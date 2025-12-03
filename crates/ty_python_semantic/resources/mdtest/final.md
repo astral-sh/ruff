@@ -501,3 +501,49 @@ class C(A):
     else:
         method4 = 56
 ```
+
+## Definitions in statically known branches
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing_extensions import final
+
+class Parent:
+    if sys.version_info >= (3, 10):
+        @final
+        def foo(self) -> None: ...
+        @final
+        def foooo(self) -> None: ...
+        @final
+        def baaaaar(self) -> None: ...
+    else:
+        @final
+        def bar(self) -> None: ...
+        @final
+        def baz(self) -> None: ...
+        @final
+        def spam(self) -> None: ...
+
+class Child(Parent):
+    def foo(self) -> None: ...  # error: [override-of-final-method]
+
+    # The declaration on `Parent` is not reachable,
+    # so this is fine
+    def bar(self) -> None: ...
+
+    if sys.version_info >= (3, 10):
+        def foooo(self) -> None: ...  # error: [override-of-final-method]
+        def baz(self) -> None: ...
+    else:
+        # Fine because this doesn't override any reachable definitions
+        def foooo(self) -> None: ...
+        # There are `@final` definitions being overridden here,
+        # but the definitions that override them are unreachable
+        def spam(self) -> None: ...
+        def baaaaar(self) -> None: ...
+```

@@ -187,8 +187,6 @@ fn check_class_declaration<'db>(
                     .unwrap_or_default();
         }
 
-        subclass_overrides_superclass_declaration = true;
-
         let Place::Defined(superclass_type, _, _) = Type::instance(db, superclass)
             .member(db, &member.name)
             .place
@@ -196,6 +194,8 @@ fn check_class_declaration<'db>(
             // If not defined on any superclass, no point in continuing to walk up the MRO
             break;
         };
+
+        subclass_overrides_superclass_declaration = true;
 
         if configuration.check_final_method_overridden() {
             overridden_final_method = overridden_final_method.or_else(|| {

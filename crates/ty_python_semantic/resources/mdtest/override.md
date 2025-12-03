@@ -283,6 +283,51 @@ class Child(Parent):
         def method8(self) -> None: ...
 ```
 
+## Definitions in statically known branches
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing_extensions import override
+
+class Parent:
+    if sys.version_info >= (3, 10):
+        def foo(self) -> None: ...
+        def foooo(self) -> None: ...
+    else:
+        def bar(self) -> None: ...
+        def baz(self) -> None: ...
+        def spam(self) -> None: ...
+
+class Child(Parent):
+    @override
+    def foo(self) -> None: ...
+
+    # The declaration on `Parent` is not reachable,
+    # so this is an error
+    @override
+    def bar(self) -> None: ...  # error: [invalid-explicit-override]
+
+    if sys.version_info >= (3, 10):
+        @override
+        def foooo(self) -> None: ...
+        @override
+        def baz(self) -> None: ...  # error: [invalid-explicit-override]
+    else:
+        # This doesn't override any reachable definitions,
+        # but the subclass definition also isn't a reachable definition
+        # from the end of the scope with the given configuration,
+        # so it's not flagged
+        @override
+        def foooo(self) -> None: ...
+        @override
+        def spam(self) -> None: ...
+```
+
 ## Overloads
 
 The typing spec states that for an overloaded method, `@override` should only be applied to the
