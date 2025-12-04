@@ -1,0 +1,44 @@
+/* Basic reset for the editor container */
+.ty-embed-container {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  box-sizing: border-box;
+}
+
+.ty-embed-container *,
+.ty-embed-container *::before,
+.ty-embed-container *::after {
+  box-sizing: inherit;
+}
+
+/* Loading state */
+.ty-embed-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px;
+  color: #666;
+}
+
+/* Error message */
+.ty-embed-error {
+  padding: 12px;
+  background-color: #ff4444;
+  color: #fff;
+  border-radius: 4px;
+  margin: 10px;
+}
+
+/* Diagnostics panel */
+.ty-embed-diagnostics {
+  font-family: "Monaco", "Menlo", "Ubuntu Mono", "Consolas", "source-code-pro",
+    monospace;
+}
+
+.ty-embed-diagnostic-item {
+  transition: background-color 0.15s ease;
+}
+
+.ty-embed-diagnostic-item:hover {
+  filter: brightness(0.95);
+}
