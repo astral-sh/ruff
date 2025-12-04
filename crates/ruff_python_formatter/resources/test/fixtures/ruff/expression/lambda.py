@@ -474,3 +474,165 @@ lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxx
 lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
 
 mapper = lambda x: dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]
+
+lambda x, y, z: (
+    x + y + z
+)
+
+lambda x, y, z: (
+    x + y + z
+    # trailing body
+)
+
+lambda x, y, z: (
+    x + y + z  # trailing eol body
+)
+
+lambda x, y, z: (
+    x + y + z
+) # trailing lambda
+
+lambda x, y, z: (
+    # leading body
+    x + y + z
+)
+
+lambda x, y, z: (  # leading eol body
+    x + y + z
+)
+
+(
+    lambda name:
+    source_bucket  # trailing eol comment
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
+(
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:  # dangling eol header comment
+    db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:
+    # dangling header comment before call
+    db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+(
+    lambda left, right:
+    # comment
+    ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+)
+
+(
+    lambda left, right:
+    ibis.timestamp("2017-04-01")  # comment
+    .cast(dt.date)
+    .between(left, right)
+)
+
+(
+    lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy:
+    # comment
+    [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+)
+
+(
+    lambda x, y:
+    # comment
+    {
+        "key": x,
+        "another": y,
+    }
+)
+
+(
+    lambda x, y:
+    # comment
+    (
+        x,
+        y,
+        z
+    )
+)
+
+(
+    lambda x:
+    # comment
+    dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:
+    db_evmtx.count_transactions_in_range[
+        # comment
+        _chain_id, from_ts, to_ts
+    ]
+)
+
+(
+    lambda
+    # comment
+    *args, **kwargs:
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # 1
+    # 2
+    left,  # 3
+    # 4
+    right:  # 5
+    # 6
+    ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+)
+
+(
+    lambda x:  # outer comment 1
+    (
+        lambda y:  # inner comment 1
+        # inner comment 2
+        lambda z: (
+            # innermost comment
+            x + y + z
+        )
+    )
+)
+
+foo(
+    lambda from_ts,  # comment prevents collapsing the parameters to one line
+    to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+foo(
+    lambda from_ts,  # but still wrap the body if it gets too long
+    to_ts,
+    _chain_id=chain_id: db_evmtx.count_transactions_in_rangeeeeeeeeeeeeeeeeeeeeeeeeeeeee(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).between(left, right).between(left, right)  # trailing comment
