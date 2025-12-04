@@ -1133,6 +1133,10 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
+        // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
+        // then relying on the call binding machinery to Just Work™?
+
         let (class_literal, _) = self.class_literal(db);
         let class_generic_context = class_literal.generic_context(db);
 
