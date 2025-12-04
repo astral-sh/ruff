@@ -32,7 +32,9 @@ use crate::types::function::{
 use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
-use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
+use crate::types::signatures::{
+    CallableSignature, Parameter, ParameterForm, ParameterKind, Parameters,
+};
 use crate::types::tuple::{TupleLength, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, ClassLiteral, DATACLASS_FLAGS, DataclassFlags,
@@ -788,65 +790,54 @@ impl<'db> Bindings<'db> {
                                     ))
                                 };
 
-                                let function_generic_context = |function: FunctionType<'db>| {
-                                    let union = UnionType::from_elements(
-                                        db,
-                                        function
-                                            .signature(db)
-                                            .overloads
-                                            .iter()
-                                            .filter_map(|signature| signature.generic_context)
-                                            .map(wrap_generic_context),
-                                    );
-                                    if union.is_never() {
-                                        Type::none(db)
-                                    } else {
-                                        union
-                                    }
-                                };
+                                let signature_generic_context =
+                                    |signature: &CallableSignature<'db>| {
+                                        UnionType::try_from_elements(
+                                            db,
+                                            signature.overloads.iter().map(|signature| {
+                                                signature.generic_context.map(wrap_generic_context)
+                                            }),
+                                        )
+                                    };
 
-                                // TODO: Handle generic functions, and unions/intersections of
-                                // generic types
-                                overload.set_return_type(match ty {
-                                    Type::ClassLiteral(class) => class
-                                        .generic_context(db)
-                                        .map(wrap_generic_context)
-                                        .unwrap_or_else(|| Type::none(db)),
+                                let generic_context_for_simple_type = |ty: Type<'db>| match ty {
+                                    Type::ClassLiteral(class) => {
+                                        class.generic_context(db).map(wrap_generic_context)
+                                    }
 
                                     Type::FunctionLiteral(function) => {
-                                        function_generic_context(*function)
+                                        signature_generic_context(function.signature(db))
                                     }
 
-                                    Type::BoundMethod(bound_method) => {
-                                        function_generic_context(bound_method.function(db))
-                                    }
+                                    Type::BoundMethod(bound_method) => signature_generic_context(
+                                        bound_method.function(db).signature(db),
+                                    ),
 
                                     Type::Callable(callable) => {
-                                        let union = UnionType::from_elements(
-                                            db,
-                                            callable
-                                                .signatures(db)
-                                                .overloads
-                                                .iter()
-                                                .filter_map(|signature| signature.generic_context)
-                                                .map(wrap_generic_context),
-                                        );
-                                        if union.is_never() {
-                                            Type::none(db)
-                                        } else {
-                                            union
-                                        }
+                                        signature_generic_context(callable.signatures(db))
                                     }
 
                                     Type::KnownInstance(KnownInstanceType::TypeAliasType(
                                         TypeAliasType::PEP695(alias),
-                                    )) => alias
-                                        .generic_context(db)
-                                        .map(wrap_generic_context)
-                                        .unwrap_or_else(|| Type::none(db)),
+                                    )) => alias.generic_context(db).map(wrap_generic_context),
 
-                                    _ => Type::none(db),
-                                });
+                                    _ => None,
+                                };
+
+                                let generic_context = match ty {
+                                    Type::Union(union_type) => UnionType::try_from_elements(
+                                        db,
+                                        union_type
+                                            .elements(db)
+                                            .iter()
+                                            .map(|ty| generic_context_for_simple_type(*ty)),
+                                    ),
+                                    _ => generic_context_for_simple_type(*ty),
+                                };
+
+                                overload.set_return_type(
+                                    generic_context.unwrap_or_else(|| Type::none(db)),
+                                );
                             }
                         }
 

@@ -391,8 +391,7 @@ class C(Generic[T]):
 reveal_type(generic_context(C))
 
 def _(c: CallableTypeOf[C]):
-    # TODO: revealed: ty_extensions.GenericContext[T@C]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@C]
     reveal_type(generic_context(c))
 
 reveal_type(C(1))  # revealed: C[int]
@@ -410,8 +409,7 @@ class D(Generic[T]):
 reveal_type(generic_context(D))
 
 def _(d: CallableTypeOf[D]):
-    # TODO: revealed: ty_extensions.GenericContext[T@D]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@D]
     reveal_type(generic_context(d))
 
 reveal_type(D(1))  # revealed: D[int]
@@ -680,8 +678,7 @@ class C(Generic[T, U]): ...
 reveal_type(generic_context(C))
 
 def _(c: CallableTypeOf[C]):
-    # TODO: revealed: ty_extensions.GenericContext[T@C, U@C]
-    # revealed: ty_extensions.GenericContext[]
+    # revealed: ty_extensions.GenericContext[T@C, U@C]
     reveal_type(generic_context(c))
 
 reveal_type(C())  # revealed: C[Unknown, Unknown]

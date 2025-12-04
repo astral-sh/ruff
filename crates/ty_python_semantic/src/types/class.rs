@@ -1283,9 +1283,13 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
+                if let Place::Defined(Type::FunctionLiteral(mut new_function), _, _) =
                     new_function_symbol
                 {
+                    if let Some(class_generic_context) = class_generic_context {
+                        new_function =
+                            new_function.with_inherited_generic_context(db, class_generic_context);
+                    }
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
@@ -1295,7 +1299,11 @@ impl<'db> ClassType<'db> {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::empty(),
+                            Some(correct_return_type),
+                        ),
                     ))
                 }
             }
