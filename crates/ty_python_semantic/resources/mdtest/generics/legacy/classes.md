@@ -337,8 +337,7 @@ class C(Generic[T]):
 reveal_type(generic_context(C))
 
 def _(c: CallableTypeOf[C]):
-    # TODO: revealed: ty_extensions.GenericContext[T@C]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@C]
     reveal_type(generic_context(c))
 
 reveal_type(C(1))  # revealed: C[int]
@@ -470,8 +469,7 @@ class D(C[T, U]):
 reveal_type(generic_context(D))
 
 def _(d: CallableTypeOf[D]):
-    # TODO: revealed: ty_extensions.GenericContext[T@D, U@D]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@D, U@D]
     reveal_type(generic_context(d))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
@@ -569,7 +567,7 @@ reveal_type(generic_context(C))
 
 def _(c: CallableTypeOf[C]):
     # TODO: revealed: ty_extensions.GenericContext[T@C, S@__init__]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@C]
     reveal_type(generic_context(c))
 
 reveal_type(C(1, 1))  # revealed: C[int]
@@ -604,8 +602,7 @@ class C(Generic[T]):
 reveal_type(generic_context(C))
 
 def _(c: CallableTypeOf[C]):
-    # TODO: revealed: ty_extensions.GenericContext[T@C]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@C]
     reveal_type(generic_context(c))
 
 reveal_type(C("string"))  # revealed: C[str]
@@ -639,8 +636,7 @@ class D(Generic[T, U]):
 reveal_type(generic_context(D))
 
 def _(d: CallableTypeOf[D]):
-    # TODO: revealed: ty_extensions.GenericContext[T@D, U@D]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@D, U@D]
     reveal_type(generic_context(d))
 
 reveal_type(D("string"))  # revealed: D[str, str]
@@ -665,8 +661,7 @@ class A(Generic[T]):
 reveal_type(generic_context(A))
 
 def _(a: CallableTypeOf[A]):
-    # TODO: revealed: ty_extensions.GenericContext[T@A]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@A]
     reveal_type(generic_context(a))
 
 reveal_type(A(x=1))  # revealed: A[int]
@@ -700,8 +695,7 @@ class D(Generic[T, U]):
 reveal_type(generic_context(D))
 
 def _(d: CallableTypeOf[D]):
-    # TODO: revealed: ty_extensions.GenericContext[T@D, U@D]
-    # revealed: None
+    # revealed: ty_extensions.GenericContext[T@D, U@D]
     reveal_type(generic_context(d))
 
 reveal_type(D())  # revealed: D[Unknown, Unknown]
