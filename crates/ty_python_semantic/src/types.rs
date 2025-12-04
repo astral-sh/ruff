@@ -9612,6 +9612,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     #[salsa::tracked(
+        cycle_fn=lazy_bound_or_constraints_cycle_recover,
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -9636,6 +9637,7 @@ impl<'db> TypeVarInstance<'db> {
     }
 
     #[salsa::tracked(
+        cycle_fn=lazy_bound_or_constraints_cycle_recover,
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
@@ -9730,7 +9732,23 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
     None
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
+fn lazy_bound_or_constraints_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous: &Option<TypeVarBoundOrConstraints<'db>>,
+    current: Option<TypeVarBoundOrConstraints<'db>>,
+    _typevar: TypeVarInstance<'db>,
+) -> Option<TypeVarBoundOrConstraints<'db>> {
+    // Normalize the bounds/constraints to ensure cycle convergence.
+    match (previous, current) {
+        (Some(prev), Some(current)) => Some(current.cycle_normalized(db, *prev, cycle)),
+        (None, Some(current)) => Some(current.recursive_type_normalized(db, cycle)),
+        (_, None) => None,
+    }
+}
+
+#[expect(clippy::ref_option)]
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -9738,6 +9756,7 @@ fn lazy_default_cycle_recover<'db>(
     default: Option<Type<'db>>,
     _typevar: TypeVarInstance<'db>,
 ) -> Option<Type<'db>> {
+    // Normalize the default to ensure cycle convergence.
     match (previous_default, default) {
         (Some(prev), Some(default)) => Some(default.cycle_normalized(db, *prev, cycle)),
         (None, Some(default)) => Some(default.recursive_type_normalized(db, cycle)),
@@ -10100,6 +10119,64 @@ impl<'db> TypeVarBoundOrConstraints<'db> {
                         .elements(db)
                         .iter()
                         .map(|ty| ty.normalized_impl(db, visitor))
+                        .collect::<Box<_>>(),
+                ))
+            }
+        }
+    }
+
+    /// Normalize for cycle recovery by combining with the previous value and
+    /// removing divergent types introduced by the cycle.
+    ///
+    /// See [`Type::cycle_normalized`] for more details on how this works.
+    fn cycle_normalized(self, db: &'db dyn Db, previous: Self, cycle: &salsa::Cycle) -> Self {
+        match (self, previous) {
+            (
+                TypeVarBoundOrConstraints::UpperBound(bound),
+                TypeVarBoundOrConstraints::UpperBound(prev_bound),
+            ) => {
+                TypeVarBoundOrConstraints::UpperBound(bound.cycle_normalized(db, prev_bound, cycle))
+            }
+            (
+                TypeVarBoundOrConstraints::Constraints(constraints),
+                TypeVarBoundOrConstraints::Constraints(prev_constraints),
+            ) => {
+                // Normalize each constraint with its corresponding previous constraint
+                let current_elements = constraints.elements(db);
+                let prev_elements = prev_constraints.elements(db);
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    current_elements
+                        .iter()
+                        .zip(prev_elements.iter())
+                        .map(|(ty, prev_ty)| ty.cycle_normalized(db, *prev_ty, cycle))
+                        .collect::<Box<_>>(),
+                ))
+            }
+            // The choice of whether it's an upper bound or constraints is purely syntactic and
+            // thus can never change in a cycle: `parsed_module` does not participate in cycles,
+            // the AST will never change from one iteration to the next.
+            _ => unreachable!(
+                "TypeVar switched from bound to constraints (or vice versa) in fixpoint iteration"
+            ),
+        }
+    }
+
+    /// Normalize recursive types for cycle recovery when there's no previous value.
+    ///
+    /// See [`Type::recursive_type_normalized`] for more details.
+    fn recursive_type_normalized(self, db: &'db dyn Db, cycle: &salsa::Cycle) -> Self {
+        match self {
+            TypeVarBoundOrConstraints::UpperBound(bound) => {
+                TypeVarBoundOrConstraints::UpperBound(bound.recursive_type_normalized(db, cycle))
+            }
+            TypeVarBoundOrConstraints::Constraints(constraints) => {
+                TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                    db,
+                    constraints
+                        .elements(db)
+                        .iter()
+                        .map(|ty| ty.recursive_type_normalized(db, cycle))
                         .collect::<Box<_>>(),
                 ))
             }
