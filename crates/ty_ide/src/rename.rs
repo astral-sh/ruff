@@ -1223,4 +1223,207 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("z"), @"Cannot rename");
     }
+
+    #[test]
+    fn rename_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): we should refuse to rename this (it's the name of a module)
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is correct
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good/fine here, it's an undefined reference
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's a module name
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's the name of a module
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Renaming the integer is correct
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 3 locations)
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
+        // and the RHS of the import statement (but *not* rename the LHS).
+        //
+        // However us being cautious here *would* be good as the rename will actually
+        // result in a `subpkg` variable still existing in this code, as the import's LHS
+        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
 }
