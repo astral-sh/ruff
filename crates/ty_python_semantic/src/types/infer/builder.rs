@@ -62,11 +62,11 @@ use crate::types::diagnostic::{
     INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
     INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
     INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_PARAM_ORDER,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -927,22 +927,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let type_vars = class.typevars_referenced_in_definition(self.db());
-            let mut seen_default = false;
-            for type_var in type_vars {
-                let has_default = type_var
-                    .typevar(self.db())
-                    .default_type(self.db())
-                    .is_some();
-                if seen_default && !has_default {
-                    report_invalid_type_param_order(
-                        &self.context,
-                        class,
-                        type_var.typevar(self.db()).name(self.db()).as_str(),
-                    );
-                }
-                if has_default {
-                    seen_default = true;
+            if self.context.is_lint_enabled(&INVALID_TYPE_PARAM_ORDER) {
+                let type_vars = class.typevars_referenced_in_definition(self.db());
+                let mut seen_default = false;
+                for type_var in type_vars {
+                    let has_default = type_var
+                        .typevar(self.db())
+                        .default_type(self.db())
+                        .is_some();
+                    if seen_default && !has_default {
+                        report_invalid_type_param_order(
+                            &self.context,
+                            class,
+                            type_var.typevar(self.db()).name(self.db()).as_str(),
+                        );
+                    }
+                    if has_default {
+                        seen_default = true;
+                    }
                 }
             }
             let scope = class.body_scope(self.db()).scope(self.db());
