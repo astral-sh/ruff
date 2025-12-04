@@ -10,6 +10,9 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
+use crate::preview::is_range_suppressions_enabled;
+use crate::settings::LinterSettings;
+
 #[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
@@ -100,7 +103,7 @@ pub(crate) struct InvalidSuppression {
 
 #[allow(unused)]
 #[derive(Debug, Default)]
-pub(crate) struct Suppressions {
+pub struct Suppressions {
     /// Valid suppression ranges with associated comments
     valid: Vec<Suppression>,
 
@@ -113,9 +116,13 @@ pub(crate) struct Suppressions {
 
 #[allow(unused)]
 impl Suppressions {
-    pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
-        let builder = SuppressionsBuilder::new(source);
-        builder.load_from_tokens(tokens)
+    pub fn from_tokens(settings: &LinterSettings, source: &str, tokens: &Tokens) -> Suppressions {
+        if is_range_suppressions_enabled(settings) {
+            let builder = SuppressionsBuilder::new(source);
+            builder.load_from_tokens(tokens)
+        } else {
+            Suppressions::default()
+        }
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -486,9 +493,12 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::suppression::{
-        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-        SuppressionParser, Suppressions,
+    use crate::{
+        settings::LinterSettings,
+        suppression::{
+            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+            SuppressionParser, Suppressions,
+        },
     };
 
     #[test]
@@ -1405,7 +1415,11 @@ def bar():
         /// Parse all suppressions and errors in a module for testing
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
-            let suppressions = Suppressions::from_tokens(source, parsed.tokens());
+            let suppressions = Suppressions::from_tokens(
+                &LinterSettings::default().with_preview_mode(),
+                source,
+                parsed.tokens(),
+            );
             DebugSuppressions {
                 source,
                 suppressions,

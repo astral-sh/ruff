@@ -27,6 +27,7 @@ use crate::suppression::Suppressions;
 /// Each edit will add a `noqa` comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
+#[expect(clippy::too_many_arguments)]
 pub fn generate_noqa_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -35,19 +36,18 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    suppressions: &Suppressions,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    // This is called by ruff_server, which already filtered diagnostics via check_path
-    let suppressions = Suppressions::default();
     let comments = find_noqa_comments(
         diagnostics,
         locator,
         &exemption,
         &directives,
         noqa_line_for,
-        &suppressions,
+        suppressions,
     );
     build_noqa_edits_by_diagnostic(comments, locator, line_ending, None)
 }
@@ -2988,6 +2988,7 @@ print(
         let messages = [PrintfStringFormatting
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2996,6 +2997,7 @@ print(
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,
@@ -3019,6 +3021,7 @@ bar =
             [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -3027,6 +3030,7 @@ bar =
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,

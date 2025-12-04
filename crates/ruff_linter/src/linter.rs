@@ -26,7 +26,6 @@ use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::fix::{FixResult, fix_file};
 use crate::noqa::add_noqa;
 use crate::package::PackageRoot;
-use crate::preview::is_range_suppressions_enabled;
 use crate::registry::Rule;
 #[cfg(any(feature = "test-rules", test))]
 use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
@@ -130,6 +129,7 @@ pub fn check_path(
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
+    suppressions: &Suppressions,
 ) -> Vec<Diagnostic> {
     // Aggregate all diagnostics.
     let mut context = LintContext::new(path, locator.contents(), settings);
@@ -333,11 +333,6 @@ pub fn check_path(
             .iter_enabled_rules()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
-        let suppressions = if is_range_suppressions_enabled(settings) {
-            Suppressions::from_tokens(locator.contents(), tokens)
-        } else {
-            Suppressions::default()
-        };
         let ignored = check_noqa(
             &mut context,
             path,
@@ -346,7 +341,7 @@ pub fn check_path(
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
             settings,
-            &suppressions,
+            suppressions,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
@@ -408,6 +403,9 @@ pub fn add_noqa_to_path(
         &indexer,
     );
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
         path,
@@ -422,13 +420,8 @@ pub fn add_noqa_to_path(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
-
-    let suppressions = if is_range_suppressions_enabled(settings) {
-        Suppressions::from_tokens(locator.contents(), parsed.tokens())
-    } else {
-        Suppressions::default()
-    };
 
     // Add any missing `# noqa` pragmas.
     // TODO(dhruvmanila): Add support for Jupyter Notebooks
@@ -476,6 +469,9 @@ pub fn lint_only(
         &indexer,
     );
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
     // Generate diagnostics.
     let diagnostics = check_path(
         path,
@@ -490,6 +486,7 @@ pub fn lint_only(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     LinterResult {
@@ -581,6 +578,9 @@ pub fn lint_fix<'a>(
             &indexer,
         );
 
+        // Parse range suppression comments
+        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
         // Generate diagnostics.
         let diagnostics = check_path(
             path,
@@ -595,6 +595,7 @@ pub fn lint_fix<'a>(
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
 
         if iterations == 0 {
@@ -784,6 +785,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{TestedNotebook, assert_notebook_path, test_contents, test_snippet};
     use crate::{Locator, assert_diagnostics, directives, settings};
 
@@ -959,6 +961,7 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
         let mut diagnostics = check_path(
             path,
             None,
@@ -972,6 +975,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         diagnostics.sort_by(Diagnostic::ruff_start_ordering);
         diagnostics
