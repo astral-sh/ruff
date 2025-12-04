@@ -136,6 +136,8 @@ class Foo[**P]:
 The type of `args` and `kwargs` inside the function is `P.args` and `P.kwargs` respectively instead
 of `tuple[P.args, ...]` and `dict[str, P.kwargs]`.
 
+### Passing `*args` and `**kwargs` to a callable
+
 ```py
 from typing import Callable
 
@@ -153,11 +155,31 @@ def f[**P](func: Callable[P, int]) -> Callable[P, None]:
         reveal_type(func(args, kwargs))  # revealed: int
 
         # Both parameters are required
-        # TODO: error and reveal `Unknown`
+        # TODO: error
         reveal_type(func())  # revealed: int
         reveal_type(func(*args))  # revealed: int
         reveal_type(func(**kwargs))  # revealed: int
     return wrapper
+```
+
+### Operations on `P.args` and `P.kwargs`
+
+The type of `P.args` and `P.kwargs` behave like a `tuple` and `dict` respectively. Internally, they
+are represented as a type variable that has an upper bound of `tuple[object, ...]` and
+`Top[dict[str, Any]]` respectively.
+
+```py
+from typing import Callable, Any
+
+def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
+    reveal_type(args + ("extra",))  # revealed: tuple[object, ...]
+    reveal_type(args + (1, 2, 3))  # revealed: tuple[object, ...]
+    reveal_type(args[0])  # revealed: object
+
+    reveal_type("key" in kwargs)  # revealed: bool
+    # TODO: Should be `object | None`
+    reveal_type(kwargs.get("key"))  # revealed: object
+    reveal_type(kwargs["key"])  # revealed: object
 ```
 
 ## Specializing generic classes explicitly
