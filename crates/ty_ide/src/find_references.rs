@@ -2008,7 +2008,7 @@ func<CURSOR>_alias()
             )
             .build();
 
-        /// No references is actually correct (or it should only see itself)
+        // No references is actually correct (or it should only see itself)
         assert_snapshot!(test.references(), @"No references found");
     }
 
