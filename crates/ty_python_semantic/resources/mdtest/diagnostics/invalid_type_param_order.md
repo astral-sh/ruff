@@ -14,11 +14,9 @@ T1 = TypeVar("T1", default=int)
 T2 = TypeVar("T2")
 T3 = TypeVar("T3")
 
-# error [invalid-type-param-order]
-class Foo(Generic[T1, T2]):
+class Foo(Generic[T1, T2]):  # error: [invalid-type-param-order]
     pass
 
-# error [invalid-type-param-order]
-class Bar(Generic[T2, T1, T3]):
+class Bar(Generic[T2, T1, T3]):  # error: [invalid-type-param-order]
     pass
 ```
