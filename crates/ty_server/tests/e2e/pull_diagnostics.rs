@@ -31,7 +31,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
 
     assert_debug_snapshot!(diagnostics);
@@ -57,7 +57,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // First request with no previous result ID
     let first_response = server.document_diagnostic_request(foo, None);
@@ -113,7 +113,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content_v1, 1);
+    server.open_text_document(foo, foo_content_v1, 1);
 
     // First request with no previous result ID
     let first_response = server.document_diagnostic_request(foo, None);
@@ -233,7 +233,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(file_a, &file_a_content, 1);
+    server.open_text_document(file_a, file_a_content, 1);
 
     // First request with no previous result IDs
     let mut first_response = server
@@ -250,10 +250,10 @@ def foo() -> str:
 
     // Make changes to files B, C, D, and E (leave A unchanged)
     // Need to open files before changing them
-    server.open_text_document(file_b, &file_b_content_v1, 1);
-    server.open_text_document(file_c, &file_c_content_v1, 1);
-    server.open_text_document(file_d, &file_d_content_v1, 1);
-    server.open_text_document(file_e, &file_e_content_v1, 1);
+    server.open_text_document(file_b, file_b_content_v1, 1);
+    server.open_text_document(file_c, file_c_content_v1, 1);
+    server.open_text_document(file_d, file_d_content_v1, 1);
+    server.open_text_document(file_e, file_e_content_v1, 1);
 
     // File B: Add a new error
     server.change_text_document(
@@ -536,9 +536,9 @@ fn workspace_diagnostic_streaming_with_caching() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(SystemPath::new("src/error_0.py"), &error_content, 1);
-    server.open_text_document(SystemPath::new("src/error_1.py"), &error_content, 1);
-    server.open_text_document(SystemPath::new("src/error_2.py"), &error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_0.py"), error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_1.py"), error_content, 1);
+    server.open_text_document(SystemPath::new("src/error_2.py"), error_content, 1);
 
     // First request to get result IDs (non-streaming for simplicity)
     let first_response = server.workspace_diagnostic_request(None, None);
@@ -716,7 +716,7 @@ def hello() -> str:
         create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
 
     // Open the file first
-    server.open_text_document(file_path, &file_content_no_error, 1);
+    server.open_text_document(file_path, file_content_no_error, 1);
 
     // Make a workspace diagnostic request to a project with one file but no diagnostics
     // This should trigger long-polling since the project has no diagnostics
@@ -819,7 +819,7 @@ def hello() -> str:
         create_workspace_server_with_file(workspace_root, file_path, file_content_no_error)?;
 
     // Open the file first
-    server.open_text_document(file_path, &file_content_no_error, 1);
+    server.open_text_document(file_path, file_content_no_error, 1);
 
     // PHASE 1: Initial suspend (no diagnostics)
     let request_id_1 = send_workspace_diagnostic_request(&mut server);

@@ -2,6 +2,7 @@ use std::cmp::Ordering;
 
 use bitflags::bitflags;
 
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{AtomicNodeIndex, Mod, ModExpression, ModModule};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -12,7 +13,7 @@ use crate::string::InterpolatedStringKind;
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::token_source::{TokenSource, TokenSourceCheckpoint};
-use crate::{Mode, ParseError, ParseErrorType, TokenKind, UnsupportedSyntaxErrorKind};
+use crate::{Mode, ParseError, ParseErrorType, UnsupportedSyntaxErrorKind};
 use crate::{Parsed, Tokens};
 
 pub use crate::parser::options::ParseOptions;

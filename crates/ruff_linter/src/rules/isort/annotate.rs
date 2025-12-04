@@ -1,5 +1,5 @@
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Stmt};
-use ruff_python_parser::Tokens;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 

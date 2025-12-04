@@ -583,3 +583,17 @@ class GoodChild2(Parent):
     @staticmethod
     def static_method(x: object) -> bool: ...
 ```
+
+## Definitely bound members with no reachable definitions(!)
+
+We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
+have bigger problems:
+
+```py
+from __future__ import annotations
+
+class MaybeEqWhile:
+    while ...:
+        def __eq__(self, other: MaybeEqWhile) -> bool:
+            return True
+```

@@ -110,6 +110,10 @@ mod tests {
         }
 
         fn rename(&self, new_name: &str) -> String {
+            let Some(_) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
+                return "Cannot rename".to_string();
+            };
+
             let Some(rename_results) =
                 rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
             else {
@@ -1182,6 +1186,7 @@ result = func(10, y=20)
         ");
     }
 
+    // TODO Should rename the alias
     #[test]
     fn import_alias() {
         let test = CursorTest::builder()
@@ -1197,21 +1202,10 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
-        info[rename]: Rename symbol (found 2 locations)
-         --> main.py:3:20
-          |
-        2 | import warnings
-        3 | import warnings as abc
-          |                    ^^^
-        4 |
-        5 | x = abc
-          |     ---
-        6 | y = warnings
-          |
-        ");
+        assert_snapshot!(test.rename("z"), @"Cannot rename");
     }
 
+    // TODO Should rename the alias
     #[test]
     fn import_alias_use() {
         let test = CursorTest::builder()
@@ -1227,18 +1221,6 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @r"
-        info[rename]: Rename symbol (found 2 locations)
-         --> main.py:3:20
-          |
-        2 | import warnings
-        3 | import warnings as abc
-          |                    ^^^
-        4 |
-        5 | x = abc
-          |     ---
-        6 | y = warnings
-          |
-        ");
+        assert_snapshot!(test.rename("z"), @"Cannot rename");
     }
 }

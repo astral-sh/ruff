@@ -145,14 +145,14 @@ mod tests {
 
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
-           --> stdlib/typing.pyi:770:1
+           --> stdlib/typing.pyi:781:1
             |
-        768 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
-        769 |
-        770 | Generic: type[_Generic]
+        779 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+        780 |
+        781 | Generic: type[_Generic]
             | ^^^^^^^
-        771 |
-        772 | class _ProtocolMeta(ABCMeta):
+        782 |
+        783 | class _ProtocolMeta(ABCMeta):
             |
         info: Source
          --> main.py:4:1
@@ -962,6 +962,60 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_type_definition(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_type_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | x: "foobar"
+          |     ^^^^^^
+          |
+        "#);
     }
 
     #[test]

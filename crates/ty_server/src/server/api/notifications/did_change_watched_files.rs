@@ -1,6 +1,8 @@
 use crate::document::DocumentKey;
 use crate::server::Result;
-use crate::server::api::diagnostics::{publish_diagnostics, publish_settings_diagnostics};
+use crate::server::api::diagnostics::{
+    publish_diagnostics_if_needed, publish_settings_diagnostics,
+};
 use crate::server::api::traits::{NotificationHandler, SyncNotificationHandler};
 use crate::session::Session;
 use crate::session::client::Client;
@@ -92,7 +94,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             );
         } else {
             for key in session.text_document_handles() {
-                publish_diagnostics(&key, session, client);
+                publish_diagnostics_if_needed(&key, session, client);
             }
         }
 

@@ -24,10 +24,10 @@ use ruff_db::source::source_text;
 use ruff_diagnostics::Edit;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
@@ -76,7 +76,7 @@ impl<'a> Importer<'a> {
         source: &'a str,
         parsed: &'a ParsedModuleRef,
     ) -> Self {
-        let imports = TopLevelImports::find(parsed);
+        let imports = TopLevelImports::find(parsed.syntax());
 
         Self {
             db,
@@ -327,9 +327,7 @@ impl<'ast> MembersInScope<'ast> {
             .members_in_scope_at(node)
             .into_iter()
             .map(|(name, memberdef)| {
-                let Some(def) = memberdef.definition else {
-                    return (name, MemberInScope::other(memberdef.ty));
-                };
+                let def = memberdef.first_reachable_definition;
                 let kind = match *def.kind(db) {
                     DefinitionKind::Import(ref kind) => {
                         MemberImportKind::Imported(AstImportKind::Import(kind.import(parsed)))
@@ -749,9 +747,9 @@ struct TopLevelImports<'ast> {
 
 impl<'ast> TopLevelImports<'ast> {
     /// Find all top-level imports from the given AST of a Python module.
-    fn find(parsed: &'ast Parsed<ast::ModModule>) -> Vec<AstImport<'ast>> {
+    fn find(module: &'ast ast::ModModule) -> Vec<AstImport<'ast>> {
         let mut visitor = TopLevelImports::default();
-        visitor.visit_body(parsed.suite());
+        visitor.visit_body(&module.body);
         visitor.imports
     }
 }
@@ -1891,13 +1889,13 @@ else:
         "#);
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r#"
-        import foo
+        from foo import MAGIC
         if os.getenv("WHATEVER"):
             from foo import MAGIC
         else:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         "#);
     }
 
@@ -2108,13 +2106,13 @@ except ImportError:
         ");
         assert_snapshot!(
             test.import_from("foo", "MAGIC"), @r"
-        import foo
+        from foo import MAGIC
         try:
             from foo import MAGIC
         except ImportError:
             from bar import MAGIC
 
-        (foo.MAGIC)
+        (MAGIC)
         ");
     }
 

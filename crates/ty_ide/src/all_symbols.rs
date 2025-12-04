@@ -20,7 +20,7 @@ pub fn all_symbols<'db>(
 
     let typing_extensions = ModuleName::new("typing_extensions").unwrap();
     let is_typing_extensions_available = importing_from.is_stub(db)
-        || resolve_real_shadowable_module(db, &typing_extensions).is_some();
+        || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
 
     let results = std::sync::Mutex::new(Vec::new());
     {

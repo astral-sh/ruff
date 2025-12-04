@@ -14,6 +14,7 @@ use unicode_normalization::UnicodeNormalization;
 
 use ruff_python_ast::name::Name;
 use ruff_python_ast::str_prefix::{AnyStringPrefix, StringLiteralPrefix};
+use ruff_python_ast::token::{TokenFlags, TokenKind};
 use ruff_python_ast::{Int, IpyEscapeKind, StringFlags};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -26,7 +27,7 @@ use crate::lexer::interpolated_string::{
     InterpolatedStringContext, InterpolatedStrings, InterpolatedStringsCheckpoint,
 };
 use crate::string::InterpolatedStringKind;
-use crate::token::{TokenFlags, TokenKind, TokenValue};
+use crate::token::TokenValue;
 
 mod cursor;
 mod indentation;

@@ -82,7 +82,7 @@ impl<'db> SemanticModel<'db> {
                     memberdef.member.name,
                     MemberDefinition {
                         ty: memberdef.member.ty,
-                        definition: memberdef.definition,
+                        first_reachable_definition: memberdef.first_reachable_definition,
                     },
                 );
             }
@@ -100,14 +100,14 @@ impl<'db> SemanticModel<'db> {
     pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
         let module_name =
             ModuleName::from_identifier_parts(self.db, self.file, module, level).ok()?;
-        resolve_module(self.db, &module_name)
+        resolve_module(self.db, self.file, &module_name)
     }
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
         let typing_extensions = ModuleName::new("typing_extensions").unwrap();
         let is_typing_extensions_available = self.file.is_stub(self.db)
-            || resolve_real_shadowable_module(self.db, &typing_extensions).is_some();
+            || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
             .into_iter()
             .filter(|module| {
@@ -146,7 +146,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         module_name: &ModuleName,
     ) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -156,7 +156,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -328,11 +328,11 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
-/// The type and definition (if available) of a symbol.
+/// The type and definition of a symbol.
 #[derive(Clone, Debug)]
 pub struct MemberDefinition<'db> {
     pub ty: Type<'db>,
-    pub definition: Option<Definition<'db>>,
+    pub first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.

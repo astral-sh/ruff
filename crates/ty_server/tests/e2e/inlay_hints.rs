@@ -28,7 +28,7 @@ y = foo(1)
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server
@@ -132,7 +132,7 @@ fn variable_inlay_hints_disabled() -> Result<()> {
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>();
 
     let hints = server

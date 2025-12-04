@@ -899,6 +899,42 @@ cls = MyClass
     }
 
     #[test]
+    fn references_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
     fn references_match_name_stmt() {
         let test = cursor_test(
             r#"
