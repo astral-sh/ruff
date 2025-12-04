@@ -1008,7 +1008,6 @@ declare_lint! {
     ///
     /// ## References
     /// - [PEP 696: Type defaults for type parameters](https://peps.python.org/pep-0696/)
-
     pub(crate) static INVALID_TYPE_PARAM_ORDER = {
         summary: "detects invalid type parameter order",
         status: LintStatus::stable("0.0.1-alpha.1"),
