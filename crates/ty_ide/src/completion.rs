@@ -537,12 +537,11 @@ fn add_unimported_completions<'db>(
     let members = importer.members_in_scope_at(scoped.node, scoped.node.start());
 
     for symbol in all_symbols(db, file, &completions.query) {
-        if symbol.module.file(db) == Some(file) || symbol.module.is_known(db, KnownModule::Builtins)
-        {
+        if symbol.file() == file || symbol.module().is_known(db, KnownModule::Builtins) {
             continue;
         }
 
-        let request = create_import_request(symbol.module.name(db), &symbol.symbol.name);
+        let request = create_import_request(symbol.module().name(db), symbol.name());
         // FIXME: `all_symbols` doesn't account for wildcard imports.
         // Since we're looking at every module, this is probably
         // "fine," but it might mean that we import a symbol from the
@@ -551,11 +550,11 @@ fn add_unimported_completions<'db>(
         // N.B. We use `add` here because `all_symbols` already
         // takes our query into account.
         completions.force_add(Completion {
-            name: ast::name::Name::new(&symbol.symbol.name),
+            name: ast::name::Name::new(symbol.name()),
             insert: Some(import_action.symbol_text().into()),
             ty: None,
-            kind: symbol.symbol.kind.to_completion_kind(),
-            module_name: Some(symbol.module.name(db)),
+            kind: symbol.kind().to_completion_kind(),
+            module_name: Some(symbol.module().name(db)),
             import: import_action.import().cloned(),
             builtin: false,
             // TODO: `is_type_check_only` requires inferring the type of the symbol
