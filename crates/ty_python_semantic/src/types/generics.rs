@@ -1655,52 +1655,48 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 };
 
-                let mut when = ConstraintSet::from(false);
                 for formal_signature in &formal_callable.signatures(self.db).overloads {
                     for actual_callable in actual_callables.as_slice() {
                         for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            when.union(
+                            let when = formal_signature.when_constraint_set_assignable_to(
                                 self.db,
-                                formal_signature.when_constraint_set_assignable_to(
-                                    self.db,
-                                    actual_signature,
-                                    self.inferable,
-                                ),
+                                actual_signature,
+                                self.inferable,
                             );
+
+                            when.for_each_path(self.db, |path| {
+                                for constraint in path.positive_constraints() {
+                                    let typevar = constraint.typevar(self.db);
+                                    let lower = constraint.lower(self.db);
+                                    let upper = constraint.upper(self.db);
+                                    let upper_has_noninferable_typevar = any_over_type(
+                                        self.db,
+                                        upper,
+                                        &|ty| {
+                                            ty.as_typevar().is_some_and(|bound_typevar| {
+                                                !bound_typevar.is_inferable(self.db, self.inferable)
+                                            })
+                                        },
+                                        false,
+                                    );
+                                    if !upper.is_object() && !upper_has_noninferable_typevar {
+                                        self.add_type_mapping(typevar, upper, polarity, &mut f);
+                                    }
+                                    if typevar.is_inferable(self.db, self.inferable)
+                                        && let Type::TypeVar(lower_bound_typevar) = lower
+                                    {
+                                        self.add_type_mapping(
+                                            lower_bound_typevar,
+                                            Type::TypeVar(typevar),
+                                            polarity,
+                                            &mut f,
+                                        );
+                                    }
+                                }
+                            });
                         }
                     }
                 }
-
-                when.for_each_path(self.db, |path| {
-                    for constraint in path.positive_constraints() {
-                        let typevar = constraint.typevar(self.db);
-                        let lower = constraint.lower(self.db);
-                        let upper = constraint.upper(self.db);
-                        let upper_has_noninferable_typevar = any_over_type(
-                            self.db,
-                            upper,
-                            &|ty| {
-                                ty.as_typevar().is_some_and(|bound_typevar| {
-                                    !bound_typevar.is_inferable(self.db, self.inferable)
-                                })
-                            },
-                            false,
-                        );
-                        if !upper.is_object() && !upper_has_noninferable_typevar {
-                            self.add_type_mapping(typevar, upper, polarity, &mut f);
-                        }
-                        if typevar.is_inferable(self.db, self.inferable)
-                            && let Type::TypeVar(lower_bound_typevar) = lower
-                        {
-                            self.add_type_mapping(
-                                lower_bound_typevar,
-                                Type::TypeVar(typevar),
-                                polarity,
-                                &mut f,
-                            );
-                        }
-                    }
-                });
             }
 
             // TODO: Add more forms that we can structurally induct into: type[C], callables
