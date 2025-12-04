@@ -1,0 +1,56 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_type_param_order.md - Invalid Type Param Order
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_type_param_order.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Generic
+ 2 | 
+ 3 | T1 = TypeVar("T1", default=int)
+ 4 | T2 = TypeVar("T2")
+ 5 | T3 = TypeVar("T3")
+ 6 | 
+ 7 | # error [invalid-type-param-order]
+ 8 | class Foo(Generic[T1, T2]):
+ 9 |     pass
+10 | 
+11 | # error [invalid-type-param-order]
+12 | class Bar(Generic[T2, T1, T3]):
+13 |     pass
+```
+
+# Diagnostics
+
+```
+error[invalid-type-param-order]: Type parameter T2 without a default follows type parameter with a default
+ --> src/mdtest_snippet.py:8:7
+  |
+7 | # error [invalid-type-param-order]
+8 | class Foo(Generic[T1, T2]):
+  |       ^^^^^^^^^^^^^^^^^^^^
+9 |     pass
+  |
+info: rule `invalid-type-param-order` is enabled by default
+
+```
+
+```
+error[invalid-type-param-order]: Type parameter T3 without a default follows type parameter with a default
+  --> src/mdtest_snippet.py:12:7
+   |
+11 | # error [invalid-type-param-order]
+12 | class Bar(Generic[T2, T1, T3]):
+   |       ^^^^^^^^^^^^^^^^^^^^^^^^
+13 |     pass
+   |
+info: rule `invalid-type-param-order` is enabled by default
+
+```
