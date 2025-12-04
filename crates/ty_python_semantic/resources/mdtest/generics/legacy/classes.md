@@ -301,7 +301,7 @@ consistent with each other.
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 
@@ -311,10 +311,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -326,7 +324,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 
@@ -335,10 +333,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -350,7 +346,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 
@@ -362,10 +358,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -377,7 +371,7 @@ wrong_innards: C[int] = C("five")
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 
@@ -389,10 +383,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1))  # revealed: C[int]
 
@@ -407,10 +399,8 @@ class D(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[T@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[T@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 
@@ -425,7 +415,7 @@ to specialize the class.
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -440,10 +430,8 @@ class D(C[V, int]):
 
 # revealed: ty_extensions.GenericContext[V@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[V@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[V@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(1))  # revealed: D[int]
 ```
@@ -452,7 +440,7 @@ reveal_type(D(1))  # revealed: D[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -465,10 +453,8 @@ class D(C[T, U]):
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[T@D, U@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(C(1, "str"))  # revealed: C[int, str]
 reveal_type(D(1, "str"))  # revealed: D[int, str]
@@ -480,7 +466,7 @@ This is a specific example of the above, since it was reported specifically by a
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -490,10 +476,8 @@ class D(dict[T, U]):
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[T@D, U@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D(key=1))  # revealed: D[str, int]
 ```
@@ -506,7 +490,7 @@ context. But from the user's point of view, this is another example of the above
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -515,10 +499,8 @@ class C(tuple[T, U]): ...
 
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C, U@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C, U@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C((1, 2)))  # revealed: C[int, int]
 ```
@@ -551,7 +533,7 @@ def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: t
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 S = TypeVar("S")
 T = TypeVar("T")
@@ -561,10 +543,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C, S@__init__]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C, S@__init__]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C(1, 1))  # revealed: C[int]
 reveal_type(C(1, "string"))  # revealed: C[int]
@@ -578,7 +558,7 @@ wrong_innards: C[int] = C("five", 1)
 
 ```py
 from typing_extensions import overload, Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U")
@@ -596,10 +576,8 @@ class C(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C("string"))  # revealed: C[str]
 reveal_type(C(b"bytes"))  # revealed: C[bytes]
@@ -630,10 +608,8 @@ class D(Generic[T, U]):
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[T@D, U@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, str]
 reveal_type(D(1))  # revealed: D[str, int]
@@ -645,7 +621,7 @@ reveal_type(D(1, "string"))  # revealed: D[int, str]
 ```py
 from dataclasses import dataclass
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 
@@ -655,10 +631,8 @@ class A(Generic[T]):
 
 # revealed: ty_extensions.GenericContext[T@A]
 reveal_type(generic_context(A))
-
-def _(a: CallableTypeOf[A]):
-    # revealed: ty_extensions.GenericContext[T@A]
-    reveal_type(generic_context(a))
+# revealed: ty_extensions.GenericContext[T@A]
+reveal_type(generic_context(into_callable(A)))
 
 reveal_type(A(x=1))  # revealed: A[int]
 ```
@@ -667,7 +641,7 @@ reveal_type(A(x=1))  # revealed: A[int]
 
 ```py
 from typing_extensions import Generic, TypeVar
-from ty_extensions import CallableTypeOf, generic_context
+from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
 U = TypeVar("U", default=T)
@@ -676,10 +650,8 @@ class C(Generic[T, U]): ...
 
 # revealed: ty_extensions.GenericContext[T@C, U@C]
 reveal_type(generic_context(C))
-
-def _(c: CallableTypeOf[C]):
-    # revealed: ty_extensions.GenericContext[T@C, U@C]
-    reveal_type(generic_context(c))
+# revealed: ty_extensions.GenericContext[T@C, U@C]
+reveal_type(generic_context(into_callable(C)))
 
 reveal_type(C())  # revealed: C[Unknown, Unknown]
 
@@ -688,10 +660,8 @@ class D(Generic[T, U]):
 
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(D))
-
-def _(d: CallableTypeOf[D]):
-    # revealed: ty_extensions.GenericContext[T@D, U@D]
-    reveal_type(generic_context(d))
+# revealed: ty_extensions.GenericContext[T@D, U@D]
+reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D())  # revealed: D[Unknown, Unknown]
 ```

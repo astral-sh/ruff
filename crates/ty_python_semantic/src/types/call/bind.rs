@@ -841,6 +841,16 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        Some(KnownFunction::IntoCallable) => {
+                            let [Some(ty)] = overload.parameter_types() else {
+                                continue;
+                            };
+                            let Some(callables) = ty.try_upcast_to_callable(db) else {
+                                continue;
+                            };
+                            overload.set_return_type(callables.into_type(db));
+                        }
+
                         Some(KnownFunction::DunderAllNames) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 overload.set_return_type(match ty {
