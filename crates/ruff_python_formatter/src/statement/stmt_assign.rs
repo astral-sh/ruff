@@ -19,6 +19,7 @@ use crate::expression::{
     maybe_parenthesize_expression,
 };
 use crate::other::interpolated_string::InterpolatedStringLayout;
+use crate::preview::is_parenthesize_lambda_bodies_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -306,7 +307,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                 {
                     return if let Expr::Lambda(lambda) = value {
                         let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
-                        if can_omit_optional_parentheses(value, f.context()) {
+                        // See the lambda comment in `can_omit_optional_parentheses` for more
+                        // details. The preview behavior resolves this, but we still need this
+                        // branch for now on stable.
+                        if !is_parenthesize_lambda_bodies_enabled(f.context())
+                            && can_omit_optional_parentheses(value, f.context())
+                        {
                             optional_parentheses(&lambda).fmt(f)
                         } else {
                             parenthesize_if_expands(&lambda).fmt(f)
@@ -588,7 +594,12 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     let formatted_value = format_with(|f| {
                         if let Expr::Lambda(lambda) = value {
                             let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
-                            if can_omit_optional_parentheses(value, f.context()) {
+                            // See the lambda comment in `can_omit_optional_parentheses` for more
+                            // details. The preview behavior resolves this, but we still need this
+                            // branch for now on stable.
+                            if !is_parenthesize_lambda_bodies_enabled(f.context())
+                                && can_omit_optional_parentheses(value, f.context())
+                            {
                                 optional_parentheses(&lambda).fmt(f)
                             } else {
                                 parenthesize_if_expands(&lambda).fmt(f)
