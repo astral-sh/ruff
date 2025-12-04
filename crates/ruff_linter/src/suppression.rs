@@ -169,7 +169,7 @@ impl Suppressions {
                 if !suppression.used {
                     for comment in &suppression.comments {
                         let edit = if comment.codes.len() == 1 {
-                            delete_comment(suppression.range, locator)
+                            delete_comment(comment.range, locator)
                         } else {
                             let code_index = comment
                                 .codes
