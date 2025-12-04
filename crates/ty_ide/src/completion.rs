@@ -4350,7 +4350,7 @@ from os.<CURSOR>
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @r"
-        Kadabra :: Literal[1] :: Current module
+        Kadabra :: Literal[1] :: <no import required>
         AbraKadabra :: Unavailable :: package
         ");
     }
@@ -5534,7 +5534,7 @@ def foo(param: s<CURSOR>)
         // Even though long_namea is alphabetically before long_nameb,
         // long_nameb is currently imported and should be preferred.
         assert_snapshot!(snapshot, @r"
-        long_nameb :: Literal[1] :: Current module
+        long_nameb :: Literal[1] :: <no import required>
         long_namea :: Unavailable :: foo
         ");
     }
@@ -5804,7 +5804,7 @@ from .imp<CURSOR>
     #[test]
     fn typing_extensions_excluded_from_import() {
         let builder = completion_test_builder("from typing<CURSOR>").module_names();
-        assert_snapshot!(builder.build().snapshot(), @"typing :: Current module");
+        assert_snapshot!(builder.build().snapshot(), @"typing :: <no import required>");
     }
 
     #[test]
@@ -5823,8 +5823,8 @@ from .imp<CURSOR>
             .completion_test_builder()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
-        typing :: Current module
-        typing_extensions :: Current module
+        typing :: <no import required>
+        typing_extensions :: <no import required>
         ");
     }
 
@@ -5849,8 +5849,8 @@ from .imp<CURSOR>
             .completion_test_builder()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
-        typing :: Current module
-        typing_extensions :: Current module
+        typing :: <no import required>
+        typing_extensions :: <no import required>
         ");
     }
 
@@ -5883,7 +5883,7 @@ foo.ZQ<CURSOR>
             .module_names()
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+        assert_snapshot!(snapshot, @"ZQZQ :: <no import required>");
     }
 
     #[test]
@@ -5925,7 +5925,7 @@ foo.ZQ<CURSOR>
             .module_names()
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @"ZQZQ :: Current module");
+        assert_snapshot!(snapshot, @"ZQZQ :: <no import required>");
     }
 
     #[test]
@@ -6241,7 +6241,7 @@ ZQ<CURSOR>
                         let module_name = c
                             .module_name
                             .map(ModuleName::as_str)
-                            .unwrap_or("Current module");
+                            .unwrap_or("<no import required>");
                         snapshot = format!("{snapshot} :: {module_name}");
                     }
                     snapshot
