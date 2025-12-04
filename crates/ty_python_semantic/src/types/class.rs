@@ -19,7 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
+use crate::types::diagnostic::SUPER_CALL_IN_NAMED_TUPLE_METHOD;
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
@@ -39,10 +39,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypeKind,
     CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
-    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
-    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
-    determine_upper_bound,
+    KnownInstanceType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    StringLiteralType, TypeContext, TypeMapping, TypeRelation, TypedDictParams, UnionBuilder,
+    VarianceInferable, binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -5810,42 +5809,6 @@ impl KnownClass {
 
                 overload.set_return_type(Type::KnownInstance(KnownInstanceType::Deprecated(
                     DeprecatedInstance::new(db, message.as_string_literal()),
-                )));
-            }
-
-            KnownClass::TypeAliasType => {
-                let assigned_to = index
-                    .try_expression(ast::ExprRef::from(call_expression))
-                    .and_then(|expr| expr.assigned_to(db));
-
-                let containing_assignment = assigned_to.as_ref().and_then(|assigned_to| {
-                    match assigned_to.node(module).targets.as_slice() {
-                        [ast::Expr::Name(target)] => Some(index.expect_single_definition(target)),
-                        _ => None,
-                    }
-                });
-
-                let [Some(name), Some(value), ..] = overload.parameter_types() else {
-                    return;
-                };
-
-                let Some(name) = name.as_string_literal() else {
-                    if let Some(builder) =
-                        context.report_lint(&INVALID_TYPE_ALIAS_TYPE, call_expression)
-                    {
-                        builder.into_diagnostic(
-                            "The name of a `typing.TypeAlias` must be a string literal",
-                        );
-                    }
-                    return;
-                };
-                overload.set_return_type(Type::KnownInstance(KnownInstanceType::TypeAliasType(
-                    TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
-                        db,
-                        ast::name::Name::new(name.value(db)),
-                        containing_assignment,
-                        value,
-                    )),
                 )));
             }
 

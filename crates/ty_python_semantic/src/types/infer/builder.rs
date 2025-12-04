@@ -62,7 +62,7 @@ use crate::types::diagnostic::{
     INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_ALIAS_TYPE, INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
@@ -107,12 +107,13 @@ use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
     ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    ManualPEP695TypeAliasType, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
+    todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5158,6 +5159,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Some(KnownClass::NewType) => {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
+                        Some(KnownClass::TypeAliasType) => {
+                            self.infer_type_alias_type_expression(target, call_expr, definition)
+                        }
                         Some(_) | None => {
                             self.infer_call_expression_impl(call_expr, callable_type, tcx)
                         }
@@ -5688,6 +5692,129 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             definition,
             None,
         )))
+    }
+
+    /// Infer a `TypeAliasType(name, value, type_params=(...))` call expression.
+    fn infer_type_alias_type_expression(
+        &mut self,
+        target: &ast::Expr,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        fn error<'db>(
+            context: &InferContext<'db, '_>,
+            message: impl std::fmt::Display,
+            node: impl Ranged,
+        ) -> Type<'db> {
+            if let Some(builder) = context.report_lint(&INVALID_TYPE_ALIAS_TYPE, node) {
+                builder.into_diagnostic(message);
+            }
+            Type::unknown()
+        }
+
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+
+        // Extract positional arguments: name, value
+        let positional_args: Vec<_> = arguments
+            .args
+            .iter()
+            .filter(|arg| !arg.is_starred_expr())
+            .collect();
+
+        if positional_args.len() < 2 {
+            return error(
+                &self.context,
+                format!(
+                    "Wrong number of arguments in `TypeAliasType` creation, expected at least 2, found {}",
+                    positional_args.len()
+                ),
+                call_expr,
+            );
+        }
+
+        // First argument: name (string literal)
+        let name_param_ty = self.infer_expression(positional_args[0], TypeContext::default());
+        let Some(name) = name_param_ty.as_string_literal().map(|n| n.value(db)) else {
+            return error(
+                &self.context,
+                "The name of a `typing.TypeAlias` must be a string literal",
+                positional_args[0],
+            );
+        };
+
+        // Validate that the target is a simple name and matches
+        let ast::Expr::Name(ast::ExprName {
+            id: target_name, ..
+        }) = target
+        else {
+            return error(
+                &self.context,
+                "A `TypeAliasType` definition must be a simple variable assignment",
+                target,
+            );
+        };
+
+        if name != target_name {
+            return error(
+                &self.context,
+                format_args!(
+                    "The name of a `TypeAliasType` (`{name}`) must match \
+                    the name of the variable it is assigned to (`{target_name}`)"
+                ),
+                target,
+            );
+        }
+
+        // Second argument: value
+        let value_ty = self.infer_type_expression(positional_args[1]);
+
+        // Optional keyword argument: type_params
+        let generic_context = if let Some(type_params) = arguments
+            .keywords
+            .iter()
+            .find(|kw| kw.arg.as_ref().is_some_and(|arg| arg.id == "type_params"))
+        {
+            let type_params_ty = self.infer_expression(&type_params.value, TypeContext::default());
+            let Some(tuple_spec) = type_params_ty.tuple_instance_spec(db) else {
+                return error(
+                    &self.context,
+                    "`type_params` argument to `TypeAliasType` must be a tuple",
+                    &type_params.value,
+                );
+            };
+
+            let mut bound_typevars = tuple_spec
+                .all_elements()
+                .filter_map(|element| {
+                    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = element {
+                        Some(typevar.with_binding_context(db, definition))
+                    } else {
+                        // TODO: Emit a diagnostic if this is not a valid TypeVar, ParamSpec, or TypeVarTuple.
+                        None
+                    }
+                })
+                .peekable();
+
+            if bound_typevars.peek().is_some() {
+                Some(GenericContext::from_typevar_instances(db, bound_typevars))
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        Type::KnownInstance(KnownInstanceType::TypeAliasType(
+            TypeAliasType::ManualPEP695(ManualPEP695TypeAliasType::new(
+                db,
+                ast::name::Name::new(name),
+                Some(definition),
+                value_ty,
+                generic_context,
+                None,
+            )),
+        ))
     }
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
@@ -11393,19 +11520,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     );
                 }
             }
-            Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
-                _,
-            ))) => {
-                let slice_ty = self.infer_expression(slice, TypeContext::default());
-                let mut variables = FxOrderSet::default();
-                slice_ty.bind_and_find_all_legacy_typevars(
-                    self.db(),
-                    self.typevar_binding_context,
-                    &mut variables,
-                );
-                let generic_context = GenericContext::from_typevar_instances(self.db(), variables);
-                return Type::Dynamic(DynamicType::UnknownGeneric(generic_context));
-            }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(type_alias)) => {
                 if let Some(generic_context) = type_alias.generic_context(self.db()) {
                     return self.infer_explicit_type_alias_type_specialization(
@@ -11415,6 +11529,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         generic_context,
                     );
                 }
+
+                self.infer_expression(slice, TypeContext::default());
+                if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
+                    builder
+                        .into_diagnostic(format_args!("Cannot subscript non-generic type alias"));
+                }
+
+                return Type::unknown();
             }
             Type::SpecialForm(SpecialFormType::Tuple) => {
                 return tuple_generic_alias(self.db(), self.infer_tuple_type_expression(slice));

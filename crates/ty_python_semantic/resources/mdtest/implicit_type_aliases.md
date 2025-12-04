@@ -669,7 +669,7 @@ def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
 type ListOfInts2 = list[int]
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+# error: [non-subscriptable] "Cannot subscript non-generic type alias"
 DoublySpecialized = ListOfInts2[int]
 
 def _(doubly_specialized: DoublySpecialized):
