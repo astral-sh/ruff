@@ -9662,6 +9662,22 @@ impl<'db> TypeVarInstance<'db> {
         ))
     }
 
+    fn type_is_self_referential(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let identity = self.identity(db);
+        any_over_type(
+            db,
+            ty,
+            &|ty| match ty {
+                Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    identity == typevar.identity(db)
+                }
+                _ => false,
+            },
+            false,
+        )
+    }
+
     #[salsa::tracked(
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
@@ -9683,6 +9699,11 @@ impl<'db> TypeVarInstance<'db> {
             }
             _ => return None,
         };
+
+        if self.type_is_self_referential(db, ty) {
+            return None;
+        }
+
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
 
@@ -9721,6 +9742,15 @@ impl<'db> TypeVarInstance<'db> {
             }
             _ => return None,
         };
+
+        if ty
+            .elements(db)
+            .iter()
+            .any(|ty| self.type_is_self_referential(db, *ty))
+        {
+            return None;
+        }
+
         Some(TypeVarBoundOrConstraints::Constraints(ty))
     }
 
@@ -9728,33 +9758,31 @@ impl<'db> TypeVarInstance<'db> {
     fn lazy_default(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        match definition.kind(db) {
+        let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                Some(definition_expression_type(
-                    db,
-                    definition,
-                    typevar_node.default.as_ref()?,
-                ))
+                definition_expression_type(db, definition, typevar_node.default.as_ref()?)
             }
             // legacy typevar
             DefinitionKind::Assignment(assignment) => {
                 let call_expr = assignment.value(&module).as_call_expr()?;
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
-                Some(definition_expression_type(db, definition, expr))
+                definition_expression_type(db, definition, expr)
             }
             // PEP 695 ParamSpec
             DefinitionKind::ParamSpec(paramspec) => {
                 let paramspec_node = paramspec.node(&module);
-                Some(definition_expression_type(
-                    db,
-                    definition,
-                    paramspec_node.default.as_ref()?,
-                ))
+                definition_expression_type(db, definition, paramspec_node.default.as_ref()?)
             }
-            _ => None,
+            _ => return None,
+        };
+
+        if self.type_is_self_referential(db, ty) {
+            return None;
         }
+
+        Some(ty)
     }
 
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
