@@ -507,3 +507,58 @@ reveal_type(foo)  # revealed: Foo[(int, str, /)]
 reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int, str, /) -> str
 reveal_type(foo.method(1, "a"))  # revealed: str
 ```
+
+### Overloads
+
+`overloaded.pyi`:
+
+```pyi
+from typing import overload
+
+@overload
+def int_int(x: int) -> int: ...
+@overload
+def int_int(x: str) -> int: ...
+
+@overload
+def int_str(x: int) -> int: ...
+@overload
+def int_str(x: str) -> str: ...
+
+@overload
+def str_str(x: int) -> str: ...
+@overload
+def str_str(x: str) -> str: ...
+```
+
+```py
+from typing import Callable
+from overloaded import int_int, int_str, str_str
+
+def change_return_type[**P](f: Callable[P, int]) -> Callable[P, str]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> str:
+        return str(f(*args, **kwargs))
+    return nested
+
+def with_parameters[**P](
+    f: Callable[P, int], *args: P.args, **kwargs: P.kwargs
+) -> Callable[P, str]:
+    def nested(*args: P.args, **kwargs: P.kwargs) -> str:
+        return str(f(*args, **kwargs))
+    return nested
+
+reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# TODO: This shouldn't error and should pick the first overload because of the return type
+# error: [invalid-argument-type]
+reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# error: [invalid-argument-type]
+reveal_type(change_return_type(str_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# TODO: Both of these shouldn't raise an error
+# error: [invalid-argument-type]
+reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+# error: [invalid-argument-type]
+reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+```
