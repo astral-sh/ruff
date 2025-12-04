@@ -80,6 +80,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         }
 
         if is_parenthesize_lambda_bodies_enabled(f.context()) {
+            let body_comments = comments.leading_dangling_trailing(&**body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
                 // Calls and subscripts require special formatting because they have their own
                 // parentheses, but they can also have an arbitrary amount of text before the
@@ -135,6 +136,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         .fmt(f)
                     }
                 }
+                // If the body has comments, we always want to preserve the parentheses. This also
+                // ensures that we correctly handle parenthesized comments, and don't need to worry
+                // about them in the implementation below.
+                else if body_comments.has_leading() || body_comments.has_trailing_own_line() {
+                    body.format().with_options(Parentheses::Always).fmt(f)
+                }
                 // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
                 // etc., we can just format the body directly. Their own formatting results in the
                 // lambda being formatted well too. For example:
@@ -152,11 +159,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     zzzzzzzzzzzzzzzzzzzz
                 // ]
                 // ```
-                //
-                // TODO explain the comment exclusion
-                else if has_own_parentheses(body, f.context()).is_some()
-                    || comments.contains_comments(body.as_ref().into())
-                {
+                else if has_own_parentheses(body, f.context()).is_some() {
                     body.format().fmt(f)
                 }
                 // Finally, for expressions without their own parentheses, use
