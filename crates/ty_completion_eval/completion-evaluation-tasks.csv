@@ -1,4 +1,7 @@
 name,file,index,rank
+auto-import-includes-modules,main.py,0,1
+auto-import-includes-modules,main.py,1,7
+auto-import-includes-modules,main.py,2,1
 auto-import-skips-current-module,main.py,0,1
 fstring-completions,main.py,0,1
 higher-level-symbols-preferred,main.py,0,
@@ -25,4 +28,4 @@ scope-simple-long-identifier,main.py,0,1
 tstring-completions,main.py,0,1
 ty-extensions-lower-stdlib,main.py,0,9
 type-var-typing-over-ast,main.py,0,3
-type-var-typing-over-ast,main.py,1,239
+type-var-typing-over-ast,main.py,1,251
