@@ -540,9 +540,7 @@ def change_return_type[**P](f: Callable[P, int]) -> Callable[P, str]:
         return str(f(*args, **kwargs))
     return nested
 
-def with_parameters[**P](
-    f: Callable[P, int], *args: P.args, **kwargs: P.kwargs
-) -> Callable[P, str]:
+def with_parameters[**P](f: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> Callable[P, str]:
     def nested(*args: P.args, **kwargs: P.kwargs) -> str:
         return str(f(*args, **kwargs))
     return nested
