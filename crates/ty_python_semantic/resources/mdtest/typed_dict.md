@@ -868,6 +868,115 @@ def _(o1: Outer1, o2: Outer2, o3: Outer3, o4: Outer4):
     static_assert(is_subtype_of(Outer4, Outer4))
 ```
 
+## Structural equivalence
+
+Two `TypedDict`s with equivalent fields are equivalent types. This includes fields with gradual
+types:
+
+```py
+from typing_extensions import Any, TypedDict, ReadOnly, assert_type
+from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+
+class Foo(TypedDict):
+    x: int
+    y: Any
+
+# exactly the same fields
+class Bar(TypedDict):
+    x: int
+    y: Any
+
+# the same fields but in a different order
+class Baz(TypedDict):
+    y: Any
+    x: int
+
+static_assert(is_assignable_to(Foo, Bar))
+static_assert(is_equivalent_to(Foo, Bar))
+static_assert(is_assignable_to(Foo, Baz))
+static_assert(is_equivalent_to(Foo, Baz))
+
+foo: Foo = {"x": 1, "y": "hello"}
+assert_type(foo, Foo)
+assert_type(foo, Bar)
+assert_type(foo, Baz)
+```
+
+Equivalent `TypedDict`s within unions can also produce equivalent unions, which currently relies on
+"normalization" machinery:
+
+```py
+def f(var: Foo | int):
+    assert_type(var, Foo | int)
+    assert_type(var, Bar | int)
+    assert_type(var, Baz | int)
+    # TODO: Union simplification compares `TypedDict`s by name/identity to avoid cycles. This assert
+    # should also pass once that's fixed.
+    assert_type(var, Foo | Bar | Baz | int)  # error: [type-assertion-failure]
+```
+
+Here are several cases that are not equivalent. In particular, assignability does not imply
+equivalence:
+
+```py
+class FewerFields(TypedDict):
+    x: int
+
+static_assert(is_assignable_to(Foo, FewerFields))
+static_assert(not is_equivalent_to(Foo, FewerFields))
+assert_type(foo, FewerFields)  # error: [type-assertion-failure]
+
+class DifferentMutability(TypedDict):
+    x: int
+    y: ReadOnly[Any]
+
+static_assert(is_assignable_to(Foo, DifferentMutability))
+static_assert(not is_equivalent_to(Foo, DifferentMutability))
+assert_type(foo, DifferentMutability)  # error: [type-assertion-failure]
+
+class MoreFields(TypedDict):
+    x: int
+    y: Any
+    z: str
+
+static_assert(not is_assignable_to(Foo, MoreFields))
+static_assert(not is_equivalent_to(Foo, MoreFields))
+assert_type(foo, MoreFields)  # error: [type-assertion-failure]
+
+class DifferentFieldStaticType(TypedDict):
+    x: str
+    y: Any
+
+static_assert(not is_assignable_to(Foo, DifferentFieldStaticType))
+static_assert(not is_equivalent_to(Foo, DifferentFieldStaticType))
+assert_type(foo, DifferentFieldStaticType)  # error: [type-assertion-failure]
+
+class DifferentFieldGradualType(TypedDict):
+    x: int
+    y: Any | str
+
+static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
+static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
+assert_type(foo, DifferentFieldGradualType)  # error: [type-assertion-failure]
+```
+
+Casting between equivalent types produces a redundant cast warning. When the types have different
+names, the warning makes that clear:
+
+```py
+from typing import TypedDict, cast
+
+class Foo2(TypedDict):
+    x: int
+
+class Bar2(TypedDict):
+    x: int
+
+foo: Foo2 = {"x": 1}
+_ = cast(Foo2, foo)  # error: [redundant-cast] "Value is already of type `Foo2`"
+_ = cast(Bar2, foo)  # error: [redundant-cast] "Value is already of type `Foo2`, which is equivalent to `Bar2`"
+```
+
 ## Key-based access
 
 ### Reading

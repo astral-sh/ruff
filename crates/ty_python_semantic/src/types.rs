@@ -1460,6 +1460,7 @@ impl<'db> Type<'db> {
     /// - Strips the types of default values from parameters in `Callable` types: only whether a parameter
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     /// - Converts class-based protocols into synthesized protocols
+    /// - Converts class-based typeddicts into synthesized typeddicts
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())
@@ -1518,10 +1519,9 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                self
-            }
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                Type::TypedDict(typed_dict.normalized_impl(db, visitor))
+            }),
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
             Type::NewTypeInstance(newtype) => {
                 visitor.visit(self, || {
@@ -3014,6 +3014,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to_impl(db, right, inferable, visitor)
             }
 
+            (Type::TypedDict(left), Type::TypedDict(right)) => {
+                left.is_equivalent_to_impl(db, right, inferable, visitor)
+            }
+
             _ => ConstraintSet::from(false),
         }
     }
@@ -4278,6 +4282,17 @@ impl<'db> Type<'db> {
         policy: MemberLookupPolicy,
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
+
+        // TODO: It's not currently possible to hit this special case, so there's no test coverage
+        // for it. The only way to construct a SynthesizedTypedDictType right now is via
+        // normalization, and we don't do member lookups on normalized types.
+        if let Type::TypedDict(TypedDictType::Synthesized(synthesized_typed_dict)) = self
+            && let Some(member) =
+                TypedDictType::synthesized_member(db, self, synthesized_typed_dict.items(db), &name)
+        {
+            return Place::bound(member).into();
+        }
+
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
@@ -7509,7 +7524,7 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => typed_dict.to_meta_class(db).into(),
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
             Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
         }
@@ -8208,7 +8223,7 @@ impl<'db> Type<'db> {
             },
 
             Self::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
+                typed_dict.definition(db).map(TypeDefinition::Class)
             }
 
             Self::Union(_) | Self::Intersection(_) => None,

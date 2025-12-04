@@ -381,7 +381,7 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         Some(match ty {
             Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
-            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.to_meta_class(db)),
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),

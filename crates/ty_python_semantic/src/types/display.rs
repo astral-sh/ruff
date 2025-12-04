@@ -23,7 +23,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
     KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    StringLiteralType, SubclassOfInner, Type, TypedDictType, UnionType, WrapperDescriptorKind,
+    visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -897,12 +898,25 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(typed_dict) => typed_dict
-                .defining_class()
+            Type::TypedDict(TypedDictType::Class(defining_class)) => defining_class
                 .class_literal(self.db)
                 .0
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
+            // TODO: Test coverage for this.
+            Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
+                f.set_invalid_syntax();
+                f.write_str("<TypedDict with items ")?;
+                let items = synthesized.items(self.db);
+                for (i, name) in items.keys().enumerate() {
+                    let is_last = i == items.len() - 1;
+                    write!(f, "'{name}'")?;
+                    if !is_last {
+                        f.write_str(", ")?;
+                    }
+                }
+                f.write_char('>')
+            }
             Type::TypeAlias(alias) => {
                 f.write_str(alias.name(self.db))?;
                 match alias.specialization(self.db) {
@@ -2296,10 +2310,15 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_python_ast::name::Name;
 
-    use crate::Db;
     use crate::db::tests::setup_db;
     use crate::place::typing_extensions_symbol;
-    use crate::types::{KnownClass, Parameter, Parameters, Signature, Type};
+    use crate::types::class::{Field, FieldKind};
+    use crate::types::typed_dict::SynthesizedTypedDictType;
+    use crate::types::{
+        KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type, TypedDictParams,
+        TypedDictType,
+    };
+    use crate::{Db, FxOrderMap};
 
     #[test]
     fn string_literal_display() {
@@ -2341,6 +2360,48 @@ mod tests {
         assert_eq!(
             iterator_synthesized.display(&db).to_string(),
             "<Protocol with members '__iter__', '__next__'>"
+        );
+    }
+
+    #[test]
+    fn synthesized_typeddict_display() {
+        let db = setup_db();
+
+        let mut items = FxOrderMap::default();
+        items.insert(
+            Name::new("foo"),
+            Field {
+                declared_ty: Type::IntLiteral(42),
+                kind: FieldKind::TypedDict {
+                    is_required: true,
+                    is_read_only: false,
+                },
+                first_declaration: None,
+            },
+        );
+        items.insert(
+            Name::new("bar"),
+            Field {
+                declared_ty: Type::StringLiteral(StringLiteralType::new(&db, "hello")),
+                kind: FieldKind::TypedDict {
+                    is_required: true,
+                    is_read_only: false,
+                },
+                first_declaration: None,
+            },
+        );
+
+        let synthesized = SynthesizedTypedDictType::new(&db, TypedDictParams::TOTAL, items);
+        let type_ = Type::TypedDict(TypedDictType::Synthesized(synthesized));
+        assert_eq!(
+            type_.display(&db).to_string(),
+            "<TypedDict with items 'foo', 'bar'>",
+        );
+
+        // Normalization sorts the fields/items by name.
+        assert_eq!(
+            type_.normalized(&db).display(&db).to_string(),
+            "<TypedDict with items 'bar', 'foo'>",
         );
     }
 
