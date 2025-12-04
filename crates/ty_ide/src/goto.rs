@@ -511,12 +511,9 @@ impl GotoTarget<'_> {
                     definitions.extend(definitions_for_callable(model, call));
                 }
 
-                let expr_definitions = dbg!(definitions_for_expression(
-                    model,
-                    *callable,
-                    alias_resolution
-                ))
-                .unwrap_or_default();
+                let expr_definitions =
+                    definitions_for_expression(model, *callable, alias_resolution)
+                        .unwrap_or_default();
                 definitions.extend(expr_definitions);
 
                 if definitions.is_empty() {
@@ -619,11 +616,7 @@ impl GotoTarget<'_> {
             GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
             GotoTarget::ImportSymbolTarget { alias, .. } => {
-                if let Some(asname) = &alias.asname {
-                    Some(Cow::Borrowed(asname.as_str()))
-                } else {
-                    Some(Cow::Borrowed(alias.name.as_str()))
-                }
+                Some(Cow::Borrowed(alias.name.as_str()))
             }
             GotoTarget::ImportModuleComponent {
                 module_name,
@@ -917,7 +910,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
-            GotoTarget::ImportSymbolAlias { alias, .. } => alias.asname.as_ref().unwrap().range,
+            GotoTarget::ImportSymbolAlias { asname, .. } => asname.range,
             Self::ImportSymbolTarget { alias, .. } => alias.name.range,
             GotoTarget::ImportModuleComponent {
                 component_range, ..

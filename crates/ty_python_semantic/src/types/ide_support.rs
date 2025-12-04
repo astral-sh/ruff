@@ -138,7 +138,7 @@ pub fn definitions_for_name<'db>(
     // Resolve import definitions to their targets
     let mut resolved_definitions = Vec::new();
 
-    for definition in dbg!(&all_definitions) {
+    for definition in &all_definitions {
         let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
         resolved_definitions.extend(resolved);
     }
@@ -899,11 +899,11 @@ mod resolve_definition {
         );
 
         // If resolution failed, return the original definition as fallback
-        dbg!(if resolved.is_empty() {
+        if resolved.is_empty() {
             vec![ResolvedDefinition::Definition(definition)]
         } else {
             resolved
-        })
+        }
     }
 
     /// Helper function to resolve import definitions recursively.
@@ -921,7 +921,6 @@ mod resolve_definition {
         visited.insert(definition);
 
         let kind = definition.kind(db);
-        dbg!(symbol_name, definition, alias_resolution, kind);
 
         match kind {
             DefinitionKind::Import(import_def) => {
@@ -929,7 +928,7 @@ mod resolve_definition {
                 let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
-                if dbg!(&alias.asname).is_some()
+                if alias.asname.is_some()
                     && alias_resolution == ImportAliasResolution::PreserveAliases
                 {
                     return vec![ResolvedDefinition::Definition(definition)];
@@ -960,7 +959,7 @@ mod resolve_definition {
                 let import_node = import_from_def.import(&module);
                 let alias = import_from_def.alias(&module);
 
-                if dbg!(&alias.asname).is_some()
+                if alias.asname.is_some()
                     && alias_resolution == ImportAliasResolution::PreserveAliases
                 {
                     return vec![ResolvedDefinition::Definition(definition)];

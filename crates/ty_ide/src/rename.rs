@@ -24,16 +24,11 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    dbg!(file.path(db));
-    let definition_targets = dbg!(
-        dbg!(&goto_target)
-            .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
-    )
-    .declaration_targets(db)?;
+    let definition_targets = goto_target
+        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
+        .declaration_targets(db)?;
 
     for target in &definition_targets {
-        dbg!(target);
-
         let target_file = target.file();
 
         // If definition is outside the project, refuse rename
@@ -973,8 +968,7 @@ result = <CURSOR>alias()
             )
             .build();
 
-        salsa::attach(&test.db, || {
-            assert_snapshot!(test.rename("new_alias"), @r"
+        assert_snapshot!(test.rename("new_alias"), @r"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
@@ -984,7 +978,6 @@ result = <CURSOR>alias()
           |          -----
           |
         ");
-        });
     }
 
     #[test]
@@ -1227,8 +1220,7 @@ result = func(10, y=20)
             )
             .build();
 
-        salsa::attach(&test.db, || {
-            assert_snapshot!(test.rename("z"), @r"
+        assert_snapshot!(test.rename("z"), @r"
             info[rename]: Rename symbol (found 2 locations)
              --> main.py:2:15
               |
@@ -1238,8 +1230,7 @@ result = func(10, y=20)
             4 | x = lib2
               |     ----
               |
-            ")
-        });
+        ");
     }
 
     #[test]
