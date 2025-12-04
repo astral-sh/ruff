@@ -1444,10 +1444,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     Type::unknown()
                 }
-                _ => TypeIsType::unbound(
-                    self.db(),
-                    self.infer_type_expression(arguments_slice),
-                ),
+                _ => TypeIsType::unbound(self.db(), self.infer_type_expression(arguments_slice)),
             },
             SpecialFormType::TypeGuard => {
                 self.infer_type_expression(arguments_slice);

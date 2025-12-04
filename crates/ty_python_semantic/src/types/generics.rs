@@ -1483,7 +1483,7 @@ impl<'db> SpecializationBuilder<'db> {
                 } else if types_have_typevars.len() >= 2 {
                     // New logic: for multiple wrapped typevars, try class-based matching
                     // This handles cases like Ok[T] | Err[E] where we have at least 2 distinct type-containing elements
-                    for formal_elem in types_have_typevars.iter() {
+                    for formal_elem in &types_have_typevars {
                         if let Type::NominalInstance(formal_inst) = formal_elem {
                             let formal_class = formal_inst.class_literal(self.db);
 

@@ -374,8 +374,8 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
 from typing import Union, Generic, TypeVar
 from typing_extensions import TypeIs
 
-T = TypeVar('T', covariant=True)
-E = TypeVar('E', covariant=True)
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
 
 class Ok(Generic[T]):
     def __init__(self, value: T):
