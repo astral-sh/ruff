@@ -742,15 +742,18 @@ impl TestServer {
     }
 
     pub(crate) fn file_uri(&self, path: impl AsRef<SystemPath>) -> Url {
-        Url::from_file_path(self.test_context.root().join(path.as_ref()).as_std_path())
-            .expect("Path must be a valid URL")
+        Url::from_file_path(self.file_path(path).as_std_path()).expect("Path must be a valid URL")
+    }
+
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
     }
 
     /// Send a `textDocument/didOpen` notification
     pub(crate) fn open_text_document(
         &mut self,
         path: impl AsRef<SystemPath>,
-        content: &impl ToString,
+        content: impl AsRef<str>,
         version: i32,
     ) {
         let params = DidOpenTextDocumentParams {
@@ -758,7 +761,7 @@ impl TestServer {
                 uri: self.file_uri(path),
                 language_id: "python".to_string(),
                 version,
-                text: content.to_string(),
+                text: content.as_ref().to_string(),
             },
         };
         self.send_notification::<DidOpenTextDocument>(params);
@@ -793,7 +796,6 @@ impl TestServer {
     }
 
     /// Send a `workspace/didChangeWatchedFiles` notification with the given file events
-    #[expect(dead_code)]
     pub(crate) fn did_change_watched_files(&mut self, events: Vec<FileEvent>) {
         let params = DidChangeWatchedFilesParams { changes: events };
         self.send_notification::<DidChangeWatchedFiles>(params);
