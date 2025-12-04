@@ -74,7 +74,7 @@ impl<'db> Completions<'db> {
             .into_iter()
             .filter_map(|item| {
                 Some(ImportEdit {
-                    label: format!("import {}.{}", item.module_name?, item.name),
+                    label: format!("import {}", item.qualified?),
                     edit: item.import?,
                 })
             })
@@ -160,6 +160,10 @@ impl<'db> Extend<Completion<'db>> for Completions<'db> {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
+    /// The fully qualified name, when available.
+    ///
+    /// This is only set when `module_name` is available.
+    pub qualified: Option<Name>,
     /// The text that should be inserted at the cursor
     /// when the completion is selected.
     ///
@@ -225,6 +229,7 @@ impl<'db> Completion<'db> {
         let is_type_check_only = semantic.is_type_check_only(db);
         Completion {
             name: semantic.name,
+            qualified: None,
             insert: None,
             ty: semantic.ty,
             kind: None,
@@ -306,6 +311,7 @@ impl<'db> Completion<'db> {
     fn keyword(name: &str) -> Self {
         Completion {
             name: name.into(),
+            qualified: None,
             insert: None,
             ty: None,
             kind: Some(CompletionKind::Keyword),
@@ -321,6 +327,7 @@ impl<'db> Completion<'db> {
     fn value_keyword(name: &str, ty: Type<'db>) -> Completion<'db> {
         Completion {
             name: name.into(),
+            qualified: None,
             insert: None,
             ty: Some(ty),
             kind: Some(CompletionKind::Keyword),
@@ -541,7 +548,18 @@ fn add_unimported_completions<'db>(
             continue;
         }
 
-        let request = create_import_request(symbol.module().name(db), symbol.name());
+        let module_name = symbol.module().name(db);
+        let (name, qualified, request) = symbol
+            .name_in_file()
+            .map(|name| {
+                let qualified = format!("{module_name}.{name}");
+                (name, qualified, create_import_request(module_name, name))
+            })
+            .unwrap_or_else(|| {
+                let name = module_name.as_str();
+                let qualified = name.to_string();
+                (name, qualified, ImportRequest::module(name))
+            });
         // FIXME: `all_symbols` doesn't account for wildcard imports.
         // Since we're looking at every module, this is probably
         // "fine," but it might mean that we import a symbol from the
@@ -550,11 +568,12 @@ fn add_unimported_completions<'db>(
         // N.B. We use `add` here because `all_symbols` already
         // takes our query into account.
         completions.force_add(Completion {
-            name: ast::name::Name::new(symbol.name()),
+            name: ast::name::Name::new(name),
+            qualified: Some(ast::name::Name::new(qualified)),
             insert: Some(import_action.symbol_text().into()),
             ty: None,
             kind: symbol.kind().to_completion_kind(),
-            module_name: Some(symbol.module().name(db)),
+            module_name: Some(module_name),
             import: import_action.import().cloned(),
             builtin: false,
             // TODO: `is_type_check_only` requires inferring the type of the symbol
@@ -6064,6 +6083,79 @@ ZQ<CURSOR>
         ZQZQ1 :: _foo
         ZQZQ1 :: bar
         ");
+    }
+
+    #[test]
+    fn auto_import_includes_stdlib_modules_as_suggestions() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+multiprocess<CURSOR>
+"#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @r"
+        multiprocessing
+        multiprocessing.connection
+        multiprocessing.context
+        multiprocessing.dummy
+        multiprocessing.dummy.connection
+        multiprocessing.forkserver
+        multiprocessing.heap
+        multiprocessing.managers
+        multiprocessing.pool
+        multiprocessing.popen_fork
+        multiprocessing.popen_forkserver
+        multiprocessing.popen_spawn_posix
+        multiprocessing.popen_spawn_win32
+        multiprocessing.process
+        multiprocessing.queues
+        multiprocessing.reduction
+        multiprocessing.resource_sharer
+        multiprocessing.resource_tracker
+        multiprocessing.shared_memory
+        multiprocessing.sharedctypes
+        multiprocessing.spawn
+        multiprocessing.synchronize
+        multiprocessing.util
+        ");
+    }
+
+    #[test]
+    fn auto_import_includes_first_party_modules_as_suggestions() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+zqzqzq<CURSOR>
+"#,
+            )
+            .source("zqzqzqzqzq.py", "")
+            .completion_test_builder()
+            .auto_import()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"zqzqzqzqzq");
+    }
+
+    #[test]
+    fn auto_import_includes_sub_modules_as_suggestions() {
+        let snapshot = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+collabc<CURSOR>
+"#,
+            )
+            .completion_test_builder()
+            .auto_import()
+            .build()
+            .snapshot();
+        assert_snapshot!(snapshot, @"collections.abc");
     }
 
     /// A way to create a simple single-file (named `main.py`) completion test
