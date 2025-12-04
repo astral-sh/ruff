@@ -896,7 +896,10 @@ fn cached_protocol_interface<'db>(
         // type narrowing that uses `isinstance()` or `issubclass()` with
         // runtime-checkable protocols.
         for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-            let Some(ty) = place_from_bindings(db, bindings).ignore_possibly_undefined() else {
+            let Some(ty) = place_from_bindings(db, bindings)
+                .place
+                .ignore_possibly_undefined()
+            else {
                 continue;
             };
             direct_members.insert(

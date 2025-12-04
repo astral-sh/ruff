@@ -7338,7 +7338,7 @@ impl<'db> Type<'db> {
                 | SpecialFormType::Union
                 | SpecialFormType::Intersection => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::RequiresArguments(*self)
+                        InvalidTypeExpression::RequiresArguments(*special_form)
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -7364,7 +7364,7 @@ impl<'db> Type<'db> {
                 | SpecialFormType::Unpack
                 | SpecialFormType::CallableTypeOf => Err(InvalidTypeExpressionError {
                     invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::RequiresOneArgument(*self)
+                        InvalidTypeExpression::RequiresOneArgument(*special_form)
                     ],
                     fallback_type: Type::unknown(),
                 }),
@@ -7372,7 +7372,7 @@ impl<'db> Type<'db> {
                 SpecialFormType::Annotated | SpecialFormType::Concatenate => {
                     Err(InvalidTypeExpressionError {
                         invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::RequiresTwoArguments(*self)
+                            InvalidTypeExpression::RequiresTwoArguments(*special_form)
                         ],
                         fallback_type: Type::unknown(),
                     })
@@ -9106,11 +9106,11 @@ impl<'db> InvalidTypeExpressionError<'db> {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum InvalidTypeExpression<'db> {
     /// Some types always require exactly one argument when used in a type expression
-    RequiresOneArgument(Type<'db>),
+    RequiresOneArgument(SpecialFormType),
     /// Some types always require at least one argument when used in a type expression
-    RequiresArguments(Type<'db>),
+    RequiresArguments(SpecialFormType),
     /// Some types always require at least two arguments when used in a type expression
-    RequiresTwoArguments(Type<'db>),
+    RequiresTwoArguments(SpecialFormType),
     /// The `Protocol` class is invalid in type expressions
     Protocol,
     /// Same for `Generic`
@@ -9150,20 +9150,17 @@ impl<'db> InvalidTypeExpression<'db> {
         impl std::fmt::Display for Display<'_> {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self.error {
-                    InvalidTypeExpression::RequiresOneArgument(ty) => write!(
+                    InvalidTypeExpression::RequiresOneArgument(special_form) => write!(
                         f,
-                        "`{ty}` requires exactly one argument when used in a type expression",
-                        ty = ty.display(self.db)
+                        "`{special_form}` requires exactly one argument when used in a type expression",
                     ),
-                    InvalidTypeExpression::RequiresArguments(ty) => write!(
+                    InvalidTypeExpression::RequiresArguments(special_form) => write!(
                         f,
-                        "`{ty}` requires at least one argument when used in a type expression",
-                        ty = ty.display(self.db)
+                        "`{special_form}` requires at least one argument when used in a type expression",
                     ),
-                    InvalidTypeExpression::RequiresTwoArguments(ty) => write!(
+                    InvalidTypeExpression::RequiresTwoArguments(special_form) => write!(
                         f,
-                        "`{ty}` requires at least two arguments when used in a type expression",
-                        ty = ty.display(self.db)
+                        "`{special_form}` requires at least two arguments when used in a type expression",
                     ),
                     InvalidTypeExpression::Protocol => {
                         f.write_str("`typing.Protocol` is not allowed in type expressions")
@@ -12913,7 +12910,7 @@ impl<'db> ModuleLiteralType<'db> {
         let relative_submodule_name = ModuleName::new(name)?;
         let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
-        let submodule = resolve_module(db, &absolute_submodule_name)?;
+        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 

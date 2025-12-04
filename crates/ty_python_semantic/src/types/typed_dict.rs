@@ -365,7 +365,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         };
 
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
-        if let Some(declaration) = item.single_declaration {
+        if let Some(declaration) = item.first_declaration {
             let file = declaration.file(db);
             let module = parsed_module(db, file).load(db);
 

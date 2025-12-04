@@ -260,6 +260,14 @@ class ElementTree(Generic[_Root]):
     def getroot(self) -> _Root:
         """Return root element of this tree."""
 
+    def _setroot(self, element: Element[Any]) -> None:
+        """Replace root element of this tree.
+
+        This will discard the current contents of the tree and replace it
+        with the given element.  Use with care!
+
+        """
+
     def parse(self, source: _FileRead, parser: XMLParser | None = None) -> Element:
         """Load external XML document into element tree.
 

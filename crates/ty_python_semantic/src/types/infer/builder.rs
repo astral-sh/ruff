@@ -4,6 +4,7 @@ use itertools::{Either, EitherOrBoth, Itertools};
 use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span};
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::visitor::{Visitor, walk_expr};
 use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
@@ -634,7 +635,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &self.context,
                             class,
                             &field_name,
-                            field.single_declaration,
+                            field.first_declaration,
                         );
                     }
 
@@ -645,13 +646,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                     ) {
                         field_with_default_encountered =
-                            Some((field_name, field.single_declaration));
+                            Some((field_name, field.first_declaration));
                     } else if let Some(field_with_default) = field_with_default_encountered.as_ref()
                     {
                         report_namedtuple_field_without_default_after_field_with_default(
                             &self.context,
                             class,
-                            (&field_name, field.single_declaration),
+                            (&field_name, field.first_declaration),
                             field_with_default,
                         );
                     }
@@ -1034,6 +1035,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     self.db(),
                     use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
                 )
+                .place
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1727,6 +1729,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let prior_bindings = use_def.bindings_at_definition(declaration);
         // unbound_ty is Never because for this check we don't care about unbound
         let inferred_ty = place_from_bindings(self.db(), prior_bindings)
+            .place
             .with_qualifiers(TypeQualifiers::empty())
             .or_fall_back_to(self.db(), || {
                 // Fallback to bindings declared on `types.ModuleType` if it's a global symbol
@@ -6126,7 +6129,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ) else {
                     return false;
                 };
-                resolve_module(self.db(), &module_name).is_some()
+                resolve_module(self.db(), self.file(), &module_name).is_some()
             }) {
                 diagnostic
                     .help("The module can be resolved if the number of leading dots is reduced");
@@ -6363,7 +6366,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        if resolve_module(self.db(), &module_name).is_none() {
+        if resolve_module(self.db(), self.file(), &module_name).is_none() {
             self.report_unresolved_import(import_from.into(), module_ref.range(), *level, module);
         }
     }
@@ -6381,7 +6384,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return;
         };
 
-        let Some(module) = resolve_module(self.db(), &module_name) else {
+        let Some(module) = resolve_module(self.db(), self.file(), &module_name) else {
             self.add_unknown_declaration_with_binding(alias.into(), definition);
             return;
         };
@@ -6566,7 +6569,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
-        let Some(module) = resolve_module(self.db(), &thispackage_name) else {
+        let Some(module) = resolve_module(self.db(), self.file(), &thispackage_name) else {
             self.add_binding(import_from.into(), definition, |_, _| Type::unknown());
             return;
         };
@@ -6797,7 +6800,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     }
 
     fn module_type_from_name(&self, module_name: &ModuleName) -> Option<Type<'db>> {
-        resolve_module(self.db(), module_name)
+        resolve_module(self.db(), self.file(), module_name)
             .map(|module| Type::module_literal(self.db(), self.file(), module))
     }
 
@@ -8866,7 +8869,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.all_reachable_bindings(place_id))
+                place_from_bindings(db, use_def.all_reachable_bindings(place_id)).place
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -8884,7 +8887,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             let use_id = expr_ref.scoped_use_id(db, scope);
-            let place = place_from_bindings(db, use_def.bindings_at_use(use_id));
+            let place = place_from_bindings(db, use_def.bindings_at_use(use_id)).place;
 
             (place, Some(use_id))
         }
@@ -9025,7 +9028,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         EnclosingSnapshotResult::FoundBindings(bindings) => {
-                            let place = place_from_bindings(db, bindings).map_type(|ty| {
+                            let place = place_from_bindings(db, bindings).place.map_type(|ty| {
                                 self.narrow_place_with_applicable_constraints(
                                     place_expr,
                                     ty,
@@ -9145,13 +9148,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 return Place::Undefined.into();
                             }
                             EnclosingSnapshotResult::FoundBindings(bindings) => {
-                                let place = place_from_bindings(db, bindings).map_type(|ty| {
-                                    self.narrow_place_with_applicable_constraints(
-                                        place_expr,
-                                        ty,
-                                        &constraint_keys,
-                                    )
-                                });
+                                let place =
+                                    place_from_bindings(db, bindings).place.map_type(|ty| {
+                                        self.narrow_place_with_applicable_constraints(
+                                            place_expr,
+                                            ty,
+                                            &constraint_keys,
+                                        )
+                                    });
                                 constraint_keys.push((
                                     FileScopeId::global(),
                                     ConstraintKey::NestedScope(file_scope_id),
@@ -9301,6 +9305,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     /// Infer the type of a [`ast::ExprAttribute`] expression, assuming a load context.
     fn infer_attribute_load(&mut self, attribute: &ast::ExprAttribute) -> Type<'db> {
+        fn is_dotted_name(attribute: &ast::Expr) -> bool {
+            match attribute {
+                ast::Expr::Name(_) => true,
+                ast::Expr::Attribute(ast::ExprAttribute { value, .. }) => is_dotted_name(value),
+                _ => false,
+            }
+        }
+
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
         let mut value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
@@ -9389,7 +9401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         let mut maybe_submodule_name = module_name.clone();
                         maybe_submodule_name.extend(&relative_submodule);
-                        if resolve_module(db, &maybe_submodule_name).is_some() {
+                        if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
                             if let Some(builder) = self
                                 .context
                                 .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
@@ -9405,6 +9417,42 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return fallback();
                         }
                     }
+                }
+
+                if let Type::SpecialForm(special_form) = value_type {
+                    if let Some(builder) =
+                        self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                    {
+                        let mut diag = builder.into_diagnostic(format_args!(
+                            "Special form `{special_form}` has no attribute `{attr_name}`",
+                        ));
+                        if let Ok(defined_type) = value_type.in_type_expression(
+                            db,
+                            self.scope(),
+                            self.typevar_binding_context,
+                        ) && !defined_type.member(db, attr_name).place.is_undefined()
+                        {
+                            diag.help(format_args!(
+                                "Objects with type `{ty}` have a{maybe_n} `{attr_name}` attribute, but the symbol \
+                                `{special_form}` does not itself inhabit the type `{ty}`",
+                                maybe_n = if attr_name.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                                    "n"
+                                } else {
+                                    ""
+                                },
+                                ty = defined_type.display(self.db())
+                            ));
+                            if is_dotted_name(value) {
+                                let source = &source_text(self.db(), self.file())[value.range()];
+                                diag.help(format_args!(
+                                    "This error may indicate that `{source}` was defined as \
+                                    `{source} = {special_form}` when `{source}: {special_form}` \
+                                    was intended"
+                                ));
+                            }
+                        }
+                    }
+                    return fallback();
                 }
 
                 let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
