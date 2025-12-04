@@ -81,6 +81,34 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         if is_parenthesize_lambda_bodies_enabled(f.context()) {
             let fmt_body = format_with(|f: &mut PyFormatter| {
+                // Calls and subscripts require special formatting because they have their own
+                // parentheses, but they can also have an arbitrary amount of text before the
+                // opening parenthesis. We want to avoid cases where we keep a long callable on the
+                // same line as the lambda parameters. For example, `db_evmtx...` in:
+                //
+                // ```py
+                // transaction_count = self._query_txs_for_range(
+                //     get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
+                //         chain_id=_chain_id,
+                //         from_ts=from_ts,
+                //         to_ts=to_ts,
+                //     ),
+                // )
+                // ```
+                //
+                // should cause the whole lambda body to be parenthesized instead:
+                //
+                // ```py
+                // transaction_count = self._query_txs_for_range(
+                //     get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: (
+                //         db_evmtx.count_transactions_in_range(
+                //             chain_id=_chain_id,
+                //             from_ts=from_ts,
+                //             to_ts=to_ts,
+                //         )
+                //     ),
+                // )
+                // ```
                 if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
                     let unparenthesized = body.format().with_options(Parentheses::Never);
                     if CallChainLayout::from_expression(
@@ -106,11 +134,60 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         ]
                         .fmt(f)
                     }
-                } else if has_own_parentheses(body, f.context()).is_some()
+                }
+                // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
+                // etc., we can just format the body directly. Their own formatting results in the
+                // lambda being formatted well too. For example:
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+                // ```
+                //
+                // gets formatted as:
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [
+                //     xxxxxxxxxxxxxxxxxxxx,
+                //     yyyyyyyyyyyyyyyyyyyy,
+                //     zzzzzzzzzzzzzzzzzzzz
+                // ]
+                // ```
+                //
+                // TODO explain the comment exclusion
+                else if has_own_parentheses(body, f.context()).is_some()
                     || comments.contains_comments(body.as_ref().into())
                 {
                     body.format().fmt(f)
-                } else {
+                }
+                // Finally, for expressions without their own parentheses, use
+                // `parenthesize_if_expands` to add parentheses around the body, only if it expands
+                // across multiple lines. The `Parentheses::Never` here also removes unnecessary
+                // parentheses around lambda bodies that fit on one line. For example:
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+                // ```
+                //
+                // is formatted as:
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: (
+                //     xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+                // )
+                // ```
+                //
+                // while
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
+                // ```
+                //
+                // is formatted as:
+                //
+                // ```py
+                // lambda xxxxxxxxxxxxxxxxxxxx: xxxxxxxxxxxxxxxxxxxx + 1
+                // ```
+                else {
                     parenthesize_if_expands(&body.format().with_options(Parentheses::Never)).fmt(f)
                 }
             });

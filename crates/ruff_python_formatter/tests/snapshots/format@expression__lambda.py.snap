@@ -469,6 +469,15 @@ def test_string_temporal_compare_between(con, op, left, right): ...
         )
     ),
 ]
+
+# reuses the list parentheses
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+
+# adds parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+
+# removes parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
 ```
 
 ## Output
@@ -974,6 +983,19 @@ def test_string_temporal_compare_between(con, op, left, right): ...
         )
     ),
 ]
+
+# reuses the list parentheses
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [
+    xxxxxxxxxxxxxxxxxxxx,
+    yyyyyyyyyyyyyyyyyyyy,
+    zzzzzzzzzzzzzzzzzzzz,
+]
+
+# adds parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+
+# removes parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
 ```
 
 
@@ -1339,4 +1361,16 @@ def test_string_temporal_compare_between(con, op, left, right): ...
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
+@@ -508,7 +490,9 @@
+ ]
+ 
+ # adds parentheses around the body
+-lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
++lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: (
++    xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
++)
+ 
+ # removes parentheses around the body
+-lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
++lambda xxxxxxxxxxxxxxxxxxxx: xxxxxxxxxxxxxxxxxxxx + 1
 ```

@@ -463,3 +463,12 @@ def test_string_temporal_compare_between(con, op, left, right): ...
         )
     ),
 ]
+
+# reuses the list parentheses
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+
+# adds parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+
+# removes parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
