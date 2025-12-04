@@ -9732,7 +9732,7 @@ fn lazy_bound_or_constraints_cycle_initial<'db>(
     None
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn lazy_bound_or_constraints_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -9748,7 +9748,7 @@ fn lazy_bound_or_constraints_cycle_recover<'db>(
     }
 }
 
-#[allow(clippy::ref_option)]
+#[expect(clippy::ref_option)]
 fn lazy_default_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
