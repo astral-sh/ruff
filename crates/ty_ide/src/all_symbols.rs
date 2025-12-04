@@ -2,7 +2,10 @@ use ruff_db::files::File;
 use ty_project::Db;
 use ty_python_semantic::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 
-use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
+use crate::{
+    SymbolKind,
+    symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only},
+};
 
 /// Get all symbols matching the query string.
 ///
@@ -85,14 +88,43 @@ pub fn all_symbols<'db>(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AllSymbolInfo<'db> {
     /// The symbol information.
-    pub symbol: SymbolInfo<'static>,
+    symbol: SymbolInfo<'static>,
     /// The module containing the symbol.
-    pub module: Module<'db>,
+    module: Module<'db>,
     /// The file containing the symbol.
     ///
     /// This `File` is guaranteed to be the same
     /// as the `File` underlying `module`.
-    pub file: File,
+    file: File,
+}
+
+impl<'db> AllSymbolInfo<'db> {
+    /// Returns the name of this symbol.
+    pub fn name(&self) -> &str {
+        &self.symbol.name
+    }
+
+    /// Returns the "kind" of this symbol.
+    ///
+    /// The kind of a symbol in the context of auto-import is
+    /// determined on a best effort basis. It may be imprecise
+    /// in some cases, e.g., reporting a module as a variable.
+    pub fn kind(&self) -> SymbolKind {
+        self.symbol.kind
+    }
+
+    /// Returns the module this symbol is exported from.
+    pub fn module(&self) -> Module<'db> {
+        self.module
+    }
+
+    /// Returns the `File` corresponding to the module.
+    ///
+    /// This is always equivalent to
+    /// `AllSymbolInfo::module().file().unwrap()`.
+    pub fn file(&self) -> File {
+        self.file
+    }
 }
 
 #[cfg(test)]
