@@ -1244,6 +1244,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // TODO(submodule-imports): we should refuse to rename this (it's the name of a module)
         assert_snapshot!(test.rename("mypkg"), @r"
         info[rename]: Rename symbol (found 1 locations)
          --> mypackage/__init__.py:4:5
@@ -1276,6 +1277,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Refusing to rename is correct
         assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
     }
 
@@ -1299,6 +1301,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Refusing to rename is good/fine here, it's an undefined reference
         assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
     }
 
@@ -1322,6 +1325,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Refusing to rename is good here, it's a module name
         assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
     }
 
@@ -1344,6 +1348,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Refusing to rename is good here, it's the name of a module
         assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
     }
 
@@ -1366,6 +1371,7 @@ result = func(10, y=20)
             )
             .build();
 
+        // Renaming the integer is correct
         assert_snapshot!(test.rename("mypkg"), @r"
         info[rename]: Rename symbol (found 3 locations)
          --> mypackage/__init__.py:2:21
@@ -1403,6 +1409,12 @@ result = func(10, y=20)
             )
             .build();
 
+        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
+        // and the RHS of the import statement (but *not* rename the LHS).
+        //
+        // However us being cautious here *would* be good as the rename will actually
+        // result in a `subpkg` variable still existing in this code, as the import's LHS
+        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
         assert_snapshot!(test.rename("mypkg"), @r"
         info[rename]: Rename symbol (found 1 locations)
          --> mypackage/__init__.py:4:5

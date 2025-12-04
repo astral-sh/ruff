@@ -1927,6 +1927,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
         assert_snapshot!(test.references(), @r"
         info[references]: Reference 1
          --> mypackage/__init__.py:4:5
@@ -1959,6 +1960,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
         assert_snapshot!(test.references(), @"No references found");
     }
 
@@ -1982,6 +1984,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // No references is actually correct (or it should only see itself)
         assert_snapshot!(test.references(), @"No references found");
     }
 
@@ -2005,6 +2008,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        /// No references is actually correct (or it should only see itself)
         assert_snapshot!(test.references(), @"No references found");
     }
 
@@ -2027,6 +2031,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // No references is actually correct (or it should only see itself)
         assert_snapshot!(test.references(), @"No references found");
     }
 
@@ -2096,6 +2101,7 @@ func<CURSOR>_alias()
             )
             .build();
 
+        // TODO: this should also highlight the RHS subpkg in the import
         assert_snapshot!(test.references(), @r"
         info[references]: Reference 1
          --> mypackage/__init__.py:4:5

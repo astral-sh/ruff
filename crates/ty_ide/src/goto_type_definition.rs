@@ -1692,6 +1692,7 @@ def function():
             )
             .build();
 
+        // The module is the correct type definition
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
         --> mypackage/subpkg/__init__.py:1:1
@@ -1728,6 +1729,7 @@ def function():
             )
             .build();
 
+        // The module is the correct type definition
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
         --> mypackage/subpkg/__init__.py:1:1
@@ -1764,6 +1766,7 @@ def function():
             )
             .build();
 
+        // Unknown is correct, `submod` is not in scope
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
           --> stdlib/ty_extensions.pyi:20:1
@@ -1805,6 +1808,7 @@ def function():
             )
             .build();
 
+        // The module is correct
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
          --> mypackage/subpkg/submod.py:1:1
@@ -1843,6 +1847,7 @@ def function():
             )
             .build();
 
+        // The module is correct
         assert_snapshot!(test.goto_type_definition(), @r"
         info[goto-type-definition]: Type definition
          --> mypackage/subpkg/__init__.py:1:1
@@ -1881,6 +1886,7 @@ def function():
             )
             .build();
 
+        // `int` is correct
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
            --> stdlib/builtins.pyi:348:7
@@ -1921,6 +1927,7 @@ def function():
             )
             .build();
 
+        // `int` is correct
         assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type-definition]: Type definition
            --> stdlib/builtins.pyi:348:7

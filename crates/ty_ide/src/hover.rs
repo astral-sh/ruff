@@ -3341,6 +3341,7 @@ def function():
             )
             .build();
 
+        // The module is correct
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
@@ -3382,6 +3383,7 @@ def function():
             )
             .build();
 
+        // The module is correct
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
@@ -3423,6 +3425,7 @@ def function():
             )
             .build();
 
+        // Unknown is correct
         assert_snapshot!(test.hover(), @r"
         Unknown
         ---------------------------------------------
@@ -3464,6 +3467,7 @@ def function():
             )
             .build();
 
+        // The submodule is correct
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg.submod'>
         ---------------------------------------------
@@ -3504,6 +3508,7 @@ def function():
             )
             .build();
 
+        // The module is correct
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
@@ -3544,6 +3549,7 @@ def function():
             )
             .build();
 
+        // int is correct
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------
@@ -3584,6 +3590,7 @@ def function():
             )
             .build();
 
+        // int is correct
         assert_snapshot!(test.hover(), @r"
         int
         ---------------------------------------------

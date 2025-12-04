@@ -2622,6 +2622,10 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // TODO(submodule-imports): this should only highlight `subpkg` in the import statement
+        // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
+        // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
+        // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
          --> mypackage/__init__.py:2:1
@@ -2662,6 +2666,10 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // TODO(submodule-imports): I don't *think* this is what we want..?
+        // It's a bit confusing because this symbol is essentially the LHS *and* RHS of
+        // `subpkg = mypackage.subpkg`. As in, it's both defining a local `subpkg` and
+        // loading the module `mypackage.subpkg`, so, it's understandable to get confused!
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
         --> mypackage/subpkg/__init__.py:1:1
@@ -2698,6 +2706,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // No result is correct!
         assert_snapshot!(test.goto_declaration(), @"No goto target found");
     }
 
@@ -2721,6 +2730,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // Going to the submod module is correct!
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
          --> mypackage/subpkg/submod.py:1:1
@@ -2759,6 +2769,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // Going to the subpkg module is correct!
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
          --> mypackage/subpkg/__init__.py:1:1
@@ -2797,6 +2808,7 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // Going to the subpkg `int` is correct!
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
          --> mypackage/subpkg/__init__.py:2:1
@@ -2834,6 +2846,19 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
+        // TODO(submodule-imports): Ok this one is FASCINATING and it's kinda right but confusing!
+        //
+        // So there's 3 relevant definitions here:
+        //
+        // * `subpkg: int = 10` in the other file is in fact the original definition
+        //
+        // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
+        //    because it's a `DefinitionKind::ImportFromSubmodle`.
+        //    This is the span that covers the entire import.
+        //
+        // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
+        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
+        //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
          --> mypackage/__init__.py:2:1
