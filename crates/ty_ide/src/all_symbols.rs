@@ -59,12 +59,19 @@ pub fn all_symbols<'db>(
                     continue;
                 }
                 s.spawn(move |_| {
+                    if query.is_match_symbol_name(module.name(&*db)) {
+                        results.lock().unwrap().push(AllSymbolInfo {
+                            symbol: None,
+                            module,
+                            file,
+                        });
+                    }
                     for (_, symbol) in symbols_for_file_global_only(&*db, file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
                         results.lock().unwrap().push(AllSymbolInfo {
-                            symbol: symbol.to_owned(),
+                            symbol: Some(symbol.to_owned()),
                             module,
                             file,
                         });
@@ -76,8 +83,16 @@ pub fn all_symbols<'db>(
 
     let mut results = results.into_inner().unwrap();
     results.sort_by(|s1, s2| {
-        let key1 = (&s1.symbol.name, s1.file.path(db).as_str());
-        let key2 = (&s2.symbol.name, s2.file.path(db).as_str());
+        let key1 = (
+            s1.name_in_file()
+                .unwrap_or_else(|| s1.module().name(db).as_str()),
+            s1.file.path(db).as_str(),
+        );
+        let key2 = (
+            s2.name_in_file()
+                .unwrap_or_else(|| s2.module().name(db).as_str()),
+            s2.file.path(db).as_str(),
+        );
         key1.cmp(&key2)
     });
     results
@@ -88,7 +103,9 @@ pub fn all_symbols<'db>(
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AllSymbolInfo<'db> {
     /// The symbol information.
-    symbol: SymbolInfo<'static>,
+    ///
+    /// When absent, this implies the symbol is the module itself.
+    symbol: Option<SymbolInfo<'static>>,
     /// The module containing the symbol.
     module: Module<'db>,
     /// The file containing the symbol.
@@ -99,9 +116,14 @@ pub struct AllSymbolInfo<'db> {
 }
 
 impl<'db> AllSymbolInfo<'db> {
-    /// Returns the name of this symbol.
-    pub fn name(&self) -> &str {
-        &self.symbol.name
+    /// Returns the name of this symbol as it exists in a file.
+    ///
+    /// When absent, there is no concrete symbol in a module
+    /// somewhere. Instead, this represents importing a module.
+    /// In this case, if the caller needs a symbol name, they
+    /// should use `AllSymbolInfo::module().name()`.
+    pub fn name_in_file(&self) -> Option<&str> {
+        self.symbol.as_ref().map(|symbol| &*symbol.name)
     }
 
     /// Returns the "kind" of this symbol.
@@ -110,7 +132,10 @@ impl<'db> AllSymbolInfo<'db> {
     /// determined on a best effort basis. It may be imprecise
     /// in some cases, e.g., reporting a module as a variable.
     pub fn kind(&self) -> SymbolKind {
-        self.symbol.kind
+        self.symbol
+            .as_ref()
+            .map(|symbol| symbol.kind)
+            .unwrap_or(SymbolKind::Module)
     }
 
     /// Returns the module this symbol is exported from.
@@ -208,25 +233,31 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
                 return "No symbols found".to_string();
             }
 
-            self.render_diagnostics(symbols.into_iter().map(AllSymbolDiagnostic::new))
+            self.render_diagnostics(symbols.into_iter().map(|symbol_info| AllSymbolDiagnostic {
+                db: &self.db,
+                symbol_info,
+            }))
         }
     }
 
     struct AllSymbolDiagnostic<'db> {
+        db: &'db dyn Db,
         symbol_info: AllSymbolInfo<'db>,
-    }
-
-    impl<'db> AllSymbolDiagnostic<'db> {
-        fn new(symbol_info: AllSymbolInfo<'db>) -> Self {
-            Self { symbol_info }
-        }
     }
 
     impl IntoDiagnostic for AllSymbolDiagnostic<'_> {
         fn into_diagnostic(self) -> Diagnostic {
-            let symbol_kind_str = self.symbol_info.symbol.kind.to_string();
+            let symbol_kind_str = self.symbol_info.kind().to_string();
 
-            let info_text = format!("{} {}", symbol_kind_str, self.symbol_info.symbol.name);
+            let info_text = format!(
+                "{} {}",
+                symbol_kind_str,
+                self.symbol_info.name_in_file().unwrap_or_else(|| self
+                    .symbol_info
+                    .module()
+                    .name(self.db)
+                    .as_str())
+            );
 
             let sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, info_text);
 
@@ -235,9 +266,12 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
                 Severity::Info,
                 "AllSymbolInfo".to_string(),
             );
-            main.annotate(Annotation::primary(
-                Span::from(self.symbol_info.file).with_range(self.symbol_info.symbol.name_range),
-            ));
+
+            let mut span = Span::from(self.symbol_info.file());
+            if let Some(ref symbol) = self.symbol_info.symbol {
+                span = span.with_range(symbol.name_range);
+            }
+            main.annotate(Annotation::primary(span));
             main.sub(sub);
 
             main
