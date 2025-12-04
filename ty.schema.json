@@ -813,6 +813,16 @@
             }
           ]
         },
+        "invalid-type-param-order": {
+          "title": "detects invalid type parameter order",
+          "description": "## What it does\nChecks for type parameters without defaults that come after type parameters with defaults.\n\n## Why is this bad?\nType parameters without defaults must come before type parameters with defaults.\n\n## Example\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\")\n# Error: T has no default but comes after U which has a default\nclass Foo(Generic[U = int, T]): ...\n```\n\n## References\n- [PEP 696: Type defaults for type parameters](https://peps.python.org/pep-0696/)",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-variable-constraints": {
           "title": "detects invalid type variable constraints",
           "description": "## What it does\nChecks for constrained [type variables] with only one constraint.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",

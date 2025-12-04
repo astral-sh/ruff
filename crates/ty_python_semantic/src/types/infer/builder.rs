@@ -78,7 +78,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
     report_invalid_return_type, report_invalid_type_checking_constant,
-    report_named_tuple_field_with_leading_underscore,
+    report_named_tuple_field_with_leading_underscore, report_invalid_type_param_order,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
@@ -949,6 +949,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            let type_vars = class.typevars_referenced_in_definition(self.db());
+            let mut seen_default = false;
+            for type_var in type_vars {
+                let has_default = type_var
+                    .typevar(self.db())
+                    .default_type(self.db())
+                    .is_some();
+                if seen_default && !has_default {
+                    report_invalid_type_param_order(
+                        &self.context,
+                        class,
+                        type_var.typevar(self.db()).name(self.db()).as_str(),
+                    );
+                }
+                if has_default {
+                    seen_default = true;
+                }
+            }
             let scope = class.body_scope(self.db()).scope(self.db());
             if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
                 && let Some(parent) = scope.parent()
