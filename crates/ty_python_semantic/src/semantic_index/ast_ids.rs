@@ -116,29 +116,44 @@ pub(crate) mod node_key {
     use crate::node_key::NodeKey;
 
     #[derive(Copy, Clone, Eq, PartialEq, Hash, Debug, salsa::Update, get_size2::GetSize)]
-    pub(crate) struct ExpressionNodeKey(NodeKey);
+    pub(crate) struct ExpressionNodeKey(NodeKey, Option<NodeKey>);
+
+    impl From<(NodeKey, &ast::Expr)> for ExpressionNodeKey {
+        fn from(value: (NodeKey, &ast::Expr)) -> Self {
+            Self(value.0, Some(NodeKey::from_node(value.1)))
+        }
+    }
+
+    impl From<(ast::ExprRef<'_>, ast::ExprRef<'_>)> for ExpressionNodeKey {
+        fn from(value: (ast::ExprRef<'_>, ast::ExprRef<'_>)) -> Self {
+            Self(
+                NodeKey::from_node(value.0),
+                Some(NodeKey::from_node(value.1)),
+            )
+        }
+    }
 
     impl From<ast::ExprRef<'_>> for ExpressionNodeKey {
         fn from(value: ast::ExprRef<'_>) -> Self {
-            Self(NodeKey::from_node(value))
+            Self(NodeKey::from_node(value), None)
         }
     }
 
     impl From<&ast::Expr> for ExpressionNodeKey {
         fn from(value: &ast::Expr) -> Self {
-            Self(NodeKey::from_node(value))
+            Self(NodeKey::from_node(value), None)
         }
     }
 
     impl From<&ast::ExprCall> for ExpressionNodeKey {
         fn from(value: &ast::ExprCall) -> Self {
-            Self(NodeKey::from_node(value))
+            Self(NodeKey::from_node(value), None)
         }
     }
 
     impl From<&ast::Identifier> for ExpressionNodeKey {
         fn from(value: &ast::Identifier) -> Self {
-            Self(NodeKey::from_node(value))
+            Self(NodeKey::from_node(value), None)
         }
     }
 }

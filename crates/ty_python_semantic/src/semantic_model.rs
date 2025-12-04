@@ -1,4 +1,5 @@
 use ruff_db::files::{File, FilePath};
+use ruff_db::parsed::parsed_string_annotation;
 use ruff_db::source::{line_index, source_text};
 use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
@@ -287,6 +288,12 @@ impl<'db> SemanticModel<'db> {
         }
     }
 
+    fn expr_ref_pair<'a>(&'a self, arg: ExprRef<'a>) -> Option<(ExprRef<'a>, ExprRef<'a>)> {
+        self.in_string_annotation_expr
+            .as_ref()
+            .map(|in_ast_expr| (ExprRef::from(in_ast_expr), arg))
+    }
+
     /// Given a string expression, determine if it's a string annotation, and if it is,
     /// yield the parsed sub-AST and a sub-model that knows it's analyzing a sub-AST.
     ///
@@ -317,8 +324,7 @@ impl<'db> SemanticModel<'db> {
         // are not in the File's AST!
         let source = source_text(self.db, self.file);
         let string_literal = string_expr.as_single_part_string()?;
-        let ast =
-            ruff_python_parser::parse_string_annotation(source.as_str(), string_literal).ok()?;
+        let ast = parsed_string_annotation(source.as_str(), string_literal).ok()?;
         let model = Self {
             db: self.db,
             file: self.file,
@@ -422,8 +428,12 @@ impl HasType for ast::ExprRef<'_> {
             return Type::unknown();
         };
         let scope = file_scope.to_scope_id(model.db, model.file);
-
-        infer_scope_types(model.db, scope).expression_type(*self)
+        let types = infer_scope_types(model.db, scope);
+        if let Some((expr_in_ast, sub_expr)) = model.expr_ref_pair(*self) {
+            types.expression_type((expr_in_ast, sub_expr))
+        } else {
+            types.expression_type(model.expr_ref_in_ast(*self))
+        }
     }
 }
 

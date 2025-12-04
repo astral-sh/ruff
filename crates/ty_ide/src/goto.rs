@@ -313,18 +313,11 @@ impl GotoTarget<'_> {
                 subrange,
                 ..
             } => {
-                let (subast, _submodel) = model.enter_string_annotation(string_expr)?;
-                let submod = subast.syntax();
-                let subnode = covering_node(submod.into(), *subrange).node();
-
-                // The type checker knows the type of the full annotation but nothing else
-                if AnyNodeRef::from(&*submod.body) == subnode {
-                    string_expr.inferred_type(model)
-                } else {
-                    // TODO: force the typechecker to tell us its secrets
-                    // (it computes but then immediately discards these types)
-                    return None;
-                }
+                let (subast, submodel) = model.enter_string_annotation(string_expr)?;
+                let subexpr = covering_node(subast.syntax().into(), *subrange)
+                    .node()
+                    .as_expr_ref()?;
+                subexpr.inferred_type(&submodel)
             }
             GotoTarget::BinOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
