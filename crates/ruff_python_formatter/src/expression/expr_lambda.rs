@@ -8,7 +8,6 @@ use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Pare
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
-use crate::preview::is_force_single_line_lambda_parameters_enabled;
 use crate::preview::is_parenthesize_lambda_bodies_enabled;
 
 #[derive(Default)]
@@ -43,7 +42,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if is_force_single_line_lambda_parameters_enabled(f.context())
+            if is_parenthesize_lambda_bodies_enabled(f.context())
                 && !comments.contains_comments(parameters.as_ref().into())
             {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
