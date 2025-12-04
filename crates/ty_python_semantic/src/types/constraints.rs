@@ -606,7 +606,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return Node::AlwaysFalse;
         }
 
@@ -724,8 +724,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
-        other.lower(db).is_subtype_of(db, self.lower(db))
-            && self.upper(db).is_subtype_of(db, other.upper(db))
+        other
+            .lower(db)
+            .is_constraint_set_assignable_to(db, self.lower(db))
+            && self
+                .upper(db)
+                .is_constraint_set_assignable_to(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -736,7 +740,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return IntersectionResult::Disjoint;
         }
 
@@ -1280,7 +1284,7 @@ impl<'db> Node<'db> {
                 // process.
                 debug_assert!(current_bounds.is_none_or(
                     |(greatest_lower_bound, least_upper_bound)| {
-                        greatest_lower_bound.is_subtype_of(db, least_upper_bound)
+                        greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound)
                     }
                 ));
 
@@ -3485,7 +3489,7 @@ impl<'db> GenericContext<'db> {
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
-            if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
+            if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
                     bound_typevar = %identity.display(db),
