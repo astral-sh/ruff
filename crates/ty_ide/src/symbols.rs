@@ -569,6 +569,10 @@ impl SourceOrderVisitor<'_> for SymbolVisitor {
             }
         }
     }
+
+    // TODO: We might consider handling walrus expressions
+    // here, since they can be used to introduce new names.
+    fn visit_expr(&mut self, _expr: &ast::Expr) {}
 }
 
 #[cfg(test)]
