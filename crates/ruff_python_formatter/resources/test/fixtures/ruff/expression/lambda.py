@@ -472,3 +472,5 @@ lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxx
 
 # removes parentheses around the body
 lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
+
+mapper = lambda x: dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]

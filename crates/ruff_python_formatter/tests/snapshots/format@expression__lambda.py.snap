@@ -478,6 +478,8 @@ lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxx
 
 # removes parentheses around the body
 lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
+
+mapper = lambda x: dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]
 ```
 
 ## Output
@@ -996,6 +998,10 @@ lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxx
 
 # removes parentheses around the body
 lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
+
+mapper = lambda x: dict_with_default[
+    np.nan if isinstance(x, float) and np.isnan(x) else x
+]
 ```
 
 
@@ -1361,7 +1367,7 @@ lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -508,7 +490,9 @@
+@@ -508,10 +490,12 @@
  ]
  
  # adds parentheses around the body
@@ -1373,4 +1379,7 @@ lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
  # removes parentheses around the body
 -lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
 +lambda xxxxxxxxxxxxxxxxxxxx: xxxxxxxxxxxxxxxxxxxx + 1
+ 
+ mapper = lambda x: dict_with_default[
+     np.nan if isinstance(x, float) and np.isnan(x) else x
 ```
