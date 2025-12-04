@@ -292,7 +292,13 @@ impl<'a> From<&'a SymbolTreeWithChildren> for SymbolInfo<'a> {
     }
 }
 
-/// The kind of symbol
+/// The kind of symbol.
+///
+/// Note that this is computed on a best effort basis. The nature of
+/// auto-import is that it tries to do a very low effort scan of a lot of code
+/// very quickly. This means that it doesn't use things like type information
+/// or completely resolve the definition of every symbol. So for example, we
+/// might label a module as a variable, depending on how it was introduced.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, get_size2::GetSize)]
 pub enum SymbolKind {
     Module,
