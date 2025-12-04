@@ -1904,6 +1904,20 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Return true if this type is assignable to type `target` using constraint-set assignability.
+    ///
+    /// This uses `TypeRelation::ConstraintSetAssignability`, which encodes typevar relations into
+    /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
+    /// reasoning depending on inferable typevars.
+    pub fn is_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+    ) -> bool {
+        self.when_constraint_set_assignable_to(db, target, InferableTypeVars::None)
+            .is_always_satisfied(db)
+    }
+
     fn when_assignable_to(
         self,
         db: &'db dyn Db,
@@ -1911,6 +1925,20 @@ impl<'db> Type<'db> {
         inferable: InferableTypeVars<'_, 'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
+    }
+
+    fn when_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+        )
     }
 
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
