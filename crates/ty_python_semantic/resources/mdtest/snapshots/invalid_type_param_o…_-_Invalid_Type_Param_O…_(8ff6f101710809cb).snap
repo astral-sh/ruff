@@ -18,25 +18,24 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_type
  4 | T2 = TypeVar("T2")
  5 | T3 = TypeVar("T3")
  6 | 
- 7 | # error [invalid-type-param-order]
- 8 | class Foo(Generic[T1, T2]):
- 9 |     pass
-10 | 
-11 | # error [invalid-type-param-order]
-12 | class Bar(Generic[T2, T1, T3]):
-13 |     pass
+ 7 | class Foo(Generic[T1, T2]):  # error: [invalid-type-param-order]
+ 8 |     pass
+ 9 | 
+10 | class Bar(Generic[T2, T1, T3]):  # error: [invalid-type-param-order]
+11 |     pass
 ```
 
 # Diagnostics
 
 ```
 error[invalid-type-param-order]: Type parameter T2 without a default follows type parameter with a default
- --> src/mdtest_snippet.py:8:7
+ --> src/mdtest_snippet.py:7:7
   |
-7 | # error [invalid-type-param-order]
-8 | class Foo(Generic[T1, T2]):
+5 | T3 = TypeVar("T3")
+6 |
+7 | class Foo(Generic[T1, T2]):  # error: [invalid-type-param-order]
   |       ^^^^^^^^^^^^^^^^^^^^
-9 |     pass
+8 |     pass
   |
 info: rule `invalid-type-param-order` is enabled by default
 
@@ -44,12 +43,13 @@ info: rule `invalid-type-param-order` is enabled by default
 
 ```
 error[invalid-type-param-order]: Type parameter T3 without a default follows type parameter with a default
-  --> src/mdtest_snippet.py:12:7
+  --> src/mdtest_snippet.py:10:7
    |
-11 | # error [invalid-type-param-order]
-12 | class Bar(Generic[T2, T1, T3]):
+ 8 |     pass
+ 9 |
+10 | class Bar(Generic[T2, T1, T3]):  # error: [invalid-type-param-order]
    |       ^^^^^^^^^^^^^^^^^^^^^^^^
-13 |     pass
+11 |     pass
    |
 info: rule `invalid-type-param-order` is enabled by default
 
