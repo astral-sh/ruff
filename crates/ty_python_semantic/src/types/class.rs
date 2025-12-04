@@ -1134,7 +1134,7 @@ impl<'db> ClassType<'db> {
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
         let (class_literal, _) = self.class_literal(db);
-        let generic_context = class_literal.generic_context(db);
+        let class_generic_context = class_literal.generic_context(db);
 
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1232,6 +1232,11 @@ impl<'db> ClassType<'db> {
                         });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
                     let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    let generic_context = GenericContext::merge_optional(
+                        db,
+                        class_generic_context,
+                        signature.generic_context,
+                    );
                     Signature::new_generic(
                         generic_context,
                         signature.parameters().clone(),
