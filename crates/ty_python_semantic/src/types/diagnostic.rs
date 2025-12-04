@@ -3735,7 +3735,7 @@ pub(crate) fn report_invalid_type_param_order<'db>(
         builder.into_diagnostic(format_args!(
             "Type parameter {name} without a default follows type parameter with a default",
         ));
-    };
+    }
 }
 
 pub(crate) fn report_rebound_typevar<'db>(
