@@ -37,6 +37,38 @@ pub enum ReferencesMode {
     DocumentHighlights,
 }
 
+impl ReferencesMode {
+    fn to_import_alias_resolution(self) -> ImportAliasResolution {
+        match self {
+            // Resolve import aliases for find references:
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            //
+            // When finding references on `my_deprecated`, we want to find all usages of `deprecated` across the entire
+            // project.
+            Self::References | Self::ReferencesSkipDeclaration => {
+                ImportAliasResolution::ResolveAliases
+            }
+            // For rename, don't resolve import aliases.
+            //
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            // When renaming `my_deprecated`, only rename the alias, but not the original definition in `warnings`.
+            Self::Rename | Self::RenameMultiFile | Self::DocumentHighlights => {
+                ImportAliasResolution::PreserveAliases
+            }
+        }
+    }
+}
+
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub(crate) fn references(
@@ -45,12 +77,9 @@ pub(crate) fn references(
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
-    // Get the definitions for the symbol at the cursor position
-
-    // When finding references, do not resolve any local aliases.
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
+        .get_definition_targets(&model, mode.to_import_alias_resolution())?
         .declaration_targets(db)?;
 
     // Extract the target text from the goto target for fast comparison
@@ -177,67 +206,91 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 }
 
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
-                self.check_reference_from_covering_node(&covering_node);
+                self.check_reference_from_covering_node(
+                    &covering_node,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::ExprAttribute(attr_expr) => {
-                self.check_identifier_reference(&attr_expr.attr);
+                self.check_identifier_reference(
+                    &attr_expr.attr,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::StmtFunctionDef(func) if self.should_include_declaration() => {
-                self.check_identifier_reference(&func.name);
+                self.check_identifier_reference(&func.name, self.mode.to_import_alias_resolution());
             }
             AnyNodeRef::StmtClassDef(class) if self.should_include_declaration() => {
-                self.check_identifier_reference(&class.name);
+                self.check_identifier_reference(
+                    &class.name,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::Parameter(parameter) if self.should_include_declaration() => {
-                self.check_identifier_reference(&parameter.name);
+                self.check_identifier_reference(
+                    &parameter.name,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::Keyword(keyword) => {
                 if let Some(arg) = &keyword.arg {
-                    self.check_identifier_reference(arg);
+                    self.check_identifier_reference(arg, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::StmtGlobal(global_stmt) if self.should_include_declaration() => {
                 for name in &global_stmt.names {
-                    self.check_identifier_reference(name);
+                    self.check_identifier_reference(name, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::StmtNonlocal(nonlocal_stmt) if self.should_include_declaration() => {
                 for name in &nonlocal_stmt.names {
-                    self.check_identifier_reference(name);
+                    self.check_identifier_reference(name, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::ExceptHandlerExceptHandler(handler)
                 if self.should_include_declaration() =>
             {
                 if let Some(name) = &handler.name {
-                    self.check_identifier_reference(name);
+                    self.check_identifier_reference(name, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::PatternMatchAs(pattern_as) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_as.name {
-                    self.check_identifier_reference(name);
+                    self.check_identifier_reference(name, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_star.name {
-                    self.check_identifier_reference(name);
+                    self.check_identifier_reference(name, self.mode.to_import_alias_resolution());
                 }
             }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {
                 if let Some(rest_name) = &pattern_mapping.rest {
-                    self.check_identifier_reference(rest_name);
+                    self.check_identifier_reference(
+                        rest_name,
+                        self.mode.to_import_alias_resolution(),
+                    );
                 }
             }
             AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_spec.name);
+                self.check_identifier_reference(
+                    &param_spec.name,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_tuple.name);
+                self.check_identifier_reference(
+                    &param_tuple.name,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_var.name);
+                self.check_identifier_reference(
+                    &param_var.name,
+                    self.mode.to_import_alias_resolution(),
+                );
             }
             AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
                 // Highlight the sub-AST of a string annotation
@@ -258,12 +311,15 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
-                    self.check_identifier_reference(asname);
+                    self.check_identifier_reference(asname, self.mode.to_import_alias_resolution());
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
                 if alias.name.id == self.target_text {
-                    self.check_identifier_reference(&alias.name);
+                    self.check_identifier_reference(
+                        &alias.name,
+                        ImportAliasResolution::ResolveAliases,
+                    );
                 }
             }
             _ => {}
@@ -291,7 +347,11 @@ impl LocalReferencesFinder<'_> {
     }
 
     /// Helper method to check identifier references for declarations
-    fn check_identifier_reference(&mut self, identifier: &ast::Identifier) {
+    fn check_identifier_reference(
+        &mut self,
+        identifier: &ast::Identifier,
+        alias_resolution: ImportAliasResolution,
+    ) {
         // Quick text-based check first
         if identifier.id != self.target_text {
             return;
@@ -300,7 +360,7 @@ impl LocalReferencesFinder<'_> {
         let mut ancestors_with_identifier = self.ancestors.clone();
         ancestors_with_identifier.push(AnyNodeRef::from(identifier));
         let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
-        self.check_reference_from_covering_node(&covering_node);
+        self.check_reference_from_covering_node(&covering_node, alias_resolution);
     }
 
     /// Determines whether the given covering node is a reference to
@@ -308,6 +368,7 @@ impl LocalReferencesFinder<'_> {
     fn check_reference_from_covering_node(
         &mut self,
         covering_node: &crate::find_node::CoveringNode<'_>,
+        alias_resolution: ImportAliasResolution,
     ) {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
@@ -318,7 +379,7 @@ impl LocalReferencesFinder<'_> {
         {
             // Get the definitions for this goto target
             if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, ImportAliasResolution::PreserveAliases)
+                .get_definition_targets(self.model, alias_resolution)
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 // Check if any of the current definitions match our target definitions

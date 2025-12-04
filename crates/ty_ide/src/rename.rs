@@ -24,26 +24,27 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    if let Some(definition_targets) = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
-        .and_then(|definitions| definitions.declaration_targets(db))
-    {
-        for target in &definition_targets {
-            let target_file = target.file();
+    dbg!(file.path(db));
+    let definition_targets = dbg!(
+        dbg!(&goto_target)
+            .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
+    )
+    .declaration_targets(db)?;
 
-            // If definition is outside the project, refuse rename
-            if !is_file_in_project(db, target_file) {
-                return None;
-            }
+    for target in &definition_targets {
+        dbg!(target);
 
-            // If current file is not in project and any definition is outside current file, refuse rename
-            if !current_file_in_project && target_file != file {
-                return None;
-            }
+        let target_file = target.file();
+
+        // If definition is outside the project, refuse rename
+        if !is_file_in_project(db, target_file) {
+            return None;
         }
-    } else {
-        // No definition targets found. This happens for keywords, so refuse rename
-        return None;
+
+        // If current file is not in project and any definition is outside current file, refuse rename
+        if !current_file_in_project && target_file != file {
+            return None;
+        }
     }
 
     Some(goto_target.range())
@@ -972,7 +973,8 @@ result = <CURSOR>alias()
             )
             .build();
 
-        assert_snapshot!(test.rename("new_alias"), @r"
+        salsa::attach(&test.db, || {
+            assert_snapshot!(test.rename("new_alias"), @r"
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
@@ -982,6 +984,7 @@ result = <CURSOR>alias()
           |          -----
           |
         ");
+        });
     }
 
     #[test]
@@ -1082,7 +1085,7 @@ class App:
             .build();
 
         assert_snapshot!(test.rename("new_util_name"), @r"
-        info[rename]: Rename symbol (found 4 locations)
+        info[rename]: Rename symbol (found 2 locations)
          --> file3.py:2:19
           |
         2 | from file2 import func2
@@ -1092,14 +1095,6 @@ class App:
         5 |     def run(self):
         6 |         return func2()
           |                -----
-          |
-         ::: file2.py:2:28
-          |
-        2 | from file1 import func1 as func2
-          |                            -----
-        3 |
-        4 | func2()
-          | -----
           |
         ");
     }
@@ -1202,10 +1197,83 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @"Cannot rename");
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
     }
 
     // TODO Should rename the alias
+    #[test]
+    fn import_alias_to_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                import lib as lib2<CURSOR>
+
+                x = lib2
+            "#,
+            )
+            .build();
+
+        salsa::attach(&test.db, || {
+            assert_snapshot!(test.rename("z"), @r"
+            info[rename]: Rename symbol (found 2 locations)
+             --> main.py:2:15
+              |
+            2 | import lib as lib2
+              |               ^^^^
+            3 |
+            4 | x = lib2
+              |     ----
+              |
+            ")
+        });
+    }
+
+    #[test]
+    fn imported_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                from lib import deprecated<CURSOR>
+
+                x = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import deprecated
+          |                 ^^^^^^^^^^
+        3 |
+        4 | x = deprecated
+          |     ----------
+          |
+         ::: lib.py:1:5
+          |
+        1 | def deprecated(): pass
+          |     ----------
+          |
+        ");
+    }
+
     #[test]
     fn import_alias_use() {
         let test = CursorTest::builder()
@@ -1221,7 +1289,19 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @"Cannot rename");
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
     }
 
     #[test]

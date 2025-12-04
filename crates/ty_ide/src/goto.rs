@@ -73,19 +73,27 @@ pub(crate) enum GotoTarget<'a> {
     /// ```
     ImportModuleAlias {
         alias: &'a ast::Alias,
+        asname: &'a ast::Identifier,
+    },
+
+    /// Import target in from import statement
+    /// ```py
+    /// from foo import bar as baz
+    ///                        ^^^
+    /// ```
+    ImportSymbolTarget {
+        alias: &'a ast::Alias,
+        import_from: &'a ast::StmtImportFrom,
     },
 
     /// Import alias in from import statement
     /// ```py
     /// from foo import bar as baz
-    ///                 ^^^
-    /// from foo import bar as baz
     ///                        ^^^
     /// ```
     ImportSymbolAlias {
         alias: &'a ast::Alias,
-        range: TextRange,
-        import_from: &'a ast::StmtImportFrom,
+        asname: &'a ast::Identifier,
     },
 
     /// Go to on the exception handler variable
@@ -290,8 +298,9 @@ impl GotoTarget<'_> {
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
             GotoTarget::ClassDef(class) => class.inferred_type(model),
             GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
-            GotoTarget::ImportSymbolAlias { alias, .. } => alias.inferred_type(model),
-            GotoTarget::ImportModuleAlias { alias } => alias.inferred_type(model),
+            GotoTarget::ImportSymbolAlias { alias, .. }
+            | GotoTarget::ImportModuleAlias { alias, .. }
+            | GotoTarget::ImportSymbolTarget { alias, .. } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
             // When asking the type of a callable, usually you want the callable itself?
@@ -378,7 +387,9 @@ impl GotoTarget<'_> {
         alias_resolution: ImportAliasResolution,
     ) -> Option<Definitions<'db>> {
         let definitions = match self {
-            GotoTarget::Expression(expression) => definitions_for_expression(model, *expression),
+            GotoTarget::Expression(expression) => {
+                definitions_for_expression(model, *expression, alias_resolution)
+            }
             // For already-defined symbols, they are their own definitions
             GotoTarget::FunctionDef(function) => Some(vec![ResolvedDefinition::Definition(
                 function.definition(model),
@@ -393,22 +404,21 @@ impl GotoTarget<'_> {
             )]),
 
             // For import aliases (offset within 'y' or 'z' in "from x import y as z")
-            GotoTarget::ImportSymbolAlias {
-                alias, import_from, ..
-            } => {
-                if let Some(asname) = alias.asname.as_ref()
-                    && alias_resolution == ImportAliasResolution::PreserveAliases
-                {
-                    Some(definitions_for_name(model, asname.as_str(), asname.into()))
-                } else {
-                    let symbol_name = alias.name.as_str();
-                    Some(definitions_for_imported_symbol(
-                        model,
-                        import_from,
-                        symbol_name,
-                        alias_resolution,
-                    ))
-                }
+            GotoTarget::ImportSymbolAlias { asname, .. } => Some(definitions_for_name(
+                model,
+                asname.as_str(),
+                AnyNodeRef::from(*asname),
+                alias_resolution,
+            )),
+
+            GotoTarget::ImportSymbolTarget { alias, import_from } => {
+                let symbol_name = alias.name.as_str();
+                Some(definitions_for_imported_symbol(
+                    model,
+                    import_from,
+                    symbol_name,
+                    ImportAliasResolution::ResolveAliases,
+                ))
             }
 
             GotoTarget::ImportModuleComponent {
@@ -423,15 +433,12 @@ impl GotoTarget<'_> {
             }
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
-            GotoTarget::ImportModuleAlias { alias } => {
-                if let Some(asname) = alias.asname.as_ref()
-                    && alias_resolution == ImportAliasResolution::PreserveAliases
-                {
-                    Some(definitions_for_name(model, asname.as_str(), asname.into()))
-                } else {
-                    definitions_for_module(model, Some(alias.name.as_str()), 0)
-                }
-            }
+            GotoTarget::ImportModuleAlias { asname, .. } => Some(definitions_for_name(
+                model,
+                asname.as_str(),
+                AnyNodeRef::from(*asname),
+                alias_resolution,
+            )),
 
             // Handle keyword arguments in call expressions
             GotoTarget::KeywordArgument {
@@ -454,12 +461,22 @@ impl GotoTarget<'_> {
             // because they're not expressions
             GotoTarget::PatternMatchRest(pattern_mapping) => {
                 pattern_mapping.rest.as_ref().map(|name| {
-                    definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
+                    definitions_for_name(
+                        model,
+                        name.as_str(),
+                        AnyNodeRef::Identifier(name),
+                        alias_resolution,
+                    )
                 })
             }
 
             GotoTarget::PatternMatchAsName(pattern_as) => pattern_as.name.as_ref().map(|name| {
-                definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
+                definitions_for_name(
+                    model,
+                    name.as_str(),
+                    AnyNodeRef::Identifier(name),
+                    alias_resolution,
+                )
             }),
 
             GotoTarget::PatternKeywordArgument(pattern_keyword) => {
@@ -468,12 +485,18 @@ impl GotoTarget<'_> {
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
+                    alias_resolution,
                 ))
             }
 
             GotoTarget::PatternMatchStarName(pattern_star) => {
                 pattern_star.name.as_ref().map(|name| {
-                    definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
+                    definitions_for_name(
+                        model,
+                        name.as_str(),
+                        AnyNodeRef::Identifier(name),
+                        alias_resolution,
+                    )
                 })
             }
 
@@ -481,9 +504,19 @@ impl GotoTarget<'_> {
             //
             // Prefer the function impl over the callable so that its docstrings win if defined.
             GotoTarget::Call { callable, call } => {
-                let mut definitions = definitions_for_callable(model, call);
-                let expr_definitions =
-                    definitions_for_expression(model, *callable).unwrap_or_default();
+                let mut definitions = Vec::new();
+
+                // This feels off?
+                if alias_resolution == ImportAliasResolution::ResolveAliases {
+                    definitions.extend(definitions_for_callable(model, call));
+                }
+
+                let expr_definitions = dbg!(definitions_for_expression(
+                    model,
+                    *callable,
+                    alias_resolution
+                ))
+                .unwrap_or_default();
                 definitions.extend(expr_definitions);
 
                 if definitions.is_empty() {
@@ -517,7 +550,7 @@ impl GotoTarget<'_> {
                 let subexpr = covering_node(subast.syntax().into(), *subrange)
                     .node()
                     .as_expr_ref()?;
-                definitions_for_expression(&submodel, subexpr)
+                definitions_for_expression(&submodel, subexpr, alias_resolution)
             }
 
             // nonlocal and global are essentially loads, but again they're statements,
@@ -527,6 +560,7 @@ impl GotoTarget<'_> {
                     model,
                     identifier.as_str(),
                     AnyNodeRef::Identifier(identifier),
+                    alias_resolution,
                 ))
             }
 
@@ -537,6 +571,7 @@ impl GotoTarget<'_> {
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
+                    alias_resolution,
                 ))
             }
 
@@ -546,6 +581,7 @@ impl GotoTarget<'_> {
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
+                    alias_resolution,
                 ))
             }
 
@@ -555,6 +591,7 @@ impl GotoTarget<'_> {
                     model,
                     name.as_str(),
                     AnyNodeRef::Identifier(name),
+                    alias_resolution,
                 ))
             }
         };
@@ -580,7 +617,8 @@ impl GotoTarget<'_> {
             GotoTarget::FunctionDef(function) => Some(Cow::Borrowed(function.name.as_str())),
             GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
             GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
-            GotoTarget::ImportSymbolAlias { alias, .. } => {
+            GotoTarget::ImportSymbolAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
+            GotoTarget::ImportSymbolTarget { alias, .. } => {
                 if let Some(asname) = &alias.asname {
                     Some(Cow::Borrowed(asname.as_str()))
                 } else {
@@ -599,13 +637,7 @@ impl GotoTarget<'_> {
                     Some(Cow::Borrowed(module_name))
                 }
             }
-            GotoTarget::ImportModuleAlias { alias } => {
-                if let Some(asname) = &alias.asname {
-                    Some(Cow::Borrowed(asname.as_str()))
-                } else {
-                    Some(Cow::Borrowed(alias.name.as_str()))
-                }
-            }
+            GotoTarget::ImportModuleAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
             GotoTarget::ExceptVariable(except) => {
                 Some(Cow::Borrowed(except.name.as_ref()?.as_str()))
             }
@@ -667,7 +699,7 @@ impl GotoTarget<'_> {
                             // Is the offset within the alias name (asname) part?
                             if let Some(asname) = &alias.asname {
                                 if asname.range.contains_inclusive(offset) {
-                                    return Some(GotoTarget::ImportModuleAlias { alias });
+                                    return Some(GotoTarget::ImportModuleAlias { alias, asname });
                                 }
                             }
 
@@ -699,21 +731,13 @@ impl GotoTarget<'_> {
                             // Is the offset within the alias name (asname) part?
                             if let Some(asname) = &alias.asname {
                                 if asname.range.contains_inclusive(offset) {
-                                    return Some(GotoTarget::ImportSymbolAlias {
-                                        alias,
-                                        range: asname.range,
-                                        import_from,
-                                    });
+                                    return Some(GotoTarget::ImportSymbolAlias { alias, asname });
                                 }
                             }
 
                             // Is the offset in the original name part?
                             if alias.name.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportSymbolAlias {
-                                    alias,
-                                    range: alias.name.range,
-                                    import_from,
-                                });
+                                return Some(GotoTarget::ImportSymbolTarget { alias, import_from });
                             }
 
                             None
@@ -893,12 +917,13 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::FunctionDef(function) => function.name.range,
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
-            GotoTarget::ImportSymbolAlias { range, .. } => *range,
+            GotoTarget::ImportSymbolAlias { alias, .. } => alias.asname.as_ref().unwrap().range,
+            Self::ImportSymbolTarget { alias, .. } => alias.name.range,
             GotoTarget::ImportModuleComponent {
                 component_range, ..
             } => *component_range,
             GotoTarget::StringAnnotationSubexpr { subrange, .. } => *subrange,
-            GotoTarget::ImportModuleAlias { alias } => alias.asname.as_ref().unwrap().range,
+            GotoTarget::ImportModuleAlias { asname, .. } => asname.range,
             GotoTarget::ExceptVariable(except) => except.name.as_ref().unwrap().range,
             GotoTarget::KeywordArgument { keyword, .. } => keyword.arg.as_ref().unwrap().range,
             GotoTarget::PatternMatchRest(rest) => rest.rest.as_ref().unwrap().range,
@@ -955,12 +980,14 @@ fn convert_resolved_definitions_to_targets<'db>(
 fn definitions_for_expression<'db>(
     model: &SemanticModel<'db>,
     expression: ruff_python_ast::ExprRef<'_>,
+    alias_resolution: ImportAliasResolution,
 ) -> Option<Vec<ResolvedDefinition<'db>>> {
     match expression {
         ast::ExprRef::Name(name) => Some(definitions_for_name(
             model,
             name.id.as_str(),
             expression.into(),
+            alias_resolution,
         )),
         ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
             model, attribute,
