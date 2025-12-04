@@ -1090,6 +1090,60 @@ mod tests {
     }
 
     #[test]
+    fn hover_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^-
+          |      ||
+          |      |Cursor offset
+          |      source
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | x: "foobar"
+          |     ^^^-^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_overload_type_disambiguated1() {
         let test = CursorTest::builder()
             .source(

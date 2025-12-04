@@ -965,6 +965,60 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | x: "foobar"
+          |     ^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_type_match_name_stmt() {
         let test = cursor_test(
             r#"

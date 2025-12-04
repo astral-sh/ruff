@@ -1074,6 +1074,41 @@ def another_helper(path):
     }
 
     #[test]
+    fn goto_declaration_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | ^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_declaration_nested_instance_attribute() {
         let test = cursor_test(
             "
