@@ -28,6 +28,7 @@ mod tests {
     use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
     use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
@@ -955,6 +956,8 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions =
+            Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens());
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -968,6 +971,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages

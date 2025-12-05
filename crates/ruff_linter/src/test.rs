@@ -32,6 +32,7 @@ use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
@@ -234,6 +235,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
     let messages = check_path(
         path,
         path.parent()
@@ -249,6 +251,7 @@ pub(crate) fn test_contents<'a>(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let source_has_errors = parsed.has_invalid_syntax();
@@ -299,6 +302,8 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
+            let suppressions =
+                Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
             let fixed_messages = check_path(
                 path,
                 None,
@@ -312,6 +317,7 @@ pub(crate) fn test_contents<'a>(
                 source_type,
                 &parsed,
                 target_version,
+                &suppressions,
             );
 
             if parsed.has_invalid_syntax() && !source_has_errors {

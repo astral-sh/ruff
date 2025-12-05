@@ -306,6 +306,25 @@ mod tests {
     }
 
     #[test]
+    fn range_suppressions() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/suppressions.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+                Rule::UnusedNOQA,
+            ]),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+                Rule::UnusedNOQA,
+            ])
+            .with_preview_mode(),
+        );
+        Ok(())
+    }
+
+    #[test]
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),

@@ -20,6 +20,7 @@ use ruff_linter::{
     packaging::detect_package_root,
     settings::flags,
     source_kind::SourceKind,
+    suppression::Suppressions,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
@@ -118,6 +119,10 @@ pub(crate) fn check(
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
+    // Parse range suppression comments
+    let suppressions =
+        Suppressions::from_tokens(&settings.linter, locator.contents(), parsed.tokens());
+
     // Generate checks.
     let diagnostics = check_path(
         &document_path,
@@ -132,6 +137,7 @@ pub(crate) fn check(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -142,6 +148,7 @@ pub(crate) fn check(
         &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        &suppressions,
     );
 
     let mut diagnostics_map = DiagnosticsMap::default();

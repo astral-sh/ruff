@@ -2,6 +2,7 @@ use std::path::Path;
 
 use js_sys::Error;
 use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::suppression::Suppressions;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -212,6 +213,9 @@ impl Workspace {
             &indexer,
         );
 
+        let suppressions =
+            Suppressions::from_tokens(&self.settings.linter, locator.contents(), parsed.tokens());
+
         // Generate checks.
         let diagnostics = check_path(
             Path::new("<filename>"),
@@ -226,6 +230,7 @@ impl Workspace {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
 
         let source_code = locator.to_source_code();
