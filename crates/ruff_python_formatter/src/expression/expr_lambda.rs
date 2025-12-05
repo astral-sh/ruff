@@ -65,6 +65,42 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
+            }
+            // In preview, always parenthesize the body if there are dangling comments.
+            else if is_parenthesize_lambda_bodies_enabled(f.context()) {
+                // Can't use partition_point because there can be additional end of line comments
+                // after the initial set. All of these comments are dangling, for example:
+                //
+                // ```python
+                // (
+                //     lambda  # 1
+                //     # 2
+                //     :  # 3
+                //     # 4
+                //     y
+                // )
+                // ```
+                //
+                // and alternate between own line and end of line.
+                let (dangling_end_of_line, dangling_own_line) = dangling_after_parameters.split_at(
+                    dangling_after_parameters
+                        .iter()
+                        .position(|comment| comment.line_position().is_own_line())
+                        .unwrap_or_else(|| dangling_after_parameters.len()),
+                );
+                return write!(
+                    f,
+                    [
+                        space(),
+                        token("("),
+                        dangling_comments(dangling_end_of_line),
+                        soft_block_indent(&format_args!(
+                            dangling_comments(dangling_own_line),
+                            body.format().with_options(Parentheses::Never)
+                        )),
+                        token(")")
+                    ]
+                );
             } else {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
