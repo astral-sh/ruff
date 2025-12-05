@@ -4986,14 +4986,16 @@ impl<'db> Type<'db> {
                     .into()
             }
 
-            Type::TypeVar(typevar)
-                if typevar.is_paramspec(db) && matches!(name_str, "args" | "kwargs") =>
-            {
-                Place::declared(Type::TypeVar(match name_str {
-                    "args" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                    "kwargs" => typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                    _ => unreachable!(),
-                }))
+            Type::TypeVar(typevar) if name_str == "args" && typevar.is_paramspec(db) => {
+                Place::declared(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                ))
+                .into()
+            }
+            Type::TypeVar(typevar) if name_str == "kwargs" && typevar.is_paramspec(db) => {
+                Place::declared(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                ))
                 .into()
             }
 
@@ -8603,8 +8605,6 @@ pub struct TrackedConstraintSet<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for TrackedConstraintSet<'_> {}
 
-// TODO: The origin is either `TypeVarInstance` or `BoundTypeVarInstance`
-
 /// Singleton types that are heavily special-cased by ty. Despite its name,
 /// quite a different type to [`NominalInstanceType`].
 ///
@@ -9723,7 +9723,15 @@ impl<'db> TypeVarInstance<'db> {
                             }),
                         )
                     }),
-                Type::Dynamic(DynamicType::Todo(_)) => Parameters::todo(),
+                Type::Dynamic(dynamic) => match dynamic {
+                    DynamicType::Todo(_)
+                    | DynamicType::TodoUnpack
+                    | DynamicType::TodoStarredExpression => Parameters::todo(),
+                    DynamicType::Any
+                    | DynamicType::Unknown
+                    | DynamicType::UnknownGeneric(_)
+                    | DynamicType::Divergent(_) => Parameters::unknown(),
+                },
                 Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
                     return ty;
                 }
@@ -9756,7 +9764,7 @@ impl<'db> TypeVarInstance<'db> {
                 let known_class = func_ty.as_class_literal().and_then(|cls| cls.known(db));
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
-                if matches!(known_class, Some(KnownClass::ParamSpec)) {
+                if known_class == Some(KnownClass::ParamSpec) {
                     Some(convert_type_to_paramspec_value(db, default_type))
                 } else {
                     Some(default_type)
@@ -9899,16 +9907,25 @@ impl std::fmt::Display for ParamSpecAttrKind {
 pub struct BoundTypeVarIdentity<'db> {
     pub(crate) identity: TypeVarIdentity<'db>,
     pub(crate) binding_context: BindingContext<'db>,
+    /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
+    /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     paramspec_attr: Option<ParamSpecAttrKind>,
 }
 
 /// A type variable that has been bound to a generic context, and which can be specialized to a
 /// concrete type.
+///
+/// # Ordering
+///
+/// Ordering is based on the wrapped data's salsa-assigned id and not on its values.
+/// The id may change between runs, or when e.g. a `BoundTypeVarInstance` was garbage-collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct BoundTypeVarInstance<'db> {
     pub typevar: TypeVarInstance<'db>,
     binding_context: BindingContext<'db>,
+    /// If [`Some`], this indicates that this type variable is the `args` or `kwargs` component
+    /// of a `ParamSpec` i.e., `P.args` or `P.kwargs`.
     paramspec_attr: Option<ParamSpecAttrKind>,
 }
 
@@ -9949,7 +9966,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// It's the caller's responsibility to ensure that this method is only called on a `ParamSpec`
     /// type variable.
     pub(crate) fn with_paramspec_attr(self, db: &'db dyn Db, kind: ParamSpecAttrKind) -> Self {
-        debug_assert!(self.is_paramspec(db));
+        debug_assert!(
+            self.is_paramspec(db),
+            "Expected a ParamSpec, got {:?}",
+            self.kind(db)
+        );
 
         let upper_bound = TypeVarBoundOrConstraints::UpperBound(match kind {
             ParamSpecAttrKind::Args => Type::homogeneous_tuple(db, Type::object()),
@@ -9962,8 +9983,8 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             self.typevar(db).identity(db),
             Some(TypeVarBoundOrConstraintsEvaluation::Eager(upper_bound)),
-            None, // explicit_variance
-            None, // _default
+            None, // ParamSpecs cannot have explicit variance
+            None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
         );
 
         Self::new(db, typevar, self.binding_context(db), Some(kind))
@@ -9977,7 +9998,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// It's the caller's responsibility to ensure that this method is only called on a `ParamSpec`
     /// type variable.
     pub(crate) fn without_paramspec_attr(self, db: &'db dyn Db) -> Self {
-        debug_assert!(self.is_paramspec(db));
+        debug_assert!(
+            self.is_paramspec(db),
+            "Expected a ParamSpec, got {:?}",
+            self.kind(db)
+        );
 
         Self::new(
             db,
@@ -9985,8 +10010,8 @@ impl<'db> BoundTypeVarInstance<'db> {
                 db,
                 self.typevar(db).identity(db),
                 None, // Remove the upper bound set by `with_paramspec_attr`
-                None, // explicit_variance
-                None, // _default
+                None, // ParamSpecs cannot have explicit variance
+                None, // `P.args` and `P.kwargs` cannot have defaults even though `P` can
             ),
             self.binding_context(db),
             None,

@@ -136,7 +136,6 @@ def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
 ) -> None: ...
-
 def invalid(
     # TODO: error
     a1: P,
@@ -163,7 +162,6 @@ P = ParamSpec("P")
 
 def foo1(c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
-
     def nested2(
         # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
         *args: P.kwargs,
@@ -213,7 +211,6 @@ respective variadic parameter that matters.
 ```py
 class Foo3(Generic[P]):
     def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
-
     def method2(
         self,
         # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"

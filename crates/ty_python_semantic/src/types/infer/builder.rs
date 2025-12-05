@@ -2635,14 +2635,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 ));
                                 diagnostic::add_type_expression_reference_link(diag);
                             }
-                            // TODO: Should this be `Unknown` instead?
                             Type::homogeneous_tuple(self.db(), Type::unknown())
                         }
 
                         // `*args: P`
                         None => {
                             // The diagnostic for this case is handled in `in_type_expression`.
-                            // TODO: Should this be `Unknown` instead?
                             Type::homogeneous_tuple(self.db(), Type::unknown())
                         }
                     }
@@ -2762,7 +2760,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
                             diagnostic::add_type_expression_reference_link(diag);
                         }
-                        // TODO: Should this be `Unknown` instead?
                         KnownClass::Dict.to_specialized_instance(
                             self.db(),
                             [KnownClass::Str.to_instance(self.db()), Type::unknown()],
@@ -2775,7 +2772,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     // `**kwargs: P`
                     None => {
                         // The diagnostic for this case is handled in `in_type_expression`.
-                        // TODO: Should this be `Unknown` instead?
                         KnownClass::Dict.to_specialized_instance(
                             self.db(),
                             [KnownClass::Str.to_instance(self.db()), Type::unknown()],
@@ -3419,8 +3415,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
         match default_expr {
             ast::Expr::EllipsisLiteral(ellipsis) => {
-                // TODO: This should use `infer_type_expression` but that uses a `todo` type for
-                // inferring ellipsis literals in type expressions, which is not what we want here.
                 let ty = self.infer_ellipsis_literal_expression(ellipsis);
                 self.store_expression_type(default_expr, ty);
                 return;
@@ -3461,6 +3455,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
+    /// Infer the type of the expression that represents an explicit specialization of a
+    /// `ParamSpec` type variable.
     fn infer_paramspec_explicit_specialization_value(
         &mut self,
         expr: &ast::Expr,
@@ -3478,7 +3474,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                // This should be taken care by the caller.
+                // This should be taken care of by the caller.
                 if expr.is_tuple_expr() {
                     debug_assert!(
                         exactly_one_paramspec,
@@ -3534,7 +3530,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     Type::KnownInstance(known_instance)
                         if known_instance.class(self.db()) == KnownClass::ParamSpec =>
                     {
-                        // TODO: Raise diagnostic: "ParamSpec "P" is unbound"
+                        // TODO: Emit diagnostic: "ParamSpec "P" is unbound"
                         return Err(());
                     }
 
@@ -11646,7 +11642,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Helper to get the AST node corresponding to the type argument at `index`.
         let get_node = |index: usize| -> ast::AnyNodeRef<'_> {
             match slice_node {
-                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => elts
                     .get(index)
                     .expect("type argument index should not be out of range")
                     .into(),

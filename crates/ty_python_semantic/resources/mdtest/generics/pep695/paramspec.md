@@ -137,7 +137,6 @@ respective variadic parameter that matters.
 ```py
 class Foo3[**P]:
     def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
-
     def method2(
         self,
         # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"

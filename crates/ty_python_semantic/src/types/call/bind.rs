@@ -3166,7 +3166,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         };
 
-        if !matches!(callable.kind(self.db), CallableTypeKind::ParamSpecValue) {
+        if callable.kind(self.db) != CallableTypeKind::ParamSpecValue {
             return false;
         }
 

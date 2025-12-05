@@ -1700,9 +1700,9 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                 f.write_str("...")?;
             }
             ParametersKind::ParamSpec(typevar) => {
-                f.write_str(&format!("**{}", typevar.name(self.db)))?;
+                write!(f, "**{}", typevar.name(self.db))?;
                 if let Some(name) = typevar.binding_context(self.db).name(self.db) {
-                    f.write_str(&format!("@{name}"))?;
+                    write!(f, "@{name}")?;
                 }
             }
         }
