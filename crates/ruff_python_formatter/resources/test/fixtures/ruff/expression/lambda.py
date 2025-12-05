@@ -669,3 +669,29 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
     lambda:  # comment
     1
 )
+
+(
+    lambda  # comment
+    :
+    1
+)
+
+(
+    lambda:
+    # comment
+    1
+)
+
+(
+    lambda:  # comment 1
+    # comment 2
+    1
+)
+
+(
+    lambda  # comment 1
+    # comment 2
+    :  # comment 3
+    # comment 4
+    1
+)
