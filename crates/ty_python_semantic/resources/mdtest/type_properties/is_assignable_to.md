@@ -537,6 +537,9 @@ static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, Any]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int, int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[int, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[int, ...], int]))
 ```
 
 This also applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
@@ -560,6 +563,10 @@ static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int]))
 static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, int]))
 
+# `*tuple[Any, ...]` can materialize to a tuple of any length as a special case,
+# so this passes:
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], Any], tuple[*tuple[Any, ...], Any, Any]))
+
 static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[Any, ...], int]))
 static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any, ...]))
 static_assert(not is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any]))
@@ -580,6 +587,9 @@ static_assert(not is_assignable_to(tuple[int, ...], tuple[Any, Any]))
 static_assert(is_assignable_to(tuple[int, ...], tuple[int, ...]))
 static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
 static_assert(not is_assignable_to(tuple[int, ...], tuple[int, int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[*tuple[int, ...], int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...], int]))
 
 static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, *tuple[Any, ...]]))
 static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[Any, ...]))

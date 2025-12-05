@@ -998,10 +998,22 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             relation_visitor,
                             disjointness_visitor,
                         ),
-                        EitherOrBoth::Right(_) => {
+                        EitherOrBoth::Right(other_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
-                            // provide.
-                            return ConstraintSet::from(false);
+                            // provide, unless the lhs has a dynamic variable-length portion
+                            // that can materialize to provide it (for assignability only),
+                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
+                            if !relation.is_assignability() || !self.variable.is_dynamic() {
+                                return ConstraintSet::from(false);
+                            }
+                            self.variable.has_relation_to_impl(
+                                db,
+                                other_ty,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
                         }
                     };
                     if result
@@ -1037,10 +1049,22 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                             relation_visitor,
                             disjointness_visitor,
                         ),
-                        EitherOrBoth::Right(_) => {
+                        EitherOrBoth::Right(other_ty) => {
                             // The rhs has a required element that the lhs is not guaranteed to
-                            // provide.
-                            return ConstraintSet::from(false);
+                            // provide, unless the lhs has a dynamic variable-length portion
+                            // that can materialize to provide it (for assignability only),
+                            // as in `tuple[Any, ...]` matching `tuple[int, int]`.
+                            if !relation.is_assignability() || !self.variable.is_dynamic() {
+                                return ConstraintSet::from(false);
+                            }
+                            self.variable.has_relation_to_impl(
+                                db,
+                                *other_ty,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
                         }
                     };
                     if result
