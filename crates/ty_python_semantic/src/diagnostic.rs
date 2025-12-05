@@ -46,7 +46,7 @@ pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     }
 
     /// Heuristic to filter out bad matches
-    fn distance_filter(dist: usize, candidate_len: usize, best_score: &mut Option<usize>) -> bool {
+    fn distance_filter(dist: usize, wrong_name_len: usize, best_score: &mut Option<usize>) -> bool {
         // Don't consider any candidates that are inferior to the best candidate we have had so far.
         if let Some(best) = best_score {
             if dist > *best {
@@ -54,7 +54,7 @@ pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
             }
         }
         // Differences up to 1/3 of the total string length are considered candidates (If 3 characters or less, the distance limit is rounded up to 1).
-        let match_condition = dist <= candidate_len.max(3) / 3;
+        let match_condition = dist <= wrong_name_len.max(3) / 3;
         if match_condition {
             *best_score = Some(dist);
         }
@@ -62,7 +62,8 @@ pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
         match_condition
     }
 
-    if wrong_name.as_ref().len() < 3 {
+    let wrong_name_len = wrong_name.as_ref().chars().count();
+    if wrong_name_len < 3 {
         return None;
     }
 
@@ -79,9 +80,7 @@ pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
                 ),
             )
         })
-        .filter(|(candidate, dist)| {
-            distance_filter(*dist, candidate.chars().count(), &mut best_score)
-        })
+        .filter(|(_, dist)| distance_filter(*dist, wrong_name_len, &mut best_score))
         // At each iteration, the best candidate is retained, so the last candidate has the smallest score.
         .last()
         .map(|(id, _)| id)
