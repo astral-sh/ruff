@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/parentheses/call_chains.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -233,11 +232,13 @@ raise OsError("") from a.aaaaa(
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 ).a(aaaa)
 
-raise OsError(
-    "sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllllllll"
-) from a.aaaaa(
-    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
-).a(aaaa)
+raise OsError("sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllllllll") from (
+    a
+    .aaaaa(
+        aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
+    )
+    .a(aaaa)
+)
 
 a1 = Blog.objects.filter(entry__headline__contains="Lennon").filter(
     entry__pub_date__year=2008
@@ -250,7 +251,8 @@ a2 = Blog.objects.filter(
 )
 
 raise OsError("") from (
-    Blog.objects.filter(
+    Blog.objects
+    .filter(
         entry__headline__contains="Lennon",
     )
     .filter(
@@ -262,7 +264,8 @@ raise OsError("") from (
 )
 
 raise OsError("sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllllllll") from (
-    Blog.objects.filter(
+    Blog.objects
+    .filter(
         entry__headline__contains="Lennon",
     )
     .filter(
@@ -275,7 +278,8 @@ raise OsError("sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllll
 
 # Break only after calls and indexing
 b1 = (
-    session.query(models.Customer.id)
+    session
+    .query(models.Customer.id)
     .filter(
         models.Customer.account_id == account_id, models.Customer.email == email_address
     )
@@ -283,7 +287,8 @@ b1 = (
 )
 
 b2 = (
-    Blog.objects.filter(
+    Blog.objects
+    .filter(
         entry__headline__contains="Lennon",
     )
     .limit_results[:10]
@@ -294,12 +299,15 @@ b2 = (
 
 # Nested call chains
 c1 = (
-    Blog.objects.filter(
+    Blog.objects
+    .filter(
         entry__headline__contains="Lennon",
-    ).filter(
+    )
+    .filter(
         entry__pub_date__year=2008,
     )
-    + Blog.objects.filter(
+    + Blog.objects
+    .filter(
         entry__headline__contains="McCartney",
     )
     .limit_results[:10]
@@ -318,19 +326,23 @@ c1 = (
 d11 = x.e().e().e()  #
 d12 = x.e().e().e()  #
 d13 = (
-    x.e()  #
+    x
+    .e()  #
     .e()
     .e()
 )
 
 # Doesn't fit, default
 d2 = (
-    x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+    x
+    .e()
+    .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
 )
 
 # Doesn't fit, fluent style
 d3 = (
-    x.e()  #
+    x
+    .e()  #
     .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk()
     .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk()
 )
@@ -428,7 +440,9 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge().groupby(
+        df1_aaaaaaaaaaaa
+        .merge()
+        .groupby(
             1,
         )
     ).sum()
@@ -437,7 +451,9 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge().groupby(
+        df1_aaaaaaaaaaaa
+        .merge()
+        .groupby(
             1,
         )
     )
@@ -447,7 +463,8 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge()
+        df1_aaaaaaaaaaaa
+        .merge()
         .groupby(
             1,
         )
@@ -457,7 +474,8 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge()
+        df1_aaaaaaaaaaaa
+        .merge()
         .groupby(
             1,
         )

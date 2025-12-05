@@ -47,20 +47,26 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     )
                 };
 
-            if call_chain_layout == CallChainLayout::Fluent {
+            if matches!(call_chain_layout, CallChainLayout::Fluent(_)) {
                 if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
                 } else {
                     match value.as_ref() {
                         Expr::Attribute(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.after_attribute())
+                                .fmt(f)?;
                         }
                         Expr::Call(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.after_attribute())
+                                .fmt(f)?;
                         }
                         Expr::Subscript(expr) => {
-                            expr.format().with_options(call_chain_layout).fmt(f)?;
+                            expr.format()
+                                .with_options(call_chain_layout.after_attribute())
+                                .fmt(f)?;
                         }
                         _ => {
                             value.format().with_options(Parentheses::Never).fmt(f)?;
@@ -105,8 +111,12 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             // Allow the `.` on its own line if this is a fluent call chain
             // and the value either requires parenthesizing or is a call or subscript expression
             // (it's a fluent chain but not the first element).
-            else if call_chain_layout == CallChainLayout::Fluent {
-                if parenthesize_value || value.is_call_expr() || value.is_subscript_expr() {
+            else if matches!(call_chain_layout, CallChainLayout::Fluent(_)) {
+                if parenthesize_value
+                    || value.is_call_expr()
+                    || value.is_subscript_expr()
+                    || call_chain_layout.is_first_call_like()
+                {
                     soft_line_break().fmt(f)?;
                 }
             }
@@ -149,7 +159,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
         });
 
         let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && call_chain_layout == CallChainLayout::Fluent;
+            && matches!(call_chain_layout, CallChainLayout::Fluent(_));
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -165,12 +175,14 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if CallChainLayout::from_expression(
-            self.into(),
-            context.comments().ranges(),
-            context.source(),
-        ) == CallChainLayout::Fluent
-        {
+        if matches!(
+            CallChainLayout::from_expression(
+                self.into(),
+                context.comments().ranges(),
+                context.source(),
+            ),
+            CallChainLayout::Fluent(_)
+        ) {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
