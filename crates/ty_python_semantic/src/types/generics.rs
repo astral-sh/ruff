@@ -319,7 +319,15 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
-    /// Returns `true` if this generic context contains exactly one `ParamSpec` type variable.
+    /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
+    /// variables.
+    ///
+    /// For example:
+    /// ```py
+    /// class Foo[**P]: ...  # true
+    /// class Bar[T, **P]: ...  # false
+    /// class Baz[T]: ...  # false
+    /// ```
     pub(crate) fn exactly_one_paramspec(self, db: &'db dyn Db) -> bool {
         self.variables(db)
             .exactly_one()

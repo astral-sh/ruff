@@ -2579,7 +2579,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 // use the `P.args` type to perform type checking against the parameter type. This
                 // will allow us to error when `*args: P.args` is matched against, for example,
                 // `n: int` and correctly type check when `*args: P.args` is matched against
-                // `*args: P.args`.
+                // `*args: P.args` (another ParamSpec).
                 match union.elements(db) {
                     [paramspec @ Type::TypeVar(typevar), other]
                     | [other, paramspec @ Type::TypeVar(typevar)]
@@ -3120,15 +3120,55 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         if let Some((_, paramspec)) = paramspec {
             // If we reach here, none of the arguments matched the `ParamSpec` parameter, but the
-            // `ParamSpec` could specialize to a parameter list containing some parameters.
+            // `ParamSpec` could specialize to a parameter list containing some parameters. For
+            // example,
+            //
+            // ```py
+            // from typing import Callable
+            //
+            // def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+            //
+            // def f(x: int) -> None: ...
+            //
+            // foo(f)
+            // ```
+            //
+            // Here, no arguments match the `ParamSpec` parameter, but `P` specializes to `(x: int)`,
+            // so we need to perform a sub-call with no arguments.
             self.evaluate_paramspec_sub_call(None, paramspec);
         }
     }
 
     /// Try to evaluate a `ParamSpec` sub-call at the given argument index.
     ///
-    /// If the argument at the given index matches a parameter which is a `ParamSpec`, invoke
-    /// a sub-call starting from that argument index and return `true`. Otherwise, return `false`.
+    /// The `ParamSpec` parameter is always going to be at the end of the parameter list but there
+    /// can be other parameter before it. If one of these prepended positional parameters contains
+    /// a free `ParamSpec`, we consider that variable in scope for the purposes of extracting the
+    /// components of that `ParamSpec`. For example:
+    ///
+    /// ```py
+    /// from typing import Callable
+    ///
+    /// def foo[**P](f: Callable[P, None], *args: P.args, **kwargs: P.kwargs) -> None: ...
+    ///
+    /// def f(x: int, y: str) -> None: ...
+    ///
+    /// foo(f, 1, "hello")  # P: (x: int, y: str)
+    /// ```
+    ///
+    /// Here, `P` specializes to `(x: int, y: str)` when `foo` is called with `f`, which means that
+    /// the parameters of `f` become a part of `foo`'s parameter list replacing the `ParamSpec`
+    /// parameter which is:
+    ///
+    /// ```py
+    /// def foo(f: Callable[[x: int, y: str], None], x: int, y: str) -> None: ...
+    /// ```
+    ///
+    /// This method will check whether the parameter matching the argument at `argument_index` is
+    /// annotated with the components of `ParamSpec`, and if so, will invoke a sub-call considering
+    /// the arguments starting from `argument_index` against the specialized parameter list.
+    ///
+    /// Returns `true` if the sub-call was invoked, `false` otherwise.
     fn try_paramspec_evaluation_at(
         &mut self,
         argument_index: usize,
@@ -3153,7 +3193,11 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// The remaining arguments start from `argument_index` if provided, otherwise no arguments
     /// are passed.
     ///
-    /// Returns `false` if the specialization does not contain a mapping for the given `paramspec`.
+    /// This method returns `false` if the specialization does not contain a mapping for the given
+    /// `paramspec`, contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`)
+    /// or if the value is an overloaded callable.
+    ///
+    /// For more details, refer to [`Self::try_paramspec_evaluation_at`].
     fn evaluate_paramspec_sub_call(
         &mut self,
         argument_index: Option<usize>,
