@@ -12,7 +12,7 @@
 
 use std::{collections::HashMap, slice::Iter};
 
-use itertools::{EitherOrBoth, Itertools};
+use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
@@ -397,12 +397,10 @@ impl<'db> Signature<'db> {
         function_node: &ast::StmtFunctionDef,
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let parameters = Parameters::from_parameters(
-            db,
-            definition,
-            function_node.parameters.as_ref(),
-            has_implicitly_positional_first_parameter,
-        );
+        let mut parameters =
+            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        parameters
+            .find_pep484_positional_only_parameters(has_implicitly_positional_first_parameter);
         let return_ty = function_node
             .returns
             .as_ref()
@@ -1400,7 +1398,6 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         definition: Definition<'db>,
         parameters: &ast::Parameters,
-        has_implicitly_positional_first_parameter: bool,
     ) -> Self {
         let ast::Parameters {
             posonlyargs,
@@ -1418,39 +1415,19 @@ impl<'db> Parameters<'db> {
             })
         };
 
-        let pos_only_param = |param: &ast::ParameterWithDefault| {
+        let positional_only = posonlyargs.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
-                &param.parameter,
+                &arg.parameter,
                 ParameterKind::PositionalOnly {
-                    name: Some(param.parameter.name.id.clone()),
-                    default_type: default_type(param),
+                    name: Some(arg.parameter.name.id.clone()),
+                    default_type: default_type(arg),
                 },
             )
-        };
+        });
 
-        let mut positional_only: Vec<Parameter> = posonlyargs.iter().map(pos_only_param).collect();
-
-        let mut pos_or_keyword_iter = args.iter();
-
-        // If there are no PEP-570 positional-only parameters, check for the legacy PEP-484 convention
-        // for denoting positional-only parameters (parameters that start with `__` and do not end with `__`)
-        if positional_only.is_empty() {
-            let pos_or_keyword_iter = pos_or_keyword_iter.by_ref();
-
-            if has_implicitly_positional_first_parameter {
-                positional_only.extend(pos_or_keyword_iter.next().map(pos_only_param));
-            }
-
-            positional_only.extend(
-                pos_or_keyword_iter
-                    .peeking_take_while(|param| param.uses_pep_484_positional_only_convention())
-                    .map(pos_only_param),
-            );
-        }
-
-        let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
+        let positional_or_keyword = args.iter().map(|arg| {
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1505,6 +1482,38 @@ impl<'db> Parameters<'db> {
                 .chain(keyword_only)
                 .chain(keywords),
         )
+    }
+
+    pub(crate) fn find_pep484_positional_only_parameters(
+        &mut self,
+        has_implicitly_positional_first_parameter: bool,
+    ) {
+        // If there are any PEP-570 positional-only parameters, those take precedence, and PEP-484
+        // isn't relevant.
+        if self.value.iter().any(Parameter::is_positional_only) {
+            return;
+        }
+
+        // Otherwise we want to convert some of the initial positional-or-keyword parameters to
+        // become positional-only. An initial `self` and `cls` parameter might be converted
+        // (controlled by `has_implicitly_positional_first_parameter`), and any other leading
+        // parameters with PEP-484-compatible names are converted.
+        let mut positional_or_keyword_parameters = self
+            .value
+            .iter_mut()
+            .take_while(|param| param.is_positional_or_keyword());
+
+        if has_implicitly_positional_first_parameter
+            && let Some(param) = positional_or_keyword_parameters.next()
+        {
+            param.convert_positional_or_keyword_to_positional_only();
+        }
+
+        let pep484_parameters = positional_or_keyword_parameters
+            .take_while(|param| param.uses_pep_484_positional_only_convention());
+        for param in pep484_parameters {
+            param.convert_positional_or_keyword_to_positional_only();
+        }
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -1893,6 +1902,11 @@ impl<'db> Parameter<'db> {
         matches!(self.kind, ParameterKind::PositionalOnly { .. })
     }
 
+    /// Returns `true` if this is a positional-or-keyword parameter.
+    pub(crate) fn is_positional_or_keyword(&self) -> bool {
+        matches!(self.kind, ParameterKind::PositionalOrKeyword { .. })
+    }
+
     /// Returns `true` if this is a variadic parameter.
     pub(crate) fn is_variadic(&self) -> bool {
         matches!(self.kind, ParameterKind::Variadic { .. })
@@ -1948,6 +1962,24 @@ impl<'db> Parameter<'db> {
             ParameterKind::KeywordOnly { name, .. } => Some(name),
             ParameterKind::KeywordVariadic { name } => Some(name),
         }
+    }
+
+    /// Return `true` if the parameter name uses the pre-PEP-570 convention
+    /// (specified in PEP 484) to indicate to a type checker that it should be treated
+    /// as positional-only.
+    fn uses_pep_484_positional_only_convention(&self) -> bool {
+        self.name()
+            .is_some_and(|name| name.starts_with("__") && !name.ends_with("__"))
+    }
+
+    fn convert_positional_or_keyword_to_positional_only(&mut self) {
+        let ParameterKind::PositionalOrKeyword { name, default_type } = &self.kind else {
+            unreachable!("we should be limited to positional-or-keyword parameters");
+        };
+        self.kind = ParameterKind::PositionalOnly {
+            name: Some(name.clone()),
+            default_type: *default_type,
+        };
     }
 
     /// Display name of the parameter, if it has one.
