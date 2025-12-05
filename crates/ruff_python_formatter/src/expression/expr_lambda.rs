@@ -110,6 +110,28 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             // In this context, a dangling comment is a comment between the `lambda` and the body.
             if dangling.is_empty() {
                 write!(f, [space()])?;
+            }
+            // In preview, always parenthesize the body if there are dangling comments.
+            else if is_parenthesize_lambda_bodies_enabled(f.context()) {
+                let (dangling_end_of_line, dangling_own_line) = dangling.split_at(
+                    dangling
+                        .iter()
+                        .position(|comment| comment.line_position().is_own_line())
+                        .unwrap_or(dangling.len()),
+                );
+                return write!(
+                    f,
+                    [
+                        space(),
+                        token("("),
+                        trailing_comments(dangling_end_of_line),
+                        block_indent(&format_args!(
+                            leading_comments(dangling_own_line),
+                            body.format().with_options(Parentheses::Never)
+                        )),
+                        token(")")
+                    ]
+                );
             } else {
                 write!(f, [dangling_comments(dangling)])?;
             }
