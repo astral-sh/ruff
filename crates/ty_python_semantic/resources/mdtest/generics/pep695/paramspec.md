@@ -391,16 +391,16 @@ The `converter` function act as a decorator here:
 def f3(x: int, y: str) -> int:
     return 1
 
+reveal_type(f1)
+
 # TODO: This should reveal `(x: int, y: str) -> bool` but there's a cycle: https://github.com/astral-sh/ty/issues/1729
-reveal_type(f3)  # revealed: ((x: int, y: str) -> bool) | ((x: Divergent, y: Divergent) -> bool)
+reveal_type(f3)  # revealed: ((x: int, y: str) -> bool) | ((...) -> bool)
 
 reveal_type(f3(1, "a"))  # revealed: bool
 reveal_type(f3(x=1, y="a"))  # revealed: bool
 reveal_type(f3(1, y="a"))  # revealed: bool
 reveal_type(f3(y="a", x=1))  # revealed: bool
 
-# TODO: There should only be one error but the type of `f3` is a union: https://github.com/astral-sh/ty/issues/1729
-# error: [missing-argument] "No argument provided for required parameter `y`"
 # error: [missing-argument] "No argument provided for required parameter `y`"
 f3(1)
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["a"]`"
@@ -480,7 +480,8 @@ class C[**P]:
     def __init__(self, f: Callable[P, int]) -> None:
         self.f = f
 
-def f(x: int, y: str) -> bool:
+# Note that the return type must match exactly, since C is invariant on the return type of C.f.
+def f(x: int, y: str) -> int:
     return True
 
 c = C(f)

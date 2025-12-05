@@ -903,7 +903,11 @@ fn has_relation_in_invariant_position<'db>(
             disjointness_visitor,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            None,
+            Some(base_mat),
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationKind::Bottom,
@@ -913,7 +917,11 @@ fn has_relation_in_invariant_position<'db>(
             relation_visitor,
             disjointness_visitor,
         ),
-        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            Some(derived_mat),
+            None,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             derived_mat,
@@ -1424,7 +1432,9 @@ impl<'db> SpecializationBuilder<'db> {
             .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_partial(self.db, types)
+        let x = generic_context.specialize_recursive(self.db, types);
+        eprintln!("--> specialized {}", x.display_full(self.db));
+        x
     }
 
     fn add_type_mapping(
@@ -1439,6 +1449,11 @@ impl<'db> SpecializationBuilder<'db> {
             return;
         };
 
+        eprintln!(
+            " -> map {}",
+            bound_typevar.identity(self.db).display(self.db)
+        );
+        eprintln!("    new {}", ty.display(self.db));
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
@@ -1456,6 +1471,39 @@ impl<'db> SpecializationBuilder<'db> {
                 entry.insert(ty);
             }
         }
+    }
+
+    fn add_type_mappings_from_constraint_set(
+        &mut self,
+        constraints: ConstraintSet<'db>,
+        variance: TypeVarVariance,
+        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) {
+        constraints.for_each_path(self.db, |path| {
+            for constraint in path.positive_constraints() {
+                let typevar = constraint.typevar(self.db);
+                let lower = constraint.lower(self.db);
+                let upper = constraint.upper(self.db);
+                eprintln!(
+                    " ~> constraint {} ≤ {} ≤ {} {}",
+                    lower.display(self.db),
+                    typevar.identity(self.db).display(self.db),
+                    upper.display(self.db),
+                    self.inferable.display(self.db),
+                );
+                if !upper.is_object() {
+                    self.add_type_mapping(typevar, upper, variance, &mut f);
+                }
+                if let Type::TypeVar(lower_bound_typevar) = lower {
+                    self.add_type_mapping(
+                        lower_bound_typevar,
+                        Type::TypeVar(typevar),
+                        variance,
+                        &mut f,
+                    );
+                }
+            }
+        });
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
@@ -1711,43 +1759,28 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                if let Some(actual_callable) = actual
-                    .try_upcast_to_callable(self.db)
-                    .and_then(CallableTypes::exactly_one)
-                {
-                    // We're only interested in a formal callable of the form `Callable[P, ...]` for
-                    // now where `P` is a `ParamSpec`.
-                    // TODO: This would need to be updated once we support `Concatenate`
-                    // TODO: What to do for overloaded callables?
-                    let [signature] = formal_callable.signatures(self.db).as_slice() else {
-                        return Ok(());
-                    };
-                    let formal_parameters = signature.parameters();
-                    let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
-                        return Ok(());
-                    };
-                    let paramspec_value = match actual_callable.signatures(self.db).as_slice() {
-                        [] => return Ok(()),
-                        [actual_signature] => match actual_signature.parameters().kind() {
-                            ParametersKind::ParamSpec(typevar) => Type::TypeVar(typevar),
-                            _ => Type::Callable(CallableType::new(
-                                self.db,
-                                CallableSignature::single(Signature::new(
-                                    actual_signature.parameters().clone(),
-                                    None,
-                                )),
-                                CallableTypeKind::ParamSpecValue,
-                            )),
-                        },
-                        actual_signatures => Type::Callable(CallableType::new(
+                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                    return Ok(());
+                };
+                eprintln!("==> callable");
+                eprintln!("    formal {}", formal.display(self.db));
+                eprintln!("    actual {}", actual.display(self.db));
+
+                for actual_callable in actual_callables.as_slice() {
+                    eprintln!("--> pair");
+                    eprintln!(
+                        "    actual {}",
+                        Type::Callable(*actual_callable).display(self.db)
+                    );
+                    let when = formal_callable
+                        .signatures(self.db)
+                        .when_constraint_set_assignable_to(
                             self.db,
-                            CallableSignature::from_overloads(actual_signatures.iter().map(
-                                |signature| Signature::new(signature.parameters().clone(), None),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        )),
-                    };
-                    self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
+                            actual_callable.signatures(self.db),
+                            self.inferable,
+                        );
+                    eprintln!("    when {}", when.display(self.db));
+                    self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
                 }
             }
 

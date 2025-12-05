@@ -2333,7 +2333,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::FunctionLiteral(FunctionType::new(self.db(), function_literal, None, None));
         self.undecorated_type = Some(inferred_ty);
 
+        eprintln!("===> decorators {}", name);
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            eprintln!("  -> {}", decorator_ty.display(self.db()));
+            eprintln!("     {}", inferred_ty.display(self.db()));
             inferred_ty = match decorator_ty
                 .try_call(self.db(), &CallArguments::positional([inferred_ty]))
                 .map(|bindings| bindings.return_type(self.db()))
@@ -2380,6 +2383,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             };
         }
+        eprintln!(" --> decorated {}", inferred_ty.display(self.db()));
 
         self.add_declaration_with_binding(
             function.into(),

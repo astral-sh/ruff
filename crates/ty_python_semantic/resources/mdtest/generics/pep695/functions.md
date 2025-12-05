@@ -334,14 +334,13 @@ from typing import Callable
 def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
     return fn(value)
 
-def identity[T](x: T) -> T:
+def identity[T](x: T, /) -> T:
     return x
 
-def head[T](xs: list[T]) -> T:
+def head[T](xs: list[T], /) -> T:
     return xs[0]
 
-# TODO: this should be `Literal[1]`
-reveal_type(invoke(identity, 1))  # revealed: Unknown
+reveal_type(invoke(identity, 1))  # revealed: Literal[1]
 
 # TODO: this should be `Unknown | int`
 reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
@@ -582,4 +581,111 @@ def f[T](x: T, y: Not[T]) -> T:
     x = y  # error: [invalid-assignment]
     y = x  # error: [invalid-assignment]
     return x
+```
+
+## `Callable` parameters
+
+We can recurse into the parameters and return values of `Callable` parameters to infer
+specializations of a generic function.
+
+```py
+from typing import Any, Callable, NoReturn, overload, Self
+
+def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
+    return callable
+
+def returns_int() -> int:
+    raise NotImplementedError
+
+# revealed: int
+reveal_type(accepts_callable(returns_int)())
+
+class ClassWithoutConstructor: ...
+
+# revealed: ClassWithoutConstructor
+reveal_type(accepts_callable(ClassWithoutConstructor)())
+
+class ClassWithNew:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+# revealed: ClassWithNew
+reveal_type(accepts_callable(ClassWithNew)())
+
+class ClassWithInit:
+    def __init__(self) -> None: ...
+
+# revealed: ClassWithInit
+reveal_type(accepts_callable(ClassWithInit)())
+
+class ClassWithNewAndInit:
+    def __new__(cls, *args, **kwargs) -> Self:
+        raise NotImplementedError
+
+    def __init__(self) -> None: ...
+
+# revealed: ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit)())
+
+class Meta(type):
+    def __call__(cls, *args: Any, **kwargs: Any) -> NoReturn:
+        raise NotImplementedError
+
+class ClassWithNoReturnMetatype(metaclass=Meta):
+    def __new__(cls, *args: Any, **kwargs: Any) -> Self:
+        raise NotImplementedError
+
+# revealed: Never
+reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
+
+class Proxy: ...
+
+class ClassWithIgnoredInit:
+    def __new__(cls) -> Proxy:
+        return Proxy()
+
+    def __init__(self, x: int) -> None: ...
+
+# revealed: Proxy
+reveal_type(accepts_callable(ClassWithIgnoredInit)())
+
+class ClassWithOverloadedInit[T]:
+    t: T  # invariant
+
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[int]", x: int) -> None: ...
+    @overload
+    def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
+    def __init__(self, x: int | str) -> None: ...
+
+# TODO: The old solver cannot handle this overloaded constructor. The ideal solution is that we
+# would solve **P once, and map it to the entire overloaded signature of the constructor. This
+# mapping would have to include the return types, since there are different return types for each
+# overload. We would then also have to determine that R must be equal to the return type of **P's
+# solution.
+
+# TODO: revealed: ClassWithOverloadedInit[int]
+# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
+# TODO: revealed: ClassWithOverloadedInit[str]
+# TODO: no [invalid-argument-type]
+# error: [invalid-argument-type]
+# revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
+reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
+
+class GenericClass[T]:
+    t: T  # invariant
+
+    def __new__(cls, x: list[T], y: list[T]) -> Self:
+        raise NotImplementedError
+
+def _(x: list[str]):
+    # TODO: This fails because we are not propagating GenericClass's generic context into the
+    # Callable that we create for it.
+    # TODO: revealed: GenericClass[str]
+    # TODO: no errors
+    # revealed: GenericClass[T@GenericClass]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    reveal_type(accepts_callable(GenericClass)(x, x))
 ```

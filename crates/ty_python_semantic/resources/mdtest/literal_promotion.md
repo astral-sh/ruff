@@ -304,7 +304,7 @@ x11: list[Literal[1] | Literal[2] | Literal[3]] = [1, 2, 3]
 reveal_type(x11)  # revealed: list[Literal[1, 2, 3]]
 
 x12: Y[Y[Literal[1]]] = [[1]]
-reveal_type(x12)  # revealed: list[Y[Literal[1]]]
+reveal_type(x12)  # revealed: list[list[Literal[1]]]
 
 x13: list[tuple[Literal[1], Literal[2], Literal[3]]] = [(1, 2, 3)]
 reveal_type(x13)  # revealed: list[tuple[Literal[1], Literal[2], Literal[3]]]
