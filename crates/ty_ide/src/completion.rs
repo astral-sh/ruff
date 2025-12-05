@@ -489,7 +489,7 @@ fn detect_function_arg_completions<'db>(
                 name,
                 qualified: None,
                 insert,
-                ty: None,
+                ty: p.ty,
                 kind: Some(CompletionKind::Variable),
                 module_name: None,
                 import: None,
@@ -3242,8 +3242,6 @@ abc(okay=1, ba<CURSOR> baz=5
         "
         );
     }
-
-
 
     #[test]
     fn call_positional_only_argument() {
