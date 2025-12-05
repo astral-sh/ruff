@@ -240,3 +240,11 @@ from types import x
 
 from types import FunctionType
 ```
+
+## Diagnostics for stdlib typos
+
+<!-- snapshot-diagnostics -->
+
+```py
+import asyncioo  # error: [unresolved-import]
+```

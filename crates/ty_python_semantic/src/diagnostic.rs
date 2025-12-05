@@ -9,28 +9,81 @@ use std::cell::RefCell;
 use std::fmt::Write;
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
+/// The suggestion algorithm is inspired by [rustc](https://doc.rust-lang.org/beta/nightly-rustc/src/rustc_span/edit_distance.rs.html).
 pub(crate) fn did_you_mean<S: AsRef<str>, T: AsRef<str>>(
     existing_names: impl Iterator<Item = S>,
     wrong_name: T,
 ) -> Option<String> {
+    /// Edit distance with a favor rule that the score is halved if one string starts or ends with the other
+    fn edit_distance_with_substring_preferential_rule(candidate: &str, wrong_name: &str) -> usize {
+        let candidate_len = candidate.chars().count();
+        let wrong_name_len = wrong_name.chars().count();
+
+        let (shorter, shorter_len) = if candidate_len < wrong_name_len {
+            (candidate, candidate_len)
+        } else {
+            (wrong_name, wrong_name_len)
+        };
+        let (longer, longer_len) = if candidate_len < wrong_name_len {
+            (wrong_name, wrong_name_len)
+        } else {
+            (candidate, candidate_len)
+        };
+
+        // Use OSA (restricted Damerau-Levenshtein) distance, as rustc does.
+        let osa_distance = strsim::osa_distance(shorter, longer);
+
+        let not_so_different_in_length = (shorter_len * 2) > longer_len;
+        // `longer` starts or ends with `shorter` and not so different in length, give it a bonus by halving the distance.
+        if osa_distance > 1
+            && not_so_different_in_length
+            && (longer.starts_with(shorter) || longer.ends_with(shorter))
+        {
+            osa_distance.div_ceil(2)
+        } else {
+            osa_distance
+        }
+    }
+
+    /// Heuristic to filter out bad matches
+    fn distance_filter(dist: usize, candidate_len: usize, best_score: &mut Option<usize>) -> bool {
+        // Don't consider any candidates that are inferior to the best candidate we have had so far.
+        if let Some(best) = best_score {
+            if dist > *best {
+                return false;
+            }
+        }
+        // Differences up to 1/3 of the total string length are considered candidates (If 3 characters or less, the distance limit is rounded up to 1).
+        let match_condition = dist <= candidate_len.max(3) / 3;
+        if match_condition {
+            *best_score = Some(dist);
+        }
+
+        match_condition
+    }
+
     if wrong_name.as_ref().len() < 3 {
         return None;
     }
+
+    let mut best_score: Option<usize> = None;
 
     existing_names
         .filter(|ref id| id.as_ref().len() >= 2)
         .map(|ref id| {
             (
                 id.as_ref().to_string(),
-                strsim::damerau_levenshtein(
+                edit_distance_with_substring_preferential_rule(
                     &id.as_ref().to_lowercase(),
                     &wrong_name.as_ref().to_lowercase(),
                 ),
             )
         })
-        .min_by_key(|(_, dist)| *dist)
-        // Heuristic to filter out bad matches
-        .filter(|(_, dist)| *dist <= 3)
+        .filter(|(candidate, dist)| {
+            distance_filter(*dist, candidate.chars().count(), &mut best_score)
+        })
+        // At each iteration, the best candidate is retained, so the last candidate has the smallest score.
+        .last()
         .map(|(id, _)| id)
 }
 
