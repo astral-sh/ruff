@@ -118,17 +118,25 @@ class B: ...
 
 ## Validating `ParamSpec` usage
 
-`ParamSpec` is only valid as the first element to `Callable` or the final element to `Concatenate`.
+In type annotations, `ParamSpec` is only valid as the first element to `Callable`, the final element
+to `Concatenate`, or as a type parameter to `Protocol` or `Generic`.
 
 ```py
-from typing import ParamSpec, Callable, Concatenate
+from typing import ParamSpec, Callable, Concatenate, Protocol, Generic
 
 P = ParamSpec("P")
+
+class ValidProtocol(Protocol[P]):
+    def method(self, c: Callable[P, int]) -> None: ...
+
+class ValidGeneric(Generic[P]):
+    def method(self, c: Callable[P, int]) -> None: ...
 
 def valid(
     a1: Callable[P, int],
     a2: Callable[Concatenate[int, P], int],
 ) -> None: ...
+
 def invalid(
     # TODO: error
     a1: P,
@@ -149,16 +157,19 @@ The components of `ParamSpec` i.e., `P.args` and `P.kwargs` are only valid when 
 annotated types of `*args` and `**kwargs` respectively.
 
 ```py
-from typing import Callable, ParamSpec
+from typing import Generic, Callable, ParamSpec
 
 P = ParamSpec("P")
 
-def foo(c: Callable[P, int]) -> None:
+def foo1(c: Callable[P, int]) -> None:
     def nested1(*args: P.args, **kwargs: P.kwargs) -> None: ...
 
-    # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
-    # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
-    def nested2(*args: P.kwargs, **kwargs: P.args) -> None: ...
+    def nested2(
+        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        *args: P.kwargs,
+        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        **kwargs: P.args,
+    ) -> None: ...
 
     # TODO: error
     def nested3(*args: P.args) -> None: ...
@@ -166,11 +177,14 @@ def foo(c: Callable[P, int]) -> None:
     # TODO: error
     def nested4(**kwargs: P.kwargs) -> None: ...
 
+    # TODO: error
+    def nested5(*args: P.args, x: int, **kwargs: P.kwargs) -> None: ...
+
 # TODO: error
-def bar(*args: P.args, **kwargs: P.kwargs) -> None:
+def bar1(*args: P.args, **kwargs: P.kwargs) -> None:
     pass
 
-class Foo:
+class Foo1:
     # TODO: error
     def method(self, *args: P.args, **kwargs: P.kwargs) -> None: ...
 ```
@@ -178,19 +192,35 @@ class Foo:
 And, they need to be used together.
 
 ```py
-def foo(c: Callable[P, int]) -> None:
+def foo2(c: Callable[P, int]) -> None:
     # TODO: error
     def nested1(*args: P.args) -> None: ...
 
     # TODO: error
     def nested2(**kwargs: P.kwargs) -> None: ...
 
-class Foo:
+class Foo2:
     # TODO: error
     args: P.args
 
     # TODO: error
     kwargs: P.kwargs
+```
+
+The name of these parameters does not need to be `args` or `kwargs`, it's the annotated type to the
+respective variadic parameter that matters.
+
+```py
+class Foo3(Generic[P]):
+    def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
+
+    def method2(
+        self,
+        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        *paramspec_args: P.kwargs,
+        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        **paramspec_kwargs: P.args,
+    ) -> None: ...
 ```
 
 ## Specializing generic classes explicitly
@@ -254,7 +284,7 @@ reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
 ```
 
-Nor can they be omitted when there are more than one `ParamSpec`.
+Nor can they be omitted when there are more than one `ParamSpec`s.
 
 ```py
 p = TwoParamSpec[[int, str], [int]]()
@@ -336,6 +366,11 @@ reveal_type(p3.attr2)  # revealed: (str, /) -> None
 # TODO: error
 # Un-ordered type variables as the default of `PAnother` is `P`
 class ParamSpecWithDefault5(Generic[PAnother, P]):
+    attr: Callable[PAnother, None]
+
+# TODO: error
+# PAnother has default as P (another ParamSpec) which is not in scope
+class ParamSpecWithDefault6(Generic[PAnother]):
     attr: Callable[PAnother, None]
 ```
 

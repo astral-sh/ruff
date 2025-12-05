@@ -131,6 +131,22 @@ class Foo[**P]:
     kwargs: P.kwargs
 ```
 
+The name of these parameters does not need to be `args` or `kwargs`, it's the annotated type to the
+respective variadic parameter that matters.
+
+```py
+class Foo3[**P]:
+    def method1(self, *paramspec_args: P.args, **paramspec_kwargs: P.kwargs) -> None: ...
+
+    def method2(
+        self,
+        # error: [invalid-type-form] "`P.kwargs` is valid only in `**kwargs` annotation: Did you mean `P.args`?"
+        *paramspec_args: P.kwargs,
+        # error: [invalid-type-form] "`P.args` is valid only in `*args` annotation: Did you mean `P.kwargs`?"
+        **paramspec_kwargs: P.args,
+    ) -> None: ...
+```
+
 ## Semantics of `P.args` and `P.kwargs`
 
 The type of `args` and `kwargs` inside the function is `P.args` and `P.kwargs` respectively instead
@@ -177,7 +193,6 @@ def f[**P](func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
     reveal_type(args[0])  # revealed: object
 
     reveal_type("key" in kwargs)  # revealed: bool
-    # TODO: Should be `object | None`
     reveal_type(kwargs.get("key"))  # revealed: object
     reveal_type(kwargs["key"])  # revealed: object
 ```
@@ -277,7 +292,7 @@ class ParamSpecWithDefault3[**P1, **P2 = P1]:
     attr1: Callable[P1, None]
     attr2: Callable[P2, None]
 
-# `P1` hasn't been specialized, so it defaults to `Unknown` gradual form
+# `P1` hasn't been specialized, so it defaults to `...` gradual form
 p1 = ParamSpecWithDefault3()
 reveal_type(p1.attr1)  # revealed: (...) -> None
 reveal_type(p1.attr2)  # revealed: (...) -> None
@@ -388,6 +403,19 @@ reveal_type(multiple(xy, xy))  # revealed: (x: int, y: str) -> bool
 # error: [invalid-argument-type]
 reveal_type(multiple(xy, yx))  # revealed: (x: int, y: str) -> bool
 
+def keyword_only_with_default_1(*, x: int = 42) -> int:
+    return 1
+
+def keyword_only_with_default_2(*, y: int = 42) -> int:
+    return 2
+
+# The common supertype for two functions with only keyword-only parameters would be an empty
+# parameter list i.e., `()`
+# TODO: This shouldn't error
+# error: [invalid-argument-type]
+# revealed: (*, x: int = Literal[42]) -> bool
+reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
+
 def keyword_only1(*, x: int) -> int:
     return 1
 
@@ -440,6 +468,8 @@ def foo2[**P2](func: Callable[P2, int], *args: P2.args, **kwargs: P2.kwargs) -> 
 
     # error: [invalid-argument-type] "Argument to function `foo1_with_extra_arg` is incorrect: Expected `str`, found `P2@foo2.args`"
     foo1_with_extra_arg(func, *args, **kwargs)
+
+    foo1_with_extra_arg(func, "extra", *args, **kwargs)
 ```
 
 Here, the first argument to `f` can specialize `P` to the parameters of the callable passed to it

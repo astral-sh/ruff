@@ -64,8 +64,9 @@ def _(
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
 
+    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a type expression"
     def foo(a_: e) -> None:
-        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec` instances in type expressions)
+        reveal_type(a_)  # revealed: Unknown
 ```
 
 ## Inheritance

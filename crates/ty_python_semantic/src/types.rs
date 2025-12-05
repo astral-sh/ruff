@@ -7430,9 +7430,6 @@ impl<'db> Type<'db> {
                 Some(KnownClass::TypeVar) => Ok(todo_type!(
                     "Support for `typing.TypeVar` instances in type expressions"
                 )),
-                Some(KnownClass::ParamSpec) => Ok(todo_type!(
-                    "Support for `typing.ParamSpec` instances in type expressions"
-                )),
                 Some(KnownClass::TypeVarTuple) => Ok(todo_type!(
                     "Support for `typing.TypeVarTuple` instances in type expressions"
                 )),
