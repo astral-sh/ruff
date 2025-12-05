@@ -1077,15 +1077,17 @@ class App:
             )
             .build();
 
-        // FIXME this should also rename `func2` in `from file2 import func2`
         assert_snapshot!(test.rename("new_util_name"), @r"
-        info[rename]: Rename symbol (found 3 locations)
-         --> file3.py:6:16
+        info[rename]: Rename symbol (found 4 locations)
+         --> file3.py:2:19
           |
+        2 | from file2 import func2
+          |                   ^^^^^
+        3 |
         4 | class App:
         5 |     def run(self):
         6 |         return func2()
-          |                ^^^^^
+          |                -----
           |
          ::: file2.py:2:28
           |
