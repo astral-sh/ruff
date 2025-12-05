@@ -112,18 +112,6 @@ impl TypeshedVersions {
             TypeshedVersionsQueryResult::DoesNotExist
         }
     }
-
-    pub(crate) fn available_top_level_stdlib_modules(
-        &self,
-        db: &dyn Db,
-    ) -> impl Iterator<Item = &ModuleName> {
-        let current_version = Program::get(db).python_version(db);
-        self.0
-            .iter()
-            .filter(move |(_, range)| range.contains(current_version))
-            .map(|(name, _)| name)
-            .filter(|name| !name.contains('.'))
-    }
 }
 
 /// Possible answers [`TypeshedVersions::query_module()`] could give to the question:

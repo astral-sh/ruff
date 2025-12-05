@@ -20,7 +20,7 @@ use super::{
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
 };
-use crate::diagnostic::{did_you_mean, format_enumeration};
+use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
     KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
@@ -5920,15 +5920,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         // We found the most precise answer we could, stop searching
                         break;
                     }
-                }
-
-                if !module_name.contains('.')
-                    && let Some(suggestion) = did_you_mean(
-                        typeshed_versions.available_top_level_stdlib_modules(self.db()),
-                        &module_name,
-                    )
-                {
-                    diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?"));
                 }
             }
         } else {
