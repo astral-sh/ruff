@@ -15,12 +15,12 @@ doctest = false
 
 [dependencies]
 ruff_python_ast = { workspace = true }
-ruff_python_parser = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 
 [dev-dependencies]
+ruff_python_parser = { workspace = true }
 
 [lints]
 workspace = true

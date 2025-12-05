@@ -110,6 +110,10 @@ mod tests {
         }
 
         fn rename(&self, new_name: &str) -> String {
+            let Some(_) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
+                return "Cannot rename".to_string();
+            };
+
             let Some(rename_results) =
                 rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
             else {
@@ -163,7 +167,7 @@ mod tests {
     }
 
     #[test]
-    fn test_prepare_rename_parameter() {
+    fn prepare_rename_parameter() {
         let test = cursor_test(
             "
 def func(<CURSOR>value: int) -> int:
@@ -178,7 +182,7 @@ value = 0
     }
 
     #[test]
-    fn test_rename_parameter() {
+    fn rename_parameter() {
         let test = cursor_test(
             "
 def func(<CURSOR>value: int) -> int:
@@ -207,7 +211,7 @@ func(value=42)
     }
 
     #[test]
-    fn test_rename_function() {
+    fn rename_function() {
         let test = cursor_test(
             "
 def fu<CURSOR>nc():
@@ -235,7 +239,7 @@ x = func
     }
 
     #[test]
-    fn test_rename_class() {
+    fn rename_class() {
         let test = cursor_test(
             "
 class My<CURSOR>Class:
@@ -265,7 +269,7 @@ cls = MyClass
     }
 
     #[test]
-    fn test_rename_invalid_name() {
+    fn rename_invalid_name() {
         let test = cursor_test(
             "
 def fu<CURSOR>nc():
@@ -286,7 +290,7 @@ def fu<CURSOR>nc():
     }
 
     #[test]
-    fn test_multi_file_function_rename() {
+    fn multi_file_function_rename() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -312,7 +316,7 @@ from utils import helper_function
 class DataProcessor:
     def __init__(self):
         self.multiplier = helper_function
-    
+
     def process(self, value):
         return helper_function(value)
 ",
@@ -654,7 +658,7 @@ class DataProcessor:
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=a<CURSOR>b):
@@ -685,7 +689,7 @@ class DataProcessor:
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -716,7 +720,7 @@ class DataProcessor:
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Cl<CURSOR>ick(x, button=ab):
@@ -756,7 +760,7 @@ class DataProcessor:
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, but<CURSOR>ton=ab):
@@ -880,7 +884,7 @@ class DataProcessor:
     }
 
     #[test]
-    fn test_cannot_rename_import_module_component() {
+    fn cannot_rename_import_module_component() {
         // Test that we cannot rename parts of module names in import statements
         let test = cursor_test(
             "
@@ -893,7 +897,7 @@ x = os.path.join('a', 'b')
     }
 
     #[test]
-    fn test_cannot_rename_from_import_module_component() {
+    fn cannot_rename_from_import_module_component() {
         // Test that we cannot rename parts of module names in from import statements
         let test = cursor_test(
             "
@@ -906,7 +910,7 @@ result = join('a', 'b')
     }
 
     #[test]
-    fn test_cannot_rename_external_file() {
+    fn cannot_rename_external_file() {
         // This test verifies that we cannot rename a symbol when it's defined in a file
         // that's outside the project (like a standard library function)
         let test = cursor_test(
@@ -920,7 +924,7 @@ x = <CURSOR>os.path.join('a', 'b')
     }
 
     #[test]
-    fn test_rename_alias_at_import_statement() {
+    fn rename_alias_at_import_statement() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -931,8 +935,8 @@ def test(): pass
             .source(
                 "main.py",
                 "
-from utils import test as test_<CURSOR>alias
-result = test_alias()
+from utils import test as <CURSOR>alias
+result = alias()
 ",
             )
             .build();
@@ -941,16 +945,16 @@ result = test_alias()
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
-        2 | from utils import test as test_alias
-          |                           ^^^^^^^^^^
-        3 | result = test_alias()
-          |          ----------
+        2 | from utils import test as alias
+          |                           ^^^^^
+        3 | result = alias()
+          |          -----
           |
         ");
     }
 
     #[test]
-    fn test_rename_alias_at_usage_site() {
+    fn rename_alias_at_usage_site() {
         // Test renaming an alias when the cursor is on the alias in the usage statement
         let test = CursorTest::builder()
             .source(
@@ -962,8 +966,8 @@ def test(): pass
             .source(
                 "main.py",
                 "
-from utils import test as test_alias
-result = test_<CURSOR>alias()
+from utils import test as alias
+result = <CURSOR>alias()
 ",
             )
             .build();
@@ -972,16 +976,16 @@ result = test_<CURSOR>alias()
         info[rename]: Rename symbol (found 2 locations)
          --> main.py:2:27
           |
-        2 | from utils import test as test_alias
-          |                           ^^^^^^^^^^
-        3 | result = test_alias()
-          |          ----------
+        2 | from utils import test as alias
+          |                           ^^^^^
+        3 | result = alias()
+          |          -----
           |
         ");
     }
 
     #[test]
-    fn test_rename_across_import_chain_with_mixed_aliases() {
+    fn rename_across_import_chain_with_mixed_aliases() {
         // Test renaming a symbol that's imported across multiple files with mixed alias patterns
         // File 1 (source.py): defines the original function
         // File 2 (middle.py): imports without alias from source.py
@@ -1049,7 +1053,7 @@ value1 = func_alias()
     }
 
     #[test]
-    fn test_rename_alias_in_import_chain() {
+    fn rename_alias_in_import_chain() {
         let test = CursorTest::builder()
             .source(
                 "file1.py",
@@ -1101,7 +1105,7 @@ class App:
     }
 
     #[test]
-    fn test_cannot_rename_keyword() {
+    fn cannot_rename_keyword() {
         // Test that we cannot rename Python keywords like "None"
         let test = cursor_test(
             "
@@ -1116,7 +1120,7 @@ def process_value(value):
     }
 
     #[test]
-    fn test_cannot_rename_builtin_type() {
+    fn cannot_rename_builtin_type() {
         // Test that we cannot rename Python builtin types like "int"
         let test = cursor_test(
             "
@@ -1129,7 +1133,7 @@ def convert_to_number(value):
     }
 
     #[test]
-    fn test_rename_keyword_argument() {
+    fn rename_keyword_argument() {
         // Test renaming a keyword argument and its corresponding parameter
         let test = cursor_test(
             "
@@ -1156,7 +1160,7 @@ result = func(10, <CURSOR>y=20)
     }
 
     #[test]
-    fn test_rename_parameter_with_keyword_argument() {
+    fn rename_parameter_with_keyword_argument() {
         // Test renaming a parameter and its corresponding keyword argument
         let test = cursor_test(
             "
@@ -1178,6 +1182,247 @@ result = func(10, y=20)
         4 |
         5 | result = func(10, y=20)
           |                   -
+          |
+        ");
+    }
+
+    // TODO Should rename the alias
+    #[test]
+    fn import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as <CURSOR>abc
+
+                x = abc
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"Cannot rename");
+    }
+
+    // TODO Should rename the alias
+    #[test]
+    fn import_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as abc
+
+                x = abc<CURSOR>
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): we should refuse to rename this (it's the name of a module)
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is correct
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good/fine here, it's an undefined reference
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's a module name
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Refusing to rename is good here, it's the name of a module
+        assert_snapshot!(test.rename("mypkg"), @"Cannot rename");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Renaming the integer is correct
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 3 locations)
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this is incorrect, we should rename the `subpkg` int
+        // and the RHS of the import statement (but *not* rename the LHS).
+        //
+        // However us being cautious here *would* be good as the rename will actually
+        // result in a `subpkg` variable still existing in this code, as the import's LHS
+        // `DefinitionKind::ImportFromSubmodule` would stop being overwritten by the RHS!
+        assert_snapshot!(test.rename("mypkg"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
           |
         ");
     }

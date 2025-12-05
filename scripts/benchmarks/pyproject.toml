@@ -1,6 +1,6 @@
 [project]
 name = "scripts"
-version = "0.14.6"
+version = "0.14.8"
 description = ""
 authors = ["Charles Marsh <charlie.r.marsh@gmail.com>"]
 

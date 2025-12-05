@@ -12,13 +12,13 @@
 
 use crate::find_node::CoveringNode;
 use crate::goto::GotoTarget;
-use crate::{Db, NavigationTarget, ReferenceKind, ReferenceTarget};
+use crate::{Db, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
@@ -49,10 +49,9 @@ pub(crate) fn references(
 
     // When finding references, do not resolve any local aliases.
     let model = SemanticModel::new(db, file);
-    let target_definitions_nav = goto_target
+    let target_definitions = goto_target
         .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
-        .definition_targets(db)?;
-    let target_definitions: Vec<NavigationTarget> = target_definitions_nav.into_iter().collect();
+        .declaration_targets(db)?;
 
     // Extract the target text from the goto target for fast comparison
     let target_text = goto_target.to_string()?;
@@ -115,7 +114,7 @@ pub(crate) fn references(
 fn references_for_file(
     db: &dyn Db,
     file: File,
-    target_definitions: &[NavigationTarget],
+    target_definitions: &NavigationTargets,
     target_text: &str,
     mode: ReferencesMode,
     references: &mut Vec<ReferenceTarget>,
@@ -159,7 +158,7 @@ fn is_symbol_externally_visible(goto_target: &GotoTarget<'_>) -> bool {
 struct LocalReferencesFinder<'a> {
     model: &'a SemanticModel<'a>,
     tokens: &'a Tokens,
-    target_definitions: &'a [NavigationTarget],
+    target_definitions: &'a NavigationTargets,
     references: &'a mut Vec<ReferenceTarget>,
     mode: ReferencesMode,
     target_text: &'a str,
@@ -318,12 +317,10 @@ impl LocalReferencesFinder<'_> {
             GotoTarget::from_covering_node(self.model, covering_node, offset, self.tokens)
         {
             // Get the definitions for this goto target
-            if let Some(current_definitions_nav) = goto_target
+            if let Some(current_definitions) = goto_target
                 .get_definition_targets(self.model, ImportAliasResolution::PreserveAliases)
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
-                let current_definitions: Vec<NavigationTarget> =
-                    current_definitions_nav.into_iter().collect();
                 // Check if any of the current definitions match our target definitions
                 if self.navigation_targets_match(&current_definitions) {
                     // Determine if this is a read or write reference
@@ -337,7 +334,7 @@ impl LocalReferencesFinder<'_> {
     }
 
     /// Check if `Vec<NavigationTarget>` match our target definitions
-    fn navigation_targets_match(&self, current_targets: &[NavigationTarget]) -> bool {
+    fn navigation_targets_match(&self, current_targets: &NavigationTargets) -> bool {
         // Since we're comparing the same symbol, all definitions should be equivalent
         // We only need to check against the first target definition
         if let Some(first_target) = self.target_definitions.iter().next() {

@@ -74,7 +74,7 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars};
-use crate::types::ide_support::all_members;
+use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
@@ -373,7 +373,7 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, scope);
 
         let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id))
+            place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
@@ -1112,19 +1112,14 @@ impl<'db> FunctionType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         let literal = self.literal(db);
         let updated_signature = match self.updated_signature(db) {
-            Some(signature) => {
-                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
-            }
+            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
         let updated_last_definition_signature = match self.updated_last_definition_signature(db) {
-            Some(signature) => {
-                Some(signature.recursive_type_normalized_impl(db, div, nested, visitor)?)
-            }
+            Some(signature) => Some(signature.recursive_type_normalized_impl(db, div, nested)?),
             None => None,
         };
         Some(Self::new(
@@ -1887,7 +1882,7 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, &module_name) else {
+                let Some(module) = resolve_module(db, file, &module_name) else {
                     return;
                 };
 

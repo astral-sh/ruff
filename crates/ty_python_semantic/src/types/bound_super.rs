@@ -172,7 +172,7 @@ impl<'db> BoundSuperError<'db> {
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
 pub enum SuperOwnerKind<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
 }
@@ -197,17 +197,16 @@ impl<'db> SuperOwnerKind<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Some(SuperOwnerKind::Dynamic(dynamic.recursive_type_normalized()))
             }
             SuperOwnerKind::Class(class) => Some(SuperOwnerKind::Class(
-                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             SuperOwnerKind::Instance(instance) => Some(SuperOwnerKind::Instance(
-                instance.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                instance.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
     }
@@ -620,14 +619,13 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.pivot_class(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
             self.owner(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 }

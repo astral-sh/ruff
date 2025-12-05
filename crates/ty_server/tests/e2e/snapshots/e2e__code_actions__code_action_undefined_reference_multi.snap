@@ -50,7 +50,7 @@ expression: code_actions
     "isPreferred": true
   },
   {
-    "title": "import typing_extensions.Literal",
+    "title": "Ignore 'unresolved-reference' for this line",
     "kind": "quickfix",
     "diagnostics": [
       {
@@ -81,18 +81,18 @@ expression: code_actions
             "range": {
               "start": {
                 "line": 0,
-                "character": 0
+                "character": 17
               },
               "end": {
                 "line": 0,
-                "character": 0
+                "character": 17
               }
             },
-            "newText": "from typing_extensions import Literal\n"
+            "newText": "  # ty:ignore[unresolved-reference]"
           }
         ]
       }
     },
-    "isPreferred": true
+    "isPreferred": false
   }
 ]

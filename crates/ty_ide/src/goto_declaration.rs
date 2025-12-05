@@ -1074,6 +1074,41 @@ def another_helper(path):
     }
 
     #[test]
+    fn goto_declaration_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | ^^
+          |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
     fn goto_declaration_nested_instance_attribute() {
         let test = cursor_test(
             "
@@ -2563,6 +2598,298 @@ def ab(a: int, *, c: int): ...
         3 |
         4 | ab(1, c=2)
           | ^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should only highlight `subpkg` in the import statement
+        // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
+        // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
+        // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mypackage/__init__.py:2:1
+          |
+        2 | from .subpkg.submod import val
+          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): I don't *think* this is what we want..?
+        // It's a bit confusing because this symbol is essentially the LHS *and* RHS of
+        // `subpkg = mypackage.subpkg`. As in, it's both defining a local `subpkg` and
+        // loading the module `mypackage.subpkg`, so, it's understandable to get confused!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+        --> mypackage/subpkg/__init__.py:1:1
+         |
+         |
+        info: Source
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg.submod import val
+          |       ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No result is correct!
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Going to the submod module is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mypackage/subpkg/submod.py:1:1
+          |
+        1 |
+          | ^
+        2 | val: int = 0
+          |
+        info: Source
+         --> mypackage/__init__.py:2:14
+          |
+        2 | from .subpkg.submod import val
+          |              ^^^^^^
+        3 |
+        4 | x = submod
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Going to the subpkg module is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | ^
+        2 | subpkg: int = 10
+          |
+        info: Source
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg import subpkg
+          |       ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Going to the subpkg `int` is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): Ok this one is FASCINATING and it's kinda right but confusing!
+        //
+        // So there's 3 relevant definitions here:
+        //
+        // * `subpkg: int = 10` in the other file is in fact the original definition
+        //
+        // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
+        //    because it's a `DefinitionKind::ImportFromSubmodle`.
+        //    This is the span that covers the entire import.
+        //
+        // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
+        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
+        //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Declaration
+         --> mypackage/__init__.py:2:1
+          |
+        2 | from .subpkg import subpkg
+          | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+
+        info[goto-declaration]: Declaration
+         --> mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ^^^^^^
+          |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
           |
         ");
     }

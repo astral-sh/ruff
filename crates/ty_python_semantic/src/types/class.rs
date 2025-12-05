@@ -19,7 +19,7 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::INVALID_TYPE_ALIAS_TYPE;
+use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::enum_metadata;
 use crate::types::function::{DataclassTransformerParams, KnownFunction};
 use crate::types::generics::{
@@ -284,13 +284,12 @@ impl<'db> GenericAlias<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self::new(
             db,
             self.origin(db),
             self.specialization(db)
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         ))
     }
 
@@ -341,9 +340,18 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
+fn variance_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: GenericAlias<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    TypeVarVariance::Bivariant
+}
+
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -443,12 +451,11 @@ impl<'db> ClassType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::NonGeneric(_) => Some(self),
             Self::Generic(generic) => Some(Self::Generic(
-                generic.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                generic.recursive_type_normalized_impl(db, div, nested)?,
             )),
         }
     }
@@ -1377,9 +1384,9 @@ pub(crate) struct Field<'db> {
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
     pub(crate) kind: FieldKind<'db>,
-    /// The original declaration of this field, if there is exactly one.
+    /// The first declaration of this field.
     /// This field is used for backreferences in diagnostics.
-    pub(crate) single_declaration: Option<Definition<'db>>,
+    pub(crate) first_declaration: Option<Definition<'db>>,
 }
 
 impl Field<'_> {
@@ -3041,7 +3048,7 @@ impl<'db> ClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
 
             let result = place_from_declarations(db, declarations.clone());
-            let single_declaration = result.single_declaration;
+            let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
@@ -3049,7 +3056,9 @@ impl<'db> ClassLiteral<'db> {
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings).ignore_possibly_undefined();
+                let mut default_ty = place_from_bindings(db, bindings)
+                    .place
+                    .ignore_possibly_undefined();
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
@@ -3107,7 +3116,7 @@ impl<'db> ClassLiteral<'db> {
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
-                    single_declaration,
+                    first_declaration,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
@@ -3590,7 +3599,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let inferred = place_from_bindings(db, bindings);
+                    let inferred = place_from_bindings(db, bindings).place;
                     let has_binding = !inferred.is_undefined();
 
                     if has_binding {
@@ -3833,7 +3842,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     (symbol_id, place_and_qual)
                 })
                 .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
-                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                    |(symbol_id, bindings)| {
+                        (symbol_id, place_from_bindings(db, bindings).place.into())
+                    },
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
                     if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
@@ -5546,6 +5557,20 @@ impl KnownClass {
                             return;
                         };
 
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class, None) {
+                            if let Some(builder) = context
+                                .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                            {
+                                builder.into_diagnostic(format_args!(
+                                    "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                    enclosing_class.name(db)
+                                ));
+                            }
+                            overload.set_return_type(Type::unknown());
+                            return;
+                        }
+
                         // The type of the first parameter if the given scope is function-like (i.e. function or lambda).
                         // `None` if the scope is not function-like, or has no parameters.
                         let first_param = match scope.node(db) {
@@ -5585,6 +5610,22 @@ impl KnownClass {
                         overload.set_return_type(bound_super);
                     }
                     [Some(pivot_class_type), Some(owner_type)] => {
+                        // Check if the enclosing class is a `NamedTuple`, which forbids the use of `super()`.
+                        if let Some(enclosing_class) = nearest_enclosing_class(db, index, scope) {
+                            if CodeGeneratorKind::NamedTuple.matches(db, enclosing_class, None) {
+                                if let Some(builder) = context
+                                    .report_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD, call_expression)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot use `super()` in a method of NamedTuple class `{}`",
+                                        enclosing_class.name(db)
+                                    ));
+                                }
+                                overload.set_return_type(Type::unknown());
+                                return;
+                            }
+                        }
+
                         let bound_super = BoundSuperType::build(db, *pivot_class_type, *owner_type)
                             .unwrap_or_else(|err| {
                                 err.report_diagnostic(context, call_expression.into());
@@ -5809,7 +5850,7 @@ impl SlotsKind {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::module_resolver::resolve_module;
+    use crate::module_resolver::resolve_module_confident;
     use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
@@ -5825,7 +5866,8 @@ mod tests {
             });
         for class in KnownClass::iter() {
             let class_name = class.name(&db);
-            let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
+            let class_module =
+                resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
                 KnownClass::try_from_file_and_name(

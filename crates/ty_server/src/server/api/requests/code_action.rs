@@ -82,9 +82,8 @@ impl BackgroundDocumentRequestHandler for CodeActionRequestHandler {
             let encoding = snapshot.encoding();
             if let Some(NumberOrString::String(diagnostic_id)) = &diagnostic.code
                 && let Some(range) = diagnostic.range.to_text_range(db, file, url, encoding)
-                && let Some(fixes) = code_actions(db, file, range, diagnostic_id)
             {
-                for action in fixes {
+                for action in code_actions(db, file, range, diagnostic_id) {
                     actions.push(CodeActionOrCommand::CodeAction(lsp_types::CodeAction {
                         title: action.title,
                         kind: Some(CodeActionKind::QUICKFIX),

@@ -238,7 +238,7 @@ impl ClassInfoConstraintFunction {
             Type::SpecialForm(SpecialFormType::Callable)
                 if self == ClassInfoConstraintFunction::IsInstance =>
             {
-                Some(CallableType::unknown(db).top_materialization(db))
+                Some(Type::Callable(CallableType::unknown(db)).top_materialization(db))
             }
 
             Type::SpecialForm(special_form) => special_form

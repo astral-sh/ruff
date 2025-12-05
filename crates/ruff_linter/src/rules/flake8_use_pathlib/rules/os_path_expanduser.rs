@@ -41,6 +41,10 @@ use crate::{FixAvailability, Violation};
 /// directory can't be resolved: `os.path.expanduser` returns the
 /// input unchanged, while `Path.expanduser` raises `RuntimeError`.
 ///
+/// Additionally, the fix is marked as unsafe because `os.path.expanduser()` returns `str` or `bytes` (`AnyStr`),
+/// while `Path.expanduser()` returns a `Path` object. This change in return type can break code that uses
+/// the return value.
+///
 /// ## References
 /// - [Python documentation: `Path.expanduser`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.expanduser)
 /// - [Python documentation: `os.path.expanduser`](https://docs.python.org/3/library/os.path.html#os.path.expanduser)
@@ -76,6 +80,6 @@ pub(crate) fn os_path_expanduser(checker: &Checker, call: &ExprCall, segments: &
         "path",
         is_fix_os_path_expanduser_enabled(checker.settings()),
         OsPathExpanduser,
-        Some(Applicability::Unsafe),
+        Applicability::Unsafe,
     );
 }

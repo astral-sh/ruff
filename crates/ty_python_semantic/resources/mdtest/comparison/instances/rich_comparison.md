@@ -309,7 +309,7 @@ reveal_type(A() != object())  # revealed: bool
 reveal_type(object() == A())  # revealed: bool
 reveal_type(object() != A())  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `A` and `object`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `A` and `object`"
 # revealed: Unknown
 reveal_type(A() < object())
 ```
@@ -327,13 +327,13 @@ reveal_type(1 >= 1.0)  # revealed: bool
 reveal_type(1 == 2j)  # revealed: bool
 reveal_type(1 != 2j)  # revealed: bool
 
-# error: [unsupported-operator] "Operator `<` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 < 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `<=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `<=` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 <= 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `>` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 > 2j)  # revealed: Unknown
-# error: [unsupported-operator] "Operator `>=` is not supported for types `int` and `complex`, in comparing `Literal[1]` with `complex`"
+# error: [unsupported-operator] "Operator `>=` is not supported between objects of type `Literal[1]` and `complex`"
 reveal_type(1 >= 2j)  # revealed: Unknown
 
 def f(x: bool, y: int):
@@ -385,4 +385,30 @@ class A:
 reveal_type(A() == A())  # revealed: Literal[True]
 reveal_type(A() < A())  # revealed: Literal[True]
 reveal_type(A() > A())  # revealed: Literal[True]
+```
+
+## Diagnostics where classes have the same name
+
+We use the fully qualified names of classes to disambiguate them where necessary:
+
+`a.py`:
+
+```py
+class Foo: ...
+```
+
+`b.py`:
+
+```py
+class Foo: ...
+```
+
+`main.py`:
+
+```py
+import a
+import b
+
+# error: [unsupported-operator] "Operator `<` is not supported between objects of type `a.Foo` and `b.Foo`"
+a.Foo() < b.Foo()
 ```

@@ -459,3 +459,12 @@ Module(
 5 | type X[T = x := int] = int
 6 | type X[T: int = *int] = int
   |
+
+
+  |
+3 | type X[T = (yield x)] = int
+4 | type X[T = yield from x] = int
+5 | type X[T = x := int] = int
+  |                 ^^^ Syntax Error: non default type parameter `int` follows default type parameter
+6 | type X[T: int = *int] = int
+  |

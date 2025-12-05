@@ -274,12 +274,11 @@ impl<'db> SubclassOfType<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         Some(Self {
             subclass_of: self
                 .subclass_of
-                .recursive_type_normalized_impl(db, div, nested, visitor)?,
+                .recursive_type_normalized_impl(db, div, nested)?,
         })
     }
 
@@ -325,7 +324,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
 }
 
@@ -365,7 +364,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Self::Class(_) | Self::TypeVar(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -445,11 +444,10 @@ impl<'db> SubclassOfInner<'db> {
         db: &'db dyn Db,
         div: Type<'db>,
         nested: bool,
-        visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
         match self {
             Self::Class(class) => Some(Self::Class(
-                class.recursive_type_normalized_impl(db, div, nested, visitor)?,
+                class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
             Self::TypeVar(_) => Some(self),
@@ -463,8 +461,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl From<DynamicType> for SubclassOfInner<'_> {
-    fn from(value: DynamicType) -> Self {
+impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicType<'db>) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }

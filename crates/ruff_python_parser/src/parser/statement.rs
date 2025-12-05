@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use std::fmt::{Display, Write};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AtomicNodeIndex, ExceptHandler, Expr, ExprContext, IpyEscapeKind, Operator,
     PythonVersion, Stmt, WithItem,
@@ -14,7 +15,7 @@ use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{Mode, ParseErrorType, UnsupportedSyntaxErrorKind};
 

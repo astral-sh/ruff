@@ -118,7 +118,14 @@ if sys.version_info < (3, 14):
     __all__ += ["URLopener", "FancyURLopener"]
 
 _T = TypeVar("_T")
+
+# The actual type is `addinfourl | HTTPResponse`, but users would need to use `typing.cast` or `isinstance` to narrow the type,
+# so we use `Any` instead.
+# See
+# - https://github.com/python/typeshed/pull/15042
+# - https://github.com/python/typing/issues/566
 _UrlopenRet: TypeAlias = Any
+
 _DataType: TypeAlias = ReadableBuffer | SupportsRead[bytes] | Iterable[bytes] | None
 
 if sys.version_info >= (3, 13):

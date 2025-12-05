@@ -143,6 +143,10 @@ await C()
 def f():
     # error: [invalid-syntax] "`await` outside of an asynchronous function"
     await C()
+
+(await cor async for cor in f())  # ok
+(await cor for cor in f())  # ok
+([await c for c in cor] async for cor in f())  # ok
 ```
 
 Generators are evaluated lazily, so `await` is allowed, even outside of a function.

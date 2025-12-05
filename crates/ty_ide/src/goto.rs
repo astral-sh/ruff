@@ -8,8 +8,8 @@ use std::borrow::Cow;
 use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use ty_python_semantic::ResolvedDefinition;
@@ -396,13 +396,19 @@ impl GotoTarget<'_> {
             GotoTarget::ImportSymbolAlias {
                 alias, import_from, ..
             } => {
-                let symbol_name = alias.name.as_str();
-                Some(definitions_for_imported_symbol(
-                    model,
-                    import_from,
-                    symbol_name,
-                    alias_resolution,
-                ))
+                if let Some(asname) = alias.asname.as_ref()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    Some(definitions_for_name(model, asname.as_str(), asname.into()))
+                } else {
+                    let symbol_name = alias.name.as_str();
+                    Some(definitions_for_imported_symbol(
+                        model,
+                        import_from,
+                        symbol_name,
+                        alias_resolution,
+                    ))
+                }
             }
 
             GotoTarget::ImportModuleComponent {
@@ -418,12 +424,12 @@ impl GotoTarget<'_> {
 
             // Handle import aliases (offset within 'z' in "import x.y as z")
             GotoTarget::ImportModuleAlias { alias } => {
-                if alias_resolution == ImportAliasResolution::ResolveAliases {
-                    definitions_for_module(model, Some(alias.name.as_str()), 0)
+                if let Some(asname) = alias.asname.as_ref()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    Some(definitions_for_name(model, asname.as_str(), asname.into()))
                 } else {
-                    alias.asname.as_ref().map(|name| {
-                        definitions_for_name(model, name.as_str(), AnyNodeRef::Identifier(name))
-                    })
+                    definitions_for_module(model, Some(alias.name.as_str()), 0)
                 }
             }
 

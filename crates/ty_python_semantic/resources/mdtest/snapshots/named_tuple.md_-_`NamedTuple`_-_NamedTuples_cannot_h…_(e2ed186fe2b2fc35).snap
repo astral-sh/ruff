@@ -1,0 +1,43 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: named_tuple.md - `NamedTuple` - NamedTuples cannot have field names starting with underscores
+mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import NamedTuple
+ 2 | 
+ 3 | class Foo(NamedTuple):
+ 4 |     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+ 5 |     _bar: int
+ 6 | 
+ 7 | class Bar(NamedTuple):
+ 8 |     x: int
+ 9 | 
+10 | class Baz(Bar):
+11 |     _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
+```
+
+# Diagnostics
+
+```
+error[invalid-named-tuple]: NamedTuple field name cannot start with an underscore
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | class Foo(NamedTuple):
+4 |     # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+5 |     _bar: int
+  |     ^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
+6 |
+7 | class Bar(NamedTuple):
+  |
+info: rule `invalid-named-tuple` is enabled by default
+
+```

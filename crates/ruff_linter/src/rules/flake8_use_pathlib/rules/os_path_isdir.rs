@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -73,6 +74,6 @@ pub(crate) fn os_path_isdir(checker: &Checker, call: &ExprCall, segments: &[&str
         "s",
         is_fix_os_path_isdir_enabled(checker.settings()),
         OsPathIsdir,
-        None,
+        Applicability::Safe,
     );
 }

@@ -7,6 +7,7 @@ pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
 use crate::{ProgressReporter, Project, ProjectMetadata};
+use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
@@ -129,7 +130,10 @@ impl ProjectDatabase {
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let memory_usage = ruff_memory_usage::attach_tracker(StandardTracker::new(), || {
+            <dyn salsa::Database>::memory_usage(self)
+        });
+
         let mut ingredients = memory_usage
             .structs
             .into_iter()

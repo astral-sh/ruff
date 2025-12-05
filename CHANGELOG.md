@@ -1,5 +1,69 @@
 # Changelog
 
+## 0.14.8
+
+Released on 2025-12-04.
+
+### Preview features
+
+- \[`flake8-bugbear`\] Catch `yield` expressions within other statements (`B901`) ([#21200](https://github.com/astral-sh/ruff/pull/21200))
+- \[`flake8-use-pathlib`\] Mark fixes unsafe for return type changes (`PTH104`, `PTH105`, `PTH109`, `PTH115`) ([#21440](https://github.com/astral-sh/ruff/pull/21440))
+
+### Bug fixes
+
+- Fix syntax error false positives for `await` outside functions ([#21763](https://github.com/astral-sh/ruff/pull/21763))
+- \[`flake8-simplify`\] Fix truthiness assumption for non-iterable arguments in tuple/list/set calls (`SIM222`, `SIM223`) ([#21479](https://github.com/astral-sh/ruff/pull/21479))
+
+### Documentation
+
+- Suggest using `--output-file` option in GitLab integration ([#21706](https://github.com/astral-sh/ruff/pull/21706))
+
+### Other changes
+
+- [syntax-error] Default type parameter followed by non-default type parameter ([#21657](https://github.com/astral-sh/ruff/pull/21657))
+
+### Contributors
+
+- [@kieran-ryan](https://github.com/kieran-ryan)
+- [@11happy](https://github.com/11happy)
+- [@danparizher](https://github.com/danparizher)
+- [@ntBre](https://github.com/ntBre)
+
+## 0.14.7
+
+Released on 2025-11-28.
+
+### Preview features
+
+- \[`flake8-bandit`\] Handle string literal bindings in suspicious-url-open-usage (`S310`) ([#21469](https://github.com/astral-sh/ruff/pull/21469))
+- \[`pylint`\] Fix `PLR1708` false positives on nested functions ([#21177](https://github.com/astral-sh/ruff/pull/21177))
+- \[`pylint`\] Fix suppression for empty dict without tuple key annotation (`PLE1141`) ([#21290](https://github.com/astral-sh/ruff/pull/21290))
+- \[`ruff`\] Add rule `RUF066` to detect unnecessary class properties ([#21535](https://github.com/astral-sh/ruff/pull/21535))
+- \[`ruff`\] Catch more dummy variable uses (`RUF052`) ([#19799](https://github.com/astral-sh/ruff/pull/19799))
+
+### Bug fixes
+
+- [server] Set severity for non-rule diagnostics ([#21559](https://github.com/astral-sh/ruff/pull/21559))
+- \[`flake8-implicit-str-concat`\] Avoid invalid fix in (`ISC003`) ([#21517](https://github.com/astral-sh/ruff/pull/21517))
+- \[`parser`\] Fix panic when parsing IPython escape command expressions ([#21480](https://github.com/astral-sh/ruff/pull/21480))
+
+### CLI
+
+- Show partial fixability indicator in statistics output ([#21513](https://github.com/astral-sh/ruff/pull/21513))
+
+### Contributors
+
+- [@mikeleppane](https://github.com/mikeleppane)
+- [@senekor](https://github.com/senekor)
+- [@ShaharNaveh](https://github.com/ShaharNaveh)
+- [@JumboBear](https://github.com/JumboBear)
+- [@prakhar1144](https://github.com/prakhar1144)
+- [@tsvikas](https://github.com/tsvikas)
+- [@danparizher](https://github.com/danparizher)
+- [@chirizxc](https://github.com/chirizxc)
+- [@AlexWaygood](https://github.com/AlexWaygood)
+- [@MichaReiser](https://github.com/MichaReiser)
+
 ## 0.14.6
 
 Released on 2025-11-21.

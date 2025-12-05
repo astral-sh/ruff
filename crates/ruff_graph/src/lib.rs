@@ -49,7 +49,7 @@ impl ModuleImports {
         // Resolve the imports.
         let mut resolved_imports = ModuleImports::default();
         for import in imports {
-            for resolved in Resolver::new(db).resolve(import) {
+            for resolved in Resolver::new(db, path).resolve(import) {
                 if let Some(path) = resolved.as_system_path() {
                     resolved_imports.insert(path.to_path_buf());
                 }
