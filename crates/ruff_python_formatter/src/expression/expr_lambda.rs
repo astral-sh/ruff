@@ -86,7 +86,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                     dangling_after_parameters
                         .iter()
                         .position(|comment| comment.line_position().is_own_line())
-                        .unwrap_or_else(|| dangling_after_parameters.len()),
+                        .unwrap_or(dangling_after_parameters.len()),
                 );
                 return write!(
                     f,
