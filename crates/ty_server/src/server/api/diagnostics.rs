@@ -12,7 +12,7 @@ use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{Annotation, Severity, SubDiagnostic};
 use ruff_db::files::{File, FileRange};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use serde::{Deserialize, Serialize};
 use ty_project::{Db as _, ProjectDatabase};
 
@@ -200,7 +200,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
 pub(crate) fn publish_settings_diagnostics(
     session: &mut Session,
     client: &Client,
-    path: SystemPathBuf,
+    path: &SystemPath,
 ) {
     // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
     //
@@ -212,7 +212,7 @@ pub(crate) fn publish_settings_diagnostics(
     }
 
     let session_encoding = session.position_encoding();
-    let state = session.project_state_mut(&AnySystemPath::System(path));
+    let state = session.project_state_mut(&AnySystemPath::System(path.to_path_buf()));
     let db = &state.db;
     let project = db.project();
     let settings_diagnostics = project.check_settings(db);
