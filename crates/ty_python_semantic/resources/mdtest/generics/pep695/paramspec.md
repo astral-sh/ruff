@@ -246,7 +246,6 @@ But, they cannot be omitted when there are multiple type variables.
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
-reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 
 # TODO: error: paramspec is unbound
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
@@ -264,6 +263,13 @@ reveal_type(p.attr2)  # revealed: (int, /) -> None
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
 TwoParamSpec[int, str]
+```
+
+Specializing `ParamSpec` type variable using `typing.Any` isn't explicitly allowed by the spec but
+both mypy and Pyright allow this and there are usages of this in the wild e.g., `staticmethod[Any, Any]`.
+
+```py
+reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
 ```
 
 ## Specialization when defaults are involved

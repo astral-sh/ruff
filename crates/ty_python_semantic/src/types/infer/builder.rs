@@ -3581,6 +3581,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Ok(Type::paramspec_value_callable(db, parameters));
                     }
 
+                    // This is specifically to handle a case where there are more than one type
+                    // variables and at least one of them is a `ParamSpec` which is specialized
+                    // using `typing.Any`. This isn't explicitly allowed in the spec, but both mypy
+                    // and Pyright allows this and the ecosystem report suggested there are usages
+                    // of this in the wild e.g., `staticmethod[Any, Any]`. For example,
+                    //
+                    // ```python
+                    // class Foo[**P, T]: ...
+                    //
+                    // Foo[Any, int]  # P: (Any, /), T: int
+                    // ```
                     Type::Dynamic(DynamicType::Any) => {
                         return Ok(Type::paramspec_value_callable(
                             db,
