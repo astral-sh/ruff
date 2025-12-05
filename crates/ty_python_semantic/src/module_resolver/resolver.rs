@@ -449,6 +449,7 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
     if search_paths.is_empty() {
         None
     } else {
+        search_paths.reverse();
         Some(search_paths)
     }
 }
