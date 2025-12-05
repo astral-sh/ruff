@@ -4,7 +4,9 @@ use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Parameter;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
@@ -1808,7 +1810,9 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref() {
+        if let Some(arg) = function.parameters.kwarg.as_ref()
+            && !should_suppress_kwarg_check(checker, arg)
+        {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
@@ -1831,6 +1835,16 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 function.identifier(),
             );
         }
+    }
+}
+
+fn should_suppress_kwarg_check(checker: &Checker, parameter: &Parameter) -> bool {
+    if let Some(annotation) = &parameter.annotation {
+        checker
+            .semantic()
+            .match_typing_expr(map_subscript(annotation), "Unpack")
+    } else {
+        false
     }
 }
 
