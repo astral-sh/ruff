@@ -314,6 +314,9 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
 
     /// The default values of the parameters of a function definition.
     parameter_defaults: Option<Vec<Option<Type<'db>>>>,
+
+    /// The return type of a function definition.
+    return_type: Option<Type<'db>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -354,6 +357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             dataclass_field_specifiers: SmallVec::new(),
             parameters: None,
             parameter_defaults: None,
+            return_type: None,
         }
     }
 
@@ -2456,6 +2460,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
             }
+
+            self.return_type = Some(annotated.inner_type());
         }
     }
 
@@ -12197,6 +12203,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             parameters: _,
             parameter_defaults: _,
+            return_type: _,
 
             // builder only state
             typevar_binding_context: _,
@@ -12276,6 +12283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return_types_and_ranges: _,
             parameters,
             parameter_defaults,
+            return_type,
         } = self;
 
         let _ = scope;
@@ -12287,7 +12295,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || undecorated_type.is_some()
             || !deferred.is_empty()
             || parameters.is_some()
-            || parameter_defaults.is_some())
+            || parameter_defaults.is_some()
+            || return_type.is_some())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
@@ -12297,6 +12306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 undecorated_type,
                 parameters,
                 parameter_defaults,
+                return_type,
             })
         });
 
@@ -12347,6 +12357,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             undecorated_type: _,
             parameters: _,
             parameter_defaults: _,
+            return_type: _,
 
             // Builder only state
             dataclass_field_specifiers: _,
