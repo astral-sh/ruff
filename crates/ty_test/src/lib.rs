@@ -1,7 +1,6 @@
 use crate::config::Log;
 use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
-use anyhow::Context;
 use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
@@ -28,10 +27,12 @@ use ty_python_semantic::{
 mod assertion;
 mod config;
 mod db;
+mod dependencies;
 mod diagnostic;
 mod matcher;
 mod parser;
 
+use dependencies::{copy_site_packages_to_db, setup_venv_with_dependencies};
 use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
@@ -71,16 +72,21 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
-        let inconsistencies = run_module_resolution_consistency_test(&db);
-        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+            Ok(())
+        } else {
+            run_module_resolution_consistency_test(&db)
+        };
+
+        let this_test_failed = result.is_err() || inconsistencies.is_err();
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = failures {
+        if let Err(failures) = result {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -213,12 +219,24 @@ impl OutputFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestOutcome {
+    Success,
+    Skipped,
+}
+
+impl TestOutcome {
+    const fn has_been_skipped(self) -> bool {
+        matches!(self, TestOutcome::Skipped)
+    }
+}
+
 fn run_test(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
-) -> Result<(), Failures> {
+) -> Result<TestOutcome, Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -251,6 +269,10 @@ fn run_test(
 
     // Setup virtual environment with dependencies if specified
     let _temp_venv = if let Some(dependencies) = test.configuration().dependencies() {
+        if !std::env::var("MDTEST_INCLUDE_EXTERNAL").is_ok_and(|v| v == "1") {
+            return Ok(TestOutcome::Skipped);
+        }
+
         let (temp_dir, venv_path) = setup_venv_with_dependencies(dependencies, python_version)
             .expect("Failed to setup virtual environment with dependencies");
 
@@ -580,7 +602,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(())
+        Ok(TestOutcome::Success)
     } else {
         Err(failures)
     }
@@ -827,218 +849,4 @@ impl AttemptTestError<'_> {
             by_line,
         }
     }
-}
-
-/// Setup a virtual environment with the specified dependencies.
-///
-/// This function:
-/// 1. Creates a temporary directory
-/// 2. Generates a minimal pyproject.toml with the dependencies
-/// 3. Runs `uv sync` to install dependencies
-/// 4. Returns the path to the virtual environment
-fn setup_venv_with_dependencies(
-    dependencies: &[String],
-    python_version: ruff_python_ast::PythonVersion,
-) -> anyhow::Result<(tempfile::TempDir, SystemPathBuf)> {
-    // Create a temporary directory for the project
-    let temp_dir = tempfile::Builder::new()
-        .prefix("mdtest-venv-")
-        .tempdir()
-        .context("Failed to create temporary directory for mdtest virtual environment")?;
-
-    let temp_path = SystemPath::from_std_path(temp_dir.path())
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "Temporary directory path is not valid UTF-8: {}",
-                temp_dir.path().display()
-            )
-        })?
-        .to_path_buf();
-
-    // Generate a minimal pyproject.toml
-    let pyproject_toml = format!(
-        r#"[project]
-name = "mdtest-deps"
-version = "0.1.0"
-requires-python = "~={python_version}.0"
-dependencies = [
-{deps}
-]
-"#,
-        python_version = python_version,
-        deps = dependencies
-            .iter()
-            .map(|dep| format!("    \"{dep}\","))
-            .collect::<Vec<_>>()
-            .join("\n")
-    );
-
-    std::fs::write(
-        temp_path.join("pyproject.toml").as_std_path(),
-        pyproject_toml,
-    )
-    .context("Failed to write pyproject.toml")?;
-
-    // Run `uv sync` to install dependencies
-    let uv_sync_output = std::process::Command::new("uv")
-        .arg("sync")
-        .current_dir(temp_path.as_std_path())
-        .output()
-        .context("Failed to run `uv sync`. Is `uv` installed and available in the PATH?")?;
-
-    if !uv_sync_output.status.success() {
-        let stderr = String::from_utf8_lossy(&uv_sync_output.stderr);
-        anyhow::bail!(
-            "`uv sync` failed with exit code {:?}:\n{}",
-            uv_sync_output.status.code(),
-            stderr
-        );
-    }
-
-    // Return the temp dir and path to the venv
-    let venv_path = temp_path.join(".venv");
-    Ok((temp_dir, venv_path))
-}
-
-/// Copy the site-packages directory from a real virtual environment to the in-memory filesystem of `db`.
-///
-/// This recursively copies all files from the venv's site-packages directory into the
-/// in-memory filesystem at the specified destination path.
-fn copy_site_packages_to_db(
-    db: &mut Db,
-    venv_path: &SystemPath,
-    dest_venv_path: &SystemPath,
-    python_version: ruff_python_ast::PythonVersion,
-) -> anyhow::Result<()> {
-    use std::fs;
-
-    // Determine the site-packages path within the venv
-    let (site_packages_path, python_dir_name) = if cfg!(target_os = "windows") {
-        let sp_path = venv_path.join("Lib").join("site-packages");
-        (sp_path, String::new()) // Windows doesn't need the python version in the path
-    } else {
-        // On Unix, we need to find the actual python directory in lib/
-        // It could be python3.12, python3.12.1, etc.
-        let lib_path = venv_path.join("lib");
-
-        if !lib_path.as_std_path().exists() {
-            anyhow::bail!("lib directory not found in virtual environment at '{venv_path}'",);
-        }
-
-        // Find the python directory
-        let major = python_version.major;
-        let minor = python_version.minor;
-        let python_dir = fs::read_dir(lib_path.as_std_path())
-            .context("Failed to read lib directory")?
-            .filter_map(Result::ok)
-            .find(|entry| {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                name_str == format!("python{major}.{minor}")
-                    && entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
-            })
-            .ok_or_else(|| {
-                anyhow::anyhow!(
-                    "Could not find python directory in '{}'. Expected 'python{}.{}'",
-                    lib_path,
-                    python_version.major,
-                    python_version.minor
-                )
-            })?;
-
-        let python_dir_name = python_dir.file_name();
-        let python_dir_str = python_dir_name
-            .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Python directory name is not valid UTF-8"))?;
-
-        let actual_python_dir = lib_path.join(python_dir_str);
-        (
-            actual_python_dir.join("site-packages"),
-            python_dir_str.to_string(),
-        )
-    };
-
-    if !site_packages_path.as_std_path().exists() {
-        anyhow::bail!("site-packages directory not found at '{site_packages_path}'",);
-    }
-
-    // Destination site-packages path in the in-memory filesystem
-    // Use the actual python directory name we found
-    let dest_site_packages = if cfg!(target_os = "windows") {
-        dest_venv_path.join("Lib").join("site-packages")
-    } else {
-        dest_venv_path
-            .join("lib")
-            .join(&python_dir_name)
-            .join("site-packages")
-    };
-
-    // Create the destination directory structure
-    db.create_directory_all(&dest_site_packages)
-        .context("Failed to create site-packages directory in database")?;
-
-    // Recursively copy all files from site-packages
-    copy_directory_recursive(db, &site_packages_path, &dest_site_packages)?;
-
-    Ok(())
-}
-
-fn copy_directory_recursive(
-    db: &mut Db,
-    src: &SystemPath,
-    dest: &SystemPath,
-) -> anyhow::Result<()> {
-    use std::fs;
-
-    for entry in fs::read_dir(src.as_std_path())
-        .with_context(|| format!("Failed to read directory {src}"))?
-    {
-        let entry = entry.with_context(|| format!("Failed to read directory entry in {src}"))?;
-        let entry_path = entry.path();
-        let file_type = entry
-            .file_type()
-            .with_context(|| format!("Failed to get file type for {}", entry_path.display()))?;
-
-        let src_path = SystemPath::from_std_path(&entry_path)
-            .ok_or_else(|| anyhow::anyhow!("Path {} is not valid UTF-8", entry_path.display()))?;
-
-        let file_name = entry.file_name();
-        let file_name_str = file_name.to_str().ok_or_else(|| {
-            anyhow::anyhow!(
-                "File name {} is not valid UTF-8",
-                file_name.to_string_lossy()
-            )
-        })?;
-
-        let dest_path = dest.join(file_name_str);
-
-        if file_type.is_dir() {
-            // Skip __pycache__ directories and other unnecessary directories
-            if file_name_str == "__pycache__" || file_name_str.ends_with(".dist-info") {
-                continue;
-            }
-
-            db.create_directory_all(&dest_path)
-                .with_context(|| format!("Failed to create directory {dest_path}"))?;
-
-            copy_directory_recursive(db, src_path, &dest_path)?;
-        } else if file_type.is_file() {
-            let is_python_source = entry_path.extension().is_some_and(|ext| {
-                ext.eq_ignore_ascii_case("py") || ext.eq_ignore_ascii_case("pyi")
-            });
-
-            if !is_python_source {
-                // Skip all non-Python files (binaries, data files, etc.)
-                continue;
-            }
-
-            let contents = fs::read_to_string(src_path.as_std_path())
-                .with_context(|| format!("Failed to read file {src_path}"))?;
-
-            db.write_file(&dest_path, contents)
-                .with_context(|| format!("Failed to write file {dest_path}"))?;
-        }
-    }
-
-    Ok(())
 }
