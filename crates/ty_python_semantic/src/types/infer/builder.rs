@@ -7108,10 +7108,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        if self.deferred_state.in_string_annotation() {
+        if self.deferred_state.in_string_annotation()
+            || self.inner_expression_inference_state.is_get()
+        {
             // Avoid storing the type of expressions that are part of a string annotation because
             // the expression ids don't exists in the semantic index. Instead, we'll store the type
             // on the string expression itself that represents the annotation.
+            // Also, if `inner_expression_inference_state` is `Get`, the expression type has already been stored.
             return;
         }
 
