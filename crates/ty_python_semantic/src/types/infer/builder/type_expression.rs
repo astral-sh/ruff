@@ -14,8 +14,8 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeContext,
+    TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
 };
 
 /// Type expressions
@@ -911,7 +911,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                KnownInstanceType::TypeAliasType(type_alias) => {
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
@@ -944,19 +944,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             Type::unknown()
                         }
                     }
-                }
-                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    // TODO: support generic "manual" PEP 695 type aliases
-                    let slice_ty = self.infer_expression(slice, TypeContext::default());
-                    let mut variables = FxOrderSet::default();
-                    slice_ty.bind_and_find_all_legacy_typevars(
-                        self.db(),
-                        self.typevar_binding_context,
-                        &mut variables,
-                    );
-                    let generic_context =
-                        GenericContext::from_typevar_instances(self.db(), variables);
-                    Type::Dynamic(DynamicType::UnknownGeneric(generic_context))
                 }
                 KnownInstanceType::LiteralStringAlias(_) => {
                     self.infer_type_expression(slice);
