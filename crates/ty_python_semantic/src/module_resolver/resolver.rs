@@ -329,7 +329,14 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
         path,
         search_paths(db, ModuleResolveMode::StubsAllowed),
     )
-    .or_else(|| file_to_module_impl(db, file, path, desperate_search_paths(db, file).iter()))
+    .or_else(|| {
+        file_to_module_impl(
+            db,
+            file,
+            path,
+            desperate_search_paths(db, file).iter().flatten(),
+        )
+    })
 }
 
 fn file_to_module_impl<'db, 'a>(
@@ -395,7 +402,7 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -422,16 +429,28 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPat
     }
 
     // Only allow searching up to the first-party path's root
+    let mut search_paths = Vec::new();
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
-        if system.path_exists(&candidate_path.join("pyproject.toml"))
-            || system.path_exists(&candidate_path.join("ty.toml"))
+        // Any dir named `tests` might be a pytest root, but not if it's a package
+        let is_pytest_dir = rel_dir.file_name() == Some("tests")
+            && !system.is_file(&candidate_path.join("__init__.py"))
+            && !system.is_file(&candidate_path.join("__init__.pyi"));
+        // Any dir with a pyproject.toml or ty.toml might be a project root
+        if is_pytest_dir
+            || system.is_file(&candidate_path.join("pyproject.toml"))
+            || system.is_file(&candidate_path.join("ty.toml"))
         {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
-            return Some(search_path);
+            search_paths.push(search_path);
         }
     }
-    None
+
+    if search_paths.is_empty() {
+        None
+    } else {
+        Some(search_paths)
+    }
 }
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct SearchPaths {
@@ -954,7 +973,7 @@ fn desperately_resolve_name(
     mode: ModuleResolveMode,
 ) -> Option<ResolvedName> {
     let search_paths = desperate_search_paths(db, importing_file);
-    resolve_name_impl(db, name, mode, search_paths.iter())
+    resolve_name_impl(db, name, mode, search_paths.iter().flatten())
 }
 
 fn resolve_name_impl<'a>(
