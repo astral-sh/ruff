@@ -604,6 +604,12 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda  # comment
+    *args, **kwargs:
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3

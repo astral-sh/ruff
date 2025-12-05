@@ -610,6 +610,12 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda  # comment
+    *args, **kwargs:
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3
@@ -1292,6 +1298,12 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda  # comment
+    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+    + 1
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3
@@ -1939,7 +1951,7 @@ transform = (
  )
  
  (
-@@ -630,8 +630,9 @@
+@@ -630,14 +630,16 @@
  (
      lambda
      # comment
@@ -1951,7 +1963,16 @@ transform = (
  )
  
  (
-@@ -639,19 +640,20 @@
+     lambda  # comment
+-    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+-    + 1
++    *args, **kwargs: (
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
++    )
+ )
+ 
+ (
+@@ -645,19 +647,20 @@
      # 2
      left,  # 3
      # 4
@@ -1982,7 +2003,7 @@ transform = (
          )
      )
  )
-@@ -669,16 +671,15 @@
+@@ -675,16 +678,15 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
