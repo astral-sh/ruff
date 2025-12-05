@@ -95,7 +95,7 @@ python-version = "3.12"
 ```
 
 ```py
-from typing import final
+from typing import Any, final
 from ty_extensions import static_assert, is_disjoint_from
 
 @final
@@ -106,9 +106,12 @@ class Foo[T]:
 class A: ...
 class B: ...
 
+static_assert(not is_disjoint_from(A, B))
 static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
+static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
 
-# TODO: `int` and `str` are disjoint bases, so these should be disjoint.
+# `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
 static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
