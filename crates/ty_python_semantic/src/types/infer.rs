@@ -661,9 +661,6 @@ struct DefinitionInferenceExtra<'db> {
     /// The parameters of a function definition (without any default values filled in).
     parameters: Option<Vec<Parameter<'db>>>,
 
-    /// The default values of the parameters of a function definition.
-    parameter_defaults: Option<Vec<Option<Type<'db>>>>,
-
     /// The return type of a function definition.
     return_type: Option<Type<'db>>,
 }

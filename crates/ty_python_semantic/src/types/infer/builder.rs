@@ -312,9 +312,6 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// The parameters of a function definition (without any default values filled in).
     parameters: Option<Vec<Parameter<'db>>>,
 
-    /// The default values of the parameters of a function definition.
-    parameter_defaults: Option<Vec<Option<Type<'db>>>>,
-
     /// The return type of a function definition.
     return_type: Option<Type<'db>>,
 }
@@ -356,7 +353,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
             parameters: None,
-            parameter_defaults: None,
             return_type: None,
         }
     }
@@ -2293,7 +2289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
-        let defaults: Vec<_> = parameters
+        let _defaults: Vec<_> = parameters
             .iter_non_variadic_params()
             .map(|param| {
                 param
@@ -2302,7 +2298,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|default| self.infer_expression(default, TypeContext::default()))
             })
             .collect();
-        self.parameter_defaults = Some(defaults);
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
@@ -12202,7 +12197,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Ignored; only relevant to definition regions
             undecorated_type: _,
             parameters: _,
-            parameter_defaults: _,
             return_type: _,
 
             // builder only state
@@ -12282,7 +12276,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             region: _,
             return_types_and_ranges: _,
             parameters,
-            parameter_defaults,
             return_type,
         } = self;
 
@@ -12295,7 +12288,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || undecorated_type.is_some()
             || !deferred.is_empty()
             || parameters.is_some()
-            || parameter_defaults.is_some()
             || return_type.is_some())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
@@ -12305,7 +12297,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 diagnostics,
                 undecorated_type,
                 parameters,
-                parameter_defaults,
                 return_type,
             })
         });
@@ -12354,7 +12345,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred: _,
             bindings: _,
             declarations: _,
-            parameter_defaults: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
