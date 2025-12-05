@@ -2702,21 +2702,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_node = function_definition.node(self.module());
         let function_name = &function_node.name;
 
-        // TODO: handle implicit type of `cls` for classmethods
-        if is_implicit_classmethod(function_name) || is_implicit_staticmethod(function_name) {
+        if is_implicit_staticmethod(function_name) {
             return None;
         }
 
+        let mut is_classmethod = is_implicit_classmethod(function_name);
         let inference = infer_definition_types(db, method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
-            if decorator_ty.as_class_literal().is_some_and(|class| {
-                matches!(
-                    class.known(db),
-                    Some(KnownClass::Classmethod | KnownClass::Staticmethod)
-                )
-            }) {
-                return None;
+            if let Some(known_class) = decorator_ty
+                .as_class_literal()
+                .and_then(|class| class.known(db))
+            {
+                if known_class == KnownClass::Staticmethod {
+                    return None;
+                }
+
+                is_classmethod |= known_class == KnownClass::Classmethod;
             }
         }
 
@@ -2726,7 +2728,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inner_type()
             .as_class_literal()?;
 
-        typing_self(db, self.scope(), Some(method_definition), class_literal)
+        let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
+        if is_classmethod {
+            typing_self
+                .map(|typing_self| SubclassOfType::from(db, SubclassOfInner::TypeVar(typing_self)))
+        } else {
+            typing_self.map(Type::TypeVar)
+        }
     }
 
     /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.

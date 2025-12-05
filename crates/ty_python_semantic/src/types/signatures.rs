@@ -1702,6 +1702,7 @@ impl<'db> Parameters<'db> {
 
                     Some(
                         typing_self(db, scope_id, typevar_binding_context, class)
+                            .map(Type::TypeVar)
                             .expect("We should always find the surrounding class for an implicit self: Self annotation"),
                     )
                 } else {
