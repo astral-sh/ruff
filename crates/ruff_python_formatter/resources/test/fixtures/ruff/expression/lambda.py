@@ -517,6 +517,15 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda name: # dangling header comment
+    (
+        source_bucket
+        if name == source_bucket_name
+        else storage.Bucket(mock_service, destination_bucket_name)
+    )
+)
+
+(
     lambda from_ts, to_ts, _chain_id=chain_id:  # dangling eol header comment
     db_evmtx.count_transactions_in_range(
         chain_id=_chain_id,

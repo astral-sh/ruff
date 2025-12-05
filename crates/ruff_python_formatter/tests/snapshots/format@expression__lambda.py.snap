@@ -523,6 +523,15 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda name: # dangling header comment
+    (
+        source_bucket
+        if name == source_bucket_name
+        else storage.Bucket(mock_service, destination_bucket_name)
+    )
+)
+
+(
     lambda from_ts, to_ts, _chain_id=chain_id:  # dangling eol header comment
     db_evmtx.count_transactions_in_range(
         chain_id=_chain_id,
@@ -1202,6 +1211,15 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda name:  # dangling header comment
+    (
+        source_bucket
+        if name == source_bucket_name
+        else storage.Bucket(mock_service, destination_bucket_name)
+    )
+)
+
+(
     lambda from_ts, to_ts, _chain_id=chain_id:  # dangling eol header comment
     db_evmtx.count_transactions_in_range(
         chain_id=_chain_id,
@@ -1745,7 +1763,7 @@ transform = (
  )
  
  (
-@@ -579,9 +567,11 @@
+@@ -588,9 +576,11 @@
  )
  
  (
@@ -1760,7 +1778,7 @@ transform = (
  )
  
  (
-@@ -621,8 +611,9 @@
+@@ -630,8 +620,9 @@
  (
      lambda
      # comment
@@ -1772,7 +1790,7 @@ transform = (
  )
  
  (
-@@ -640,9 +631,11 @@
+@@ -649,9 +640,11 @@
      (
          lambda y:  # inner comment 1
          # inner comment 2
@@ -1787,7 +1805,7 @@ transform = (
          )
      )
  )
-@@ -660,16 +653,15 @@
+@@ -669,16 +662,15 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
