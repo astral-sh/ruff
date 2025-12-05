@@ -8048,7 +8048,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
                             self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
+                                .break_recursion_cycle(self.db()),
                         );
                     }
                     parameter
@@ -8062,7 +8062,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
                             self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
+                                .break_recursion_cycle(self.db()),
                         );
                     }
                     parameter
@@ -8080,7 +8080,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     if let Some(default) = param.default() {
                         parameter = parameter.with_default_type(
                             self.infer_expression(default, TypeContext::default())
-                                .replace_parameter_defaults(self.db()),
+                                .break_recursion_cycle(self.db()),
                         );
                     }
                     parameter

@@ -421,7 +421,7 @@ impl<'db> Signature<'db> {
                 defaults
                     .next()
                     .expect("should have optional default for each non-variadic parameter")
-                    .map(|ty| ty.replace_parameter_defaults(db))
+                    .map(|ty| ty.break_recursion_cycle(db))
             });
         }
         let mut parameters = Parameters::new(db, inferred_signature.parameters);
@@ -1987,13 +1987,9 @@ impl<'db> ParameterKind<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         let apply_to_default_type = |default_type: &Option<Type<'db>>| {
-            if type_mapping == &TypeMapping::ReplaceParameterDefaults && default_type.is_some() {
-                Some(Type::unknown())
-            } else {
-                default_type
-                    .as_ref()
-                    .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-            }
+            default_type
+                .as_ref()
+                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
         };
 
         match self {

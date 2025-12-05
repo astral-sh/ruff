@@ -7589,11 +7589,15 @@ impl<'db> Type<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
-        // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
-        // early. This is not just an optimization, it also prevents us from infinitely expanding
-        // the type, if it's something that can contain a `Self` reference.
         match type_mapping {
+            // If we are binding `typing.Self`, and this type is what we are binding `Self` to, return
+            // early. This is not just an optimization, it also prevents us from infinitely expanding
+            // the type, if it's something that can contain a `Self` reference.
             TypeMapping::BindSelf { self_type, .. } if self == *self_type => return self,
+
+            // If we are breaking a recursive type, look for that before expanding this type.
+            TypeMapping::BreakRecursionCycle(target) if self == *target => return Type::unknown(),
+
             _ => {}
         }
 
@@ -7612,7 +7616,7 @@ impl<'db> Type<'db> {
                         TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
                         TypeMapping::Materialize(_) |
-                        TypeMapping::ReplaceParameterDefaults |
+                        TypeMapping::BreakRecursionCycle(_) |
                         TypeMapping::EagerExpansion => self,
                     }
                 }
@@ -7788,7 +7792,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::Materialize(_) |
-                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::BreakRecursionCycle(_) |
                 TypeMapping::EagerExpansion |
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::Off) => self,
                 TypeMapping::PromoteLiterals(PromoteLiteralsMode::On) => self.promote_literals_impl(db, tcx)
@@ -7801,7 +7805,7 @@ impl<'db> Type<'db> {
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
                 TypeMapping::PromoteLiterals(_) |
-                TypeMapping::ReplaceParameterDefaults |
+                TypeMapping::BreakRecursionCycle(_) |
                 TypeMapping::EagerExpansion => self,
                 TypeMapping::Materialize(materialization_kind) => match materialization_kind {
                     MaterializationKind::Top => Type::object(),
@@ -8068,11 +8072,12 @@ impl<'db> Type<'db> {
         .find_legacy_typevars(db, None, variables);
     }
 
-    /// Replace default types in parameters of callables with `Unknown`.
-    pub(crate) fn replace_parameter_defaults(self, db: &'db dyn Db) -> Type<'db> {
+    /// Looks for any recursive references to this type inside of itself, replacing them with
+    /// `Unknown`.
+    pub(crate) fn break_recursion_cycle(self, db: &'db dyn Db) -> Type<'db> {
         self.apply_type_mapping(
             db,
-            &TypeMapping::ReplaceParameterDefaults,
+            &TypeMapping::BreakRecursionCycle(self),
             TypeContext::default(),
         )
     }
@@ -8512,9 +8517,9 @@ pub enum TypeMapping<'a, 'db> {
     ReplaceSelf { new_upper_bound: Type<'db> },
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
-    /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
-    /// recursion when the type of the default value of a parameter depends on the callable itself.
-    ReplaceParameterDefaults,
+    /// Looks for any recursive references to a type inside of itself, replacing them with
+    /// `Unknown`.
+    BreakRecursionCycle(Type<'db>),
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
@@ -8533,7 +8538,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
-            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::BreakRecursionCycle(_)
             | TypeMapping::EagerExpansion => context,
             TypeMapping::BindSelf {
                 binding_context, ..
@@ -8567,7 +8572,7 @@ impl<'db> TypeMapping<'_, 'db> {
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
-            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::BreakRecursionCycle(_)
             | TypeMapping::EagerExpansion => self.clone(),
         }
     }
@@ -9975,7 +9980,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 }
             }
             TypeMapping::PromoteLiterals(_)
-            | TypeMapping::ReplaceParameterDefaults
+            | TypeMapping::BreakRecursionCycle(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion => Type::TypeVar(self),
             TypeMapping::Materialize(materialization_kind) => {
