@@ -1504,10 +1504,142 @@ impl<'db> SpecializationBuilder<'db> {
             // multiple union elements, we ideally want to express that _only one_ of them needs to
             // match, and that we should infer the smallest type mapping that allows that.
             //
-            // For now, we punt on fully handling multiple typevar elements. Instead, we handle two
-            // common cases specially:
+            // For now, we still punt on fully general multiple-typevar unions. Instead, we handle a
+            // few common cases specially:
+            //   - "Sum-type-like" unions where each typevar is confined to exactly one union arm.
+            //   - Unions where exactly one arm is a bare typevar (e.g. `T | None`).
+            //   - The corresponding `formal: Union[...]`, `actual: non-union` variant below.
             (Type::Union(formal_union), Type::Union(actual_union)) => {
-                // First, if both formal and actual are unions, and precisely one formal union
+                // First, try to pair union elements for "sum-type-like" unions where:
+                // 1. Multiple union elements contain typevars (e.g., `Ok[T] | Err[E]`)
+                // 2. Each typevar is confined to exactly one union element (not shared across elements)
+                // 3. Each actual element has exactly one matching formal element
+                //
+                // This handles cases like `Ok[T] | Err[E]` vs. `Ok[int] | Err[Exception]`,
+                // but explicitly avoids cases like `T | list[T]` or `list[T] | set[T]` where
+                // typevars appear in multiple elements or are shared across elements.
+
+                // Helper to collect typevars from a single type
+                fn collect_typevars_from_type<'db>(
+                    db: &'db dyn Db,
+                    ty: Type<'db>,
+                ) -> FxHashSet<BoundTypeVarIdentity<'db>> {
+                    #[derive(Default)]
+                    struct CollectTypeVars<'db> {
+                        typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
+                        recursion_guard: TypeCollector<'db>,
+                    }
+
+                    impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
+                        fn should_visit_lazy_type_attributes(&self) -> bool {
+                            true
+                        }
+
+                        fn visit_bound_type_var_type(
+                            &self,
+                            db: &'db dyn Db,
+                            bound_typevar: BoundTypeVarInstance<'db>,
+                        ) {
+                            self.typevars
+                                .borrow_mut()
+                                .insert(bound_typevar.identity(db));
+                            walk_bound_type_var_type(db, bound_typevar, self);
+                        }
+
+                        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
+                            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
+                        }
+                    }
+
+                    let visitor = CollectTypeVars::default();
+                    visitor.visit_type(db, ty);
+                    visitor.typevars.into_inner()
+                }
+
+                let formal_elements: Vec<_> = formal_union.elements(self.db).to_vec();
+
+                // Check that each typevar appears in exactly one union element
+                let mut typevar_to_elements: FxHashMap<BoundTypeVarIdentity<'_>, FxHashSet<usize>> =
+                    FxHashMap::default();
+
+                for (idx, ty) in formal_elements.iter().enumerate() {
+                    for tv in collect_typevars_from_type(self.db, *ty) {
+                        typevar_to_elements.entry(tv).or_default().insert(idx);
+                    }
+                }
+
+                // Only proceed if:
+                // 1. There are at least 2 elements with typevars
+                // 2. Each typevar appears in exactly one element (no shared typevars)
+                let formal_with_typevars: Vec<_> = formal_elements
+                    .iter()
+                    .filter(|ty| !collect_typevars_from_type(self.db, **ty).is_empty())
+                    .copied()
+                    .collect();
+
+                let all_typevars_confined = typevar_to_elements
+                    .values()
+                    .all(|indices| indices.len() == 1);
+
+                if formal_with_typevars.len() >= 2 && all_typevars_confined {
+                    // Now try to pair each actual element with exactly one formal element.
+                    // For nominal types, prefer exact class matching (faster and more precise),
+                    // but fall back to subtyping for protocols and inheritance cases.
+                    for actual_element in actual_union.elements(self.db) {
+                        let matching_formals: Vec<_> = match actual_element {
+                            Type::NominalInstance(actual_nominal) => {
+                                // First try exact class match for nominal types
+                                let class_matches: Vec<_> = formal_with_typevars
+                                    .iter()
+                                    .filter(|formal_element| {
+                                        let Type::NominalInstance(formal_nominal) = formal_element
+                                        else {
+                                            return false;
+                                        };
+                                        actual_nominal.class_literal(self.db)
+                                            == formal_nominal.class_literal(self.db)
+                                    })
+                                    .copied()
+                                    .collect();
+
+                                // If class matching gives exactly one result, use it.
+                                // Otherwise, fall back to subtyping to handle inheritance/protocols.
+                                if class_matches.len() == 1 {
+                                    class_matches
+                                } else {
+                                    formal_with_typevars
+                                        .iter()
+                                        .filter(|formal_element| {
+                                            actual_element
+                                                .when_subtype_of(
+                                                    self.db,
+                                                    **formal_element,
+                                                    self.inferable,
+                                                )
+                                                .is_always_satisfied(self.db)
+                                        })
+                                        .copied()
+                                        .collect()
+                                }
+                            }
+                            _ => formal_with_typevars
+                                .iter()
+                                .filter(|formal_element| {
+                                    actual_element
+                                        .when_subtype_of(self.db, **formal_element, self.inferable)
+                                        .is_always_satisfied(self.db)
+                                })
+                                .copied()
+                                .collect(),
+                        };
+
+                        if let [formal_match] = matching_formals.as_slice() {
+                            self.infer_map_impl(*formal_match, *actual_element, polarity, f)?;
+                        }
+                    }
+                }
+
+                // Next, if both formal and actual are unions, and precisely one formal union
                 // element _is_ a typevar (not _contains_ a typevar), then we remove any actual
                 // union elements that are a subtype of the formal (as a whole), and map the formal
                 // typevar to any remaining actual union elements.
@@ -1546,7 +1678,7 @@ impl<'db> SpecializationBuilder<'db> {
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
             (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element is assignable
+                // If the formal is a union, and precisely one union element is assignable
                 // from the actual type, then we don't add any type mapping. This handles a case like
                 //
                 // ```py
