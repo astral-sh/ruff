@@ -1483,17 +1483,22 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db),
-                            )),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
                     );
 
-                    diagnostic.info(format_args!(
-                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                        asserted_type = asserted_ty.display(db),
-                        inferred_type = actual_ty.display(db),
-                    ));
+                    if actual_ty.is_subtype_of(db, *asserted_ty) {
+                        diagnostic.info(format_args!(
+                            "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.info(format_args!(
+                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
