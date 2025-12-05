@@ -197,7 +197,6 @@ struct LocalReferencesFinder<'a> {
 impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         self.ancestors.push(node);
-        let alias_resolution = self.mode.to_import_alias_resolution();
 
         match node {
             AnyNodeRef::ExprName(name_expr) => {
@@ -207,67 +206,67 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
                 }
 
                 let covering_node = CoveringNode::from_ancestors(self.ancestors.clone());
-                self.check_reference_from_covering_node(&covering_node, alias_resolution);
+                self.check_reference_from_covering_node(&covering_node);
             }
             AnyNodeRef::ExprAttribute(attr_expr) => {
-                self.check_identifier_reference(&attr_expr.attr, alias_resolution);
+                self.check_identifier_reference(&attr_expr.attr);
             }
             AnyNodeRef::StmtFunctionDef(func) if self.should_include_declaration() => {
-                self.check_identifier_reference(&func.name, alias_resolution);
+                self.check_identifier_reference(&func.name);
             }
             AnyNodeRef::StmtClassDef(class) if self.should_include_declaration() => {
-                self.check_identifier_reference(&class.name, alias_resolution);
+                self.check_identifier_reference(&class.name);
             }
             AnyNodeRef::Parameter(parameter) if self.should_include_declaration() => {
-                self.check_identifier_reference(&parameter.name, alias_resolution);
+                self.check_identifier_reference(&parameter.name);
             }
             AnyNodeRef::Keyword(keyword) => {
                 if let Some(arg) = &keyword.arg {
-                    self.check_identifier_reference(arg, alias_resolution);
+                    self.check_identifier_reference(arg);
                 }
             }
             AnyNodeRef::StmtGlobal(global_stmt) if self.should_include_declaration() => {
                 for name in &global_stmt.names {
-                    self.check_identifier_reference(name, alias_resolution);
+                    self.check_identifier_reference(name);
                 }
             }
             AnyNodeRef::StmtNonlocal(nonlocal_stmt) if self.should_include_declaration() => {
                 for name in &nonlocal_stmt.names {
-                    self.check_identifier_reference(name, alias_resolution);
+                    self.check_identifier_reference(name);
                 }
             }
             AnyNodeRef::ExceptHandlerExceptHandler(handler)
                 if self.should_include_declaration() =>
             {
                 if let Some(name) = &handler.name {
-                    self.check_identifier_reference(name, alias_resolution);
+                    self.check_identifier_reference(name);
                 }
             }
             AnyNodeRef::PatternMatchAs(pattern_as) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_as.name {
-                    self.check_identifier_reference(name, alias_resolution);
+                    self.check_identifier_reference(name);
                 }
             }
             AnyNodeRef::PatternMatchStar(pattern_star) if self.should_include_declaration() => {
                 if let Some(name) = &pattern_star.name {
-                    self.check_identifier_reference(name, alias_resolution);
+                    self.check_identifier_reference(name);
                 }
             }
             AnyNodeRef::PatternMatchMapping(pattern_mapping)
                 if self.should_include_declaration() =>
             {
                 if let Some(rest_name) = &pattern_mapping.rest {
-                    self.check_identifier_reference(rest_name, alias_resolution);
+                    self.check_identifier_reference(rest_name);
                 }
             }
             AnyNodeRef::TypeParamParamSpec(param_spec) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_spec.name, alias_resolution);
+                self.check_identifier_reference(&param_spec.name);
             }
             AnyNodeRef::TypeParamTypeVarTuple(param_tuple) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_tuple.name, alias_resolution);
+                self.check_identifier_reference(&param_tuple.name);
             }
             AnyNodeRef::TypeParamTypeVar(param_var) if self.should_include_declaration() => {
-                self.check_identifier_reference(&param_var.name, alias_resolution);
+                self.check_identifier_reference(&param_var.name);
             }
             AnyNodeRef::ExprStringLiteral(string_expr) if self.should_include_declaration() => {
                 // Highlight the sub-AST of a string annotation
@@ -288,12 +287,12 @@ impl<'a> SourceOrderVisitor<'a> for LocalReferencesFinder<'a> {
             AnyNodeRef::Alias(alias) if self.should_include_declaration() => {
                 // Handle import alias declarations
                 if let Some(asname) = &alias.asname {
-                    self.check_identifier_reference(asname, alias_resolution);
+                    self.check_identifier_reference(asname);
                 }
                 // Only check the original name if it matches our target text
                 // This is for cases where we're renaming the imported symbol name itself
                 if alias.name.id == self.target_text {
-                    self.check_identifier_reference(&alias.name, alias_resolution);
+                    self.check_identifier_reference(&alias.name);
                 }
             }
             _ => {}
@@ -321,11 +320,7 @@ impl LocalReferencesFinder<'_> {
     }
 
     /// Helper method to check identifier references for declarations
-    fn check_identifier_reference(
-        &mut self,
-        identifier: &ast::Identifier,
-        alias_resolution: ImportAliasResolution,
-    ) {
+    fn check_identifier_reference(&mut self, identifier: &ast::Identifier) {
         // Quick text-based check first
         if identifier.id != self.target_text {
             return;
@@ -334,7 +329,7 @@ impl LocalReferencesFinder<'_> {
         let mut ancestors_with_identifier = self.ancestors.clone();
         ancestors_with_identifier.push(AnyNodeRef::from(identifier));
         let covering_node = CoveringNode::from_ancestors(ancestors_with_identifier);
-        self.check_reference_from_covering_node(&covering_node, alias_resolution);
+        self.check_reference_from_covering_node(&covering_node);
     }
 
     /// Determines whether the given covering node is a reference to
@@ -342,7 +337,6 @@ impl LocalReferencesFinder<'_> {
     fn check_reference_from_covering_node(
         &mut self,
         covering_node: &crate::find_node::CoveringNode<'_>,
-        alias_resolution: ImportAliasResolution,
     ) {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
@@ -353,7 +347,7 @@ impl LocalReferencesFinder<'_> {
         {
             // Get the definitions for this goto target
             if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, alias_resolution)
+                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 // Check if any of the current definitions match our target definitions
