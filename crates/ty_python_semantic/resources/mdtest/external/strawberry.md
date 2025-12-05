@@ -1,4 +1,4 @@
-# SQLAlchemy
+# Strawberry GraphQL
 
 ```toml
 [environment]
