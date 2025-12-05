@@ -2290,6 +2290,7 @@ def function():
             "#,
         );
 
+        // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @r"
         P@Alias (bivariant)
         ---------------------------------------------
