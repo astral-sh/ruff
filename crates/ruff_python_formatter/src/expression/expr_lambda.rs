@@ -82,6 +82,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         if is_parenthesize_lambda_bodies_enabled(f.context()) {
             let body_comments = comments.leading_dangling_trailing(&**body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
+                // If the body has comments, we always want to preserve the parentheses. This also
+                // ensures that we correctly handle parenthesized comments, and don't need to worry
+                // about them in the implementation below.
+                if body_comments.has_leading() || body_comments.has_trailing_own_line() {
+                    body.format().with_options(Parentheses::Always).fmt(f)
+                }
                 // Calls and subscripts require special formatting because they have their own
                 // parentheses, but they can also have an arbitrary amount of text before the
                 // opening parenthesis. We want to avoid cases where we keep a long callable on the
@@ -110,7 +116,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     ),
                 // )
                 // ```
-                if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
+                else if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
                     let unparenthesized = body.format().with_options(Parentheses::Never);
                     if CallChainLayout::from_expression(
                         body.into(),
@@ -135,12 +141,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         ]
                         .fmt(f)
                     }
-                }
-                // If the body has comments, we always want to preserve the parentheses. This also
-                // ensures that we correctly handle parenthesized comments, and don't need to worry
-                // about them in the implementation below.
-                else if body_comments.has_leading() || body_comments.has_trailing_own_line() {
-                    body.format().with_options(Parentheses::Always).fmt(f)
                 }
                 // For other cases with their own parentheses, such as lists, sets, dicts, tuples,
                 // etc., we can just format the body directly. Their own formatting results in the
