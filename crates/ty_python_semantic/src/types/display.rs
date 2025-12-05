@@ -903,7 +903,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 .0
                 .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f),
-            // TODO: Test coverage for this.
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_syntax();
                 f.write_str("<TypedDict with items ")?;
