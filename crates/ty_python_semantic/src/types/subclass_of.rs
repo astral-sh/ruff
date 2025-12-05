@@ -416,7 +416,7 @@ impl<'db> SubclassOfInner<'db> {
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let constraints = constraints
+                    let constraints_types = constraints
                         .elements(db)
                         .iter()
                         .map(|constraint| {
@@ -425,7 +425,11 @@ impl<'db> SubclassOfInner<'db> {
                         })
                         .collect::<Box<_>>();
 
-                    TypeVarBoundOrConstraints::Constraints(UnionType::new(db, constraints))
+                    TypeVarBoundOrConstraints::Constraints(UnionType::new(
+                        db,
+                        constraints_types,
+                        constraints.recursively_defined(db),
+                    ))
                 }
             })
         });
