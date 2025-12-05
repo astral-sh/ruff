@@ -120,7 +120,7 @@ pub(crate) fn check(
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
     // Parse range suppression comments
-    let suppressions =
+    let mut suppressions =
         Suppressions::from_tokens(&settings.linter, locator.contents(), parsed.tokens());
 
     // Generate checks.
@@ -137,7 +137,7 @@ pub(crate) fn check(
         source_type,
         &parsed,
         target_version,
-        &suppressions,
+        &mut suppressions,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -148,7 +148,7 @@ pub(crate) fn check(
         &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
-        &suppressions,
+        &mut suppressions,
     );
 
     let mut diagnostics_map = DiagnosticsMap::default();

@@ -129,7 +129,7 @@ pub fn check_path(
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
-    suppressions: &Suppressions,
+    suppressions: &mut Suppressions,
 ) -> Vec<Diagnostic> {
     // Aggregate all diagnostics.
     let mut context = LintContext::new(path, locator.contents(), settings);
@@ -404,7 +404,7 @@ pub fn add_noqa_to_path(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let mut suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
@@ -420,7 +420,7 @@ pub fn add_noqa_to_path(
         source_type,
         &parsed,
         target_version,
-        &suppressions,
+        &mut suppressions,
     );
 
     // Add any missing `# noqa` pragmas.
@@ -470,7 +470,7 @@ pub fn lint_only(
     );
 
     // Parse range suppression comments
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let mut suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
 
     // Generate diagnostics.
     let diagnostics = check_path(
@@ -486,7 +486,7 @@ pub fn lint_only(
         source_type,
         &parsed,
         target_version,
-        &suppressions,
+        &mut suppressions,
     );
 
     LinterResult {
@@ -579,7 +579,8 @@ pub fn lint_fix<'a>(
         );
 
         // Parse range suppression comments
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let mut suppressions =
+            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
 
         // Generate diagnostics.
         let diagnostics = check_path(
@@ -595,7 +596,7 @@ pub fn lint_fix<'a>(
             source_type,
             &parsed,
             target_version,
-            &suppressions,
+            &mut suppressions,
         );
 
         if iterations == 0 {
@@ -961,7 +962,8 @@ mod tests {
             &locator,
             &indexer,
         );
-        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+        let mut suppressions =
+            Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
         let mut diagnostics = check_path(
             path,
             None,
@@ -975,7 +977,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
-            &suppressions,
+            &mut suppressions,
         );
         diagnostics.sort_by(Diagnostic::ruff_start_ordering);
         diagnostics

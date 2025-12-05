@@ -36,7 +36,7 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
-    suppressions: &Suppressions,
+    suppressions: &mut Suppressions,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
@@ -2988,7 +2988,7 @@ print(
         let messages = [PrintfStringFormatting
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
-        let suppressions = Suppressions::default();
+        let mut suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2997,7 +2997,7 @@ print(
             &[],
             &noqa_line_for,
             LineEnding::Lf,
-            &suppressions,
+            &mut suppressions,
         );
         assert_eq!(
             edits,
@@ -3021,7 +3021,7 @@ bar =
             [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
-        let suppressions = Suppressions::default();
+        let mut suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -3030,7 +3030,7 @@ bar =
             &[],
             &noqa_line_for,
             LineEnding::Lf,
-            &suppressions,
+            &mut suppressions,
         );
         assert_eq!(
             edits,
