@@ -955,6 +955,10 @@ static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
 ```
 
+## Redundant cast warnings
+
+<!-- snapshot-diagnostics -->
+
 Casting between equivalent types produces a redundant cast warning. When the types have different
 names, the warning makes that clear:
 
@@ -968,8 +972,8 @@ class Bar2(TypedDict):
     x: int
 
 foo: Foo2 = {"x": 1}
-_ = cast(Foo2, foo)  # error: [redundant-cast] "Value is already of type `Foo2`"
-_ = cast(Bar2, foo)  # error: [redundant-cast] "Value is already of type `Foo2`, which is equivalent to `Bar2`"
+_ = cast(Foo2, foo)  # error: [redundant-cast]
+_ = cast(Bar2, foo)  # error: [redundant-cast]
 ```
 
 ## Key-based access
