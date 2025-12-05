@@ -2281,12 +2281,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
-        for default in parameters
+        let _defaults: Vec<_> = parameters
             .iter_non_variadic_params()
-            .filter_map(|param| param.default.as_deref())
-        {
-            self.infer_expression(default, TypeContext::default());
-        }
+            .map(|param| {
+                param
+                    .default
+                    .as_deref()
+                    .map(|default| self.infer_expression(default, TypeContext::default()))
+            })
+            .collect();
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
