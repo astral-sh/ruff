@@ -403,7 +403,7 @@ impl<'db> Signature<'db> {
         defaults: &[Option<Type<'db>>],
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let mut inferred_signature = inferred_signature
+        let inferred_signature = inferred_signature
             .or_else(|| {
                 let file = definition.file(db);
                 let index = semantic_index(db, file);
@@ -412,8 +412,10 @@ impl<'db> Signature<'db> {
                 let scope = file_scope.to_scope_id(db, file);
                 infer_scope_types(db, scope).inferred_function_signature()
             })
-            .or_else(|| infer_deferred_types(db, definition).inferred_function_signature())
-            .expect("should have an inferred function signature");
+            .or_else(|| infer_deferred_types(db, definition).inferred_function_signature());
+        let Some(mut inferred_signature) = inferred_signature else {
+            return Self::bottom();
+        };
 
         let mut defaults = defaults.into_iter();
         for parameter in &mut inferred_signature.parameters {
