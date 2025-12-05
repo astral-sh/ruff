@@ -973,7 +973,7 @@ mod resolve_definition {
                     import_node,
                     &alias.name,
                     visited,
-                    ImportAliasResolution::ResolveAliases,
+                    alias_resolution,
                 )
             }
 
@@ -991,7 +991,7 @@ mod resolve_definition {
                         import_node,
                         symbol_name,
                         visited,
-                        ImportAliasResolution::ResolveAliases,
+                        alias_resolution,
                     )
                 } else {
                     // No symbol context provided, can't resolve star import

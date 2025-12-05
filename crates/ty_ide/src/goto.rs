@@ -76,12 +76,14 @@ pub(crate) enum GotoTarget<'a> {
         asname: &'a ast::Identifier,
     },
 
-    /// Import target in from import statement
+    /// In an import statement, the named under which the symbol is exported
+    /// in the imported file.
+    ///
     /// ```py
     /// from foo import bar as baz
-    ///                        ^^^
+    ///                 ^^^
     /// ```
-    ImportSymbolTarget {
+    ImportExportedName {
         alias: &'a ast::Alias,
         import_from: &'a ast::StmtImportFrom,
     },
@@ -300,7 +302,7 @@ impl GotoTarget<'_> {
             GotoTarget::Parameter(parameter) => parameter.inferred_type(model),
             GotoTarget::ImportSymbolAlias { alias, .. }
             | GotoTarget::ImportModuleAlias { alias, .. }
-            | GotoTarget::ImportSymbolTarget { alias, .. } => alias.inferred_type(model),
+            | GotoTarget::ImportExportedName { alias, .. } => alias.inferred_type(model),
             GotoTarget::ExceptVariable(except) => except.inferred_type(model),
             GotoTarget::KeywordArgument { keyword, .. } => keyword.value.inferred_type(model),
             // When asking the type of a callable, usually you want the callable itself?
@@ -411,13 +413,13 @@ impl GotoTarget<'_> {
                 alias_resolution,
             )),
 
-            GotoTarget::ImportSymbolTarget { alias, import_from } => {
+            GotoTarget::ImportExportedName { alias, import_from } => {
                 let symbol_name = alias.name.as_str();
                 Some(definitions_for_imported_symbol(
                     model,
                     import_from,
                     symbol_name,
-                    ImportAliasResolution::ResolveAliases,
+                    alias_resolution,
                 ))
             }
 
@@ -615,7 +617,7 @@ impl GotoTarget<'_> {
             GotoTarget::ClassDef(class) => Some(Cow::Borrowed(class.name.as_str())),
             GotoTarget::Parameter(parameter) => Some(Cow::Borrowed(parameter.name.as_str())),
             GotoTarget::ImportSymbolAlias { asname, .. } => Some(Cow::Borrowed(asname.as_str())),
-            GotoTarget::ImportSymbolTarget { alias, .. } => {
+            GotoTarget::ImportExportedName { alias, .. } => {
                 Some(Cow::Borrowed(alias.name.as_str()))
             }
             GotoTarget::ImportModuleComponent {
@@ -730,7 +732,7 @@ impl GotoTarget<'_> {
 
                             // Is the offset in the original name part?
                             if alias.name.range.contains_inclusive(offset) {
-                                return Some(GotoTarget::ImportSymbolTarget { alias, import_from });
+                                return Some(GotoTarget::ImportExportedName { alias, import_from });
                             }
 
                             None
@@ -911,7 +913,7 @@ impl Ranged for GotoTarget<'_> {
             GotoTarget::ClassDef(class) => class.name.range,
             GotoTarget::Parameter(parameter) => parameter.name.range,
             GotoTarget::ImportSymbolAlias { asname, .. } => asname.range,
-            Self::ImportSymbolTarget { alias, .. } => alias.name.range,
+            Self::ImportExportedName { alias, .. } => alias.name.range,
             GotoTarget::ImportModuleComponent {
                 component_range, ..
             } => *component_range,
