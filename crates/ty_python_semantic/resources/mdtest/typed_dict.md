@@ -924,7 +924,6 @@ class FewerFields(TypedDict):
 
 static_assert(is_assignable_to(Foo, FewerFields))
 static_assert(not is_equivalent_to(Foo, FewerFields))
-assert_type(foo, FewerFields)  # error: [type-assertion-failure]
 
 class DifferentMutability(TypedDict):
     x: int
@@ -932,7 +931,6 @@ class DifferentMutability(TypedDict):
 
 static_assert(is_assignable_to(Foo, DifferentMutability))
 static_assert(not is_equivalent_to(Foo, DifferentMutability))
-assert_type(foo, DifferentMutability)  # error: [type-assertion-failure]
 
 class MoreFields(TypedDict):
     x: int
@@ -941,7 +939,6 @@ class MoreFields(TypedDict):
 
 static_assert(not is_assignable_to(Foo, MoreFields))
 static_assert(not is_equivalent_to(Foo, MoreFields))
-assert_type(foo, MoreFields)  # error: [type-assertion-failure]
 
 class DifferentFieldStaticType(TypedDict):
     x: str
@@ -949,7 +946,6 @@ class DifferentFieldStaticType(TypedDict):
 
 static_assert(not is_assignable_to(Foo, DifferentFieldStaticType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldStaticType))
-assert_type(foo, DifferentFieldStaticType)  # error: [type-assertion-failure]
 
 class DifferentFieldGradualType(TypedDict):
     x: int
@@ -957,7 +953,6 @@ class DifferentFieldGradualType(TypedDict):
 
 static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
-assert_type(foo, DifferentFieldGradualType)  # error: [type-assertion-failure]
 ```
 
 Casting between equivalent types produces a redundant cast warning. When the types have different
