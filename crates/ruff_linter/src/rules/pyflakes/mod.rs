@@ -956,7 +956,7 @@ mod tests {
             &locator,
             &indexer,
         );
-        let mut suppressions =
+        let suppressions =
             Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens());
         let mut messages = check_path(
             Path::new("<filename>"),
@@ -971,7 +971,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
-            &mut suppressions,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages
