@@ -31,6 +31,8 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
+            let parameters_have_comments = comments.contains_comments(parameters.as_ref().into());
+
             // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
             let (dangling_before_parameters, dangling_after_parameters) = dangling
@@ -43,7 +45,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if preview && !comments.contains_comments(parameters.as_ref().into()) {
+            if preview && !parameters_have_comments {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
                 write!(
                     buffer,
