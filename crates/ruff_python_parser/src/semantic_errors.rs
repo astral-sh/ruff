@@ -300,7 +300,7 @@ impl SemanticSyntaxChecker {
                     visitor.visit_expr(annotation);
                 }
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if ctx.global(id.as_str()).is_some() {
+                    if ctx.global(id.as_str()).is_some() && ctx.in_function_scope() {
                         Self::add_error(
                             ctx,
                             SemanticSyntaxErrorKind::AnnotatedGlobal(id.to_string()),
