@@ -26,6 +26,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
+        let preview = is_parenthesize_lambda_bodies_enabled(f.context());
 
         write!(f, [token("lambda")])?;
 
@@ -42,9 +43,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
-            if is_parenthesize_lambda_bodies_enabled(f.context())
-                && !comments.contains_comments(parameters.as_ref().into())
-            {
+            if preview && !comments.contains_comments(parameters.as_ref().into()) {
                 let mut buffer = RemoveSoftLinesBuffer::new(f);
                 write!(
                     buffer,
@@ -67,7 +66,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 write!(f, [space()])?;
             }
             // In preview, always parenthesize the body if there are dangling comments.
-            else if is_parenthesize_lambda_bodies_enabled(f.context()) {
+            else if preview {
                 // Can't use partition_point because there can be additional end of line comments
                 // after the initial set. All of these comments are dangling, for example:
                 //
