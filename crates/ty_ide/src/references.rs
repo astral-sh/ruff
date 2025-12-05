@@ -38,7 +38,7 @@ pub enum ReferencesMode {
 }
 
 impl ReferencesMode {
-    fn to_import_alias_resolution(self) -> ImportAliasResolution {
+    pub(super) fn to_import_alias_resolution(self) -> ImportAliasResolution {
         match self {
             // Resolve import aliases for find references:
             // ```py
