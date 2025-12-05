@@ -146,6 +146,18 @@ class Foo3[**P]:
     ) -> None: ...
 ```
 
+It isn't allowed to annotate an instance attribute either:
+
+```py
+class Foo4[**P]:
+    def __init__(self, fn: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
+        self.fn = fn
+        # TODO: error
+        self.args: P.args = args
+        # TODO: error
+        self.kwargs: P.kwargs = kwargs
+```
+
 ## Semantics of `P.args` and `P.kwargs`
 
 The type of `args` and `kwargs` inside the function is `P.args` and `P.kwargs` respectively instead
@@ -550,6 +562,22 @@ from typing import Callable
 
 def baz[**P](fn: Callable[P, None], foo: Foo[P]) -> None:
     fn(*foo.args, **foo.kwargs)
+```
+
+The `Unknown` can be eliminated by using annotating these attributes with `Final`:
+
+```py
+from typing import Final
+
+class FooWithFinal[**P]:
+    def __init__(self, *args: P.args, **kwargs: P.kwargs) -> None:
+        self.args: Final = args
+        self.kwargs: Final = kwargs
+
+def with_final[**P](foo: FooWithFinal[P]) -> None:
+    reveal_type(foo)  # revealed: FooWithFinal[P@with_final]
+    reveal_type(foo.args)  # revealed: P@with_final.args
+    reveal_type(foo.kwargs)  # revealed: P@with_final.kwargs
 ```
 
 ### Specializing `Self` when `ParamSpec` is involved
