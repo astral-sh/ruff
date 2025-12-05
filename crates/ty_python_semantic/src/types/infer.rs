@@ -51,6 +51,7 @@ use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
+use crate::types::signatures::Parameter;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, declaration_type,
@@ -650,6 +651,12 @@ struct DefinitionInferenceExtra<'db> {
 
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
+
+    /// The parameters of a function definition (without any default values filled in).
+    parameters: Option<Vec<Parameter<'db>>>,
+
+    /// The default values of the parameters of a function definition.
+    parameter_defaults: Option<Vec<Option<Type<'db>>>>,
 }
 
 impl<'db> DefinitionInference<'db> {

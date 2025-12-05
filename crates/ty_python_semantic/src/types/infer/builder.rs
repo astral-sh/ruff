@@ -308,6 +308,12 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
+
+    /// The parameters of a function definition (without any default values filled in).
+    parameters: Option<Vec<Parameter<'db>>>,
+
+    /// The default values of the parameters of a function definition.
+    parameter_defaults: Option<Vec<Option<Type<'db>>>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -346,6 +352,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
+            parameters: None,
+            parameter_defaults: None,
         }
     }
 
@@ -1915,7 +1923,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.defer_annotations().into(),
         );
         self.infer_type_parameters(type_params);
-        self.infer_parameters(&function.parameters);
+        self.parameters = Some(self.infer_parameters(&function.parameters));
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -2281,7 +2289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
-        let _defaults: Vec<_> = parameters
+        let defaults: Vec<_> = parameters
             .iter_non_variadic_params()
             .map(|param| {
                 param
@@ -2290,6 +2298,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .map(|default| self.infer_expression(default, TypeContext::default()))
             })
             .collect();
+        self.parameter_defaults = Some(defaults);
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
@@ -2303,7 +2312,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
-                self.infer_parameters(parameters);
+                self.parameters = Some(self.infer_parameters(parameters));
                 self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
@@ -2916,7 +2925,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
-        self.infer_parameters(function.parameters.as_ref());
+        self.parameters = Some(self.infer_parameters(function.parameters.as_ref()));
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -12186,6 +12195,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            parameters: _,
+            parameter_defaults: _,
 
             // builder only state
             typevar_binding_context: _,
@@ -12263,6 +12274,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            parameters,
+            parameter_defaults,
         } = self;
 
         let _ = scope;
@@ -12272,7 +12285,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || !string_annotations.is_empty()
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
-            || !deferred.is_empty())
+            || !deferred.is_empty()
+            || parameters.is_some()
+            || parameter_defaults.is_some())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
@@ -12280,6 +12295,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
+                parameters,
+                parameter_defaults,
             })
         });
 
@@ -12328,6 +12345,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
+            parameters: _,
+            parameter_defaults: _,
 
             // Builder only state
             dataclass_field_specifiers: _,
