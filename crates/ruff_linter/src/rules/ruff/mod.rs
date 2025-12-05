@@ -306,31 +306,21 @@ mod tests {
     }
 
     #[test]
-    fn range_suppressions_stable() -> Result<()> {
-        let diagnostics = test_path(
+    fn range_suppressions() -> Result<()> {
+        assert_diagnostics_diff!(
             Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
             ]),
-        )?;
-        assert_diagnostics!(diagnostics);
-        Ok(())
-    }
-
-    #[test]
-    fn range_suppressions_preview() -> Result<()> {
-        let diagnostics = test_path(
-            Path::new("ruff/suppressions.py"),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
             ])
             .with_preview_mode(),
-        )?;
-        assert_diagnostics!(diagnostics);
+        );
         Ok(())
     }
 
