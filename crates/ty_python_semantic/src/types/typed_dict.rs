@@ -347,6 +347,9 @@ impl<'db> TypedDictType<'db> {
                     visitor,
                 ),
             );
+            if constraints.is_never_satisfied(db) {
+                return constraints;
+            }
         }
         constraints
     }
