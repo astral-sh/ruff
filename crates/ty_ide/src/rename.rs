@@ -1449,15 +1449,15 @@ result = func(10, y=20)
             .source(
                 "main.py",
                 r#"
-                from lib2 import test
+                from lib import test
 
                 test("test")
                 "#,
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
-        info[rename]: Rename symbol (found 1 locations)
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
          --> lib.py:5:5
           |
         4 | @overload
@@ -1466,7 +1466,15 @@ result = func(10, y=20)
         6 | @overload
         7 | def test(a: str) -> str: ...
           |
-        ");
+         ::: main.py:2:17
+          |
+        2 | from lib import test
+          |                 ----
+        3 |
+        4 | test("test")
+          | ----
+          |
+        "#);
     }
 
     #[test]
