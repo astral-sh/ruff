@@ -1441,7 +1441,12 @@ impl<'db> SpecializationBuilder<'db> {
 
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
-                // TODO: mypy and Pyright does this, should we keep doing it?
+                // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
+                // the type checker can solve it to a common behavioral supertype. We don't
+                // implement that yet so in case there are multiple ParamSpecs, use the
+                // specialization from the first occurrence.
+                // https://github.com/astral-sh/ty/issues/1778
+                // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
                 if bound_typevar.is_paramspec(self.db) {
                     return;
                 }
