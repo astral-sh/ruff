@@ -1,20 +1,17 @@
 use crate::db::Db;
 
-use anyhow::Context;
-use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
+use anyhow::{Context, Result, anyhow, bail};
+use ruff_db::system::{DbWithWritableSystem as _, SystemPath};
 use ruff_python_ast::PythonVersion;
 
-/// Setup a virtual environment with the specified dependencies.
-///
-/// This function:
-/// 1. Creates a temporary directory
-/// 2. Generates a minimal pyproject.toml with the dependencies
-/// 3. Runs `uv sync` to install dependencies
-/// 4. Returns the path to the virtual environment
-pub(crate) fn setup_venv_with_dependencies(
+/// Setup a virtual environment in the in-memory filesystem of `db` with
+/// the specified dependencies installed.
+pub(crate) fn setup_venv(
+    db: &mut Db,
     dependencies: &[String],
     python_version: PythonVersion,
-) -> anyhow::Result<(tempfile::TempDir, SystemPathBuf)> {
+    dest_venv_path: &SystemPath,
+) -> Result<()> {
     // Create a temporary directory for the project
     let temp_dir = tempfile::Builder::new()
         .prefix("mdtest-venv-")
@@ -23,7 +20,7 @@ pub(crate) fn setup_venv_with_dependencies(
 
     let temp_path = SystemPath::from_std_path(temp_dir.path())
         .ok_or_else(|| {
-            anyhow::anyhow!(
+            anyhow!(
                 "Temporary directory path is not valid UTF-8: {}",
                 temp_dir.path().display()
             )
@@ -59,32 +56,32 @@ dependencies = [
         .arg("sync")
         .current_dir(temp_path.as_std_path())
         .output()
-        .context("Failed to run `uv sync`. Is `uv` installed and available in the PATH?")?;
+        .context("Failed to run `uv sync`. Is `uv` installed?")?;
 
     if !uv_sync_output.status.success() {
         let stderr = String::from_utf8_lossy(&uv_sync_output.stderr);
-        anyhow::bail!(
+        bail!(
             "`uv sync` failed with exit code {:?}:\n{}",
             uv_sync_output.status.code(),
             stderr
         );
     }
 
-    // Return the temp dir and path to the venv
     let venv_path = temp_path.join(".venv");
-    Ok((temp_dir, venv_path))
+
+    copy_site_packages_to_db(db, &venv_path, dest_venv_path, python_version)
 }
 
 /// Copy the site-packages directory from a real virtual environment to the in-memory filesystem of `db`.
 ///
 /// This recursively copies all files from the venv's site-packages directory into the
 /// in-memory filesystem at the specified destination path.
-pub(crate) fn copy_site_packages_to_db(
+fn copy_site_packages_to_db(
     db: &mut Db,
     venv_path: &SystemPath,
     dest_venv_path: &SystemPath,
     python_version: PythonVersion,
-) -> anyhow::Result<()> {
+) -> Result<()> {
     use std::fs;
 
     // Determine the site-packages path within the venv
@@ -97,14 +94,14 @@ pub(crate) fn copy_site_packages_to_db(
         let lib_path = venv_path.join("lib");
 
         if !lib_path.as_std_path().exists() {
-            anyhow::bail!("lib directory not found in virtual environment at '{venv_path}'",);
+            bail!("'lib' directory not found in virtual environment at '{venv_path}'",);
         }
 
         // Find the python directory
         let major = python_version.major;
         let minor = python_version.minor;
         let python_dir = fs::read_dir(lib_path.as_std_path())
-            .context("Failed to read lib directory")?
+            .context("Failed to read 'lib' directory")?
             .filter_map(Result::ok)
             .find(|entry| {
                 let name = entry.file_name();
@@ -113,7 +110,7 @@ pub(crate) fn copy_site_packages_to_db(
                     && entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
             })
             .ok_or_else(|| {
-                anyhow::anyhow!(
+                anyhow!(
                     "Could not find python directory in '{}'. Expected 'python{}.{}'",
                     lib_path,
                     python_version.major,
@@ -124,7 +121,7 @@ pub(crate) fn copy_site_packages_to_db(
         let python_dir_name = python_dir.file_name();
         let python_dir_str = python_dir_name
             .to_str()
-            .ok_or_else(|| anyhow::anyhow!("Python directory name is not valid UTF-8"))?;
+            .ok_or_else(|| anyhow!("Python directory name is not valid UTF-8"))?;
 
         let actual_python_dir = lib_path.join(python_dir_str);
         (
@@ -134,7 +131,7 @@ pub(crate) fn copy_site_packages_to_db(
     };
 
     if !site_packages_path.as_std_path().exists() {
-        anyhow::bail!("site-packages directory not found at '{site_packages_path}'",);
+        bail!("site-packages directory not found at '{site_packages_path}'",);
     }
 
     // Destination site-packages path in the in-memory filesystem
@@ -158,11 +155,7 @@ pub(crate) fn copy_site_packages_to_db(
     Ok(())
 }
 
-fn copy_directory_recursive(
-    db: &mut Db,
-    src: &SystemPath,
-    dest: &SystemPath,
-) -> anyhow::Result<()> {
+fn copy_directory_recursive(db: &mut Db, src: &SystemPath, dest: &SystemPath) -> Result<()> {
     use std::fs;
 
     for entry in fs::read_dir(src.as_std_path())
@@ -175,11 +168,11 @@ fn copy_directory_recursive(
             .with_context(|| format!("Failed to get file type for {}", entry_path.display()))?;
 
         let src_path = SystemPath::from_std_path(&entry_path)
-            .ok_or_else(|| anyhow::anyhow!("Path {} is not valid UTF-8", entry_path.display()))?;
+            .ok_or_else(|| anyhow!("Path {} is not valid UTF-8", entry_path.display()))?;
 
         let file_name = entry.file_name();
         let file_name_str = file_name.to_str().ok_or_else(|| {
-            anyhow::anyhow!(
+            anyhow!(
                 "File name {} is not valid UTF-8",
                 file_name.to_string_lossy()
             )
