@@ -4218,7 +4218,7 @@ pub(super) fn hint_if_stdlib_submodule_exists_on_other_versions(
 /// misconfigured their Python version.
 pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     db: &dyn Db,
-    mut diagnostic: LintDiagnosticGuard,
+    diagnostic: &mut LintDiagnosticGuard,
     value_type: Type,
     attr: &str,
     action: &str,
@@ -4258,5 +4258,5 @@ pub(super) fn hint_if_stdlib_attribute_exists_on_other_versions(
     // TODO: determine what version they need to be on
     // TODO: also mention the platform we're assuming
     // TODO: determine what platform they need to be on
-    add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, action);
+    add_inferred_python_version_hint_to_diagnostic(db, diagnostic, action);
 }

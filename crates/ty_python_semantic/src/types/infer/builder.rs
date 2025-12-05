@@ -20,7 +20,7 @@ use super::{
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
 };
-use crate::diagnostic::format_enumeration;
+use crate::diagnostic::{did_you_mean_for_unresolved_member, format_enumeration};
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
 use crate::module_resolver::{
     KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
@@ -6341,11 +6341,40 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if !submodule_hint_added {
             hint_if_stdlib_attribute_exists_on_other_versions(
                 self.db(),
-                diagnostic,
+                &mut diagnostic,
                 module_ty,
                 name,
                 "resolving imports",
             );
+        }
+
+        let is_safe_to_compute_suggestions = || {
+            if !self.scope().file_scope_id(self.db()).is_global() {
+                return true;
+            }
+            if import_is_self_referential {
+                return false;
+            }
+            if import_from.level != 0 {
+                return false;
+            }
+            let Some(current_module) = file_to_module(self.db(), self.file()) else {
+                return false;
+            };
+            if module_name.starts_with(current_module.name(self.db())) {
+                return false;
+            }
+            if current_module.name(self.db()).starts_with(&module_name) {
+                return false;
+            }
+            true
+        };
+
+        if is_safe_to_compute_suggestions() {
+            if let Some(suggestion) = did_you_mean_for_unresolved_member(self.db(), module_ty, name)
+            {
+                diagnostic.set_primary_message(format_args!("Did you mean `{suggestion}`?",));
+            }
         }
     }
 
@@ -9262,7 +9291,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return fallback();
                 }
 
-                let diagnostic = match value_type {
+                let mut diagnostic = match value_type {
                     Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
                         "Module `{module_name}` has no member `{attr_name}`",
                         module_name = module.module(db).name(db),
@@ -9287,11 +9316,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 hint_if_stdlib_attribute_exists_on_other_versions(
                     db,
-                    diagnostic,
+                    &mut diagnostic,
                     value_type,
                     attr_name,
                     &format!("resolving the `{attr_name}` attribute"),
                 );
+
+                if let Some(suggestion) = did_you_mean_for_unresolved_member(db, value_type, &attr.id) {
+                    diagnostic.set_primary_message(format_args!(
+                        "Did you mean `{suggestion}`?",
+                    ));
+                }
 
                 fallback()
             }

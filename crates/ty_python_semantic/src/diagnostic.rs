@@ -1,5 +1,7 @@
 use crate::{
-    Db, Program, PythonVersionWithSource, lint::lint_documentation_url, types::TypeCheckDiagnostics,
+    Db, Program, PythonVersionWithSource,
+    lint::lint_documentation_url,
+    types::{Type, TypeCheckDiagnostics, list_members::all_members},
 };
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, SubDiagnostic, SubDiagnosticSeverity},
@@ -7,6 +9,19 @@ use ruff_db::{
 };
 use std::cell::RefCell;
 use std::fmt::Write;
+
+pub(crate) fn did_you_mean_for_unresolved_member<'db>(
+    db: &'db dyn Db,
+    obj: Type<'db>,
+    unresolved_member: &str,
+) -> Option<String> {
+    did_you_mean(
+        all_members(db, obj)
+            .iter()
+            .map(|member| member.name.as_str()),
+        unresolved_member,
+    )
+}
 
 /// Suggest a name from `existing_names` that is similar to `wrong_name`.
 /// The suggestion algorithm is inspired by [rustc](https://doc.rust-lang.org/beta/nightly-rustc/src/rustc_span/edit_distance.rs.html).
