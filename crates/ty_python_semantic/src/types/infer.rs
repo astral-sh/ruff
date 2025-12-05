@@ -381,6 +381,12 @@ impl<'db> TypeContext<'db> {
         }
     }
 
+    pub(crate) fn and_then(self, f: impl FnOnce(Type<'db>) -> Option<Type<'db>>) -> Self {
+        Self {
+            annotation: self.annotation.and_then(f),
+        }
+    }
+
     pub(crate) fn is_typealias(&self) -> bool {
         self.annotation
             .is_some_and(|ty| ty.is_typealias_special_form())
