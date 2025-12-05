@@ -208,3 +208,147 @@ async def test_async(session: AsyncSession):
         # TODO: should be `str`
         reveal_type(name)  # revealed: Unknown
 ```
+
+## What is it that we do not support yet?
+
+Basic setup:
+
+```py
+from datetime import datetime
+
+from sqlalchemy import select, Integer, Text, Boolean, DateTime
+from sqlalchemy.orm import Session
+from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import create_engine
+
+engine = create_engine("sqlite://example.db")
+session = Session(engine)
+
+class Base(DeclarativeBase):
+    pass
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    name: Mapped[str] = mapped_column(Text)
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
+```
+
+Why do we see `Unknown`s for `select(User.id, User.name)` here?
+
+```py
+stmt = select(User.id, User.name)
+# TODO: should be `Select[tuple[int, str]]`
+reveal_type(stmt)  # revealed: Select[tuple[Unknown, Unknown]]
+```
+
+The types of the arguments seem correct:
+
+```py
+reveal_type(User.id)  # revealed: InstrumentedAttribute[int]
+reveal_type(User.name)  # revealed: InstrumentedAttribute[str]
+```
+
+The two-parameter overload of `select` has a type of
+
+`def select(__ent0: _TCCA[_T0], __ent1: _TCCA[_T1], /) -> Select[_T0, _T1]: ...`
+
+here `_TCCA` is an alias for `_TypedColumnClauseArgument`:
+
+```py
+from sqlalchemy.sql._typing import _TypedColumnClauseArgument
+
+# revealed: <types.UnionType special form 'TypedColumnsClauseRole[_T@_TypedColumnClauseArgument] | SQLCoreOperations[_T@_TypedColumnClauseArgument] | type[_T@_TypedColumnClauseArgument]'>
+reveal_type(_TypedColumnClauseArgument)
+```
+
+If we use that generic type alias in a type expression, we can properly specialize it:
+
+```py
+def _(
+    col: _TypedColumnClauseArgument[int],
+) -> None:
+    reveal_type(col)  # revealed: TypedColumnsClauseRole[int] | SQLCoreOperations[int] | type[int]
+```
+
+Next, verify that we can assign `User.id` to a fully specialized version of
+`_TypedColumnClauseArgument`:
+
+```py
+user_id_as_tcca: _TypedColumnClauseArgument[int] = User.id
+```
+
+If we use the generic version of `_TypedColumnClauseArgument` without specialization, we get
+`Unknown`:
+
+```py
+def extract_t_from_tcca[T](col: _TypedColumnClauseArgument[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_t_from_tcca(User.id))  # revealed: Unknown
+```
+
+However, if we use just the relevant union element of `_TypedColumnClauseArgument`
+(`SQLCoreOperations`), it works as expected:
+
+```py
+from sqlalchemy.sql.elements import SQLCoreOperations
+
+def extract_t_from_sco[T](col: SQLCoreOperations[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_t_from_sco(User.id))  # revealed: int
+reveal_type(extract_t_from_sco(User.name))  # revealed: str
+```
+
+I reported this as <https://github.com/astral-sh/ty/issues/1772>.
+
+Now let's assume we would be able to solve for `T` here. This would mean we would get a type of
+`Select[tuple[int, str]]`. Can we use that type and proceed with it? It looks like this works:
+
+```py
+from sqlalchemy.sql.selectable import Select
+
+def _(stmt: Select[tuple[int, str]]) -> None:
+    for row in session.execute(stmt):
+        reveal_type(row)  # revealed: Row[tuple[int, str]]
+```
+
+What about the `_tuple` calls? This seems to work:
+
+```py
+def _(stmt: Select[tuple[int, str]]) -> None:
+    result = session.execute(stmt)
+
+    reveal_type(result)  # revealed: Result[tuple[int, str]]
+
+    user = result.one_or_none()
+    reveal_type(user)  # revealed: Row[tuple[int, str]] | None
+
+    if not user:
+        return
+
+    reveal_type(user)  # revealed: Row[tuple[int, str]] & ~AlwaysFalsy
+    reveal_type(user._tuple())  # revealed: tuple[int, str]
+```
+
+What about `.tuples()`? That seems to work as well:
+
+```py
+def _(stmt: Select[tuple[int, str]]) -> None:
+    for user_id, name in session.execute(stmt).tuples():
+        reveal_type(user_id)  # revealed: int
+        reveal_type(name)  # revealed: str
+```
+
+What about the `.scalar` calls? Those seem to work too:
+
+```py
+def _(stmt: Select[tuple[int]]) -> None:
+    user_id = session.scalar(stmt)
+    reveal_type(user_id)  # revealed: int | None
+
+    reveal_type(session.scalars(stmt).first())  # revealed: int | None
+```
