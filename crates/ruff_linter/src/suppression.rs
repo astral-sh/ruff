@@ -4,6 +4,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
+use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -75,7 +76,7 @@ impl PendingSuppressionComment<'_> {
 }
 
 #[allow(unused)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
     code: CompactString,
@@ -87,7 +88,7 @@ pub(crate) struct Suppression {
     comments: SmallVec<[SuppressionComment; 2]>,
 
     /// Whether this suppression actually suppressed a diagnostic
-    used: bool,
+    used: Cell<bool>,
 }
 
 #[allow(unused)]
@@ -139,7 +140,7 @@ impl Suppressions {
     }
 
     /// Check if a diagnostic is suppressed by any known range suppressions
-    pub(crate) fn check_diagnostic(&mut self, diagnostic: &Diagnostic) -> bool {
+    pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
         if self.valid.is_empty() {
             return false;
         }
@@ -154,9 +155,9 @@ impl Suppressions {
             return false;
         };
 
-        for suppression in &mut self.valid {
+        for suppression in &self.valid {
             if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
-                suppression.used = true;
+                suppression.used.set(true);
                 return true;
             }
         }
@@ -168,7 +169,10 @@ impl Suppressions {
             return;
         }
 
-        let unused = self.valid.iter().filter(|suppression| !suppression.used);
+        let unused = self
+            .valid
+            .iter()
+            .filter(|suppression| !suppression.used.get());
 
         for suppression in unused {
             let Ok(rule) = Rule::from_code(&suppression.code) else {
@@ -331,7 +335,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: combined_range,
                         comments: smallvec![comment.comment.clone(), other.comment.clone()],
-                        used: false,
+                        used: false.into(),
                     });
                 }
 
@@ -348,7 +352,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: implicit_range,
                         comments: smallvec![comment.comment.clone()],
-                        used: false,
+                        used: false.into(),
                     });
                 }
                 self.pending.remove(comment_index);

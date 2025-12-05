@@ -36,7 +36,7 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
-    suppressions: &mut Suppressions,
+    suppressions: &Suppressions,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
@@ -735,7 +735,7 @@ pub(crate) fn add_noqa(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     reason: Option<&str>,
-    suppressions: &mut Suppressions,
+    suppressions: &Suppressions,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
@@ -763,7 +763,7 @@ fn add_noqa_inner(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     reason: Option<&str>,
-    suppressions: &mut Suppressions,
+    suppressions: &Suppressions,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -879,7 +879,7 @@ fn find_noqa_comments<'a>(
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
-    suppressions: &'a mut Suppressions,
+    suppressions: &'a Suppressions,
 ) -> Vec<Option<NoqaComment<'a>>> {
     // List of noqa comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
@@ -2876,7 +2876,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
-            &mut Suppressions::default(),
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -2901,7 +2901,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
-            &mut Suppressions::default(),
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -2933,7 +2933,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
-            &mut Suppressions::default(),
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -2965,7 +2965,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
-            &mut Suppressions::default(),
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -2988,7 +2988,7 @@ print(
         let messages = [PrintfStringFormatting
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
-        let mut suppressions = Suppressions::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2997,7 +2997,7 @@ print(
             &[],
             &noqa_line_for,
             LineEnding::Lf,
-            &mut suppressions,
+            &suppressions,
         );
         assert_eq!(
             edits,
@@ -3021,7 +3021,7 @@ bar =
             [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
-        let mut suppressions = Suppressions::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -3030,7 +3030,7 @@ bar =
             &[],
             &noqa_line_for,
             LineEnding::Lf,
-            &mut suppressions,
+            &suppressions,
         );
         assert_eq!(
             edits,
