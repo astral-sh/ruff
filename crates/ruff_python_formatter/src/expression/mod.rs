@@ -883,19 +883,55 @@ pub enum CallChainLayout {
     Default,
 
     /// A nested call chain element that uses fluent style.
-    Fluent,
+    Fluent(AttributeState),
 
     /// A nested call chain element not using fluent style.
     NonFluent,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributeState {
+    CallsOrSubscriptsPreceding(u32),
+    FirstCallOrSubscript,
+    BeforeFirstCallOrSubscript,
+}
+
 impl CallChainLayout {
+    pub(crate) fn call_like_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x)) => {
+                if x > 1 {
+                    Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x - 1))
+                } else {
+                    Self::Fluent(AttributeState::FirstCallOrSubscript)
+                }
+            }
+            _ => self,
+        }
+    }
+
+    pub(crate) fn after_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::FirstCallOrSubscript) => {
+                Self::Fluent(AttributeState::BeforeFirstCallOrSubscript)
+            }
+            _ => self,
+        }
+    }
+
+    pub(crate) fn is_first_call_like(self) -> bool {
+        matches!(self, Self::Fluent(AttributeState::FirstCallOrSubscript))
+    }
+
     pub(crate) fn from_expression(
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
-        let mut attributes_after_parentheses = 0;
+        let mut call_like_attributes_after_parentheses = 0;
+
+        let mut was_in_call_like = false;
+
         loop {
             match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -905,14 +941,12 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
+                    call_like_attributes_after_parentheses += u32::from(was_in_call_like);
                     if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
-                        attributes_after_parentheses += 1;
                         break;
-                    } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                        attributes_after_parentheses += 1;
                     }
-
+                    was_in_call_like = false;
                     expr = ExprRef::from(value.as_ref());
                 }
                 // ```
@@ -925,18 +959,10 @@ impl CallChainLayout {
                 // ```
                 ExprRef::Call(ast::ExprCall { func: inner, .. })
                 | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    was_in_call_like = true;
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We to format the following in fluent style:
-                    // ```
-                    // f2 = (a).w().t(1,)
-                    //       ^ expr
-                    // ```
-                    if is_expression_parenthesized(expr, comment_ranges, source) {
-                        attributes_after_parentheses += 1;
-                    }
-
                     break;
                 }
             }
@@ -946,10 +972,12 @@ impl CallChainLayout {
                 break;
             }
         }
-        if attributes_after_parentheses < 2 {
+        if call_like_attributes_after_parentheses < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent
+            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(
+                call_like_attributes_after_parentheses,
+            ))
         }
     }
 
@@ -972,7 +1000,7 @@ impl CallChainLayout {
                     CallChainLayout::NonFluent
                 }
             }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+            layout @ (CallChainLayout::Fluent(_) | CallChainLayout::NonFluent) => layout,
         }
     }
 }
