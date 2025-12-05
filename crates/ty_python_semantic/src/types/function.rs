@@ -1339,6 +1339,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.into_callable`
+    IntoCallable,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
     /// `ty_extensions.enum_members`
@@ -1411,6 +1413,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::IntoCallable
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
@@ -1946,6 +1949,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::IntoCallable
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert

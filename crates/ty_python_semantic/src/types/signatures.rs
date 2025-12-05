@@ -667,10 +667,11 @@ impl<'db> Signature<'db> {
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
+        let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
             let self_mapping = TypeMapping::BindSelf {
                 self_type,
-                binding_context: self.definition.map(BindingContext::Definition),
+                binding_context,
             };
             parameters = parameters.apply_type_mapping_impl(
                 db,
@@ -682,7 +683,9 @@ impl<'db> Signature<'db> {
                 .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
         }
         Self {
-            generic_context: self.generic_context,
+            generic_context: self
+                .generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
