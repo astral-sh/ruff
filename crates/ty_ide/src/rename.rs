@@ -1426,4 +1426,144 @@ result = func(10, y=20)
           |
         ");
     }
+
+    // TODO: This should rename all overloads
+    #[test]
+    fn rename_overloaded_function() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test<CURSOR>() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:5:5
+          |
+        4 | @overload
+        5 | def test() -> None: ...
+          |     ^^^^
+        6 | @overload
+        7 | def test(a: str) -> str: ...
+          |
+        ");
+    }
+
+    #[test]
+    fn rename_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                class Test:
+                    attribute<CURSOR>: str
+
+                    def __init__(self, value: str):
+                        self.attribute = value
+
+                class Child(Test):
+                    def test(self):
+                        return self.attribute
+
+
+                c = Child("test")
+
+                print(c.attribute)
+                c.attribute = "new_value"
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 5 locations)
+          --> mypackage/__init__.py:3:5
+           |
+         2 | class Test:
+         3 |     attribute: str
+           |     ^^^^^^^^^
+         4 |
+         5 |     def __init__(self, value: str):
+         6 |         self.attribute = value
+           |              ---------
+         7 |
+         8 | class Child(Test):
+         9 |     def test(self):
+        10 |         return self.attribute
+           |                     ---------
+           |
+          ::: mypackage/__init__.py:15:9
+           |
+        13 | c = Child("test")
+        14 |
+        15 | print(c.attribute)
+           |         ---------
+        16 | c.attribute = "new_value"
+           |   ---------
+           |
+        "#);
+    }
+
+    // TODO: This should rename all attribute usages
+    // Note: Pylance only renames the assignment in `__init__`.
+    #[test]
+    fn rename_implicit_attribute() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                class Test:
+                    def __init__(self, value: str):
+                        self.<CURSOR>attribute = value
+
+                class Child(Test):
+                    def __init__(self, value: str):
+                        super().__init__(value)
+                        self.attribute = value + "child"
+
+                    def test(self):
+                        return self.attribute
+
+
+                c = Child("test")
+
+                print(c.attribute)
+                c.attribute = "new_value"
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r"
+        info[rename]: Rename symbol (found 1 locations)
+         --> mypackage/__init__.py:4:14
+          |
+        2 | class Test:
+        3 |     def __init__(self, value: str):
+        4 |         self.attribute = value
+          |              ^^^^^^^^^
+        5 |
+        6 | class Child(Test):
+          |
+        ");
+    }
 }
