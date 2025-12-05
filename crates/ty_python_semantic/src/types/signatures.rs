@@ -29,10 +29,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind,
+    TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1145,6 +1145,57 @@ impl<'db> Signature<'db> {
             return result;
         }
 
+        // If either parameter list is a ParamSpec, then we can create a constraint set that holds
+        // when the ParamSpec is assignable to the other parameter list.
+        if relation.is_constraint_set_assignability() {
+            match (
+                self.parameters.as_paramspec(),
+                other.parameters.as_paramspec(),
+            ) {
+                (Some(self_bound_typevar), Some(other_bound_typevar)) => {
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::TypeVar(other_bound_typevar),
+                        Type::TypeVar(other_bound_typevar),
+                        relation,
+                    );
+                }
+
+                (Some(self_bound_typevar), None) => {
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(other.parameters.clone(), None)),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                        relation,
+                    );
+                }
+
+                (None, Some(other_bound_typevar)) => {
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(self.parameters.clone(), None)),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        other_bound_typevar,
+                        lower,
+                        Type::object(),
+                        relation,
+                    );
+                }
+
+                (None, None) => {}
+            }
+        }
+
         let mut parameters = ParametersZip {
             current_self: None,
             current_other: None,
@@ -1560,6 +1611,13 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_gradual(&self) -> bool {
         matches!(self.kind, ParametersKind::Gradual)
+    }
+
+    pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
+        match self.kind {
+            ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
+            _ => None,
+        }
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
