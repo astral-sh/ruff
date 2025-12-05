@@ -12347,17 +12347,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             scope,
             cycle_recovery,
+            parameters,
+            return_type,
 
             // Ignored, because scope types are never extended into other scopes.
             deferred: _,
             bindings: _,
             declarations: _,
+            parameter_defaults: _,
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
-            parameters: _,
-            parameter_defaults: _,
-            return_type: _,
 
             // Builder only state
             dataclass_field_specifiers: _,
@@ -12375,15 +12375,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!string_annotations.is_empty() || !diagnostics.is_empty() || cycle_recovery.is_some())
-                .then(|| {
-                    Box::new(ScopeInferenceExtra {
-                        string_annotations,
-                        cycle_recovery,
-                        diagnostics,
-                    })
-                });
+        let extra = (!string_annotations.is_empty()
+            || !diagnostics.is_empty()
+            || cycle_recovery.is_some()
+            || parameters.is_some()
+            || return_type.is_some())
+        .then(|| {
+            Box::new(ScopeInferenceExtra {
+                string_annotations,
+                cycle_recovery,
+                diagnostics,
+                parameters,
+                return_type,
+            })
+        });
 
         expressions.shrink_to_fit();
 
