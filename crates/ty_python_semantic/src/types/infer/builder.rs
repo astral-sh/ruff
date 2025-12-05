@@ -1927,7 +1927,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.defer_annotations().into(),
         );
         self.infer_type_parameters(type_params);
-        self.parameters = Some(self.infer_parameters(&function.parameters));
+        self.infer_parameters(&function.parameters);
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -2316,7 +2316,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
-                self.parameters = Some(self.infer_parameters(parameters));
+                self.infer_parameters(parameters);
                 self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
@@ -2465,7 +2465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_parameters(&mut self, parameters: &ast::Parameters) -> Vec<Parameter<'db>> {
+    fn infer_parameters(&mut self, parameters: &ast::Parameters) {
         let ast::Parameters {
             range: _,
             node_index: _,
@@ -2518,7 +2518,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parameters.push(parameter);
         }
 
-        parameters
+        self.parameters = Some(parameters);
     }
 
     fn infer_parameter_with_default(
@@ -2931,7 +2931,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
-        self.parameters = Some(self.infer_parameters(function.parameters.as_ref()));
+        self.infer_parameters(function.parameters.as_ref());
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
