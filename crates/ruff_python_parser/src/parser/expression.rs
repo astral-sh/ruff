@@ -1243,6 +1243,11 @@ impl<'src> Parser<'src> {
             progress.assert_progressing(self);
 
             if self.at(TokenKind::String) {
+                // test_err invalid_string_prefix
+                // uf"hey"
+                // uu"there"
+                // ru"""howsit
+                // going?"""
                 strings.push(self.parse_string_or_byte_literal());
             } else if self.at(TokenKind::FStringStart) {
                 strings.push(StringType::FString(
