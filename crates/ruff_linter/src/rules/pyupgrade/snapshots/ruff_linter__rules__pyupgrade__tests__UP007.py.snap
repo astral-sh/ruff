@@ -205,17 +205,6 @@ help: Convert to `X | Y`
 43 | 
 44 | 
 
-UP007 Use `X | Y` for type annotations
-  --> UP007.py:46:9
-   |
-45 | def f() -> None:
-46 |     x = Union[str, int]
-   |         ^^^^^^^^^^^^^^^
-47 |     x = Union["str", "int"]
-48 |     x: Union[str, int]
-   |
-help: Convert to `X | Y`
-
 UP007 [*] Use `X | Y` for type annotations
   --> UP007.py:48:8
    |
@@ -342,4 +331,15 @@ help: Convert to `X | Y`
 91 + def myfunc(param: "tuple[int | 'AClass' | None, str]"):
 92 |     print(param)
 93 | 
-94 |
+94 | 
+
+UP007 Use `X | Y` for type annotations
+   --> UP007.py:160:12
+    |
+159 | # Implicit type alias at module level - should be flagged
+160 | IntOrStr = Union[int, str]
+    |            ^^^^^^^^^^^^^^^
+161 |
+162 | if __name__ == "__main__":
+    |
+help: Convert to `X | Y`
