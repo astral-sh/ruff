@@ -1427,12 +1427,11 @@ result = func(10, y=20)
         ");
     }
 
-    // TODO: This should rename all overloads
     #[test]
     fn rename_overloaded_function() {
         let test = CursorTest::builder()
             .source(
-                "lib1.py",
+                "lib.py",
                 r#"
                 from typing import overload, Any
 
@@ -1459,7 +1458,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 1 locations)
-         --> lib1.py:5:5
+         --> lib.py:5:5
           |
         4 | @overload
         5 | def test() -> None: ...
@@ -1468,6 +1467,108 @@ result = func(10, y=20)
         7 | def test(a: str) -> str: ...
           |
         ");
+    }
+
+    #[test]
+    fn rename_overloaded_method() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                class Test:
+                    @overload
+                    def test<CURSOR>() -> None: ...
+                    @overload
+                    def test(a: str) -> str: ...
+                    @overload
+                    def test(a: int) -> int: ...
+
+                    def test(a: Any) -> Any:
+                        return a
+
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Test
+
+                Test().test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:6:9
+          |
+        4 | class Test:
+        5 |     @overload
+        6 |     def test() -> None: ...
+          |         ^^^^
+        7 |     @overload
+        8 |     def test(a: str) -> str: ...
+          |
+         ::: main.py:4:8
+          |
+        2 | from lib import Test
+        3 |
+        4 | Test().test("test")
+          |        ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_function_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test<CURSOR>("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import test
+          |                 ^^^^
+        3 |
+        4 | test("test")
+          | ----
+          |
+         ::: lib.py:5:5
+          |
+        4 | @overload
+        5 | def test() -> None: ...
+          |     ----
+        6 | @overload
+        7 | def test(a: str) -> str: ...
+          |
+        "#);
     }
 
     #[test]
@@ -2033,5 +2134,37 @@ result = func(10, y=20)
         6 | class Child(Test):
           |
         ");
+    }
+
+    // TODO: Should not rename the first declaration
+    #[test]
+    fn rename_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+          |       -
+          |
+        "#);
     }
 }
