@@ -3476,7 +3476,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
                 // This should be taken care of by the caller.
                 if expr.is_tuple_expr() {
-                    debug_assert!(
+                    assert!(
                         exactly_one_paramspec,
                         "Inferring ParamSpec value during explicit specialization for a \
                     tuple expression should only happen when it contains exactly one ParamSpec"
