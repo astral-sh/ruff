@@ -4283,16 +4283,6 @@ impl<'db> Type<'db> {
     ) -> PlaceAndQualifiers<'db> {
         tracing::trace!("class_member: {}.{}", self.display(db), name);
 
-        // TODO: It's not currently possible to hit this special case, so there's no test coverage
-        // for it. The only way to construct a SynthesizedTypedDictType right now is via
-        // normalization, and we don't do member lookups on normalized types.
-        if let Type::TypedDict(TypedDictType::Synthesized(synthesized_typed_dict)) = self
-            && let Some(member) =
-                TypedDictType::synthesized_member(db, self, synthesized_typed_dict.items(db), &name)
-        {
-            return Place::bound(member).into();
-        }
-
         match self {
             Type::Union(union) => union.map_with_boundness_and_qualifiers(db, |elem| {
                 elem.class_member_with_policy(db, name.clone(), policy)
