@@ -516,6 +516,14 @@ lambda x, y, z: (  # leading eol body
     else storage.Bucket(mock_service, destination_bucket_name)
 )
 
+x = (
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
 (
     lambda name: # dangling header comment
     (

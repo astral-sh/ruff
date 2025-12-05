@@ -522,6 +522,14 @@ lambda x, y, z: (  # leading eol body
     else storage.Bucket(mock_service, destination_bucket_name)
 )
 
+x = (
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
 (
     lambda name: # dangling header comment
     (
@@ -1260,6 +1268,14 @@ lambda x, y, z: (  # leading eol body
     else storage.Bucket(mock_service, destination_bucket_name)
 )
 
+x = (
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
 (
     lambda name:  # dangling header comment
     (
@@ -1900,7 +1916,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -540,22 +529,24 @@
+@@ -540,21 +529,23 @@
  )
  
  (
@@ -1928,6 +1944,15 @@ transform = (
 +    )
  )
  
+-x = (
+-    lambda name:
++x = lambda name: (
+     # dangling header comment
+     source_bucket
+     if name == source_bucket_name
+@@ -562,8 +553,7 @@
+ )
+ 
  (
 -    lambda name:  # dangling header comment
 -    (
@@ -1935,7 +1960,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -563,61 +554,70 @@
+@@ -571,61 +561,70 @@
  )
  
  (
@@ -2038,7 +2063,7 @@ transform = (
  )
  
  (
-@@ -630,27 +630,31 @@
+@@ -638,27 +637,31 @@
  (
      lambda
      # comment
@@ -2078,7 +2103,7 @@ transform = (
  )
  
  (
-@@ -658,19 +662,20 @@
+@@ -666,19 +669,20 @@
      # 2
      left,  # 3
      # 4
@@ -2109,7 +2134,7 @@ transform = (
          )
      )
  )
-@@ -688,18 +693,17 @@
+@@ -696,18 +700,17 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,

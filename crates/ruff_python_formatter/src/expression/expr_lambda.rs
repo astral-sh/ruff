@@ -89,19 +89,27 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         .position(|comment| comment.line_position().is_own_line())
                         .unwrap_or(dangling_after_parameters.len()),
                 );
-                return write!(
-                    f,
-                    [
-                        space(),
-                        token("("),
-                        trailing_comments(dangling_end_of_line),
-                        block_indent(&format_args!(
-                            leading_comments(dangling_own_line),
-                            body.format().with_options(Parentheses::Never)
-                        )),
-                        token(")")
-                    ]
-                );
+
+                let fmt_body = format_with(|f: &mut PyFormatter| {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            token("("),
+                            trailing_comments(dangling_end_of_line),
+                            block_indent(&format_args!(
+                                leading_comments(dangling_own_line),
+                                body.format().with_options(Parentheses::Never)
+                            )),
+                            token(")")
+                        ]
+                    )
+                });
+
+                return match self.layout {
+                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+                    ExprLambdaLayout::Default => fmt_body.fmt(f),
+                };
             } else {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
