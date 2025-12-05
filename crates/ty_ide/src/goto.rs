@@ -508,7 +508,9 @@ impl GotoTarget<'_> {
             GotoTarget::Call { callable, call } => {
                 let mut definitions = Vec::new();
 
-                // This feels off?
+                // We prefer the specific overload for hover, go-to-def etc. However,
+                // `definitions_for_callable` always resolves import aliases. That's why we
+                // skip it in cases import alias resolution is turned of (rename, highlight references).
                 if alias_resolution == ImportAliasResolution::ResolveAliases {
                     definitions.extend(definitions_for_callable(model, call));
                 }
