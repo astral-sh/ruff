@@ -230,7 +230,7 @@ calc = Calculator()
             "
 def test():
     # Cursor on a position with no symbol
-    <CURSOR>  
+    <CURSOR>
 ",
         );
 
