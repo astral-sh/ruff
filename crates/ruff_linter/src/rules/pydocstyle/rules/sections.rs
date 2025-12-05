@@ -1811,7 +1811,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
             }
         }
         if let Some(arg) = function.parameters.kwarg.as_ref()
-            && !should_suppress_kwarg_check(checker, arg)
+            && !should_ignore_kwarg_check(checker, arg)
         {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
@@ -1838,7 +1838,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     }
 }
 
-fn should_suppress_kwarg_check(checker: &Checker, parameter: &Parameter) -> bool {
+fn should_ignore_kwarg_check(checker: &Checker, parameter: &Parameter) -> bool {
     if let Some(annotation) = &parameter.annotation {
         checker
             .semantic()
