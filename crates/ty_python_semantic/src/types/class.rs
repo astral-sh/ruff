@@ -32,12 +32,13 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypes, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypeKind,
+    CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1023,8 +1024,11 @@ impl<'db> ClassType<'db> {
 
                         let getitem_signature =
                             CallableSignature::from_overloads(overload_signatures);
-                        let getitem_type =
-                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        let getitem_type = Type::Callable(CallableType::new(
+                            db,
+                            getitem_signature,
+                            CallableTypeKind::FunctionLike,
+                        ));
                         Member::definitely_declared(getitem_type)
                     })
                     .unwrap_or_else(fallback_member_lookup)
@@ -1190,7 +1194,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                true,
+                CallableTypeKind::FunctionLike,
             );
 
             if returns_non_subclass {
@@ -1259,7 +1263,7 @@ impl<'db> ClassType<'db> {
                 Some(CallableType::new(
                     db,
                     synthesized_dunder_init_signature,
-                    true,
+                    CallableTypeKind::FunctionLike,
                 ))
             } else {
                 None
@@ -2082,9 +2086,11 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
-                Type::Callable(callable_ty) => {
-                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
-                }
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
@@ -2679,7 +2685,7 @@ impl<'db> ClassLiteral<'db> {
                             ),
                             Some(Type::none(db)),
                         )),
-                        true,
+                        CallableTypeKind::FunctionLike,
                     )));
                 }
 
@@ -2705,7 +2711,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
@@ -2732,7 +2738,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
@@ -2840,7 +2846,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
@@ -2900,7 +2906,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
@@ -2928,7 +2934,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {

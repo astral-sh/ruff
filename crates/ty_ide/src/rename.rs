@@ -3,7 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_semantic::SemanticModel;
 
 /// Returns the range of the symbol if it can be renamed, None if not.
 pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text_size::TextRange> {
@@ -24,26 +24,22 @@ pub fn can_rename(db: &dyn Db, file: File, offset: TextSize) -> Option<ruff_text
 
     let current_file_in_project = is_file_in_project(db, file);
 
-    if let Some(definition_targets) = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)
-        .and_then(|definitions| definitions.declaration_targets(db))
-    {
-        for target in &definition_targets {
-            let target_file = target.file();
+    let definition_targets = goto_target
+        .get_definition_targets(&model, ReferencesMode::Rename.to_import_alias_resolution())?
+        .declaration_targets(db)?;
 
-            // If definition is outside the project, refuse rename
-            if !is_file_in_project(db, target_file) {
-                return None;
-            }
+    for target in &definition_targets {
+        let target_file = target.file();
 
-            // If current file is not in project and any definition is outside current file, refuse rename
-            if !current_file_in_project && target_file != file {
-                return None;
-            }
+        // If definition is outside the project, refuse rename
+        if !is_file_in_project(db, target_file) {
+            return None;
         }
-    } else {
-        // No definition targets found. This happens for keywords, so refuse rename
-        return None;
+
+        // If current file is not in project and any definition is outside current file, refuse rename
+        if !current_file_in_project && target_file != file {
+            return None;
+        }
     }
 
     Some(goto_target.range())
@@ -1186,7 +1182,6 @@ result = func(10, y=20)
         ");
     }
 
-    // TODO Should rename the alias
     #[test]
     fn import_alias() {
         let test = CursorTest::builder()
@@ -1202,10 +1197,80 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @"Cannot rename");
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
     }
 
-    // TODO Should rename the alias
+    #[test]
+    fn import_alias_to_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                import lib as lib2<CURSOR>
+
+                x = lib2
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @r"
+            info[rename]: Rename symbol (found 2 locations)
+             --> main.py:2:15
+              |
+            2 | import lib as lib2
+              |               ^^^^
+            3 |
+            4 | x = lib2
+              |     ----
+              |
+        ");
+    }
+
+    #[test]
+    fn imported_first_party_definition() {
+        let test = CursorTest::builder()
+            .source("lib.py", "def deprecated(): pass")
+            .source(
+                "main.py",
+                r#"
+                from lib import deprecated<CURSOR>
+
+                x = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import deprecated
+          |                 ^^^^^^^^^^
+        3 |
+        4 | x = deprecated
+          |     ----------
+          |
+         ::: lib.py:1:5
+          |
+        1 | def deprecated(): pass
+          |     ----------
+          |
+        ");
+    }
+
     #[test]
     fn import_alias_use() {
         let test = CursorTest::builder()
@@ -1221,7 +1286,19 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("z"), @"Cannot rename");
+        assert_snapshot!(test.rename("z"), @r"
+        info[rename]: Rename symbol (found 2 locations)
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |     ---
+        6 | y = warnings
+          |
+        ");
     }
 
     #[test]
@@ -1427,12 +1504,11 @@ result = func(10, y=20)
         ");
     }
 
-    // TODO: This should rename all overloads
     #[test]
     fn rename_overloaded_function() {
         let test = CursorTest::builder()
             .source(
-                "lib1.py",
+                "lib.py",
                 r#"
                 from typing import overload, Any
 
@@ -1450,16 +1526,16 @@ result = func(10, y=20)
             .source(
                 "main.py",
                 r#"
-                from lib2 import test
+                from lib import test
 
                 test("test")
                 "#,
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r"
-        info[rename]: Rename symbol (found 1 locations)
-         --> lib1.py:5:5
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> lib.py:5:5
           |
         4 | @overload
         5 | def test() -> None: ...
@@ -1467,7 +1543,117 @@ result = func(10, y=20)
         6 | @overload
         7 | def test(a: str) -> str: ...
           |
-        ");
+         ::: main.py:2:17
+          |
+        2 | from lib import test
+          |                 ----
+        3 |
+        4 | test("test")
+          | ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_method() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                class Test:
+                    @overload
+                    def test<CURSOR>() -> None: ...
+                    @overload
+                    def test(a: str) -> str: ...
+                    @overload
+                    def test(a: int) -> int: ...
+
+                    def test(a: Any) -> Any:
+                        return a
+
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import Test
+
+                Test().test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 2 locations)
+         --> lib.py:6:9
+          |
+        4 | class Test:
+        5 |     @overload
+        6 |     def test() -> None: ...
+          |         ^^^^
+        7 |     @overload
+        8 |     def test(a: str) -> str: ...
+          |
+         ::: main.py:4:8
+          |
+        2 | from lib import Test
+        3 |
+        4 | Test().test("test")
+          |        ----
+          |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_function_usage() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test<CURSOR>("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:17
+          |
+        2 | from lib import test
+          |                 ^^^^
+        3 |
+        4 | test("test")
+          | ----
+          |
+         ::: lib.py:5:5
+          |
+        4 | @overload
+        5 | def test() -> None: ...
+          |     ----
+        6 | @overload
+        7 | def test(a: str) -> str: ...
+          |
+        "#);
     }
 
     #[test]
@@ -2033,5 +2219,37 @@ result = func(10, y=20)
         6 | class Child(Test):
           |
         ");
+    }
+
+    // TODO: Should not rename the first declaration
+    #[test]
+    fn rename_redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 3 locations)
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+          |       -
+          |
+        "#);
     }
 }

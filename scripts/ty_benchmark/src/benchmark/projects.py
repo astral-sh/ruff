@@ -177,8 +177,8 @@ ALL: Final = [
     Project(
         name="homeassistant",
         repository="https://github.com/home-assistant/core.git",
-        revision="10c12623bfc0b3a06ffaa88bf986f61818cfb8be",
-        python_version="3.13",
+        revision="7fd440c4a06777bc4cfd90a3c176ded80c87a8fd",
+        python_version="3.14",
         include=["homeassistant"],
         skip="Missing dependencies on Windows" if sys.platform == "win32" else None,
         install_arguments=[
