@@ -506,8 +506,20 @@ struct CompletionAnswer {
 impl CompletionAnswer {
     /// Returns true when this answer matches the completion given.
     fn matches(&self, completion: &Completion) -> bool {
+        if let Some(ref qualified) = completion.qualified {
+            if qualified.as_str() == self.qualified() {
+                return true;
+            }
+        }
         self.symbol == completion.name.as_str()
             && self.module.as_deref() == completion.module_name.map(ModuleName::as_str)
+    }
+
+    fn qualified(&self) -> String {
+        self.module
+            .as_ref()
+            .map(|module| format!("{module}.{}", self.symbol))
+            .unwrap_or_else(|| self.symbol.clone())
     }
 }
 

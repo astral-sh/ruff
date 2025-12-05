@@ -8,7 +8,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
     MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionType, todo_type,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -190,7 +190,9 @@ impl<'db> SubclassOfType<'db> {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-                    Some(TypeVarBoundOrConstraints::Constraints(union)) => Type::Union(union),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db)
+                    }
                 }
             }
         };
@@ -351,7 +353,7 @@ impl<'db> SubclassOfInner<'db> {
                             .and_then(|subclass_of| subclass_of.into_class(db))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match constraints.elements(db) {
+                        match &**constraints.elements(db) {
                             [bound] => Self::try_from_instance(db, *bound)
                                 .and_then(|subclass_of| subclass_of.into_class(db)),
                             _ => Some(ClassType::object(db)),
@@ -416,16 +418,10 @@ impl<'db> SubclassOfInner<'db> {
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let constraints = constraints
-                        .elements(db)
-                        .iter()
-                        .map(|constraint| {
-                            SubclassOfType::try_from_instance(db, *constraint)
-                                .unwrap_or(SubclassOfType::subclass_of_unknown())
-                        })
-                        .collect::<Box<_>>();
-
-                    TypeVarBoundOrConstraints::Constraints(UnionType::new(db, constraints))
+                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
+                        SubclassOfType::try_from_instance(db, *constraint)
+                            .unwrap_or(SubclassOfType::subclass_of_unknown())
+                    }))
                 }
             })
         });

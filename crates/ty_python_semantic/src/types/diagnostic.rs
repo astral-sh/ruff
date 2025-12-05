@@ -2998,11 +2998,10 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Special form `{}` expected at least 2 arguments \
+    builder.into_diagnostic(
+        "Special form `typing.Annotated` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        SpecialFormType::Annotated
-    ));
+    );
 }
 
 pub(crate) fn report_invalid_argument_number_to_special_form(
@@ -3103,8 +3102,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        SpecialFormType::Callable
+        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 

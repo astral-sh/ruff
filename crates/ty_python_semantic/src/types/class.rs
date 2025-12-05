@@ -340,9 +340,18 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
+fn variance_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: GenericAlias<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    TypeVarVariance::Bivariant
+}
+
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -1126,8 +1135,12 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
+        // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
+        // then relying on the call binding machinery to Just Work™?
+
         let (class_literal, _) = self.class_literal(db);
-        let generic_context = class_literal.generic_context(db);
+        let class_generic_context = class_literal.generic_context(db);
 
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
@@ -1225,6 +1238,11 @@ impl<'db> ClassType<'db> {
                         });
                     let return_type = self_annotation.unwrap_or(correct_return_type);
                     let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    let generic_context = GenericContext::merge_optional(
+                        db,
+                        class_generic_context,
+                        signature.generic_context,
+                    );
                     Signature::new_generic(
                         generic_context,
                         signature.parameters().clone(),
@@ -1271,9 +1289,13 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
+                if let Place::Defined(Type::FunctionLiteral(mut new_function), _, _) =
                     new_function_symbol
                 {
+                    if let Some(class_generic_context) = class_generic_context {
+                        new_function =
+                            new_function.with_inherited_generic_context(db, class_generic_context);
+                    }
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
@@ -1283,7 +1305,11 @@ impl<'db> ClassType<'db> {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::empty(),
+                            Some(correct_return_type),
+                        ),
                     ))
                 }
             }
@@ -5860,7 +5886,7 @@ impl SlotsKind {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::module_resolver::resolve_module;
+    use crate::module_resolver::resolve_module_confident;
     use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
@@ -5876,7 +5902,8 @@ mod tests {
             });
         for class in KnownClass::iter() {
             let class_name = class.name(&db);
-            let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
+            let class_module =
+                resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
                 KnownClass::try_from_file_and_name(

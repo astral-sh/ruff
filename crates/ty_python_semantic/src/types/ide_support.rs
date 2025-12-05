@@ -938,7 +938,7 @@ mod resolve_definition {
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, &module_name) else {
+                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
@@ -1025,7 +1025,7 @@ mod resolve_definition {
             else {
                 return Vec::new();
             };
-            let Some(resolved_module) = resolve_module(db, &module_name) else {
+            let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                 return Vec::new();
             };
             resolved_module.file(db)
@@ -1134,7 +1134,12 @@ mod resolve_definition {
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
-        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        // We need to pass an importing file to `resolve_real_module` which is a bit odd
+        // here because there isn't really an importing file. However this `resolve_real_module`
+        // can be understood as essentially `import .`, which is also what `file_to_module` is,
+        // so this is in fact exactly the file we want to consider the importer.
+        let real_module =
+            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
         let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));

@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.14.8
+
+Released on 2025-12-04.
+
+### Preview features
+
+- \[`flake8-bugbear`\] Catch `yield` expressions within other statements (`B901`) ([#21200](https://github.com/astral-sh/ruff/pull/21200))
+- \[`flake8-use-pathlib`\] Mark fixes unsafe for return type changes (`PTH104`, `PTH105`, `PTH109`, `PTH115`) ([#21440](https://github.com/astral-sh/ruff/pull/21440))
+
+### Bug fixes
+
+- Fix syntax error false positives for `await` outside functions ([#21763](https://github.com/astral-sh/ruff/pull/21763))
+- \[`flake8-simplify`\] Fix truthiness assumption for non-iterable arguments in tuple/list/set calls (`SIM222`, `SIM223`) ([#21479](https://github.com/astral-sh/ruff/pull/21479))
+
+### Documentation
+
+- Suggest using `--output-file` option in GitLab integration ([#21706](https://github.com/astral-sh/ruff/pull/21706))
+
+### Other changes
+
+- [syntax-error] Default type parameter followed by non-default type parameter ([#21657](https://github.com/astral-sh/ruff/pull/21657))
+
+### Contributors
+
+- [@kieran-ryan](https://github.com/kieran-ryan)
+- [@11happy](https://github.com/11happy)
+- [@danparizher](https://github.com/danparizher)
+- [@ntBre](https://github.com/ntBre)
+
 ## 0.14.7
 
 Released on 2025-11-28.

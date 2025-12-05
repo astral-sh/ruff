@@ -250,7 +250,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                             for export in
                                 ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
-                                    .and_then(|module_name| resolve_module(self.db, &module_name))
+                                    .and_then(|module_name| {
+                                        resolve_module(self.db, self.file, &module_name)
+                                    })
                                     .iter()
                                     .flat_map(|module| {
                                         module

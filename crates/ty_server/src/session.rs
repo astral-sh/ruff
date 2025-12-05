@@ -564,7 +564,7 @@ impl Session {
             publish_settings_diagnostics(self, client, root);
         }
 
-        if let Some(global_options) = combined_global_options.take() {
+        if let Some(global_options) = combined_global_options {
             let global_settings = global_options.into_settings();
             if global_settings.diagnostic_mode().is_workspace() {
                 for project in self.projects.values_mut() {

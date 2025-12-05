@@ -606,7 +606,6 @@ elif sys.version_info >= (3, 10):
     ) -> CompletedProcess[Any]: ...
 
 else:
-    # 3.9 adds arguments "user", "group", "extra_groups" and "umask"
     @overload
     def run(
         args: _CMD,

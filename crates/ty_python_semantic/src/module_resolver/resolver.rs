@@ -1,8 +1,31 @@
 /*!
-This module principally provides two routines for resolving a particular module
-name to a `Module`: [`resolve_module`] and [`resolve_real_module`]. You'll
-usually want the former, unless you're certain you want to forbid stubs, in
-which case, use the latter.
+This module principally provides several routines for resolving a particular module
+name to a `Module`:
+
+* [`file_to_module`][]: resolves the module `.<self>` (often as the first step in resolving `.`)
+* [`resolve_module`][]: resolves an absolute module name
+
+You may notice that we actually provide `resolve_(real)_(shadowable)_module_(confident)`.
+You almost certainly just want [`resolve_module`][]. The other variations represent
+restrictions to answer specific kinds of questions, usually to empower IDE features.
+
+* The `real` variation disallows all stub files, including the vendored typeshed.
+  This enables the goto-definition ("real") vs goto-declaration ("stub or real") distinction.
+
+* The `confident` variation disallows "desperate resolution", which is a fallback
+  mode where we start trying to use ancestor directories of the importing file
+  as search-paths, but only if we failed to resolve it with the normal search-paths.
+  This is mostly just a convenience for cases where we don't want to try to define
+  the importing file (resolving a `KnownModule` and tests).
+
+* The `shadowable` variation disables some guards that prevents third-party code
+  from shadowing any vendored non-stdlib `KnownModule`. In particular `typing_extensions`,
+  which we vendor and heavily assume the contents of (and so don't ever want to shadow).
+  This enables checking if the user *actually* has `typing_extensions` installed,
+  in which case it's ok to suggest it in features like auto-imports.
+
+There is some awkwardness to the structure of the code to specifically enable caching
+of queries, as module resolution happens a lot and involves a lot of disk access.
 
 For implementors, see `import-resolution-diagram.svg` for a flow diagram that
 specifies ty's implementation of Python's import resolution algorithm.
@@ -33,14 +56,51 @@ use super::module::{Module, ModuleKind};
 use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVendoredPathRef};
 
 /// Resolves a module name to a module.
-pub fn resolve_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Option<Module<'db>> {
+pub fn resolve_module<'db>(
+    db: &'db dyn Db,
+    importing_file: File,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
+
+    resolve_module_query(db, interned_name)
+        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+}
+
+/// Resolves a module name to a module, without desperate resolution available.
+///
+/// This is appropriate for resolving a `KnownModule`, or cases where for whatever reason
+/// we don't have a well-defined importing file.
+pub fn resolve_module_confident<'db>(
+    db: &'db dyn Db,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
     let interned_name = ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsAllowed);
 
     resolve_module_query(db, interned_name)
 }
 
 /// Resolves a module name to a module (stubs not allowed).
-pub fn resolve_real_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Option<Module<'db>> {
+pub fn resolve_real_module<'db>(
+    db: &'db dyn Db,
+    importing_file: File,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
+    let interned_name =
+        ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
+
+    resolve_module_query(db, interned_name)
+        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
+}
+
+/// Resolves a module name to a module, without desperate resolution available (stubs not allowed).
+///
+/// This is appropriate for resolving a `KnownModule`, or cases where for whatever reason
+/// we don't have a well-defined importing file.
+pub fn resolve_real_module_confident<'db>(
+    db: &'db dyn Db,
+    module_name: &ModuleName,
+) -> Option<Module<'db>> {
     let interned_name =
         ModuleNameIngredient::new(db, module_name, ModuleResolveMode::StubsNotAllowed);
 
@@ -60,6 +120,7 @@ pub fn resolve_real_module<'db>(db: &'db dyn Db, module_name: &ModuleName) -> Op
 /// are involved in an import cycle with `builtins`.
 pub fn resolve_real_shadowable_module<'db>(
     db: &'db dyn Db,
+    importing_file: File,
     module_name: &ModuleName,
 ) -> Option<Module<'db>> {
     let interned_name = ModuleNameIngredient::new(
@@ -69,6 +130,7 @@ pub fn resolve_real_shadowable_module<'db>(
     );
 
     resolve_module_query(db, interned_name)
+        .or_else(|| desperately_resolve_module(db, importing_file, interned_name))
 }
 
 /// Which files should be visible when doing a module query
@@ -181,6 +243,55 @@ fn resolve_module_query<'db>(
     Some(module)
 }
 
+/// Like `resolve_module_query` but for cases where it failed to resolve the module
+/// and we are now Getting Desperate and willing to try the ancestor directories of
+/// the `importing_file` as potential temporary search paths that are private
+/// to this import.
+///
+/// The reason this is split out is because in 99.9% of cases `resolve_module_query`
+/// will find the right answer (or no valid answer exists), and we want it to be
+/// aggressively cached. Including the `importing_file` as part of that query would
+/// trash the caching of import resolution between files.
+///
+/// TODO: should (some) of this also be cached? If an entire directory of python files
+/// is misunderstood we'll end up in here a lot.
+fn desperately_resolve_module<'db>(
+    db: &'db dyn Db,
+    importing_file: File,
+    module_name: ModuleNameIngredient<'db>,
+) -> Option<Module<'db>> {
+    let name = module_name.name(db);
+    let mode = module_name.mode(db);
+    let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
+
+    let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode) else {
+        tracing::debug!("Module `{name}` not found while looking in parent dirs");
+        return None;
+    };
+
+    let module = match resolved {
+        ResolvedName::FileModule(module) => {
+            tracing::trace!(
+                "Resolved module `{name}` to `{path}`",
+                path = module.file.path(db)
+            );
+            Module::file_module(
+                db,
+                name.clone(),
+                module.kind,
+                module.search_path,
+                module.file,
+            )
+        }
+        ResolvedName::NamespacePackage => {
+            tracing::trace!("Module `{name}` is a namespace package");
+            Module::namespace_package(db, name.clone())
+        }
+    };
+
+    Some(module)
+}
+
 /// Resolves the module for the given path.
 ///
 /// Returns `None` if the path is not a module locatable via any of the known search paths.
@@ -201,13 +312,33 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// Resolves the module for the file with the given id.
 ///
 /// Returns `None` if the file is not a module locatable via any of the known search paths.
+///
+/// This function can be understood as essentially resolving `import .<self>` in the file itself,
+/// and indeed, one of its primary jobs is resolving `.<self>` to derive the module name of `.`.
+/// This intuition is particularly useful for understanding why it's correct that we pass
+/// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
 
-    let module_name = search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|candidate| {
+    file_to_module_impl(
+        db,
+        file,
+        path,
+        search_paths(db, ModuleResolveMode::StubsAllowed),
+    )
+    .or_else(|| file_to_module_impl(db, file, path, desperate_search_paths(db, file).iter()))
+}
+
+fn file_to_module_impl<'db, 'a>(
+    db: &'db dyn Db,
+    file: File,
+    path: SystemOrVendoredPathRef<'a>,
+    mut search_paths: impl Iterator<Item = &'a SearchPath>,
+) -> Option<Module<'db>> {
+    let module_name = search_paths.find_map(|candidate: &SearchPath| {
         let relative_path = match path {
             SystemOrVendoredPathRef::System(path) => candidate.relativize_system_path(path),
             SystemOrVendoredPathRef::Vendored(path) => candidate.relativize_vendored_path(path),
@@ -219,7 +350,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     // If it doesn't, then that means that multiple modules have the same name in different
     // root paths, but that the module corresponding to `path` is in a lower priority search path,
     // in which case we ignore it.
-    let module = resolve_module(db, &module_name)?;
+    let module = resolve_module(db, file, &module_name)?;
     let module_file = module.file(db)?;
 
     if file.path(db) == module_file.path(db) {
@@ -230,7 +361,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
         // If a .py and .pyi are both defined, the .pyi will be the one returned by `resolve_module().file`,
         // which would make us erroneously believe the `.py` is *not* also this module (breaking things
         // like relative imports). So here we try `resolve_real_module().file` to cover both cases.
-        let module = resolve_real_module(db, &module_name)?;
+        let module = resolve_real_module(db, file, &module_name)?;
         let module_file = module.file(db)?;
         if file.path(db) == module_file.path(db) {
             return Some(module);
@@ -250,6 +381,58 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
     Program::get(db).search_paths(db).iter(db, resolve_mode)
 }
 
+/// Get the search-paths that should be used for desperate resolution of imports in this file
+///
+/// Currently this is "the closest ancestor dir that contains a pyproject.toml", which is
+/// a completely arbitrary decision. We could potentially change this to return an iterator
+/// of every ancestor with a pyproject.toml or every ancestor.
+///
+/// For now this works well in common cases where we have some larger workspace that contains
+/// one or more python projects in sub-directories, and those python projects assume that
+/// absolute imports resolve relative to the pyproject.toml they live under.
+///
+/// Being so strict minimizes concerns about this going off a lot and doing random
+/// chaotic things. In particular, all files under a given pyproject.toml will currently
+/// agree on this being their desperate search-path, which is really nice.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+    let system = db.system();
+    let importing_path = importing_file.path(db).as_system_path()?;
+
+    // Only allow this if the importing_file is under the first-party search path
+    let (base_path, rel_path) =
+        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
+            if !search_path.is_first_party() {
+                return None;
+            }
+            Some((
+                search_path.as_system_path()?,
+                search_path.relativize_system_path_only(importing_path)?,
+            ))
+        })?;
+
+    // Read the revision on the corresponding file root to
+    // register an explicit dependency on this directory. When
+    // the revision gets bumped, the cache that Salsa creates
+    // for this routine will be invalidated.
+    //
+    // (This is conditional because ruff uses this code too and doesn't set roots)
+    if let Some(root) = db.files().root(db, base_path) {
+        let _ = root.revision(db);
+    }
+
+    // Only allow searching up to the first-party path's root
+    for rel_dir in rel_path.ancestors() {
+        let candidate_path = base_path.join(rel_dir);
+        if system.path_exists(&candidate_path.join("pyproject.toml"))
+            || system.path_exists(&candidate_path.join("ty.toml"))
+        {
+            let search_path = SearchPath::first_party(system, candidate_path).ok()?;
+            return Some(search_path);
+        }
+    }
+    None
+}
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct SearchPaths {
     /// Search paths that have been statically determined purely from reading
@@ -756,6 +939,30 @@ struct ModuleNameIngredient<'db> {
 /// Given a module name and a list of search paths in which to lookup modules,
 /// attempt to resolve the module name
 fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Option<ResolvedName> {
+    let search_paths = search_paths(db, mode);
+    resolve_name_impl(db, name, mode, search_paths)
+}
+
+/// Like `resolve_name` but for cases where it failed to resolve the module
+/// and we are now Getting Desperate and willing to try the ancestor directories of
+/// the `importing_file` as potential temporary search paths that are private
+/// to this import.
+fn desperately_resolve_name(
+    db: &dyn Db,
+    importing_file: File,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+) -> Option<ResolvedName> {
+    let search_paths = desperate_search_paths(db, importing_file);
+    resolve_name_impl(db, name, mode, search_paths.iter())
+}
+
+fn resolve_name_impl<'a>(
+    db: &dyn Db,
+    name: &ModuleName,
+    mode: ModuleResolveMode,
+    search_paths: impl Iterator<Item = &'a SearchPath>,
+) -> Option<ResolvedName> {
     let program = Program::get(db);
     let python_version = program.python_version(db);
     let resolver_state = ResolverContext::new(db, python_version, mode);
@@ -765,7 +972,7 @@ fn resolve_name(db: &dyn Db, name: &ModuleName, mode: ModuleResolveMode) -> Opti
     let stub_name = name.to_stub_package();
     let mut is_namespace_package = false;
 
-    for search_path in search_paths(db, mode) {
+    for search_path in search_paths {
         // When a builtin module is imported, standard module resolution is bypassed:
         // the module name always resolves to the stdlib module,
         // even if there's a module of the same name in the first-party root
@@ -1409,11 +1616,11 @@ mod tests {
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
 
         assert_eq!(
             Some(&foo_module),
-            resolve_module(&db, &foo_module_name).as_ref()
+            resolve_module_confident(&db, &foo_module_name).as_ref()
         );
 
         assert_eq!("foo", foo_module.name(&db));
@@ -1435,11 +1642,11 @@ mod tests {
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
 
         assert_eq!(
             Some(&foo_module),
-            resolve_module(&db, &foo_module_name).as_ref()
+            resolve_module_confident(&db, &foo_module_name).as_ref()
         );
 
         assert_eq!("foo", foo_module.name(&db));
@@ -1467,11 +1674,11 @@ mod tests {
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
 
         assert_eq!(
             Some(&foo_module),
-            resolve_module(&db, &foo_module_name).as_ref()
+            resolve_module_confident(&db, &foo_module_name).as_ref()
         );
 
         assert_eq!("foo", foo_module.name(&db));
@@ -1494,7 +1701,8 @@ mod tests {
             .build();
 
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
-        let builtins = resolve_module(&db, &builtins_module_name).expect("builtins to resolve");
+        let builtins =
+            resolve_module_confident(&db, &builtins_module_name).expect("builtins to resolve");
 
         assert_eq!(
             builtins.file(&db).unwrap().path(&db),
@@ -1518,7 +1726,8 @@ mod tests {
             .build();
 
         let builtins_module_name = ModuleName::new_static("builtins").unwrap();
-        let builtins = resolve_module(&db, &builtins_module_name).expect("builtins to resolve");
+        let builtins =
+            resolve_module_confident(&db, &builtins_module_name).expect("builtins to resolve");
 
         assert_eq!(
             builtins.file(&db).unwrap().path(&db),
@@ -1539,11 +1748,11 @@ mod tests {
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
 
         assert_eq!(
             Some(&functools_module),
-            resolve_module(&db, &functools_module_name).as_ref()
+            resolve_module_confident(&db, &functools_module_name).as_ref()
         );
 
         assert_eq!(&stdlib, functools_module.search_path(&db).unwrap());
@@ -1596,9 +1805,10 @@ mod tests {
 
         let existing_modules = create_module_names(&["asyncio", "functools", "xml.etree"]);
         for module_name in existing_modules {
-            let resolved_module = resolve_module(&db, &module_name).unwrap_or_else(|| {
-                panic!("Expected module {module_name} to exist in the mock stdlib")
-            });
+            let resolved_module =
+                resolve_module_confident(&db, &module_name).unwrap_or_else(|| {
+                    panic!("Expected module {module_name} to exist in the mock stdlib")
+                });
             let search_path = resolved_module.search_path(&db).unwrap();
             assert_eq!(
                 &stdlib, search_path,
@@ -1649,7 +1859,7 @@ mod tests {
 
         for module_name in nonexisting_modules {
             assert!(
-                resolve_module(&db, &module_name).is_none(),
+                resolve_module_confident(&db, &module_name).is_none(),
                 "Unexpectedly resolved a module for {module_name}"
             );
         }
@@ -1692,9 +1902,10 @@ mod tests {
         ]);
 
         for module_name in existing_modules {
-            let resolved_module = resolve_module(&db, &module_name).unwrap_or_else(|| {
-                panic!("Expected module {module_name} to exist in the mock stdlib")
-            });
+            let resolved_module =
+                resolve_module_confident(&db, &module_name).unwrap_or_else(|| {
+                    panic!("Expected module {module_name} to exist in the mock stdlib")
+                });
             let search_path = resolved_module.search_path(&db).unwrap();
             assert_eq!(
                 &stdlib, search_path,
@@ -1728,7 +1939,7 @@ mod tests {
         let nonexisting_modules = create_module_names(&["importlib", "xml", "xml.etree"]);
         for module_name in nonexisting_modules {
             assert!(
-                resolve_module(&db, &module_name).is_none(),
+                resolve_module_confident(&db, &module_name).is_none(),
                 "Unexpectedly resolved a module for {module_name}"
             );
         }
@@ -1750,11 +1961,11 @@ mod tests {
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
 
         assert_eq!(
             Some(&functools_module),
-            resolve_module(&db, &functools_module_name).as_ref()
+            resolve_module_confident(&db, &functools_module_name).as_ref()
         );
         assert_eq!(&src, functools_module.search_path(&db).unwrap());
         assert_eq!(ModuleKind::Module, functools_module.kind(&db));
@@ -1777,7 +1988,7 @@ mod tests {
             .build();
 
         let pydoc_data_topics_name = ModuleName::new_static("pydoc_data.topics").unwrap();
-        let pydoc_data_topics = resolve_module(&db, &pydoc_data_topics_name).unwrap();
+        let pydoc_data_topics = resolve_module_confident(&db, &pydoc_data_topics_name).unwrap();
 
         assert_eq!("pydoc_data.topics", pydoc_data_topics.name(&db));
         assert_eq!(pydoc_data_topics.search_path(&db).unwrap(), &stdlib);
@@ -1794,7 +2005,8 @@ mod tests {
             .build();
 
         let foo_path = src.join("foo/__init__.py");
-        let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_module =
+            resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
 
         assert_eq!("foo", foo_module.name(&db));
         assert_eq!(&src, foo_module.search_path(&db).unwrap());
@@ -1821,7 +2033,8 @@ mod tests {
 
         let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
-        let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_module =
+            resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_init_path = src.join("foo/__init__.py");
 
         assert_eq!(&src, foo_module.search_path(&db).unwrap());
@@ -1844,8 +2057,9 @@ mod tests {
 
         let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
-        let foo = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
-        let foo_real = resolve_real_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo = resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_real =
+            resolve_real_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_stub = src.join("foo.pyi");
 
         assert_eq!(&src, foo.search_path(&db).unwrap());
@@ -1870,7 +2084,7 @@ mod tests {
         let TestCase { db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let baz_module =
-            resolve_module(&db, &ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
+            resolve_module_confident(&db, &ModuleName::new_static("foo.bar.baz").unwrap()).unwrap();
         let baz_path = src.join("foo/bar/baz.py");
 
         assert_eq!(&src, baz_module.search_path(&db).unwrap());
@@ -1894,7 +2108,8 @@ mod tests {
             .with_site_packages_files(&[("foo.py", "")])
             .build();
 
-        let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let foo_module =
+            resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
         let foo_src_path = src.join("foo.py");
 
         assert_eq!(&src, foo_module.search_path(&db).unwrap());
@@ -1965,8 +2180,10 @@ mod tests {
             },
         );
 
-        let foo_module = resolve_module(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
-        let bar_module = resolve_module(&db, &ModuleName::new_static("bar").unwrap()).unwrap();
+        let foo_module =
+            resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
+        let bar_module =
+            resolve_module_confident(&db, &ModuleName::new_static("bar").unwrap()).unwrap();
 
         assert_ne!(foo_module, bar_module);
 
@@ -2001,7 +2218,7 @@ mod tests {
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
         let foo_pieces = (
             foo_module.name(&db).clone(),
             foo_module.file(&db),
@@ -2022,7 +2239,7 @@ mod tests {
         // Re-query the foo module. The foo module should still be cached
         // because `bar.py` isn't relevant for resolving `foo`.
 
-        let foo_module2 = resolve_module(&db, &foo_module_name);
+        let foo_module2 = resolve_module_confident(&db, &foo_module_name);
         let foo_pieces2 = foo_module2.map(|foo_module2| {
             (
                 foo_module2.name(&db).clone(),
@@ -2049,14 +2266,15 @@ mod tests {
         let foo_path = src.join("foo.py");
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        assert_eq!(resolve_module(&db, &foo_module_name), None);
+        assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
 
         // Now write the foo file
         db.write_file(&foo_path, "x = 1")?;
 
         let foo_file = system_path_to_file(&db, &foo_path).expect("foo.py to exist");
 
-        let foo_module = resolve_module(&db, &foo_module_name).expect("Foo module to resolve");
+        let foo_module =
+            resolve_module_confident(&db, &foo_module_name).expect("Foo module to resolve");
         assert_eq!(foo_file, foo_module.file(&db).unwrap());
 
         Ok(())
@@ -2070,7 +2288,8 @@ mod tests {
         let TestCase { mut db, src, .. } = TestCaseBuilder::new().with_src_files(SRC).build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).expect("foo module to exist");
+        let foo_module =
+            resolve_module_confident(&db, &foo_module_name).expect("foo module to exist");
         let foo_init_path = src.join("foo/__init__.py");
 
         assert_eq!(&foo_init_path, foo_module.file(&db).unwrap().path(&db));
@@ -2082,7 +2301,8 @@ mod tests {
         File::sync_path(&mut db, &foo_init_path);
         File::sync_path(&mut db, foo_init_path.parent().unwrap());
 
-        let foo_module = resolve_module(&db, &foo_module_name).expect("Foo module to resolve");
+        let foo_module =
+            resolve_module_confident(&db, &foo_module_name).expect("Foo module to resolve");
         assert_eq!(&src.join("foo.py"), foo_module.file(&db).unwrap().path(&db));
 
         Ok(())
@@ -2108,7 +2328,7 @@ mod tests {
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let stdlib_functools_path = stdlib.join("functools.pyi");
 
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &stdlib);
         assert_eq!(
             Ok(functools_module.file(&db).unwrap()),
@@ -2121,7 +2341,7 @@ mod tests {
         let site_packages_functools_path = site_packages.join("functools.py");
         db.write_file(&site_packages_functools_path, "f: int")
             .unwrap();
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         let functools_file = functools_module.file(&db).unwrap();
         let functools_search_path = functools_module.search_path(&db).unwrap().clone();
         let events = db.take_salsa_events();
@@ -2156,7 +2376,7 @@ mod tests {
             .build();
 
         let functools_module_name = ModuleName::new_static("functools").unwrap();
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &stdlib);
         assert_eq!(
             Ok(functools_module.file(&db).unwrap()),
@@ -2167,7 +2387,7 @@ mod tests {
         // since first-party files take higher priority in module resolution:
         let src_functools_path = src.join("functools.py");
         db.write_file(&src_functools_path, "FOO: int").unwrap();
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &src);
         assert_eq!(
             Ok(functools_module.file(&db).unwrap()),
@@ -2198,7 +2418,7 @@ mod tests {
         let functools_module_name = ModuleName::new_static("functools").unwrap();
         let src_functools_path = src.join("functools.py");
 
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &src);
         assert_eq!(
             Ok(functools_module.file(&db).unwrap()),
@@ -2211,7 +2431,7 @@ mod tests {
             .remove_file(&src_functools_path)
             .unwrap();
         File::sync_path(&mut db, &src_functools_path);
-        let functools_module = resolve_module(&db, &functools_module_name).unwrap();
+        let functools_module = resolve_module_confident(&db, &functools_module_name).unwrap();
         assert_eq!(functools_module.search_path(&db).unwrap(), &stdlib);
         assert_eq!(
             Ok(functools_module.file(&db).unwrap()),
@@ -2233,8 +2453,8 @@ mod tests {
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let foo_bar_module_name = ModuleName::new_static("foo.bar").unwrap();
 
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
-        let foo_bar_module = resolve_module(&db, &foo_bar_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
+        let foo_bar_module = resolve_module_confident(&db, &foo_bar_module_name).unwrap();
 
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
@@ -2262,11 +2482,11 @@ mod tests {
 
         // Lines with leading whitespace in `.pth` files do not parse:
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        assert_eq!(resolve_module(&db, &foo_module_name), None);
+        assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
 
         // Lines with trailing whitespace in `.pth` files do:
         let bar_module_name = ModuleName::new_static("bar").unwrap();
-        let bar_module = resolve_module(&db, &bar_module_name).unwrap();
+        let bar_module = resolve_module_confident(&db, &bar_module_name).unwrap();
         assert_eq!(
             bar_module.file(&db).unwrap().path(&db),
             &FilePath::system("/y/src/bar.py")
@@ -2285,7 +2505,7 @@ mod tests {
             .build();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
 
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
@@ -2333,10 +2553,10 @@ not_a_directory
         let b_module_name = ModuleName::new_static("b").unwrap();
         let spam_module_name = ModuleName::new_static("spam").unwrap();
 
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
-        let a_module = resolve_module(&db, &a_module_name).unwrap();
-        let b_module = resolve_module(&db, &b_module_name).unwrap();
-        let spam_module = resolve_module(&db, &spam_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
+        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
+        let b_module = resolve_module_confident(&db, &b_module_name).unwrap();
+        let spam_module = resolve_module_confident(&db, &spam_module_name).unwrap();
 
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
@@ -2370,14 +2590,14 @@ not_a_directory
         let foo_module_name = ModuleName::new_static("foo").unwrap();
         let bar_module_name = ModuleName::new_static("bar").unwrap();
 
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
             &FilePath::system("/x/src/foo.py")
         );
 
         db.clear_salsa_events();
-        let bar_module = resolve_module(&db, &bar_module_name).unwrap();
+        let bar_module = resolve_module_confident(&db, &bar_module_name).unwrap();
         assert_eq!(
             bar_module.file(&db).unwrap().path(&db),
             &FilePath::system("/y/src/bar.py")
@@ -2407,7 +2627,7 @@ not_a_directory
         db.write_files(x_directory).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
             &FilePath::system("/x/src/foo.py")
@@ -2419,7 +2639,7 @@ not_a_directory
 
         File::sync_path(&mut db, &site_packages.join("_foo.pth"));
 
-        assert_eq!(resolve_module(&db, &foo_module_name), None);
+        assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
     }
 
     #[test]
@@ -2434,7 +2654,7 @@ not_a_directory
         db.write_files(x_directory).unwrap();
 
         let foo_module_name = ModuleName::new_static("foo").unwrap();
-        let foo_module = resolve_module(&db, &foo_module_name).unwrap();
+        let foo_module = resolve_module_confident(&db, &foo_module_name).unwrap();
         let src_path = SystemPathBuf::from("/x/src");
         assert_eq!(
             foo_module.file(&db).unwrap().path(&db),
@@ -2447,7 +2667,7 @@ not_a_directory
         db.memory_file_system().remove_directory(&src_path).unwrap();
         File::sync_path(&mut db, &src_path.join("foo.py"));
         File::sync_path(&mut db, &src_path);
-        assert_eq!(resolve_module(&db, &foo_module_name), None);
+        assert_eq!(resolve_module_confident(&db, &foo_module_name), None);
     }
 
     #[test]
@@ -2507,7 +2727,7 @@ not_a_directory
         // The editable installs discovered from the `.pth` file in the first `site-packages` directory
         // take precedence over the second `site-packages` directory...
         let a_module_name = ModuleName::new_static("a").unwrap();
-        let a_module = resolve_module(&db, &a_module_name).unwrap();
+        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
         assert_eq!(
             a_module.file(&db).unwrap().path(&db),
             &editable_install_location
@@ -2521,7 +2741,7 @@ not_a_directory
         // ...But now that the `.pth` file in the first `site-packages` directory has been deleted,
         // the editable install no longer exists, so the module now resolves to the file in the
         // second `site-packages` directory
-        let a_module = resolve_module(&db, &a_module_name).unwrap();
+        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
         assert_eq!(
             a_module.file(&db).unwrap().path(&db),
             &system_site_packages_location
@@ -2579,12 +2799,12 @@ not_a_directory
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
         let a_module_name = ModuleName::new_static("A").unwrap();
-        assert_eq!(resolve_module(&db, &a_module_name), None);
+        assert_eq!(resolve_module_confident(&db, &a_module_name), None);
 
         // Now lookup the same module using the lowercase `a` and it should
         // resolve to the file in the system site-packages
         let a_module_name = ModuleName::new_static("a").unwrap();
-        let a_module = resolve_module(&db, &a_module_name).expect("a.py to resolve");
+        let a_module = resolve_module_confident(&db, &a_module_name).expect("a.py to resolve");
         assert!(
             a_module
                 .file(&db)

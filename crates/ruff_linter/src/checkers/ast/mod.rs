@@ -69,6 +69,7 @@ use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
+use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
@@ -727,6 +728,12 @@ impl SemanticSyntaxContext for Checker<'_> {
                 // PLE0117
                 if self.is_rule_enabled(Rule::NonlocalWithoutBinding) {
                     self.report_diagnostic(NonlocalWithoutBinding { name }, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
+                // B901
+                if self.is_rule_enabled(Rule::ReturnInGenerator) {
+                    self.report_diagnostic(ReturnInGenerator, error.range);
                 }
             }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable

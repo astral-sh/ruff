@@ -294,7 +294,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let hover = server.hover_request(foo, Position::new(0, 5));
 
     assert!(
@@ -326,7 +326,7 @@ def foo() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let hover = server.hover_request(foo, Position::new(0, 5));
 
     assert!(
@@ -367,14 +367,14 @@ def bar() -> str:
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
     let hover_foo = server.hover_request(foo, Position::new(0, 5));
     assert!(
         hover_foo.is_none(),
         "Expected no hover information for workspace A, got: {hover_foo:?}"
     );
 
-    server.open_text_document(bar, &bar_content, 1);
+    server.open_text_document(bar, bar_content, 1);
     let hover_bar = server.hover_request(bar, Position::new(0, 5));
     assert!(
         hover_bar.is_some(),

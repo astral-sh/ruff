@@ -1339,6 +1339,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.into_callable`
+    IntoCallable,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
     /// `ty_extensions.enum_members`
@@ -1411,6 +1413,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::IntoCallable
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
@@ -1483,17 +1486,22 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db),
-                            )),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
                     );
 
-                    diagnostic.info(format_args!(
-                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                        asserted_type = asserted_ty.display(db),
-                        inferred_type = actual_ty.display(db),
-                    ));
+                    if actual_ty.is_subtype_of(db, *asserted_ty) {
+                        diagnostic.info(format_args!(
+                            "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.info(format_args!(
+                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
@@ -1882,7 +1890,7 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, &module_name) else {
+                let Some(module) = resolve_module(db, file, &module_name) else {
                     return;
                 };
 
@@ -1941,6 +1949,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::IntoCallable
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert
