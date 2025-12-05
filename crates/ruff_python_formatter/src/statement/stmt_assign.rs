@@ -9,6 +9,7 @@ use crate::comments::{
     Comments, LeadingDanglingTrailingComments, SourceComment, trailing_comments,
 };
 use crate::context::{NodeLevel, WithNodeLevel};
+use crate::expression::expr_lambda::ExprLambdaLayout;
 use crate::expression::parentheses::{
     NeedsParentheses, OptionalParentheses, Parentheses, Parenthesize, is_expression_parenthesized,
     optional_parentheses,
@@ -18,6 +19,7 @@ use crate::expression::{
     maybe_parenthesize_expression,
 };
 use crate::other::interpolated_string::InterpolatedStringLayout;
+use crate::preview::is_parenthesize_lambda_bodies_enabled;
 use crate::statement::trailing_semicolon;
 use crate::string::StringLikeExtensions;
 use crate::string::implicit::{
@@ -303,12 +305,22 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return maybe_parenthesize_expression(
-                        value,
-                        *statement,
-                        Parenthesize::IfBreaks,
-                    )
-                    .fmt(f);
+                    return if let Expr::Lambda(lambda) = value {
+                        let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
+                        // See the lambda comment in `can_omit_optional_parentheses` for more
+                        // details. The preview behavior resolves this, but we still need this
+                        // branch for now on stable.
+                        if !is_parenthesize_lambda_bodies_enabled(f.context())
+                            && can_omit_optional_parentheses(value, f.context())
+                        {
+                            optional_parentheses(&lambda).fmt(f)
+                        } else {
+                            parenthesize_if_expands(&lambda).fmt(f)
+                        }
+                    } else {
+                        maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
+                            .fmt(f)
+                    };
                 }
 
                 let comments = f.context().comments().clone();
@@ -579,19 +591,28 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
+                    let formatted_value = format_with(|f| {
+                        if let Expr::Lambda(lambda) = value {
+                            let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
+                            // See the lambda comment in `can_omit_optional_parentheses` for more
+                            // details. The preview behavior resolves this, but we still need this
+                            // branch for now on stable.
+                            if !is_parenthesize_lambda_bodies_enabled(f.context())
+                                && can_omit_optional_parentheses(value, f.context())
+                            {
+                                optional_parentheses(&lambda).fmt(f)
+                            } else {
+                                parenthesize_if_expands(&lambda).fmt(f)
+                            }
+                        } else {
+                            maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
+                                .fmt(f)
+                        }
+                    });
+
                     return write!(
                         f,
-                        [
-                            before_operator,
-                            space(),
-                            operator,
-                            space(),
-                            maybe_parenthesize_expression(
-                                value,
-                                *statement,
-                                Parenthesize::IfBreaks
-                            )
-                        ]
+                        [before_operator, space(), operator, space(), formatted_value]
                     );
                 }
 

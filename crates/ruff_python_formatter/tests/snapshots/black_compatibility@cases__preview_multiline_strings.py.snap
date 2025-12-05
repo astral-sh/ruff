@@ -375,7 +375,7 @@ a = b if """
  # Another use case
  data = yaml.load("""\
  a: 1
-@@ -77,19 +106,23 @@
+@@ -77,10 +106,12 @@
  b: 2
  """,
  )
@@ -390,19 +390,7 @@ a = b if """
  
  MULTILINE = """
  foo
- """.replace("\n", "")
--generated_readme = lambda project_name: """
-+generated_readme = (
-+    lambda project_name: """
- {}
- 
- <Add content here!>
- """.strip().format(project_name)
-+)
- parser.usage += """
- Custom extra help summary.
- 
-@@ -156,16 +189,24 @@
+@@ -156,16 +187,24 @@
               10 LOAD_CONST               0 (None)
               12 RETURN_VALUE
  """ % (_C.__init__.__code__.co_firstlineno + 1,)
@@ -433,7 +421,7 @@ a = b if """
  [
      """cow
  moos""",
-@@ -206,7 +247,9 @@
+@@ -206,7 +245,9 @@
      "c"
  )
  
@@ -444,7 +432,7 @@ a = b if """
  
  assert some_var == expected_result, """
  test
-@@ -224,10 +267,8 @@
+@@ -224,10 +265,8 @@
                  """Sxxxxxxx xxxxxxxx, xxxxxxx xx xxxxxxxxx
                  xxxxxxxxxxxxx xxxxxxx xxxxxxxxx xxx-xxxxxxxxxx xxxxxx xx xxx-xxxxxx"""
              ),
@@ -457,7 +445,7 @@ a = b if """
          },
      }
  
-@@ -246,14 +287,12 @@
+@@ -246,14 +285,12 @@
  a
  a"""
      ),
@@ -597,13 +585,11 @@ data = yaml.load(
 MULTILINE = """
 foo
 """.replace("\n", "")
-generated_readme = (
-    lambda project_name: """
+generated_readme = lambda project_name: """
 {}
 
 <Add content here!>
 """.strip().format(project_name)
-)
 parser.usage += """
 Custom extra help summary.
 
