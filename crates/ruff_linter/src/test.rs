@@ -235,7 +235,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
-    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+    let mut suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
     let messages = check_path(
         path,
         path.parent()
@@ -251,7 +251,7 @@ pub(crate) fn test_contents<'a>(
         source_type,
         &parsed,
         target_version,
-        &suppressions,
+        &mut suppressions,
     );
 
     let source_has_errors = parsed.has_invalid_syntax();
@@ -302,7 +302,7 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
-            let suppressions =
+            let mut suppressions =
                 Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
             let fixed_messages = check_path(
                 path,
@@ -317,7 +317,7 @@ pub(crate) fn test_contents<'a>(
                 source_type,
                 &parsed,
                 target_version,
-                &suppressions,
+                &mut suppressions,
             );
 
             if parsed.has_invalid_syntax() && !source_has_errors {

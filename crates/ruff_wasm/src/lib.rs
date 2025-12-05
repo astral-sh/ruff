@@ -213,7 +213,7 @@ impl Workspace {
             &indexer,
         );
 
-        let suppressions =
+        let mut suppressions =
             Suppressions::from_tokens(&self.settings.linter, locator.contents(), parsed.tokens());
 
         // Generate checks.
@@ -230,7 +230,7 @@ impl Workspace {
             source_type,
             &parsed,
             target_version,
-            &suppressions,
+            &mut suppressions,
         );
 
         let source_code = locator.to_source_code();
