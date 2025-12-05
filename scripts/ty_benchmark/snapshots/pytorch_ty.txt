@@ -743,9 +743,9 @@ torch/_dynamo/eval_frame.py:1739:9: error[unresolved-attribute] Module `torch._C
 torch/_dynamo/eval_frame.py:1954:9: error[unresolved-attribute] Module `torch._C` has no member `_log_api_usage_once`
 torch/_dynamo/eval_frame.py:2228:22: warning[possibly-missing-attribute] Submodule `traceback` may not be available as an attribute on module `torch.fx`
 torch/_dynamo/external_utils.py:103:59: error[unresolved-attribute] Module `torch` has no member `as_tensor`
-torch/_dynamo/functional_export.py:372:16: error[unsupported-operator] Operator `in` is not supported for types `str` and `Module`, in comparing `Literal["dynamo_flat_name_to_original_fqn"]` with `Unknown | Tensor | Module`
+torch/_dynamo/functional_export.py:372:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["dynamo_flat_name_to_original_fqn"]` and `Unknown | Tensor | Module`
 torch/_dynamo/functional_export.py:374:70: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
-torch/_dynamo/functional_export.py:379:16: error[unsupported-operator] Operator `in` is not supported for types `str` and `Module`, in comparing `Literal["dynamo_compile_id"]` with `Unknown | Tensor | Module`
+torch/_dynamo/functional_export.py:379:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["dynamo_compile_id"]` and `Unknown | Tensor | Module`
 torch/_dynamo/functional_export.py:381:55: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
 torch/_dynamo/functional_export.py:512:13: error[unresolved-attribute] Cannot assign object of type `int` to attribute `num_inputs` on type `Self@__init__` with custom `__setattr__` method.
 torch/_dynamo/functional_export.py:513:13: error[unresolved-attribute] Cannot assign object of type `None` to attribute `gm_inputs` on type `Self@__init__` with custom `__setattr__` method.
@@ -930,7 +930,7 @@ torch/_dynamo/symbolic_convert.py:921:28: error[invalid-argument-type] Argument 
 torch/_dynamo/symbolic_convert.py:1004:9: error[unresolved-attribute] Unresolved attribute `dispatch_table` on type `type`.
 torch/_dynamo/symbolic_convert.py:1292:17: error[missing-argument] No argument provided for required parameter `self` of function `is_non_empty_graph`
 torch/_dynamo/symbolic_convert.py:1602:28: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `InstructionTranslatorBase`, found `Unknown | InstructionTranslatorBase | None`
-torch/_dynamo/symbolic_convert.py:1654:42: error[unsupported-operator] Operator `in` is not supported for types `str` and `object`, in comparing `Literal["Data-dependent"]` with `object`
+torch/_dynamo/symbolic_convert.py:1654:42: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["Data-dependent"]` and `object`
 torch/_dynamo/symbolic_convert.py:1843:21: warning[possibly-missing-attribute] Submodule `package` may not be available as an attribute on module `torch`
 torch/_dynamo/symbolic_convert.py:1988:17: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | None`
 torch/_dynamo/symbolic_convert.py:2228:60: error[invalid-argument-type] Argument to function `get_dynamo_observed_exception` is incorrect: Expected `type[Exception]`, found `Unknown | type`
@@ -1004,7 +1004,6 @@ torch/_dynamo/utils.py:865:25: error[unresolved-attribute] Module `torch` has no
 torch/_dynamo/utils.py:865:38: error[unresolved-attribute] Module `torch` has no member `short`
 torch/_dynamo/utils.py:866:5: error[unresolved-attribute] Module `torch` has no member `BoolTensor`
 torch/_dynamo/utils.py:866:24: error[unresolved-attribute] Module `torch` has no member `bool`
-torch/_dynamo/utils.py:1038:68: error[invalid-type-arguments] Too many type arguments to class `tuple`: expected 1, got 2
 torch/_dynamo/utils.py:1665:18: error[unresolved-import] Cannot resolve imported module `torch._inductor.fb.remote_cache`
 torch/_dynamo/utils.py:1680:22: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
 torch/_dynamo/utils.py:1901:36: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
@@ -1708,12 +1707,12 @@ torch/_dynamo/variables/user_defined.py:1298:37: error[invalid-argument-type] Ar
 torch/_dynamo/variables/user_defined.py:1317:14: warning[possibly-missing-attribute] Submodule `_dynamo` may not be available as an attribute on module `torch._C`
 torch/_dynamo/variables/user_defined.py:1334:56: error[invalid-argument-type] Argument to bound method `__getattribute__` is incorrect: Expected `str`, found `object`
 torch/_dynamo/variables/user_defined.py:1334:68: error[too-many-positional-arguments] Too many positional arguments to bound method `__getattribute__`: expected 2, got 3
-torch/_dynamo/variables/user_defined.py:1402:25: error[unsupported-operator] Operator `not in` is not supported for types `Unknown` and `object`
+torch/_dynamo/variables/user_defined.py:1402:25: error[unsupported-operator] Operator `not in` is not supported between objects of type `Unknown` and `object`
 torch/_dynamo/variables/user_defined.py:1478:32: error[unresolved-attribute] Object of type `object` has no attribute `_parameters`
 torch/_dynamo/variables/user_defined.py:1479:32: error[unresolved-attribute] Object of type `object` has no attribute `_buffers`
 torch/_dynamo/variables/user_defined.py:1480:32: error[unresolved-attribute] Object of type `object` has no attribute `_modules`
 torch/_dynamo/variables/user_defined.py:1504:40: error[unresolved-attribute] Object of type `Self@var_getattr` has no attribute `get_nn_module_stack_source`
-torch/_dynamo/variables/user_defined.py:1532:17: error[unsupported-operator] Operator `not in` is not supported for types `Unknown` and `object`, in comparing `Unknown & ~Literal["__dict__"] & ~Literal["__class__"]` with `object`
+torch/_dynamo/variables/user_defined.py:1532:17: error[unsupported-operator] Operator `not in` is not supported between objects of type `Unknown & ~Literal["__dict__"] & ~Literal["__class__"]` and `object`
 torch/_dynamo/variables/user_defined.py:1551:20: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None | TupleVariable`
 torch/_dynamo/variables/user_defined.py:1573:17: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `((...) -> Any) | None`, found `None | AttrSource`
 torch/_dynamo/variables/user_defined.py:1689:57: error[invalid-argument-type] Argument is incorrect: Expected `Source`, found `Unknown | Source | None`
@@ -2108,7 +2107,6 @@ torch/_export/serde/serialize.py:2558:29: warning[possibly-missing-attribute] Su
 torch/_export/serde/serialize.py:3101:51: error[unresolved-attribute] Module `torch._C` has no member `_get_max_operator_version`
 torch/_export/serde/serialize.py:3180:9: error[invalid-method-override] Invalid override of method `default`: Definition is incompatible with `JSONEncoder.default`
 torch/_export/serde/serialize.py:3865:31: error[unresolved-attribute] Module `torch` has no member `FunctionSchema`
-torch/_export/serde/union.py:49:12: error[call-non-callable] Object of type `<decorator produced by dataclass-like function>` is not callable
 torch/_export/verifier.py:49:19: error[unresolved-attribute] Module `torch` has no member `memory_format`
 torch/_export/verifier.py:49:40: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_export/verifier.py:49:53: error[unresolved-attribute] Module `torch` has no member `device`
@@ -2175,7 +2173,7 @@ torch/_functorch/_aot_autograd/collect_metadata_analysis.py:842:37: error[unreso
 torch/_functorch/_aot_autograd/frontend_utils.py:50:30: error[unresolved-attribute] Module `torch` has no member `ScriptObject`
 torch/_functorch/_aot_autograd/frontend_utils.py:71:35: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
 torch/_functorch/_aot_autograd/frontend_utils.py:116:26: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
-torch/_functorch/_aot_autograd/frontend_utils.py:156:16: error[unsupported-operator] Operator `in` is not supported for types `str` and `Module`, in comparing `str` with `Tensor | Module`
+torch/_functorch/_aot_autograd/frontend_utils.py:156:16: error[unsupported-operator] Operator `in` is not supported between objects of type `str` and `Tensor | Module`
 torch/_functorch/_aot_autograd/frontend_utils.py:157:18: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
 torch/_functorch/_aot_autograd/functional_utils.py:75:12: error[unresolved-attribute] Module `torch` has no member `_from_functional_tensor`
 torch/_functorch/_aot_autograd/functional_utils.py:119:16: error[unresolved-attribute] Module `torch` has no member `_functionalize_are_all_mutations_hidden_from_autograd`
@@ -2623,10 +2621,10 @@ torch/_higher_order_ops/invoke_subgraph.py:536:28: error[invalid-assignment] Obj
 torch/_higher_order_ops/local_map.py:16:22: error[unresolved-import] Module `torch._C` has no member `DispatchKey`
 torch/_higher_order_ops/local_map.py:59:16: error[unresolved-attribute] Module `torch` has no member `empty_strided`
 torch/_higher_order_ops/local_map.py:124:9: warning[possibly-missing-attribute] Submodule `tensor` may not be available as an attribute on module `torch.distributed`
-torch/_higher_order_ops/local_map.py:135:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[Tensor, int, SymInt, None]`, found `tuple[@Todo, @Todo]`
+torch/_higher_order_ops/local_map.py:135:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[Tensor, int, SymInt, None]`, found `tuple[@Todo(StarredExpression), @Todo(StarredExpression)]`
 torch/_higher_order_ops/local_map.py:140:13: warning[possibly-missing-attribute] Submodule `tensor` may not be available as an attribute on module `torch.distributed`
 torch/_higher_order_ops/local_map.py:156:9: warning[possibly-missing-attribute] Submodule `tensor` may not be available as an attribute on module `torch.distributed`
-torch/_higher_order_ops/local_map.py:158:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[Tensor, int, SymInt, None]`, found `tuple[@Todo, @Todo]`
+torch/_higher_order_ops/local_map.py:158:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[Tensor, int, SymInt, None]`, found `tuple[@Todo(StarredExpression), @Todo(StarredExpression)]`
 torch/_higher_order_ops/local_map.py:172:9: warning[possibly-missing-attribute] Submodule `tensor` may not be available as an attribute on module `torch.distributed`
 torch/_higher_order_ops/local_map.py:407:14: error[unresolved-attribute] Module `torch._C` has no member `_AutoDispatchBelowAutograd`
 torch/_higher_order_ops/local_map.py:434:14: error[unresolved-attribute] Module `torch._C` has no member `_AutoDispatchBelowAutograd`
@@ -2711,10 +2709,10 @@ torch/_higher_order_ops/triton_kernel_wrap.py:398:22: error[unresolved-import] C
 torch/_higher_order_ops/triton_kernel_wrap.py:412:22: error[unresolved-import] Cannot resolve imported module `triton.runtime.jit`
 torch/_higher_order_ops/triton_kernel_wrap.py:419:18: error[unresolved-import] Cannot resolve imported module `triton._utils`
 torch/_higher_order_ops/triton_kernel_wrap.py:434:37: error[non-subscriptable] Cannot subscript object of type `(...) -> Unknown` with no `__getitem__` method
-torch/_higher_order_ops/triton_kernel_wrap.py:790:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo]` and value of type `None` on object of type `dict[tuple[Any], Any]`
-torch/_higher_order_ops/triton_kernel_wrap.py:791:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo]` and value of type `Any` on object of type `dict[tuple[Any], Any]`
-torch/_higher_order_ops/triton_kernel_wrap.py:792:12: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Any], Any].__getitem__(key: tuple[Any], /) -> Any` cannot be called with key of type `tuple[str, @Todo]` on object of type `dict[tuple[Any], Any]`
-torch/_higher_order_ops/triton_kernel_wrap.py:794:16: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Any], Any].__getitem__(key: tuple[Any], /) -> Any` cannot be called with key of type `tuple[str, @Todo]` on object of type `dict[tuple[Any], Any]`
+torch/_higher_order_ops/triton_kernel_wrap.py:790:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo(StarredExpression)]` and value of type `None` on object of type `dict[tuple[Any], Any]`
+torch/_higher_order_ops/triton_kernel_wrap.py:791:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo(StarredExpression)]` and value of type `Any` on object of type `dict[tuple[Any], Any]`
+torch/_higher_order_ops/triton_kernel_wrap.py:792:12: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Any], Any].__getitem__(key: tuple[Any], /) -> Any` cannot be called with key of type `tuple[str, @Todo(StarredExpression)]` on object of type `dict[tuple[Any], Any]`
+torch/_higher_order_ops/triton_kernel_wrap.py:794:16: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Any], Any].__getitem__(key: tuple[Any], /) -> Any` cannot be called with key of type `tuple[str, @Todo(StarredExpression)]` on object of type `dict[tuple[Any], Any]`
 torch/_higher_order_ops/triton_kernel_wrap.py:973:16: warning[possibly-missing-attribute] Attribute `fn` may be missing on object of type `Unknown | Autotuner | JITFunction`
 torch/_higher_order_ops/triton_kernel_wrap.py:1077:13: warning[possibly-missing-attribute] Attribute `fn` may be missing on object of type `Unknown | Autotuner | JITFunction`
 torch/_higher_order_ops/triton_kernel_wrap.py:1079:13: warning[possibly-missing-attribute] Attribute `configs` may be missing on object of type `Unknown | Autotuner | JITFunction`
@@ -2779,7 +2777,7 @@ torch/_higher_order_ops/while_loop.py:783:20: error[unresolved-attribute] Module
 torch/_higher_order_ops/while_loop.py:783:42: error[unresolved-attribute] Module `torch` has no member `int64`
 torch/_higher_order_ops/while_loop.py:786:13: error[unresolved-attribute] Module `torch` has no member `zeros_like`
 torch/_higher_order_ops/while_loop.py:796:13: error[unresolved-attribute] Module `torch` has no member `cat`
-torch/_higher_order_ops/while_loop.py:887:17: error[invalid-argument-type] Argument to bound method `__call__` is incorrect: Expected `tuple[Tensor | int | float]`, found `tuple[Unknown, @Todo, @Todo]`
+torch/_higher_order_ops/while_loop.py:887:17: error[invalid-argument-type] Argument to bound method `__call__` is incorrect: Expected `tuple[Tensor | int | float]`, found `tuple[Unknown, @Todo(StarredExpression), @Todo(StarredExpression)]`
 torch/_higher_order_ops/wrap.py:9:22: error[unresolved-import] Module `torch._C` has no member `DispatchKey`
 torch/_higher_order_ops/wrap.py:88:20: error[unresolved-attribute] Module `torch` has no member `is_grad_enabled`
 torch/_higher_order_ops/wrap.py:291:28: error[unresolved-attribute] Module `torch._C` has no member `DispatchKey`
@@ -4283,7 +4281,7 @@ torch/_inductor/codegen/mps.py:52:5: error[unresolved-attribute] Module `torch` 
 torch/_inductor/codegen/mps.py:77:12: error[unresolved-attribute] Object of type `Expr` has no attribute `is_integer`
 torch/_inductor/codegen/mps.py:86:16: error[unresolved-attribute] Object of type `Expr` has no attribute `is_integer`
 torch/_inductor/codegen/mps.py:120:12: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
-torch/_inductor/codegen/mps.py:122:20: error[unsupported-operator] Operator `<` is not supported for types `Basic` and `int`, in comparing `Basic` with `Literal[0]`
+torch/_inductor/codegen/mps.py:122:20: error[unsupported-operator] Operator `<` is not supported between objects of type `Basic` and `Literal[0]`
 torch/_inductor/codegen/mps.py:127:82: error[unsupported-operator] Unary operator `-` is unsupported for type `Basic`
 torch/_inductor/codegen/mps.py:145:12: error[unresolved-attribute] Object of type `Expr` has no attribute `is_integer`
 torch/_inductor/codegen/mps.py:177:16: error[unresolved-attribute] Module `torch` has no member `dtype`
@@ -5875,11 +5873,11 @@ torch/_inductor/fx_passes/serialized_patterns/_sfdp_pattern_9.py:203:84: error[u
 torch/_inductor/fx_passes/serialized_patterns/_sfdp_pattern_9.py:218:84: error[unresolved-attribute] Module `torch` has no member `contiguous_format`
 torch/_inductor/fx_passes/split_cat.py:129:23: error[unresolved-attribute] Module `torch` has no member `unbind`
 torch/_inductor/fx_passes/split_cat.py:268:25: error[unresolved-attribute] Module `torch` has no member `unbind`
-torch/_inductor/fx_passes/split_cat.py:294:8: error[unsupported-operator] Operator `<` is not supported for types `Sequence[Divergent]` and `int`, in comparing `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` with `Literal[0]`
+torch/_inductor/fx_passes/split_cat.py:294:8: error[unsupported-operator] Operator `<` is not supported between objects of type `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` and `Literal[0]`
 torch/_inductor/fx_passes/split_cat.py:298:13: error[unresolved-attribute] Module `torch` has no member `unbind`
 torch/_inductor/fx_passes/split_cat.py:309:26: error[unresolved-attribute] Module `torch` has no member `cat`
 torch/_inductor/fx_passes/split_cat.py:309:37: error[unresolved-attribute] Module `torch` has no member `concat`
-torch/_inductor/fx_passes/split_cat.py:344:8: error[unsupported-operator] Operator `<` is not supported for types `Sequence[Divergent]` and `int`, in comparing `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` with `Literal[0]`
+torch/_inductor/fx_passes/split_cat.py:344:8: error[unsupported-operator] Operator `<` is not supported between objects of type `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` and `Literal[0]`
 torch/_inductor/fx_passes/split_cat.py:353:32: error[unresolved-attribute] Module `torch` has no member `cat`
 torch/_inductor/fx_passes/split_cat.py:359:13: error[unresolved-attribute] Module `torch` has no member `cat`
 torch/_inductor/fx_passes/split_cat.py:370:25: error[unresolved-attribute] Module `torch` has no member `stack`
@@ -5939,7 +5937,7 @@ torch/_inductor/fx_passes/split_cat.py:1502:9: error[unresolved-attribute] Modul
 torch/_inductor/fx_passes/split_cat.py:1521:31: error[unresolved-attribute] Module `torch` has no member `cat`
 torch/_inductor/fx_passes/split_cat.py:1609:9: error[unresolved-attribute] Module `torch` has no member `cat`
 torch/_inductor/fx_passes/split_cat.py:1626:31: error[unresolved-attribute] Module `torch` has no member `cat`
-torch/_inductor/fx_passes/split_cat.py:1974:8: error[unsupported-operator] Operator `<` is not supported for types `Sequence[Divergent]` and `int`, in comparing `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` with `Literal[0]`
+torch/_inductor/fx_passes/split_cat.py:1974:8: error[unsupported-operator] Operator `<` is not supported between objects of type `(Any & ~None) | Sequence[Divergent] | Mapping[str, Divergent] | ... omitted 12 union elements` and `Literal[0]`
 torch/_inductor/fx_passes/split_cat.py:2142:16: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/_inductor/fx_passes/split_cat.py:2154:17: error[unresolved-attribute] Module `torch` has no member `permute`
 torch/_inductor/fx_passes/split_cat.py:2157:50: error[unresolved-attribute] Module `torch` has no member `permute`
@@ -6063,7 +6061,7 @@ torch/_inductor/index_propagation.py:156:23: error[unresolved-attribute] Module 
 torch/_inductor/index_propagation.py:174:23: error[unresolved-attribute] Module `torch` has no member `promote_types`
 torch/_inductor/index_propagation.py:179:23: error[unresolved-attribute] Module `torch` has no member `promote_types`
 torch/_inductor/index_propagation.py:234:57: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_inductor/index_propagation.py:336:70: error[invalid-argument-type] Argument to function `statically_known_true` is incorrect: Expected `tuple[tuple[Symbol, ValueRanges[Any]]] | None`, found `tuple[@Todo, @Todo]`
+torch/_inductor/index_propagation.py:336:70: error[invalid-argument-type] Argument to function `statically_known_true` is incorrect: Expected `tuple[tuple[Symbol, ValueRanges[Any]]] | None`, found `tuple[@Todo(StarredExpression), @Todo(StarredExpression)]`
 torch/_inductor/index_propagation.py:338:9: error[invalid-method-override] Invalid override of method `indirect_indexing`: Definition is incompatible with `OpsHandler.indirect_indexing`
 torch/_inductor/inductor_prims.py:25:29: error[unresolved-attribute] Module `torch` has no member `Tag`
 torch/_inductor/inductor_prims.py:59:12: error[unresolved-attribute] Module `torch` has no member `amax`
@@ -6196,7 +6194,7 @@ torch/_inductor/ir.py:2418:16: error[invalid-return-type] Return type does not m
 torch/_inductor/ir.py:2433:52: error[invalid-argument-type] Argument to function `extract_free_symbols` is incorrect: Expected `Sequence[Expr]`, found `Sequence[int | Expr]`
 torch/_inductor/ir.py:2438:17: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_inductor/ir.py:2439:23: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_inductor/ir.py:2492:62: error[unsupported-operator] Operator `>=` is not supported for types `None` and `str`, in comparing `Unknown | None` with `Literal["3.3.0"]`
+torch/_inductor/ir.py:2492:62: error[unsupported-operator] Operator `>=` is not supported between objects of type `Unknown | None` and `Literal["3.3.0"]`
 torch/_inductor/ir.py:2537:17: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_inductor/ir.py:2538:16: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/ir.py:2577:19: error[unresolved-attribute] Module `torch` has no member `dtype`
@@ -6671,10 +6669,10 @@ torch/_inductor/lowering.py:1739:43: error[unresolved-attribute] Module `torch` 
 torch/_inductor/lowering.py:1755:31: error[unresolved-attribute] Module `torch` has no member `int8`
 torch/_inductor/lowering.py:1755:43: error[unresolved-attribute] Module `torch` has no member `uint8`
 torch/_inductor/lowering.py:1883:5: warning[deprecated] The function `check` is deprecated: `torch._prims_common.check` is deprecated and will be removed in the future. Please use `torch._check*` functions instead.
-torch/_inductor/lowering.py:2098:8: error[unsupported-operator] Operator `<` is not supported for types `Basic` and `int`, in comparing `Unknown | Basic` with `Literal[0]`
+torch/_inductor/lowering.py:2098:8: error[unsupported-operator] Operator `<` is not supported between objects of type `Unknown | Basic` and `Literal[0]`
 torch/_inductor/lowering.py:2099:9: error[unsupported-operator] Operator `+=` is unsupported between objects of type `Basic` and `Unknown | int`
-torch/_inductor/lowering.py:2100:12: error[unsupported-operator] Operator `<=` is not supported for types `int` and `Basic`, in comparing `Literal[0]` with `Unknown | Basic`
-torch/_inductor/lowering.py:2100:17: error[unsupported-operator] Operator `<` is not supported for types `Basic` and `int`, in comparing `Unknown | Basic` with `Unknown | int`
+torch/_inductor/lowering.py:2100:12: error[unsupported-operator] Operator `<=` is not supported between objects of type `Literal[0]` and `Unknown | Basic`
+torch/_inductor/lowering.py:2100:17: error[unsupported-operator] Operator `<` is not supported between objects of type `Unknown | Basic` and `Unknown | int`
 torch/_inductor/lowering.py:2155:19: error[unresolved-attribute] Module `torch` has no member `float8_e8m0fnu`
 torch/_inductor/lowering.py:2288:32: error[unresolved-attribute] Module `torch` has no member `int64`
 torch/_inductor/lowering.py:2307:57: error[unresolved-attribute] Module `torch` has no member `int32`
@@ -7227,9 +7225,9 @@ torch/_inductor/scheduler.py:3474:33: warning[possibly-missing-attribute] Submod
 torch/_inductor/scheduler.py:3481:21: warning[possibly-missing-attribute] Submodule `ir` may not be available as an attribute on module `torch._inductor`
 torch/_inductor/scheduler.py:3607:14: error[unresolved-import] Cannot resolve imported module `triton.compiler.errors`
 torch/_inductor/scheduler.py:3667:33: warning[possibly-missing-attribute] Submodule `select_algorithm` may not be available as an attribute on module `torch._inductor`
-torch/_inductor/scheduler.py:3672:29: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `tuple[Any, LambdaFuture | None, ModuleType]`, found `tuple[ChoiceCaller & Unknown, @Todo]`
+torch/_inductor/scheduler.py:3672:29: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `tuple[Any, LambdaFuture | None, ModuleType]`, found `tuple[ChoiceCaller & Unknown, @Todo(StarredExpression)]`
 torch/_inductor/scheduler.py:3722:43: warning[possibly-missing-attribute] Submodule `ir` may not be available as an attribute on module `torch._inductor`
-torch/_inductor/scheduler.py:3745:43: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `tuple[Any, LambdaFuture | None, ModuleType]`, found `tuple[ChoiceCaller & Unknown, @Todo]`
+torch/_inductor/scheduler.py:3745:43: error[invalid-argument-type] Argument to bound method `append` is incorrect: Expected `tuple[Any, LambdaFuture | None, ModuleType]`, found `tuple[ChoiceCaller & Unknown, @Todo(StarredExpression)]`
 torch/_inductor/scheduler.py:4203:49: error[invalid-argument-type] Argument to bound method `statically_known_gt` is incorrect: Expected `Expr`, found `int`
 torch/_inductor/scheduler.py:4628:32: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/scheduler.py:5158:31: warning[possibly-missing-attribute] Attribute `data` may be missing on object of type `(TensorBox & ~TorchBindObject & ~GeneratorState) | (Expr & ~TorchBindObject & ~GeneratorState)`
@@ -7678,10 +7676,10 @@ torch/_library/infer_schema.py:63:18: error[unresolved-attribute] Object of type
 torch/_library/infer_schema.py:132:37: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/infer_schema.py:185:50: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_library/infer_schema.py:187:44: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_library/infer_schema.py:222:80: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm | GenericAlias, str] | tuple[types.UnionType, str]]` is not assignable to `list[tuple[type | _SpecialForm | GenericAlias, str]]`
-torch/_library/infer_schema.py:244:46: error[invalid-argument-type] Argument to function `derived_seq_types` is incorrect: Expected `type | _SpecialForm`, found `types.UnionType`
-torch/_library/infer_schema.py:248:13: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[tuple[type | _SpecialForm | GenericAlias, str]]`, found `GeneratorType[tuple[types.UnionType, str], None, None]`
-torch/_library/infer_schema.py:256:82: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm, str, bool, bool, bool] | tuple[types.UnionType, str, bool, bool, bool] | tuple[<NewType pseudo-class 'OpaqueType'>, str, bool, bool, bool]]` is not assignable to `list[tuple[type | _SpecialForm, str, bool, bool, bool]]`
+torch/_library/infer_schema.py:222:80: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm | GenericAlias, str] | tuple[<types.UnionType special form>, str]]` is not assignable to `list[tuple[type | _SpecialForm | GenericAlias, str]]`
+torch/_library/infer_schema.py:244:46: error[invalid-argument-type] Argument to function `derived_seq_types` is incorrect: Expected `type | _SpecialForm`, found `<types.UnionType special form>`
+torch/_library/infer_schema.py:248:13: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[tuple[type | _SpecialForm | GenericAlias, str]]`, found `GeneratorType[tuple[<types.UnionType special form 'Unknown | None'>, str], None, None]`
+torch/_library/infer_schema.py:256:82: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm, str, bool, bool, bool] | tuple[<types.UnionType special form 'int | float'>, str, bool, bool, bool] | tuple[<NewType pseudo-class 'OpaqueType'>, str, bool, bool, bool]]` is not assignable to `list[tuple[type | _SpecialForm, str, bool, bool, bool]]`
 torch/_library/opaque_object.py:23:36: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/opaque_object.py:26:41: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/opaque_object.py:84:12: error[unresolved-attribute] Module `torch._C` has no member `_make_opaque_object`
@@ -9892,10 +9890,10 @@ torch/_numpy/_funcs_impl.py:329:9: error[unresolved-attribute] Module `torch` ha
 torch/_numpy/_funcs_impl.py:346:12: error[unresolved-attribute] Module `torch` has no member `logspace`
 torch/_numpy/_funcs_impl.py:375:18: error[unresolved-attribute] Module `torch` has no member `float64`
 torch/_numpy/_funcs_impl.py:375:35: warning[possibly-missing-attribute] Attribute `is_complex` may be missing on object of type `(DTypeLike@arange & ~None) | Divergent`
-torch/_numpy/_funcs_impl.py:381:9: error[unsupported-operator] Operator `>` is not supported for types `typing.TypeVar` and `Literal[0]`, in comparing `typing.TypeVar | (int & ~Literal[0]) | float | complex | None` with `Literal[0]`
-torch/_numpy/_funcs_impl.py:381:22: error[unsupported-operator] Operator `>` is not supported for types `typing.TypeVar` and `typing.TypeVar`, in comparing `typing.TypeVar | int | float | complex` with `typing.TypeVar | int | float | complex | None`
-torch/_numpy/_funcs_impl.py:381:40: error[unsupported-operator] Operator `<` is not supported for types `typing.TypeVar` and `Literal[0]`, in comparing `typing.TypeVar | (int & ~Literal[0]) | float | complex | None` with `Literal[0]`
-torch/_numpy/_funcs_impl.py:381:53: error[unsupported-operator] Operator `<` is not supported for types `typing.TypeVar` and `typing.TypeVar`, in comparing `typing.TypeVar | int | float | complex` with `typing.TypeVar | int | float | complex | None`
+torch/_numpy/_funcs_impl.py:381:9: error[unsupported-operator] Operator `>` is not supported between objects of type `(Unknown & ~Literal[0]) | (int & ~Literal[0]) | float | complex | None` and `Literal[0]`
+torch/_numpy/_funcs_impl.py:381:22: error[unsupported-operator] Operator `>` is not supported between objects of type `(Unknown & ~None) | int | float | complex` and `Unknown | int | float | complex | None`
+torch/_numpy/_funcs_impl.py:381:40: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~Literal[0]) | (int & ~Literal[0]) | float | complex | None` and `Literal[0]`
+torch/_numpy/_funcs_impl.py:381:53: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~None) | int | float | complex` and `Unknown | int | float | complex | None`
 torch/_numpy/_funcs_impl.py:383:16: error[unresolved-attribute] Module `torch` has no member `empty`
 torch/_numpy/_funcs_impl.py:385:14: error[unresolved-attribute] Module `torch` has no member `arange`
 torch/_numpy/_funcs_impl.py:402:12: error[unresolved-attribute] Module `torch` has no member `empty`
@@ -16236,8 +16234,6 @@ torch/distributed/_symmetric_memory/_nvshmem_triton.py:1206:38: warning[possibly
 torch/distributed/_tools/fake_collectives.py:14:1: warning[possibly-missing-attribute] Member `batch_isend_irecv` may be missing on module `torch.distributed`
 torch/distributed/_tools/fsdp2_mem_tracker.py:107:31: error[unresolved-attribute] Module `torch` has no member `device`
 torch/distributed/_tools/fsdp2_mem_tracker.py:109:38: error[unresolved-attribute] Module `torch` has no member `device`
-torch/distributed/_tools/fsdp2_mem_tracker.py:449:51: error[invalid-argument-type] Argument to bound method `register_step_pre_hook` is incorrect: Expected `(typing.Self, tuple[Any, ...], dict[str, Any], /) -> tuple[tuple[Any, ...], dict[str, Any]] | None`, found `def _opt_step_pre_hook(optimizer: Optimizer, args: Any, kwargs: Any) -> None`
-torch/distributed/_tools/fsdp2_mem_tracker.py:450:52: error[invalid-argument-type] Argument to bound method `register_step_post_hook` is incorrect: Expected `(typing.Self, tuple[Any, ...], dict[str, Any], /) -> None`, found `def _opt_step_post_hook(optimizer: Optimizer, args: Any, kwargs: Any) -> None`
 torch/distributed/_tools/fsdp2_mem_tracker.py:538:19: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
 torch/distributed/_tools/fsdp2_mem_tracker.py:555:29: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
 torch/distributed/_tools/fsdp2_mem_tracker.py:566:28: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
@@ -16463,7 +16459,7 @@ torch/distributed/checkpoint/_async_process_executor.py:262:17: warning[possibly
 torch/distributed/checkpoint/_async_process_executor.py:262:49: warning[possibly-missing-attribute] Member `Backend` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/_async_process_executor.py:263:13: warning[possibly-missing-attribute] Member `barrier` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/_async_process_executor.py:333:33: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
-torch/distributed/checkpoint/_async_process_executor.py:366:13: error[invalid-argument-type] Argument to bound method `save` is incorrect: Expected `dict[str, typing.TypeVar | Any]`, found `object`
+torch/distributed/checkpoint/_async_process_executor.py:366:13: error[invalid-argument-type] Argument to bound method `save` is incorrect: Expected `dict[str, Unknown]`, found `object`
 torch/distributed/checkpoint/_async_process_executor.py:381:33: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/_async_thread_executor.py:20:29: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/_async_thread_executor.py:55:33: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
@@ -16547,7 +16543,6 @@ torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:50:30: warning[
 torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:64:5: warning[possibly-missing-attribute] Member `init_process_group` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:77:17: warning[deprecated] The function `save_state_dict` is deprecated: `save_state_dict` is deprecated and will be removed in future versions.Please use `save` instead.
 torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:96:17: warning[deprecated] The function `load_state_dict` is deprecated: `load_state_dict` is deprecated and will be removed in future versions. Please use `load` instead.
-torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:109:31: error[invalid-argument-type] Argument to function `optim_state_dict_to_load` is incorrect: Expected `dict[str, Any]`, found `typing.TypeVar | Any`
 torch/distributed/checkpoint/examples/fsdp_checkpoint_example.py:118:5: warning[possibly-missing-attribute] Member `destroy_process_group` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/examples/stateful_example.py:19:43: warning[possibly-missing-import] Member `init_device_mesh` of module `torch.distributed.device_mesh` may be missing
 torch/distributed/checkpoint/examples/stateful_example.py:39:16: error[unresolved-attribute] Module `torch` has no member `rand`
@@ -16558,7 +16553,6 @@ torch/distributed/checkpoint/filesystem.py:342:27: error[unresolved-attribute] M
 torch/distributed/checkpoint/filesystem.py:390:35: error[unresolved-attribute] Module `torch._C` has no member `_get_privateuse1_backend_name`
 torch/distributed/checkpoint/format_utils.py:106:29: warning[possibly-missing-attribute] Member `distributed_c10d` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/format_utils.py:108:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/checkpoint/format_utils.py:108:26: warning[possibly-missing-attribute] Attribute `to` may be missing on object of type `Any | typing.TypeVar`
 torch/distributed/checkpoint/format_utils.py:110:26: error[unresolved-attribute] Module `torch` has no member `empty_like`
 torch/distributed/checkpoint/format_utils.py:112:13: warning[possibly-missing-attribute] Member `broadcast` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/format_utils.py:129:9: error[invalid-method-override] Invalid override of method `set_up_storage_reader`: Definition is incompatible with `StorageReader.set_up_storage_reader`
@@ -16601,9 +16595,6 @@ torch/distributed/checkpoint/optimizer.py:108:18: error[unresolved-attribute] Mo
 torch/distributed/checkpoint/optimizer.py:112:12: error[unresolved-attribute] Module `torch` has no member `empty`
 torch/distributed/checkpoint/optimizer.py:124:43: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/optimizer.py:136:21: warning[possibly-missing-attribute] Member `ProcessGroup` may be missing on module `torch.distributed`
-torch/distributed/checkpoint/optimizer.py:138:29: warning[possibly-missing-attribute] Attribute `size` may be missing on object of type `typing.TypeVar | Any`
-torch/distributed/checkpoint/optimizer.py:139:30: error[invalid-argument-type] Argument to function `_is_nested_tensor` is incorrect: Expected `Tensor`, found `typing.TypeVar | Any`
-torch/distributed/checkpoint/optimizer.py:140:24: warning[possibly-missing-attribute] Attribute `local_shards` may be missing on object of type `typing.TypeVar | Any`
 torch/distributed/checkpoint/optimizer.py:190:29: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/distributed/checkpoint/optimizer.py:193:27: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/distributed/checkpoint/optimizer.py:207:43: error[unresolved-attribute] Module `torch` has no member `Size`
@@ -16863,14 +16854,14 @@ torch/distributed/elastic/rendezvous/api.py:14:31: warning[possibly-missing-impo
 torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:16:31: warning[possibly-missing-import] Member `FileStore` of module `torch.distributed` may be missing
 torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:16:42: warning[possibly-missing-import] Member `Store` of module `torch.distributed` may be missing
 torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:16:49: warning[possibly-missing-import] Member `TCPStore` of module `torch.distributed` may be missing
-torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:90:28: error[invalid-return-type] Return type does not match returned value: expected `tuple[bytes, Any, bool] | None`, found `tuple[@Todo, Literal[False]]`
+torch/distributed/elastic/rendezvous/c10d_rendezvous_backend.py:90:28: error[invalid-return-type] Return type does not match returned value: expected `tuple[bytes, Any, bool] | None`, found `tuple[@Todo(StarredExpression), Literal[False]]`
 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:24:31: warning[possibly-missing-import] Member `Store` of module `torch.distributed` may be missing
 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1105:49: warning[possibly-missing-attribute] Member `Store` may be missing on module `torch.distributed`
 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1126:69: warning[possibly-missing-attribute] Member `TCPStore` may be missing on module `torch.distributed`
 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1127:16: warning[possibly-missing-attribute] Member `TCPStore` may be missing on module `torch.distributed`
 torch/distributed/elastic/rendezvous/dynamic_rendezvous.py:1373:16: warning[possibly-missing-attribute] Member `PrefixStore` may be missing on module `torch.distributed`
 torch/distributed/elastic/rendezvous/etcd_rendezvous_backend.py:20:31: warning[possibly-missing-import] Member `Store` of module `torch.distributed` may be missing
-torch/distributed/elastic/rendezvous/etcd_rendezvous_backend.py:126:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[bytes, Any, bool] | None`, found `tuple[@Todo, Literal[True]]`
+torch/distributed/elastic/rendezvous/etcd_rendezvous_backend.py:126:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[bytes, Any, bool] | None`, found `tuple[@Todo(StarredExpression), Literal[True]]`
 torch/distributed/elastic/rendezvous/etcd_rendezvous_backend.py:130:24: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Unknown | EtcdResult`
 torch/distributed/elastic/rendezvous/etcd_rendezvous_backend.py:140:23: warning[possibly-missing-attribute] Attribute `modifiedIndex` may be missing on object of type `Unknown | EtcdResult`
 torch/distributed/elastic/rendezvous/etcd_store.py:15:31: warning[possibly-missing-import] Member `Store` of module `torch.distributed` may be missing
@@ -18069,7 +18060,7 @@ torch/distributions/bernoulli.py:78:25: warning[possibly-missing-attribute] Attr
 torch/distributions/bernoulli.py:81:26: warning[possibly-missing-attribute] Attribute `expand` may be missing on object of type `Unknown | lazy_property[Unknown, Unknown]`
 torch/distributions/bernoulli.py:88:16: warning[possibly-missing-attribute] Attribute `new` may be missing on object of type `Unknown | lazy_property[Unknown, Unknown] | Tensor`
 torch/distributions/bernoulli.py:92:16: error[invalid-return-type] Return type does not match returned value: expected `Tensor`, found `Unknown | lazy_property[Unknown, Unknown]`
-torch/distributions/bernoulli.py:96:17: error[unsupported-operator] Operator `>=` is not supported for types `lazy_property[Unknown, Unknown]` and `float`, in comparing `Unknown | lazy_property[Unknown, Unknown]` with `float`
+torch/distributions/bernoulli.py:96:17: error[unsupported-operator] Operator `>=` is not supported between objects of type `Unknown | lazy_property[Unknown, Unknown]` and `float`
 torch/distributions/bernoulli.py:102:30: error[unsupported-operator] Operator `-` is unsupported between objects of type `Literal[1]` and `Unknown | lazy_property[Unknown, Unknown]`
 torch/distributions/bernoulli.py:106:32: error[invalid-argument-type] Argument to function `probs_to_logits` is incorrect: Expected `Tensor`, found `Unknown | lazy_property[Unknown, Unknown]`
 torch/distributions/bernoulli.py:110:32: error[invalid-argument-type] Argument to function `logits_to_probs` is incorrect: Expected `Tensor`, found `Unknown | lazy_property[Unknown, Unknown]`
@@ -18354,7 +18345,7 @@ torch/distributions/generalized_pareto.py:139:15: error[unresolved-attribute] Mo
 torch/distributions/generalized_pareto.py:140:16: error[unresolved-attribute] Module `torch` has no member `broadcast_to`
 torch/distributions/generalized_pareto.py:150:17: error[unresolved-attribute] Module `torch` has no member `where`
 torch/distributions/geometric.py:70:27: error[unresolved-attribute] Module `torch` has no member `Size`
-torch/distributions/geometric.py:78:21: error[unsupported-operator] Operator `>` is not supported for types `lazy_property[Unknown, Unknown]` and `int`, in comparing `Unknown | lazy_property[Unknown, Unknown] | Tensor` with `Literal[0]`
+torch/distributions/geometric.py:78:21: error[unsupported-operator] Operator `>` is not supported between objects of type `Unknown | lazy_property[Unknown, Unknown] | Tensor` and `Literal[0]`
 torch/distributions/geometric.py:80:33: warning[possibly-missing-attribute] Attribute `data` may be missing on object of type `Unknown | lazy_property[Unknown, Unknown] | Tensor`
 torch/distributions/geometric.py:83:63: warning[possibly-missing-attribute] Attribute `shape` may be missing on object of type `Unknown | lazy_property[Unknown, Unknown] | Tensor`
 torch/distributions/geometric.py:90:23: error[unresolved-attribute] Module `torch` has no member `Size`
@@ -19012,7 +19003,7 @@ torch/fx/experimental/recording.py:169:56: error[unresolved-attribute] Object of
 torch/fx/experimental/recording.py:245:20: error[unresolved-attribute] Object of type `((...) -> Unknown) & (() -> object)` has no attribute `__name__`
 torch/fx/experimental/schema_type_annotation.py:110:38: error[unresolved-attribute] Module `torch._C` has no member `_jit_try_infer_type`
 torch/fx/experimental/shape_inference/infer_shape.py:53:30: error[unresolved-attribute] Module `torch` has no member `randn`
-torch/fx/experimental/symbolic_shapes.py:253:9: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int | SymInt, int]`, found `tuple[Literal[1], Unknown, int] | tuple[Literal[0], @Todo]`
+torch/fx/experimental/symbolic_shapes.py:253:9: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int | SymInt, int]`, found `tuple[Literal[1], Unknown, int] | tuple[Literal[0], @Todo(StarredExpression)]`
 torch/fx/experimental/symbolic_shapes.py:253:13: warning[possibly-missing-attribute] Attribute `node` may be missing on object of type `int | SymInt`
 torch/fx/experimental/symbolic_shapes.py:326:9: warning[possibly-missing-attribute] Submodule `experimental` may not be available as an attribute on module `torch.fx`
 torch/fx/experimental/symbolic_shapes.py:327:9: warning[possibly-missing-attribute] Submodule `experimental` may not be available as an attribute on module `torch.fx`
@@ -20255,6 +20246,15 @@ torch/nn/modules/flatten.py:48:9: error[unresolved-attribute] Cannot assign obje
 torch/nn/modules/flatten.py:49:9: error[unresolved-attribute] Cannot assign object of type `int` to attribute `end_dim` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/flatten.py:127:9: error[unresolved-attribute] Cannot assign object of type `int | str` to attribute `dim` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/flatten.py:128:9: error[unresolved-attribute] Cannot assign object of type `Unknown | list[int] | tuple[int, ...] | tuple[tuple[str, int]]` to attribute `unflattened_size` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:143:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `output_size` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:144:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `kernel_size` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:145:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `dilation` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:146:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `padding` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:147:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `stride` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:315:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `kernel_size` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:316:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `dilation` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:317:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `padding` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/fold.py:318:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...]` to attribute `stride` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/lazy.py:176:9: error[invalid-assignment] Cannot assign to read-only property `_load_hook` on object of type `_LazyProtocol`: Attempted assignment to `_LazyProtocol._load_hook` here
 torch/nn/modules/lazy.py:178:9: error[invalid-assignment] Cannot assign to read-only property `_initialize_hook` on object of type `_LazyProtocol`: Attempted assignment to `_LazyProtocol._initialize_hook` here
 torch/nn/modules/linear.py:106:9: error[unresolved-attribute] Cannot assign object of type `int` to attribute `in_features` on type `Self@__init__` with custom `__setattr__` method.
@@ -20417,12 +20417,14 @@ torch/nn/modules/transformer.py:1071:72: error[invalid-argument-type] Argument t
 torch/nn/modules/transformer.py:1078:13: error[unresolved-attribute] Cannot assign object of type `(Tensor, /) -> Tensor` to attribute `activation` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/transformer.py:1080:13: error[unresolved-attribute] Cannot assign object of type `((Tensor, /) -> Tensor) & ~str` to attribute `activation` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:161:9: error[unresolved-attribute] Cannot assign object of type `str` to attribute `name` on type `Self@__init__` with custom `__setattr__` method.
-torch/nn/modules/upsampling.py:162:9: error[unresolved-attribute] Cannot assign object of type `@Todo | None` to attribute `size` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/upsampling.py:162:9: error[unresolved-attribute] Cannot assign object of type `int | tuple[int, ...] | None` to attribute `size` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:164:13: error[unresolved-attribute] Cannot assign object of type `tuple[float, ...]` to attribute `scale_factor` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:166:13: error[unresolved-attribute] Cannot assign object of type `float | None` to attribute `scale_factor` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:167:9: error[unresolved-attribute] Cannot assign object of type `str` to attribute `mode` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:168:9: error[unresolved-attribute] Cannot assign object of type `bool | None` to attribute `align_corners` on type `Self@__init__` with custom `__setattr__` method.
 torch/nn/modules/upsampling.py:169:9: error[unresolved-attribute] Cannot assign object of type `bool | None` to attribute `recompute_scale_factor` on type `Self@__init__` with custom `__setattr__` method.
+torch/nn/modules/upsampling.py:177:13: error[invalid-argument-type] Argument to function `interpolate` is incorrect: Expected `int | None`, found `int | tuple[int, ...] | None`
+torch/nn/modules/upsampling.py:178:13: error[invalid-argument-type] Argument to function `interpolate` is incorrect: Expected `list[int | float] | None`, found `int | float | tuple[int | float, ...] | None`
 torch/nn/modules/utils.py:72:21: error[unresolved-attribute] Object of type `object` has no attribute `keys`
 torch/nn/modules/utils.py:83:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `object`
 torch/nn/modules/utils.py:83:48: error[unresolved-attribute] Object of type `object` has no attribute `pop`
@@ -22284,8 +22286,6 @@ torch/optim/optimizer.py:219:55: error[unresolved-attribute] Module `torch` has 
 torch/optim/optimizer.py:219:74: error[unresolved-attribute] Module `torch` has no member `float32`
 torch/optim/optimizer.py:227:45: error[unresolved-attribute] Module `torch._C` has no member `_get_privateuse1_backend_name`
 torch/optim/optimizer.py:381:9: error[unresolved-attribute] Module `torch._C` has no member `_log_api_usage_once`
-torch/optim/optimizer.py:516:39: error[invalid-argument-type] Argument is incorrect: Expected `typing.Self`, found `Optimizer`
-torch/optim/optimizer.py:534:31: error[invalid-argument-type] Argument is incorrect: Expected `typing.Self`, found `Optimizer`
 torch/optim/optimizer.py:546:20: error[unresolved-attribute] Module `torch` has no member `device`
 torch/optim/optimizer.py:546:34: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/optim/optimizer.py:792:39: error[unresolved-attribute] Module `torch` has no member `float32`
@@ -23440,19 +23440,19 @@ torch/utils/_pytree.py:812:12: error[invalid-return-type] Return type does not m
 torch/utils/_pytree.py:865:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[list[tuple[KeyEntry, T@_ordereddict_flatten_with_keys]], Any]`, found `tuple[list[tuple[MappingKey[Unknown, Unknown], Unknown] | Unknown], Any]`
 torch/utils/_pytree.py:890:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[list[tuple[KeyEntry, T@_defaultdict_flatten_with_keys]], Any]`, found `tuple[list[tuple[MappingKey[Unknown, Unknown], Unknown] | Unknown], Any]`
 torch/utils/_pytree.py:949:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[list[tuple[KeyEntry, T@_deque_flatten_with_keys]], Any]`, found `tuple[list[tuple[SequenceKey[Unknown], T@_deque_flatten_with_keys] | Unknown], Any]`
-torch/utils/_pytree.py:1012:34: error[invalid-assignment] Object of type `frozenset[type | Unknown | ((typename: str, field_names: Iterable[str], *, rename: bool = Literal[False], module: str | None = None, defaults: Iterable[Any] | None = None) -> type[tuple[Unknown, ...]])]` is not assignable to `frozenset[type]`
-torch/utils/_pytree.py:1119:30: error[unresolved-attribute] Object of type `typing.Self` has no attribute `num_nodes`
-torch/utils/_pytree.py:1120:31: error[unresolved-attribute] Object of type `typing.Self` has no attribute `num_leaves`
+torch/utils/_pytree.py:1012:34: error[invalid-assignment] Object of type `frozenset[type | Unknown | ((typename: str, field_names: Iterable[str], *, rename: bool = Literal[False], module: str | None = None, defaults: Iterable[Any] | None = None) -> type[tuple[Any, ...]])]` is not assignable to `frozenset[type]`
+torch/utils/_pytree.py:1119:30: error[unresolved-attribute] Special form `typing.Self` has no attribute `num_nodes`
+torch/utils/_pytree.py:1120:31: error[unresolved-attribute] Special form `typing.Self` has no attribute `num_leaves`
 torch/utils/_pytree.py:1131:62: error[too-many-positional-arguments] Too many positional arguments to bound method `__repr__`: expected 1, got 2
 torch/utils/_pytree.py:1135:58: error[too-many-positional-arguments] Too many positional arguments to bound method `__repr__`: expected 1, got 2
-torch/utils/_pytree.py:1167:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children_specs]`, found `list[typing.Self]`
-torch/utils/_pytree.py:1173:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children]`, found `list[typing.Self]`
-torch/utils/_pytree.py:1176:16: error[invalid-return-type] Return type does not match returned value: expected `Self@child`, found `typing.Self`
-torch/utils/_pytree.py:1280:20: error[unresolved-attribute] Object of type `typing.Self` has no attribute `num_leaves`
-torch/utils/_pytree.py:1281:34: error[unresolved-attribute] Object of type `typing.Self` has no attribute `unflatten`
+torch/utils/_pytree.py:1167:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children_specs]`, found `list[<special form 'typing.Self'>]`
+torch/utils/_pytree.py:1173:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children]`, found `list[<special form 'typing.Self'>]`
+torch/utils/_pytree.py:1176:16: error[invalid-return-type] Return type does not match returned value: expected `Self@child`, found `<special form 'typing.Self'>`
+torch/utils/_pytree.py:1280:20: error[unresolved-attribute] Special form `typing.Self` has no attribute `num_leaves`
+torch/utils/_pytree.py:1281:34: error[unresolved-attribute] Special form `typing.Self` has no attribute `unflatten`
 torch/utils/_pytree.py:1341:18: warning[deprecated] The class `LeafSpec` is deprecated: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
 torch/utils/_pytree.py:1344:24: warning[deprecated] The class `LeafSpec` is deprecated: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
-torch/utils/_pytree.py:1917:40: error[invalid-argument-type] Argument to function `_treespec_to_json` is incorrect: Expected `TreeSpec`, found `typing.Self`
+torch/utils/_pytree.py:1917:40: error[invalid-argument-type] Argument to function `_treespec_to_json` is incorrect: Expected `TreeSpec`, found `<special form 'typing.Self'>`
 torch/utils/_stats.py:26:12: error[unresolved-attribute] Object of type `(...) -> _R@count` has no attribute `__qualname__`
 torch/utils/_stats.py:27:33: error[unresolved-attribute] Object of type `(...) -> _R@count` has no attribute `__qualname__`
 torch/utils/_stats.py:28:29: error[unresolved-attribute] Object of type `(...) -> _R@count` has no attribute `__qualname__`
@@ -23523,7 +23523,7 @@ torch/utils/_sympy/printers.py:475:53: error[unresolved-attribute] Object of typ
 torch/utils/_sympy/printers.py:481:53: error[unresolved-attribute] Object of type `Expr` has no attribute `is_integer`
 torch/utils/_sympy/printers.py:487:53: error[unresolved-attribute] Object of type `Expr` has no attribute `is_integer`
 torch/utils/_sympy/printers.py:573:12: error[unresolved-attribute] Object of type `Basic` has no attribute `is_integer`
-torch/utils/_sympy/printers.py:575:16: error[unsupported-operator] Operator `>=` is not supported for types `Basic` and `int`, in comparing `Basic` with `Literal[0]`
+torch/utils/_sympy/printers.py:575:16: error[unsupported-operator] Operator `>=` is not supported between objects of type `Basic` and `Literal[0]`
 torch/utils/_sympy/printers.py:581:86: error[unsupported-operator] Unary operator `-` is unsupported for type `Basic`
 torch/utils/_sympy/reference.py:114:21: error[unresolved-attribute] Module `torch` has no member `float64`
 torch/utils/_sympy/reference.py:222:21: error[unresolved-attribute] Module `torch` has no member `int64`
@@ -23811,6 +23811,7 @@ torch/utils/data/typing.ipynb:cell 10:2:27: error[invalid-return-type] Function 
 torch/utils/data/typing.ipynb:cell 12:6:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[Unknown]`
 torch/utils/data/typing.ipynb:cell 12:10:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[T_co@__iter__]`
 torch/utils/data/typing.ipynb:cell 14:2:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[tuple[T_co@DP, str]]`
+torch/utils/data/typing.ipynb:cell 14:8:9: error[invalid-method-override] Invalid override of method `__iter__`: Definition is incompatible with `IterDataPipe.__iter__`
 torch/utils/data/typing.ipynb:cell 14:8:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[tuple[int | str, str]]`
 torch/utils/data/typing.ipynb:cell 17:2:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[list[int]]`
 torch/utils/data/typing.ipynb:cell 18:2:27: error[invalid-return-type] Function always implicitly returns `None`, which is not assignable to return type `Iterator[Any]`
@@ -23970,4 +23971,4 @@ torch/xpu/random.py:52:18: error[unresolved-attribute] Module `torch` has no mem
 torch/xpu/random.py:54:18: error[unresolved-attribute] Module `torch` has no member `device`
 torch/xpu/streams.py:14:14: error[unresolved-attribute] Module `torch._C` has no member `_XpuStreamBase`
 torch/xpu/streams.py:103:13: error[unresolved-attribute] Module `torch._C` has no member `_XpuEventBase`
-Found 23800 diagnostics
+Found 23801 diagnostics
