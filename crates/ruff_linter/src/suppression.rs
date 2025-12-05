@@ -164,7 +164,7 @@ impl Suppressions {
         false
     }
 
-    pub(crate) fn generate_diagnostics(&self, context: &LintContext, locator: &Locator) {
+    pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
         if !context.is_rule_enabled(Rule::UnusedSuppression) {
             return;
         }
