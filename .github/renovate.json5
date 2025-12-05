@@ -76,14 +76,6 @@
       enabled: false,
     },
     {
-      // `mkdocs-material` requires a manual update to keep the version in sync
-      // with `mkdocs-material-insider`.
-      // See: https://squidfunk.github.io/mkdocs-material/insiders/upgrade/
-      matchManagers: ["pip_requirements"],
-      matchPackageNames: ["mkdocs-material"],
-      enabled: false,
-    },
-    {
       groupName: "pre-commit dependencies",
       matchManagers: ["pre-commit"],
       description: "Weekly update of pre-commit dependencies",
