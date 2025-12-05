@@ -1344,6 +1344,38 @@ static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-a
 static_assert(not is_assignable_to(TypeIs[Any], str))
 ```
 
+## `ParamSpec`
+
+```py
+from ty_extensions import TypeOf, static_assert, is_assignable_to, Unknown
+from typing import ParamSpec, Mapping, Callable, Any
+
+P = ParamSpec("P")
+
+def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
+    static_assert(is_assignable_to(TypeOf[args], tuple[Any, ...]))
+    static_assert(is_assignable_to(TypeOf[args], tuple[object, ...]))
+    static_assert(is_assignable_to(TypeOf[args], tuple[Unknown, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, str]))
+
+    static_assert(not is_assignable_to(tuple[Any, ...], TypeOf[args]))
+    static_assert(not is_assignable_to(tuple[object, ...], TypeOf[args]))
+    static_assert(not is_assignable_to(tuple[Unknown, ...], TypeOf[args]))
+
+    static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Any]))
+    static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Unknown]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, object]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, int]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Any]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, object]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Unknown]))
+
+    static_assert(not is_assignable_to(dict[str, Any], TypeOf[kwargs]))
+    static_assert(not is_assignable_to(dict[str, object], TypeOf[kwargs]))
+    static_assert(not is_assignable_to(dict[str, Unknown], TypeOf[kwargs]))
+```
+
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [typing documentation]: https://typing.python.org/en/latest/spec/concepts.html#the-assignable-to-or-consistent-subtyping-relation

@@ -17,13 +17,16 @@ use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -937,6 +940,9 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
         if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
         }
+        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
+            write!(f, ".{paramspec_attr}")?;
+        }
         Ok(())
     }
 }
@@ -1298,7 +1304,12 @@ impl<'db> DisplayGenericContext<'_, 'db> {
                 f.write_str(", ")?;
             }
             f.set_invalid_syntax();
-            f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+            let typevar = bound_typevar.typevar(self.db);
+            if typevar.is_paramspec(self.db) {
+                write!(f, "**{}", typevar.name(self.db))?;
+            } else {
+                f.write_str(typevar.name(self.db))?;
+            }
         }
         f.write_char(']')
     }
@@ -1459,6 +1470,7 @@ impl<'db> CallableType<'db> {
     ) -> DisplayCallableType<'a, 'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
+            kind: self.kind(db),
             db,
             settings,
         }
@@ -1467,6 +1479,7 @@ impl<'db> CallableType<'db> {
 
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
+    kind: CallableTypeKind,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1474,9 +1487,18 @@ pub(crate) struct DisplayCallableType<'a, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.signatures.overloads.as_slice() {
-            [signature] => signature
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            [signature] => {
+                if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                    signature
+                        .parameters()
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                } else {
+                    signature
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             signatures => {
                 // TODO: How to display overloads?
                 if !self.settings.multiline {
@@ -1552,73 +1574,11 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         f.set_invalid_syntax();
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
-        let multiline = self.settings.multiline && self.parameters.len() > 1;
-        // Opening parenthesis
-        f.write_char('(')?;
-        if multiline {
-            f.write_str("\n    ")?;
-        }
-        if self.parameters.is_gradual() {
-            // We represent gradual form as `...` in the signature, internally the parameters still
-            // contain `(*args, **kwargs)` parameters.
-            f.write_str("...")?;
-        } else {
-            let mut star_added = false;
-            let mut needs_slash = false;
-            let mut first = true;
-            let arg_separator = if multiline { ",\n    " } else { ", " };
 
-            for parameter in self.parameters.as_slice() {
-                // Handle special separators
-                if !star_added && parameter.is_keyword_only() {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('*')?;
-                    star_added = true;
-                    first = false;
-                }
-                if parameter.is_positional_only() {
-                    needs_slash = true;
-                } else if needs_slash {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('/')?;
-                    needs_slash = false;
-                    first = false;
-                }
-
-                // Add comma before parameter if not first
-                if !first {
-                    f.write_str(arg_separator)?;
-                }
-
-                // Write parameter with range tracking
-                let param_name = parameter
-                    .display_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
-                parameter
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
-
-                first = false;
-            }
-
-            if needs_slash {
-                if !first {
-                    f.write_str(arg_separator)?;
-                }
-                f.write_char('/')?;
-            }
-        }
-
-        if multiline {
-            f.write_char('\n')?;
-        }
-        // Closing parenthesis
-        f.write_char(')')?;
+        // Parameters
+        self.parameters
+            .display_with(self.db, self.settings.clone())
+            .fmt_detailed(&mut f)?;
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
@@ -1644,6 +1604,120 @@ pub(crate) struct SignatureDisplayDetails {
     pub parameter_ranges: Vec<TextRange>,
     /// Names of the parameters in order
     pub parameter_names: Vec<String>,
+}
+
+impl<'db> Parameters<'db> {
+    fn display_with<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> DisplayParameters<'a, 'db> {
+        DisplayParameters {
+            parameters: self,
+            db,
+            settings,
+        }
+    }
+}
+
+struct DisplayParameters<'a, 'db> {
+    parameters: &'a Parameters<'db>,
+    db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
+        // display them as `**P` instead, so avoid multiline in that case.
+        // TODO: This might change once we support `Concatenate`
+        let multiline = self.settings.multiline
+            && self.parameters.len() > 1
+            && !matches!(
+                self.parameters.kind(),
+                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
+            );
+        // Opening parenthesis
+        f.write_char('(')?;
+        if multiline {
+            f.write_str("\n    ")?;
+        }
+        match self.parameters.kind() {
+            ParametersKind::Standard => {
+                let mut star_added = false;
+                let mut needs_slash = false;
+                let mut first = true;
+                let arg_separator = if multiline { ",\n    " } else { ", " };
+
+                for parameter in self.parameters.as_slice() {
+                    // Handle special separators
+                    if !star_added && parameter.is_keyword_only() {
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+                        f.write_char('*')?;
+                        star_added = true;
+                        first = false;
+                    }
+                    if parameter.is_positional_only() {
+                        needs_slash = true;
+                    } else if needs_slash {
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+                        f.write_char('/')?;
+                        needs_slash = false;
+                        first = false;
+                    }
+
+                    // Add comma before parameter if not first
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+
+                    // Write parameter with range tracking
+                    let param_name = parameter
+                        .display_name()
+                        .map(|name| name.to_string())
+                        .unwrap_or_default();
+                    parameter
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                    first = false;
+                }
+
+                if needs_slash {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('/')?;
+                }
+            }
+            ParametersKind::Gradual => {
+                // We represent gradual form as `...` in the signature, internally the parameters still
+                // contain `(*args, **kwargs)` parameters.
+                f.write_str("...")?;
+            }
+            ParametersKind::ParamSpec(typevar) => {
+                write!(f, "**{}", typevar.name(self.db))?;
+                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
+                    write!(f, "@{name}")?;
+                }
+            }
+        }
+        if multiline {
+            f.write_char('\n')?;
+        }
+        // Closing parenthesis
+        f.write_char(')')
+    }
+}
+
+impl Display for DisplayParameters<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
 }
 
 impl<'db> Parameter<'db> {
