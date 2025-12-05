@@ -37,14 +37,16 @@ class MDTestRunner:
     mdtest_executable: Path | None
     console: Console
     filters: list[str]
+    enable_external: bool
 
-    def __init__(self, filters: list[str] | None = None) -> None:
+    def __init__(self, filters: list[str] | None, enable_external: bool) -> None:
         self.mdtest_executable = None
         self.console = Console()
         self.filters = [
             f.removesuffix(".md").replace("/", "_").replace("-", "_")
             for f in (filters or [])
         ]
+        self.enable_external = enable_external
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -120,6 +122,7 @@ class MDTestRunner:
                 CLICOLOR_FORCE="1",
                 INSTA_FORCE_PASS="1",
                 INSTA_OUTPUT="none",
+                MDTEST_EXTERNAL="1" if self.enable_external else "0",
             ),
             capture_output=capture_output,
             text=True,
@@ -266,11 +269,19 @@ def main() -> None:
         nargs="*",
         help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
     )
+    parser.add_argument(
+        "--enable-external",
+        "-e",
+        action="store_true",
+        help="Enable tests with external dependencies",
+    )
 
     args = parser.parse_args()
 
     try:
-        runner = MDTestRunner(filters=args.filters)
+        runner = MDTestRunner(
+            filters=args.filters, enable_external=args.enable_external
+        )
         runner.watch()
     except KeyboardInterrupt:
         print()
