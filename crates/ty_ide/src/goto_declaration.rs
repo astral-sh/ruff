@@ -2622,16 +2622,12 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): this should only highlight `subpkg` in the import statement
-        // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
-        // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
-        // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> mypackage/__init__.py:2:1
+         --> mypackage/__init__.py:2:7
           |
         2 | from .subpkg.submod import val
-          | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |       ^^^^^^
         3 |
         4 | x = subpkg
           |
@@ -2846,25 +2842,26 @@ def ab(a: int, *, c: int): ...
             )
             .build();
 
-        // TODO(submodule-imports): Ok this one is FASCINATING and it's kinda right but confusing!
+        // TODO(submodule-imports): Ok this one is FASCINATING but definitely wrong!
         //
         // So there's 3 relevant definitions here:
         //
-        // * `subpkg: int = 10` in the other file is in fact the original definition
+        // * `subpkg: int = 10` in the other file is in fact the original definition.
+        //    Including it here is accurate and possibly useful?
         //
         // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
         //    because it's a `DefinitionKind::ImportFromSubmodle`.
-        //    This is the span that covers the entire import.
+        //    Including it here is Pedantically Correct but Unhelpful.
         //
         // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
-        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
-        //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
+        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition.
+        //    This is the most important one and doesn't show up at all! Sadness!
         assert_snapshot!(test.goto_declaration(), @r"
         info[goto-declaration]: Declaration
-         --> mypackage/__init__.py:2:1
+         --> mypackage/__init__.py:2:7
           |
         2 | from .subpkg import subpkg
-          | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+          |       ^^^^^^
         3 |
         4 | x = subpkg
           |

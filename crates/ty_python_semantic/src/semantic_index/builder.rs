@@ -1529,7 +1529,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     // Record whether this is equivalent to `from . import ...`
                     is_self_import = module_name == thispackage;
 
-                    if node.module.is_some()
+                    if let Some(module_node) = &node.module
                         && let Some(relative_submodule) = module_name.relative_to(&thispackage)
                         && let Some(direct_submodule) = relative_submodule.components().next()
                         && !self.seen_submodule_imports.contains(direct_submodule)
@@ -1540,9 +1540,23 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                         let direct_submodule_name = Name::new(direct_submodule);
                         let symbol = self.add_symbol(direct_submodule_name);
+
+                        let module_index = if node.level == 0 {
+                            // "whatever.thispackage.x.y" we want `x`
+                            thispackage.components().count()
+                        } else {
+                            // ".x.y" we want `x` (level 1 => index 0)
+                            // "..x.y" we want `y` (level 2 => index 1)
+                            // (The Identifier doesn't include the prefix dots)
+                            node.level as usize - 1
+                        };
                         self.add_definition(
                             symbol.into(),
-                            ImportFromSubmoduleDefinitionNodeRef { node },
+                            ImportFromSubmoduleDefinitionNodeRef {
+                                node,
+                                module: module_node,
+                                module_index,
+                            },
                         );
                     }
                 }
