@@ -367,3 +367,129 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
         # TODO: Should be `Foo`
         reveal_type(a)  # revealed: Bar
 ```
+
+## Generic type narrowing with `TypeIs`
+
+```py
+from typing import Union, Generic, TypeVar
+from typing_extensions import TypeIs
+
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
+
+class Ok(Generic[T]):
+    def __init__(self, value: T):
+        self._value = value
+
+    @property
+    def ok_value(self) -> T:
+        return self._value
+
+class Err(Generic[E]):
+    def __init__(self, error: E):
+        self._error = error
+
+    @property
+    def err_value(self) -> E:
+        return self._error
+
+Result = Union[Ok[T], Err[E]]
+
+def is_err(result: Result[T, E]) -> TypeIs[Err[E]]:
+    return isinstance(result, Err)
+
+def some_function() -> Result[int, Exception]:
+    return Err(Exception("error"))
+
+def use_function() -> None:
+    result = some_function()
+
+    if is_err(result):
+        reveal_type(result)  # revealed: Err[Exception]
+        reveal_type(result.err_value)  # revealed: Exception
+        return None
+
+    # After narrowing: Ok[int] with negative constraint
+    reveal_type(result)  # revealed: Ok[int] & ~Err[Exception]
+    reveal_type(result.ok_value)  # revealed: int
+```
+
+## Generic union specialization without `TypeIs`
+
+```py
+from typing import Union, Generic, TypeVar
+
+T = TypeVar('T', covariant=True)
+E = TypeVar('E', covariant=True)
+
+
+class Ok(Generic[T]):
+    def __init__(self, value: T):
+        self._value = value
+    
+    @property
+    def ok_value(self) -> T:
+        return self._value
+    
+    def is_err(self) -> bool:
+        return False
+
+
+class Err(Generic[E]):
+    def __init__(self, error: E):
+        self._error = error
+    
+    @property
+    def err_value(self) -> E:
+        return self._error
+    
+    def is_err(self) -> bool:
+        return True
+
+
+def err_kind(result: Union[Ok[T], Err[E]]) -> E | None:
+    pass
+
+# ------------------------------------------------------------
+
+def f(result: Union[Ok[int], Err[Exception]]):
+    reveal_type(err_kind(result))  # revealed: Exception | None
+```
+
+## Shared typevar across union elements
+
+When a typevar appears in multiple union elements, the constraint solver should not
+attempt to infer it, as this would be unsound.
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class A(Generic[T]): ...
+class B(Generic[T]): ...
+
+def g(x: A[T] | B[T]) -> T: ...  # error: [invalid-return-type]
+
+def test_shared_typevar(x: A[int] | B[str]):
+    # T appears in both A[T] and B[T], so it should not be inferred
+    # as int | str (which would be unsound). Our confinement check catches this.
+    reveal_type(g(x))  # revealed: Unknown
+```
+
+## Typevar in multiple structural positions
+
+When a typevar appears both bare and nested, inference should be conservative.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def h(x: T | list[T]) -> T: ...  # error: [invalid-return-type]
+
+def test_nested_typevar(x: int | list[int]):
+    # T appears both as T and in list[T]. Our confinement check prevents
+    # inferring T = int | list[int], which would be wrong.
+    reveal_type(h(x))  # revealed: Unknown
+```
