@@ -7,7 +7,6 @@ use ruff_index::{IndexSlice, IndexVec};
 
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
-use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
 
@@ -28,6 +27,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
+use crate::{FxHashMap, FxHashSet};
 
 pub mod ast_ids;
 mod builder;

@@ -5,10 +5,9 @@
 
 use bitflags::bitflags;
 use ruff_db::diagnostic::Annotation;
-use rustc_hash::FxHashSet;
 
 use crate::{
-    Db,
+    Db, FxHashSet,
     lint::LintId,
     place::Place,
     semantic_index::{
@@ -56,8 +55,8 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_members_of_scope(db, scope).collect();
 
-    for member in own_class_members {
-        check_class_declaration(context, configuration, class_specialized, scope, &member);
+    for member in own_class_members.unstable_iter() {
+        check_class_declaration(context, configuration, class_specialized, scope, member);
     }
 }
 

@@ -12806,6 +12806,7 @@ impl<'db> ModuleLiteralType<'db> {
     }
 
     /// Get the submodule attributes we believe to be defined on this module.
+    /// This is an unstable iterator.
     ///
     /// Note that `ModuleLiteralType` is per-importing-file, so this analysis
     /// includes "imports the importing file has performed".
@@ -12859,7 +12860,7 @@ impl<'db> ModuleLiteralType<'db> {
     fn available_submodule_attributes(&self, db: &'db dyn Db) -> impl Iterator<Item = Name> {
         self.importing_file(db)
             .into_iter()
-            .flat_map(|file| imported_modules(db, file))
+            .flat_map(|file| imported_modules(db, file).unstable_iter())
             .filter_map(|submodule_name| submodule_name.relative_to(self.module(db).name(db)))
             .filter_map(|relative_submodule| relative_submodule.components().next().map(Name::from))
     }

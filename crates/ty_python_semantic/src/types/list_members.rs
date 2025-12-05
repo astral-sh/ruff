@@ -8,10 +8,9 @@
 use std::cmp::Ordering;
 
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
 
 use crate::{
-    Db, NameKind,
+    Db, FxHashSet, NameKind,
     place::{
         Place, PlaceWithDefinition, imported_symbol, place_from_bindings, place_from_declarations,
     },
@@ -113,7 +112,8 @@ impl<'db> AllMembers<'db> {
                     .iter()
                     .map(|ty| AllMembers::of(db, *ty).members)
                     .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .unstable_into_iter(),
             ),
 
             Type::Intersection(intersection) => self.members.extend(
@@ -122,7 +122,8 @@ impl<'db> AllMembers<'db> {
                     .iter()
                     .map(|ty| AllMembers::of(db, *ty).members)
                     .reduce(|acc, members| acc.union(&members).cloned().collect())
-                    .unwrap_or_default(),
+                    .unwrap_or_default()
+                    .unstable_into_iter(),
             ),
 
             Type::NominalInstance(instance) => {
@@ -203,7 +204,8 @@ impl<'db> AllMembers<'db> {
                                 .reduce(|acc, members| {
                                     acc.intersection(&members).cloned().collect()
                                 })
-                                .unwrap_or_default(),
+                                .unwrap_or_default()
+                                .unstable_into_iter(),
                         );
                     }
                 }

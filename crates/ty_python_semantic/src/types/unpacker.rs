@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
+use crate::FxHashMap;
 use ruff_db::parsed::ParsedModuleRef;
-use rustc_hash::FxHashMap;
 
 use ruff_python_ast::{self as ast, AnyNodeRef};
 
@@ -245,7 +245,7 @@ impl<'db> UnpackResult<'db> {
         previous_cycle_result: &UnpackResult<'db>,
         cycle: &salsa::Cycle,
     ) -> Self {
-        for (expr, ty) in &mut self.targets {
+        for (expr, ty) in self.targets.unstable_iter_mut() {
             let previous_ty = previous_cycle_result.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }

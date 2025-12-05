@@ -10,6 +10,7 @@ use crate::suppression::{
 };
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
+pub use hash::{FxHashMap, FxHashSet};
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
     KnownModule, Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules,
@@ -21,7 +22,7 @@ pub use program::{
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;
-use rustc_hash::FxHasher;
+pub use rustc_hash::{FxBuildHasher, FxHasher};
 pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
@@ -37,6 +38,7 @@ pub use types::ide_support::{
 pub mod ast_node_ref;
 mod db;
 mod dunder_all;
+mod hash;
 pub mod lint;
 pub(crate) mod list;
 mod module_name;

@@ -207,7 +207,7 @@ impl TestCase {
         let mut expected: HashSet<_> = expected.into_iter().collect();
 
         let actual = self.db().project().files(self.db());
-        for file in &actual {
+        for file in actual.unstable_iter() {
             assert!(
                 expected.remove(&file),
                 "Indexed project files contains '{}' which was not expected.",

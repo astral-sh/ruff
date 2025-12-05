@@ -26,9 +26,8 @@ use ruff_python_ast::{
     name::Name,
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
-use rustc_hash::FxHashMap;
 
-use crate::{Db, module_name::ModuleName, resolve_module};
+use crate::{Db, FxHashMap, module_name::ModuleName, resolve_module};
 
 fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()
@@ -79,7 +78,7 @@ impl<'db> ExportFinder<'db> {
         match self.dunder_all {
             DunderAll::NotPresent => self
                 .exports
-                .into_iter()
+                .unstable_into_iter()
                 .filter_map(|(name, kind)| {
                     if kind == PossibleExportKind::StubImportWithoutRedundantAlias {
                         return None;
@@ -90,7 +89,7 @@ impl<'db> ExportFinder<'db> {
                     Some(name.clone())
                 })
                 .collect(),
-            DunderAll::Present => self.exports.into_keys().cloned().collect(),
+            DunderAll::Present => self.exports.unstable_into_keys().cloned().collect(),
         }
     }
 }

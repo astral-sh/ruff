@@ -2,12 +2,11 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 
 use indexmap::IndexMap;
-use rustc_hash::FxBuildHasher;
 
-use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
 use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, SpecialFormType, Type};
+use crate::{Db, FxBuildHasher};
 
 /// The inferred method resolution order of a given class.
 ///

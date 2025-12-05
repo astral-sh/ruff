@@ -2,13 +2,13 @@ use std::marker::PhantomData;
 use std::ops::Deref;
 use std::sync::Arc;
 
-use rustc_hash::FxHashSet;
 use salsa::Setter;
 
 use ruff_db::files::File;
 
 use crate::db::Db;
 use crate::{IOErrorDiagnostic, Project};
+use ty_python_semantic::FxHashSet;
 
 /// The indexed files of a project.
 ///
@@ -164,6 +164,10 @@ impl Indexed<'_> {
     pub(super) fn len(&self) -> usize {
         self.inner.files.len()
     }
+
+    pub fn unstable_iter(&self) -> IndexedIter<'_> {
+        self.inner.files.unstable_iter().copied()
+    }
 }
 
 impl Deref for Indexed<'_> {
@@ -175,15 +179,6 @@ impl Deref for Indexed<'_> {
 }
 
 pub(super) type IndexedIter<'a> = std::iter::Copied<std::collections::hash_set::Iter<'a, File>>;
-
-impl<'a> IntoIterator for &'a Indexed<'_> {
-    type Item = File;
-    type IntoIter = IndexedIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.inner.files.iter().copied()
-    }
-}
 
 /// A Mutable view of a project's indexed files.
 ///
@@ -251,12 +246,10 @@ impl Drop for IndexedMut<'_> {
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
-
-    use crate::ProjectMetadata;
     use crate::db::Db;
     use crate::db::tests::TestDb;
     use crate::files::Index;
+    use crate::{FxHashSet, ProjectMetadata};
     use ruff_db::files::system_path_to_file;
     use ruff_db::system::{DbWithWritableSystem as _, SystemPathBuf};
     use ruff_python_ast::name::Name;
@@ -288,8 +281,8 @@ mod tests {
             }
             Index::Indexed(files_2) => {
                 assert_eq!(
-                    files_2.iter().collect::<Vec<_>>(),
-                    files.iter().collect::<Vec<_>>()
+                    files_2.unstable_iter().collect::<Vec<_>>(),
+                    files.unstable_iter().collect::<Vec<_>>()
                 );
             }
         }

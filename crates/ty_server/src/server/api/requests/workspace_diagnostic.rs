@@ -14,9 +14,9 @@ use lsp_types::{
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::File;
 use ruff_db::source::source_text;
-use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use ty_project::{ProgressReporter, ProjectDatabase};
+use ty_python_semantic::FxHashMap;
 
 use crate::PositionEncoding;
 use crate::document::DocumentKey;
@@ -453,7 +453,9 @@ impl<'a> ResponseWriter<'a> {
 
         // Handle files that had diagnostics in previous request but no longer have any
         // Any remaining entries in previous_results are files that were fixed
-        for (key, (previous_url, previous_result_id)) in self.previous_result_ids {
+        for (key, (previous_url, previous_result_id)) in
+            self.previous_result_ids.unstable_into_iter()
+        {
             // This file had diagnostics before but doesn't now, so we need to report it as having no diagnostics
             let version = self
                 .index

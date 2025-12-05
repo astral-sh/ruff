@@ -4,7 +4,6 @@ use ruff_python_ast::{self as ast, ExprStringLiteral, ModExpression};
 use ruff_python_ast::{Expr, ExprRef, HasNodeIndex, name::Name};
 use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
-use rustc_hash::FxHashMap;
 
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
@@ -13,7 +12,7 @@ use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::list_members::{Member, all_members, all_members_of_scope};
 use crate::types::{Type, binding_type, infer_scope_types};
-use crate::{Db, resolve_real_shadowable_module};
+use crate::{Db, FxHashMap, resolve_real_shadowable_module};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -164,7 +163,7 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for Member { name, ty } in all_members(self.db, ty) {
+        for Member { name, ty } in all_members(self.db, ty).unstable_into_iter() {
             completions.push(Completion {
                 name,
                 ty: Some(ty),
@@ -198,7 +197,7 @@ impl<'db> SemanticModel<'db> {
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
         let ty = node.value.inferred_type(self);
         all_members(self.db, ty)
-            .into_iter()
+            .unstable_into_iter()
             .map(|member| Completion {
                 name: member.name,
                 ty: Some(member.ty),

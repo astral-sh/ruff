@@ -78,7 +78,7 @@ pub(crate) fn references(
     // Check if the symbol is potentially visible outside of this module
     if search_across_files && is_symbol_externally_visible(goto_target) {
         // Look for references in all other files within the workspace
-        for other_file in &db.project().files(db) {
+        for other_file in db.project().files(db).unstable_iter() {
             // Skip the current file as we already processed it
             if other_file == file {
                 continue;

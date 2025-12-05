@@ -1,5 +1,3 @@
-use rustc_hash::FxHashSet;
-
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
@@ -8,7 +6,7 @@ use ruff_python_ast::{self as ast};
 
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
-use crate::{Db, ModuleName, resolve_module};
+use crate::{Db, FxHashSet, ModuleName, resolve_module};
 
 fn dunder_all_names_cycle_initial(
     _db: &dyn Db,
@@ -103,7 +101,8 @@ impl<'db> DunderAllNamesCollector<'db> {
                     // The module either does not have a `__all__` variable or it is invalid.
                     return false;
                 };
-                self.names.extend(module_dunder_all_names.iter().cloned());
+                self.names
+                    .extend(module_dunder_all_names.unstable_iter().cloned());
                 true
             }
 
@@ -240,7 +239,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
 
                         if all_names.contains(&Name::new_static("__all__")) {
                             self.update_origin(DunderAllOrigin::StarImport);
-                            self.names.extend(all_names.iter().cloned());
+                            self.names.extend(all_names.unstable_iter().cloned());
                         }
                     } else {
                         // `from module import __all__`
@@ -270,7 +269,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                         };
 
                         self.update_origin(DunderAllOrigin::ExternalModule);
-                        self.names.extend(all_names.iter().cloned());
+                        self.names.extend(all_names.unstable_iter().cloned());
                     }
                 }
             }

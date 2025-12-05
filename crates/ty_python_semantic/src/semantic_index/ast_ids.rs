@@ -1,10 +1,9 @@
-use rustc_hash::FxHashMap;
-
 use ruff_index::newtype_index;
 use ruff_python_ast as ast;
 use ruff_python_ast::ExprRef;
 
 use crate::Db;
+use crate::FxHashMap;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;

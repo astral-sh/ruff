@@ -1,9 +1,9 @@
+use crate::FxHasher;
 use bitflags::bitflags;
 use hashbrown::hash_table::Entry;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::{self as ast, name::Name};
 use ruff_text_size::{TextLen as _, TextRange, TextSize};
-use rustc_hash::FxHasher;
 use smallvec::SmallVec;
 use std::hash::{Hash, Hasher as _};
 use std::ops::{Deref, DerefMut};

@@ -6,8 +6,8 @@ use std::str::FromStr;
 
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
-use rustc_hash::FxHashMap;
 
+use crate::FxHashMap;
 use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
@@ -222,7 +222,7 @@ impl FromStr for TypeshedVersions {
 
 impl fmt::Display for TypeshedVersions {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let sorted_items: BTreeMap<&ModuleName, &PyVersionRange> = self.0.iter().collect();
+        let sorted_items: BTreeMap<&ModuleName, &PyVersionRange> = self.0.unstable_iter().collect();
         for (module_name, range) in sorted_items {
             writeln!(f, "{module_name}: {range}")?;
         }

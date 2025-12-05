@@ -7,7 +7,6 @@ use std::ops::Range;
 
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use rayon::ThreadPoolBuilder;
-use rustc_hash::FxHashSet;
 
 use ruff_benchmark::TestFile;
 use ruff_db::diagnostic::{Diagnostic, DiagnosticId, Severity};
@@ -18,7 +17,7 @@ use ruff_python_ast::PythonVersion;
 use ty_project::metadata::options::{EnvironmentOptions, Options};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ChangedKind};
-use ty_project::{CheckMode, Db, ProjectDatabase, ProjectMetadata};
+use ty_project::{CheckMode, Db, FxHashSet, ProjectDatabase, ProjectMetadata};
 
 struct Case {
     db: ProjectDatabase,

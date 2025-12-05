@@ -4,9 +4,9 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::walk_directory::{ErrorKind, WalkDirectoryBuilder, WalkState};
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PySourceType;
-use rustc_hash::FxHashSet;
 use std::path::PathBuf;
 use thiserror::Error;
+use ty_python_semantic::FxHashSet;
 
 /// Filter that decides which files are included in the project.
 ///

@@ -6,10 +6,9 @@ use crate::types::{
     BoundMethodType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
     Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, module_resolver::KnownModule};
+use crate::{Db, FxHashSet, module_resolver::KnownModule};
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
-use rustc_hash::FxHashSet;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.

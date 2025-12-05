@@ -1,11 +1,11 @@
 use crate::session::client::ClientResponseHandler;
 use lsp_server::RequestId;
-use rustc_hash::FxHashMap;
 use std::cell::{Cell, OnceCell, RefCell};
 use std::fmt::Formatter;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
 use std::time::Instant;
+use ty_python_semantic::FxHashMap;
 
 /// Tracks the pending requests between client and server.
 pub(crate) struct RequestQueue {

@@ -68,8 +68,8 @@ use lsp_types::{
     WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
-use rustc_hash::FxHashMap;
 use tempfile::TempDir;
+use ty_python_semantic::FxHashMap;
 
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 

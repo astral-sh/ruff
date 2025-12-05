@@ -1,4 +1,3 @@
-use crate::Db;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::place::{PlaceExpr, PlaceTable, ScopedPlaceId};
 use crate::semantic_index::place_table;
@@ -15,6 +14,7 @@ use crate::types::{
     SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
     TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
+use crate::{Db, FxHashMap};
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -22,7 +22,6 @@ use ruff_python_stdlib::identifiers::is_identifier;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
-use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
 use super::UnionType;
@@ -280,7 +279,7 @@ fn merge_constraints_and<'db>(
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from {
+    for (key, value) in from.unstable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = IntersectionBuilder::new(db)
@@ -300,7 +299,7 @@ fn merge_constraints_or<'db>(
     from: &NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
-    for (key, value) in from {
+    for (key, value) in from.unstable_iter() {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
                 *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
@@ -310,7 +309,7 @@ fn merge_constraints_or<'db>(
             }
         }
     }
-    for (key, value) in into.iter_mut() {
+    for (key, value) in into.unstable_iter_mut() {
         if !from.contains_key(key) {
             *value = Type::object();
         }

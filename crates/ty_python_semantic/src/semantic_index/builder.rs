@@ -2,7 +2,6 @@ use std::cell::{OnceCell, RefCell};
 use std::sync::Arc;
 
 use except_handlers::TryNodeContextStackManager;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_db::files::File;
 use ruff_db::parsed::ParsedModuleRef;
@@ -50,7 +49,7 @@ use crate::semantic_index::use_def::{
 use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestorsIter};
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
-use crate::{Db, Program};
+use crate::{Db, FxHashMap, FxHashSet, Program};
 
 mod except_handlers;
 
@@ -475,7 +474,7 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
         if !symbol.is_reassigned() {
             return;
         }
-        for (key, snapshot_id) in &self.enclosing_snapshots {
+        for (key, snapshot_id) in self.enclosing_snapshots.unstable_iter() {
             if let Some(enclosing_symbol) = key.enclosing_place.as_symbol() {
                 let name = self.place_tables[key.enclosing_scope]
                     .symbol(enclosing_symbol)
