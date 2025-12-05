@@ -610,6 +610,19 @@ lambda x, y, z: (  # leading eol body
 )
 
 (
+    lambda  # comment 1
+    # comment 2
+    *args, **kwargs: # comment 3
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment 1
+    *args, **kwargs: # comment 3
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3
@@ -651,3 +664,8 @@ foo(
 )
 
 transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).between(left, right).between(left, right)  # trailing comment
+
+(
+    lambda:  # comment
+    1
+)
