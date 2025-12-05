@@ -1700,8 +1700,15 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
-        self.annotated_type = Some(annotated_type);
+    pub(crate) fn with_annotated_type(self, annotated_type: Type<'db>) -> Self {
+        self.with_optional_annotated_type(Some(annotated_type))
+    }
+
+    pub(crate) fn with_optional_annotated_type(
+        mut self,
+        annotated_type: Option<Type<'db>>,
+    ) -> Self {
+        self.annotated_type = annotated_type;
         self
     }
 

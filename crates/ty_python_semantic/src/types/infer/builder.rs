@@ -2447,29 +2447,66 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
     }
 
-    fn infer_parameters(&mut self, parameters: &ast::Parameters) {
+    fn infer_parameters(&mut self, parameters: &ast::Parameters) -> Vec<Parameter<'db>> {
         let ast::Parameters {
             range: _,
             node_index: _,
-            posonlyargs: _,
-            args: _,
+            posonlyargs,
+            args,
             vararg,
-            kwonlyargs: _,
+            kwonlyargs,
             kwarg,
         } = parameters;
 
-        for param_with_default in parameters.iter_non_variadic_params() {
-            self.infer_parameter_with_default(param_with_default);
+        let mut parameters = Vec::new();
+
+        for positional_only in posonlyargs {
+            let parameter_name = positional_only.parameter.name.id.clone();
+            let parameter_type = self.infer_parameter_with_default(positional_only);
+            let parameter = Parameter::positional_only(Some(parameter_name))
+                .with_optional_annotated_type(parameter_type);
+            parameters.push(parameter);
         }
+
+        for positional_or_keyword in args {
+            let parameter_name = positional_or_keyword.parameter.name.id.clone();
+            let parameter_type = self.infer_parameter_with_default(positional_or_keyword);
+            let parameter = Parameter::positional_or_keyword(parameter_name)
+                .with_optional_annotated_type(parameter_type);
+            parameters.push(parameter);
+        }
+
         if let Some(vararg) = vararg {
-            self.infer_parameter(vararg);
+            let parameter_name = vararg.name.id.clone();
+            let parameter_type = self.infer_parameter(vararg);
+            let parameter =
+                Parameter::variadic(parameter_name).with_optional_annotated_type(parameter_type);
+            parameters.push(parameter);
         }
+
+        for keyword_only in kwonlyargs {
+            let parameter_name = keyword_only.parameter.name.id.clone();
+            let parameter_type = self.infer_parameter_with_default(keyword_only);
+            let parameter = Parameter::keyword_only(parameter_name)
+                .with_optional_annotated_type(parameter_type);
+            parameters.push(parameter);
+        }
+
         if let Some(kwarg) = kwarg {
-            self.infer_parameter(kwarg);
+            let parameter_name = kwarg.name.id.clone();
+            let parameter_type = self.infer_parameter(kwarg);
+            let parameter = Parameter::keyword_variadic(parameter_name)
+                .with_optional_annotated_type(parameter_type);
+            parameters.push(parameter);
         }
+
+        parameters
     }
 
-    fn infer_parameter_with_default(&mut self, parameter_with_default: &ast::ParameterWithDefault) {
+    fn infer_parameter_with_default(
+        &mut self,
+        parameter_with_default: &ast::ParameterWithDefault,
+    ) -> Option<Type<'db>> {
         let ast::ParameterWithDefault {
             range: _,
             node_index: _,
@@ -2502,9 +2539,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
         }
+
+        annotated.map(|annotated| annotated.inner_type())
     }
 
-    fn infer_parameter(&mut self, parameter: &ast::Parameter) {
+    fn infer_parameter(&mut self, parameter: &ast::Parameter) -> Option<Type<'db>> {
         let ast::Parameter {
             range: _,
             node_index: _,
@@ -2512,10 +2551,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation,
         } = parameter;
 
-        self.infer_optional_annotation_expression(
+        let annotated = self.infer_optional_annotation_expression(
             annotation.as_deref(),
             self.defer_annotations().into(),
         );
+
+        annotated.map(|annotated| annotated.inner_type())
     }
 
     /// Set initial declared type (if annotated) and inferred type for a function-parameter symbol,
