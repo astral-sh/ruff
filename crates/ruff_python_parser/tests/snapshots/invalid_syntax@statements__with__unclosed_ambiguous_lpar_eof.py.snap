@@ -19,12 +19,13 @@ Module(
                         WithItem {
                             range: 5..6,
                             node_index: NodeIndex(None),
-                            context_expr: Name(
-                                ExprName {
+                            context_expr: Tuple(
+                                ExprTuple {
                                     node_index: NodeIndex(None),
-                                    range: 6..6,
-                                    id: Name(""),
-                                    ctx: Invalid,
+                                    range: 5..6,
+                                    elts: [],
+                                    ctx: Load,
+                                    parenthesized: true,
                                 },
                             ),
                             optional_vars: None,
