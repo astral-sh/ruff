@@ -1432,7 +1432,7 @@ result = func(10, y=20)
     fn rename_overloaded_function() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "lib1.py",
                 r#"
                 from typing import overload, Any
 
@@ -1448,9 +1448,9 @@ result = func(10, y=20)
                 "#,
             )
             .source(
-                "mypackage/subpkg/__init__.py",
+                "main.py",
                 r#"
-                from lib import test
+                from lib2 import test
 
                 test("test")
                 "#,
@@ -1459,7 +1459,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 1 locations)
-         --> mypackage/__init__.py:5:5
+         --> lib1.py:5:5
           |
         4 | @overload
         5 | def test() -> None: ...
@@ -1474,7 +1474,7 @@ result = func(10, y=20)
     fn rename_property() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "lib.py",
                 r#"
                 class Foo:
                     @property
@@ -1483,9 +1483,9 @@ result = func(10, y=20)
                 "#,
             )
             .source(
-                "mypackage/subpkg/__init__.py",
+                "main.py",
                 r#"
-                from mypackage import Foo
+                from lib import Foo
 
                 print(Foo().my_property)
                 "#,
@@ -1494,7 +1494,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 2 locations)
-         --> mypackage/__init__.py:4:9
+         --> lib.py:4:9
           |
         2 | class Foo:
         3 |     @property
@@ -1502,9 +1502,9 @@ result = func(10, y=20)
           |         ^^^^^^^^^^^
         5 |         return 42
           |
-         ::: mypackage/subpkg/__init__.py:4:13
+         ::: main.py:4:13
           |
-        2 | from mypackage import Foo
+        2 | from lib import Foo
         3 |
         4 | print(Foo().my_property)
           |             -----------
@@ -1518,7 +1518,7 @@ result = func(10, y=20)
     fn rename_property_with_setter() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "lib.py",
                 r#"
                 class Foo:
                     @property
@@ -1531,9 +1531,9 @@ result = func(10, y=20)
                 "#,
             )
             .source(
-                "mypackage/subpkg/__init__.py",
+                "main.py",
                 r#"
-                from mypackage import Foo
+                from lib import Foo
 
                 print(Foo().my_property)
                 Foo().my_property = 56
@@ -1543,7 +1543,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 4 locations)
-         --> mypackage/__init__.py:4:9
+         --> lib.py:4:9
           |
         2 | class Foo:
         3 |     @property
@@ -1556,9 +1556,9 @@ result = func(10, y=20)
         8 |     def my_property(self, value: int) -> None:
         9 |         pass
           |
-         ::: mypackage/subpkg/__init__.py:4:13
+         ::: main.py:4:13
           |
-        2 | from mypackage import Foo
+        2 | from lib import Foo
         3 |
         4 | print(Foo().my_property)
           |             -----------
@@ -1574,7 +1574,7 @@ result = func(10, y=20)
     fn rename_property_with_deleter() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "lib.py",
                 r#"
                 class Foo:
                     @property
@@ -1587,9 +1587,9 @@ result = func(10, y=20)
                 "#,
             )
             .source(
-                "mypackage/subpkg/__init__.py",
+                "main.py",
                 r#"
-                from mypackage import Foo
+                from lib import Foo
 
                 print(Foo().my_property)
                 del Foo().my_property
@@ -1599,7 +1599,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 4 locations)
-         --> mypackage/__init__.py:4:9
+         --> lib.py:4:9
           |
         2 | class Foo:
         3 |     @property
@@ -1612,9 +1612,9 @@ result = func(10, y=20)
         8 |     def my_property(self) -> None:
         9 |         pass
           |
-         ::: mypackage/subpkg/__init__.py:4:13
+         ::: main.py:4:13
           |
-        2 | from mypackage import Foo
+        2 | from lib import Foo
         3 |
         4 | print(Foo().my_property)
           |             -----------
@@ -1631,7 +1631,7 @@ result = func(10, y=20)
     fn rename_property_with_setter_and_deleter() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "lib.py",
                 r#"
                 class Foo:
                     @property
@@ -1648,9 +1648,9 @@ result = func(10, y=20)
                 "#,
             )
             .source(
-                "mypackage/subpkg/__init__.py",
+                "main.py",
                 r#"
-                from mypackage import Foo
+                from lib import Foo
 
                 print(Foo().my_property)
                 Foo().my_property = 56
@@ -1661,7 +1661,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 6 locations)
-          --> mypackage/__init__.py:4:9
+          --> lib.py:4:9
            |
          2 | class Foo:
          3 |     @property
@@ -1679,9 +1679,9 @@ result = func(10, y=20)
         12 |     def my_property(self) -> None:
         13 |         pass
            |
-          ::: mypackage/subpkg/__init__.py:4:13
+          ::: main.py:4:13
            |
-         2 | from mypackage import Foo
+         2 | from lib import Foo
          3 |
          4 | print(Foo().my_property)
            |             -----------
@@ -1942,7 +1942,7 @@ result = func(10, y=20)
     fn rename_attribute() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "foo.py",
                 r#"
                 class Test:
                     attribute<CURSOR>: str
@@ -1965,7 +1965,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r#"
         info[rename]: Rename symbol (found 5 locations)
-          --> mypackage/__init__.py:3:5
+          --> foo.py:3:5
            |
          2 | class Test:
          3 |     attribute: str
@@ -1980,7 +1980,7 @@ result = func(10, y=20)
         10 |         return self.attribute
            |                     ---------
            |
-          ::: mypackage/__init__.py:15:9
+          ::: foo.py:15:9
            |
         13 | c = Child("test")
         14 |
@@ -1998,7 +1998,7 @@ result = func(10, y=20)
     fn rename_implicit_attribute() {
         let test = CursorTest::builder()
             .source(
-                "mypackage/__init__.py",
+                "main.py",
                 r#"
                 class Test:
                     def __init__(self, value: str):
@@ -2023,7 +2023,7 @@ result = func(10, y=20)
 
         assert_snapshot!(test.rename("better_name"), @r"
         info[rename]: Rename symbol (found 1 locations)
-         --> mypackage/__init__.py:4:14
+         --> main.py:4:14
           |
         2 | class Test:
         3 |     def __init__(self, value: str):
