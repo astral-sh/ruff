@@ -15,14 +15,18 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::EitherOrBoth;
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::scope::NodeWithScopeRef;
+use crate::semantic_index::semantic_index;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::function::InferredFunctionSignature;
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, MaterializationKind,
-    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    NormalizedVisitor, TypeContext, TypeMapping, TypeRelation, VarianceInferable,
+    infer_deferred_types, infer_scope_types, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -395,18 +399,41 @@ impl<'db> Signature<'db> {
         pep695_generic_context: Option<GenericContext<'db>>,
         definition: Definition<'db>,
         function_node: &ast::StmtFunctionDef,
+        inferred_signature: Option<InferredFunctionSignature<'db>>,
+        defaults: &[Option<Type<'db>>],
         has_implicitly_positional_first_parameter: bool,
     ) -> Self {
-        let mut parameters =
-            Parameters::from_parameters(db, definition, function_node.parameters.as_ref());
+        let mut inferred_signature = inferred_signature
+            .or_else(|| {
+                let file = definition.file(db);
+                let index = semantic_index(db, file);
+                let file_scope = index
+                    .try_node_scope(NodeWithScopeRef::FunctionTypeParameters(function_node))?;
+                let scope = file_scope.to_scope_id(db, file);
+                infer_scope_types(db, scope).inferred_function_signature()
+            })
+            .or_else(|| infer_deferred_types(db, definition).inferred_function_signature())
+            .expect("should have an inferred function signature");
+
+        let mut defaults = defaults.into_iter();
+        for parameter in &mut inferred_signature.parameters {
+            parameter.update_default_type(|| {
+                defaults
+                    .next()
+                    .expect("should have optional default for each non-variadic parameter")
+                    .map(|ty| ty.replace_parameter_defaults(db))
+            });
+        }
+        let mut parameters = Parameters::new(db, inferred_signature.parameters);
         parameters
             .find_pep484_positional_only_parameters(has_implicitly_positional_first_parameter);
-        let return_ty = function_node
-            .returns
-            .as_ref()
-            .map(|returns| definition_expression_type(db, definition, returns.as_ref()));
-        let legacy_generic_context =
-            GenericContext::from_function_params(db, definition, &parameters, return_ty);
+
+        let legacy_generic_context = GenericContext::from_function_params(
+            db,
+            definition,
+            &parameters,
+            inferred_signature.return_type,
+        );
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
             db,
             pep695_generic_context,
@@ -417,7 +444,7 @@ impl<'db> Signature<'db> {
             generic_context: full_generic_context,
             definition: Some(definition),
             parameters,
-            return_ty,
+            return_ty: inferred_signature.return_type,
         }
     }
 
@@ -1394,96 +1421,6 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    fn from_parameters(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        parameters: &ast::Parameters,
-    ) -> Self {
-        let ast::Parameters {
-            posonlyargs,
-            args,
-            vararg,
-            kwonlyargs,
-            kwarg,
-            range: _,
-            node_index: _,
-        } = parameters;
-
-        let default_type = |param: &ast::ParameterWithDefault| {
-            param.default().map(|default| {
-                definition_expression_type(db, definition, default).replace_parameter_defaults(db)
-            })
-        };
-
-        let positional_only = posonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOnly {
-                    name: Some(arg.parameter.name.id.clone()),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-
-        let positional_or_keyword = args.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::PositionalOrKeyword {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-
-        let variadic = vararg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                arg,
-                ParameterKind::Variadic {
-                    name: arg.name.id.clone(),
-                },
-            )
-        });
-
-        let keyword_only = kwonlyargs.iter().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                &arg.parameter,
-                ParameterKind::KeywordOnly {
-                    name: arg.parameter.name.id.clone(),
-                    default_type: default_type(arg),
-                },
-            )
-        });
-
-        let keywords = kwarg.as_ref().map(|arg| {
-            Parameter::from_node_and_kind(
-                db,
-                definition,
-                arg,
-                ParameterKind::KeywordVariadic {
-                    name: arg.name.id.clone(),
-                },
-            )
-        });
-
-        Self::new(
-            db,
-            positional_only
-                .into_iter()
-                .chain(positional_or_keyword)
-                .chain(variadic)
-                .chain(keyword_only)
-                .chain(keywords),
-        )
-    }
-
     pub(crate) fn find_pep484_positional_only_parameters(
         &mut self,
         has_implicitly_positional_first_parameter: bool,
@@ -1724,6 +1661,15 @@ impl<'db> Parameter<'db> {
         self
     }
 
+    pub(crate) fn update_default_type(&mut self, default: impl FnOnce() -> Option<Type<'db>>) {
+        match &mut self.kind {
+            ParameterKind::PositionalOnly { default_type, .. }
+            | ParameterKind::PositionalOrKeyword { default_type, .. }
+            | ParameterKind::KeywordOnly { default_type, .. } => *default_type = default(),
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => {}
+        }
+    }
+
     pub(crate) fn type_form(mut self) -> Self {
         self.form = ParameterForm::Type;
         self
@@ -1881,22 +1827,6 @@ impl<'db> Parameter<'db> {
             kind,
             form: *form,
         })
-    }
-
-    fn from_node_and_kind(
-        db: &'db dyn Db,
-        definition: Definition<'db>,
-        parameter: &ast::Parameter,
-        kind: ParameterKind<'db>,
-    ) -> Self {
-        Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
-            kind,
-            form: ParameterForm::Value,
-            inferred_annotation: false,
-        }
     }
 
     /// Returns `true` if this is a keyword-only parameter.

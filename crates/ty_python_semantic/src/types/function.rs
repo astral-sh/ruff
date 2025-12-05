@@ -77,7 +77,7 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
-use crate::types::signatures::{CallableSignature, Signature};
+use crate::types::signatures::{CallableSignature, Parameter, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
@@ -196,6 +196,12 @@ pub(crate) fn is_implicit_classmethod(function_name: &str) -> bool {
     matches!(function_name, "__init_subclass__" | "__class_getitem__")
 }
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
+pub struct InferredFunctionSignature<'db> {
+    pub(crate) parameters: Vec<Parameter<'db>>,
+    pub(crate) return_type: Option<Type<'db>>,
+}
+
 /// Representation of a function definition in the AST: either a non-generic function, or a generic
 /// function that has not been specialized.
 ///
@@ -228,6 +234,11 @@ pub struct OverloadLiteral<'db> {
     /// The arguments to `dataclass_transformer`, if this function was annotated
     /// with `@dataclass_transformer(...)`.
     pub(crate) dataclass_transformer_params: Option<DataclassTransformerParams<'db>>,
+
+    inferred_signature: Option<InferredFunctionSignature<'db>>,
+
+    #[returns(ref)]
+    inferred_defaults: Vec<Option<Type<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -248,6 +259,8 @@ impl<'db> OverloadLiteral<'db> {
             self.decorators(db),
             self.deprecated(db),
             Some(params),
+            self.inferred_signature(db),
+            self.inferred_defaults(db),
         )
     }
 
@@ -505,6 +518,8 @@ impl<'db> OverloadLiteral<'db> {
             pep695_ctx,
             definition,
             function_stmt_node,
+            self.inferred_signature(db),
+            self.inferred_defaults(db),
             has_implicitly_positional_first_parameter,
         );
 

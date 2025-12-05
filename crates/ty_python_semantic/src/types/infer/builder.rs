@@ -16,9 +16,9 @@ use smallvec::SmallVec;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    InferenceRegion, InferredFunctionSignature, ScopeInference, ScopeInferenceExtra,
-    infer_deferred_types, infer_definition_types, infer_expression_types,
-    infer_same_file_expression_type, infer_unpack_types,
+    InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
+    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
+    infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
@@ -83,8 +83,8 @@ use crate::types::diagnostic::{
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_comparison,
 };
 use crate::types::function::{
-    FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
-    is_implicit_classmethod, is_implicit_staticmethod,
+    FunctionDecorators, FunctionLiteral, FunctionType, InferredFunctionSignature, KnownFunction,
+    OverloadLiteral, is_implicit_classmethod, is_implicit_staticmethod,
 };
 use crate::types::generics::{
     GenericContext, InferableTypeVars, LegacyGenericBase, SpecializationBuilder, bind_typevar,
@@ -2289,7 +2289,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
-        let _defaults: Vec<_> = parameters
+        let defaults: Vec<_> = parameters
             .iter_non_variadic_params()
             .map(|param| {
                 param
@@ -2301,9 +2301,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If there are type params, parameters and returns are evaluated in that scope, that is, in
         // `infer_function_type_params`, rather than here.
-        if type_params.is_none() {
+        let inferred_signature = if type_params.is_none() {
             if self.defer_annotations() {
                 self.deferred.insert(definition, self.multi_inference_state);
+                None
             } else {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
@@ -2317,8 +2318,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     return_type,
                 });
                 self.typevar_binding_context = previous_typevar_binding_context;
+                self.signature.clone()
             }
-        }
+        } else {
+            None
+        };
 
         let known_function =
             KnownFunction::try_from_definition_and_name(self.db(), definition, name);
@@ -2341,6 +2345,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             function_decorators,
             deprecated,
             dataclass_transformer_params,
+            inferred_signature,
+            defaults,
         );
         let function_literal = FunctionLiteral::new(self.db(), overload_literal);
 

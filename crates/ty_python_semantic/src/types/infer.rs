@@ -49,9 +49,8 @@ use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::diagnostic::TypeCheckDiagnostics;
-use crate::types::function::FunctionType;
+use crate::types::function::{FunctionType, InferredFunctionSignature};
 use crate::types::generics::Specialization;
-use crate::types::signatures::Parameter;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
     ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, declaration_type,
@@ -527,12 +526,6 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
-struct InferredFunctionSignature<'db> {
-    parameters: Vec<Parameter<'db>>,
-    return_type: Option<Type<'db>>,
-}
-
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
@@ -616,13 +609,10 @@ impl<'db> ScopeInference<'db> {
         extra.string_annotations.contains(&expression.into())
     }
 
-    pub(crate) fn inferred_function_signature(
-        &self,
-    ) -> Option<(Vec<Parameter<'db>>, Option<Type<'db>>)> {
+    pub(crate) fn inferred_function_signature(&self) -> Option<InferredFunctionSignature<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.signature.as_ref())
-            .map(|signature| (signature.parameters.clone(), signature.return_type))
+            .and_then(|extra| extra.signature.as_ref().cloned())
     }
 }
 
@@ -801,13 +791,10 @@ impl<'db> DefinitionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
 
-    pub(crate) fn inferred_function_signature(
-        &self,
-    ) -> Option<(Vec<Parameter<'db>>, Option<Type<'db>>)> {
+    pub(crate) fn inferred_function_signature(&self) -> Option<InferredFunctionSignature<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.signature.as_ref())
-            .map(|signature| (signature.parameters.clone(), signature.return_type))
+            .and_then(|extra| extra.signature.as_ref().cloned())
     }
 }
 
