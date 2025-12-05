@@ -1427,6 +1427,44 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    fn add_type_mappings_from_constraint_set(
+        &mut self,
+        constraints: ConstraintSet<'db>,
+        variance: TypeVarVariance,
+        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) {
+        constraints.for_each_path(self.db, |path| {
+            for constraint in path.positive_constraints() {
+                let typevar = constraint.typevar(self.db);
+                let lower = constraint.lower(self.db);
+                let upper = constraint.upper(self.db);
+                let upper_has_noninferable_typevar = any_over_type(
+                    self.db,
+                    upper,
+                    &|ty| {
+                        ty.as_typevar().is_some_and(|bound_typevar| {
+                            !bound_typevar.is_inferable(self.db, self.inferable)
+                        })
+                    },
+                    false,
+                );
+                if !upper.is_object() && !upper_has_noninferable_typevar {
+                    self.add_type_mapping(typevar, upper, variance, &mut f);
+                }
+                if typevar.is_inferable(self.db, self.inferable)
+                    && let Type::TypeVar(lower_bound_typevar) = lower
+                {
+                    self.add_type_mapping(
+                        lower_bound_typevar,
+                        Type::TypeVar(typevar),
+                        variance,
+                        &mut f,
+                    );
+                }
+            }
+        });
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
@@ -1692,37 +1730,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 actual_signature,
                                 self.inferable,
                             );
-
-                            when.for_each_path(self.db, |path| {
-                                for constraint in path.positive_constraints() {
-                                    let typevar = constraint.typevar(self.db);
-                                    let lower = constraint.lower(self.db);
-                                    let upper = constraint.upper(self.db);
-                                    let upper_has_noninferable_typevar = any_over_type(
-                                        self.db,
-                                        upper,
-                                        &|ty| {
-                                            ty.as_typevar().is_some_and(|bound_typevar| {
-                                                !bound_typevar.is_inferable(self.db, self.inferable)
-                                            })
-                                        },
-                                        false,
-                                    );
-                                    if !upper.is_object() && !upper_has_noninferable_typevar {
-                                        self.add_type_mapping(typevar, upper, polarity, &mut f);
-                                    }
-                                    if typevar.is_inferable(self.db, self.inferable)
-                                        && let Type::TypeVar(lower_bound_typevar) = lower
-                                    {
-                                        self.add_type_mapping(
-                                            lower_bound_typevar,
-                                            Type::TypeVar(typevar),
-                                            polarity,
-                                            &mut f,
-                                        );
-                                    }
-                                }
-                            });
+                            self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
                         }
                     }
                 }
