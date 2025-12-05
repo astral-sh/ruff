@@ -683,6 +683,9 @@ def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
     # Callable that we create for it.
     # TODO: revealed: GenericClass[str]
-    # revealed: Unknown
+    # TODO: no errors
+    # revealed: GenericClass[T@GenericClass]
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
     reveal_type(accepts_callable(GenericClass)(x, x))
 ```
