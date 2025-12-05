@@ -1153,13 +1153,17 @@ impl<'db> Signature<'db> {
                 other.parameters.as_paramspec(),
             ) {
                 (Some(self_bound_typevar), Some(other_bound_typevar)) => {
-                    return ConstraintSet::constrain_typevar(
+                    result.intersect(
                         db,
-                        self_bound_typevar,
-                        Type::TypeVar(other_bound_typevar),
-                        Type::TypeVar(other_bound_typevar),
-                        relation,
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            self_bound_typevar,
+                            Type::TypeVar(other_bound_typevar),
+                            Type::TypeVar(other_bound_typevar),
+                            relation,
+                        ),
                     );
+                    return result;
                 }
 
                 (Some(self_bound_typevar), None) => {
@@ -1168,13 +1172,17 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new(other.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
                     ));
-                    return ConstraintSet::constrain_typevar(
+                    result.intersect(
                         db,
-                        self_bound_typevar,
-                        Type::Never,
-                        upper,
-                        relation,
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            self_bound_typevar,
+                            Type::Never,
+                            upper,
+                            relation,
+                        ),
                     );
+                    return result;
                 }
 
                 (None, Some(other_bound_typevar)) => {
@@ -1183,13 +1191,17 @@ impl<'db> Signature<'db> {
                         CallableSignature::single(Signature::new(self.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
                     ));
-                    return ConstraintSet::constrain_typevar(
+                    result.intersect(
                         db,
-                        other_bound_typevar,
-                        lower,
-                        Type::object(),
-                        relation,
+                        ConstraintSet::constrain_typevar(
+                            db,
+                            other_bound_typevar,
+                            lower,
+                            Type::object(),
+                            relation,
+                        ),
                     );
+                    return result;
                 }
 
                 (None, None) => {}
