@@ -658,13 +658,18 @@ class ClassWithOverloadedInit[T]:
     def __init__(self: "ClassWithOverloadedInit[str]", x: str) -> None: ...
     def __init__(self, x: int | str) -> None: ...
 
-# TODO: These unions are because we don't handle the ParamSpec in accepts_callable, so when
-# inferring a specialization through the Callable we lose the information about how the parameter
-# types distinguish the two overloads.
+# TODO: The old solver cannot handle this overloaded constructor. The ideal solution is that we
+# would solve **P once, and map it to the entire overloaded signature of the constructor. This
+# mapping would have to include the return types, since there are different return types for each
+# overload. We would then also have to determine that R must be equal to the return type of **P's
+# solution.
+
 # TODO: revealed: ClassWithOverloadedInit[int]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
 # TODO: revealed: ClassWithOverloadedInit[str]
+# TODO: no [invalid-argument-type]
+# error: [invalid-argument-type]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
