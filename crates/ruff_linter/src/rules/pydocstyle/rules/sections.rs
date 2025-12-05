@@ -1238,7 +1238,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
-/// - [Python - Unpack for keyword arguments¶](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
+/// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
