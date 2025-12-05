@@ -164,34 +164,46 @@ impl Suppressions {
     }
 
     pub(crate) fn generate_diagnostics(&self, context: &LintContext, locator: &Locator) {
-        if context.is_rule_enabled(Rule::UnusedSuppression) {
-            for suppression in &self.valid {
-                if !suppression.used {
-                    for comment in &suppression.comments {
-                        let edit = if comment.codes.len() == 1 {
-                            delete_comment(comment.range, locator)
-                        } else {
-                            let code_index = comment
-                                .codes
-                                .iter()
-                                .position(|range| locator.slice(range) == suppression.code)
-                                .unwrap();
-                            let code_range = if code_index < (comment.codes.len() - 1) {
-                                TextRange::new(
-                                    comment.codes[code_index].start(),
-                                    comment.codes[code_index + 1].start(),
-                                )
-                            } else {
-                                comment.codes[code_index]
-                            };
-                            Edit::range_deletion(code_range)
-                        };
+        if !context.is_rule_enabled(Rule::UnusedSuppression) {
+            return;
+        }
 
-                        let mut diagnostic = context
-                            .report_diagnostic(UnusedSuppression, suppression.comments[0].range);
-                        diagnostic.set_fix(Fix::safe_edit(edit));
-                    }
-                }
+        let unused = self.valid.iter().filter(|suppression| !suppression.used);
+
+        for suppression in unused {
+            let Ok(rule) = Rule::from_code(&suppression.code) else {
+                continue; // TODO: invalid code
+            };
+            if !context.is_rule_enabled(rule) {
+                continue; // don't count disabled rules as unused
+            }
+            for comment in &suppression.comments {
+                let mut range = comment.range;
+                let edit = if comment.codes.len() == 1 {
+                    delete_comment(comment.range, locator)
+                } else {
+                    let code_index = comment
+                        .codes
+                        .iter()
+                        .position(|range| locator.slice(range) == suppression.code)
+                        .unwrap();
+                    range = comment.codes[code_index];
+                    let code_range = if code_index < (comment.codes.len() - 1) {
+                        TextRange::new(
+                            comment.codes[code_index].start(),
+                            comment.codes[code_index + 1].start(),
+                        )
+                    } else {
+                        TextRange::new(
+                            comment.codes[code_index - 1].end(),
+                            comment.codes[code_index].end(),
+                        )
+                    };
+                    Edit::range_deletion(code_range)
+                };
+
+                let mut diagnostic = context.report_diagnostic(UnusedSuppression, range);
+                diagnostic.set_fix(Fix::safe_edit(edit));
             }
         }
     }
