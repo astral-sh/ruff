@@ -121,32 +121,40 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 write!(f, [space()])?;
             }
             // In preview, always parenthesize the body if there are dangling comments.
-            else if is_parenthesize_lambda_bodies_enabled(f.context()) {
+            else if preview {
                 let (dangling_end_of_line, dangling_own_line) = dangling.split_at(
                     dangling
                         .iter()
                         .position(|comment| comment.line_position().is_own_line())
                         .unwrap_or(dangling.len()),
                 );
-                return write!(
-                    f,
-                    [
-                        space(),
-                        token("("),
-                        trailing_comments(dangling_end_of_line),
-                        block_indent(&format_args!(
-                            leading_comments(dangling_own_line),
-                            body.format().with_options(Parentheses::Never)
-                        )),
-                        token(")")
-                    ]
-                );
+
+                let fmt_body = format_with(|f: &mut PyFormatter| {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            token("("),
+                            trailing_comments(dangling_end_of_line),
+                            block_indent(&format_args!(
+                                leading_comments(dangling_own_line),
+                                body.format().with_options(Parentheses::Never)
+                            )),
+                            token(")")
+                        ]
+                    )
+                });
+
+                return match self.layout {
+                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+                    ExprLambdaLayout::Default => fmt_body.fmt(f),
+                };
             } else {
                 write!(f, [dangling_comments(dangling)])?;
             }
         }
 
-        if is_parenthesize_lambda_bodies_enabled(f.context()) {
+        if preview {
             let body_comments = comments.leading_dangling_trailing(&**body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
                 // If the body has comments, we always want to preserve the parentheses. This also
