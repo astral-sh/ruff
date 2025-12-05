@@ -293,7 +293,8 @@ TwoParamSpec[int, str]
 ```
 
 Specializing `ParamSpec` type variable using `typing.Any` isn't explicitly allowed by the spec but
-both mypy and Pyright allow this and there are usages of this in the wild e.g., `staticmethod[Any, Any]`.
+both mypy and Pyright allow this and there are usages of this in the wild e.g.,
+`staticmethod[Any, Any]`.
 
 ```py
 reveal_type(TypeVarAndParamSpec[int, Any]().attr)  # revealed: (...) -> int
