@@ -232,11 +232,13 @@ raise OsError("") from a.aaaaa(
     aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
 ).a(aaaa)
 
-raise OsError(
-    "sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllllllll"
-) from a.aaaaa(
-    aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
-).a(aaaa)
+raise OsError("sökdjffffsldkfjlhsakfjhalsökafhsöfdahsödfjösaaksjdllllllllllllll") from (
+    a
+    .aaaaa(
+        aksjdhflsakhdflkjsadlfajkslhfdkjsaldajlahflashdfljahlfksajlhfajfjfsaahflakjslhdfkjalhdskjfa
+    )
+    .a(aaaa)
+)
 
 a1 = Blog.objects.filter(entry__headline__contains="Lennon").filter(
     entry__pub_date__year=2008
@@ -297,9 +299,11 @@ b2 = (
 
 # Nested call chains
 c1 = (
-    Blog.objects.filter(
+    Blog.objects
+    .filter(
         entry__headline__contains="Lennon",
-    ).filter(
+    )
+    .filter(
         entry__pub_date__year=2008,
     )
     + Blog.objects
@@ -330,7 +334,9 @@ d13 = (
 
 # Doesn't fit, default
 d2 = (
-    x.e().esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
+    x
+    .e()
+    .esadjkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkfsdddd()  #
 )
 
 # Doesn't fit, fluent style
@@ -434,7 +440,9 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge().groupby(
+        df1_aaaaaaaaaaaa
+        .merge()
+        .groupby(
             1,
         )
     ).sum()
@@ -443,7 +451,9 @@ max_message_id = (
 
 (
     (
-        df1_aaaaaaaaaaaa.merge().groupby(
+        df1_aaaaaaaaaaaa
+        .merge()
+        .groupby(
             1,
         )
     )

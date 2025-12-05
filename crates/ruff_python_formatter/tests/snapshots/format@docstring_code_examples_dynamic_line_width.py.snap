@@ -2686,9 +2686,9 @@ def doctest_extra_indent1():
 	...                         self._df.filter(pl.col(col).str.starts_with(c))
 	...                         for c in sorted(
 	...                                 set(
-	...                                         df.select(
-	...                                                 pl.col(col).str.slice(0, 1)
-	...                                         ).to_series()
+	...                                         df
+	...                                         .select(pl.col(col).str.slice(0, 1))
+	...                                         .to_series()
 	...                                 )
 	...                         )
 	...                 ]
