@@ -1186,6 +1186,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
 ///
+/// Parameters annotated with `typing.Unpack` are exempt from this rule.
+/// This follows Python typing specification for unpacking keyword arguments.
+///
 /// ## Example
 /// ```python
 /// def calculate_speed(distance: float, time: float) -> float:
@@ -1235,6 +1238,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+/// - [Python - Unpack for keyword arguments¶](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
@@ -1811,7 +1815,7 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
             }
         }
         if let Some(arg) = function.parameters.kwarg.as_ref()
-            && !should_ignore_kwarg_check(checker, arg)
+            && !has_unpack_annotation(checker, arg)
         {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
@@ -1838,14 +1842,13 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
     }
 }
 
-fn should_ignore_kwarg_check(checker: &Checker, parameter: &Parameter) -> bool {
-    if let Some(annotation) = &parameter.annotation {
+/// Returns `true` if the parameter is annotated with `typing.Unpack`
+fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
+    parameter.annotation.as_ref().is_some_and(|annotation| {
         checker
             .semantic()
             .match_typing_expr(map_subscript(annotation), "Unpack")
-    } else {
-        false
-    }
+    })
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
