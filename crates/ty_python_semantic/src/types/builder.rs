@@ -1255,7 +1255,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 speculative = speculative.add_positive(bound);
                             }
                             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(Type::Union(constraints));
+                                speculative = speculative.add_positive(constraints.as_type(db));
                             }
                             // TypeVars without a bound or constraint implicitly have `object` as their
                             // upper bound, and it is always a no-op to add `object` to an intersection.
