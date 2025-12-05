@@ -16,9 +16,9 @@ use smallvec::SmallVec;
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
-    InferenceRegion, ScopeInference, ScopeInferenceExtra, infer_deferred_types,
-    infer_definition_types, infer_expression_types, infer_same_file_expression_type,
-    infer_unpack_types,
+    InferenceRegion, InferredFunctionSignature, ScopeInference, ScopeInferenceExtra,
+    infer_deferred_types, infer_definition_types, infer_expression_types,
+    infer_same_file_expression_type, infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
 use crate::module_name::{ModuleName, ModuleNameResolutionError};
@@ -309,11 +309,8 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
 
-    /// The parameters of a function definition (without any default values filled in).
-    parameters: Option<Vec<Parameter<'db>>>,
-
-    /// The return type of a function definition.
-    return_type: Option<Type<'db>>,
+    /// The inferred signature of a function definition (without any default values filled in).
+    signature: Option<InferredFunctionSignature<'db>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -352,8 +349,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
-            parameters: None,
-            return_type: None,
+            signature: None,
         }
     }
 
@@ -1918,12 +1914,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let binding_context = self.index.expect_single_definition(function);
         let previous_typevar_binding_context =
             self.typevar_binding_context.replace(binding_context);
-        self.infer_return_type_annotation(
+        let return_type = self.infer_return_type_annotation(
             function.returns.as_deref(),
             self.defer_annotations().into(),
         );
         self.infer_type_parameters(type_params);
-        self.infer_parameters(&function.parameters);
+        let parameters = self.infer_parameters(&function.parameters);
+        self.signature = Some(InferredFunctionSignature {
+            parameters,
+            return_type,
+        });
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -2307,11 +2307,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 let previous_typevar_binding_context =
                     self.typevar_binding_context.replace(definition);
-                self.infer_return_type_annotation(
+                let return_type = self.infer_return_type_annotation(
                     returns.as_deref(),
                     DeferredExpressionState::None,
                 );
-                self.infer_parameters(parameters);
+                let parameters = self.infer_parameters(parameters);
+                self.signature = Some(InferredFunctionSignature {
+                    parameters,
+                    return_type,
+                });
                 self.typevar_binding_context = previous_typevar_binding_context;
             }
         }
@@ -2434,8 +2438,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         returns: Option<&ast::Expr>,
         deferred_expression_state: DeferredExpressionState,
-    ) {
-        if let Some(returns) = returns {
+    ) -> Option<Type<'db>> {
+        returns.map(|returns| {
             let annotated = self.infer_annotation_expression(returns, deferred_expression_state);
 
             if !annotated.qualifiers.is_empty() {
@@ -2456,11 +2460,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            self.return_type = Some(annotated.inner_type());
-        }
+            annotated.inner_type()
+        })
     }
 
-    fn infer_parameters(&mut self, parameters: &ast::Parameters) {
+    fn infer_parameters(&mut self, parameters: &ast::Parameters) -> Vec<Parameter<'db>> {
         let ast::Parameters {
             range: _,
             node_index: _,
@@ -2513,7 +2517,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parameters.push(parameter);
         }
 
-        self.parameters = Some(parameters);
+        parameters
     }
 
     fn infer_parameter_with_default(
@@ -2922,11 +2926,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         function: &ast::StmtFunctionDef,
     ) {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
-        self.infer_return_type_annotation(
+        let return_type = self.infer_return_type_annotation(
             function.returns.as_deref(),
             DeferredExpressionState::Deferred,
         );
-        self.infer_parameters(function.parameters.as_ref());
+        let parameters = self.infer_parameters(function.parameters.as_ref());
+        self.signature = Some(InferredFunctionSignature {
+            parameters,
+            return_type,
+        });
         self.typevar_binding_context = previous_typevar_binding_context;
     }
 
@@ -12196,8 +12204,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             // Ignored; only relevant to definition regions
             undecorated_type: _,
-            parameters: _,
-            return_type: _,
+            signature: _,
 
             // builder only state
             typevar_binding_context: _,
@@ -12264,6 +12271,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             deferred,
             cycle_recovery,
             undecorated_type,
+            signature,
             // builder only state
             dataclass_field_specifiers: _,
             all_definitely_bound: _,
@@ -12275,8 +12283,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
-            parameters,
-            return_type,
         } = self;
 
         let _ = scope;
@@ -12287,8 +12293,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             || cycle_recovery.is_some()
             || undecorated_type.is_some()
             || !deferred.is_empty()
-            || parameters.is_some()
-            || return_type.is_some())
+            || signature.is_some())
         .then(|| {
             Box::new(DefinitionInferenceExtra {
                 string_annotations,
@@ -12296,8 +12301,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 deferred: deferred.into_boxed_slice(),
                 diagnostics,
                 undecorated_type,
-                parameters,
-                return_type,
+                signature,
             })
         });
 
@@ -12338,8 +12342,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             mut expressions,
             scope,
             cycle_recovery,
-            parameters,
-            return_type,
+            signature,
 
             // Ignored, because scope types are never extended into other scopes.
             deferred: _,
@@ -12368,15 +12371,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let extra = (!string_annotations.is_empty()
             || !diagnostics.is_empty()
             || cycle_recovery.is_some()
-            || parameters.is_some()
-            || return_type.is_some())
+            || signature.is_some())
         .then(|| {
             Box::new(ScopeInferenceExtra {
                 string_annotations,
                 cycle_recovery,
                 diagnostics,
-                parameters,
-                return_type,
+                signature,
             })
         });
 

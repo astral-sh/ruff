@@ -527,6 +527,12 @@ impl<'db> InferenceRegion<'db> {
     }
 }
 
+#[derive(Debug, Eq, PartialEq, get_size2::GetSize, salsa::Update)]
+struct InferredFunctionSignature<'db> {
+    parameters: Vec<Parameter<'db>>,
+    return_type: Option<Type<'db>>,
+}
+
 /// The inferred types for a scope region.
 #[derive(Debug, Eq, PartialEq, salsa::Update, get_size2::GetSize)]
 pub(crate) struct ScopeInference<'db> {
@@ -548,11 +554,8 @@ struct ScopeInferenceExtra<'db> {
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
 
-    /// The parameters of a function definition (without any default values filled in).
-    parameters: Option<Vec<Parameter<'db>>>,
-
-    /// The return type of a function definition.
-    return_type: Option<Type<'db>>,
+    /// The inferred signature of a function definition (without any default values filled in).
+    signature: Option<InferredFunctionSignature<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -612,6 +615,15 @@ impl<'db> ScopeInference<'db> {
 
         extra.string_annotations.contains(&expression.into())
     }
+
+    pub(crate) fn inferred_function_signature(
+        &self,
+    ) -> Option<(Vec<Parameter<'db>>, Option<Type<'db>>)> {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.signature.as_ref())
+            .map(|signature| (signature.parameters.clone(), signature.return_type))
+    }
 }
 
 /// The inferred types for a definition region.
@@ -658,11 +670,8 @@ struct DefinitionInferenceExtra<'db> {
     /// For function definitions, the undecorated type of the function.
     undecorated_type: Option<Type<'db>>,
 
-    /// The parameters of a function definition (without any default values filled in).
-    parameters: Option<Vec<Parameter<'db>>>,
-
-    /// The return type of a function definition.
-    return_type: Option<Type<'db>>,
+    /// The inferred signature of a function definition (without any default values filled in).
+    signature: Option<InferredFunctionSignature<'db>>,
 }
 
 impl<'db> DefinitionInference<'db> {
@@ -790,6 +799,15 @@ impl<'db> DefinitionInference<'db> {
 
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
+    }
+
+    pub(crate) fn inferred_function_signature(
+        &self,
+    ) -> Option<(Vec<Parameter<'db>>, Option<Type<'db>>)> {
+        self.extra
+            .as_ref()
+            .and_then(|extra| extra.signature.as_ref())
+            .map(|signature| (signature.parameters.clone(), signature.return_type))
     }
 }
 
