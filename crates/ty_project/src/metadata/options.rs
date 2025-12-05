@@ -285,22 +285,6 @@ impl Options {
                 roots.push(python);
             }
 
-            // Considering pytest test discovery conventions,
-            // we also include the `tests` directory if it exists and is not a package.
-            let tests_dir = project_root.join("tests");
-            if system.is_directory(&tests_dir)
-                && !system.is_file(&tests_dir.join("__init__.py"))
-                && !system.is_file(&tests_dir.join("__init__.pyi"))
-                && !roots.contains(&tests_dir)
-            {
-                // If the `tests` directory exists and is not a package, include it as a source root.
-                tracing::debug!(
-                    "Including `./tests` in `environment.root` because a `./tests` directory exists"
-                );
-
-                roots.push(tests_dir);
-            }
-
             // The project root should always be included, and should always come
             // after any subdirectories such as `./src`, `./tests` and/or `./python`.
             roots.push(project_root.to_path_buf());
