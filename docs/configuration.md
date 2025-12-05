@@ -604,9 +604,11 @@ Options:
           format is "full" [env: RUFF_OUTPUT_FORMAT=] [possible values:
           concise, full, json, json-lines, junit, grouped, github, gitlab,
           pylint, rdjson, azure, sarif]
-  -o, --output-file <OUTPUT_FILE>
-          Specify file to write the linter output to (default: stdout) [env:
-          RUFF_OUTPUT_FILE=]
+  -o, --output-file <FORMAT:TARGET>
+          Specify output destination(s) using format:target syntax. Can be
+          specified multiple times for multiple outputs. Also supports
+          comma-separated values: --output-file gitlab:file.json,full:stdout
+          [env: RUFF_OUTPUT_FILE=]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values:
           py37, py38, py39, py310, py311, py312, py313, py314]
