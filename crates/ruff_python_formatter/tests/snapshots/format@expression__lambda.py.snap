@@ -2038,7 +2038,7 @@ transform = (
  )
  
  (
-@@ -630,27 +630,29 @@
+@@ -630,27 +630,31 @@
  (
      lambda
      # comment
@@ -2050,10 +2050,10 @@ transform = (
  )
  
  (
--    lambda  # comment
+     lambda  # comment
 -    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
 -    + 1
-+    lambda *args, **kwargs: (  # comment
++    *args, **kwargs: (
 +        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 +    )
  )
@@ -2069,16 +2069,16 @@ transform = (
  )
  
  (
--    lambda  # comment 1
+     lambda  # comment 1
 -    *args, **kwargs:  # comment 3
 -    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-+    lambda *args, **kwargs: (  # comment 1  # comment 3
++    *args, **kwargs: (  # comment 3
 +        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 +    )
  )
  
  (
-@@ -658,19 +660,20 @@
+@@ -658,19 +662,20 @@
      # 2
      left,  # 3
      # 4
@@ -2109,7 +2109,7 @@ transform = (
          )
      )
  )
-@@ -688,18 +691,17 @@
+@@ -688,18 +693,17 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,

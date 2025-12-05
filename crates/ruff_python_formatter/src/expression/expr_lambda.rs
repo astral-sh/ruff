@@ -33,77 +33,15 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         if let Some(parameters) = parameters {
             let parameters_have_comments = comments.contains_comments(parameters.as_ref().into());
 
-            // There are four main groups of comments we want to format here that are all
-            // classified as dangling in the comment placement logic:
-            //
-            // ```py
-            // lambda  # end-of-line before parameters
-            // # own-line before parameters
-            // x, y, z:  # end-of-line after parameters
-            // # own-line after parameters
-            // x + y + z
-            // ```
-            //
-            // As long as the parameters themselves don't contain comments, we want to move all of
-            // these into the parenthesized lambda body, if we can do so without changing the order
-            // or the type of the comment.
-            //
-            // In this example, with all four types present, we can't move the comments before the
-            // parameters into the body without making the EOL comment after the parameters an
-            // own-line comment, so we can only reformat this as:
-            //
-            // ```py
-            // lambda  # end-of-line before parameters
-            // # own-line before parameters
-            // x, y, z: (  # end-of-line after parameters
-            //     # own-line after parameters
-            //     x + y + z
-            // )
-            // ```
-            //
-            // but in the absence of the inner comments, we should format this:
-            //
-            // ```py
-            // lambda  # end-of-line before parameters
-            // # own-line before parameters
-            // x, y, z: x + y + z
-            // ```
-            //
-            // to
-            //
-            // ```py
-            // lambda x, y, z: (  # end-of-line before parameters
-            //     # own-line before parameters
-            //     x + y + z
-            // )
-            // ```
-
             // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
             let (dangling_before_parameters, dangling_after_parameters) = dangling
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
-            let (trailing_end_of_line_after_lambda_keyword, trailing_own_line_after_lambda_keyword) =
-                if preview && !parameters_have_comments {
-                    dangling_before_parameters.split_at(
-                        dangling_before_parameters
-                            .iter()
-                            .position(|comment| comment.line_position().is_own_line())
-                            .unwrap_or(dangling_before_parameters.len()),
-                    )
-                } else {
-                    ([].as_slice(), dangling_before_parameters)
-                };
-
-            trailing_comments(trailing_end_of_line_after_lambda_keyword).fmt(f)?;
-
-            if trailing_own_line_after_lambda_keyword.is_empty() || preview {
+            if dangling_before_parameters.is_empty() {
                 write!(f, [space()])?;
             } else {
-                write!(
-                    f,
-                    [dangling_comments(trailing_own_line_after_lambda_keyword)]
-                )?;
+                write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
@@ -126,12 +64,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             write!(f, [token(":")])?;
 
-            // if any dangling_after_parameters
-            // or any end of line before the parameters
-
-            if dangling_after_parameters.is_empty()
-                && trailing_own_line_after_lambda_keyword.is_empty()
-            {
+            if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
             }
             // In preview, always parenthesize the body if there are dangling comments.
@@ -161,7 +94,6 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                     [
                         space(),
                         token("("),
-                        trailing_comments(trailing_own_line_after_lambda_keyword),
                         trailing_comments(dangling_end_of_line),
                         block_indent(&format_args!(
                             leading_comments(dangling_own_line),
