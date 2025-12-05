@@ -282,24 +282,6 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    /// Return the meta-type of this `TypedDict` type.
-    pub(super) fn to_meta_class(self, db: &'db dyn Db) -> ClassType<'db> {
-        // `TypedDict` instances are instances of `dict` at runtime, but its important that we
-        // understand a more specific meta type in order to correctly handle `__getitem__`.
-        match self {
-            TypedDictType::Class(defining_class) => defining_class,
-            TypedDictType::Synthesized(_) => KnownClass::TypedDictFallback
-                .try_to_class_literal(db)
-                .map(|class| class.default_specialization(db))
-                .unwrap_or_else(|| {
-                    KnownClass::Object
-                        .try_to_class_literal(db)
-                        .map(|class| class.default_specialization(db))
-                        .expect("object class must exist")
-                }),
-        }
-    }
-
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             TypedDictType::Class(_) => {
