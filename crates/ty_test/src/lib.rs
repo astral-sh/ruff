@@ -27,12 +27,11 @@ use ty_python_semantic::{
 mod assertion;
 mod config;
 mod db;
-mod dependencies;
 mod diagnostic;
+mod external_dependencies;
 mod matcher;
 mod parser;
 
-use dependencies::{copy_site_packages_to_db, setup_venv_with_dependencies};
 use ty_static::EnvVars;
 
 /// Run `path` as a markdown test suite with given `title`.
@@ -268,23 +267,20 @@ fn run_test(
     let python_version = test.configuration().python_version().unwrap_or_default();
 
     // Setup virtual environment with dependencies if specified
-    let _temp_venv = if let Some(dependencies) = test.configuration().dependencies() {
-        if !std::env::var("MDTEST_INCLUDE_EXTERNAL").is_ok_and(|v| v == "1") {
+    let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
+    if let Some(dependencies) = test.configuration().dependencies() {
+        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
             return Ok(TestOutcome::Skipped);
         }
 
-        let (temp_dir, venv_path) = setup_venv_with_dependencies(dependencies, python_version)
-            .expect("Failed to setup virtual environment with dependencies");
-
-        // Copy site-packages into the in-memory filesystem
-        let dest_venv_path = SystemPathBuf::from("/.venv");
-        copy_site_packages_to_db(db, &venv_path, &dest_venv_path, python_version)
-            .expect("Failed to copy site-packages to database");
-
-        Some(temp_dir)
-    } else {
-        None
-    };
+        external_dependencies::setup_venv(
+            db,
+            dependencies,
+            python_version,
+            &venv_for_external_dependencies,
+        )
+        .expect("Failed to setup in-memory virtual environment with dependencies");
+    }
 
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
@@ -390,9 +386,8 @@ fn run_test(
 
     let site_packages_paths = if configuration.dependencies().is_some() {
         // If dependencies were specified, use the venv we just set up
-        let python_path = SystemPathBuf::from("/.venv");
         let environment = PythonEnvironment::new(
-            &python_path,
+            &venv_for_external_dependencies,
             SysPrefixPathOrigin::PythonCliFlag,
             db.system(),
         )

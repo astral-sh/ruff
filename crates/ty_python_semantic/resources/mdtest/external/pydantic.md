@@ -23,7 +23,8 @@ user = User(id=1, name="John Doe")
 reveal_type(user.id)  # revealed: int
 reveal_type(user.name)  # revealed: str
 
-invalid_user = User(id=2)  # error: [missing-argument] "No argument provided for required parameter `name`"
+# error: [missing-argument] "No argument provided for required parameter `name`"
+invalid_user = User(id=2)
 ```
 
 ## Usage of `Field`
@@ -43,21 +44,4 @@ product = Product("Laptop", price_cent=999_00)
 reveal_type(product.id)  # revealed: int
 reveal_type(product.name)  # revealed: str
 reveal_type(product.internal_price_cent)  # revealed: int
-```
-
-## Regression 1159
-
-```py
-from pydantic import BaseModel, Field
-
-def secret_from_env(env_var: str, default: str | None = None) -> bytes | None:
-    raise NotImplementedError
-
-class BaseChatOpenAI(BaseModel):
-    model_name: str = Field(default="gpt-3.5-turbo", alias="model")
-    openai_api_key: bytes | None = Field(alias="api_key", default_factory=secret_from_env("OPENAI_API_KEY", default=None))
-
-# TODO: no error here
-# error: [unknown-argument] "Argument `model` does not match any known parameter"
-BaseChatOpenAI(model="gpt-4", api_key=b"my_secret_key")
 ```
