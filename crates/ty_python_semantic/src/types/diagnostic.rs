@@ -90,6 +90,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
+    registry.register_lint(&INVALID_TYPE_PARAM_ORDER);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
@@ -983,6 +984,33 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::stable("0.0.1-alpha.6"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for type parameters without defaults that come after type parameters with defaults.
+    ///
+    /// ## Why is this bad?
+    /// Type parameters without defaults must come before type parameters with defaults.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from typing import Generic, TypeVar
+    ///
+    /// T = TypeVar("T")
+    /// U = TypeVar("U")
+    /// # Error: T has no default but comes after U which has a default
+    /// class Foo(Generic[U = int, T]): ...
+    /// ```
+    ///
+    /// ## References
+    /// - [PEP 696: Type defaults for type parameters](https://peps.python.org/pep-0696/)
+    pub(crate) static INVALID_TYPE_PARAM_ORDER = {
+        summary: "detects invalid type parameter order",
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -3653,6 +3681,20 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
         let typed_dict_name = typed_dict_ty.display(db);
         builder.into_diagnostic(format_args!(
             "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
+        ));
+    }
+}
+
+pub(crate) fn report_invalid_type_param_order<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    name: &str,
+) {
+    if let Some(builder) =
+        context.report_lint(&INVALID_TYPE_PARAM_ORDER, class.header_range(context.db()))
+    {
+        builder.into_diagnostic(format_args!(
+            "Type parameter {name} without a default follows type parameter with a default",
         ));
     }
 }
