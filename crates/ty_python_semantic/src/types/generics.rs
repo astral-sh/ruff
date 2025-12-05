@@ -1749,17 +1749,15 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 };
 
-                for formal_signature in &formal_callable.signatures(self.db).overloads {
-                    for actual_callable in actual_callables.as_slice() {
-                        for actual_signature in &actual_callable.signatures(self.db).overloads {
-                            let when = formal_signature.when_constraint_set_assignable_to(
-                                self.db,
-                                actual_signature,
-                                self.inferable,
-                            );
-                            self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
-                        }
-                    }
+                for actual_callable in actual_callables.as_slice() {
+                    let when = formal_callable
+                        .signatures(self.db)
+                        .when_constraint_set_assignable_to(
+                            self.db,
+                            actual_callable.signatures(self.db),
+                            self.inferable,
+                        );
+                    self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
                 }
             }
 

@@ -398,6 +398,31 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
+    fn signatures_is_single_paramspec(
+        signatures: &[Signature<'db>],
+    ) -> Option<BoundTypeVarInstance<'db>> {
+        let [signature] = signatures else {
+            return None;
+        };
+        signature.parameters.as_paramspec()
+    }
+
+    pub(crate) fn when_constraint_set_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to_impl(
+            db,
+            other,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
+        )
+    }
+
     /// Implementation of subtyping and assignability between two, possible overloaded, callable
     /// types.
     fn has_relation_to_inner(
@@ -409,6 +434,62 @@ impl<'db> CallableSignature<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        if relation.is_constraint_set_assignability() {
+            // TODO: Oof, maybe ParamSpec needs to live at CallableSignature, not Signature?
+            let self_is_single_paramspec = Self::signatures_is_single_paramspec(self_signatures);
+            let other_is_single_paramspec = Self::signatures_is_single_paramspec(other_signatures);
+
+            match (self_is_single_paramspec, other_is_single_paramspec) {
+                (Some(self_bound_typevar), Some(other_bound_typevar)) => {
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::TypeVar(other_bound_typevar),
+                        Type::TypeVar(other_bound_typevar),
+                        relation,
+                    );
+                }
+
+                (Some(self_bound_typevar), None) => {
+                    let upper =
+                        Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::from_overloads(other_signatures.iter().map(
+                                |signature| Signature::new(signature.parameters().clone(), None),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        ));
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                        relation,
+                    );
+                }
+
+                (None, Some(other_bound_typevar)) => {
+                    let lower =
+                        Type::Callable(CallableType::new(
+                            db,
+                            CallableSignature::from_overloads(self_signatures.iter().map(
+                                |signature| Signature::new(signature.parameters().clone(), None),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        ));
+                    return ConstraintSet::constrain_typevar(
+                        db,
+                        other_bound_typevar,
+                        lower,
+                        Type::object(),
+                        relation,
+                    );
+                }
+
+                (None, None) => {}
+            }
+        }
+
         match (self_signatures, other_signatures) {
             ([self_signature], [other_signature]) => {
                 // Base case: both callable types contain a single signature.
@@ -964,22 +1045,6 @@ impl<'db> Signature<'db> {
         result
     }
 
-    pub(crate) fn when_constraint_set_assignable_to(
-        &self,
-        db: &'db dyn Db,
-        other: &Signature<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
-    ) -> ConstraintSet<'db> {
-        self.has_relation_to_impl(
-            db,
-            other,
-            inferable,
-            TypeRelation::ConstraintSetAssignability,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
-        )
-    }
-
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl(
         &self,
@@ -1143,69 +1208,6 @@ impl<'db> Signature<'db> {
                 ),
             );
             return result;
-        }
-
-        // If either parameter list is a ParamSpec, then we can create a constraint set that holds
-        // when the ParamSpec is assignable to the other parameter list.
-        if relation.is_constraint_set_assignability() {
-            match (
-                self.parameters.as_paramspec(),
-                other.parameters.as_paramspec(),
-            ) {
-                (Some(self_bound_typevar), Some(other_bound_typevar)) => {
-                    result.intersect(
-                        db,
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            self_bound_typevar,
-                            Type::TypeVar(other_bound_typevar),
-                            Type::TypeVar(other_bound_typevar),
-                            relation,
-                        ),
-                    );
-                    return result;
-                }
-
-                (Some(self_bound_typevar), None) => {
-                    let upper = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new(other.parameters.clone(), None)),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    result.intersect(
-                        db,
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            self_bound_typevar,
-                            Type::Never,
-                            upper,
-                            relation,
-                        ),
-                    );
-                    return result;
-                }
-
-                (None, Some(other_bound_typevar)) => {
-                    let lower = Type::Callable(CallableType::new(
-                        db,
-                        CallableSignature::single(Signature::new(self.parameters.clone(), None)),
-                        CallableTypeKind::ParamSpecValue,
-                    ));
-                    result.intersect(
-                        db,
-                        ConstraintSet::constrain_typevar(
-                            db,
-                            other_bound_typevar,
-                            lower,
-                            Type::object(),
-                            relation,
-                        ),
-                    );
-                    return result;
-                }
-
-                (None, None) => {}
-            }
         }
 
         let mut parameters = ParametersZip {
