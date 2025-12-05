@@ -38,7 +38,21 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             let (dangling_before_parameters, dangling_after_parameters) = dangling
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
-            if dangling_before_parameters.is_empty() {
+            let (trailing_end_of_line_after_lambda_keyword, dangling_after_lambda_keyword) =
+                if preview {
+                    dangling_before_parameters.split_at(
+                        dangling_before_parameters
+                            .iter()
+                            .position(|comment| comment.line_position().is_own_line())
+                            .unwrap_or(dangling_before_parameters.len()),
+                    )
+                } else {
+                    ([].as_slice(), dangling_before_parameters)
+                };
+
+            trailing_comments(trailing_end_of_line_after_lambda_keyword).fmt(f)?;
+
+            if dangling_after_lambda_keyword.is_empty() {
                 write!(f, [space()])?;
             } else {
                 write!(f, [dangling_comments(dangling_before_parameters)])?;
@@ -63,6 +77,9 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
 
             write!(f, [token(":")])?;
+
+            // if any dangling_after_parameters
+            // or any end of line before the parameters
 
             if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
