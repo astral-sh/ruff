@@ -48,6 +48,9 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "renameProvider": {
+      "prepareProvider": true
+    },
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [

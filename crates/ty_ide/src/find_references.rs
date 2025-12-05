@@ -899,6 +899,42 @@ cls = MyClass
     }
 
     #[test]
+    fn references_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
     fn references_match_name_stmt() {
         let test = cursor_test(
             r#"
@@ -1867,6 +1903,213 @@ func<CURSOR>_alias()
         5 | y = xyz
           |     ^^^
         6 | z = deprecated
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+
+        info[references]: Reference 2
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+
+        info[references]: Reference 3
+         --> mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO: this should also highlight the RHS subpkg in the import
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
           |
         ");
     }

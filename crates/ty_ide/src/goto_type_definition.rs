@@ -965,6 +965,60 @@ mod tests {
     }
 
     #[test]
+    fn goto_type_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main.py:2:5
+          |
+        2 | x: "foobar"
+          |     ^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
     fn goto_type_match_name_stmt() {
         let test = cursor_test(
             r#"
@@ -1614,6 +1668,283 @@ def function():
         2 | def foo(a: str | None, b):
         3 |     a
           |     ^
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The module is the correct type definition
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+        --> mypackage/subpkg/__init__.py:1:1
+         |
+         |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The module is the correct type definition
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+        --> mypackage/subpkg/__init__.py:1:1
+         |
+         |
+        info: Source
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg.submod import val
+          |       ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Unknown is correct, `submod` is not in scope
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = submod
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The module is correct
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> mypackage/subpkg/submod.py:1:1
+          |
+        1 | /
+        2 | | val: int = 0
+          | |_____________^
+          |
+        info: Source
+         --> mypackage/__init__.py:2:14
+          |
+        2 | from .subpkg.submod import val
+          |              ^^^^^^
+        3 |
+        4 | x = submod
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // The module is correct
+        assert_snapshot!(test.goto_type_definition(), @r"
+        info[goto-type-definition]: Type definition
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 | /
+        2 | | subpkg: int = 10
+          | |_________________^
+          |
+        info: Source
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg import subpkg
+          |       ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // `int` is correct
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_type_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // `int` is correct
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
           |
         "#);
     }

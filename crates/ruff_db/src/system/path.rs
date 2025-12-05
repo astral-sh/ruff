@@ -667,6 +667,13 @@ impl Deref for SystemPathBuf {
     }
 }
 
+impl AsRef<Path> for SystemPathBuf {
+    #[inline]
+    fn as_ref(&self) -> &Path {
+        self.0.as_std_path()
+    }
+}
+
 impl<P: AsRef<SystemPath>> FromIterator<P> for SystemPathBuf {
     fn from_iter<I: IntoIterator<Item = P>>(iter: I) -> Self {
         let mut buf = SystemPathBuf::new();

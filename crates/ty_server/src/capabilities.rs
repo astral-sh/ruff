@@ -1,5 +1,5 @@
 use lsp_types::{
-    ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
+    self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
     DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
     HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
     NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
@@ -8,11 +8,9 @@ use lsp_types::{
     TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
     TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
+use std::str::FromStr;
 
 use crate::PositionEncoding;
-use crate::session::GlobalSettings;
-use lsp_types as types;
-use std::str::FromStr;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -349,7 +347,6 @@ impl ResolvedClientCapabilities {
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
-    global_settings: &GlobalSettings,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -368,11 +365,9 @@ pub(crate) fn server_capabilities(
         // dynamically based on the `ty.experimental.rename` setting.
         None
     } else {
-        // Otherwise, we check whether user has enabled rename support via the resolved settings
-        // from initialization options.
-        global_settings
-            .is_rename_enabled()
-            .then(|| OneOf::Right(server_rename_options()))
+        // Otherwise, we always register the rename provider and bail out in `prepareRename` if
+        // the feature is disabled.
+        Some(OneOf::Right(server_rename_options()))
     };
 
     ServerCapabilities {

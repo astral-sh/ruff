@@ -3348,18 +3348,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
         match bound.as_deref() {
             Some(expr @ ast::Expr::Tuple(ast::ExprTuple { elts, .. })) => {
-                // We don't use UnionType::from_elements or UnionBuilder here, because we don't
-                // want to simplify the list of constraints like we do with the elements of an
-                // actual union type.
-                // TODO: Consider using a new `OneOfType` connective here instead, since that
-                // more accurately represents the actual semantics of typevar constraints.
-                let ty = Type::Union(UnionType::new(
+                // Here, we interpret `bound` as a heterogeneous tuple and convert it to `TypeVarConstraints` in `TypeVarInstance::lazy_constraints`.
+                let tuple_ty = Type::heterogeneous_tuple(
                     self.db(),
                     elts.iter()
                         .map(|expr| self.infer_type_expression(expr))
                         .collect::<Box<[_]>>(),
-                ));
-                self.store_expression_type(expr, ty);
+                );
+                self.store_expression_type(expr, tuple_ty);
             }
             Some(expr) => {
                 self.infer_type_expression(expr);
@@ -7299,10 +7295,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
-        if self.deferred_state.in_string_annotation() {
+        if self.deferred_state.in_string_annotation()
+            || self.inner_expression_inference_state.is_get()
+        {
             // Avoid storing the type of expressions that are part of a string annotation because
             // the expression ids don't exists in the semantic index. Instead, we'll store the type
             // on the string expression itself that represents the annotation.
+            // Also, if `inner_expression_inference_state` is `Get`, the expression type has already been stored.
             return;
         }
 
@@ -11681,6 +11680,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                     inferred_type_arguments.push(provided_type);
 
+                    // TODO consider just accepting the given specialization without checking
+                    // against bounds/constraints, but recording the expression for deferred
+                    // checking at end of scope. This would avoid a lot of cycles caused by eagerly
+                    // doing assignment checks here.
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
@@ -11705,10 +11708,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            // TODO: this is wrong, the given specialization needs to be assignable
+                            // to _at least one_ of the individual constraints, not to the union of
+                            // all of them. `int | str` is not a valid specialization of a typevar
+                            // constrained to `(int, str)`.
                             if provided_type
                                 .when_assignable_to(
                                     db,
-                                    Type::Union(constraints),
+                                    constraints.as_type(db),
                                     InferableTypeVars::None,
                                 )
                                 .is_never_satisfied(db)

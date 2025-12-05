@@ -65,7 +65,7 @@ unused-ignore-comment = \"warn\"
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -103,7 +103,7 @@ unused-ignore-comment = \"warn\"
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -145,7 +145,7 @@ unused-ignore-comment = \"warn\"
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -182,7 +182,7 @@ def my_func(): ...
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -221,7 +221,7 @@ def my_func(): ...
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -257,7 +257,7 @@ x: typing.Literal[1] = 1
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -294,7 +294,7 @@ html.parser
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);
@@ -302,6 +302,42 @@ html.parser
     let code_action_params = code_actions_at(&server, diagnostics, foo, range);
 
     // Get code actions
+    let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
+    let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
+
+    insta::assert_json_snapshot!(code_actions);
+
+    Ok(())
+}
+
+/// Regression test for a panic when a code-fix diagnostic points at a string annotation
+#[test]
+fn code_action_invalid_string_annotations() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"
+ab: "foobar"
+"#;
+
+    let ty_toml = SystemPath::new("ty.toml");
+    let ty_toml_content = "";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(ty_toml, ty_toml_content)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    // Wait for diagnostics to be computed.
+    let diagnostics = server.document_diagnostic_request(foo, None);
+    let range = full_range(foo_content);
+    let code_action_params = code_actions_at(&server, diagnostics, foo, range);
+
+    // Get code actions for the line with the unused ignore comment.
     let code_action_id = server.send_request::<CodeActionRequest>(code_action_params);
     let code_actions = server.await_response::<CodeActionRequest>(&code_action_id);
 
