@@ -1063,7 +1063,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
-        (Ruff, "103") => rules::ruff::rules::UnusedSuppression,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]
