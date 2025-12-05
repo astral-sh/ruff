@@ -17,7 +17,7 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
-use crate::rules::ruff::rules::UnusedSuppression;
+use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
 use crate::settings::LinterSettings;
 
 #[allow(unused)]
@@ -165,7 +165,7 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        if !context.is_rule_enabled(Rule::UnusedSuppression) {
+        if !context.is_rule_enabled(Rule::UnusedNOQA) {
             return;
         }
 
@@ -206,7 +206,16 @@ impl Suppressions {
                     Edit::range_deletion(code_range)
                 };
 
-                let mut diagnostic = context.report_diagnostic(UnusedSuppression, range);
+                let mut diagnostic = context.report_diagnostic(
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            unmatched: vec![suppression.code.to_string()],
+                            ..UnusedCodes::default()
+                        }),
+                        kind: crate::rules::ruff::rules::UnusedNOQAKind::Suppression,
+                    },
+                    range,
+                );
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
         }
