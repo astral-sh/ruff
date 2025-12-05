@@ -1432,7 +1432,9 @@ impl<'db> SpecializationBuilder<'db> {
             .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_recursive(self.db, types)
+        let x = generic_context.specialize_recursive(self.db, types);
+        eprintln!("--> specialized {}", x.display_full(self.db));
+        x
     }
 
     fn add_type_mapping(
@@ -1447,6 +1449,11 @@ impl<'db> SpecializationBuilder<'db> {
             return;
         };
 
+        eprintln!(
+            " -> map {}",
+            bound_typevar.identity(self.db).display(self.db)
+        );
+        eprintln!("    new {}", ty.display(self.db));
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
                 // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
@@ -1477,6 +1484,13 @@ impl<'db> SpecializationBuilder<'db> {
                 let typevar = constraint.typevar(self.db);
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
+                eprintln!(
+                    " ~> constraint {} ≤ {} ≤ {} {}",
+                    lower.display(self.db),
+                    typevar.identity(self.db).display(self.db),
+                    upper.display(self.db),
+                    self.inferable.display(self.db),
+                );
                 if !upper.is_object() {
                     self.add_type_mapping(typevar, upper, variance, &mut f);
                 }
@@ -1748,8 +1762,16 @@ impl<'db> SpecializationBuilder<'db> {
                 let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
                     return Ok(());
                 };
+                eprintln!("==> callable");
+                eprintln!("    formal {}", formal.display(self.db));
+                eprintln!("    actual {}", actual.display(self.db));
 
                 for actual_callable in actual_callables.as_slice() {
+                    eprintln!("--> pair");
+                    eprintln!(
+                        "    actual {}",
+                        Type::Callable(*actual_callable).display(self.db)
+                    );
                     let when = formal_callable
                         .signatures(self.db)
                         .when_constraint_set_assignable_to(
@@ -1757,6 +1779,7 @@ impl<'db> SpecializationBuilder<'db> {
                             actual_callable.signatures(self.db),
                             self.inferable,
                         );
+                    eprintln!("    when {}", when.display(self.db));
                     self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
                 }
             }
