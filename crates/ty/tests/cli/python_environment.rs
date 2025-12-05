@@ -2387,12 +2387,10 @@ fn default_root_flat_layout() -> anyhow::Result<()> {
 }
 
 #[test]
-#[ignore]
 fn default_root_tests_folder() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("src/foo.py", "foo = 10"),
         ("tests/bar.py", "bar = 20"),
-        ("pyproject.toml", ""),
         (
             "tests/test_bar.py",
             r#"
