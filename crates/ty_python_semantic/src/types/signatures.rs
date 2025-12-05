@@ -201,67 +201,120 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        if let TypeMapping::Specialization(specialization) = type_mapping
-            && let [self_signature] = self.overloads.as_slice()
-            && let Some((prefix_parameters, typevar)) = self_signature
-                .parameters
-                .find_paramspec_from_args_kwargs(db)
-        {
-            let prefix_parameters = prefix_parameters
-                .iter()
-                .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                .collect::<Vec<_>>();
-
-            let generic_context = self_signature
-                .generic_context
-                .map(|context| type_mapping.update_signature_generic_context(db, context));
-
-            let return_ty = self_signature
-                .return_ty
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-
-            match specialization.get(db, typevar) {
-                Some(Type::TypeVar(typevar)) if typevar.is_paramspec(db) => {
-                    return Self::single(Signature {
-                        generic_context,
+        fn try_apply_type_mapping_for_paramspec<'db>(
+            db: &'db dyn Db,
+            self_signature: &Signature<'db>,
+            prefix_parameters: &[Parameter<'db>],
+            paramspec_value: Type<'db>,
+            type_mapping: &TypeMapping<'_, 'db>,
+            tcx: TypeContext<'db>,
+            visitor: &ApplyTypeMappingVisitor<'db>,
+        ) -> Option<CallableSignature<'db>> {
+            match paramspec_value {
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                    Some(CallableSignature::single(Signature {
+                        generic_context: self_signature.generic_context.map(|context| {
+                            type_mapping.update_signature_generic_context(db, context)
+                        }),
                         definition: self_signature.definition,
                         parameters: Parameters::new(
                             db,
-                            prefix_parameters.into_iter().chain([
-                                Parameter::variadic(Name::new_static("args")).with_annotated_type(
-                                    Type::TypeVar(
-                                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
-                                    ),
-                                ),
-                                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                                    .with_annotated_type(Type::TypeVar(
-                                        typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
-                                    )),
-                            ]),
+                            prefix_parameters
+                                .iter()
+                                .map(|param| {
+                                    param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                })
+                                .chain([
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::TypeVar(
+                                            typevar
+                                                .with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                                        )),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::TypeVar(
+                                            typevar
+                                                .with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                                        )),
+                                ]),
                         ),
-                        return_ty,
-                    });
+                        return_ty: self_signature
+                            .return_ty
+                            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                    }))
                 }
-                Some(Type::Callable(callable))
+                Type::Callable(callable)
                     if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
                 {
-                    return Self::from_overloads(callable.signatures(db).iter().map(|signature| {
-                        Signature {
-                            generic_context,
+                    Some(CallableSignature::from_overloads(
+                        callable.signatures(db).iter().map(|signature| Signature {
+                            generic_context: self_signature.generic_context.map(|context| {
+                                type_mapping.update_signature_generic_context(db, context)
+                            }),
                             definition: signature.definition,
                             parameters: Parameters::new(
                                 db,
                                 prefix_parameters
                                     .iter()
-                                    .cloned()
+                                    .map(|param| {
+                                        param.apply_type_mapping_impl(
+                                            db,
+                                            type_mapping,
+                                            tcx,
+                                            visitor,
+                                        )
+                                    })
                                     .chain(signature.parameters().iter().cloned()),
                             ),
-                            return_ty,
-                        }
-                    }));
+                            return_ty: self_signature.return_ty.map(|ty| {
+                                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            }),
+                        }),
+                    ))
                 }
-                _ => {}
+                _ => None,
             }
+        }
+
+        match type_mapping {
+            TypeMapping::Specialization(specialization) => {
+                if let [self_signature] = self.overloads.as_slice()
+                    && let Some((prefix_parameters, paramspec)) = self_signature
+                        .parameters
+                        .find_paramspec_from_args_kwargs(db)
+                    && let Some(paramspec_value) = specialization.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        self_signature,
+                        prefix_parameters,
+                        paramspec_value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    return result;
+                }
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                if let [self_signature] = self.overloads.as_slice()
+                    && let Some((prefix_parameters, paramspec)) = self_signature
+                        .parameters
+                        .find_paramspec_from_args_kwargs(db)
+                    && let Some(paramspec_value) = partial.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        self_signature,
+                        prefix_parameters,
+                        paramspec_value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    return result;
+                }
+            }
+            _ => {}
         }
 
         Self::from_overloads(
