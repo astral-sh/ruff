@@ -246,7 +246,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     ])?;
 
     // Make sure that the CLI fails when the `libs` directory is not in the search path.
-    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -254,7 +254,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
      --> test.py:2:6
       |
     2 | from utils import add
-      |      ^^^^^
+      |      ^^^^^ Did you mean `distutils`?
     3 |
     4 | stat = add(10, 15)
       |
@@ -267,7 +267,7 @@ fn cli_arguments_are_relative_to_the_current_directory() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     assert_cmd_snapshot!(case.command().current_dir(case.root().join("child")).arg("--extra-search-path").arg("../libs"), @r###"
     success: true
