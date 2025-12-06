@@ -253,7 +253,7 @@ class C:
 
 # TODO: Mypy and pyright do not support this, but it would be great if we could
 # infer `Unknown | str` here (`Weird` is not a possible type for the `w` attribute).
-reveal_type(C().w)  # revealed: Unknown | Weird
+reveal_type(C().w)  # revealed: Unknown
 ```
 
 #### Attributes defined in tuple unpackings
@@ -596,8 +596,16 @@ class C:
         if (2 + 3) < 4:
             self.x: str = "a"
 
-# TODO: this would ideally raise an `unresolved-attribute` error
-reveal_type(C().x)  # revealed: str
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
+
+class C:
+    def __init__(self) -> None:
+        if (2 + 3) < 4:
+            self.x = "a"
+
+# error: [unresolved-attribute]
+reveal_type(C().x)  # revealed: Unknown
 ```
 
 ```py
@@ -627,15 +635,11 @@ class C:
             # error: [unresolved-attribute]
             self.e = e
 
-# TODO: this would ideally be `Unknown | Literal[1]`
-reveal_type(C(True).a)  # revealed: Unknown | Literal[1, "a"]
-# TODO: this would ideally raise an `unresolved-attribute` error
-reveal_type(C(True).b)  # revealed: Unknown | Literal[2]
+reveal_type(C(True).a)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C(True).b)  # revealed: Unknown
 reveal_type(C(True).c)  # revealed: Unknown | Literal[3] | str
-# Ideally, this would just be `Unknown | Literal[5]`, but we currently do not
-# attempt to analyze control flow within methods more closely. All reachable
-# attribute assignments are considered, so `self.x = 4` is also included:
-reveal_type(C(True).d)  # revealed: Unknown | Literal[4, 5]
+reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
 # error: [unresolved-attribute]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
@@ -643,6 +647,16 @@ reveal_type(C(True).e)  # revealed: Unknown
 #### Attributes considered always bound
 
 ```py
+class C:
+    def __init__(self):
+        self.x = 1
+        return
+        self.y = 2
+
+reveal_type(C().x)  # revealed: Unknown | Literal[1]
+# error: [unresolved-attribute]
+reveal_type(C().y)  # revealed: Unknown
+
 class C:
     def __init__(self, cond: bool):
         self.x = 1

@@ -453,6 +453,18 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
+    pub(crate) fn referable_member_bindings(
+        &self,
+        db: &'db dyn crate::Db,
+        member: ScopedMemberId,
+    ) -> ReferableBindingWithConstraintsIterator<'_, 'db> {
+        ReferableBindingWithConstraintsIterator {
+            inner: self.end_of_scope_member_bindings(member),
+            use_def_map: self,
+            db,
+        }
+    }
+
     pub(crate) fn all_reachable_bindings(
         &self,
         place: ScopedPlaceId,
@@ -561,6 +573,18 @@ impl<'db> UseDefMap<'db> {
     ) -> DeclarationsIterator<'_, 'db> {
         let declarations = &self.reachable_definitions_by_member[member].declarations;
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
+    }
+
+    pub(crate) fn referable_member_declarations(
+        &self,
+        db: &'db dyn crate::Db,
+        member: ScopedMemberId,
+    ) -> ReferableDeclarationsIterator<'_, 'db> {
+        ReferableDeclarationsIterator {
+            inner: self.end_of_scope_member_declarations(member),
+            use_def_map: self,
+            db,
+        }
     }
 
     pub(crate) fn all_reachable_declarations(
@@ -697,16 +721,43 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
                         .iter_predicates(live_binding.narrowing_constraint),
                 },
                 reachability_constraint: live_binding.reachability_constraint,
+                reachability_constraint_before_transfer: live_binding
+                    .reachability_constraint_before_transfer,
             })
     }
 }
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
+/// An iterator of reachable bindings, i.e. bindings that were reachable before return/break etc. was invoked.
+pub(crate) struct ReferableBindingWithConstraintsIterator<'map, 'db> {
+    inner: BindingWithConstraintsIterator<'map, 'db>,
+    use_def_map: &'map UseDefMap<'db>,
+    db: &'db dyn crate::Db,
+}
+
+impl<'map, 'db> Iterator for ReferableBindingWithConstraintsIterator<'map, 'db> {
+    type Item = BindingWithConstraints<'map, 'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.by_ref().find(|binding_with_constraints| {
+            match binding_with_constraints.reachability_constraint_before_transfer {
+                Some(reachability_before_transfer) => self
+                    .use_def_map
+                    .is_reachable(self.db, reachability_before_transfer),
+                None => self
+                    .use_def_map
+                    .is_reachable(self.db, binding_with_constraints.reachability_constraint),
+            }
+        })
+    }
+}
+
 pub(crate) struct BindingWithConstraints<'map, 'db> {
     pub(crate) binding: DefinitionState<'db>,
     pub(crate) narrowing_constraint: ConstraintsIterator<'map, 'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
+    pub(crate) reachability_constraint_before_transfer: Option<ScopedReachabilityConstraintId>,
 }
 
 pub(crate) struct ConstraintsIterator<'map, 'db> {
@@ -765,6 +816,7 @@ pub(crate) struct DeclarationsIterator<'map, 'db> {
 pub(crate) struct DeclarationWithConstraint<'db> {
     pub(crate) declaration: DefinitionState<'db>,
     pub(crate) reachability_constraint: ScopedReachabilityConstraintId,
+    pub(crate) reachability_constraint_before_transfer: Option<ScopedReachabilityConstraintId>,
 }
 
 impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
@@ -775,10 +827,13 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
             |LiveDeclaration {
                  declaration,
                  reachability_constraint,
+                 reachability_constraint_before_transfer,
              }| {
                 DeclarationWithConstraint {
                     declaration: self.all_definitions[*declaration],
                     reachability_constraint: *reachability_constraint,
+                    reachability_constraint_before_transfer:
+                        *reachability_constraint_before_transfer,
                 }
             },
         )
@@ -786,6 +841,33 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 }
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
+
+/// An iterator of reachable declarations, i.e. declarations that were reachable before return/break etc. was invoked.
+pub(crate) struct ReferableDeclarationsIterator<'map, 'db> {
+    inner: DeclarationsIterator<'map, 'db>,
+    use_def_map: &'map UseDefMap<'db>,
+    db: &'db dyn crate::Db,
+}
+
+impl<'db> Iterator for ReferableDeclarationsIterator<'_, 'db> {
+    type Item = DeclarationWithConstraint<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.by_ref().find(
+            |declaration_with_constraints| match declaration_with_constraints
+                .reachability_constraint_before_transfer
+            {
+                Some(reachability_before_transfer) => self
+                    .use_def_map
+                    .is_reachable(self.db, reachability_before_transfer),
+                None => self.use_def_map.is_reachable(
+                    self.db,
+                    declaration_with_constraints.reachability_constraint,
+                ),
+            },
+        )
+    }
+}
 
 #[derive(Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 struct ReachableDefinitions {
@@ -877,21 +959,15 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    pub(super) fn mark_unreachable(&mut self) {
+    pub(super) fn mark_transferred(&mut self) {
         self.reachability = ScopedReachabilityConstraintId::ALWAYS_FALSE;
 
         for state in &mut self.symbol_states {
-            state.record_reachability_constraint(
-                &mut self.reachability_constraints,
-                ScopedReachabilityConstraintId::ALWAYS_FALSE,
-            );
+            state.mark_transferred(&mut self.reachability_constraints);
         }
 
         for state in &mut self.member_states {
-            state.record_reachability_constraint(
-                &mut self.reachability_constraints,
-                ScopedReachabilityConstraintId::ALWAYS_FALSE,
-            );
+            state.mark_transferred(&mut self.reachability_constraints);
         }
     }
 
