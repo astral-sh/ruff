@@ -8,7 +8,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
     MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, todo_type,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -381,7 +381,12 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         Some(match ty {
             Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
-            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::Class(class) => SubclassOfInner::Class(class),
+                TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
+                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
+                ),
+            },
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),

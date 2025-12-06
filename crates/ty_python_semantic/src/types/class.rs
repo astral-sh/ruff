@@ -41,7 +41,7 @@ use crate::types::{
     determine_upper_bound,
 };
 use crate::{
-    Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
+    Db, FxIndexMap, FxIndexSet, FxOrderMap, FxOrderSet, Program,
     module_resolver::file_to_module,
     place::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
@@ -158,8 +158,8 @@ fn fields_cycle_initial<'db>(
     _self: ClassLiteral<'db>,
     _specialization: Option<Specialization<'db>>,
     _field_policy: CodeGeneratorKind<'db>,
-) -> FxIndexMap<Name, Field<'db>> {
-    FxIndexMap::default()
+) -> FxOrderMap<Name, Field<'db>> {
+    FxOrderMap::default()
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -1388,7 +1388,7 @@ impl MethodDecorator {
 }
 
 /// Kind-specific metadata for different types of fields
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum FieldKind<'db> {
     /// `NamedTuple` field metadata
     NamedTuple { default_ty: Option<Type<'db>> },
@@ -1416,8 +1416,8 @@ pub(crate) enum FieldKind<'db> {
 }
 
 /// Metadata regarding a dataclass field/attribute or a `TypedDict` "item" / key-value pair.
-#[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Field<'db> {
+#[derive(Debug, Clone, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub struct Field<'db> {
     /// The declared type of the field
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
@@ -1427,7 +1427,7 @@ pub(crate) struct Field<'db> {
     pub(crate) first_declaration: Option<Definition<'db>>,
 }
 
-impl Field<'_> {
+impl<'db> Field<'db> {
     pub(crate) const fn is_required(&self) -> bool {
         match &self.kind {
             FieldKind::NamedTuple { default_ty } => default_ty.is_none(),
@@ -1446,9 +1446,35 @@ impl Field<'_> {
             _ => false,
         }
     }
-}
 
-impl<'db> Field<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Field {
+            kind: self.kind,
+            first_declaration: self.first_declaration,
+            declared_ty: self
+                .declared_ty
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+        }
+    }
+
+    pub(super) fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        Field {
+            kind: self.kind.clone(),
+            first_declaration: None,
+            declared_ty: self.declared_ty.normalized_impl(db, visitor),
+        }
+    }
+
     /// Returns true if this field is a `dataclasses.KW_ONLY` sentinel.
     /// <https://docs.python.org/3/library/dataclasses.html#dataclasses.KW_ONLY>
     pub(crate) fn is_kw_only_sentinel(&self, db: &'db dyn Db) -> bool {
@@ -1913,7 +1939,7 @@ impl<'db> ClassLiteral<'db> {
     }
 
     /// Compute `TypedDict` parameters dynamically based on MRO detection and AST parsing.
-    fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
+    pub(super) fn typed_dict_params(self, db: &'db dyn Db) -> Option<TypedDictParams> {
         if !self.is_typed_dict(db) {
             return None;
         }
@@ -3004,7 +3030,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> FxOrderMap<Name, Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -3052,8 +3078,8 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxIndexMap<Name, Field<'db>> {
-        let mut attributes = FxIndexMap::default();
+    ) -> FxOrderMap<Name, Field<'db>> {
+        let mut attributes = FxOrderMap::default();
 
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);

@@ -12,10 +12,14 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
+use crate::semantic_index::definition::Definition;
 use crate::types::constraints::ConstraintSet;
 use crate::types::generics::InferableTypeVars;
-use crate::types::{HasRelationToVisitor, IsDisjointVisitor, TypeContext, TypeRelation};
-use crate::{Db, FxIndexMap};
+use crate::types::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
+    TypeRelation,
+};
+use crate::{Db, FxOrderMap};
 
 use ordermap::OrderSet;
 
@@ -41,24 +45,35 @@ impl Default for TypedDictParams {
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
+pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
+    Class(ClassType<'db>),
+    /// A `TypedDict` that doesn't correspond to a class definition, either because it's been
+    /// `normalized`, or because it's been synthesized to represent constraints.
+    Synthesized(SynthesizedTypedDictType<'db>),
 }
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
-        Self { defining_class }
+        Self::Class(defining_class)
     }
 
-    pub(crate) fn defining_class(self) -> ClassType<'db> {
-        self.defining_class
+    pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
+        match self {
+            Self::Class(defining_class) => Some(defining_class),
+            Self::Synthesized(_) => None,
+        }
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> &'db FxIndexMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db FxOrderMap<Name, Field<'db>> {
+        match self {
+            Self::Class(defining_class) => {
+                let (class_literal, specialization) = defining_class.class_literal(db);
+                class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+            }
+            Self::Synthesized(synthesized) => synthesized.items(db),
+        }
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -69,12 +84,12 @@ impl<'db> TypedDictType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
-        Self {
-            defining_class: self.defining_class.apply_type_mapping_impl(
-                db,
-                type_mapping,
-                tcx,
-                visitor,
+        match self {
+            Self::Class(defining_class) => {
+                Self::Class(defining_class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Self::Synthesized(synthesized) => Self::Synthesized(
+                synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
         }
     }
@@ -93,9 +108,9 @@ impl<'db> TypedDictType<'db> {
         // First do a quick nominal check that (if it succeeds) means that we can avoid
         // materializing the full `TypedDict` schema for either `self` or `target`.
         // This should be cheaper in many cases, and also helps us avoid some cycles.
-        if self
-            .defining_class
-            .is_subclass_of(db, target.defining_class)
+        if let Some(defining_class) = self.defining_class()
+            && let Some(target_defining_class) = target.defining_class()
+            && defining_class.is_subclass_of(db, target_defining_class)
         {
             return ConstraintSet::from(true);
         }
@@ -246,6 +261,66 @@ impl<'db> TypedDictType<'db> {
         }
         constraints
     }
+
+    pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self {
+            TypedDictType::Class(defining_class) => Some(defining_class.definition(db)),
+            TypedDictType::Synthesized(_) => None,
+        }
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        match self {
+            TypedDictType::Class(_) => {
+                let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+            }
+            TypedDictType::Synthesized(synthesized) => {
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+            }
+        }
+    }
+
+    pub(crate) fn is_equivalent_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: TypedDictType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the
+        // params at all, because `total` is already incorporated into `FieldKind`.
+
+        // Compare the fields without requiring them to be in sorted order. Class-based `TypedDict`
+        // fields are not sorted. We do sort synthetic fields in `normalized_impl`, but there will
+        // soon be other sources of `SynthesizedTypedDictType` besides normalization.
+        if self.items(db).len() != other.items(db).len() {
+            return ConstraintSet::from(false);
+        }
+        let other_items = other.items(db);
+        let mut constraints = ConstraintSet::from(true);
+        for (name, field) in self.items(db) {
+            let Some(other_field) = other_items.get(name) else {
+                return ConstraintSet::from(false);
+            };
+            if field.kind != other_field.kind {
+                return ConstraintSet::from(false);
+            }
+            constraints.intersect(
+                db,
+                field.declared_ty.is_equivalent_to_impl(
+                    db,
+                    other_field.declared_ty,
+                    inferable,
+                    visitor,
+                ),
+            );
+            if constraints.is_never_satisfied(db) {
+                return constraints;
+            }
+        }
+        constraints
+    }
 }
 
 pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -253,7 +328,16 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
+    match typed_dict {
+        TypedDictType::Class(defining_class) => {
+            visitor.visit_type(db, defining_class.into());
+        }
+        TypedDictType::Synthesized(synthesized) => {
+            for field in synthesized.items(db).values() {
+                visitor.visit_type(db, field.declared_ty);
+            }
+        }
+    }
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
@@ -629,5 +713,57 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
         Ok(provided_keys)
     } else {
         Err(provided_keys)
+    }
+}
+
+#[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct SynthesizedTypedDictType<'db> {
+    #[returns(ref)]
+    pub(crate) items: FxOrderMap<Name, Field<'db>>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
+
+impl<'db> SynthesizedTypedDictType<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
+                (name.clone(), field)
+            })
+            .collect::<FxOrderMap<_, _>>();
+
+        SynthesizedTypedDictType::new(db, items)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let mut items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field.clone().normalized_impl(db, visitor);
+                (name.clone(), field)
+            })
+            .collect::<FxOrderMap<_, _>>();
+        // `Hash`/`Eq` for `FxOrderMap` includes the key order, so we need to sort.
+        items.sort_unstable_keys();
+        Self::new(db, items)
+    }
+
+    fn heap_size((items,): &(FxOrderMap<Name, Field<'db>>,)) -> usize {
+        ruff_memory_usage::order_map_heap_size(items)
     }
 }
