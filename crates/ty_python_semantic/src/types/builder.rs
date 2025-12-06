@@ -629,13 +629,7 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
-    pub(crate) fn try_build(mut self) -> Option<Type<'db>> {
-        // If the type is defined recursively, the union type is sorted and normalized.
-        // This is because the execution order of the queries is not deterministic and may result in a different order of elements.
-        // The order of the union type does not affect the type check result, but unstable output is undesirable.
-        if self.recursively_defined.is_yes() {
-            self.order_elements = true;
-        }
+    pub(crate) fn try_build(self) -> Option<Type<'db>> {
         let mut types = vec![];
         for element in self.elements {
             match element {
@@ -659,6 +653,8 @@ impl<'db> UnionBuilder<'db> {
                     union_or_intersection_elements_ordering(self.db, l, r)
                 }
             });
+        } else {
+            types.sort_unstable_by(|l, r| structural_type_ordering(self.db, l, r));
         }
         match types.len() {
             0 => None,
