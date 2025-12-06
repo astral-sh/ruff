@@ -182,7 +182,11 @@ impl Declarations {
                         b.reachability_constraint_before_transfer,
                     ) {
                         (Some(a), Some(b)) => {
-                            Some(reachability_constraints.add_or_constraint(a, b))
+                            debug_assert_eq!(
+                                a, b,
+                                "`reachability_constraint_before_transfer` should be a unique ID."
+                            );
+                            Some(a)
                         }
                         (Some(a), None) => Some(a),
                         (None, Some(b)) => Some(b),
@@ -404,7 +408,11 @@ impl Bindings {
                         b.reachability_constraint_before_transfer,
                     ) {
                         (Some(a), Some(b)) => {
-                            Some(reachability_constraints.add_or_constraint(a, b))
+                            debug_assert_eq!(
+                                a, b,
+                                "`reachability_constraint_before_transfer` should be a unique ID."
+                            );
+                            Some(a)
                         }
                         (Some(a), None) => Some(a),
                         (None, Some(b)) => Some(b),
