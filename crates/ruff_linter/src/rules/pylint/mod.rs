@@ -16,10 +16,10 @@ mod tests {
     use crate::registry::Rule;
     use crate::rules::{flake8_tidy_imports, pylint};
 
-    use crate::assert_diagnostics;
     use crate::settings::LinterSettings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Rule::SingledispatchMethod, Path::new("singledispatch_method.py"))]
     #[test_case(
@@ -250,6 +250,32 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(
+        Rule::UselessExceptionStatement,
+        Path::new("useless_exception_statement.py")
+    )]
+    fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "preview__{}_{}",
+            rule_code.noqa_code(),
+            path.to_string_lossy()
+        );
+
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pylint").join(path).as_path(),
+            &LinterSettings {
+                preview: PreviewMode::Disabled,
+                ..LinterSettings::for_rule(rule_code)
+            },
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
         Ok(())
     }
 
