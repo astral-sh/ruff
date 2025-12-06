@@ -741,6 +741,9 @@ impl<'map, 'db> Iterator for ReferableBindingWithConstraintsIterator<'map, 'db> 
 
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.by_ref().find(|binding_with_constraints| {
+            if !binding_with_constraints.binding.is_defined() {
+                return false;
+            }
             match binding_with_constraints.reachability_constraint_before_transfer {
                 Some(reachability_before_transfer) => self
                     .use_def_map
@@ -853,10 +856,11 @@ impl<'db> Iterator for ReferableDeclarationsIterator<'_, 'db> {
     type Item = DeclarationWithConstraint<'db>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.inner.by_ref().find(
-            |declaration_with_constraints| match declaration_with_constraints
-                .reachability_constraint_before_transfer
-            {
+        self.inner.by_ref().find(|declaration_with_constraints| {
+            if !declaration_with_constraints.declaration.is_defined() {
+                return false;
+            }
+            match declaration_with_constraints.reachability_constraint_before_transfer {
                 Some(reachability_before_transfer) => self
                     .use_def_map
                     .is_reachable(self.db, reachability_before_transfer),
@@ -864,8 +868,8 @@ impl<'db> Iterator for ReferableDeclarationsIterator<'_, 'db> {
                     self.db,
                     declaration_with_constraints.reachability_constraint,
                 ),
-            },
-        )
+            }
+        })
     }
 }
 

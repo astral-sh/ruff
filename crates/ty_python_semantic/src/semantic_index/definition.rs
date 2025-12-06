@@ -193,6 +193,10 @@ pub(crate) enum DefinitionState<'db> {
 }
 
 impl<'db> DefinitionState<'db> {
+    pub(crate) fn is_defined(self) -> bool {
+        matches!(self, DefinitionState::Defined(_))
+    }
+
     pub(crate) fn is_defined_and(self, f: impl Fn(Definition<'db>) -> bool) -> bool {
         matches!(self, DefinitionState::Defined(def) if f(def))
     }

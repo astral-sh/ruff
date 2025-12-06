@@ -3341,7 +3341,7 @@ impl<'db> ClassLiteral<'db> {
             for attribute_declaration in attribute_declarations {
                 let DefinitionState::Defined(declaration) = attribute_declaration.declaration
                 else {
-                    continue;
+                    unreachable!();
                 };
 
                 let DefinitionKind::AnnotatedAssignment(assignment) = declaration.kind(db) else {
@@ -3434,12 +3434,8 @@ impl<'db> ClassLiteral<'db> {
             }
 
             for attribute_assignment in attribute_assignments {
-                if let DefinitionState::Undefined = attribute_assignment.binding {
-                    continue;
-                }
-
                 let DefinitionState::Defined(binding) = attribute_assignment.binding else {
-                    continue;
+                    unreachable!();
                 };
 
                 if !is_method_reachable.is_always_false() {
