@@ -729,7 +729,7 @@ impl<'map, 'db> Iterator for BindingWithConstraintsIterator<'map, 'db> {
 
 impl std::iter::FusedIterator for BindingWithConstraintsIterator<'_, '_> {}
 
-/// An iterator of reachable bindings, i.e. bindings that were reachable before return/break etc. was invoked.
+/// An iterator of referable bindings, i.e. bindings that were reachable before return/break etc. was invoked.
 pub(crate) struct ReferableBindingWithConstraintsIterator<'map, 'db> {
     inner: BindingWithConstraintsIterator<'map, 'db>,
     use_def_map: &'map UseDefMap<'db>,
@@ -845,7 +845,7 @@ impl<'db> Iterator for DeclarationsIterator<'_, 'db> {
 
 impl std::iter::FusedIterator for DeclarationsIterator<'_, '_> {}
 
-/// An iterator of reachable declarations, i.e. declarations that were reachable before return/break etc. was invoked.
+/// An iterator of referable declarations, i.e. declarations that were reachable before return/break etc. was invoked.
 pub(crate) struct ReferableDeclarationsIterator<'map, 'db> {
     inner: DeclarationsIterator<'map, 'db>,
     use_def_map: &'map UseDefMap<'db>,

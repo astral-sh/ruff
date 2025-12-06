@@ -644,6 +644,28 @@ reveal_type(C(True).d)  # revealed: Unknown | Literal[5]
 reveal_type(C(True).e)  # revealed: Unknown
 ```
 
+#### Attributes defined in possibly-unreachable branches
+
+```py
+from typing import Callable
+
+class C:
+    def __init__(self, cond: Callable[[], bool]) -> None:
+        i = 0
+        while cond():
+            i += 1
+
+        # TODO: this should be `int`
+        reveal_type(i)  # revealed: Literal[0, 1]
+        if i < 100:
+            return
+        self.x = 1
+
+# TODO: this should be a possibly-unresolved-attribute error, not unresolved-attribute
+# error: [unresolved-attribute]
+reveal_type(C(lambda: False).x)  # revealed: Unknown
+```
+
 #### Attributes considered always bound
 
 ```py
