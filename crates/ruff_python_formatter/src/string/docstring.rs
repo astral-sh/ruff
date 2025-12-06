@@ -1098,8 +1098,8 @@ impl<'src> CodeExampleRst<'src> {
                 return false;
             };
 
-            // Line must end with only whitespace after the language identifier
-            rest.trim().is_empty()
+            // Line must end immediately after the language identifier (no trailing whitespace)
+            rest.is_empty()
         }
 
         if !is_rst_directive_start(original.line) {
@@ -1511,8 +1511,11 @@ impl<'src> CodeExampleMarkdown<'src> {
             return Some((kind, fence_len));
         }
 
-        // Check if it starts with a Python language identifier using state machine
-        // The state machine only matches if followed by whitespace or end of string
+        // Check if it starts with a Python language identifier using state machine.
+        // NOTE: This is stricter than the original regex which matched any info string
+        // starting with py/python (e.g., "python-repl" would have matched). We now require
+        // an exact language identifier followed by whitespace or end of string, which is
+        // more conservative and avoids matching non-Python formats like "pycon" or "python-repl".
         if strip_python_lang_prefix(info_string).is_some() {
             return Some((kind, fence_len));
         }
