@@ -21,3 +21,46 @@ B901 Using `yield` and `return {value}` in a generator function can lead to conf
 37 |
 38 |     yield from not_broken()
    |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> B901.py:56:5
+   |
+55 | def broken3():
+56 |     return (yield from [])
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> B901.py:61:5
+   |
+59 | def broken4():
+60 |     x = yield from []
+61 |     return x
+   |     ^^^^^^^^
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> B901.py:72:5
+   |
+71 |     inner((yield from []))
+72 |     return x
+   |     ^^^^^^^^
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> B901.py:83:5
+   |
+81 | async def broken6():
+82 |     yield 1
+83 |     return foo()
+   |     ^^^^^^^^^^^^
+   |
+
+B901 Using `yield` and `return {value}` in a generator function can lead to confusing behavior
+  --> B901.py:88:5
+   |
+86 | async def broken7():
+87 |     yield 1
+88 |     return [1, 2, 3]
+   |     ^^^^^^^^^^^^^^^^
+   |

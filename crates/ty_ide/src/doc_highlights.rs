@@ -230,10 +230,58 @@ calc = Calculator()
             "
 def test():
     # Cursor on a position with no symbol
-    <CURSOR>  
+    <CURSOR>
 ",
         );
 
         assert_snapshot!(test.document_highlights(), @"No highlights found");
+    }
+
+    // TODO: Should only highlight the last use and the last declaration
+    #[test]
+    fn redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.document_highlights(), @r#"
+        info[document_highlights]: Highlight 1 (Write)
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          |
+
+        info[document_highlights]: Highlight 2 (Write)
+         --> main.py:4:1
+          |
+        2 | a: str = "test"
+        3 |
+        4 | a: int = 10
+          | ^
+        5 |
+        6 | print(a)
+          |
+
+        info[document_highlights]: Highlight 3 (Read)
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+          |
+        "#);
     }
 }

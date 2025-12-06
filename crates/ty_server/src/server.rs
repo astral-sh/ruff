@@ -72,15 +72,8 @@ impl Server {
         tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
 
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = server_capabilities(
-            position_encoding,
-            resolved_client_capabilities,
-            &initialization_options
-                .options
-                .global
-                .clone()
-                .into_settings(),
-        );
+        let server_capabilities =
+            server_capabilities(position_encoding, resolved_client_capabilities);
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
         tracing::info!("Version: {version}");

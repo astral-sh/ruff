@@ -11,6 +11,8 @@ use crate::ExprRef;
 /// Note that without a parent the range can be inaccurate, e.g. `f(a)` we falsely return a set of
 /// parentheses around `a` even if the parentheses actually belong to `f`. That is why you should
 /// generally prefer [`parenthesized_range`].
+///
+/// Prefer [`crate::token::parentheses_iterator`] if you have access to [`crate::token::Tokens`].
 pub fn parentheses_iterator<'a>(
     expr: ExprRef<'a>,
     parent: Option<AnyNodeRef>,
@@ -57,6 +59,8 @@ pub fn parentheses_iterator<'a>(
 
 /// Returns the [`TextRange`] of a given expression including parentheses, if the expression is
 /// parenthesized; or `None`, if the expression is not parenthesized.
+///
+/// Prefer [`crate::token::parenthesized_range`] if you have access to [`crate::token::Tokens`].
 pub fn parenthesized_range(
     expr: ExprRef,
     parent: AnyNodeRef,

@@ -22,10 +22,10 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -54,11 +54,11 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version = wut
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -87,11 +87,11 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version_info = no-really-wut
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -132,7 +132,7 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 implementation = CPython
 uv = 0.7.6
 version_info = 3.13.2
@@ -141,7 +141,7 @@ prompt = ruff
 extends-environment = /.other-environment
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```
@@ -182,12 +182,12 @@ python = "/.venv"
 `/.venv/pyvenv.cfg`:
 
 ```cfg
-home = /doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin
+home = /do/re/mi//cpython-3.13.2-macos-aarch64-none/bin
 version_info = 3.13
 command = /.pyenv/versions/3.13.3/bin/python3.13 -m venv --without-pip --prompt="python-default/3.13.3" /somewhere-else/python/virtualenvs/python-default/3.13.3
 ```
 
-`/doo/doo/wop/cpython-3.13.2-macos-aarch64-none/bin/python`:
+`/do/re/mi//cpython-3.13.2-macos-aarch64-none/bin/python`:
 
 ```text
 ```

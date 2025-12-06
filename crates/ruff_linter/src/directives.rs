@@ -5,8 +5,8 @@ use std::str::FromStr;
 
 use bitflags::bitflags;
 
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_index::Indexer;
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::CommentRanges;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};

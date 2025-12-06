@@ -32,6 +32,7 @@ impl BackgroundDocumentRequestHandler for PrepareRenameRequestHandler {
         if snapshot
             .workspace_settings()
             .is_language_services_disabled()
+            || !snapshot.global_settings().is_rename_enabled()
         {
             return Ok(None);
         }

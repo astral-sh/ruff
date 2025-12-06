@@ -488,11 +488,110 @@ class C(A):
         pass
 
     if coinflip():
-        def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+        def method2(self) -> None: ...  # error: [override-of-final-method]
     else:
-        def method2(self) -> None: ...  # TODO: should emit [override-of-final-method]
+        def method2(self) -> None: ...
 
     if coinflip():
         def method3(self) -> None: ...  # error: [override-of-final-method]
-        def method4(self) -> None: ...  # error: [override-of-final-method]
+
+    # TODO: we should emit Liskov violations here too:
+    if coinflip():
+        method4 = 42  # error: [override-of-final-method]
+    else:
+        method4 = 56
+```
+
+## Definitions in statically known branches
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+import sys
+from typing_extensions import final
+
+class Parent:
+    if sys.version_info >= (3, 10):
+        @final
+        def foo(self) -> None: ...
+        @final
+        def foooo(self) -> None: ...
+        @final
+        def baaaaar(self) -> None: ...
+    else:
+        @final
+        def bar(self) -> None: ...
+        @final
+        def baz(self) -> None: ...
+        @final
+        def spam(self) -> None: ...
+
+class Child(Parent):
+    def foo(self) -> None: ...  # error: [override-of-final-method]
+
+    # The declaration on `Parent` is not reachable,
+    # so this is fine
+    def bar(self) -> None: ...
+
+    if sys.version_info >= (3, 10):
+        def foooo(self) -> None: ...  # error: [override-of-final-method]
+        def baz(self) -> None: ...
+    else:
+        # Fine because this doesn't override any reachable definitions
+        def foooo(self) -> None: ...
+        # There are `@final` definitions being overridden here,
+        # but the definitions that override them are unreachable
+        def spam(self) -> None: ...
+        def baaaaar(self) -> None: ...
+```
+
+## Overloads in statically-known branches in stub files
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```pyi
+import sys
+from typing_extensions import overload, final
+
+class Foo:
+    if sys.version_info >= (3, 10):
+        @overload
+        @final
+        def method(self, x: int) -> int: ...
+    else:
+        @overload
+        def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...
+
+    if sys.version_info >= (3, 10):
+        @overload
+        def method2(self, x: int) -> int: ...
+    else:
+        @overload
+        @final
+        def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
+
+class Bar(Foo):
+    @overload
+    def method(self, x: int) -> int: ...
+    @overload
+    def method(self, x: str) -> str: ...  # error: [override-of-final-method]
+
+    # This is fine: the only overload that is marked `@final`
+    # is in a statically-unreachable branch
+    @overload
+    def method2(self, x: int) -> int: ...
+    @overload
+    def method2(self, x: str) -> str: ...
 ```

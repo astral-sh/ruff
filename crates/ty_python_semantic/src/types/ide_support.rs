@@ -1,27 +1,17 @@
-use std::cmp::Ordering;
 use std::collections::HashMap;
 
-use crate::place::{
-    Place, builtins_module_scope, imported_symbol, place_from_bindings, place_from_declarations,
-};
+use crate::FxIndexSet;
+use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
-use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{
-    attribute_scopes, global_scope, place_table, semantic_index, use_def_map,
-};
+use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
-use crate::types::generics::Specialization;
 use crate::types::signatures::Signature;
-use crate::types::{CallDunderError, SubclassOfInner, UnionType};
-use crate::types::{
-    CallableTypes, ClassBase, ClassLiteral, KnownClass, KnownInstanceType, Type, TypeContext,
-    TypeVarBoundOrConstraints, class::CodeGeneratorKind,
-};
-use crate::{Db, DisplaySettings, HasType, NameKind, SemanticModel};
+use crate::types::{CallDunderError, UnionType};
+use crate::types::{CallableTypes, ClassBase, KnownClass, Type, TypeContext};
+use crate::{Db, DisplaySettings, HasType, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
@@ -29,505 +19,15 @@ use rustc_hash::FxHashSet;
 pub use resolve_definition::{ImportAliasResolution, ResolvedDefinition, map_stub_definition};
 use resolve_definition::{find_symbol_in_scope, resolve_definition};
 
-// `__init__`, `__repr__`, `__eq__`, `__ne__` and `__hash__` are always included via `object`,
-// so we don't need to list them here.
-const SYNTHETIC_DATACLASS_ATTRIBUTES: &[&str] = &[
-    "__lt__",
-    "__le__",
-    "__gt__",
-    "__ge__",
-    "__replace__",
-    "__setattr__",
-    "__delattr__",
-    "__slots__",
-    "__weakref__",
-    "__match_args__",
-    "__dataclass_fields__",
-    "__dataclass_params__",
-];
-
-pub(crate) fn all_declarations_and_bindings<'db>(
-    db: &'db dyn Db,
-    scope_id: ScopeId<'db>,
-) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
-    let use_def_map = use_def_map(db, scope_id);
-    let table = place_table(db, scope_id);
-
-    use_def_map
-        .all_end_of_scope_symbol_declarations()
-        .filter_map(move |(symbol_id, declarations)| {
-            let place_result = place_from_declarations(db, declarations);
-            let definition = place_result.single_declaration;
-            place_result
-                .ignore_conflicting_declarations()
-                .place
-                .ignore_possibly_undefined()
-                .map(|ty| {
-                    let symbol = table.symbol(symbol_id);
-                    let member = Member {
-                        name: symbol.name().clone(),
-                        ty,
-                    };
-                    MemberWithDefinition { member, definition }
-                })
-        })
-        .chain(use_def_map.all_end_of_scope_symbol_bindings().filter_map(
-            move |(symbol_id, bindings)| {
-                // It's not clear to AG how to using a bindings
-                // iterator here to get the correct definition for
-                // this binding. Below, we look through all bindings
-                // with a definition and only take one if there is
-                // exactly one. I don't think this can be wrong, but
-                // it's probably omitting definitions in some cases.
-                let mut definition = None;
-                for binding in bindings.clone() {
-                    if let Some(def) = binding.binding.definition() {
-                        if definition.is_some() {
-                            definition = None;
-                            break;
-                        }
-                        definition = Some(def);
-                    }
-                }
-                place_from_bindings(db, bindings)
-                    .ignore_possibly_undefined()
-                    .map(|ty| {
-                        let symbol = table.symbol(symbol_id);
-                        let member = Member {
-                            name: symbol.name().clone(),
-                            ty,
-                        };
-                        MemberWithDefinition { member, definition }
-                    })
-            },
-        ))
-}
-
-struct AllMembers<'db> {
-    members: FxHashSet<Member<'db>>,
-}
-
-impl<'db> AllMembers<'db> {
-    fn of(db: &'db dyn Db, ty: Type<'db>) -> Self {
-        let mut all_members = Self {
-            members: FxHashSet::default(),
-        };
-        all_members.extend_with_type(db, ty);
-        all_members
-    }
-
-    fn extend_with_type(&mut self, db: &'db dyn Db, ty: Type<'db>) {
-        match ty {
-            Type::Union(union) => self.members.extend(
-                union
-                    .elements(db)
-                    .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
-                    .reduce(|acc, members| acc.intersection(&members).cloned().collect())
-                    .unwrap_or_default(),
-            ),
-
-            Type::Intersection(intersection) => self.members.extend(
-                intersection
-                    .positive(db)
-                    .iter()
-                    .map(|ty| AllMembers::of(db, *ty).members)
-                    .reduce(|acc, members| acc.union(&members).cloned().collect())
-                    .unwrap_or_default(),
-            ),
-
-            Type::NominalInstance(instance) => {
-                let (class_literal, specialization) = instance.class(db).class_literal(db);
-                self.extend_with_instance_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-            }
-
-            Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, Type::instance(db, newtype.base_class_type(db)));
-            }
-
-            Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
-            }
-
-            Type::GenericAlias(generic_alias) if generic_alias.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
-            }
-
-            Type::SubclassOf(subclass_of_type) if subclass_of_type.is_typed_dict(db) => {
-                self.extend_with_type(db, KnownClass::TypedDictFallback.to_class_literal(db));
-            }
-
-            Type::ClassLiteral(class_literal) => {
-                self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
-            }
-
-            Type::GenericAlias(generic_alias) => {
-                let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
-                if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                    self.extend_with_class_members(db, ty, metaclass);
-                }
-            }
-
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(_) => {
-                    self.extend_with_type(db, KnownClass::Type.to_instance(db));
-                }
-                _ => {
-                    if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        let (class_literal, specialization) = class_type.class_literal(db);
-                        self.extend_with_class_members(db, ty, class_literal);
-                        self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-                        if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                            self.extend_with_class_members(db, ty, metaclass);
-                        }
-                    }
-                }
-            },
-
-            Type::Dynamic(_) | Type::Never | Type::AlwaysTruthy | Type::AlwaysFalsy => {
-                self.extend_with_type(db, Type::object());
-            }
-
-            Type::TypeAlias(alias) => self.extend_with_type(db, alias.value_type(db)),
-
-            Type::TypeVar(bound_typevar) => {
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    None => {
-                        self.extend_with_type(db, Type::object());
-                    }
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        self.extend_with_type(db, bound);
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        self.members.extend(
-                            constraints
-                                .elements(db)
-                                .iter()
-                                .map(|ty| AllMembers::of(db, *ty).members)
-                                .reduce(|acc, members| {
-                                    acc.intersection(&members).cloned().collect()
-                                })
-                                .unwrap_or_default(),
-                        );
-                    }
-                }
-            }
-
-            Type::IntLiteral(_)
-            | Type::BooleanLiteral(_)
-            | Type::StringLiteral(_)
-            | Type::BytesLiteral(_)
-            | Type::EnumLiteral(_)
-            | Type::LiteralString
-            | Type::PropertyInstance(_)
-            | Type::FunctionLiteral(_)
-            | Type::BoundMethod(_)
-            | Type::KnownBoundMethod(_)
-            | Type::WrapperDescriptor(_)
-            | Type::DataclassDecorator(_)
-            | Type::DataclassTransformer(_)
-            | Type::Callable(_)
-            | Type::ProtocolInstance(_)
-            | Type::SpecialForm(_)
-            | Type::KnownInstance(_)
-            | Type::BoundSuper(_)
-            | Type::TypeIs(_) => match ty.to_meta_type(db) {
-                Type::ClassLiteral(class_literal) => {
-                    self.extend_with_class_members(db, ty, class_literal);
-                }
-                Type::SubclassOf(subclass_of) => {
-                    if let Some(class) = subclass_of.subclass_of().into_class(db) {
-                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
-                    }
-                }
-                Type::GenericAlias(generic_alias) => {
-                    let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, ty, class_literal);
-                }
-                _ => {}
-            },
-
-            Type::TypedDict(_) => {
-                if let Type::ClassLiteral(class_literal) = ty.to_meta_type(db) {
-                    self.extend_with_class_members(db, ty, class_literal);
-                }
-
-                if let Type::ClassLiteral(class) =
-                    KnownClass::TypedDictFallback.to_class_literal(db)
-                {
-                    self.extend_with_instance_members(db, ty, class);
-                }
-            }
-
-            Type::ModuleLiteral(literal) => {
-                self.extend_with_type(db, KnownClass::ModuleType.to_instance(db));
-                let module = literal.module(db);
-
-                let Some(file) = module.file(db) else {
-                    return;
-                };
-
-                let module_scope = global_scope(db, file);
-                let use_def_map = use_def_map(db, module_scope);
-                let place_table = place_table(db, module_scope);
-
-                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
-                    let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Defined(ty, _, _) =
-                        imported_symbol(db, file, symbol_name, None).place
-                    else {
-                        continue;
-                    };
-
-                    // Filter private symbols from stubs if they appear to be internal types
-                    let is_stub_file = file.path(db).extension() == Some("pyi");
-                    let is_private_symbol = match NameKind::classify(symbol_name) {
-                        NameKind::Dunder | NameKind::Normal => false,
-                        NameKind::Sunder => true,
-                    };
-                    if is_private_symbol && is_stub_file {
-                        match ty {
-                            Type::NominalInstance(instance)
-                                if matches!(
-                                    instance.known_class(db),
-                                    Some(
-                                        KnownClass::TypeVar
-                                            | KnownClass::TypeVarTuple
-                                            | KnownClass::ParamSpec
-                                            | KnownClass::UnionType
-                                    )
-                                ) =>
-                            {
-                                continue;
-                            }
-                            Type::ClassLiteral(class) if class.is_protocol(db) => continue,
-                            Type::KnownInstance(
-                                KnownInstanceType::TypeVar(_)
-                                | KnownInstanceType::TypeAliasType(_)
-                                | KnownInstanceType::UnionType(_)
-                                | KnownInstanceType::Literal(_)
-                                | KnownInstanceType::Annotated(_),
-                            ) => continue,
-                            _ => {}
-                        }
-                    }
-
-                    self.members.insert(Member {
-                        name: symbol_name.clone(),
-                        ty,
-                    });
-                }
-
-                self.members
-                    .extend(literal.available_submodule_attributes(db).filter_map(
-                        |submodule_name| {
-                            let ty = literal.resolve_submodule(db, &submodule_name)?;
-                            let name = submodule_name.clone();
-                            Some(Member { name, ty })
-                        },
-                    ));
-            }
-        }
-    }
-
-    /// Add members from `class_literal` (including following its
-    /// parent classes).
-    ///
-    /// `ty` should be the original type that we're adding members for.
-    /// For example, in:
-    ///
-    /// ```text
-    /// class Meta(type):
-    ///     @property
-    ///     def meta_attr(self) -> int:
-    ///         return 0
-    ///
-    /// class C(metaclass=Meta): ...
-    ///
-    /// C.<CURSOR>
-    /// ```
-    ///
-    /// then `class_literal` might be `Meta`, but `ty` should be the
-    /// type of `C`. This ensures that the descriptor protocol is
-    /// correctly used (or not used) to get the type of each member of
-    /// `C`.
-    fn extend_with_class_members(
-        &mut self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
-    ) {
-        for parent in class_literal
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
-        {
-            let parent_scope = parent.body_scope(db);
-            for memberdef in all_declarations_and_bindings(db, parent_scope) {
-                let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_undefined() else {
-                    continue;
-                };
-                self.members.insert(Member {
-                    name: memberdef.member.name,
-                    ty,
-                });
-            }
-        }
-    }
-
-    fn extend_with_instance_members(
-        &mut self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
-    ) {
-        for parent in class_literal
-            .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
-        {
-            let class_body_scope = parent.body_scope(db);
-            let file = class_body_scope.file(db);
-            let index = semantic_index(db, file);
-            for function_scope_id in attribute_scopes(db, class_body_scope) {
-                for place_expr in index.place_table(function_scope_id).members() {
-                    let Some(name) = place_expr.as_instance_attribute() else {
-                        continue;
-                    };
-                    let result = ty.member(db, name);
-                    let Some(ty) = result.place.ignore_possibly_undefined() else {
-                        continue;
-                    };
-                    self.members.insert(Member {
-                        name: Name::new(name),
-                        ty,
-                    });
-                }
-            }
-
-            // This is very similar to `extend_with_class_members`,
-            // but uses the type of the class instance to query the
-            // class member. This gets us the right type for each
-            // member, e.g., `SomeClass.__delattr__` is not a bound
-            // method, but `instance_of_SomeClass.__delattr__` is.
-            for memberdef in all_declarations_and_bindings(db, class_body_scope) {
-                let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_undefined() else {
-                    continue;
-                };
-                self.members.insert(Member {
-                    name: memberdef.member.name,
-                    ty,
-                });
-            }
-        }
-    }
-
-    fn extend_with_synthetic_members(
-        &mut self,
-        db: &'db dyn Db,
-        ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
-        specialization: Option<Specialization<'db>>,
-    ) {
-        match CodeGeneratorKind::from_class(db, class_literal, specialization) {
-            Some(CodeGeneratorKind::NamedTuple) => {
-                if ty.is_nominal_instance() {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
-                } else {
-                    self.extend_with_type(db, KnownClass::NamedTupleFallback.to_class_literal(db));
-                }
-            }
-            Some(CodeGeneratorKind::TypedDict) => {}
-            Some(CodeGeneratorKind::DataclassLike(_)) => {
-                for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
-                    if let Place::Defined(synthetic_member, _, _) = ty.member(db, attr).place {
-                        self.members.insert(Member {
-                            name: Name::from(*attr),
-                            ty: synthetic_member,
-                        });
-                    }
-                }
-            }
-            None => {}
-        }
-    }
-}
-
-/// A member of a type with an optional definition.
-#[derive(Clone, Debug, Eq, PartialEq, Hash)]
-pub struct MemberWithDefinition<'db> {
-    pub member: Member<'db>,
-    pub definition: Option<Definition<'db>>,
-}
-
-/// A member of a type.
-///
-/// This represents a single item in (ideally) the list returned by
-/// `dir(object)`.
-///
-/// The equality, comparison and hashing traits implemented for
-/// this type are done so by taking only the name into account. At
-/// present, this is because we assume the name is enough to uniquely
-/// identify each attribute on an object. This is perhaps complicated
-/// by overloads, but they only get represented by one member for
-/// now. Moreover, it is convenient to be able to sort collections of
-/// members, and a `Type` currently (as of 2025-07-09) has no way to do
-/// ordered comparisons.
-#[derive(Clone, Debug)]
-pub struct Member<'db> {
-    pub name: Name,
-    pub ty: Type<'db>,
-}
-
-impl std::hash::Hash for Member<'_> {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.name.hash(state);
-    }
-}
-
-impl Eq for Member<'_> {}
-
-impl<'db> PartialEq for Member<'db> {
-    fn eq(&self, rhs: &Member<'db>) -> bool {
-        self.name == rhs.name
-    }
-}
-
-impl<'db> Ord for Member<'db> {
-    fn cmp(&self, rhs: &Member<'db>) -> Ordering {
-        self.name.cmp(&rhs.name)
-    }
-}
-
-impl<'db> PartialOrd for Member<'db> {
-    fn partial_cmp(&self, rhs: &Member<'db>) -> Option<Ordering> {
-        Some(self.cmp(rhs))
-    }
-}
-
-/// List all members of a given type: anything that would be valid when accessed
-/// as an attribute on an object of the given type.
-pub fn all_members<'db>(db: &'db dyn Db, ty: Type<'db>) -> FxHashSet<Member<'db>> {
-    AllMembers::of(db, ty).members
-}
-
 /// Get the primary definition kind for a name expression within a specific file.
 /// Returns the first definition kind that is reachable for this name in its scope.
 /// This is useful for IDE features like semantic tokens.
 pub fn definition_for_name<'db>(
     model: &SemanticModel<'db>,
     name: &ast::ExprName,
+    alias_resolution: ImportAliasResolution,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(model, name.id.as_str(), name.into());
+    let definitions = definitions_for_name(model, name.id.as_str(), name.into(), alias_resolution);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -545,6 +45,7 @@ pub fn definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
     node: AnyNodeRef<'_>,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let file = model.file();
@@ -555,7 +56,7 @@ pub fn definitions_for_name<'db>(
         return vec![];
     };
 
-    let mut all_definitions = Vec::new();
+    let mut all_definitions = FxIndexSet::default();
 
     // Search through the scope hierarchy: start from the current scope and
     // traverse up through parent scopes to find definitions
@@ -591,13 +92,13 @@ pub fn definitions_for_name<'db>(
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
 
                 for declaration in global_declarations {
                     if let Some(def) = declaration.declaration.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
             }
@@ -618,13 +119,13 @@ pub fn definitions_for_name<'db>(
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
@@ -638,21 +139,14 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(
-            db,
-            *definition,
-            Some(name_str),
-            ImportAliasResolution::ResolveAliases,
-        );
+        let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
         resolved_definitions.extend(resolved);
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    if resolved_definitions.is_empty() {
-        let Some(builtins_scope) = builtins_module_scope(db) else {
-            return resolved_definitions;
-        };
-
+    if resolved_definitions.is_empty()
+        && let Some(builtins_scope) = builtins_module_scope(db)
+    {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
         // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
@@ -1434,13 +928,19 @@ mod resolve_definition {
                 let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
+
                 // Get the full module name being imported
                 let Some(module_name) = ModuleName::new(&alias.name) else {
                     return Vec::new(); // Invalid module name, return empty list
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, &module_name) else {
+                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
@@ -1457,7 +957,13 @@ mod resolve_definition {
                 let file = definition.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
-                let name = &import_from_def.alias(&module).name;
+                let alias = import_from_def.alias(&module);
+
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
@@ -1465,7 +971,7 @@ mod resolve_definition {
                     db,
                     file,
                     import_node,
-                    name,
+                    &alias.name,
                     visited,
                     alias_resolution,
                 )
@@ -1527,7 +1033,7 @@ mod resolve_definition {
             else {
                 return Vec::new();
             };
-            let Some(resolved_module) = resolve_module(db, &module_name) else {
+            let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                 return Vec::new();
             };
             resolved_module.file(db)
@@ -1636,7 +1142,12 @@ mod resolve_definition {
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
-        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        // We need to pass an importing file to `resolve_real_module` which is a bit odd
+        // here because there isn't really an importing file. However this `resolve_real_module`
+        // can be understood as essentially `import .`, which is also what `file_to_module` is,
+        // so this is in fact exactly the file we want to consider the importer.
+        let real_module =
+            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
         let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));

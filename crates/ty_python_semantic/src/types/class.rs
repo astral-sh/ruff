@@ -32,12 +32,13 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypes, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypeKind,
+    CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -353,9 +354,18 @@ impl<'db> From<GenericAlias<'db>> for Type<'db> {
     }
 }
 
+fn variance_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self: GenericAlias<'db>,
+    _typevar: BoundTypeVarInstance<'db>,
+) -> TypeVarVariance {
+    TypeVarVariance::Bivariant
+}
+
 #[salsa::tracked]
 impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
-    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size, cycle_initial=variance_of_cycle_initial)]
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         let origin = self.origin(db);
 
@@ -1025,8 +1035,11 @@ impl<'db> ClassType<'db> {
 
                         let getitem_signature =
                             CallableSignature::from_overloads(overload_signatures);
-                        let getitem_type =
-                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        let getitem_type = Type::Callable(CallableType::new(
+                            db,
+                            getitem_signature,
+                            CallableTypeKind::FunctionLike,
+                        ));
                         Member::definitely_declared(getitem_type)
                     })
                     .unwrap_or_else(fallback_member_lookup)
@@ -1137,6 +1150,13 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
+        // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
+        // then relying on the call binding machinery to Just Work™?
+
+        let (class_literal, _) = self.class_literal(db);
+        let class_generic_context = class_literal.generic_context(db);
+
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -1185,7 +1205,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                true,
+                CallableTypeKind::FunctionLike,
             );
 
             if returns_non_subclass {
@@ -1210,39 +1230,58 @@ impl<'db> ClassType<'db> {
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
-        let synthesized_dunder_init_callable =
-            if let Place::Defined(ty, _, _) = dunder_init_function_symbol {
-                let signature = match ty {
-                    Type::FunctionLiteral(dunder_init_function) => {
-                        Some(dunder_init_function.signature(db))
-                    }
-                    Type::Callable(callable) => Some(callable.signatures(db)),
-                    _ => None,
+        let synthesized_dunder_init_callable = if let Place::Defined(ty, _, _) =
+            dunder_init_function_symbol
+        {
+            let signature = match ty {
+                Type::FunctionLiteral(dunder_init_function) => {
+                    Some(dunder_init_function.signature(db))
+                }
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            };
+
+            if let Some(signature) = signature {
+                let synthesized_signature = |signature: &Signature<'db>| {
+                    let self_annotation = signature
+                        .parameters()
+                        .get_positional(0)
+                        .and_then(Parameter::annotated_type)
+                        .filter(|ty| {
+                            ty.as_typevar()
+                                .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
+                        });
+                    let return_type = self_annotation.unwrap_or(correct_return_type);
+                    let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    let generic_context = GenericContext::merge_optional(
+                        db,
+                        class_generic_context,
+                        signature.generic_context,
+                    );
+                    Signature::new_generic(
+                        generic_context,
+                        signature.parameters().clone(),
+                        Some(return_type),
+                    )
+                    .with_definition(signature.definition())
+                    .bind_self(db, Some(instance_ty))
                 };
 
-                if let Some(signature) = signature {
-                    let synthesized_signature = |signature: &Signature<'db>| {
-                        let instance_ty = Type::instance(db, self);
-                        Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                            .with_definition(signature.definition())
-                            .bind_self(db, Some(instance_ty))
-                    };
+                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                    signature.overloads.iter().map(synthesized_signature),
+                );
 
-                    let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                        signature.overloads.iter().map(synthesized_signature),
-                    );
-
-                    Some(CallableType::new(
-                        db,
-                        synthesized_dunder_init_signature,
-                        true,
-                    ))
-                } else {
-                    None
-                }
+                Some(CallableType::new(
+                    db,
+                    synthesized_dunder_init_signature,
+                    CallableTypeKind::FunctionLike,
+                ))
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
@@ -1265,9 +1304,13 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
+                if let Place::Defined(Type::FunctionLiteral(mut new_function), _, _) =
                     new_function_symbol
                 {
+                    if let Some(class_generic_context) = class_generic_context {
+                        new_function =
+                            new_function.with_inherited_generic_context(db, class_generic_context);
+                    }
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
@@ -1277,7 +1320,11 @@ impl<'db> ClassType<'db> {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::empty(),
+                            Some(correct_return_type),
+                        ),
                     ))
                 }
             }
@@ -1401,9 +1448,9 @@ pub(crate) struct Field<'db> {
     pub(crate) declared_ty: Type<'db>,
     /// Kind-specific metadata for this field
     pub(crate) kind: FieldKind<'db>,
-    /// The original declaration of this field, if there is exactly one.
+    /// The first declaration of this field.
     /// This field is used for backreferences in diagnostics.
-    pub(crate) single_declaration: Option<Definition<'db>>,
+    pub(crate) first_declaration: Option<Definition<'db>>,
 }
 
 impl Field<'_> {
@@ -2063,9 +2110,11 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
-                Type::Callable(callable_ty) => {
-                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
-                }
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
@@ -2660,7 +2709,7 @@ impl<'db> ClassLiteral<'db> {
                             ),
                             Some(Type::none(db)),
                         )),
-                        true,
+                        CallableTypeKind::FunctionLike,
                     )));
                 }
 
@@ -2686,7 +2735,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
@@ -2713,7 +2762,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
@@ -2821,7 +2870,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
@@ -2881,7 +2930,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
@@ -2909,7 +2958,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
@@ -3065,7 +3114,7 @@ impl<'db> ClassLiteral<'db> {
             let symbol = table.symbol(symbol_id);
 
             let result = place_from_declarations(db, declarations.clone());
-            let single_declaration = result.single_declaration;
+            let first_declaration = result.first_declaration;
             let attr = result.ignore_conflicting_declarations();
             if attr.is_class_var() {
                 continue;
@@ -3073,7 +3122,9 @@ impl<'db> ClassLiteral<'db> {
 
             if let Some(attr_ty) = attr.place.ignore_possibly_undefined() {
                 let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                let mut default_ty = place_from_bindings(db, bindings).ignore_possibly_undefined();
+                let mut default_ty = place_from_bindings(db, bindings)
+                    .place
+                    .ignore_possibly_undefined();
 
                 default_ty =
                     default_ty.map(|ty| ty.apply_optional_specialization(db, specialization));
@@ -3131,7 +3182,7 @@ impl<'db> ClassLiteral<'db> {
                 let mut field = Field {
                     declared_ty: attr_ty.apply_optional_specialization(db, specialization),
                     kind,
-                    single_declaration,
+                    first_declaration,
                 };
 
                 // Check if this is a KW_ONLY sentinel and mark subsequent fields as keyword-only
@@ -3614,7 +3665,7 @@ impl<'db> ClassLiteral<'db> {
                     // The attribute is declared in the class body.
 
                     let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-                    let inferred = place_from_bindings(db, bindings);
+                    let inferred = place_from_bindings(db, bindings).place;
                     let has_binding = !inferred.is_undefined();
 
                     if has_binding {
@@ -3871,7 +3922,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
                     (symbol_id, place_and_qual)
                 })
                 .chain(use_def_map.all_end_of_scope_symbol_bindings().map(
-                    |(symbol_id, bindings)| (symbol_id, place_from_bindings(db, bindings).into()),
+                    |(symbol_id, bindings)| {
+                        (symbol_id, place_from_bindings(db, bindings).place.into())
+                    },
                 ))
                 .filter_map(|(symbol_id, place_and_qual)| {
                     if let Some(name) = table.place(symbol_id).as_symbol().map(Symbol::name) {
@@ -5877,7 +5930,7 @@ impl SlotsKind {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::module_resolver::resolve_module;
+    use crate::module_resolver::resolve_module_confident;
     use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
@@ -5893,7 +5946,8 @@ mod tests {
             });
         for class in KnownClass::iter() {
             let class_name = class.name(&db);
-            let class_module = resolve_module(&db, &class.canonical_module(&db).name()).unwrap();
+            let class_module =
+                resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
 
             assert_eq!(
                 KnownClass::try_from_file_and_name(

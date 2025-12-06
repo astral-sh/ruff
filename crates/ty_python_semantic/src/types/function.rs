@@ -74,13 +74,13 @@ use crate::types::diagnostic::{
 };
 use crate::types::display::DisplaySettings;
 use crate::types::generics::{GenericContext, InferableTypeVars};
-use crate::types::ide_support::all_members;
+use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, ClassBase,
-    ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
+    ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
     UnionBuilder, binding_type, definition_expression_type, walk_signature,
@@ -373,7 +373,7 @@ impl<'db> OverloadLiteral<'db> {
             .scoped_use_id(db, scope);
 
         let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
-            place_from_bindings(db, use_def.bindings_at_use(use_id))
+            place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
         };
@@ -1007,7 +1007,7 @@ impl<'db> FunctionType<'db> {
 
     /// Convert the `FunctionType` into a [`CallableType`].
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
-        CallableType::new(db, self.signature(db), true)
+        CallableType::new(db, self.signature(db), CallableTypeKind::FunctionLike)
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].
@@ -1354,6 +1354,8 @@ pub enum KnownFunction {
     IsSingleValued,
     /// `ty_extensions.generic_context`
     GenericContext,
+    /// `ty_extensions.into_callable`
+    IntoCallable,
     /// `ty_extensions.dunder_all_names`
     DunderAllNames,
     /// `ty_extensions.enum_members`
@@ -1426,6 +1428,7 @@ impl KnownFunction {
             | Self::IsSingleton
             | Self::IsSubtypeOf
             | Self::GenericContext
+            | Self::IntoCallable
             | Self::DunderAllNames
             | Self::EnumMembers
             | Self::StaticAssert
@@ -1498,17 +1501,22 @@ impl KnownFunction {
 
                     diagnostic.annotate(
                         Annotation::secondary(context.span(&call_expression.arguments.args[0]))
-                            .message(format_args!(
-                                "Inferred type of argument is `{}`",
-                                actual_ty.display(db),
-                            )),
+                            .message(format_args!("Inferred type is `{}`", actual_ty.display(db),)),
                     );
 
-                    diagnostic.info(format_args!(
-                        "`{asserted_type}` and `{inferred_type}` are not equivalent types",
-                        asserted_type = asserted_ty.display(db),
-                        inferred_type = actual_ty.display(db),
-                    ));
+                    if actual_ty.is_subtype_of(db, *asserted_ty) {
+                        diagnostic.info(format_args!(
+                            "`{inferred_type}` is a subtype of `{asserted_type}`, but they are not equivalent",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    } else {
+                        diagnostic.info(format_args!(
+                            "`{asserted_type}` and `{inferred_type}` are not equivalent types",
+                            asserted_type = asserted_ty.display(db),
+                            inferred_type = actual_ty.display(db),
+                        ));
+                    }
 
                     diagnostic.set_concise_message(format_args!(
                         "Type `{}` does not match asserted type `{}`",
@@ -1897,7 +1905,7 @@ impl KnownFunction {
                 let Some(module_name) = ModuleName::new(module_name) else {
                     return;
                 };
-                let Some(module) = resolve_module(db, &module_name) else {
+                let Some(module) = resolve_module(db, file, &module_name) else {
                     return;
                 };
 
@@ -1956,6 +1964,7 @@ pub(crate) mod tests {
                 KnownFunction::IsSingleton
                 | KnownFunction::IsSubtypeOf
                 | KnownFunction::GenericContext
+                | KnownFunction::IntoCallable
                 | KnownFunction::DunderAllNames
                 | KnownFunction::EnumMembers
                 | KnownFunction::StaticAssert

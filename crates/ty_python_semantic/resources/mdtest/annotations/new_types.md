@@ -1,24 +1,16 @@
 # NewType
 
-## Valid forms
+## Basic usage
+
+`NewType` can be used to create distinct types that are based on existing types:
 
 ```py
 from typing_extensions import NewType
-from types import GenericAlias
 
-X = GenericAlias(type, ())
-A = NewType("A", int)
-# TODO: typeshed for `typing.GenericAlias` uses `type` for the first argument. `NewType` should be special-cased
-# to be compatible with `type`
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `type`, found `<NewType pseudo-class 'A'>`"
-B = GenericAlias(A, ())
+UserId = NewType("UserId", int)
 
-def _(
-    a: A,
-    b: B,
-):
-    reveal_type(a)  # revealed: A
-    reveal_type(b)  # revealed: @Todo(Support for `typing.GenericAlias` instances in type expressions)
+def _(user_id: UserId):
+    reveal_type(user_id)  # revealed: UserId
 ```
 
 ## Subtyping

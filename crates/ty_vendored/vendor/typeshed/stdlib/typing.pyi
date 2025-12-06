@@ -644,6 +644,7 @@ if sys.version_info >= (3, 10):
         def __or__(self, other: Any) -> _SpecialForm: ...
         def __ror__(self, other: Any) -> _SpecialForm: ...
         __supertype__: type | NewType
+        __name__: str
 
 else:
     def NewType(name: str, tp: Any) -> Any:
@@ -722,12 +723,22 @@ def no_type_check(arg: _F) -> _F:
     This mutates the function(s) or class(es) in place.
     """
 
-def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
-    """Decorator to give another decorator the @no_type_check effect.
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+        """Decorator to give another decorator the @no_type_check effect.
 
-    This wraps the decorator with something that wraps the decorated
-    function in @no_type_check.
-    """
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
+
+else:
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+        """Decorator to give another decorator the @no_type_check effect.
+
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -1784,9 +1795,7 @@ class NamedTuple(tuple[Any, ...]):
     @overload
     def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
     @overload
-    @typing_extensions.deprecated(
-        "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
-    )
+    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...

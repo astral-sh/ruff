@@ -4,6 +4,7 @@ use bitflags::bitflags;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_python_ast::name::Name;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{
     self as ast, AnyStringFlags, AtomicNodeIndex, BoolOp, CmpOp, ConversionFlag, Expr, ExprContext,
     FString, InterpolatedStringElement, InterpolatedStringElements, IpyEscapeKind, Number,
@@ -18,7 +19,7 @@ use crate::string::{
     InterpolatedStringKind, StringType, parse_interpolated_string_literal_element,
     parse_string_literal,
 };
-use crate::token::{TokenKind, TokenValue};
+use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 use crate::{
     InterpolatedStringErrorType, Mode, ParseErrorType, UnsupportedSyntaxError,

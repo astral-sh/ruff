@@ -2012,7 +2012,7 @@ mod tests {
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -6428,11 +6428,11 @@ mod tests {
                         a = Literal['a', 'b', 'c']",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Literal
 
-        a[: <typing.Literal special form>] = Literal['a', 'b', 'c']
-        ");
+        a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {

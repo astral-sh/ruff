@@ -17,13 +17,16 @@ use crate::Db;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
-use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
+use crate::types::signatures::{
+    CallableSignature, Parameter, Parameters, ParametersKind, Signature,
+};
 use crate::types::tuple::TupleSpec;
 use crate::types::visitor::TypeVisitor;
 use crate::types::{
-    BoundTypeVarIdentity, CallableType, IntersectionType, KnownBoundMethodType, KnownClass,
-    KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType, SpecialFormType,
-    StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind, visitor,
+    BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
+    KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
+    SpecialFormType, StringLiteralType, SubclassOfInner, Type, UnionType, WrapperDescriptorKind,
+    visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -72,14 +75,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_type_pair(
+    pub fn from_possibly_ambiguous_types(
         db: &'db dyn Db,
-        type_1: Type<'db>,
-        type_2: Type<'db>,
+        types: impl IntoIterator<Item = Type<'db>>,
     ) -> Self {
         let collector = AmbiguousClassCollector::default();
-        collector.visit_type(db, type_1);
-        collector.visit_type(db, type_2);
+
+        for ty in types {
+            collector.visit_type(db, ty);
+        }
 
         Self {
             qualified: Rc::new(
@@ -695,7 +699,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 ),
             },
             Type::SpecialForm(special_form) => {
-                write!(f.with_type(self.ty), "{special_form}")
+                f.set_invalid_syntax();
+                write!(f.with_type(self.ty), "<special form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())
@@ -934,6 +939,9 @@ impl Display for DisplayBoundTypeVarIdentity<'_> {
         f.write_str(self.bound_typevar_identity.identity.name(self.db))?;
         if let Some(binding_context) = self.bound_typevar_identity.binding_context.name(self.db) {
             write!(f, "@{binding_context}")?;
+        }
+        if let Some(paramspec_attr) = self.bound_typevar_identity.paramspec_attr {
+            write!(f, ".{paramspec_attr}")?;
         }
         Ok(())
     }
@@ -1296,7 +1304,12 @@ impl<'db> DisplayGenericContext<'_, 'db> {
                 f.write_str(", ")?;
             }
             f.set_invalid_syntax();
-            f.write_str(bound_typevar.typevar(self.db).name(self.db))?;
+            let typevar = bound_typevar.typevar(self.db);
+            if typevar.is_paramspec(self.db) {
+                write!(f, "**{}", typevar.name(self.db))?;
+            } else {
+                f.write_str(typevar.name(self.db))?;
+            }
         }
         f.write_char(']')
     }
@@ -1457,6 +1470,7 @@ impl<'db> CallableType<'db> {
     ) -> DisplayCallableType<'a, 'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
+            kind: self.kind(db),
             db,
             settings,
         }
@@ -1465,6 +1479,7 @@ impl<'db> CallableType<'db> {
 
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
+    kind: CallableTypeKind,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1472,9 +1487,18 @@ pub(crate) struct DisplayCallableType<'a, 'db> {
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         match self.signatures.overloads.as_slice() {
-            [signature] => signature
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            [signature] => {
+                if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                    signature
+                        .parameters()
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                } else {
+                    signature
+                        .display_with(self.db, self.settings.clone())
+                        .fmt_detailed(f)
+                }
+            }
             signatures => {
                 // TODO: How to display overloads?
                 if !self.settings.multiline {
@@ -1550,73 +1574,11 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         f.set_invalid_syntax();
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
-        let multiline = self.settings.multiline && self.parameters.len() > 1;
-        // Opening parenthesis
-        f.write_char('(')?;
-        if multiline {
-            f.write_str("\n    ")?;
-        }
-        if self.parameters.is_gradual() {
-            // We represent gradual form as `...` in the signature, internally the parameters still
-            // contain `(*args, **kwargs)` parameters.
-            f.write_str("...")?;
-        } else {
-            let mut star_added = false;
-            let mut needs_slash = false;
-            let mut first = true;
-            let arg_separator = if multiline { ",\n    " } else { ", " };
 
-            for parameter in self.parameters.as_slice() {
-                // Handle special separators
-                if !star_added && parameter.is_keyword_only() {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('*')?;
-                    star_added = true;
-                    first = false;
-                }
-                if parameter.is_positional_only() {
-                    needs_slash = true;
-                } else if needs_slash {
-                    if !first {
-                        f.write_str(arg_separator)?;
-                    }
-                    f.write_char('/')?;
-                    needs_slash = false;
-                    first = false;
-                }
-
-                // Add comma before parameter if not first
-                if !first {
-                    f.write_str(arg_separator)?;
-                }
-
-                // Write parameter with range tracking
-                let param_name = parameter
-                    .display_name()
-                    .map(|name| name.to_string())
-                    .unwrap_or_default();
-                parameter
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
-
-                first = false;
-            }
-
-            if needs_slash {
-                if !first {
-                    f.write_str(arg_separator)?;
-                }
-                f.write_char('/')?;
-            }
-        }
-
-        if multiline {
-            f.write_char('\n')?;
-        }
-        // Closing parenthesis
-        f.write_char(')')?;
+        // Parameters
+        self.parameters
+            .display_with(self.db, self.settings.clone())
+            .fmt_detailed(&mut f)?;
 
         // Return type
         let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
@@ -1642,6 +1604,120 @@ pub(crate) struct SignatureDisplayDetails {
     pub parameter_ranges: Vec<TextRange>,
     /// Names of the parameters in order
     pub parameter_names: Vec<String>,
+}
+
+impl<'db> Parameters<'db> {
+    fn display_with<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        settings: DisplaySettings<'db>,
+    ) -> DisplayParameters<'a, 'db> {
+        DisplayParameters {
+            parameters: self,
+            db,
+            settings,
+        }
+    }
+}
+
+struct DisplayParameters<'a, 'db> {
+    parameters: &'a Parameters<'db>,
+    db: &'db dyn Db,
+    settings: DisplaySettings<'db>,
+}
+
+impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
+    fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // For `ParamSpec` kind, the parameters still contain `*args` and `**kwargs`, but we
+        // display them as `**P` instead, so avoid multiline in that case.
+        // TODO: This might change once we support `Concatenate`
+        let multiline = self.settings.multiline
+            && self.parameters.len() > 1
+            && !matches!(
+                self.parameters.kind(),
+                ParametersKind::Gradual | ParametersKind::ParamSpec(_)
+            );
+        // Opening parenthesis
+        f.write_char('(')?;
+        if multiline {
+            f.write_str("\n    ")?;
+        }
+        match self.parameters.kind() {
+            ParametersKind::Standard => {
+                let mut star_added = false;
+                let mut needs_slash = false;
+                let mut first = true;
+                let arg_separator = if multiline { ",\n    " } else { ", " };
+
+                for parameter in self.parameters.as_slice() {
+                    // Handle special separators
+                    if !star_added && parameter.is_keyword_only() {
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+                        f.write_char('*')?;
+                        star_added = true;
+                        first = false;
+                    }
+                    if parameter.is_positional_only() {
+                        needs_slash = true;
+                    } else if needs_slash {
+                        if !first {
+                            f.write_str(arg_separator)?;
+                        }
+                        f.write_char('/')?;
+                        needs_slash = false;
+                        first = false;
+                    }
+
+                    // Add comma before parameter if not first
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+
+                    // Write parameter with range tracking
+                    let param_name = parameter
+                        .display_name()
+                        .map(|name| name.to_string())
+                        .unwrap_or_default();
+                    parameter
+                        .display_with(self.db, self.settings.singleline())
+                        .fmt_detailed(&mut f.with_detail(TypeDetail::Parameter(param_name)))?;
+
+                    first = false;
+                }
+
+                if needs_slash {
+                    if !first {
+                        f.write_str(arg_separator)?;
+                    }
+                    f.write_char('/')?;
+                }
+            }
+            ParametersKind::Gradual => {
+                // We represent gradual form as `...` in the signature, internally the parameters still
+                // contain `(*args, **kwargs)` parameters.
+                f.write_str("...")?;
+            }
+            ParametersKind::ParamSpec(typevar) => {
+                write!(f, "**{}", typevar.name(self.db))?;
+                if let Some(name) = typevar.binding_context(self.db).name(self.db) {
+                    write!(f, "@{name}")?;
+                }
+            }
+        }
+        if multiline {
+            f.write_char('\n')?;
+        }
+        // Closing parenthesis
+        f.write_char(')')
+    }
+}
+
+impl Display for DisplayParameters<'_, '_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        self.fmt_detailed(&mut TypeWriter::Formatter(f))
+    }
 }
 
 impl<'db> Parameter<'db> {
@@ -2172,16 +2248,24 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
         let ty = Type::KnownInstance(self.known_instance);
         match self.known_instance {
             KnownInstanceType::SubscriptedProtocol(generic_context) => {
+                f.set_invalid_syntax();
+                f.write_str("<special form '")?;
                 f.with_type(ty).write_str("typing.Protocol")?;
-                f.write_str(&generic_context.display(self.db).to_string())
+                f.write_str(&generic_context.display(self.db).to_string())?;
+                f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
+                f.set_invalid_syntax();
+                f.write_str("<special form '")?;
                 f.with_type(ty).write_str("typing.Generic")?;
-                f.write_str(&generic_context.display(self.db).to_string())
+                f.write_str(&generic_context.display(self.db).to_string())?;
+                f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {
                 if let Some(specialization) = alias.specialization(self.db) {
-                    f.write_str(alias.name(self.db))?;
+                    f.set_invalid_syntax();
+                    f.write_str("<type alias '")?;
+                    f.with_type(ty).write_str(alias.name(self.db))?;
                     f.write_str(
                         &specialization
                             .display_short(
@@ -2190,7 +2274,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                                 DisplaySettings::default(),
                             )
                             .to_string(),
-                    )
+                    )?;
+                    f.write_str("'>")
                 } else {
                     f.with_type(ty).write_str("typing.TypeAliasType")
                 }
@@ -2200,9 +2285,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(typevar_instance) => {
                 if typevar_instance.kind(self.db).is_paramspec() {
-                    f.write_str("typing.ParamSpec")
+                    f.with_type(ty).write_str("typing.ParamSpec")
                 } else {
-                    f.write_str("typing.TypeVar")
+                    f.with_type(ty).write_str("typing.TypeVar")
                 }
             }
             KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),
@@ -2213,10 +2298,8 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 }
                 Ok(())
             }
-            KnownInstanceType::ConstraintSet(tracked_set) => {
-                let constraints = tracked_set.constraints(self.db);
-                f.with_type(ty).write_str("ty_extensions.ConstraintSet")?;
-                write!(f, "[{}]", constraints.display(self.db))
+            KnownInstanceType::ConstraintSet(_) => {
+                f.with_type(ty).write_str("ty_extensions.ConstraintSet")
             }
             KnownInstanceType::GenericContext(generic_context) => {
                 f.with_type(ty).write_str("ty_extensions.GenericContext")?;
@@ -2227,22 +2310,56 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str("ty_extensions.Specialization")?;
                 write!(f, "{}", specialization.display_full(self.db))
             }
-            KnownInstanceType::UnionType(_) => f.with_type(ty).write_str("types.UnionType"),
-            KnownInstanceType::Literal(_) => {
+            KnownInstanceType::UnionType(union) => {
                 f.set_invalid_syntax();
-                f.write_str("<typing.Literal special form>")
+                f.write_char('<')?;
+                f.with_type(ty).write_str("types.UnionType")?;
+                f.write_str(" special form")?;
+                if let Ok(ty) = union.union_type(self.db) {
+                    write!(f, " '{}'", ty.display(self.db))?;
+                }
+                f.write_char('>')
             }
-            KnownInstanceType::Annotated(_) => {
+            KnownInstanceType::Literal(inner) => {
                 f.set_invalid_syntax();
-                f.write_str("<typing.Annotated special form>")
+                write!(
+                    f,
+                    "<special form '{}'>",
+                    inner.inner(self.db).display(self.db)
+                )
             }
-            KnownInstanceType::TypeGenericAlias(_) | KnownInstanceType::Callable(_) => {
-                f.with_type(ty).write_str("GenericAlias")
+            KnownInstanceType::Annotated(inner) => {
+                f.set_invalid_syntax();
+                f.write_str("<special form '")?;
+                f.with_type(ty).write_str("typing.Annotated")?;
+                write!(
+                    f,
+                    "[{}, <metadata>]'>",
+                    inner.inner(self.db).display(self.db)
+                )
+            }
+            KnownInstanceType::Callable(callable) => {
+                f.set_invalid_syntax();
+                f.write_char('<')?;
+                f.with_type(ty).write_str("typing.Callable")?;
+                write!(f, " special form '{}'>", callable.display(self.db))
+            }
+            KnownInstanceType::TypeGenericAlias(inner) => {
+                f.set_invalid_syntax();
+                f.write_str("<special form '")?;
+                write!(
+                    f.with_type(ty),
+                    "type[{}]",
+                    inner.inner(self.db).display(self.db)
+                )?;
+                f.write_str("'>")
             }
             KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
             KnownInstanceType::NewType(declaration) => {
                 f.set_invalid_syntax();
-                write!(f, "<NewType pseudo-class '{}'>", declaration.name(self.db))
+                f.write_str("<NewType pseudo-class '")?;
+                f.with_type(ty).write_str(declaration.name(self.db))?;
+                f.write_str("'>")
             }
         }
     }

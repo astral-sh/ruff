@@ -150,6 +150,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
     }
 
+    /// Create a new [`CallArguments`] starting from the specified index.
+    pub(super) fn start_from(&self, index: usize) -> Self {
+        Self {
+            arguments: self.arguments[index..].to_vec(),
+            types: self.types[index..].to_vec(),
+        }
+    }
+
     /// Returns an iterator on performing [argument type expansion].
     ///
     /// Each element of the iterator represents a set of argument lists, where each argument list

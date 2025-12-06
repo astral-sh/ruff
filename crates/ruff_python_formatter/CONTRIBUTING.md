@@ -74,7 +74,7 @@ def f():  # a
 The other option is to use the playground (also check the playground README):
 
 ```shell
-cd playground && npm install && npm run dev:wasm && npm run dev
+cd playground && npm ci --ignore-scripts && npm run dev:wasm && npm run dev
 ```
 
 Run`npm run dev:wasm` and reload the page in the browser to refresh.

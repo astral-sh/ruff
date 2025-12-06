@@ -7,10 +7,11 @@
 ```py
 from typing_extensions import assert_type
 
-def _(x: int):
+def _(x: int, y: bool):
     assert_type(x, int)  # fine
     assert_type(x, str)  # error: [type-assertion-failure]
     assert_type(assert_type(x, int), int)
+    assert_type(y, int)  # error: [type-assertion-failure]
 ```
 
 ## Narrowing

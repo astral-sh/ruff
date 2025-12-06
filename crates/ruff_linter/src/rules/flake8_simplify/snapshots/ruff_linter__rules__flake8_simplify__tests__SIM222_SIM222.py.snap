@@ -1144,3 +1144,23 @@ help: Replace with `(i for i in range(1))`
 208 | # https://github.com/astral-sh/ruff/issues/21136
 209 | def get_items():
 note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `True` instead of `... or True`
+   --> SIM222.py:222:1
+    |
+221 | # https://github.com/astral-sh/ruff/issues/21473
+222 | tuple("") or True  # SIM222
+    | ^^^^^^^^^^^^^^^^^
+223 | tuple(t"") or True  # OK
+224 | tuple(0) or True  # OK
+    |
+help: Replace with `True`
+219 | 
+220 | 
+221 | # https://github.com/astral-sh/ruff/issues/21473
+    - tuple("") or True  # SIM222
+222 + True  # SIM222
+223 | tuple(t"") or True  # OK
+224 | tuple(0) or True  # OK
+225 | tuple(1) or True  # OK
+note: This is an unsafe fix and may change runtime behavior

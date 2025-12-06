@@ -6,7 +6,7 @@ expression: completions
   {
     "label": "Literal (import typing)",
     "kind": 6,
-    "sortText": " 50",
+    "sortText": "[RANKING]",
     "insertText": "Literal",
     "additionalTextEdits": [
       {
@@ -25,30 +25,9 @@ expression: completions
     ]
   },
   {
-    "label": "Literal (import typing_extensions)",
-    "kind": 6,
-    "sortText": " 51",
-    "insertText": "Literal",
-    "additionalTextEdits": [
-      {
-        "range": {
-          "start": {
-            "line": 1,
-            "character": 0
-          },
-          "end": {
-            "line": 1,
-            "character": 0
-          }
-        },
-        "newText": "from typing_extensions import Literal\n"
-      }
-    ]
-  },
-  {
     "label": "LiteralString (import typing)",
     "kind": 6,
-    "sortText": " 52",
+    "sortText": "[RANKING]",
     "insertText": "LiteralString",
     "additionalTextEdits": [
       {
@@ -63,27 +42,6 @@ expression: completions
           }
         },
         "newText": "from typing import LiteralString\n"
-      }
-    ]
-  },
-  {
-    "label": "LiteralString (import typing_extensions)",
-    "kind": 6,
-    "sortText": " 53",
-    "insertText": "LiteralString",
-    "additionalTextEdits": [
-      {
-        "range": {
-          "start": {
-            "line": 1,
-            "character": 0
-          },
-          "end": {
-            "line": 1,
-            "character": 0
-          }
-        },
-        "newText": "from typing_extensions import LiteralString\n"
       }
     ]
   }

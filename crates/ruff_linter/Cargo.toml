@@ -1,6 +1,6 @@
 [package]
 name = "ruff_linter"
-version = "0.14.7"
+version = "0.14.8"
 publish = false
 authors = { workspace = true }
 edition = { workspace = true }
@@ -35,6 +35,7 @@ anyhow = { workspace = true }
 bitflags = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
+compact_str = { workspace = true }
 fern = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }

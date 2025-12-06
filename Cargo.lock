@@ -2859,7 +2859,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.7"
+version = "0.14.8"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3117,13 +3117,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.7"
+version = "0.14.8"
 dependencies = [
  "aho-corasick",
  "anyhow",
  "bitflags 2.10.0",
  "clap",
  "colored 3.0.0",
+ "compact_str",
  "fern",
  "glob",
  "globset",
@@ -3472,7 +3473,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.7"
+version = "0.14.8"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

@@ -398,7 +398,7 @@ the expression `str`:
 from ty_extensions import TypeOf, is_subtype_of, static_assert
 
 # This is incorrect and therefore fails with ...
-# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet[never]` is statically known to be falsy"
+# error: "Static assertion error: argument of type `ty_extensions.ConstraintSet` is statically known to be falsy"
 static_assert(is_subtype_of(str, type[str]))
 
 # Correct, returns True:
