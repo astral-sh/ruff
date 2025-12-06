@@ -266,7 +266,7 @@ reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
-<!-- blacken-docs:off -->
+<!-- blacken-docs:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
