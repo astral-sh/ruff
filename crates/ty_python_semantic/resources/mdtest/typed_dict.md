@@ -955,6 +955,35 @@ static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
 static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
 ```
 
+## Structural equivalence understands the interaction between `Required`/`NotRequired` and `total`
+
+```py
+from ty_extensions import static_assert, is_equivalent_to
+from typing_extensions import TypedDict, Required, NotRequired
+
+class Foo1(TypedDict, total=False):
+    x: int
+    y: str
+
+class Foo2(TypedDict):
+    y: NotRequired[str]
+    x: NotRequired[int]
+
+static_assert(is_equivalent_to(Foo1, Foo2))
+static_assert(is_equivalent_to(Foo1 | int, int | Foo2))
+
+class Bar1(TypedDict, total=False):
+    x: int
+    y: Required[str]
+
+class Bar2(TypedDict):
+    y: str
+    x: NotRequired[int]
+
+static_assert(is_equivalent_to(Bar1, Bar2))
+static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
+```
+
 ## Redundant cast warnings
 
 <!-- snapshot-diagnostics -->

@@ -270,23 +270,10 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    fn params(self, db: &'db dyn Db) -> TypedDictParams {
-        match self {
-            TypedDictType::Class(defining_class) => {
-                let class_literal = defining_class.class_literal(db).0;
-                class_literal
-                    .typed_dict_params(db)
-                    .expect("must be a TypedDict")
-            }
-            TypedDictType::Synthesized(synthesized) => synthesized.params(db),
-        }
-    }
-
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             TypedDictType::Class(_) => {
-                let synthesized =
-                    SynthesizedTypedDictType::new(db, self.params(db), self.items(db));
+                let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
                 TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
             }
             TypedDictType::Synthesized(synthesized) => {
@@ -302,9 +289,9 @@ impl<'db> TypedDictType<'db> {
         inferable: InferableTypeVars<'_, 'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        if self.params(db) != other.params(db) {
-            return ConstraintSet::from(false);
-        }
+        // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the
+        // params at all, because `total` is already incorporated into `FieldKind`.
+
         // Compare the fields without requiring them to be in sorted order. Class-based `TypedDict`
         // fields are not sorted. We do sort synthetic fields in `normalized_impl`, but there will
         // soon be other sources of `SynthesizedTypedDictType` besides normalization.
@@ -1037,8 +1024,6 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
 #[salsa::interned(debug, heap_size=SynthesizedTypedDictType::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct SynthesizedTypedDictType<'db> {
-    pub(crate) params: TypedDictParams,
-
     #[returns(ref)]
     pub(crate) items: FxOrderMap<Name, Field<'db>>,
 }
@@ -1066,7 +1051,7 @@ impl<'db> SynthesizedTypedDictType<'db> {
             })
             .collect::<FxOrderMap<_, _>>();
 
-        SynthesizedTypedDictType::new(db, self.params(db), items)
+        SynthesizedTypedDictType::new(db, items)
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
@@ -1080,10 +1065,10 @@ impl<'db> SynthesizedTypedDictType<'db> {
             .collect::<FxOrderMap<_, _>>();
         // `Hash`/`Eq` for `FxOrderMap` includes the key order, so we need to sort.
         items.sort_unstable_keys();
-        Self::new(db, self.params(db), items)
+        Self::new(db, items)
     }
 
-    fn heap_size((params, items): &(TypedDictParams, FxOrderMap<Name, Field<'db>>)) -> usize {
-        ruff_memory_usage::heap_size(params) + ruff_memory_usage::order_map_heap_size(items)
+    fn heap_size((items,): &(FxOrderMap<Name, Field<'db>>,)) -> usize {
+        ruff_memory_usage::order_map_heap_size(items)
     }
 }

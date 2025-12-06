@@ -2314,8 +2314,7 @@ mod tests {
     use crate::types::class::{Field, FieldKind};
     use crate::types::typed_dict::SynthesizedTypedDictType;
     use crate::types::{
-        KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type, TypedDictParams,
-        TypedDictType,
+        KnownClass, Parameter, Parameters, Signature, StringLiteralType, Type, TypedDictType,
     };
     use crate::{Db, FxOrderMap};
 
@@ -2390,7 +2389,7 @@ mod tests {
             },
         );
 
-        let synthesized = SynthesizedTypedDictType::new(&db, TypedDictParams::TOTAL, items);
+        let synthesized = SynthesizedTypedDictType::new(&db, items);
         let type_ = Type::TypedDict(TypedDictType::Synthesized(synthesized));
         assert_eq!(
             type_.display(&db).to_string(),
