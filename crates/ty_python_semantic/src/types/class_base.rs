@@ -18,7 +18,7 @@ use crate::types::{
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -62,8 +62,10 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
-            ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
-            ClassBase::Dynamic(DynamicType::Todo(_) | DynamicType::TodoUnpack) => "@Todo",
+            ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
+            ClassBase::Dynamic(
+                DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
+            ) => "@Todo",
             ClassBase::Dynamic(DynamicType::Divergent(_)) => "Divergent",
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",

@@ -594,7 +594,7 @@ impl SearchPath {
         )
     }
 
-    pub(crate) fn is_first_party(&self) -> bool {
+    pub fn is_first_party(&self) -> bool {
         matches!(&*self.0, SearchPathInner::FirstParty(_))
     }
 
@@ -608,6 +608,18 @@ impl SearchPath {
 
     #[must_use]
     pub(crate) fn relativize_system_path(&self, path: &SystemPath) -> Option<ModulePath> {
+        self.relativize_system_path_only(path)
+            .map(|relative_path| ModulePath {
+                search_path: self.clone(),
+                relative_path: relative_path.as_utf8_path().to_path_buf(),
+            })
+    }
+
+    #[must_use]
+    pub(crate) fn relativize_system_path_only<'a>(
+        &self,
+        path: &'a SystemPath,
+    ) -> Option<&'a SystemPath> {
         if path
             .extension()
             .is_some_and(|extension| !self.is_valid_extension(extension))
@@ -621,14 +633,7 @@ impl SearchPath {
             | SearchPathInner::StandardLibraryCustom(search_path)
             | SearchPathInner::StandardLibraryReal(search_path)
             | SearchPathInner::SitePackages(search_path)
-            | SearchPathInner::Editable(search_path) => {
-                path.strip_prefix(search_path)
-                    .ok()
-                    .map(|relative_path| ModulePath {
-                        search_path: self.clone(),
-                        relative_path: relative_path.as_utf8_path().to_path_buf(),
-                    })
-            }
+            | SearchPathInner::Editable(search_path) => path.strip_prefix(search_path).ok(),
             SearchPathInner::StandardLibraryVendored(_) => None,
         }
     }
@@ -783,7 +788,7 @@ impl fmt::Display for SearchPath {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub(super) enum SystemOrVendoredPathRef<'db> {
     System(&'db SystemPath),
     Vendored(&'db VendoredPath),

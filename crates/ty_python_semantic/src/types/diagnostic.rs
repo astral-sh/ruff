@@ -18,12 +18,14 @@ use crate::types::class::{
     CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
 };
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::tuple::TupleSpec;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
@@ -35,13 +37,11 @@ use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
-    source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parentheses_iterator;
+use ruff_python_ast::token::parentheses_iterator;
 use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
@@ -545,7 +545,8 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// An invalidly defined `NamedTuple` class may lead to the type checker
-    /// drawing incorrect conclusions. It may also lead to `TypeError`s at runtime.
+    /// drawing incorrect conclusions. It may also lead to `TypeError`s or
+    /// `AttributeError`s at runtime.
     ///
     /// ## Examples
     /// A class definition cannot combine `NamedTuple` with other base classes
@@ -557,6 +558,27 @@ declare_lint! {
     /// >>> from typing import NamedTuple
     /// >>> class Foo(NamedTuple, object): ...
     /// TypeError: can only inherit from a NamedTuple type and Generic
+    /// ```
+    ///
+    /// Further, `NamedTuple` field names cannot start with an underscore:
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     _bar: int
+    /// ValueError: Field names cannot start with an underscore: '_bar'
+    /// ```
+    ///
+    /// `NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,
+    /// `_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes
+    /// without a type annotation will raise an `AttributeError` at runtime.
+    ///
+    /// ```pycon
+    /// >>> from typing import NamedTuple
+    /// >>> class Foo(NamedTuple):
+    /// ...     x: int
+    /// ...     _asdict = 42
+    /// AttributeError: Cannot overwrite NamedTuple attribute _asdict
     /// ```
     pub(crate) static INVALID_NAMED_TUPLE = {
         summary: "detects invalid `NamedTuple` class definitions",
@@ -2388,7 +2410,7 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -2399,9 +2421,7 @@ pub(super) fn report_invalid_assignment<'db>(
         // )  # ty: ignore <- or here
         // ```
 
-        let comment_ranges = CommentRanges::from(context.module().tokens());
-        let source = source_text(context.db(), context.file());
-        parentheses_iterator(value_node.into(), None, &comment_ranges, &source)
+        parentheses_iterator(value_node.into(), None, context.module().tokens())
             .last()
             .unwrap_or(value_node.range())
     } else {
@@ -2526,7 +2546,7 @@ pub(super) fn report_invalid_return_type(
     };
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
@@ -2978,11 +2998,10 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Special form `{}` expected at least 2 arguments \
+    builder.into_diagnostic(
+        "Special form `typing.Annotated` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        SpecialFormType::Annotated
-    ));
+    );
 }
 
 pub(crate) fn report_invalid_argument_number_to_special_form(
@@ -3083,8 +3102,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        SpecialFormType::Callable
+        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -3529,7 +3547,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
 pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    (field, field_def): &(Name, Option<Definition<'db>>),
+    (field, field_def): (&str, Option<Definition<'db>>),
     (field_with_default, field_with_default_def): &(Name, Option<Definition<'db>>),
 ) {
     let db = context.db();
@@ -3542,9 +3560,9 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
     let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let mut diagnostic = builder.into_diagnostic(
         "NamedTuple field without default value cannot follow field(s) with default value(s)",
-    ));
+    );
 
     diagnostic.set_primary_message(format_args!(
         "Field `{field}` defined here without a default value",
@@ -3573,6 +3591,40 @@ pub(super) fn report_namedtuple_field_without_default_after_field_with_default<'
             "Earlier field `{field_with_default}` was defined with a default value",
         ));
     }
+}
+
+pub(super) fn report_named_tuple_field_with_leading_underscore<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    field_name: &str,
+    field_definition: Option<Definition<'db>>,
+) {
+    let db = context.db();
+    let module = context.module();
+
+    let diagnostic_range = field_definition
+        .map(|definition| definition.kind(db).full_range(module))
+        .unwrap_or_else(|| class.header_range(db));
+
+    let Some(builder) = context.report_lint(&INVALID_NAMED_TUPLE, diagnostic_range) else {
+        return;
+    };
+    let mut diagnostic =
+        builder.into_diagnostic("NamedTuple field name cannot start with an underscore");
+
+    if field_definition.is_some() {
+        diagnostic.set_primary_message(
+            "Class definition will raise `TypeError` at runtime due to this field",
+        );
+    } else {
+        diagnostic.set_primary_message(format_args!(
+            "Class definition will raise `TypeError` at runtime due to field `{field_name}`",
+        ));
+    }
+
+    diagnostic.set_concise_message(format_args!(
+        "NamedTuple field `{field_name}` cannot start with an underscore"
+    ));
 }
 
 pub(crate) fn report_missing_typed_dict_key<'db>(
@@ -3995,6 +4047,112 @@ pub(super) fn report_overridden_final_method<'db>(
         diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
+    }
+}
+
+pub(super) fn report_unsupported_comparison<'db>(
+    context: &InferContext<'db, '_>,
+    error: &UnsupportedComparisonError<'db>,
+    range: TextRange,
+    left: &ast::Expr,
+    right: &ast::Expr,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) {
+    let db = context.db();
+
+    let Some(diagnostic_builder) = context.report_lint(&UNSUPPORTED_OPERATOR, range) else {
+        return;
+    };
+
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+        db,
+        [error.left_ty, error.right_ty, left_ty, right_ty],
+    );
+
+    let mut diagnostic =
+        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
+
+    if left_ty == right_ty {
+        diagnostic.set_primary_message(format_args!(
+            "Both operands have type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+        diagnostic.annotate(context.secondary(left));
+        diagnostic.annotate(context.secondary(right));
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between two objects of type `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone())
+        ));
+    } else {
+        for (ty, expr) in [(left_ty, left), (right_ty, right)] {
+            diagnostic.annotate(context.secondary(expr).message(format_args!(
+                "Has type `{}`",
+                ty.display_with(db, display_settings.clone())
+            )));
+        }
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between objects of type `{}` and `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone()),
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+
+    // For non-atomic types like unions and tuples, we now provide context
+    // on the underlying elements that caused the error.
+    // If we're emitting a diagnostic for something like `(1, "foo") < (2, 3)`:
+    //
+    // - `left_ty` is `tuple[Literal[1], Literal["foo"]]`
+    // - `right_ty` is `tuple[Literal[2], Literal[3]]
+    // - `error.left_ty` is `Literal["foo"]`
+    // - `error.right_ty` is `Literal[3]`
+    if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
+        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(db).as_deref()
+            && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
+            && lhs_spec.len() == rhs_spec.len()
+            && let Some(position) = lhs_spec
+                .elements()
+                .zip(rhs_spec.elements())
+                .position(|tup| tup == (&error.left_ty, &error.right_ty))
+        {
+            if error.left_ty == error.right_ty {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported between \
+                    the tuple elements at index {} (both of type `{}`)",
+                    error.op,
+                    position + 1,
+                    error.left_ty.display_with(db, display_settings),
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported between \
+                    the tuple elements at index {} (of type `{}` and `{}`)",
+                    error.op,
+                    position + 1,
+                    error.left_ty.display_with(db, display_settings.clone()),
+                    error.right_ty.display_with(db, display_settings),
+                ));
+            }
+        } else {
+            if error.left_ty == error.right_ty {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported \
+                    between two objects of type `{}`",
+                    error.op,
+                    error.left_ty.display_with(db, display_settings),
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported \
+                    between objects of type `{}` and `{}`",
+                    error.op,
+                    error.left_ty.display_with(db, display_settings.clone()),
+                    error.right_ty.display_with(db, display_settings)
+                ));
+            }
+        }
     }
 }
 

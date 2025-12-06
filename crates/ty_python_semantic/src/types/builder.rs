@@ -221,12 +221,11 @@ impl RecursivelyDefined {
     }
 }
 
-// TODO increase this once we extend `UnionElement` throughout all union/intersection
-// representations, so that we can make large unions of literals fast in all operations.
-//
-// For now (until we solve https://github.com/astral-sh/ty/issues/957), keep this number
-// below 200, which is the salsa fixpoint iteration limit.
-const MAX_UNION_LITERALS: usize = 190;
+/// If the value ​​is defined recursively, widening is performed from fewer literal elements, resulting in faster convergence of the fixed-point iteration.
+const MAX_RECURSIVE_UNION_LITERALS: usize = 10;
+/// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
+/// so in principle we can have as many literal elements as we want, but to avoid unintended huge computational loads, we limit it to 256.
+const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
@@ -284,6 +283,27 @@ impl<'db> UnionBuilder<'db> {
         self.elements.push(UnionElement::Type(Type::object()));
     }
 
+    fn widen_literal_types(&mut self, seen_aliases: &mut Vec<Type<'db>>) {
+        let mut replace_with = vec![];
+        for elem in &self.elements {
+            match elem {
+                UnionElement::IntLiterals(_) => {
+                    replace_with.push(KnownClass::Int.to_instance(self.db));
+                }
+                UnionElement::StringLiterals(_) => {
+                    replace_with.push(KnownClass::Str.to_instance(self.db));
+                }
+                UnionElement::BytesLiterals(_) => {
+                    replace_with.push(KnownClass::Bytes.to_instance(self.db));
+                }
+                UnionElement::Type(_) => {}
+            }
+        }
+        for ty in replace_with {
+            self.add_in_place_impl(ty, seen_aliases);
+        }
+    }
+
     /// Adds a type to this union.
     pub(crate) fn add(mut self, ty: Type<'db>) -> Self {
         self.add_in_place(ty);
@@ -296,6 +316,15 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
+        let cycle_recovery = self.cycle_recovery;
+        let should_widen = |literals, recursively_defined: RecursivelyDefined| {
+            if recursively_defined.is_yes() && cycle_recovery {
+                literals >= MAX_RECURSIVE_UNION_LITERALS
+            } else {
+                literals >= MAX_NON_RECURSIVE_UNION_LITERALS
+            }
+        };
+
         match ty {
             Type::Union(union) => {
                 let new_elements = union.elements(self.db);
@@ -306,6 +335,17 @@ impl<'db> UnionBuilder<'db> {
                 self.recursively_defined = self
                     .recursively_defined
                     .or(union.recursively_defined(self.db));
+                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                    let literals = self.elements.iter().fold(0, |acc, elem| match elem {
+                        UnionElement::IntLiterals(literals) => acc + literals.len(),
+                        UnionElement::StringLiterals(literals) => acc + literals.len(),
+                        UnionElement::BytesLiterals(literals) => acc + literals.len(),
+                        UnionElement::Type(_) => acc,
+                    });
+                    if should_widen(literals, self.recursively_defined) {
+                        self.widen_literal_types(seen_aliases);
+                    }
+                }
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
@@ -329,7 +369,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::StringLiterals(literals) => {
-                            if literals.len() >= MAX_UNION_LITERALS {
+                            if should_widen(literals.len(), self.recursively_defined) {
                                 let replace_with = KnownClass::Str.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -374,7 +414,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
-                            if literals.len() >= MAX_UNION_LITERALS {
+                            if should_widen(literals.len(), self.recursively_defined) {
                                 let replace_with = KnownClass::Bytes.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -419,7 +459,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::IntLiterals(literals) => {
-                            if literals.len() >= MAX_UNION_LITERALS {
+                            if should_widen(literals.len(), self.recursively_defined) {
                                 let replace_with = KnownClass::Int.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -1227,7 +1267,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                                 speculative = speculative.add_positive(bound);
                             }
                             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                                speculative = speculative.add_positive(Type::Union(constraints));
+                                speculative = speculative.add_positive(constraints.as_type(db));
                             }
                             // TypeVars without a bound or constraint implicitly have `object` as their
                             // upper bound, and it is always a no-op to add `object` to an intersection.

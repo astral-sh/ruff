@@ -15,7 +15,7 @@ use ruff_db::diagnostic::{
 };
 use ruff_db::{files::File, parsed::parsed_module, source::source_text};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -413,9 +413,15 @@ pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRa
     }
 
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
-    // etc.
+    // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
     let parsed = parsed_module(db, file).load(db);
-    let tokens_after = parsed.tokens().after(range.end());
+    let tokens = parsed.tokens().at_offset(range.end());
+    let token_range = match tokens {
+        ruff_python_ast::token::TokenAt::None => range,
+        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
+        ruff_python_ast::token::TokenAt::Between(..) => range,
+    };
+    let tokens_after = parsed.tokens().after(token_range.end());
 
     // Same as for `line_end` when building up the `suppressions`: Ignore newlines
     // in multiline-strings, inside f-strings, or after a line continuation because we can't

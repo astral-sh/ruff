@@ -6,14 +6,14 @@ use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
 
-use crate::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::ide_support::{Member, all_declarations_and_bindings, all_members};
+use crate::types::list_members::{Member, all_members, all_members_of_scope};
 use crate::types::{Type, binding_type, infer_scope_types};
+use crate::{Db, resolve_real_shadowable_module};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
@@ -76,13 +76,13 @@ impl<'db> SemanticModel<'db> {
 
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             for memberdef in
-                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
+                all_members_of_scope(self.db, file_scope.to_scope_id(self.db, self.file))
             {
                 members.insert(
                     memberdef.member.name,
                     MemberDefinition {
                         ty: memberdef.member.ty,
-                        definition: memberdef.definition,
+                        first_reachable_definition: memberdef.first_reachable_definition,
                     },
                 );
             }
@@ -100,13 +100,19 @@ impl<'db> SemanticModel<'db> {
     pub fn resolve_module(&self, module: Option<&str>, level: u32) -> Option<Module<'db>> {
         let module_name =
             ModuleName::from_identifier_parts(self.db, self.file, module, level).ok()?;
-        resolve_module(self.db, &module_name)
+        resolve_module(self.db, self.file, &module_name)
     }
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
+        let typing_extensions = ModuleName::new("typing_extensions").unwrap();
+        let is_typing_extensions_available = self.file.is_stub(self.db)
+            || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
             .into_iter()
+            .filter(|module| {
+                is_typing_extensions_available || module.name(self.db) != &typing_extensions
+            })
             .map(|module| {
                 let builtin = module.is_known(self.db, KnownModule::Builtins);
                 let ty = Type::module_literal(self.db, self.file, module);
@@ -140,7 +146,7 @@ impl<'db> SemanticModel<'db> {
         &self,
         module_name: &ModuleName,
     ) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -150,7 +156,7 @@ impl<'db> SemanticModel<'db> {
     /// Returns completions for symbols available in the given module as if
     /// it were imported by this model's `File`.
     fn module_completions(&self, module_name: &ModuleName) -> Vec<Completion<'db>> {
-        let Some(module) = resolve_module(self.db, module_name) else {
+        let Some(module) = resolve_module(self.db, self.file, module_name) else {
             tracing::debug!("Could not resolve module from `{module_name:?}`");
             return vec![];
         };
@@ -215,12 +221,13 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_declarations_and_bindings(self.db, file_scope.to_scope_id(self.db, self.file))
-                    .map(|memberdef| Completion {
+                all_members_of_scope(self.db, file_scope.to_scope_id(self.db, self.file)).map(
+                    |memberdef| Completion {
                         name: memberdef.member.name,
                         ty: Some(memberdef.member.ty),
                         builtin: false,
-                    }),
+                    },
+                ),
             );
         }
         // Builtins are available in all scopes.
@@ -321,11 +328,11 @@ impl<'db> SemanticModel<'db> {
     }
 }
 
-/// The type and definition (if available) of a symbol.
+/// The type and definition of a symbol.
 #[derive(Clone, Debug)]
 pub struct MemberDefinition<'db> {
     pub ty: Type<'db>,
-    pub definition: Option<Definition<'db>>,
+    pub first_reachable_definition: Definition<'db>,
 }
 
 /// A classification of symbol names.

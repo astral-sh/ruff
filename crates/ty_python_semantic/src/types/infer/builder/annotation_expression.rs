@@ -144,18 +144,19 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                 }
                 _ => TypeAndQualifiers::declared(
-                    ty.in_type_expression(
-                        builder.db(),
-                        builder.scope(),
-                        builder.typevar_binding_context,
-                    )
-                    .unwrap_or_else(|error| {
-                        error.into_fallback_type(
-                            &builder.context,
-                            annotation,
-                            builder.is_reachable(annotation),
+                    ty.default_specialize(builder.db())
+                        .in_type_expression(
+                            builder.db(),
+                            builder.scope(),
+                            builder.typevar_binding_context,
                         )
-                    }),
+                        .unwrap_or_else(|error| {
+                            error.into_fallback_type(
+                                &builder.context,
+                                annotation,
+                                builder.is_reachable(annotation),
+                            )
+                        }),
                 ),
             }
         }
@@ -189,12 +190,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
 
             ast::Expr::Attribute(attribute) => match attribute.ctx {
-                ast::ExprContext::Load => infer_name_or_attribute(
-                    self.infer_attribute_expression(attribute),
-                    annotation,
-                    self,
-                    pep_613_policy,
-                ),
+                ast::ExprContext::Load => {
+                    let attribute_type = self.infer_attribute_expression(attribute);
+                    if let Type::TypeVar(typevar) = attribute_type
+                        && typevar.paramspec_attr(self.db()).is_some()
+                    {
+                        TypeAndQualifiers::declared(attribute_type)
+                    } else {
+                        infer_name_or_attribute(attribute_type, annotation, self, pep_613_policy)
+                    }
+                }
                 ast::ExprContext::Invalid => TypeAndQualifiers::declared(Type::unknown()),
                 ast::ExprContext::Store | ast::ExprContext::Del => TypeAndQualifiers::declared(
                     todo_type!("Attribute expression annotation in Store/Del context"),

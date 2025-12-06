@@ -5,6 +5,8 @@ use ty_server::ClientOptions;
 
 use crate::{TestServer, TestServerBuilder};
 
+static FILTERS: &[(&str, &str)] = &[(r#""sortText": "[0-9 ]+""#, r#""sortText": "[RANKING]""#)];
+
 #[test]
 fn publish_diagnostics_open() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
@@ -309,7 +311,11 @@ b: Litera
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
-    assert_json_snapshot!(completions);
+    insta::with_settings!({
+        filters => FILTERS.iter().copied(),
+    }, {
+        assert_json_snapshot!(completions);
+    });
 
     Ok(())
 }
@@ -340,7 +346,11 @@ b: Litera
 
     let completions = literal_completions(&mut server, &first_cell, Position::new(1, 9));
 
-    assert_json_snapshot!(completions);
+    insta::with_settings!({
+        filters => FILTERS.iter().copied(),
+    }, {
+        assert_json_snapshot!(completions);
+    });
 
     Ok(())
 }
@@ -373,7 +383,11 @@ b: Litera
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
-    assert_json_snapshot!(completions);
+    insta::with_settings!({
+        filters => FILTERS.iter().copied(),
+    }, {
+        assert_json_snapshot!(completions);
+    });
 
     Ok(())
 }
@@ -409,7 +423,11 @@ b: Litera
 
     let completions = literal_completions(&mut server, &second_cell, Position::new(1, 9));
 
-    assert_json_snapshot!(completions);
+    insta::with_settings!({
+        filters => FILTERS.iter().copied(),
+    }, {
+        assert_json_snapshot!(completions);
+    });
 
     Ok(())
 }

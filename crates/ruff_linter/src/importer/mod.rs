@@ -9,10 +9,11 @@ use anyhow::Result;
 use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };

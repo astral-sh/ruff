@@ -899,6 +899,42 @@ cls = MyClass
     }
 
     #[test]
+    fn references_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | ^^
+          |
+
+        info[references]: Reference 2
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
     fn references_match_name_stmt() {
         let test = cursor_test(
             r#"
@@ -1655,5 +1691,474 @@ func<CURSOR>_alias()
           | ^^^^^^^^^^
           |
         ");
+    }
+
+    #[test]
+    fn stub_target() {
+        let test = CursorTest::builder()
+            .source(
+                "path.pyi",
+                r#"
+                class Path:
+                    def __init__(self, path: str): ...
+            "#,
+            )
+            .source(
+                "path.py",
+                r#"
+                class Path:
+                    def __init__(self, path: str):
+                        self.path = path
+            "#,
+            )
+            .source(
+                "importer.py",
+                r#"
+                from path import Path<CURSOR>
+
+                a: Path = Path("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r###"
+        info[references]: Reference 1
+         --> path.pyi:2:7
+          |
+        2 | class Path:
+          |       ^^^^
+        3 |     def __init__(self, path: str): ...
+          |
+
+        info[references]: Reference 2
+         --> importer.py:2:18
+          |
+        2 | from path import Path
+          |                  ^^^^
+        3 |
+        4 | a: Path = Path("test")
+          |
+
+        info[references]: Reference 3
+         --> importer.py:4:4
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |    ^^^^
+          |
+
+        info[references]: Reference 4
+         --> importer.py:4:11
+          |
+        2 | from path import Path
+        3 |
+        4 | a: Path = Path("test")
+          |           ^^^^
+          |
+        "###);
+    }
+
+    #[test]
+    fn import_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as <CURSOR>abc
+
+                x = abc
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | import warnings as abc
+        4 |
+        5 | x = abc
+          |     ^^^
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn import_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                import warnings
+                import warnings as abc
+
+                x = abc<CURSOR>
+                y = warnings
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:3:20
+          |
+        2 | import warnings
+        3 | import warnings as abc
+          |                    ^^^
+        4 |
+        5 | x = abc
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | import warnings as abc
+        4 |
+        5 | x = abc
+          |     ^^^
+        6 | y = warnings
+          |
+        ");
+    }
+
+    #[test]
+    fn import_from_alias() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                from warnings import deprecated as xyz<CURSOR>
+                from warnings import deprecated
+
+                y = xyz
+                z = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:36
+          |
+        2 | from warnings import deprecated as xyz
+          |                                    ^^^
+        3 | from warnings import deprecated
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | from warnings import deprecated
+        4 |
+        5 | y = xyz
+          |     ^^^
+        6 | z = deprecated
+          |
+        ");
+    }
+
+    #[test]
+    fn import_from_alias_use() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                from warnings import deprecated as xyz
+                from warnings import deprecated
+
+                y = xyz<CURSOR>
+                z = deprecated
+            "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> main.py:2:36
+          |
+        2 | from warnings import deprecated as xyz
+          |                                    ^^^
+        3 | from warnings import deprecated
+          |
+
+        info[references]: Reference 2
+         --> main.py:5:5
+          |
+        3 | from warnings import deprecated
+        4 |
+        5 | y = xyz
+          |     ^^^
+        6 | z = deprecated
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^
+        3 |
+        4 | x = subpkg
+          |
+
+        info[references]: Reference 2
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+
+        info[references]: Reference 3
+         --> mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ^^^^^^
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO: this should also highlight the RHS subpkg in the import
+        assert_snapshot!(test.references(), @r"
+        info[references]: Reference 1
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^
+          |
+        ");
+    }
+
+    // TODO: Should only return references to the last declaration
+    #[test]
+    fn declarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:1
+          |
+        2 | a: str = "test"
+        3 |
+        4 | a: int = 10
+          | ^
+        5 |
+        6 | print(a)
+          |
+
+        info[references]: Reference 3
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+          |
+        "#);
     }
 }
