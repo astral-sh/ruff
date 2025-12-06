@@ -1609,13 +1609,11 @@ impl KnownFunction {
                         let source_display = format!("{}", source_type.display(db));
                         let casted_display = format!("{}", casted_type.display(db));
                         let mut diagnostic = builder.into_diagnostic(format_args!(
-                            "Value is already of type `{}`",
-                            casted_display,
+                            "Value is already of type `{casted_display}`",
                         ));
                         if source_display != casted_display {
                             diagnostic.info(format_args!(
-                                "This type is equivalent to `{}`",
-                                source_display,
+                                "This type is equivalent to `{source_display}`",
                             ));
                         }
                     }
