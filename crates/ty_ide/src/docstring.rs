@@ -824,12 +824,12 @@ mod tests {
         Check out this great example code::
 
             x_y = "hello"
-            
+
             if len(x_y) > 4:
                 print(x_y)
             else:
                 print("too short :(")
-            
+
             print("done")
 
         You love to see it.
@@ -862,12 +862,12 @@ mod tests {
         Check out this great example code ::
 
             x_y = "hello"
-            
+
             if len(x_y) > 4:
                 print(x_y)
             else:
                 print("too short :(")
-            
+
             print("done")
 
         You love to see it.
@@ -901,12 +901,12 @@ mod tests {
             ::
 
             x_y = "hello"
-            
+
             if len(x_y) > 4:
                 print(x_y)
             else:
                 print("too short :(")
-            
+
             print("done")
 
         You love to see it.
@@ -939,12 +939,12 @@ mod tests {
         let docstring = r#"
         Check out this great example code::
             x_y = "hello"
-            
+
             if len(x_y) > 4:
                 print(x_y)
             else:
                 print("too short :(")
-            
+
             print("done")
         You love to see it.
         "#;
@@ -975,12 +975,12 @@ mod tests {
         Check out this great example code::
 
             x_y = "hello"
-            
+
             if len(x_y) > 4:
                 print(x_y)
             else:
                 print("too short :(")
-            
+
             print("done")"#;
 
         let docstring = Docstring::new(docstring.to_owned());

@@ -147,6 +147,10 @@ def is_single_valued(ty: Any) -> bool:
 # type is not generic.
 def generic_context(ty: Any) -> GenericContext | None: ...
 
+# Converts a value into a `Callable`, if possible. This is the value equivalent
+# of `CallableTypeOf`, which operates on types.
+def into_callable(ty: Any) -> Any: ...
+
 # Returns the `__all__` names of a module as a tuple of sorted strings, or `None` if
 # either the module does not have `__all__` or it has invalid elements.
 def dunder_all_names(module: Any) -> Any: ...

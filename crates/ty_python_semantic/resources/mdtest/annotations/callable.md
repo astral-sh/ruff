@@ -307,12 +307,10 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    # TODO: Should reveal `ParamSpecArgs` and `ParamSpecKwargs`
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
+    reveal_type(P1.args)  # revealed: P1@_.args
+    reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
 
-    # TODO: Signature should be (**P1) -> int
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P1@_) -> int
 ```
 
 And, using the legacy syntax:
@@ -322,9 +320,8 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P2@_) -> int
 ```
 
 ## Using `typing.Unpack`

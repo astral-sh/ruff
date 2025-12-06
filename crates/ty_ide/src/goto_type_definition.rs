@@ -1111,7 +1111,7 @@ mod tests {
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=a<CURSOR>b):
@@ -1131,7 +1131,7 @@ mod tests {
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -1151,7 +1151,7 @@ mod tests {
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Cl<CURSOR>ick(x, button=ab):
@@ -1189,7 +1189,7 @@ mod tests {
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, but<CURSOR>ton=ab):
@@ -1398,12 +1398,12 @@ f(**kwargs<CURSOR>)
             r#"
 def outer():
     x = "outer_value"
-    
+
     def inner():
         nonlocal x
         x = "modified"
         return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
@@ -1438,12 +1438,12 @@ def outer():
             r#"
 def outer():
     xy = "outer_value"
-    
+
     def inner():
         nonlocal x<CURSOR>y
         xy = "modified"
         return x  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );

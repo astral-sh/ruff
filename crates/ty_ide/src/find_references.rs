@@ -2113,4 +2113,52 @@ func<CURSOR>_alias()
           |
         ");
     }
+
+    // TODO: Should only return references to the last declaration
+    #[test]
+    fn declarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Reference 1
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          |
+
+        info[references]: Reference 2
+         --> main.py:4:1
+          |
+        2 | a: str = "test"
+        3 |
+        4 | a: int = 10
+          | ^
+        5 |
+        6 | print(a)
+          |
+
+        info[references]: Reference 3
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+          |
+        "#);
+    }
 }

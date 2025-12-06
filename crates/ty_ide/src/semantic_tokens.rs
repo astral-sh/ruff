@@ -259,7 +259,11 @@ impl<'db> SemanticTokenVisitor<'db> {
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // First try to classify the token based on its definition kind.
-        let definition = definition_for_name(self.model, name);
+        let definition = definition_for_name(
+            self.model,
+            name,
+            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+        );
 
         if let Some(definition) = definition {
             let name_str = name.id.as_str();

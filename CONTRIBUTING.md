@@ -331,13 +331,6 @@ you addressed them.
 
 ## MkDocs
 
-> [!NOTE]
->
-> The documentation uses Material for MkDocs Insiders, which is closed-source software.
-> This means only members of the Astral organization can preview the documentation exactly as it
-> will appear in production.
-> Outside contributors can still preview the documentation, but there will be some differences. Consult [the Material for MkDocs documentation](https://squidfunk.github.io/mkdocs-material/insiders/benefits/#features) for which features are exclusively available in the insiders version.
-
 To preview any changes to the documentation locally:
 
 1. Install the [Rust toolchain](https://www.rust-lang.org/tools/install).
@@ -351,11 +344,7 @@ To preview any changes to the documentation locally:
 1. Run the development server with:
 
     ```shell
-    # For contributors.
-    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.public.yml
-
-    # For members of the Astral org, which has access to MkDocs Insiders via sponsorship.
-    uvx --with-requirements docs/requirements-insiders.txt -- mkdocs serve -f mkdocs.insiders.yml
+    uvx --with-requirements docs/requirements.txt -- mkdocs serve -f mkdocs.yml
     ```
 
 The documentation should then be available locally at

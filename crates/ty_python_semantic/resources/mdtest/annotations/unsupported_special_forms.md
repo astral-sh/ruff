@@ -18,9 +18,8 @@ def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
 
 def g() -> TypeGuard[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
-    # TODO: Should reveal a type representing `P.args` and `P.kwargs`
-    reveal_type(args)  # revealed: tuple[@Todo(ParamSpecArgs / ParamSpecKwargs), ...]
-    reveal_type(kwargs)  # revealed: dict[str, @Todo(ParamSpecArgs / ParamSpecKwargs)]
+    reveal_type(args)  # revealed: P@i.args
+    reveal_type(kwargs)  # revealed: P@i.kwargs
     return callback(42, *args, **kwargs)
 
 class Foo:
@@ -65,8 +64,9 @@ def _(
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
 
+    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a type expression"
     def foo(a_: e) -> None:
-        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec`)
+        reveal_type(a_)  # revealed: Unknown
 ```
 
 ## Inheritance
