@@ -1129,6 +1129,21 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: FunctionType<'db>,
+    ) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            match (self.updated_signature(db), other.updated_signature(db)) {
+                (Some(left_sig), Some(right_sig)) => left_sig.structural_ordering(db, right_sig),
+                (None, None) => std::cmp::Ordering::Equal,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+            }
+        })
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that

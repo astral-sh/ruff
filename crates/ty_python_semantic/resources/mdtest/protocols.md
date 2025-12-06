@@ -3029,7 +3029,7 @@ class B(A[P[int]]):
 def f(b: B):
     reveal_type(b)  # revealed: B
     reveal_type(b.attr)  # revealed: P[int]
-    reveal_type(b.attr.attr)  # revealed: P[int] | int
+    reveal_type(b.attr.attr)  # revealed: int | P[int]
 ```
 
 ### Recursive generic protocols with property members

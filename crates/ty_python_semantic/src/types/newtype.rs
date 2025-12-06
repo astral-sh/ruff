@@ -194,6 +194,13 @@ impl<'db> NewType<'db> {
         self.try_map_base_class_type(db, |class_type| Some(f(class_type)))
             .unwrap()
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            self.definition(db)
+                .structural_ordering(db, other.definition(db))
+        })
+    }
 }
 
 pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
