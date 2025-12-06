@@ -701,6 +701,111 @@ Employee("Alice", e_id=1)
 Employee("Alice", 1)  # error: [too-many-positional-arguments]
 ```
 
+### Inherited fields with class-level `kw_only`
+
+When a child dataclass uses `@dataclass(kw_only=True)`, the `kw_only` setting should only apply to
+fields defined in the child class, not to inherited fields from parent classes.
+
+This is a regression test for <https://github.com/astral-sh/ty/issues/1769>.
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Inner:
+    inner: int
+
+@dataclass(kw_only=True)
+class Outer(Inner):
+    outer: int
+
+# Inherited field `inner` is positional, new field `outer` is keyword-only
+reveal_type(Outer.__init__)  # revealed: (self: Outer, inner: int, *, outer: int) -> None
+
+Outer(0, outer=5)  # OK
+Outer(inner=0, outer=5)  # Also OK
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Outer(0, 5)
+```
+
+This also works when the parent class uses the `KW_ONLY` sentinel:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class Parent:
+    a: int
+    _: KW_ONLY
+    b: str
+
+@dataclass(kw_only=True)
+class Child(Parent):
+    c: bytes
+
+# `a` is positional (from parent), `b` is keyword-only (from parent's KW_ONLY),
+# `c` is keyword-only (from child's kw_only=True)
+reveal_type(Child.__init__)  # revealed: (self: Child, a: int, *, b: str, c: bytes) -> None
+
+Child(1, b="hello", c=b"world")  # OK
+# error: [missing-argument] "No arguments provided for required parameters `b`, `c`"
+# error: [too-many-positional-arguments]
+Child(1, "hello", b"world")
+```
+
+And when the child class uses the `KW_ONLY` sentinel while inheriting from a parent:
+
+```py
+from dataclasses import dataclass, KW_ONLY
+
+@dataclass
+class Base:
+    x: int
+
+@dataclass
+class Derived(Base):
+    y: str
+    _: KW_ONLY
+    z: bytes
+
+# `x` and `y` are positional, `z` is keyword-only (from Derived's KW_ONLY)
+reveal_type(Derived.__init__)  # revealed: (self: Derived, x: int, y: str, *, z: bytes) -> None
+
+Derived(1, "hello", z=b"world")  # OK
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+Derived(1, "hello", b"world")
+```
+
+The reverse case also works: when a parent has `kw_only=True` but the child doesn't, the parent's
+fields stay keyword-only while the child's fields are positional:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(kw_only=True)
+class KwOnlyParent:
+    parent_field: int
+
+@dataclass
+class PositionalChild(KwOnlyParent):
+    child_field: str
+
+# `child_field` is positional (child's default), `parent_field` stays keyword-only
+reveal_type(PositionalChild.__init__)  # revealed: (self: PositionalChild, child_field: str, *, parent_field: int) -> None
+
+PositionalChild("hello", parent_field=1)  # OK
+# error: [missing-argument]
+# error: [too-many-positional-arguments]
+PositionalChild("hello", 1)
+```
+
 ### `slots`
 
 If a dataclass is defined with `slots=True`, the `__slots__` attribute is generated as a tuple. It

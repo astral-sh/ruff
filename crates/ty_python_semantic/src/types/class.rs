@@ -21,7 +21,9 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::enum_metadata;
-use crate::types::function::{DataclassTransformerParams, KnownFunction};
+use crate::types::function::{
+    DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
+};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
@@ -3173,6 +3175,24 @@ impl<'db> ClassLiteral<'db> {
                     {
                         *kw = Some(true);
                     }
+                }
+
+                // Resolve the kw_only to the class-level default. This ensures that when fields
+                // are inherited by child classes, they use their defining class's kw_only default.
+                if let FieldKind::Dataclass {
+                    kw_only: ref mut kw @ None,
+                    ..
+                } = field.kind
+                {
+                    let class_kw_only_default = self
+                        .dataclass_params(db)
+                        .is_some_and(|params| params.flags(db).contains(DataclassFlags::KW_ONLY))
+                        || matches!(
+                            field_policy,
+                            CodeGeneratorKind::DataclassLike(Some(transformer_params))
+                                if transformer_params.flags(db).contains(DataclassTransformerFlags::KW_ONLY_DEFAULT)
+                        );
+                    *kw = Some(class_kw_only_default);
                 }
 
                 attributes.insert(symbol.name().clone(), field);
