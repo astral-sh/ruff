@@ -209,7 +209,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::{
     CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
-    infer_expression_type, static_expression_truthiness,
+    infer_expression_type, infer_narrowing_constraint, static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -952,5 +952,171 @@ impl ReachabilityConstraints {
                 }
             }
         }
+    }
+
+    /// Check if the TDD contains a `ReturnsNever` predicate for a `NoReturn` function call.
+    ///
+    /// This is used to distinguish `NoReturn` cases from assert/raise cases. `NoReturn` function
+    /// calls (like `sys.exit()`) create `ReturnsNever` predicates, while `raise` statements don't.
+    ///
+    /// `ReturnsNever` predicates are created with `is_positive: false`, so after negation,
+    /// a `NoReturn` call will have `AlwaysFalse` truthiness.
+    fn has_noreturn_call(
+        &self,
+        db: &dyn Db,
+        predicates: &Predicates<'_>,
+        start: ScopedReachabilityConstraintId,
+    ) -> bool {
+        let mut stack = vec![start];
+        let mut visited = rustc_hash::FxHashSet::default();
+
+        while let Some(current) = stack.pop() {
+            match current {
+                ALWAYS_TRUE | AMBIGUOUS | ALWAYS_FALSE => continue,
+                _ => {
+                    if !visited.insert(current) {
+                        continue;
+                    }
+
+                    let raw_index = current.as_u32() as usize;
+                    if !self.used_indices.get_bit(raw_index).unwrap_or(false) {
+                        continue;
+                    }
+                    let index = self.used_indices.rank(raw_index) as usize;
+                    let node = self.used_interiors[index];
+                    let predicate = &predicates[node.atom];
+
+                    if matches!(predicate.node, PredicateNode::ReturnsNever(_)) {
+                        let truthiness = Self::analyze_single(db, predicate);
+                        // ReturnsNever with is_positive: false and a NoReturn function
+                        // will have AlwaysFalse truthiness after negation
+                        if truthiness == Truthiness::AlwaysFalse {
+                            return true;
+                        }
+                    }
+
+                    stack.push(node.if_true);
+                    stack.push(node.if_false);
+                    stack.push(node.if_ambiguous);
+                }
+            }
+        }
+        false
+    }
+
+    /// Narrow a type based on the predicates in a reachability constraint.
+    ///
+    /// When code is only reachable under certain conditions (encoded in the reachability constraint),
+    /// those conditions can be used to narrow types. For example, if code is only reachable when
+    /// `val is not None`, we can narrow `val` from `int | None` to `int`.
+    ///
+    /// This function traverses the reachability constraint TDD and extracts predicates that can
+    /// narrow the given place, then applies them to the base type.
+    pub(crate) fn narrow_by_reachability<'db>(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        place: crate::semantic_index::place::ScopedPlaceId,
+        base_ty: Type<'db>,
+    ) -> Type<'db> {
+        // Check once if there's a NoReturn call in the TDD. This is used to distinguish
+        // NoReturn cases from assert/raise cases when if_false leads to ALWAYS_FALSE.
+        let has_noreturn = self.has_noreturn_call(db, predicates, id);
+
+        // Traverse the TDD and collect predicates that affect reachability.
+        // For each predicate, we check if one branch leads to ALWAYS_FALSE while
+        // the other leads to something reachable. If so, we know the predicate
+        // must have the value that leads to the reachable branch.
+        let mut result_ty = base_ty;
+        let mut current_id = id;
+
+        loop {
+            let node = match current_id {
+                ALWAYS_TRUE | AMBIGUOUS | ALWAYS_FALSE => break,
+                _ => {
+                    let raw_index = current_id.as_u32() as usize;
+                    if !self.used_indices.get_bit(raw_index).unwrap_or(false) {
+                        break;
+                    }
+                    let index = self.used_indices.rank(raw_index) as usize;
+                    self.used_interiors[index]
+                }
+            };
+
+            let predicate = &predicates[node.atom];
+            let truthiness = Self::analyze_single(db, predicate);
+
+            // Check if one branch leads to ALWAYS_FALSE (unreachable).
+            // If so, we can narrow based on the condition that makes the other branch reachable.
+            //
+            // For example, in: `if x is None: sys.exit()`
+            // The predicate `x is None` being true leads to the NoReturn call,
+            // which makes that branch unreachable. So the code after the if statement
+            // is only reachable when `x is None` is false, i.e., `x is not None`.
+            //
+            // We only apply this narrowing when:
+            // 1. The predicate is NOT a ReturnsNever predicate (those just mark reachability)
+            // 2. The predicate evaluates to Ambiguous (we don't know the value statically)
+            // 3. Exactly one branch leads to ALWAYS_FALSE
+            if truthiness == Truthiness::Ambiguous
+                && !matches!(predicate.node, PredicateNode::ReturnsNever(_))
+            {
+                let apply_predicate =
+                    if node.if_true == ALWAYS_FALSE && node.if_false != ALWAYS_FALSE {
+                        // The true branch is unreachable (e.g., `if x is None: sys.exit()`).
+                        // The predicate must be false for this code to be reachable.
+                        // This handles both NoReturn calls and raise statements in if-branches.
+                        Some(Predicate {
+                            node: predicate.node,
+                            is_positive: !predicate.is_positive,
+                        })
+                    } else if node.if_false == ALWAYS_FALSE
+                        && node.if_true != ALWAYS_FALSE
+                        && has_noreturn
+                    {
+                        // The false branch is unreachable. The predicate must be true.
+                        // This handles: `if x is not None: pass else: sys.exit()`
+                        //
+                        // We ONLY apply this when there's a NoReturn call in the TDD.
+                        // This distinguishes NoReturn from assert statements:
+                        // - `assert x is None` also has if_false == ALWAYS_FALSE
+                        // - But assert uses `raise`, not a NoReturn function call
+                        // - After assert, the variable might be reassigned, so we shouldn't
+                        //   apply the narrowing to the new binding
+                        Some(Predicate {
+                            node: predicate.node,
+                            is_positive: predicate.is_positive,
+                        })
+                    } else {
+                        None
+                    };
+
+                if let Some(pred) = apply_predicate {
+                    if let Some(narrowed) = infer_narrowing_constraint(db, pred, place) {
+                        let candidate = IntersectionBuilder::new(db)
+                            .add_positive(result_ty)
+                            .add_positive(narrowed)
+                            .build();
+                        // Only apply narrowing if the result is not Never.
+                        // A Never result indicates that the narrowing predicate refers to a
+                        // different value than the current binding (e.g., for assignments where
+                        // the reachability constraint is about the old value, not the new one).
+                        if !candidate.is_equivalent_to(db, Type::Never) {
+                            result_ty = candidate;
+                        }
+                    }
+                }
+            }
+
+            // Follow the branch based on the evaluated truthiness
+            current_id = match truthiness {
+                Truthiness::AlwaysTrue => node.if_true,
+                Truthiness::Ambiguous => node.if_ambiguous,
+                Truthiness::AlwaysFalse => node.if_false,
+            };
+        }
+
+        result_ty
     }
 }

@@ -618,9 +618,7 @@ def g(x: int | None):
     if x is None:
         sys.exit(1)
 
-    # TODO: should be just `int`, not `int | None`
-    # See https://github.com/astral-sh/ty/issues/685
-    reveal_type(x)  # revealed: int | None
+    reveal_type(x)  # revealed: int
 ```
 
 ### Possibly unresolved diagnostics
