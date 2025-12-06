@@ -2052,7 +2052,7 @@ mod tests {
         assert_eq!(strip_python_lang_prefix("p"), None);
         assert_eq!(strip_python_lang_prefix("pyt"), None);
         assert_eq!(strip_python_lang_prefix("pyth"), None);
-        assert_eq!(strip_python_lang_prefix("pytho"), None);
+        assert_eq!(strip_python_lang_prefix("pytho"), None); // # spellchecker:disable-line
 
         // Invalid - no word boundary
         assert_eq!(strip_python_lang_prefix("pyx"), None);
