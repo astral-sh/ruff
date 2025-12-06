@@ -257,10 +257,16 @@ reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
+```
 
+<!-- blacken-docs:off -->
+
+```py
 # error: [invalid-syntax]
 reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
+
+<!-- blacken-docs:off -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
