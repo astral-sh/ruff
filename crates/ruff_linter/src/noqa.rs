@@ -879,7 +879,7 @@ fn find_noqa_comments<'a>(
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
-    suppressions: &Suppressions,
+    suppressions: &'a Suppressions,
 ) -> Vec<Option<NoqaComment<'a>>> {
     // List of noqa comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];

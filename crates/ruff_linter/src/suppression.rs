@@ -1,8 +1,10 @@
 use compact_str::CompactString;
 use core::fmt;
 use ruff_db::diagnostic::Diagnostic;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
+use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -10,7 +12,12 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
+use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::codes::Rule;
+use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
+use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA, UnusedNOQAKind};
 use crate::settings::LinterSettings;
 
 #[allow(unused)]
@@ -69,7 +76,7 @@ impl PendingSuppressionComment<'_> {
 }
 
 #[allow(unused)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
     code: CompactString,
@@ -79,6 +86,9 @@ pub(crate) struct Suppression {
 
     /// Any comments associated with the suppression
     comments: SmallVec<[SuppressionComment; 2]>,
+
+    /// Whether this suppression actually suppressed a diagnostic
+    used: Cell<bool>,
 }
 
 #[allow(unused)]
@@ -147,10 +157,92 @@ impl Suppressions {
 
         for suppression in &self.valid {
             if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                suppression.used.set(true);
                 return true;
             }
         }
         false
+    }
+
+    pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        if !context.any_rule_enabled(&[Rule::UnusedNOQA, Rule::InvalidRuleCode]) {
+            return;
+        }
+
+        let unused = self
+            .valid
+            .iter()
+            .filter(|suppression| !suppression.used.get());
+
+        for suppression in unused {
+            let Ok(rule) = Rule::from_code(&suppression.code) else {
+                continue; // TODO: invalid code
+            };
+            for comment in &suppression.comments {
+                let mut range = comment.range;
+                let edit = if comment.codes.len() == 1 {
+                    delete_comment(comment.range, locator)
+                } else {
+                    let code_index = comment
+                        .codes
+                        .iter()
+                        .position(|range| locator.slice(range) == suppression.code)
+                        .unwrap();
+                    range = comment.codes[code_index];
+                    let code_range = if code_index < (comment.codes.len() - 1) {
+                        TextRange::new(
+                            comment.codes[code_index].start(),
+                            comment.codes[code_index + 1].start(),
+                        )
+                    } else {
+                        TextRange::new(
+                            comment.codes[code_index - 1].end(),
+                            comment.codes[code_index].end(),
+                        )
+                    };
+                    Edit::range_deletion(code_range)
+                };
+
+                let codes = if context.is_rule_enabled(rule) {
+                    UnusedCodes {
+                        unmatched: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                } else {
+                    UnusedCodes {
+                        disabled: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                };
+
+                let mut diagnostic = context.report_diagnostic(
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes {
+                            unmatched: vec![suppression.code.to_string()],
+                            ..UnusedCodes::default()
+                        }),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                    range,
+                );
+                diagnostic.set_fix(Fix::safe_edit(edit));
+            }
+        }
+
+        for error in self
+            .errors
+            .iter()
+            .filter(|error| error.kind == ParseErrorKind::MissingCodes)
+        {
+            let mut diagnostic = context.report_diagnostic(
+                UnusedNOQA {
+                    codes: Some(UnusedCodes::default()),
+                    kind: UnusedNOQAKind::Suppression,
+                },
+                error.range,
+            );
+            diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+        }
     }
 }
 
@@ -276,6 +368,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: combined_range,
                         comments: smallvec![comment.comment.clone(), other.comment.clone()],
+                        used: false.into(),
                     });
                 }
 
@@ -292,6 +385,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: implicit_range,
                         comments: smallvec![comment.comment.clone()],
+                        used: false.into(),
                     });
                 }
                 self.pending.remove(comment_index);
