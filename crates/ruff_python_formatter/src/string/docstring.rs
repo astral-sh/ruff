@@ -3,11 +3,9 @@
 #![allow(clippy::doc_markdown)]
 
 use std::cmp::Ordering;
-use std::sync::LazyLock;
 use std::{borrow::Cow, collections::VecDeque};
 
 use itertools::Itertools;
-use regex::Regex;
 
 use ruff_formatter::printer::SourceMapGeneration;
 use ruff_python_ast::{AnyStringFlags, StringFlags, str::Quote};
@@ -1073,13 +1071,38 @@ impl<'src> CodeExampleRst<'src> {
         // [directives]: https://docutils.sourceforge.io/docs/ref/rst/restructuredtext.html#directives
         // [Pygments lexer names]: https://pygments.org/docs/lexers/
         // [code-block]: https://www.sphinx-doc.org/en/master/usage/restructuredtext/directives.html#directive-code-block
-        static DIRECTIVE_START: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(
-                r"(?m)^\s*\.\. \s*(?i:code-block|sourcecode)::\s*(?i:python|py|python3|py3)$",
-            )
-            .unwrap()
-        });
-        if !DIRECTIVE_START.is_match(original.line) {
+        fn is_rst_directive_start(line: &str) -> bool {
+            let trimmed = line.trim_start();
+
+            // Must start with ".. "
+            let Some(rest) = trimmed.strip_prefix(".. ") else {
+                return false;
+            };
+            let rest = rest.trim_start();
+
+            // Match "code-block" or "sourcecode" (case-insensitive)
+            let Some(rest) = strip_prefix_ignore_ascii_case(rest, "code-block")
+                .or_else(|| strip_prefix_ignore_ascii_case(rest, "sourcecode"))
+            else {
+                return false;
+            };
+
+            // Must be followed by "::"
+            let Some(rest) = rest.strip_prefix("::") else {
+                return false;
+            };
+            let rest = rest.trim_start();
+
+            // Match Python language identifier (case-insensitive)
+            let Some(rest) = strip_python_lang_prefix(rest) else {
+                return false;
+            };
+
+            // Line must end with only whitespace after the language identifier
+            rest.trim().is_empty()
+        }
+
+        if !is_rst_directive_start(original.line) {
             return None;
         }
         Some(CodeExampleRst {
@@ -1318,50 +1341,13 @@ impl<'src> CodeExampleMarkdown<'src> {
     ///
     /// [fenced code block]: https://spec.commonmark.org/0.30/#fenced-code-blocks
     fn new(original: InputDocstringLine<'src>) -> Option<CodeExampleMarkdown<'src>> {
-        static FENCE_START: LazyLock<Regex> = LazyLock::new(|| {
-            Regex::new(
-                r"(?xm)
-                ^
-                (?:
-                    # In the backtick case, info strings (following the fence)
-                    # cannot contain backticks themselves, since it would
-                    # introduce ambiguity with parsing inline code. In other
-                    # words, if we didn't specifically exclude matching `
-                    # in the info string for backtick fences, then we might
-                    # erroneously consider something to be a code fence block
-                    # that is actually inline code.
-                    #
-                    # NOTE: The `ticklang` and `tildlang` capture groups are
-                    # currently unused, but there was some discussion about not
-                    # assuming unlabeled blocks were Python. At the time of
-                    # writing, we do assume unlabeled blocks are Python, but
-                    # one could inspect the `ticklang` and `tildlang` capture
-                    # groups to determine whether the block is labeled or not.
-                    (?<ticks>```+)(?:\s*(?<ticklang>(?i:python|py|python3|py3))[^`]*)?
-                    |
-                    (?<tilds>~~~+)(?:\s*(?<tildlang>(?i:python|py|python3|py3))\p{any}*)?
-                )
-                $
-                ",
-            )
-            .unwrap()
-        });
-
         let (opening_fence_indent, rest) = indent_with_suffix(original.line);
         // Quit quickly in the vast majority of cases.
         if !rest.starts_with("```") && !rest.starts_with("~~~") {
             return None;
         }
 
-        let caps = FENCE_START.captures(rest)?;
-        let (fence_kind, fence_len) = if let Some(ticks) = caps.name("ticks") {
-            (MarkdownFenceKind::Backtick, ticks.as_str().chars().count())
-        } else {
-            let tildes = caps
-                .name("tilds")
-                .expect("no ticks means it must be tildes");
-            (MarkdownFenceKind::Tilde, tildes.as_str().chars().count())
-        };
+        let (fence_kind, fence_len) = Self::parse_markdown_fence_start(rest)?;
         Some(CodeExampleMarkdown {
             lines: vec![],
             opening_fence_indent: Indentation::from_str(opening_fence_indent),
@@ -1480,6 +1466,58 @@ impl<'src> CodeExampleMarkdown<'src> {
     /// valid.
     fn into_reset_action(self) -> CodeExampleAddAction<'src> {
         CodeExampleAddAction::Reset { code: self.lines }
+    }
+
+    /// Parses a Markdown fenced code block opening line.
+    ///
+    /// Returns the fence type and length if the line is a valid Python code fence.
+    /// Returns `None` if not a valid Python code fence.
+    ///
+    /// In the backtick case, info strings (following the fence) cannot contain
+    /// backticks themselves, since it would introduce ambiguity with parsing
+    /// inline code. In other words, if we didn't specifically exclude matching
+    /// backticks in the info string for backtick fences, then we might
+    /// erroneously consider something to be a code fence block that is actually
+    /// inline code.
+    fn parse_markdown_fence_start(line: &str) -> Option<(MarkdownFenceKind, usize)> {
+        // Check if it's backticks or tildes
+        let (fence_char, kind) = if line.starts_with('`') {
+            ('`', MarkdownFenceKind::Backtick)
+        } else if line.starts_with('~') {
+            ('~', MarkdownFenceKind::Tilde)
+        } else {
+            return None;
+        };
+
+        // Count consecutive fence characters (need at least 3)
+        let fence_len = line.bytes().take_while(|&b| b == fence_char as u8).count();
+        if fence_len < 3 {
+            return None;
+        }
+
+        // Get content after the fence
+        let rest = &line[fence_len..];
+
+        // For backtick fences, info string cannot contain backticks
+        if fence_char == '`' && rest.contains('`') {
+            return None;
+        }
+
+        // Check the language identifier
+        let info_string = rest.trim();
+
+        // Empty info string is treated as Python (matches original implementation)
+        if info_string.is_empty() {
+            return Some((kind, fence_len));
+        }
+
+        // Check if it starts with a Python language identifier using state machine
+        // The state machine only matches if followed by whitespace or end of string
+        if strip_python_lang_prefix(info_string).is_some() {
+            return Some((kind, fence_len));
+        }
+
+        None
     }
 }
 
@@ -1897,9 +1935,90 @@ fn is_rst_option(line: &str) -> bool {
         .any(|ch| ch == ':')
 }
 
+/// Case-insensitive ASCII prefix stripping.
+///
+/// If `s` starts with `prefix` (case-insensitive), returns the remainder of `s`
+/// after the prefix. Otherwise, returns `None`.
+fn strip_prefix_ignore_ascii_case<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
+    if s.len() < prefix.len() {
+        return None;
+    }
+    if s[..prefix.len()].eq_ignore_ascii_case(prefix) {
+        Some(&s[prefix.len()..])
+    } else {
+        None
+    }
+}
+
+/// Matches a Python language identifier using a state machine.
+///
+/// Matches "py", "py3", "python", or "python3" (case-insensitive) and returns
+/// the remainder of the string after the match. This is more efficient than
+/// multiple `strip_prefix_ignore_ascii_case` calls as it traverses the input
+/// only once.
+///
+/// State machine structure:
+/// ```text
+/// Start -> 'p' -> 'y' -> (accept "py")
+///                     -> '3' -> (accept "py3")
+///                     -> 't' -> 'h' -> 'o' -> 'n' -> (accept "python")
+///                                                 -> '3' -> (accept "python3")
+/// ```
+fn strip_python_lang_prefix(s: &str) -> Option<&str> {
+    let bytes = s.as_bytes();
+
+    // State 0-1: expect "py"
+    if !bytes.get(..2)?.eq_ignore_ascii_case(b"py") {
+        return None;
+    }
+
+    // State 2: "py" matched - check what's next
+    match bytes.get(2).map(u8::to_ascii_lowercase) {
+        // "py" followed by end or whitespace -> accept "py"
+        None => return Some(&s[2..]),
+        Some(b) if b.is_ascii_whitespace() => return Some(&s[2..]),
+
+        // "py3" -> accept "py3"
+        Some(b'3') => {
+            return match bytes.get(3) {
+                None => Some(&s[3..]),
+                Some(b) if b.is_ascii_whitespace() => Some(&s[3..]),
+                Some(_) => None,
+            };
+        }
+
+        // Continue to "python" - check "thon" suffix
+        Some(b't') => {
+            if !bytes.get(3..6)?.eq_ignore_ascii_case(b"hon") {
+                return None;
+            }
+        }
+
+        // Invalid
+        Some(_) => return None,
+    }
+
+    // State 6: "python" matched - check what's next
+    match bytes.get(6).map(u8::to_ascii_lowercase) {
+        // "python" followed by end or whitespace -> accept "python"
+        None => Some(&s[6..]),
+        Some(b) if b.is_ascii_whitespace() => Some(&s[6..]),
+
+        // "python3" -> accept "python3"
+        Some(b'3') => match bytes.get(7) {
+            None => Some(&s[7..]),
+            Some(b) if b.is_ascii_whitespace() => Some(&s[7..]),
+            Some(_) => None,
+        },
+
+        // Invalid (e.g., "pythonx")
+        Some(_) => None,
+    }
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::string::docstring::Indentation;
+    use crate::string::docstring::{Indentation, strip_python_lang_prefix};
 
     #[test]
     fn indentation_like_black() {
@@ -1907,5 +2026,44 @@ mod tests {
         assert_eq!(Indentation::from_str("\t        \t").columns(), 24);
         assert_eq!(Indentation::from_str("\t\t\t").columns(), 24);
         assert_eq!(Indentation::from_str("    ").columns(), 4);
+    }
+
+    #[test]
+    fn python_lang_state_machine() {
+        // Valid matches - exact
+        assert_eq!(strip_python_lang_prefix("py"), Some(""));
+        assert_eq!(strip_python_lang_prefix("py3"), Some(""));
+        assert_eq!(strip_python_lang_prefix("python"), Some(""));
+        assert_eq!(strip_python_lang_prefix("python3"), Some(""));
+
+        // Valid matches - case insensitive
+        assert_eq!(strip_python_lang_prefix("PY"), Some(""));
+        assert_eq!(strip_python_lang_prefix("Py3"), Some(""));
+        assert_eq!(strip_python_lang_prefix("Python"), Some(""));
+        assert_eq!(strip_python_lang_prefix("PYTHON3"), Some(""));
+        assert_eq!(strip_python_lang_prefix("PyThOn"), Some(""));
+
+        // Valid matches - with trailing whitespace
+        assert_eq!(strip_python_lang_prefix("py "), Some(" "));
+        assert_eq!(strip_python_lang_prefix("python\t"), Some("\t"));
+        assert_eq!(strip_python_lang_prefix("python3 extra"), Some(" extra"));
+
+        // Invalid - prefix only
+        assert_eq!(strip_python_lang_prefix("p"), None);
+        assert_eq!(strip_python_lang_prefix("pyt"), None);
+        assert_eq!(strip_python_lang_prefix("pyth"), None);
+        assert_eq!(strip_python_lang_prefix("pytho"), None);
+
+        // Invalid - no word boundary
+        assert_eq!(strip_python_lang_prefix("pyx"), None);
+        assert_eq!(strip_python_lang_prefix("py33"), None);
+        assert_eq!(strip_python_lang_prefix("pythonx"), None);
+        assert_eq!(strip_python_lang_prefix("python33"), None);
+        assert_eq!(strip_python_lang_prefix("python3x"), None);
+
+        // Invalid - completely different
+        assert_eq!(strip_python_lang_prefix("rust"), None);
+        assert_eq!(strip_python_lang_prefix(""), None);
+        assert_eq!(strip_python_lang_prefix("javascript"), None);
     }
 }
