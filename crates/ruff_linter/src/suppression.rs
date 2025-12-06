@@ -17,7 +17,7 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
-use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
+use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA, UnusedNOQAKind};
 use crate::settings::LinterSettings;
 
 #[allow(unused)]
@@ -165,7 +165,7 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        if !context.is_rule_enabled(Rule::UnusedNOQA) {
+        if !context.any_rule_enabled(&[Rule::UnusedNOQA, Rule::InvalidRuleCode]) {
             return;
         }
 
@@ -178,9 +178,6 @@ impl Suppressions {
             let Ok(rule) = Rule::from_code(&suppression.code) else {
                 continue; // TODO: invalid code
             };
-            if !context.is_rule_enabled(rule) {
-                continue; // don't count disabled rules as unused
-            }
             for comment in &suppression.comments {
                 let mut range = comment.range;
                 let edit = if comment.codes.len() == 1 {
@@ -206,18 +203,45 @@ impl Suppressions {
                     Edit::range_deletion(code_range)
                 };
 
+                let codes = if context.is_rule_enabled(rule) {
+                    UnusedCodes {
+                        unmatched: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                } else {
+                    UnusedCodes {
+                        disabled: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                };
+
                 let mut diagnostic = context.report_diagnostic(
                     UnusedNOQA {
                         codes: Some(UnusedCodes {
                             unmatched: vec![suppression.code.to_string()],
                             ..UnusedCodes::default()
                         }),
-                        kind: crate::rules::ruff::rules::UnusedNOQAKind::Suppression,
+                        kind: UnusedNOQAKind::Suppression,
                     },
                     range,
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
+        }
+
+        for error in self
+            .errors
+            .iter()
+            .filter(|error| error.kind == ParseErrorKind::MissingCodes)
+        {
+            let mut diagnostic = context.report_diagnostic(
+                UnusedNOQA {
+                    codes: Some(UnusedCodes::default()),
+                    kind: UnusedNOQAKind::Suppression,
+                },
+                error.range,
+            );
+            diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
         }
     }
 }
