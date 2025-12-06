@@ -228,7 +228,9 @@ Explicit specialization of a generic class involving `ParamSpec` is done by prov
 of types, `...`, or another in-scope `ParamSpec`.
 
 ```py
+reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
+reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
 def func[**P2](c: Callable[P2, None]):
@@ -238,6 +240,12 @@ P2 = ParamSpec("P2")
 
 # TODO: error: paramspec is unbound
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
+reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
+
+# error: [invalid-syntax]
+reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
 ```
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
@@ -255,14 +263,19 @@ reveal_type(OnlyParamSpec[int]().attr)  # revealed: (int, /) -> None
 But, they cannot be omitted when there are multiple type variables.
 
 ```py
+reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
 # TODO: error: paramspec is unbound
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
-# error: [invalid-type-arguments]
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, (int, str)]().attr)  # revealed: (...) -> Unknown
 ```
 
 Nor can they be omitted when there are more than one `ParamSpec`.
