@@ -649,7 +649,7 @@ impl<'db> Signature<'db> {
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
             for param in &self.parameters {
-                parameters.push(param.recursive_type_normalized_impl(db, div, nested)?);
+                parameters.push(param.recursive_type_normalized_impl(db, div, true)?);
             }
             Parameters::new(db, parameters)
         };

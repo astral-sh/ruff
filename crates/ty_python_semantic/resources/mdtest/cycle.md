@@ -129,15 +129,15 @@ class C:
         self.c = lambda positional_only=self.c, /: positional_only
         self.d = lambda *, kw_only=self.d: kw_only
 
-        # revealed: (positional=Unknown | ((positional=Unknown) -> Unknown)) -> Unknown
+        # revealed: (positional=Unknown) -> Unknown
         reveal_type(self.a)
 
-        # revealed: (*, kw_only=Unknown | ((*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: (*, kw_only=Unknown) -> Unknown
         reveal_type(self.b)
 
-        # revealed: (positional_only=Unknown | ((positional_only=Unknown, /) -> Unknown), /) -> Unknown
+        # revealed: (positional_only=Unknown, /) -> Unknown
         reveal_type(self.c)
 
-        # revealed: (*, kw_only=Unknown | ((*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: (*, kw_only=Unknown) -> Unknown
         reveal_type(self.d)
 ```
