@@ -22,7 +22,9 @@ use super::{
     semantic_index,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
-use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
+use crate::types::constraints::{
+    ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
+};
 use crate::types::function::{is_implicit_classmethod, is_implicit_staticmethod};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, typing_self, walk_generic_context,
@@ -398,13 +400,19 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
+    /// Checks whether the given slice contains a single signature, and that signature is a
+    /// ParamSpec signature. If so, returns the [`BoundTypeVarInstance`] for the ParamSpec, along
+    /// with the return type of the signature.
     fn signatures_is_single_paramspec(
         signatures: &[Signature<'db>],
-    ) -> Option<BoundTypeVarInstance<'db>> {
+    ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
         let [signature] = signatures else {
             return None;
         };
-        signature.parameters.as_paramspec()
+        signature
+            .parameters
+            .as_paramspec()
+            .map(|bound_typevar| (bound_typevar, signature.return_ty))
     }
 
     pub(crate) fn when_constraint_set_assignable_to(
@@ -440,17 +448,33 @@ impl<'db> CallableSignature<'db> {
             let other_is_single_paramspec = Self::signatures_is_single_paramspec(other_signatures);
 
             match (self_is_single_paramspec, other_is_single_paramspec) {
-                (Some(self_bound_typevar), Some(other_bound_typevar)) => {
-                    return ConstraintSet::constrain_typevar(
+                (
+                    Some((self_bound_typevar, self_return_type)),
+                    Some((other_bound_typevar, other_return_type)),
+                ) => {
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
                         relation,
                     );
+                    let return_types_match = self_return_type.zip(other_return_type).when_some_and(
+                        |(self_return_type, other_return_type)| {
+                            self_return_type.has_relation_to_impl(
+                                db,
+                                other_return_type,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        },
+                    );
+                    return param_spec_matches.and(db, || return_types_match);
                 }
 
-                (Some(self_bound_typevar), None) => {
+                (Some((self_bound_typevar, self_return_type)), None) => {
                     let upper =
                         Type::Callable(CallableType::new(
                             db,
@@ -459,16 +483,32 @@ impl<'db> CallableSignature<'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                         ));
-                    return ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         self_bound_typevar,
                         Type::Never,
                         upper,
                         relation,
                     );
+                    let return_types_match = self_return_type.when_some_and(|self_return_type| {
+                        other_signatures
+                            .iter()
+                            .filter_map(|signature| signature.return_ty)
+                            .when_all(db, |other_return_type| {
+                                self_return_type.has_relation_to_impl(
+                                    db,
+                                    other_return_type,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
+                    });
+                    return param_spec_matches.and(db, || return_types_match);
                 }
 
-                (None, Some(other_bound_typevar)) => {
+                (None, Some((other_bound_typevar, other_return_type))) => {
                     let lower =
                         Type::Callable(CallableType::new(
                             db,
@@ -477,13 +517,29 @@ impl<'db> CallableSignature<'db> {
                             )),
                             CallableTypeKind::ParamSpecValue,
                         ));
-                    return ConstraintSet::constrain_typevar(
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         other_bound_typevar,
                         lower,
                         Type::object(),
                         relation,
                     );
+                    let return_types_match = other_return_type.when_some_and(|other_return_type| {
+                        self_signatures
+                            .iter()
+                            .filter_map(|signature| signature.return_ty)
+                            .when_all(db, |self_return_type| {
+                                self_return_type.has_relation_to_impl(
+                                    db,
+                                    other_return_type,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
+                    });
+                    return param_spec_matches.and(db, || return_types_match);
                 }
 
                 (None, None) => {}
