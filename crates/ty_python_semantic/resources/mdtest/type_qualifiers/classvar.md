@@ -101,6 +101,37 @@ class C:
     x: ClassVar[int, str] = 1
 ```
 
+## Trailing comma creates a tuple
+
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+
+```py
+from typing import ClassVar
+
+class C:
+    # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
+    x: ClassVar[(),]
+
+# error: [invalid-attribute-access] "Cannot assign to ClassVar `x` from an instance of type `C`"
+C().x = 42
+reveal_type(C.x)  # revealed: Unknown
+```
+
+This also applies when the trailing comma is inside the brackets (see
+[ty#1768](https://github.com/astral-sh/ty/issues/1768)):
+
+```py
+from typing import ClassVar
+
+class D:
+    # A trailing comma here doesn't change the meaning; it's still one argument.
+    a: ClassVar[int,] = 1
+
+reveal_type(D.a)  # revealed: int
+```
+
 ## Illegal `ClassVar` in type expression
 
 ```py
