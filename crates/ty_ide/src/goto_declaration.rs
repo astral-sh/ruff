@@ -2894,6 +2894,86 @@ def ab(a: int, *, c: int): ...
         ");
     }
 
+    // TODO: Should only return `a: int`
+    #[test]
+    fn redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+
+                a: bool = True
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Declaration
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | ^
+        3 |
+        4 | a: int = 10
+          |
+        info: Source
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+        7 |
+        8 | a: bool = True
+          |
+
+        info[goto-declaration]: Declaration
+         --> main.py:4:1
+          |
+        2 | a: str = "test"
+        3 |
+        4 | a: int = 10
+          | ^
+        5 |
+        6 | print(a)
+          |
+        info: Source
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+        7 |
+        8 | a: bool = True
+          |
+
+        info[goto-declaration]: Declaration
+         --> main.py:8:1
+          |
+        6 | print(a)
+        7 |
+        8 | a: bool = True
+          | ^
+          |
+        info: Source
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^
+        7 |
+        8 | a: bool = True
+          |
+        "#);
+    }
+
     impl CursorTest {
         fn goto_declaration(&self) -> String {
             let Some(targets) = goto_declaration(&self.db, self.cursor.file, self.cursor.offset)

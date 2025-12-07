@@ -272,6 +272,12 @@ large_stack_arrays = "allow"
 lto = "fat"
 codegen-units = 16
 
+# Profile to build a minimally sized binary for ruff/ty
+[profile.minimal-size]
+inherits = "release"
+opt-level = "z"
+codegen-units = 1
+
 # Some crates don't change as much but benefit more from
 # more expensive optimization passes, so we selectively
 # decrease codegen-units in some cases.

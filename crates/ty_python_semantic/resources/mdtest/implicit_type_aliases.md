@@ -398,7 +398,7 @@ reveal_type(Sum)  # revealed: <class 'tuple[T@Sum, U@Sum]'>
 reveal_type(ListOrTuple)  # revealed: <types.UnionType special form 'list[T@ListOrTuple] | tuple[T@ListOrTuple, ...]'>
 # revealed: <types.UnionType special form 'list[T@ListOrTupleLegacy] | tuple[T@ListOrTupleLegacy, ...]'>
 reveal_type(ListOrTupleLegacy)
-reveal_type(MyCallable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+reveal_type(MyCallable)  # revealed: <typing.Callable special form '(**P@MyCallable) -> T@MyCallable'>
 reveal_type(AnnotatedType)  # revealed: <special form 'typing.Annotated[T@AnnotatedType, <metadata>]'>
 reveal_type(TransparentAlias)  # revealed: typing.TypeVar
 reveal_type(MyOptional)  # revealed: <types.UnionType special form 'T@MyOptional | None'>
@@ -425,8 +425,7 @@ def _(
     reveal_type(int_and_bytes)  # revealed: tuple[int, bytes]
     reveal_type(list_or_tuple)  # revealed: list[int] | tuple[int, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
-    # TODO: This should be `(str, bytes) -> int`
-    reveal_type(my_callable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+    reveal_type(my_callable)  # revealed: (str, bytes, /) -> int
     reveal_type(annotated_int)  # revealed: int
     reveal_type(transparent_alias)  # revealed: int
     reveal_type(optional_int)  # revealed: int | None
@@ -463,7 +462,7 @@ reveal_type(ListOfPairs)  # revealed: <class 'list[tuple[str, str]]'>
 reveal_type(ListOrTupleOfInts)  # revealed: <types.UnionType special form 'list[int] | tuple[int, ...]'>
 reveal_type(AnnotatedInt)  # revealed: <special form 'typing.Annotated[int, <metadata>]'>
 reveal_type(SubclassOfInt)  # revealed: <special form 'type[int]'>
-reveal_type(CallableIntToStr)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+reveal_type(CallableIntToStr)  # revealed: <typing.Callable special form '(int, /) -> str'>
 
 def _(
     ints_or_none: IntsOrNone,
@@ -480,8 +479,7 @@ def _(
     reveal_type(list_or_tuple_of_ints)  # revealed: list[int] | tuple[int, ...]
     reveal_type(annotated_int)  # revealed: int
     reveal_type(subclass_of_int)  # revealed: type[int]
-    # TODO: This should be `(int, /) -> str`
-    reveal_type(callable_int_to_str)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+    reveal_type(callable_int_to_str)  # revealed: (int, /) -> str
 ```
 
 A generic implicit type alias can also be used in another generic implicit type alias:
@@ -534,8 +532,7 @@ def _(
     reveal_type(unknown_and_unknown)  # revealed: tuple[Unknown, Unknown]
     reveal_type(list_or_tuple)  # revealed: list[Unknown] | tuple[Unknown, ...]
     reveal_type(list_or_tuple_legacy)  # revealed: list[Unknown] | tuple[Unknown, ...]
-    # TODO: should be (...) -> Unknown
-    reveal_type(my_callable)  # revealed: @Todo(Callable[..] specialized with ParamSpec)
+    reveal_type(my_callable)  # revealed: (...) -> Unknown
     reveal_type(annotated_unknown)  # revealed: Unknown
     reveal_type(optional_unknown)  # revealed: Unknown | None
 ```

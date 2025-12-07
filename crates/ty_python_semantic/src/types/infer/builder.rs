@@ -56,17 +56,17 @@ use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, Meth
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS, CYCLIC_CLASS_DEFINITION,
-    CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY, INCONSISTENT_MRO,
-    INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS, INVALID_BASE,
-    INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY, INVALID_LEGACY_TYPE_VARIABLE,
-    INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE, INVALID_OVERLOAD,
-    INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL, INVALID_TYPE_ARGUMENTS,
-    INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_VARIABLE_CONSTRAINTS,
-    IncompatibleBases, NON_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE,
-    POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS,
-    UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT,
-    UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
+    self, CALL_NON_CALLABLE, CONFLICTING_DECLARATIONS, CONFLICTING_METACLASS,
+    CYCLIC_CLASS_DEFINITION, CYCLIC_TYPE_ALIAS_DEFINITION, DIVISION_BY_ZERO, DUPLICATE_KW_ONLY,
+    INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, INVALID_ATTRIBUTE_ACCESS,
+    INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
+    INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
+    INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
+    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
+    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
@@ -94,7 +94,6 @@ use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
 use crate::types::mro::MroErrorKind;
 use crate::types::newtype::NewType;
-use crate::types::signatures::{Parameter, Parameters, Signature};
 use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{Tuple, TupleLength, TupleSpec, TupleType};
 use crate::types::typed_dict::{
@@ -103,16 +102,17 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypes,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
     ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
     IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParameterForm, SpecialFormType, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    overrides, todo_type,
+    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
+    Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
+    UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
+use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
@@ -2368,7 +2368,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                                 db,
                                 callable.signatures(db),
-                                true,
+                                CallableTypeKind::FunctionLike,
                             ))),
                             Type::Union(union) => union
                                 .try_map(db, |element| into_function_like_callable(db, *element)),
@@ -2676,7 +2676,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 todo_type!("PEP 646")
             } else {
                 let annotated_type = self.file_expression_type(annotation);
-                Type::homogeneous_tuple(self.db(), annotated_type)
+                if let Type::TypeVar(typevar) = annotated_type
+                    && typevar.is_paramspec(self.db())
+                {
+                    match typevar.paramspec_attr(self.db()) {
+                        // `*args: P.args`
+                        Some(ParamSpecAttrKind::Args) => annotated_type,
+
+                        // `*args: P.kwargs`
+                        Some(ParamSpecAttrKind::Kwargs) => {
+                            // TODO: Should this diagnostic be raised as part of
+                            // `ArgumentTypeChecker`?
+                            if let Some(builder) =
+                                self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                            {
+                                let name = typevar.name(self.db());
+                                let mut diag = builder.into_diagnostic(format_args!(
+                                    "`{name}.kwargs` is valid only in `**kwargs` annotation",
+                                ));
+                                diag.set_primary_message(format_args!(
+                                    "Did you mean `{name}.args`?"
+                                ));
+                                diagnostic::add_type_expression_reference_link(diag);
+                            }
+                            Type::homogeneous_tuple(self.db(), Type::unknown())
+                        }
+
+                        // `*args: P`
+                        None => {
+                            // The diagnostic for this case is handled in `in_type_expression`.
+                            Type::homogeneous_tuple(self.db(), Type::unknown())
+                        }
+                    }
+                } else {
+                    Type::homogeneous_tuple(self.db(), annotated_type)
+                }
             };
 
             self.add_declaration_with_binding(
@@ -2759,7 +2793,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         typing_self(db, self.scope(), Some(method_definition), class_literal)
     }
 
-    /// Set initial declared/inferred types for a `*args` variadic positional parameter.
+    /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.
     ///
     /// The annotated type is implicitly wrapped in a string-keyed dictionary.
     ///
@@ -2772,11 +2806,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
     ) {
         if let Some(annotation) = parameter.annotation() {
-            let annotated_ty = self.file_expression_type(annotation);
-            let ty = KnownClass::Dict.to_specialized_instance(
-                self.db(),
-                [KnownClass::Str.to_instance(self.db()), annotated_ty],
-            );
+            let annotated_type = self.file_expression_type(annotation);
+            let ty = if let Type::TypeVar(typevar) = annotated_type
+                && typevar.is_paramspec(self.db())
+            {
+                match typevar.paramspec_attr(self.db()) {
+                    // `**kwargs: P.args`
+                    Some(ParamSpecAttrKind::Args) => {
+                        // TODO: Should this diagnostic be raised as part of `ArgumentTypeChecker`?
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, annotation)
+                        {
+                            let name = typevar.name(self.db());
+                            let mut diag = builder.into_diagnostic(format_args!(
+                                "`{name}.args` is valid only in `*args` annotation",
+                            ));
+                            diag.set_primary_message(format_args!("Did you mean `{name}.kwargs`?"));
+                            diagnostic::add_type_expression_reference_link(diag);
+                        }
+                        KnownClass::Dict.to_specialized_instance(
+                            self.db(),
+                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                        )
+                    }
+
+                    // `**kwargs: P.kwargs`
+                    Some(ParamSpecAttrKind::Kwargs) => annotated_type,
+
+                    // `**kwargs: P`
+                    None => {
+                        // The diagnostic for this case is handled in `in_type_expression`.
+                        KnownClass::Dict.to_specialized_instance(
+                            self.db(),
+                            [KnownClass::Str.to_instance(self.db()), Type::unknown()],
+                        )
+                    }
+                }
+            } else {
+                KnownClass::Dict.to_specialized_instance(
+                    self.db(),
+                    [KnownClass::Str.to_instance(self.db()), annotated_type],
+                )
+            };
             self.add_declaration_with_binding(
                 parameter.into(),
                 definition,
@@ -3405,20 +3476,81 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let previous_deferred_state =
             std::mem::replace(&mut self.deferred_state, DeferredExpressionState::Deferred);
-        let default_ty = self.infer_paramspec_default(default);
-        self.store_expression_type(default, default_ty);
+        self.infer_paramspec_default(default);
         self.deferred_state = previous_deferred_state;
     }
 
-    fn infer_paramspec_default(&mut self, default: &ast::Expr) -> Type<'db> {
-        // This is the same logic as `TypeInferenceBuilder::infer_callable_parameter_types` except
-        // for the subscript branch which is required for `Concatenate` but that cannot be
-        // specified in this context.
-        match default {
-            ast::Expr::EllipsisLiteral(_) => {
-                Type::single_callable(self.db(), Signature::new(Parameters::gradual_form(), None))
+    fn infer_paramspec_default(&mut self, default_expr: &ast::Expr) {
+        match default_expr {
+            ast::Expr::EllipsisLiteral(ellipsis) => {
+                let ty = self.infer_ellipsis_literal_expression(ellipsis);
+                self.store_expression_type(default_expr, ty);
+                return;
             }
             ast::Expr::List(ast::ExprList { elts, .. }) => {
+                let types = elts
+                    .iter()
+                    .map(|elt| self.infer_type_expression(elt))
+                    .collect::<Vec<_>>();
+                // N.B. We cannot represent a heterogeneous list of types in our type system, so we
+                // use a heterogeneous tuple type to represent the list of types instead.
+                self.store_expression_type(
+                    default_expr,
+                    Type::heterogeneous_tuple(self.db(), types),
+                );
+                return;
+            }
+            ast::Expr::Name(_) => {
+                let ty = self.infer_type_expression(default_expr);
+                let is_paramspec = match ty {
+                    Type::TypeVar(typevar) => typevar.is_paramspec(self.db()),
+                    Type::KnownInstance(known_instance) => {
+                        known_instance.class(self.db()) == KnownClass::ParamSpec
+                    }
+                    _ => false,
+                };
+                if is_paramspec {
+                    return;
+                }
+            }
+            _ => {}
+        }
+        if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default_expr) {
+            builder.into_diagnostic(
+                "The default value to `ParamSpec` must be either \
+                    a list of types, `ParamSpec`, or `...`",
+            );
+        }
+    }
+
+    /// Infer the type of the expression that represents an explicit specialization of a
+    /// `ParamSpec` type variable.
+    fn infer_paramspec_explicit_specialization_value(
+        &mut self,
+        expr: &ast::Expr,
+        exactly_one_paramspec: bool,
+    ) -> Result<Type<'db>, ()> {
+        let db = self.db();
+
+        match expr {
+            ast::Expr::EllipsisLiteral(_) => {
+                return Ok(Type::paramspec_value_callable(
+                    db,
+                    Parameters::gradual_form(),
+                ));
+            }
+
+            ast::Expr::Tuple(ast::ExprTuple { elts, .. })
+            | ast::Expr::List(ast::ExprList { elts, .. }) => {
+                // This should be taken care of by the caller.
+                if expr.is_tuple_expr() {
+                    assert!(
+                        exactly_one_paramspec,
+                        "Inferring ParamSpec value during explicit specialization for a \
+                    tuple expression should only happen when it contains exactly one ParamSpec"
+                    );
+                }
+
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
                 // Whether to infer `Todo` for the parameters
@@ -3447,41 +3579,109 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     )
                 };
 
-                Type::single_callable(self.db(), Signature::new(parameters, None))
+                return Ok(Type::paramspec_value_callable(db, parameters));
             }
-            ast::Expr::Name(name) => {
-                let name_ty = self.infer_name_load(name);
-                let is_paramspec = match name_ty {
-                    Type::KnownInstance(known_instance) => {
-                        known_instance.class(self.db()) == KnownClass::ParamSpec
+
+            ast::Expr::Subscript(_) => {
+                // TODO: Support `Concatenate[...]`
+                return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
+            }
+
+            ast::Expr::Name(_) => {
+                let param_type = self.infer_type_expression(expr);
+
+                match param_type {
+                    Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                        return Ok(param_type);
                     }
-                    Type::NominalInstance(nominal) => {
-                        nominal.has_known_class(self.db(), KnownClass::ParamSpec)
+
+                    Type::KnownInstance(known_instance)
+                        if known_instance.class(self.db()) == KnownClass::ParamSpec =>
+                    {
+                        // TODO: Emit diagnostic: "ParamSpec "P" is unbound"
+                        return Err(());
                     }
-                    _ => false,
-                };
-                if is_paramspec {
-                    name_ty
-                } else {
-                    if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
-                        builder.into_diagnostic(
-                            "The default value to `ParamSpec` must be either a list of types, \
-                        `ParamSpec`, or `...`",
-                        );
+
+                    // This is to handle the following case:
+                    //
+                    // ```python
+                    // from typing import ParamSpec
+                    //
+                    // class Foo[**P]: ...
+                    //
+                    // Foo[ParamSpec]  # P: (ParamSpec, /)
+                    // ```
+                    Type::NominalInstance(nominal)
+                        if nominal.has_known_class(self.db(), KnownClass::ParamSpec) =>
+                    {
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::new(
+                                self.db(),
+                                [
+                                    Parameter::positional_only(None)
+                                        .with_annotated_type(param_type),
+                                ],
+                            ),
+                        ));
                     }
-                    Type::unknown()
+
+                    _ if exactly_one_paramspec => {
+                        // Square brackets are optional when `ParamSpec` is the only type variable
+                        // being specialized. This means that a single name expression represents a
+                        // parameter list with a single parameter. For example,
+                        //
+                        // ```python
+                        // class OnlyParamSpec[**P]: ...
+                        //
+                        // OnlyParamSpec[int]  # P: (int, /)
+                        // ```
+                        let parameters =
+                            if param_type.is_todo() {
+                                Parameters::todo()
+                            } else {
+                                Parameters::new(
+                                    self.db(),
+                                    [Parameter::positional_only(None)
+                                        .with_annotated_type(param_type)],
+                                )
+                            };
+                        return Ok(Type::paramspec_value_callable(db, parameters));
+                    }
+
+                    // This is specifically to handle a case where there are more than one type
+                    // variables and at least one of them is a `ParamSpec` which is specialized
+                    // using `typing.Any`. This isn't explicitly allowed in the spec, but both mypy
+                    // and Pyright allows this and the ecosystem report suggested there are usages
+                    // of this in the wild e.g., `staticmethod[Any, Any]`. For example,
+                    //
+                    // ```python
+                    // class Foo[**P, T]: ...
+                    //
+                    // Foo[Any, int]  # P: (Any, /), T: int
+                    // ```
+                    Type::Dynamic(DynamicType::Any) => {
+                        return Ok(Type::paramspec_value_callable(
+                            db,
+                            Parameters::gradual_form(),
+                        ));
+                    }
+
+                    _ => {}
                 }
             }
-            _ => {
-                if let Some(builder) = self.context.report_lint(&INVALID_PARAMSPEC, default) {
-                    builder.into_diagnostic(
-                        "The default value to `ParamSpec` must be either a list of types, \
-                        `ParamSpec`, or `...`",
-                    );
-                }
-                Type::unknown()
-            }
+
+            _ => {}
         }
+
+        if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr) {
+            builder.into_diagnostic(
+                "Type argument for `ParamSpec` must be either \
+                    a list of types, `ParamSpec`, `Concatenate`, or `...`",
+            );
+        }
+
+        Err(())
     }
 
     fn infer_typevartuple_definition(
@@ -9189,9 +9389,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let ast::ExprAttribute { value, attr, .. } = attribute;
 
-        let value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
+        let mut value_type = self.infer_maybe_standalone_expression(value, TypeContext::default());
         let db = self.db();
         let mut constraint_keys = vec![];
+
+        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = value_type
+            && typevar.is_paramspec(db)
+            && let Some(bound_typevar) = bind_typevar(
+                db,
+                self.index,
+                self.scope().file_scope_id(db),
+                self.typevar_binding_context,
+                typevar,
+            )
+        {
+            value_type = Type::TypeVar(bound_typevar);
+        }
 
         let mut assigned_type = None;
         if let Some(place_expr) = PlaceExpr::try_from_expr(attribute) {
@@ -11244,7 +11457,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     std::slice::from_ref(&*subscript.slice)
                 };
 
-                // TODO: Remove this once we support ParamSpec and Concatenate properly. This is necessary
+                // TODO: Remove this once we support Concatenate properly. This is necessary
                 // to avoid a lot of false positives downstream, because we can't represent the typevar-
                 // specialized `Callable` types yet.
                 let num_arguments = arguments.len();
@@ -11252,27 +11465,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let first_arg = &arguments[0];
                     let second_arg = &arguments[1];
 
-                    if first_arg.is_name_expr() {
-                        let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
-                        if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
-                            first_arg_ty
-                            && typevar.kind(self.db()).is_paramspec()
-                        {
-                            return todo_type!("Callable[..] specialized with ParamSpec");
-                        }
-
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
-                        {
-                            builder.into_diagnostic(format_args!(
-                                "The first argument to `Callable` must be either a list of types, \
-                                     ParamSpec, Concatenate, or `...`",
-                            ));
-                        }
-                        return Type::KnownInstance(KnownInstanceType::Callable(
-                            CallableType::unknown(self.db()),
-                        ));
-                    } else if first_arg.is_subscript_expr() {
+                    if first_arg.is_subscript_expr() {
                         let first_arg_ty = self.infer_expression(first_arg, TypeContext::default());
                         if let Type::Dynamic(DynamicType::UnknownGeneric(generic_context)) =
                             first_arg_ty
@@ -11504,22 +11697,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
         let slice_node = subscript.slice.as_ref();
 
-        // Extract type arguments from the subscript
-        let type_arguments: Vec<Type<'db>> = match slice_node {
+        let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
+        let (type_arguments, store_inferred_type_arguments) = match slice_node {
             ast::Expr::Tuple(tuple) => {
-                let types: Vec<_> = tuple
-                    .elts
-                    .iter()
-                    .map(|elt| self.infer_type_expression(elt))
-                    .collect();
-                self.store_expression_type(
-                    slice_node,
-                    Type::heterogeneous_tuple(db, types.iter().copied()),
-                );
-                types
+                if exactly_one_paramspec {
+                    (std::slice::from_ref(slice_node), false)
+                } else {
+                    (tuple.elts.as_slice(), true)
+                }
             }
-            _ => vec![self.infer_type_expression(slice_node)],
+            _ => (std::slice::from_ref(slice_node), false),
         };
+        let mut inferred_type_arguments = Vec::with_capacity(type_arguments.len());
 
         let typevars = generic_context.variables(db);
         let typevars_len = typevars.len();
@@ -11532,7 +11721,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // Helper to get the AST node corresponding to the type argument at `index`.
         let get_node = |index: usize| -> ast::AnyNodeRef<'_> {
             match slice_node {
-                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts
+                ast::Expr::Tuple(ast::ExprTuple { elts, .. }) if !exactly_one_paramspec => elts
                     .get(index)
                     .expect("type argument index should not be out of range")
                     .into(),
@@ -11544,10 +11733,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
-                EitherOrBoth::Both(typevar, &provided_type) => {
+                EitherOrBoth::Both(typevar, expr) => {
                     if typevar.default_type(db).is_some() {
                         typevar_with_defaults += 1;
                     }
+
+                    let provided_type = if typevar.is_paramspec(db) {
+                        match self.infer_paramspec_explicit_specialization_value(
+                            expr,
+                            exactly_one_paramspec,
+                        ) {
+                            Ok(paramspec_value) => paramspec_value,
+                            Err(()) => {
+                                has_error = true;
+                                Type::unknown()
+                            }
+                        }
+                    } else {
+                        self.infer_type_expression(expr)
+                    };
+
+                    inferred_type_arguments.push(provided_type);
+
                     // TODO consider just accepting the given specialization without checking
                     // against bounds/constraints, but recording the expression for deferred
                     // checking at end of scope. This would avoid a lot of cycles caused by eagerly
@@ -11611,17 +11818,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         None => {}
                     }
+
                     specialization_types.push(Some(provided_type));
                 }
                 EitherOrBoth::Left(typevar) => {
                     if typevar.default_type(db).is_none() {
+                        // This is an error case, so no need to push into the specialization types.
                         missing_typevars.push(typevar);
                     } else {
                         typevar_with_defaults += 1;
+                        specialization_types.push(None);
                     }
-                    specialization_types.push(None);
                 }
-                EitherOrBoth::Right(_) => {
+                EitherOrBoth::Right(expr) => {
+                    inferred_type_arguments.push(self.infer_type_expression(expr));
                     first_excess_type_argument_index.get_or_insert(index);
                 }
             }
@@ -11673,10 +11883,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             has_error = true;
         }
 
+        if store_inferred_type_arguments {
+            self.store_expression_type(
+                slice_node,
+                Type::heterogeneous_tuple(db, inferred_type_arguments),
+            );
+        }
+
         if has_error {
             let unknowns = generic_context
                 .variables(self.db())
-                .map(|_| Some(Type::unknown()))
+                .map(|typevar| {
+                    Some(if typevar.is_paramspec(db) {
+                        Type::paramspec_value_callable(db, Parameters::unknown())
+                    } else {
+                        Type::unknown()
+                    })
+                })
                 .collect::<Vec<_>>();
             return specialize(&unknowns);
         }
@@ -12112,10 +12335,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         Type::Dynamic(
                             DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
                         ) => true,
-                        Type::NominalInstance(nominal) => matches!(
-                            nominal.known_class(self.db()),
-                            Some(KnownClass::TypeVarTuple | KnownClass::ParamSpec)
-                        ),
+                        Type::NominalInstance(nominal) => {
+                            nominal.has_known_class(self.db(), KnownClass::TypeVarTuple)
+                        }
                         _ => false,
                     },
                     true,

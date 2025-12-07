@@ -340,6 +340,22 @@ class C:
     x: Final[int, str] = 1
 ```
 
+### Trailing comma creates a tuple
+
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+
+```py
+from typing import Final
+
+# error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
+x: Final[(),] = 42
+
+# error: [invalid-assignment] "Reassignment of `Final` symbol `x` is not allowed"
+x = 56
+```
+
 ### Illegal `Final` in type expression
 
 ```py

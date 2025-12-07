@@ -2143,15 +2143,13 @@ def function():
             "#,
         );
 
+        // TODO: This should just be `**AB@Alias2 (<variance>)`
+        // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @r"
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ---------------------------------------------
         ```python
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2292,12 +2290,12 @@ def function():
             "#,
         );
 
-        // TODO: This should be `P@Alias (<variance>)`
+        // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @r"
-        typing.ParamSpec
+        P@Alias (bivariant)
         ---------------------------------------------
         ```python
-        typing.ParamSpec
+        P@Alias (bivariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
