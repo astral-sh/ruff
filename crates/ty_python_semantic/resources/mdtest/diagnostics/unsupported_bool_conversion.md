@@ -59,3 +59,39 @@ def get() -> NotBoolable1 | NotBoolable2 | NotBoolable3:
 # error: [unsupported-bool-conversion]
 10 and get() and True
 ```
+
+## Constrained TypeVar has >=1 constraint that doesn't support boolean conversion
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class NotBoolable:
+    __bool__ = None
+
+def f[T: (int, NotBoolable)](x: T) -> T:
+    # error: [unsupported-bool-conversion]
+    if x:
+        pass
+    return x
+```
+
+## TypeVar has an upper bound that doesn't support boolean conversion
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class NotBoolable:
+    __bool__ = None
+
+def f[T: NotBoolable](x: T) -> T:
+    # error: [unsupported-bool-conversion]
+    if x:
+        pass
+    return x
+```

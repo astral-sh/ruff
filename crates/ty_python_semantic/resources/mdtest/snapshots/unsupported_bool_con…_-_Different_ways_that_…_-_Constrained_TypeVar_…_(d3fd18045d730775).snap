@@ -1,0 +1,40 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: unsupported_bool_conversion.md - Different ways that `unsupported-bool-conversion` can occur - Constrained TypeVar has >=1 constraint that doesn't support boolean conversion
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/unsupported_bool_conversion.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class NotBoolable:
+2 |     __bool__ = None
+3 | 
+4 | def f[T: (int, NotBoolable)](x: T) -> T:
+5 |     # error: [unsupported-bool-conversion]
+6 |     if x:
+7 |         pass
+8 |     return x
+```
+
+# Diagnostics
+
+```
+error[unsupported-bool-conversion]: Boolean conversion is unsupported for type variable `T@f` because constraint `NotBoolable` doesn't implement `__bool__` correctly
+ --> src/mdtest_snippet.py:6:8
+  |
+4 | def f[T: (int, NotBoolable)](x: T) -> T:
+5 |     # error: [unsupported-bool-conversion]
+6 |     if x:
+  |        ^
+7 |         pass
+8 |     return x
+  |
+info: rule `unsupported-bool-conversion` is enabled by default
+
+```

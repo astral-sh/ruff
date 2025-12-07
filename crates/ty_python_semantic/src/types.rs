@@ -5307,12 +5307,19 @@ impl<'db> Type<'db> {
             }
         };
 
-        let try_union = |union: UnionType<'db>| {
+        let try_union = |union_like: Either<UnionType<'db>, BoundTypeVarInstance<'db>>| {
             let mut truthiness = None;
             let mut all_not_callable = true;
             let mut has_errors = false;
+            let union_elements = match union_like {
+                Either::Left(union) => union.elements(db),
+                Either::Right(tvar) => tvar
+                    .typevar(db)
+                    .constraints(db)
+                    .expect("Should only call `try_union` on a constrained TypeVar"),
+            };
 
-            for element in union.elements(db) {
+            for element in union_elements {
                 let element_truthiness =
                     match element.try_bool_impl(db, allow_short_circuit, visitor) {
                         Ok(truthiness) => truthiness,
@@ -5340,9 +5347,13 @@ impl<'db> Type<'db> {
                         not_boolable_type: *self,
                     });
                 }
-                return Err(BoolError::Union {
-                    union,
-                    truthiness: truthiness.unwrap_or(Truthiness::Ambiguous),
+                let truthiness = truthiness.unwrap_or(Truthiness::Ambiguous);
+                return Err(match union_like {
+                    Either::Left(union) => BoolError::Union { union, truthiness },
+                    Either::Right(typevar) => BoolError::ConstrainedTypevar {
+                        typevar,
+                        truthiness,
+                    },
                 });
             }
             Ok(truthiness.unwrap_or(Truthiness::Ambiguous))
@@ -5404,12 +5415,17 @@ impl<'db> Type<'db> {
             Type::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => Truthiness::Ambiguous,
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        bound.try_bool_impl(db, allow_short_circuit, visitor)?
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => visitor
+                        .visit(*self, || {
+                            bound.try_bool_impl(db, allow_short_circuit, visitor)
+                        })
+                        .map_err(|err| BoolError::BoundTypeVar {
+                            typevar: *bound_typevar,
+                            truthiness: err.fallback_truthiness(),
+                        })?,
+                    Some(TypeVarBoundOrConstraints::Constraints(_)) => {
+                        visitor.visit(*self, || try_union(Either::Right(*bound_typevar)))?
                     }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => constraints
-                        .as_type(db)
-                        .try_bool_impl(db, allow_short_circuit, visitor)?,
                 }
             }
 
@@ -5421,7 +5437,7 @@ impl<'db> Type<'db> {
 
             Type::ProtocolInstance(_) => try_dunders()?,
 
-            Type::Union(union) => try_union(*union)?,
+            Type::Union(union) => try_union(Either::Left(*union))?,
 
             Type::Intersection(_) => {
                 // TODO
@@ -10320,11 +10336,7 @@ fn walk_type_var_constraints<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 impl<'db> TypeVarConstraints<'db> {
     fn as_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut builder = UnionBuilder::new(db);
-        for ty in self.elements(db) {
-            builder = builder.add(*ty);
-        }
-        builder.build()
+        UnionType::from_elements(db, self.elements(db))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
@@ -11451,6 +11463,18 @@ pub(super) enum BoolError<'db> {
         truthiness: Truthiness,
     },
 
+    /// A typevar has a bound that doesn't implement `__bool__` correctly.
+    BoundTypeVar {
+        typevar: BoundTypeVarInstance<'db>,
+        truthiness: Truthiness,
+    },
+
+    /// A typevar has constraints, and >=1 constraint doesn't implement `__bool__` correctly.
+    ConstrainedTypevar {
+        typevar: BoundTypeVarInstance<'db>,
+        truthiness: Truthiness,
+    },
+
     /// Any other reason why the type can't be converted to a bool.
     /// E.g. because calling `__bool__` returns in a union type and not all variants support `__bool__` or
     /// because `__bool__` points to a type that has a possibly missing `__call__` method.
@@ -11464,6 +11488,8 @@ impl<'db> BoolError<'db> {
             | BoolError::IncorrectReturnType { .. }
             | BoolError::Other { .. } => Truthiness::Ambiguous,
             BoolError::IncorrectArguments { truthiness, .. }
+            | BoolError::ConstrainedTypevar { truthiness, .. }
+            | BoolError::BoundTypeVar { truthiness, .. }
             | BoolError::Union { truthiness, .. } => *truthiness,
         }
     }
@@ -11481,6 +11507,8 @@ impl<'db> BoolError<'db> {
                 not_boolable_type, ..
             } => *not_boolable_type,
             BoolError::Union { union, .. } => Type::Union(*union),
+            BoolError::ConstrainedTypevar { typevar, .. }
+            | BoolError::BoundTypeVar { typevar, .. } => Type::TypeVar(*typevar),
         }
     }
 
@@ -11575,6 +11603,35 @@ impl<'db> BoolError<'db> {
                      because `{}` doesn't implement `__bool__` correctly",
                     Type::Union(*union).display(context.db()),
                     first_error.not_boolable_type().display(context.db()),
+                ));
+            }
+            Self::ConstrainedTypevar { typevar, .. } => {
+                let first_error = typevar
+                    .typevar(context.db())
+                    .constraints(context.db())
+                    .into_iter()
+                    .flatten()
+                    .find_map(|constraint| constraint.try_bool(context.db()).err())
+                    .unwrap();
+
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type variable `{}` \
+                     because constraint `{}` doesn't implement `__bool__` correctly",
+                    Type::TypeVar(*typevar).display(context.db()),
+                    first_error.not_boolable_type().display(context.db()),
+                ));
+            }
+            Self::BoundTypeVar { typevar, .. } => {
+                let bound = typevar
+                    .typevar(context.db())
+                    .upper_bound(context.db())
+                    .unwrap();
+
+                builder.into_diagnostic(format_args!(
+                    "Boolean conversion is unsupported for type variable `{}` \
+                     because upper bound `{}` doesn't implement `__bool__` correctly",
+                    Type::TypeVar(*typevar).display(context.db()),
+                    bound.display(context.db()),
                 ));
             }
 
