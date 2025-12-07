@@ -494,7 +494,7 @@ impl<'db> CallableSignature<'db> {
                         other_signatures
                             .iter()
                             .filter_map(|signature| signature.return_ty)
-                            .when_all(db, |other_return_type| {
+                            .when_any(db, |other_return_type| {
                                 self_return_type.has_relation_to_impl(
                                     db,
                                     other_return_type,
@@ -528,7 +528,7 @@ impl<'db> CallableSignature<'db> {
                         self_signatures
                             .iter()
                             .filter_map(|signature| signature.return_ty)
-                            .when_all(db, |self_return_type| {
+                            .when_any(db, |self_return_type| {
                                 self_return_type.has_relation_to_impl(
                                     db,
                                     other_return_type,
