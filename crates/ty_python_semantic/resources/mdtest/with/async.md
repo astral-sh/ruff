@@ -213,7 +213,7 @@ async def connect() -> AsyncGenerator[Session]:
     yield Session()
 
 # TODO: this should be `() -> _AsyncGeneratorContextManager[Session, None]`
-reveal_type(connect)  # revealed: () -> _AsyncGeneratorContextManager[Unknown, None]
+reveal_type(connect)  # revealed: (...) -> _AsyncGeneratorContextManager[Unknown, None]
 
 async def main():
     async with connect() as session:
