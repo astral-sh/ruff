@@ -668,8 +668,6 @@ class ClassWithOverloadedInit[T]:
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
 # TODO: revealed: ClassWithOverloadedInit[str]
-# TODO: no [invalid-argument-type]
-# error: [invalid-argument-type]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(""))
 
