@@ -153,10 +153,6 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
-    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
-        &self.overloads
-    }
-
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
@@ -401,8 +397,8 @@ impl<'db> CallableSignature<'db> {
     }
 
     /// Checks whether the given slice contains a single signature, and that signature is a
-    /// ParamSpec signature. If so, returns the [`BoundTypeVarInstance`] for the ParamSpec, along
-    /// with the return type of the signature.
+    /// `ParamSpec` signature. If so, returns the [`BoundTypeVarInstance`] for the `ParamSpec`,
+    /// along with the return type of the signature.
     fn signatures_is_single_paramspec(
         signatures: &[Signature<'db>],
     ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
