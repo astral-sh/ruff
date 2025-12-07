@@ -2169,18 +2169,9 @@ impl<'db> Type<'db> {
             {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound
-                        .has_relation_to_impl(
-                            db,
-                            target,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        ),
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        constraints.elements(db).iter().when_all(db, |constraint| {
-                            constraint.has_relation_to_impl(
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                        relation_visitor.visit((self, target, relation), || {
+                            bound.has_relation_to_impl(
                                 db,
                                 target,
                                 inferable,
@@ -2188,6 +2179,20 @@ impl<'db> Type<'db> {
                                 relation_visitor,
                                 disjointness_visitor,
                             )
+                        })
+                    }
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.elements(db).iter().when_all(db, |constraint| {
+                            relation_visitor.visit((self, target, relation), || {
+                                constraint.has_relation_to_impl(
+                                    db,
+                                    target,
+                                    inferable,
+                                    relation,
+                                    relation_visitor,
+                                    disjointness_visitor,
+                                )
+                            })
                         })
                     }
                 }
