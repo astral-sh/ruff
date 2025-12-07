@@ -103,8 +103,9 @@ class C:
 
 ## Trailing comma creates a tuple
 
-A trailing comma in a subscript creates a single-element tuple. We need to handle this
-gracefully and emit a proper error rather than crashing (see [ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
 
 ```py
 from typing import ClassVar
@@ -118,7 +119,8 @@ C().x = 42
 reveal_type(C.x)  # revealed: Unknown
 ```
 
-This also applies when the trailing comma is inside the brackets (see [ty#1768](https://github.com/astral-sh/ty/issues/1768)):
+This also applies when the trailing comma is inside the brackets (see
+[ty#1768](https://github.com/astral-sh/ty/issues/1768)):
 
 ```py
 from typing import ClassVar

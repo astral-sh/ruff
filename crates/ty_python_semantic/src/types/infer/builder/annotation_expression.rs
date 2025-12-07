@@ -275,7 +275,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         };
                         let type_and_qualifiers = if let [argument] = arguments {
                             let mut type_and_qualifiers = self.infer_annotation_expression_impl(
-                                &argument,
+                                argument,
                                 PEP613Policy::Disallowed,
                             );
 

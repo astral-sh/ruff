@@ -112,8 +112,9 @@ class Wrong:
     x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `InitVar` expected exactly 1 argument, got 2"
 ```
 
-A trailing comma in a subscript creates a single-element tuple. We need to handle this
-gracefully and emit a proper error rather than crashing (see [ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
 
 ```py
 from dataclasses import InitVar, dataclass
