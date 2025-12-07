@@ -113,7 +113,7 @@ class Wrong:
 ```
 
 A trailing comma in a subscript creates a single-element tuple. We need to handle this
-gracefully and emit a proper error rather than crashing (see ty#1793).
+gracefully and emit a proper error rather than crashing (see [ty#1793](https://github.com/astral-sh/ty/issues/1793)).
 
 ```py
 from dataclasses import InitVar, dataclass
@@ -122,6 +122,12 @@ from dataclasses import InitVar, dataclass
 class AlsoWrong:
     # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
     x: InitVar[(),]
+
+# revealed: (self: AlsoWrong, x: Unknown) -> None
+reveal_type(AlsoWrong.__init__)
+
+# error: [unresolved-attribute]
+reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 
 A bare `InitVar` is not allowed according to the [type annotation grammar]:
