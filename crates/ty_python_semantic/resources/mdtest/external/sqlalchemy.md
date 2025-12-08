@@ -45,9 +45,7 @@ invalid_user = User(invalid_arg=42)
 First, set up a `Session`:
 
 ```py
-from datetime import datetime
-
-from sqlalchemy import select, Integer, Text, Boolean, DateTime
+from sqlalchemy import select, Integer, Text, Boolean
 from sqlalchemy.orm import Session
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.orm import Mapped, mapped_column
@@ -126,15 +124,6 @@ for user_id, name in session.execute(stmt).tuples():
     # TODO: should be `str`
     reveal_type(name)  # revealed: Unknown
 
-stmt = select(User.id, User.name).where(User.name == "Alice")
-alice1 = session.scalars(stmt).first()
-# TODO: should be `tuple[int, str] | None`
-reveal_type(alice1)  # revealed: Any | None
-
-alice2 = session.scalar(stmt)
-# TODO: should be `tuple[int, str] | None`
-reveal_type(alice2)  # revealed: Any
-
 result = session.execute(stmt)
 row = result.one_or_none()
 assert row is not None
@@ -143,6 +132,19 @@ assert row is not None
 reveal_type(user_id)  # revealed: Unknown
 # TODO: should be `str`
 reveal_type(name)  # revealed: Unknown
+
+stmt = select(User.id).where(User.name == "Alice")
+
+# TODO: should be `Select[tuple[int]]`
+reveal_type(stmt)  # revealed: Select[tuple[Unknown]]
+
+alice_id = session.scalars(stmt).first()
+# TODO: should be `int | None`
+reveal_type(alice_id)  # revealed: Unknown | None
+
+alice_id = session.scalar(stmt)
+# TODO: should be `int | None`
+reveal_type(alice_id)  # revealed: Unknown | None
 ```
 
 Using the legacy `query` API also works:
