@@ -35,8 +35,49 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
-            let (dangling_before_parameters, dangling_after_parameters) = dangling
-                .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
+            let (dangling_before_parameters, dangling_after_parameters) =
+                // To prevent an instability in cases like:
+                //
+                // ```py
+                // (
+                //     lambda # comment 1
+                //     * # comment 2
+                //     x: # comment 3
+                //     x
+                // )
+                // ```
+                //
+                // `# comment 1` and `# comment 2` also become dangling comments on the lambda, so
+                // in preview, we include these in `dangling_after_parameters`, as long as the
+                // parameter list doesn't include any additional comments.
+                //
+                // This ends up formatted as:
+                //
+                // ```py
+                // (
+                //     lambda *x: (  # comment 1  # comment 2  # comment 3
+                //         x
+                //     )
+                // )
+                // ```
+                //
+                // instead of the stable formatting:
+                //
+                // ```py
+                // (
+                //     lambda  # comment 1
+                //     *x:  # comment 2
+                //     # comment 3
+                //     x
+                // )
+                // ```
+                if preview && !parameters_have_comments {
+                    ([].as_slice(), dangling)
+                } else {
+                    dangling.split_at(
+                        dangling.partition_point(|comment| comment.end() < parameters.start()),
+                    )
+                };
 
             if dangling_before_parameters.is_empty() {
                 write!(f, [space()])?;
