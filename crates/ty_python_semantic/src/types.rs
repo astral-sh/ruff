@@ -8314,6 +8314,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(type_alias) => {
                     type_alias.definition(db).map(TypeDefinition::TypeAlias)
                 }
+                KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
                 _ => None,
             },
 

@@ -271,8 +271,8 @@ method, which means that it is a *data* descriptor (if there is no setter, `__se
 available but yields an `AttributeError` at runtime).
 
 ```py
-reveal_type(type(attr_property).__get__)  # revealed: <wrapper-descriptor `__get__` of `property` objects>
-reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor `__set__` of `property` objects>
+reveal_type(type(attr_property).__get__)  # revealed: <wrapper-descriptor '__get__' of 'property' objects>
+reveal_type(type(attr_property).__set__)  # revealed: <wrapper-descriptor '__set__' of 'property' objects>
 ```
 
 When we access `c.attr`, the `__get__` method of the `property` class is called, passing the

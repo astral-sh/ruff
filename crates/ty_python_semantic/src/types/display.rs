@@ -14,6 +14,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::Db;
+use crate::place::Place;
 use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
@@ -642,11 +643,13 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::PropertyInstance(_) => f.with_type(self.ty).write_str("property"),
             Type::ModuleLiteral(module) => {
                 f.set_invalid_syntax();
-                write!(
-                    f.with_type(self.ty),
-                    "<module '{}'>",
-                    module.module(self.db).name(self.db)
-                )
+                f.write_char('<')?;
+                f.with_type(KnownClass::ModuleType.to_class_literal(self.db))
+                    .write_str("module")?;
+                f.write_str(" '")?;
+                f.with_type(self.ty)
+                    .write_str(module.module(self.db).name(self.db))?;
+                f.write_str("'>")
             }
             Type::ClassLiteral(class) => {
                 f.set_invalid_syntax();
@@ -692,11 +695,17 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     write!(f.with_type(Type::Dynamic(dynamic)), "{dynamic}")?;
                     f.write_char(']')
                 }
-                SubclassOfInner::TypeVar(bound_typevar) => write!(
-                    f,
-                    "type[{}]",
-                    bound_typevar.identity(self.db).display(self.db)
-                ),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    write!(
+                        f.with_type(Type::TypeVar(bound_typevar)),
+                        "{}",
+                        bound_typevar.identity(self.db).display(self.db)
+                    )?;
+                    f.write_char(']')
+                }
             },
             Type::SpecialForm(special_form) => {
                 f.set_invalid_syntax();
@@ -763,61 +772,115 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             }
             Type::KnownBoundMethod(method_type) => {
                 f.set_invalid_syntax();
-                match method_type {
-                    KnownBoundMethodType::FunctionTypeDunderGet(function) => {
-                        write!(
-                            f,
-                            "<method-wrapper `__get__` of `{function}`>",
-                            function = function.name(self.db),
-                        )
-                    }
-                    KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-                        write!(
-                            f,
-                            "<method-wrapper `__call__` of `{function}`>",
-                            function = function.name(self.db),
-                        )
-                    }
-                    KnownBoundMethodType::PropertyDunderGet(_) => {
-                        f.write_str("<method-wrapper `__get__` of `property` object>")
-                    }
-                    KnownBoundMethodType::PropertyDunderSet(_) => {
-                        f.write_str("<method-wrapper `__set__` of `property` object>")
-                    }
-                    KnownBoundMethodType::StrStartswith(_) => {
-                        f.write_str("<method-wrapper `startswith` of `str` object>")
-                    }
+                let (cls, member_name, cls_name, ty, ty_name) = match method_type {
+                    KnownBoundMethodType::FunctionTypeDunderGet(function) => (
+                        KnownClass::FunctionType,
+                        "__get__",
+                        "function",
+                        Type::FunctionLiteral(function),
+                        Some(&**function.name(self.db)),
+                    ),
+                    KnownBoundMethodType::FunctionTypeDunderCall(function) => (
+                        KnownClass::FunctionType,
+                        "__call__",
+                        "function",
+                        Type::FunctionLiteral(function),
+                        Some(&**function.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderGet(property) => (
+                        KnownClass::Property,
+                        "__get__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .getter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|getter| &**getter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::PropertyDunderSet(property) => (
+                        KnownClass::Property,
+                        "__set__",
+                        "property",
+                        Type::PropertyInstance(property),
+                        property
+                            .getter(self.db)
+                            .and_then(Type::as_function_literal)
+                            .map(|getter| &**getter.name(self.db)),
+                    ),
+                    KnownBoundMethodType::StrStartswith(literal) => (
+                        KnownClass::Property,
+                        "startswith",
+                        "string",
+                        Type::StringLiteral(literal),
+                        Some(literal.value(self.db)),
+                    ),
                     KnownBoundMethodType::ConstraintSetRange => {
-                        f.write_str("bound method `ConstraintSet.range`")
+                        return f.write_str("bound method `ConstraintSet.range`");
                     }
                     KnownBoundMethodType::ConstraintSetAlways => {
-                        f.write_str("bound method `ConstraintSet.always`")
+                        return f.write_str("bound method `ConstraintSet.always`");
                     }
                     KnownBoundMethodType::ConstraintSetNever => {
-                        f.write_str("bound method `ConstraintSet.never`")
+                        return f.write_str("bound method `ConstraintSet.never`");
                     }
                     KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
-                        f.write_str("bound method `ConstraintSet.implies_subtype_of`")
+                        return f.write_str("bound method `ConstraintSet.implies_subtype_of`");
                     }
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
-                        f.write_str("bound method `ConstraintSet.satisfies`")
+                        return f.write_str("bound method `ConstraintSet.satisfies`");
                     }
                     KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => {
-                        f.write_str("bound method `ConstraintSet.satisfied_by_all_typevars`")
+                        return f
+                            .write_str("bound method `ConstraintSet.satisfied_by_all_typevars`");
                     }
                     KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
-                        f.write_str("bound method `GenericContext.specialize_constrained`")
+                        return f.write_str("bound method `GenericContext.specialize_constrained`");
                     }
+                };
+
+                let class_ty = cls.to_class_literal(self.db);
+                f.write_char('<')?;
+                f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
+                    .write_str("method-wrapper")?;
+                f.write_str(" '")?;
+                if let Place::Defined(member_ty, _, _) = class_ty.member(self.db, member_name).place
+                {
+                    f.with_type(member_ty).write_str(member_name)?;
+                } else {
+                    f.write_str(member_name)?;
+                }
+                f.write_str("' of ")?;
+                f.with_type(class_ty).write_str(cls_name)?;
+                if let Some(name) = ty_name {
+                    f.write_str(" '")?;
+                    f.with_type(ty).write_str(name)?;
+                    f.write_str("'>")
+                } else {
+                    f.write_str("' object>")
                 }
             }
             Type::WrapperDescriptor(kind) => {
                 f.set_invalid_syntax();
-                let (method, object) = match kind {
-                    WrapperDescriptorKind::FunctionTypeDunderGet => ("__get__", "function"),
-                    WrapperDescriptorKind::PropertyDunderGet => ("__get__", "property"),
-                    WrapperDescriptorKind::PropertyDunderSet => ("__set__", "property"),
+                let (method, object, cls) = match kind {
+                    WrapperDescriptorKind::FunctionTypeDunderGet => {
+                        ("__get__", "function", KnownClass::FunctionType)
+                    }
+                    WrapperDescriptorKind::PropertyDunderGet => {
+                        ("__get__", "property", KnownClass::Property)
+                    }
+                    WrapperDescriptorKind::PropertyDunderSet => {
+                        ("__set__", "property", KnownClass::Property)
+                    }
                 };
-                write!(f, "<wrapper-descriptor `{method}` of `{object}` objects>")
+                f.write_char('<')?;
+                f.with_type(KnownClass::WrapperDescriptorType.to_class_literal(self.db))
+                    .write_str("wrapper-descriptor")?;
+                f.write_str(" '")?;
+                f.write_str(method)?;
+                f.write_str("' of '")?;
+                f.with_type(cls.to_class_literal(self.db))
+                    .write_str(object)?;
+                f.write_str("' objects>")
             }
             Type::DataclassDecorator(_) => {
                 f.set_invalid_syntax();
@@ -907,7 +970,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 .fmt_detailed(f),
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_syntax();
-                f.write_str("<TypedDict with items ")?;
+                f.write_char('<')?;
+                f.with_type(Type::SpecialForm(SpecialFormType::TypedDict))
+                    .write_str("TypedDict")?;
+                f.write_str(" with items ")?;
                 let items = synthesized.items(self.db);
                 for (i, name) in items.keys().enumerate() {
                     let is_last = i == items.len() - 1;
@@ -1318,10 +1384,13 @@ impl<'db> DisplayGenericContext<'_, 'db> {
             f.set_invalid_syntax();
             let typevar = bound_typevar.typevar(self.db);
             if typevar.is_paramspec(self.db) {
-                write!(f, "**{}", typevar.name(self.db))?;
-            } else {
-                f.write_str(typevar.name(self.db))?;
+                f.write_str("**")?;
             }
+            write!(
+                f.with_type(Type::TypeVar(*bound_typevar)),
+                "{}",
+                typevar.name(self.db)
+            )?;
         }
         f.write_char(']')
     }
@@ -1334,7 +1403,11 @@ impl<'db> DisplayGenericContext<'_, 'db> {
                 f.write_str(", ")?;
             }
             f.set_invalid_syntax();
-            write!(f, "{}", bound_typevar.identity(self.db).display(self.db))?;
+            write!(
+                f.with_type(Type::TypeVar(bound_typevar)),
+                "{}",
+                bound_typevar.identity(self.db).display(self.db)
+            )?;
         }
         f.write_char(']')
     }
@@ -2262,15 +2335,17 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::SubscriptedProtocol(generic_context) => {
                 f.set_invalid_syntax();
                 f.write_str("<special form '")?;
-                f.with_type(ty).write_str("typing.Protocol")?;
-                f.write_str(&generic_context.display(self.db).to_string())?;
+                f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
+                    .write_str("typing.Protocol")?;
+                generic_context.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
                 f.set_invalid_syntax();
                 f.write_str("<special form '")?;
-                f.with_type(ty).write_str("typing.Generic")?;
-                f.write_str(&generic_context.display(self.db).to_string())?;
+                f.with_type(Type::SpecialForm(SpecialFormType::Generic))
+                    .write_str("typing.Generic")?;
+                generic_context.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeAliasType(alias) => {
@@ -2278,15 +2353,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     f.set_invalid_syntax();
                     f.write_str("<type alias '")?;
                     f.with_type(ty).write_str(alias.name(self.db))?;
-                    f.write_str(
-                        &specialization
-                            .display_short(
-                                self.db,
-                                TupleSpecialization::No,
-                                DisplaySettings::default(),
-                            )
-                            .to_string(),
-                    )?;
+                    specialization
+                        .display_short(self.db, TupleSpecialization::No, DisplaySettings::default())
+                        .fmt_detailed(f)?;
                     f.write_str("'>")
                 } else {
                     f.with_type(ty).write_str("typing.TypeAliasType")
@@ -2306,7 +2375,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::Field(field) => {
                 f.with_type(ty).write_str("dataclasses.Field")?;
                 if let Some(default_ty) = field.default_type(self.db) {
-                    write!(f, "[{}]", default_ty.display(self.db))?;
+                    f.write_char('[')?;
+                    write!(f.with_type(default_ty), "{}", default_ty.display(self.db))?;
+                    f.write_char(']')?;
                 }
                 Ok(())
             }
@@ -2325,51 +2396,58 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             KnownInstanceType::UnionType(union) => {
                 f.set_invalid_syntax();
                 f.write_char('<')?;
-                f.with_type(ty).write_str("types.UnionType")?;
+                f.with_type(KnownClass::UnionType.to_class_literal(self.db))
+                    .write_str("types.UnionType")?;
                 f.write_str(" special form")?;
                 if let Ok(ty) = union.union_type(self.db) {
-                    write!(f, " '{}'", ty.display(self.db))?;
+                    f.write_str(" '")?;
+                    ty.display(self.db).fmt_detailed(f)?;
+                    f.write_char('\'')?;
                 }
                 f.write_char('>')
             }
             KnownInstanceType::Literal(inner) => {
                 f.set_invalid_syntax();
-                write!(
-                    f,
-                    "<special form '{}'>",
-                    inner.inner(self.db).display(self.db)
-                )
+                f.write_str("<special form '")?;
+                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                f.write_str("'>")
             }
             KnownInstanceType::Annotated(inner) => {
                 f.set_invalid_syntax();
                 f.write_str("<special form '")?;
-                f.with_type(ty).write_str("typing.Annotated")?;
-                write!(
-                    f,
-                    "[{}, <metadata>]'>",
-                    inner.inner(self.db).display(self.db)
-                )
+                f.with_type(Type::SpecialForm(SpecialFormType::Annotated))
+                    .write_str("typing.Annotated")?;
+                f.write_char('[')?;
+                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                f.write_str(", <metadata>]'>")
             }
             KnownInstanceType::Callable(callable) => {
                 f.set_invalid_syntax();
                 f.write_char('<')?;
-                f.with_type(ty).write_str("typing.Callable")?;
-                write!(f, " special form '{}'>", callable.display(self.db))
+                f.with_type(Type::SpecialForm(SpecialFormType::Callable))
+                    .write_str("typing.Callable")?;
+                f.write_str(" special form '")?;
+                callable.display(self.db).fmt_detailed(f)?;
+                f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_syntax();
                 f.write_str("<special form '")?;
-                write!(
-                    f.with_type(ty),
-                    "type[{}]",
-                    inner.inner(self.db).display(self.db)
-                )?;
-                f.write_str("'>")
+                f.with_type(KnownClass::Type.to_class_literal(self.db))
+                    .write_str("type")?;
+                f.write_char('[')?;
+                inner.inner(self.db).display(self.db).fmt_detailed(f)?;
+                f.write_str("]'>")
             }
-            KnownInstanceType::LiteralStringAlias(_) => f.write_str("str"),
+            KnownInstanceType::LiteralStringAlias(_) => f
+                .with_type(KnownClass::Str.to_class_literal(self.db))
+                .write_str("str"),
             KnownInstanceType::NewType(declaration) => {
                 f.set_invalid_syntax();
-                f.write_str("<NewType pseudo-class '")?;
+                f.write_char('<')?;
+                f.with_type(KnownClass::NewType.to_class_literal(self.db))
+                    .write_str("NewType")?;
+                f.write_str(" pseudo-class '")?;
                 f.with_type(ty).write_str(declaration.name(self.db))?;
                 f.write_str("'>")
             }
