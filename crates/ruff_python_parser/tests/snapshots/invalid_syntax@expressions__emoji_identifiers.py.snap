@@ -24,12 +24,13 @@ Module(
                             },
                         ),
                     ],
-                    value: Name(
-                        ExprName {
+                    value: Tuple(
+                        ExprTuple {
                             node_index: NodeIndex(None),
-                            range: 5..5,
-                            id: Name(""),
-                            ctx: Invalid,
+                            range: 4..5,
+                            elts: [],
+                            ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                 },

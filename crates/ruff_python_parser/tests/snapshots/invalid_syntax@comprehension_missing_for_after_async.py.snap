@@ -13,13 +13,28 @@ Module(
             Expr(
                 StmtExpr {
                     node_index: NodeIndex(None),
-                    range: 0..7,
+                    range: 0..1,
+                    value: Tuple(
+                        ExprTuple {
+                            node_index: NodeIndex(None),
+                            range: 0..1,
+                            elts: [],
+                            ctx: Load,
+                            parenthesized: true,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 6..6,
                     value: Name(
                         ExprName {
                             node_index: NodeIndex(None),
-                            range: 1..6,
-                            id: Name("async"),
-                            ctx: Load,
+                            range: 6..6,
+                            id: Name(""),
+                            ctx: Invalid,
                         },
                     ),
                 },
@@ -77,7 +92,21 @@ Module(
 
   |
 1 | (async)
-  |  ^^^^^ Syntax Error: Expected an identifier, but found a keyword `async` that cannot be used here
+  |  ^^^^^ Syntax Error: Compound statements are not allowed on the same line as simple statements
+2 | (x async x in iter)
+  |
+
+
+  |
+1 | (async)
+  |       ^ Syntax Error: Expected `def`, `with` or `for` to follow `async`, found `)`
+2 | (x async x in iter)
+  |
+
+
+  |
+1 | (async)
+  |        ^ Syntax Error: Expected a statement
 2 | (x async x in iter)
   |
 

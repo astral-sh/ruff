@@ -1,0 +1,93 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing_closing_bracket_4.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..16,
+        body: [
+            AnnAssign(
+                StmtAnnAssign {
+                    node_index: NodeIndex(None),
+                    range: 0..16,
+                    target: If(
+                        ExprIf {
+                            node_index: NodeIndex(None),
+                            range: 0..9,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 5..9,
+                                    value: true,
+                                },
+                            ),
+                            body: List(
+                                ExprList {
+                                    node_index: NodeIndex(None),
+                                    range: 0..1,
+                                    elts: [],
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 9..9,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                    annotation: Name(
+                        ExprName {
+                            node_index: NodeIndex(None),
+                            range: 12..16,
+                            id: Name("pass"),
+                            ctx: Load,
+                        },
+                    ),
+                    value: None,
+                    simple: false,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | [
+2 | if True:
+  |        ^ Syntax Error: Expected `else`, found `:`
+3 |     pass
+  |
+
+
+  |
+1 | / [
+2 | | if True:
+  | |_______^ Syntax Error: Invalid annotated assignment target
+3 |       pass
+  |
+
+
+  |
+1 | [
+2 | if True:
+3 |     pass
+  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
+  |
+
+
+  |
+1 | [
+2 | if True:
+3 |     pass
+  |         ^ Syntax Error: unexpected EOF while parsing
+  |

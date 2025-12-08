@@ -1946,14 +1946,6 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lsqb);
 
-        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
-            return Expr::List(ast::ExprList {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
-        }
         // Nice error message when having a unclosed open bracket `[`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -1964,6 +1956,17 @@ impl<'src> Parser<'src> {
 
         // Return an empty `ListExpr` when finding a `]` right after the `[`
         if self.eat(TokenKind::Rsqb) {
+            return Expr::List(ast::ExprList {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        if (self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()))
+            || self.at_sequence_end()
+        {
             return Expr::List(ast::ExprList {
                 elts: vec![],
                 ctx: ExprContext::Load,
@@ -2007,14 +2010,6 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
-            return Expr::Dict(ast::ExprDict {
-                items: vec![],
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-            });
-        }
-
         // Nice error message when having a unclosed open brace `{`
         if self.at_ts(NEWLINE_EOF_SET) {
             self.add_error(
@@ -2025,6 +2020,16 @@ impl<'src> Parser<'src> {
 
         // Return an empty `DictExpr` when finding a `}` right after the `{`
         if self.eat(TokenKind::Rbrace) {
+            return Expr::Dict(ast::ExprDict {
+                items: vec![],
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+            });
+        }
+
+        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek())
+            || self.at_sequence_end()
+        {
             return Expr::Dict(ast::ExprDict {
                 items: vec![],
                 range: self.node_range(start),
@@ -2124,17 +2129,6 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
-            return Expr::Tuple(ast::ExprTuple {
-                elts: vec![],
-                ctx: ExprContext::Load,
-                range: self.node_range(start),
-                node_index: AtomicNodeIndex::NONE,
-                parenthesized: true,
-            })
-            .into();
-        }
-
         // Nice error message when having a unclosed open parenthesis `(`
         if self.at_ts(NEWLINE_EOF_SET) {
             let range = self.current_token_range();
@@ -2146,6 +2140,19 @@ impl<'src> Parser<'src> {
 
         // Return an empty `TupleExpr` when finding a `)` right after the `(`
         if self.eat(TokenKind::Rpar) {
+            return Expr::Tuple(ast::ExprTuple {
+                elts: vec![],
+                ctx: ExprContext::Load,
+                range: self.node_range(start),
+                node_index: AtomicNodeIndex::NONE,
+                parenthesized: true,
+            })
+            .into();
+        }
+
+        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek())
+            || self.at_sequence_end()
+        {
             return Expr::Tuple(ast::ExprTuple {
                 elts: vec![],
                 ctx: ExprContext::Load,
