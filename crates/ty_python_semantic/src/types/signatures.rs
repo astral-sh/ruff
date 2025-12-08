@@ -538,7 +538,7 @@ impl<'db> Signature<'db> {
             return Self::bottom();
         };
 
-        let mut defaults = defaults.into_iter();
+        let mut defaults = defaults.iter();
         for parameter in &mut inferred_signature.parameters {
             parameter.update_default_type(|| {
                 defaults

@@ -612,7 +612,7 @@ impl<'db> ScopeInference<'db> {
     pub(crate) fn inferred_function_signature(&self) -> Option<InferredFunctionSignature<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.signature.as_ref().cloned())
+            .and_then(|extra| extra.signature.clone())
     }
 }
 
@@ -794,7 +794,7 @@ impl<'db> DefinitionInference<'db> {
     pub(crate) fn inferred_function_signature(&self) -> Option<InferredFunctionSignature<'db>> {
         self.extra
             .as_ref()
-            .and_then(|extra| extra.signature.as_ref().cloned())
+            .and_then(|extra| extra.signature.clone())
     }
 }
 
