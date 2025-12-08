@@ -1,3 +1,4 @@
-[
+a = [
+
 if True:
 	pass

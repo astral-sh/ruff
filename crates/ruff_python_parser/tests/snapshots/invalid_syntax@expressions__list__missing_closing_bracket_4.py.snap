@@ -8,27 +8,37 @@ input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..16,
+        range: 0..21,
         body: [
-            AnnAssign(
-                StmtAnnAssign {
+            Assign(
+                StmtAssign {
                     node_index: NodeIndex(None),
-                    range: 0..16,
-                    target: If(
+                    range: 0..14,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 0..1,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: If(
                         ExprIf {
                             node_index: NodeIndex(None),
-                            range: 0..9,
+                            range: 4..14,
                             test: BooleanLiteral(
                                 ExprBooleanLiteral {
                                     node_index: NodeIndex(None),
-                                    range: 5..9,
+                                    range: 10..14,
                                     value: true,
                                 },
                             ),
                             body: List(
                                 ExprList {
                                     node_index: NodeIndex(None),
-                                    range: 0..1,
+                                    range: 4..5,
                                     elts: [],
                                     ctx: Load,
                                 },
@@ -36,23 +46,19 @@ Module(
                             orelse: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
-                                    range: 9..9,
+                                    range: 14..14,
                                     id: Name(""),
                                     ctx: Invalid,
                                 },
                             ),
                         },
                     ),
-                    annotation: Name(
-                        ExprName {
-                            node_index: NodeIndex(None),
-                            range: 12..16,
-                            id: Name("pass"),
-                            ctx: Load,
-                        },
-                    ),
-                    value: None,
-                    simple: false,
+                },
+            ),
+            Pass(
+                StmtPass {
+                    node_index: NodeIndex(None),
+                    range: 17..21,
                 },
             ),
         ],
@@ -62,32 +68,16 @@ Module(
 ## Errors
 
   |
-1 | [
-2 | if True:
+1 | a = [
+2 |
+3 | if True:
   |        ^ Syntax Error: Expected `else`, found `:`
-3 |     pass
+4 |     pass
   |
 
 
   |
-1 | / [
-2 | | if True:
-  | |_______^ Syntax Error: Invalid annotated assignment target
-3 |       pass
-  |
-
-
-  |
-1 | [
-2 | if True:
-3 |     pass
-  |     ^^^^ Syntax Error: Expected an identifier, but found a keyword `pass` that cannot be used here
-  |
-
-
-  |
-1 | [
-2 | if True:
-3 |     pass
+3 | if True:
+4 |     pass
   |         ^ Syntax Error: unexpected EOF while parsing
   |
