@@ -5033,9 +5033,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ) => {
                             self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
                         }
-                        Some(KnownClass::ParamSpec) => {
-                            self.infer_paramspec(target, call_expr, definition)
-                        }
+                        Some(
+                            paramspec_class @ (KnownClass::ParamSpec
+                            | KnownClass::ExtensionsParamSpec),
+                        ) => self.infer_legacy_paramspec(
+                            target,
+                            call_expr,
+                            definition,
+                            paramspec_class,
+                        ),
                         Some(KnownClass::NewType) => {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
@@ -5080,11 +5086,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         target_ty
     }
 
-    fn infer_paramspec(
+    fn infer_legacy_paramspec(
         &mut self,
         target: &ast::Expr,
         call_expr: &ast::ExprCall,
         definition: Definition<'db>,
+        known_class: KnownClass,
     ) -> Type<'db> {
         fn error<'db>(
             context: &InferContext<'db, '_>,
@@ -5101,7 +5108,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let arguments = &call_expr.arguments;
-        let assume_all_features = self.in_stub();
+        let is_typing_extensions = known_class == KnownClass::ExtensionsParamSpec;
+        let assume_all_features = self.in_stub() || is_typing_extensions;
         let python_version = Program::get(db).python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
@@ -5594,7 +5602,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_type_expression(&bound.value);
         }
         if let Some(default) = arguments.find_keyword("default") {
-            if let Some(KnownClass::ParamSpec) = known_class {
+            if matches!(
+                known_class,
+                Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+            ) {
                 self.infer_paramspec_default(&default.value);
             } else {
                 self.infer_type_expression(&default.value);
@@ -8440,7 +8451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    Some(KnownClass::ParamSpec) => {
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_PARAMSPEC, call_expression)
