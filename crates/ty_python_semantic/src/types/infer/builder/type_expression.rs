@@ -1172,7 +1172,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                     .in_type_expression(db, self.scope(), None)
                     .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
-                self.store_expression_type(arguments_slice, ty);
+                // Only store on the tuple slice; non-tuple cases are handled by
+                // `infer_subscript_load_impl` via `infer_expression`.
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, ty);
+                }
                 ty
             }
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
