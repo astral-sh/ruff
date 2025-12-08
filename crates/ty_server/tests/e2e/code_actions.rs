@@ -142,7 +142,7 @@ x: Literal[1] = 1
         .build()
         .wait_until_workspaces_are_initialized();
 
-    server.open_text_document(foo, &foo_content, 1);
+    server.open_text_document(foo, foo_content, 1);
 
     // Wait for diagnostics to be computed.
     let diagnostics = server.document_diagnostic_request(foo, None);

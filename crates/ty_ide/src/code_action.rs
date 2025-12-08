@@ -6,7 +6,7 @@ use ruff_text_size::TextRange;
 use ty_project::Db;
 use ty_python_semantic::create_suppression_fix;
 use ty_python_semantic::lint::LintId;
-use ty_python_semantic::types::{UNRESOLVED_REFERENCE, UNDEFINED_REVEAL};
+use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
 /// A `QuickFix` Code Action
 #[derive(Debug, Clone)]
@@ -31,14 +31,15 @@ pub fn code_actions(
 
     // Suggest imports for unresolved references (often ideal)
     // TODO: suggest qualifying with an already imported symbol
-    let is_unresolved_reference = lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
+    let is_unresolved_reference =
+        lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
     if is_unresolved_reference
         && let Some(import_quick_fix) = create_import_symbol_quick_fix(db, file, diagnostic_range)
     {
         actions.extend(import_quick_fix);
     }
 
-    // Suggest just supressing the lint (always a valid option, but never ideal)
+    // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
         edits: create_suppression_fix(db, file, lint_id, diagnostic_range).into_edits(),
