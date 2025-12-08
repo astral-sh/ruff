@@ -364,12 +364,17 @@ impl<'src> Parser<'src> {
 
         match self.current_token_kind() {
             TokenKind::DoubleStar => {
+                let current_start = self.node_start();
                 self.bump(TokenKind::DoubleStar);
                 let right =
                     self.parse_binary_expression_or_higher(OperatorPrecedence::Exponent, context);
+                // test_ok missing_power_lhs
+                // # parse_options: {"target-version": "3.8"}
+                // {x: **y for x, y in z}
+                // foo(**kwargs)
                 return Expr::BinOp(ast::ExprBinOp {
                     left: Box::new(Expr::Name(ast::ExprName {
-                        range: self.missing_node_range(),
+                        range: TextRange::empty(current_start),
                         id: Name::empty(),
                         ctx: ExprContext::Invalid,
                         node_index: AtomicNodeIndex::NONE,

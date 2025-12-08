@@ -1,0 +1,141 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/missing_power_lhs.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..80,
+        body: [
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 43..65,
+                    value: DictComp(
+                        ExprDictComp {
+                            node_index: NodeIndex(None),
+                            range: 43..65,
+                            key: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 44..45,
+                                    id: Name("x"),
+                                    ctx: Load,
+                                },
+                            ),
+                            value: BinOp(
+                                ExprBinOp {
+                                    node_index: NodeIndex(None),
+                                    range: 47..50,
+                                    left: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 47..47,
+                                            id: Name(""),
+                                            ctx: Invalid,
+                                        },
+                                    ),
+                                    op: Pow,
+                                    right: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 49..50,
+                                            id: Name("y"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                },
+                            ),
+                            generators: [
+                                Comprehension {
+                                    range: 51..64,
+                                    node_index: NodeIndex(None),
+                                    target: Tuple(
+                                        ExprTuple {
+                                            node_index: NodeIndex(None),
+                                            range: 55..59,
+                                            elts: [
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 55..56,
+                                                        id: Name("x"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                                Name(
+                                                    ExprName {
+                                                        node_index: NodeIndex(None),
+                                                        range: 58..59,
+                                                        id: Name("y"),
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            ],
+                                            ctx: Store,
+                                            parenthesized: false,
+                                        },
+                                    ),
+                                    iter: Name(
+                                        ExprName {
+                                            node_index: NodeIndex(None),
+                                            range: 63..64,
+                                            id: Name("z"),
+                                            ctx: Load,
+                                        },
+                                    ),
+                                    ifs: [],
+                                    is_async: false,
+                                },
+                            ],
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 66..79,
+                    value: Call(
+                        ExprCall {
+                            node_index: NodeIndex(None),
+                            range: 66..79,
+                            func: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 66..69,
+                                    id: Name("foo"),
+                                    ctx: Load,
+                                },
+                            ),
+                            arguments: Arguments {
+                                range: 69..79,
+                                node_index: NodeIndex(None),
+                                args: [],
+                                keywords: [
+                                    Keyword {
+                                        range: 70..78,
+                                        node_index: NodeIndex(None),
+                                        arg: None,
+                                        value: Name(
+                                            ExprName {
+                                                node_index: NodeIndex(None),
+                                                range: 72..78,
+                                                id: Name("kwargs"),
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        },
+                    ),
+                },
+            ),
+        ],
+    },
+)
+```

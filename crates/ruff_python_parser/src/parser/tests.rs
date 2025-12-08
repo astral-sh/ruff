@@ -157,21 +157,3 @@ t"i}'"#;
 
     insta::assert_debug_snapshot!(error);
 }
-
-#[test]
-fn test_dict_double_star_missing_left_operand() {
-    let source = r#"{x: **y for x, y in data}"#;
-    let parsed = parse_expression(source);
-    assert!(parsed.is_ok());
-    let result = parsed.unwrap();
-    insta::assert_debug_snapshot!(result);
-}
-
-#[test]
-fn test_function_kwargs() {
-    let source = r#"foo(**kwargs)"#;
-    let parsed = parse_expression(source);
-    assert!(parsed.is_ok());
-    let result = parsed.unwrap();
-    insta::assert_debug_snapshot!(result);
-}
