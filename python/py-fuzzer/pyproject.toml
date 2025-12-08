@@ -4,7 +4,6 @@ version = "0.0.0"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "packaging",
     "pysource-codegen>=0.6.0",
     "pysource-minimize>=0.8.0",
     "rich-argparse>=1.7.0",
@@ -32,9 +31,6 @@ strict = true
 warn_unreachable = true
 local_partial_types = true
 enable_error_code = "ignore-without-code,redundant-expr,truthy-bool"
-
-[tool.ty.environment]
-python = "./.venv"
 
 [tool.ty.rules]
 possibly-unresolved-reference = "error"

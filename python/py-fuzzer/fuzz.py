@@ -29,14 +29,12 @@ import concurrent.futures
 import enum
 import subprocess
 import tempfile
-import tomllib
 from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
 from typing import Final, NewType, NoReturn, assert_never
 
-import packaging.specifiers
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
 from rich_argparse import RawDescriptionRichHelpFormatter
@@ -48,15 +46,9 @@ ExitCode = NewType("ExitCode", int)
 
 TY_TARGET_PLATFORM: Final = "linux"
 
-with Path(__file__).parent.parent.parent.joinpath("pyproject.toml").open("rb") as f:
-    pyproject_toml = tomllib.load(f)
-
-pyproject_specifier = packaging.specifiers.Specifier(
-    pyproject_toml["project"]["requires-python"]
-)
-assert pyproject_specifier.operator == ">="
-
-OLDEST_SUPPORTED_PYTHON: Final = pyproject_specifier.version
+# ty supports `--python-version=3.8`, but typeshed only supports 3.9+,
+# so that's probably the oldest version we can usefully test with.
+OLDEST_SUPPORTED_PYTHON: Final = "3.9"
 
 
 def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
