@@ -246,7 +246,6 @@ of types, `...`, or another in-scope `ParamSpec`.
 ```py
 reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
-reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
 def func(c: Callable[P2, None]):
@@ -257,6 +256,14 @@ reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
 reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
+```
+
+An explicit tuple expression (unlike an implicit one that omits the parentheses) is also accepted
+when the `ParamSpec` is the only type variable. But, this isn't recommended is mainly a fallout of
+it having the same AST as the one without the parentheses. Both mypy and Pyright also allow this.
+
+```py
+reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
 ```
 
 <!-- blacken-docs:off -->
