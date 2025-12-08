@@ -3,6 +3,7 @@
 ```toml
 [environment]
 python-version = "3.13"
+python-platform = "linux"
 
 [project]
 dependencies = ["sqlmodel==0.0.27"]

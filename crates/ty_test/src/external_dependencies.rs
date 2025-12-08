@@ -3,7 +3,7 @@ use crate::db::Db;
 use anyhow::{Context, Result, anyhow, bail};
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
-use ty_python_semantic::{PythonEnvironment, SysPrefixPathOrigin};
+use ty_python_semantic::{PythonEnvironment, PythonPlatform, SysPrefixPathOrigin};
 
 /// Setup a virtual environment in the in-memory filesystem of `db` with
 /// the specified dependencies installed.
@@ -11,6 +11,7 @@ pub(crate) fn setup_venv(
     db: &mut Db,
     dependencies: &[String],
     python_version: PythonVersion,
+    python_platform: &PythonPlatform,
     dest_venv_path: &SystemPath,
 ) -> Result<()> {
     // Create a temporary directory for the project
@@ -52,9 +53,22 @@ dependencies = [
     )
     .context("Failed to write pyproject.toml")?;
 
+    // Convert PythonPlatform to uv's platform format
+    let uv_platform = match python_platform {
+        PythonPlatform::Identifier(id) => match id.as_str() {
+            "win32" => "windows",
+            "darwin" => "macos",
+            "linux" => "linux",
+            other => other,
+        },
+        PythonPlatform::All => {
+            bail!("For an mdtest with external dependencies, a Python platform must be specified");
+        }
+    };
+
     // Run `uv sync` to install dependencies
     let uv_sync_output = std::process::Command::new("uv")
-        .arg("sync")
+        .args(["sync", "--python-platform", uv_platform])
         .current_dir(temp_path.as_std_path())
         .output()
         .context("Failed to run `uv sync`. Is `uv` installed?")?;

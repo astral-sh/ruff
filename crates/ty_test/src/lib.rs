@@ -273,10 +273,15 @@ fn run_test(
             return Ok(TestOutcome::Skipped);
         }
 
+        let python_platform = test.configuration().python_platform().expect(
+            "Tests with external dependencies must specify `python-platform` in the configuration",
+        );
+
         external_dependencies::setup_venv(
             db,
             dependencies,
             python_version,
+            &python_platform,
             &venv_for_external_dependencies,
         )
         .expect("Failed to setup in-memory virtual environment with dependencies");

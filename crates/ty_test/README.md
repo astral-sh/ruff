@@ -322,12 +322,14 @@ Tests can specify external Python dependencies using a `[project]` section in th
 This allows testing code that uses third-party libraries like `pydantic`, `numpy`, etc.
 
 It is recommended to specify exact versions of packages to ensure reproducibility. The specified
-Python version can also be important during package resolution.
+Python version and platform are required for tests with external dependencies, as they are used
+during package resolution.
 
 ````markdown
 ```toml
 [environment]
 python-version = "3.13"
+python-platform = "linux"
 
 [project]
 dependencies = ["pydantic==2.12.2"]

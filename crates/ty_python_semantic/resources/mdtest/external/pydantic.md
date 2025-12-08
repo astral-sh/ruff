@@ -3,6 +3,7 @@
 ```toml
 [environment]
 python-version = "3.12"
+python-platform = "linux"
 
 [project]
 dependencies = ["pydantic==2.12.2"]
