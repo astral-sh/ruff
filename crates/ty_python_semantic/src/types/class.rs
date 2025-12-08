@@ -5139,7 +5139,6 @@ impl KnownClass {
             | Self::Generator
             | Self::SpecialForm
             | Self::TypeVar
-            | Self::ParamSpec
             | Self::StdlibAlias
             | Self::Iterable
             | Self::Iterator
@@ -5154,6 +5153,13 @@ impl KnownClass {
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::ParamSpec => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
