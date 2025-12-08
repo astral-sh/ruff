@@ -419,33 +419,30 @@ def use_function() -> None:
 ```py
 from typing import Union, Generic, TypeVar
 
-T = TypeVar('T', covariant=True)
-E = TypeVar('E', covariant=True)
-
+T = TypeVar("T", covariant=True)
+E = TypeVar("E", covariant=True)
 
 class Ok(Generic[T]):
     def __init__(self, value: T):
         self._value = value
-    
+
     @property
     def ok_value(self) -> T:
         return self._value
-    
+
     def is_err(self) -> bool:
         return False
-
 
 class Err(Generic[E]):
     def __init__(self, error: E):
         self._error = error
-    
+
     @property
     def err_value(self) -> E:
         return self._error
-    
+
     def is_err(self) -> bool:
         return True
-
 
 def err_kind(result: Union[Ok[T], Err[E]]) -> E | None:
     pass
@@ -458,8 +455,8 @@ def f(result: Union[Ok[int], Err[Exception]]):
 
 ## Shared typevar across union elements
 
-When a typevar appears in multiple union elements, the constraint solver should not
-attempt to infer it, as this would be unsound.
+When a typevar appears in multiple union elements, the constraint solver should not attempt to infer
+it, as this would be unsound.
 
 ```py
 from typing import TypeVar, Generic
@@ -470,7 +467,6 @@ class A(Generic[T]): ...
 class B(Generic[T]): ...
 
 def g(x: A[T] | B[T]) -> T: ...  # error: [invalid-return-type]
-
 def test_shared_typevar(x: A[int] | B[str]):
     # T appears in both A[T] and B[T], so it should not be inferred
     # as int | str (which would be unsound). Our confinement check catches this.
@@ -487,7 +483,6 @@ from typing import TypeVar
 T = TypeVar("T")
 
 def h(x: T | list[T]) -> T: ...  # error: [invalid-return-type]
-
 def test_nested_typevar(x: int | list[int]):
     # T appears both as T and in list[T]. Our confinement check prevents
     # inferring T = int | list[int], which would be wrong.
