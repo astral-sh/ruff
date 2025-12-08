@@ -1,8 +1,9 @@
 use crate::db::Db;
 
 use anyhow::{Context, Result, anyhow, bail};
-use ruff_db::system::{DbWithWritableSystem as _, SystemPath};
+use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
+use ty_python_semantic::{PythonEnvironment, SysPrefixPathOrigin};
 
 /// Setup a virtual environment in the in-memory filesystem of `db` with
 /// the specified dependencies installed.
@@ -80,72 +81,27 @@ fn copy_site_packages_to_db(
     db: &mut Db,
     venv_path: &SystemPath,
     dest_venv_path: &SystemPath,
-    python_version: PythonVersion,
+    _python_version: PythonVersion,
 ) -> Result<()> {
-    use std::fs;
+    // Discover the site-packages directory in the virtual environment
+    let system = OsSystem::new(venv_path);
+    let env = PythonEnvironment::new(venv_path, SysPrefixPathOrigin::LocalVenv, &system)
+        .context("Failed to create Python environment for temporary virtual environment")?;
 
-    // Determine the site-packages path within the venv
-    let (site_packages_path, python_dir_name) = if cfg!(target_os = "windows") {
-        let sp_path = venv_path.join("Lib").join("site-packages");
-        (sp_path, String::new()) // Windows doesn't need the python version in the path
-    } else {
-        // On Unix, we need to find the actual python directory in lib/
-        // It could be python3.12, python3.12.1, etc.
-        let lib_path = venv_path.join("lib");
+    let site_packages_paths = env
+        .site_packages_paths(&system)
+        .context(format!("Failed to discover site-packages in '{venv_path}'"))?;
 
-        if !lib_path.as_std_path().exists() {
-            bail!("'lib' directory not found in virtual environment at '{venv_path}'",);
-        }
-
-        // Find the python directory
-        let major = python_version.major;
-        let minor = python_version.minor;
-        let python_dir = fs::read_dir(lib_path.as_std_path())
-            .context("Failed to read 'lib' directory")?
-            .filter_map(Result::ok)
-            .find(|entry| {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                name_str == format!("python{major}.{minor}")
-                    && entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false)
-            })
-            .ok_or_else(|| {
-                anyhow!(
-                    "Could not find python directory in '{}'. Expected 'python{}.{}'",
-                    lib_path,
-                    python_version.major,
-                    python_version.minor
-                )
-            })?;
-
-        let python_dir_name = python_dir.file_name();
-        let python_dir_str = python_dir_name
-            .to_str()
-            .ok_or_else(|| anyhow!("Python directory name is not valid UTF-8"))?;
-
-        let actual_python_dir = lib_path.join(python_dir_str);
-        (
-            actual_python_dir.join("site-packages"),
-            python_dir_str.to_string(),
-        )
-    };
-
-    if !site_packages_path.as_std_path().exists() {
-        bail!("site-packages directory not found at '{site_packages_path}'",);
-    }
-
-    // Destination site-packages path in the in-memory filesystem
-    // Use the actual python directory name we found
-    let dest_site_packages = if cfg!(target_os = "windows") {
-        dest_venv_path.join("Lib").join("site-packages")
-    } else {
-        dest_venv_path
-            .join("lib")
-            .join(&python_dir_name)
-            .join("site-packages")
-    };
+    let site_packages_path = site_packages_paths
+        .into_iter()
+        .next()
+        .ok_or_else(|| anyhow!("No site-packages directory found in '{venv_path}'"))?;
 
     // Create the destination directory structure
+    let relative_site_packages = site_packages_path.strip_prefix(venv_path).map_err(|_| {
+        anyhow!("site-packages path '{site_packages_path}' is not under venv path '{venv_path}'")
+    })?;
+    let dest_site_packages = dest_venv_path.join(relative_site_packages);
     db.create_directory_all(&dest_site_packages)
         .context("Failed to create site-packages directory in database")?;
 
