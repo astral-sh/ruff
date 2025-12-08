@@ -51,7 +51,10 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 value.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match value.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(call_chain_layout.call_like_attribute())
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => value.format().with_options(Parentheses::Never).fmt(f),
@@ -72,7 +75,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
         });
 
         let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && call_chain_layout == CallChainLayout::Fluent;
+            && matches!(call_chain_layout, CallChainLayout::Fluent(_));
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -88,12 +91,15 @@ impl NeedsParentheses for ExprSubscript {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if CallChainLayout::from_expression(
-                self.into(),
-                context.comments().ranges(),
-                context.source(),
-            ) == CallChainLayout::Fluent
-            {
+            if matches!(
+                CallChainLayout::from_expression(
+                    self.into(),
+                    context.comments().ranges(),
+                    context.source(),
+                    context
+                ),
+                CallChainLayout::Fluent(_)
+            ) {
                 OptionalParentheses::Multiline
             } else if is_expression_parenthesized(
                 self.value.as_ref().into(),

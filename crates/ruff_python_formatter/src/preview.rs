@@ -59,3 +59,17 @@ pub(crate) const fn is_avoid_parens_for_long_as_captures_enabled(
 pub(crate) const fn is_parenthesize_lambda_bodies_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
+
+/// Returns `true` if the
+/// [`fluent_layout_split_first_call`]() preview
+/// style is enabled.
+pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
+
+/// Returns `true` if the
+/// [`fluent_layout_more_often`]() preview
+/// style is enabled.
+pub(crate) const fn is_fluent_layout_more_often_enabled(context: &PyFormatContext) -> bool {
+    context.is_preview()
+}
