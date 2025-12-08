@@ -8,7 +8,7 @@ use lsp_types::{
 };
 use ruff_source_file::OneIndexed;
 use ruff_text_size::Ranged;
-use ty_ide::{CompletionKind, CompletionSettings, completion};
+use ty_ide::{CompletionKind, completion};
 use ty_project::ProjectDatabase;
 
 use crate::document::{PositionExt, ToRangeExt};
@@ -56,10 +56,8 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
         ) else {
             return Ok(None);
         };
-        let settings = CompletionSettings {
-            auto_import: snapshot.global_settings().is_auto_import_enabled(),
-        };
-        let completions = completion(db, &settings, file, offset);
+        let settings = snapshot.workspace_settings().completions();
+        let completions = completion(db, settings, file, offset);
         if completions.is_empty() {
             return Ok(None);
         }

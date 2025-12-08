@@ -380,9 +380,20 @@ pub enum CompletionKind {
     TypeParameter,
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct CompletionSettings {
     pub auto_import: bool,
+}
+
+// N.B. It's important for the defaults here to match the defaults
+// established by `CompletionOptions::into_settings`. This is
+// because `WorkspaceSettings::default()` uses this definition.
+// But `WorkspaceOptions::default().into_settings()` will use the
+// `CompletionOptions::into_settings` definition.
+impl Default for CompletionSettings {
+    fn default() -> CompletionSettings {
+        CompletionSettings { auto_import: true }
+    }
 }
 
 pub fn completion<'db>(
@@ -6610,7 +6621,14 @@ collabc<CURSOR>
         fn completion_test_builder(&self) -> CompletionTestBuilder {
             CompletionTestBuilder {
                 cursor_test: self.build(),
-                settings: CompletionSettings::default(),
+                settings: CompletionSettings {
+                    // The tests were originally written with auto-import
+                    // disabled, since it was disabled by default. But then
+                    // we enabled it by default. However, we kept the tests
+                    // as written with the assumption that auto-import was
+                    // disabled unless opted into. ---AG
+                    auto_import: false,
+                },
                 skip_builtins: false,
                 skip_keywords: false,
                 type_signatures: false,
