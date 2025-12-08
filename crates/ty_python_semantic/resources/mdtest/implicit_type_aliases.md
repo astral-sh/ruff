@@ -656,10 +656,9 @@ A generic alias that is already fully specialized cannot be specialized again:
 ```py
 ListOfInts = list[int]
 
-# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[int]'>` is already specialized"
 def _(doubly_specialized: ListOfInts[int]):
-    # TODO: This should ideally be `list[Unknown]` or `Unknown`
-    reveal_type(doubly_specialized)  # revealed: list[int]
+    reveal_type(doubly_specialized)  # revealed: Unknown
 ```
 
 Specializing a generic implicit type alias with an incorrect number of type arguments also results
@@ -695,23 +694,21 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # TODO: Better error message (of kind `invalid-type-form`)?
-    # error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+    # error: [non-subscriptable] "Cannot subscript non-generic type alias"
     specialized: this_does_not_work()[int],
 ):
-    reveal_type(specialized)  # revealed: int | str
+    reveal_type(specialized)  # revealed: Unknown
 ```
 
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
 
 ```py
-# TODO: Better error message (of kind `invalid-type-form`)?
-# error: [invalid-type-arguments] "Too many type arguments: expected 0, got 1"
+# error: [non-subscriptable] "Cannot subscript non-generic type alias"
 x: (list[T] | set[T])[int]
 
 def _():
     # TODO: `list[Unknown] | set[Unknown]` might be better
-    reveal_type(x)  # revealed: list[typing.TypeVar] | set[typing.TypeVar]
+    reveal_type(x)  # revealed: Unknown
 ```
 
 ### Multiple definitions

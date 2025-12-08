@@ -236,7 +236,7 @@ def func[**P2](c: Callable[P2, None]):
 
 P2 = ParamSpec("P2")
 
-# TODO: error: paramspec is unbound
+# error: [invalid-type-form] "ParamSpec `P2` is unbound"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 ```
 
@@ -259,10 +259,10 @@ reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str,
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
-# TODO: error: paramspec is unbound
-reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-form] "ParamSpec `P2` is unbound"
+reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments]
-reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
 ```
 
 Nor can they be omitted when there are more than one `ParamSpec`.
