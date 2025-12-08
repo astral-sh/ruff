@@ -895,6 +895,8 @@ impl CallChainLayout {
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
+        let mut first_attr_value_parenthesized = false;
+
         let mut attributes_after_parentheses = 0;
         loop {
             match expr {
@@ -907,7 +909,7 @@ impl CallChainLayout {
                     // ```
                     if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
-                        attributes_after_parentheses += 1;
+                        first_attr_value_parenthesized = true;
                         break;
                     } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
                         attributes_after_parentheses += 1;
@@ -925,28 +927,22 @@ impl CallChainLayout {
                 // ```
                 ExprRef::Call(ast::ExprCall { func: inner, .. })
                 | ExprRef::Subscript(ast::ExprSubscript { value: inner, .. }) => {
+                    // We preserve these parentheses so don't recurse
+                    // e.g. (a)[0].x().y().z()
+                    //         ^stop here
+                    if is_expression_parenthesized(inner.into(), comment_ranges, source) {
+                        break;
+                    }
+
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We to format the following in fluent style:
-                    // ```
-                    // f2 = (a).w().t(1,)
-                    //       ^ expr
-                    // ```
-                    if is_expression_parenthesized(expr, comment_ranges, source) {
-                        attributes_after_parentheses += 1;
-                    }
-
                     break;
                 }
             }
-
-            // We preserve these parentheses so don't recurse
-            if is_expression_parenthesized(expr, comment_ranges, source) {
-                break;
-            }
         }
-        if attributes_after_parentheses < 2 {
+
+        if attributes_after_parentheses + u32::from(first_attr_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
             CallChainLayout::Fluent
