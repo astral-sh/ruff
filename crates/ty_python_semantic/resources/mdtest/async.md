@@ -82,6 +82,24 @@ async def main():
     reveal_type(b)  # revealed: int
 ```
 
+### `asynccontextmanager`
+
+```py
+from contextlib import asynccontextmanager
+from typing import AsyncGenerator
+
+class Session: ...
+
+@asynccontextmanager
+async def connect() -> AsyncGenerator[Session]:
+    yield Session()
+
+async def main():
+    async with connect() as session:
+        # TODO: should be `Session`
+        reveal_type(session)  # revealed: Unknown
+```
+
 ## Under the hood
 
 ```toml
