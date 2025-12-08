@@ -349,6 +349,7 @@ pub(super) fn to_lsp_diagnostic(
             sub_diagnostic
                 .annotations()
                 .iter()
+                .filter(|annotation| !annotation.is_primary())
                 .filter_map(|annotation| {
                     annotation_to_related_information(db, annotation, encoding)
                 }),
