@@ -3472,17 +3472,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
 
+            ast::Expr::Tuple(_) if !exactly_one_paramspec => {
+                // Tuple expression is only allowed when the generic context contains only one
+                // `ParamSpec` type variable and no other type variables.
+            }
+
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                // This should be taken care of by the caller.
-                if expr.is_tuple_expr() {
-                    assert!(
-                        exactly_one_paramspec,
-                        "Inferring ParamSpec value during explicit specialization for a \
-                    tuple expression should only happen when it contains exactly one ParamSpec"
-                    );
-                }
-
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
                 // Whether to infer `Todo` for the parameters
@@ -3519,7 +3515,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(name) => {
+                if name.is_invalid() {
+                    return Err(());
+                }
+
                 let param_type = self.infer_type_expression(expr);
 
                 match param_type {
@@ -11650,7 +11650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
         let (type_arguments, store_inferred_type_arguments) = match slice_node {
             ast::Expr::Tuple(tuple) => {
-                if exactly_one_paramspec {
+                if exactly_one_paramspec && !tuple.elts.is_empty() {
                     (std::slice::from_ref(slice_node), false)
                 } else {
                     (tuple.elts.as_slice(), true)
