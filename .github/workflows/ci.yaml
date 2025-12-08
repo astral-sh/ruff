@@ -24,6 +24,8 @@ env:
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
+  # Enable mdtests that require external dependencies
+  MDTEST_EXTERNAL: "1"
 
 jobs:
   determine_changes:
