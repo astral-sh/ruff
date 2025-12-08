@@ -6,7 +6,7 @@ invalid-syntax: annotated name `a` can't be global
   |
 2 | def f1():
 3 |     global a
-4 |     a: str = "foo"
+4 |     a: str = "foo"  # error
   |     ^
 5 |
 6 | b: int = 1
@@ -17,7 +17,7 @@ invalid-syntax: annotated name `b` can't be global
    |
  8 |     def inner():
  9 |         global b
-10 |         b: str = "nested"
+10 |         b: str = "nested"  # error
    |         ^
 11 |
 12 | c: int = 1
@@ -28,7 +28,7 @@ invalid-syntax: annotated name `c` can't be global
    |
 13 | def f2():
 14 |     global c
-15 |     c: list[str] = []
+15 |     c: list[str] = []  # error
    |     ^
 16 |
 17 | d: int = 1
@@ -39,7 +39,7 @@ invalid-syntax: annotated name `d` can't be global
    |
 18 | def f3():
 19 |     global d
-20 |     d: str
+20 |     d: str  # error
    |     ^
 21 |
 22 | e: int = 1
