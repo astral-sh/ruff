@@ -878,6 +878,20 @@ impl<'a> First<'a> {
 ///     )
 /// ).all()
 /// ```
+///
+/// In `preview`, we also track the position of the leftmost call or
+/// subscript on an attribute in the chain and break just before the dot.
+///
+/// So, for example, we would get:
+/// ```python
+///     Blog.objects
+///     .filter(
+///         entry__headline__contains="Lennon",
+///     ).filter(
+///         entry__pub_date__year=2008,
+///     )
+/// ```
+/// in the first summand above, and similarly in the second.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
     /// The root of a call chain
@@ -891,6 +905,8 @@ pub enum CallChainLayout {
     NonFluent,
 }
 
+/// Records information about the position of a call chain
+/// element relative to the first call or subscript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeState {
     CallsOrSubscriptsPreceding(u32),
