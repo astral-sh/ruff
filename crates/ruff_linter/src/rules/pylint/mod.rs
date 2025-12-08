@@ -444,4 +444,90 @@ mod tests {
         assert_diagnostics!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn too_many_lines_below_limit() {
+        use crate::test::test_snippet;
+
+        let diagnostics = test_snippet(
+            r"
+# Line 1
+# Line 2
+# Line 3
+import os
+"
+            .trim(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                pylint: pylint::settings::Settings {
+                    max_module_lines: 1000,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLines])
+            },
+        );
+        assert_diagnostics!(diagnostics);
+    }
+
+    #[test]
+    fn too_many_lines_exceeds_limit() {
+        use crate::test::test_snippet;
+
+        let diagnostics = test_snippet(
+            r"
+# Line 1
+# Line 2
+# Line 3
+# Line 4
+# Line 5
+# Line 6
+# Line 7
+# Line 8
+# Line 9
+# Line 10
+# Line 11
+import os
+"
+            .trim(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                pylint: pylint::settings::Settings {
+                    max_module_lines: 10,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLines])
+            },
+        );
+        assert!(!diagnostics.is_empty());
+    }
+
+    #[test]
+    fn too_many_lines_at_limit() {
+        use crate::test::test_snippet;
+
+        let diagnostics = test_snippet(
+            r"
+# Line 1
+# Line 2
+# Line 3
+# Line 4
+# Line 5
+# Line 6
+# Line 7
+# Line 8
+# Line 9
+# Line 10
+"
+            .trim(),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                pylint: pylint::settings::Settings {
+                    max_module_lines: 10,
+                    ..pylint::settings::Settings::default()
+                },
+                ..LinterSettings::for_rules(vec![Rule::TooManyLines])
+            },
+        );
+        assert_diagnostics!(diagnostics);
+    }
 }

@@ -61,6 +61,7 @@ pub struct Settings {
     pub max_public_methods: usize,
     pub max_locals: usize,
     pub max_nested_blocks: usize,
+    pub max_module_lines: usize,
 }
 
 impl Default for Settings {
@@ -77,6 +78,7 @@ impl Default for Settings {
             max_public_methods: 20,
             max_locals: 15,
             max_nested_blocks: 5,
+            max_module_lines: 1000,
         }
     }
 }
@@ -97,7 +99,8 @@ impl fmt::Display for Settings {
                 self.max_statements,
                 self.max_public_methods,
                 self.max_locals,
-                self.max_nested_blocks
+                self.max_nested_blocks,
+                self.max_module_lines
             ]
         }
         Ok(())
