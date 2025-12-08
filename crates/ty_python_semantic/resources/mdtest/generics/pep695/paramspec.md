@@ -283,7 +283,7 @@ reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
 # error: [invalid-type-form] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
-# error: [invalid-type-arguments]
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> int
