@@ -20,11 +20,15 @@ pub(crate) fn setup_venv(
         .tempdir()
         .context("Failed to create temporary directory for mdtest virtual environment")?;
 
-    let temp_path = SystemPath::from_std_path(temp_dir.path())
+    // Canonicalize here to fix problems with `.strip_prefix()` later on Windows
+    let temp_dir_path = dunce::canonicalize(temp_dir.path())
+        .context("Failed to canonicalize temporary directory path")?;
+
+    let temp_path = SystemPath::from_std_path(&temp_dir_path)
         .ok_or_else(|| {
             anyhow!(
                 "Temporary directory path is not valid UTF-8: {}",
-                temp_dir.path().display()
+                temp_dir_path.display()
             )
         })?
         .to_path_buf();
