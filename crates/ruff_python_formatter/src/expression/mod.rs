@@ -993,10 +993,35 @@ impl CallChainLayout {
             }
         }
 
-        if attributes_after_parentheses + u32::from(first_attr_value_parenthesized) < 2 {
-            CallChainLayout::NonFluent
+        // Observe that `call_like_count >= attributes_after_parentheses`
+        //
+        // Indeed, the latter accumulates only at an attribute expression
+        // with non-parenthesized, call-like value. After that, we
+        // immediately set `was_in_call_like` to `true`. Any execution path
+        // from that code point to the exit or to the next accumulation of
+        // `attribute_after_parentheses` passes through
+        //
+        // ```
+        // call_like_count += u32::from(was_in_call_like);
+        // ```
+        //
+        // and it does so before it could pass through
+        // `was_in_call_like = false`.
+        //
+        // This justifies the name `fluent_layout_more_often_enabled`
+        // used below.
+        if is_fluent_layout_more_often_enabled(context) {
+            if call_like_count + u32::from(first_attr_value_parenthesized) < 2 {
+                CallChainLayout::NonFluent
+            } else {
+                CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
+            }
         } else {
-            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
+            if attributes_after_parentheses + u32::from(first_attr_value_parenthesized) < 2 {
+                CallChainLayout::NonFluent
+            } else {
+                CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
+            }
         }
     }
 
