@@ -167,7 +167,7 @@ impl Diagnostic {
     ///
     /// A diagnostic always has a message, but it may be empty.
     pub fn primary_message(&self) -> &str {
-        return self.inner.message.as_str();
+        self.inner.message.as_str()
     }
 
     /// Introspects this diagnostic and returns what kind of "primary" message
@@ -192,9 +192,10 @@ impl Diagnostic {
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match annotation.is_empty() {
-            false => ConciseMessage::Both { main, annotation },
-            true => ConciseMessage::MainDiagnostic(main),
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
     }
 
@@ -668,9 +669,10 @@ impl SubDiagnostic {
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match annotation.is_empty() {
-            false => ConciseMessage::Both { main, annotation },
-            true => ConciseMessage::MainDiagnostic(main),
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
     }
 }
