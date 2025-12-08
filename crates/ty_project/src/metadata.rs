@@ -9,13 +9,15 @@ use ty_python_semantic::ProgramSettings;
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
-use crate::metadata::value::ValueSource;
+use crate::metadata::script::{Pep723Error, Pep723Metadata};
+use crate::metadata::value::{RelativePathBuf, ValueSource};
 pub use options::Options;
 use options::TyTomlError;
 
 mod configuration_file;
 pub mod options;
 pub mod pyproject;
+pub mod script;
 pub mod settings;
 pub mod value;
 
@@ -85,6 +87,32 @@ impl ProjectMetadata {
         )
     }
 
+    /// Loads a project from a `pyproject.toml` file.
+    pub(crate) fn from_script(
+        script: Pep723Metadata,
+        script_path: &SystemPath,
+    ) -> Result<Self, ResolveRequiresPythonError> {
+        let project = Some(&script.to_project());
+        let parent_dir = script_path
+            .parent()
+            .map(ToOwned::to_owned)
+            .unwrap_or_default();
+        let mut metadata = Self::from_options(
+            script.tool.and_then(|tool| tool.ty).unwrap_or_default(),
+            parent_dir,
+            project,
+        )?;
+
+        // Try to get `uv sync --script` to setup the venv for us
+        if let Some(python) = script::uv_sync_script(script_path) {
+            let mut environment = metadata.options.environment.unwrap_or_default();
+            environment.python = Some(RelativePathBuf::new(python, ValueSource::Cli));
+            metadata.options.environment = Some(environment);
+        }
+
+        Ok(metadata)
+    }
+
     /// Loads a project from a set of options with an optional pyproject-project table.
     pub fn from_options(
         mut options: Options,
@@ -120,6 +148,46 @@ impl ProjectMetadata {
         })
     }
 
+    pub fn discover_script(
+        path: &SystemPath,
+        system: &dyn System,
+    ) -> Result<ProjectMetadata, ProjectMetadataError> {
+        tracing::debug!("Searching for a PEP-723 Script in '{path}'");
+        if !system.is_file(path) {
+            return Err(ProjectMetadataError::NotAScript(path.to_path_buf()));
+        }
+
+        let script_metadata = if let Ok(script_str) = system.read_to_string(path) {
+            match Pep723Metadata::from_script_str(
+                script_str.as_bytes(),
+                ValueSource::File(Arc::new(path.to_owned())),
+            ) {
+                Ok(Some(pyproject)) => Some(pyproject),
+                Ok(None) => None,
+                Err(error) => {
+                    return Err(ProjectMetadataError::InvalidScript {
+                        path: path.to_owned(),
+                        source: Box::new(error),
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
+        let Some(script_metadata) = script_metadata else {
+            return Err(ProjectMetadataError::NotAScript(path.to_path_buf()));
+        };
+
+        let metadata = ProjectMetadata::from_script(script_metadata, path).map_err(|err| {
+            ProjectMetadataError::InvalidRequiresPythonConstraint {
+                source: err,
+                path: path.to_owned(),
+            }
+        })?;
+
+        Ok(metadata)
+    }
     /// Discovers the closest project at `path` and returns its metadata.
     ///
     /// The algorithm traverses upwards in the `path`'s ancestor chain and uses the following precedence
@@ -319,9 +387,18 @@ pub enum ProjectMetadataError {
     #[error("project path '{0}' is not a directory")]
     NotADirectory(SystemPathBuf),
 
+    #[error("project path '{0}' is not a PEP-723 script")]
+    NotAScript(SystemPathBuf),
+
     #[error("{path} is not a valid `pyproject.toml`: {source}")]
     InvalidPyProject {
         source: Box<PyProjectError>,
+        path: SystemPathBuf,
+    },
+
+    #[error("{path} is not a valid PEP-723 script: {source}")]
+    InvalidScript {
+        source: Box<Pep723Error>,
         path: SystemPathBuf,
     },
 
