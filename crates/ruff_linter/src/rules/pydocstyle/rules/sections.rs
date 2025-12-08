@@ -1187,7 +1187,7 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// using the `pep257` and `numpy` conventions.
 ///
 /// Parameters annotated with `typing.Unpack` are exempt from this rule.
-/// This follows Python typing specification for unpacking keyword arguments.
+/// This follows the Python typing specification for unpacking keyword arguments.
 ///
 /// ## Example
 /// ```python
