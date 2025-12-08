@@ -653,11 +653,29 @@ def g(obj: Y[bool, range]):
 
 A generic alias that is already fully specialized cannot be specialized again:
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 ListOfInts = list[int]
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[int]'>` is already specialized"
 def _(doubly_specialized: ListOfInts[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+type ListOfInts2 = list[int]
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+DoublySpecialized = ListOfInts2[int]
+
+def _(doubly_specialized: DoublySpecialized):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[int]'>` is already specialized"
+List = list[int][int]
+
+def _(doubly_specialized: List):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
 

@@ -914,6 +914,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                    if type_alias.specialization(self.db()).is_some() {
+                        if let Some(builder) =
+                            self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "Cannot subscript non-generic type alias: double specialization is not allowed",
+                            ));
+                        }
+                        return Type::unknown();
+                    }
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
@@ -938,9 +948,17 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
                             {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot subscript non-generic type alias"
-                                ));
+                                let value_type = type_alias.raw_value_type(self.db());
+                                if value_type.is_generic_nominal_instance() {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot subscript non-generic type alias: `{}` is already specialized",
+                                        value_type.display(self.db()),
+                                    ));
+                                } else {
+                                    builder.into_diagnostic(format_args!(
+                                        "Cannot subscript non-generic type alias"
+                                    ));
+                                }
                             }
 
                             Type::unknown()

@@ -93,6 +93,10 @@ impl<'db> Type<'db> {
         matches!(self, Type::NominalInstance(_))
     }
 
+    pub(crate) const fn is_generic_nominal_instance(self) -> bool {
+        matches!(self, Type::NominalInstance(instance_type) if matches!(instance_type.0, NominalInstanceInner::NonTuple(class) if class.is_generic()))
+    }
+
     pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self {
             Type::NominalInstance(instance_type) => Some(instance_type),

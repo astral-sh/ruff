@@ -80,12 +80,26 @@ def _(b: B[int]):
 type IntOrStr = int | str
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias"
-def _(c: IntOrStr[int]): ...
+def _(c: IntOrStr[int]):
+    reveal_type(c)  # revealed: Unknown
 
 type ListOfInts = list[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
-def _(l: ListOfInts[int]): ...
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+def _(l: ListOfInts[int]):
+    reveal_type(l)  # revealed: Unknown
+
+type List[T] = list[T]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: double specialization is not allowed"
+def _(l: List[int][int]):
+    reveal_type(l)  # revealed: Unknown
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+type DoubleSpecialization[T] = list[T][T]
+
+def _(d: DoubleSpecialization[int]):
+    reveal_type(d)  # revealed: Unknown
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:

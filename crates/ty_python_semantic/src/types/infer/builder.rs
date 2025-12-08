@@ -12069,9 +12069,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))),
                 _,
             ) if alias.generic_context(db).is_none() => {
+                debug_assert!(alias.specialization(db).is_none());
                 if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
-                    builder
-                        .into_diagnostic(format_args!("Cannot subscript non-generic type alias"));
+                    let value_type = alias.raw_value_type(db);
+                    if value_type.is_generic_nominal_instance() {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot subscript non-generic type alias: `{}` is already specialized",
+                            value_type.display(db),
+                        ));
+                    } else {
+                        builder.into_diagnostic(format_args!(
+                            "Cannot subscript non-generic type alias"
+                        ));
+                    }
                 }
 
                 Some(Type::unknown())
