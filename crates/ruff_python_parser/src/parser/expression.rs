@@ -1946,9 +1946,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lsqb);
 
-        if self.at(TokenKind::Unknown)
-            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
-        {
+        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
             return Expr::List(ast::ExprList {
                 elts: vec![],
                 ctx: ExprContext::Load,
