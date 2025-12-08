@@ -1,0 +1,98 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+[
+  {
+    "title": "import typing.reveal_type",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        },
+        "severity": 2,
+        "code": "undefined-reveal",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#undefined-reveal"
+        },
+        "source": "ty",
+        "message": "`reveal_type` used without importing it",
+        "relatedInformation": []
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing import reveal_type\n"
+          }
+        ]
+      }
+    },
+    "isPreferred": true
+  },
+  {
+    "title": "Ignore 'undefined-reveal' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 0
+          },
+          "end": {
+            "line": 0,
+            "character": 11
+          }
+        },
+        "severity": 2,
+        "code": "undefined-reveal",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#undefined-reveal"
+        },
+        "source": "ty",
+        "message": "`reveal_type` used without importing it",
+        "relatedInformation": []
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 14
+              },
+              "end": {
+                "line": 0,
+                "character": 14
+              }
+            },
+            "newText": "  # ty:ignore[undefined-reveal]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]
