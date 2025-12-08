@@ -501,6 +501,71 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
 
+#### Fluent layout for method chains
+
+At times, when developers write long chains of methods on an object, such as
+
+```python
+x = df.filter(cond).agg(func).merge(other)
+```
+
+the intent is to perform a sequence of transformations or operations
+on a fixed object of interest - in this example, the object `df`.
+Assuming the assigned expression exceeds the `line-length`, this preview
+style will format the above as:
+
+```python
+x = (
+    df
+    .filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+This deviates from the stable formatting, and also from Black, both
+of which would produce:
+
+
+```python
+x = (
+    df.filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+Both the stable and preview formatting are variants of something
+called a **fluent layout**.
+
+In general, this preview style differs from the stable style in the
+following two ways:
+
+1. In the case where a fluent layout is applied, the preview formatting
+differs from the stable formatting only at the first attribute that precedes
+a call or subscript. The preview formatting breaks _before_ this attribute,
+while the stable formatting breaks _after_ the call or subscript.
+2. When `preview` is enabled, the fluent layout will be used slightly more often, as we explain below.
+
+To explain point (2), we need to explain the heuristic used for deciding
+whether to apply a fluent layout. In stable, the heuristic is essentially
+to apply fluent formatting in the following situations:
+
+- A parenthesized, call, or subscript expression is followed by at least one attribute that is called or subscripted, excluding the last attribute in the chain, or
+- A non-attribute expression is followed by at least two attributes that
+are called or subscripted, excluding the last attribute in the chain
+
+In `preview` the heuristic is identical except that we do not exclude the
+last attribute in the chain from consideration.
+
+For example, with `line-length = 8`, we have:
+
+```python
+x = a[0].b().c   # formatted to fluent with and without preview
+x = a.b().c().d # formatted to fluent with and without preview
+x = a.d.b().c() # formatted to fluent only in preview
+```
+
 ## Sorting imports
 
 Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,
