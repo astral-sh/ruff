@@ -888,6 +888,10 @@ impl Annotation {
     pub fn hide_snippet(&mut self, yes: bool) {
         self.hide_snippet = yes;
     }
+
+    pub fn is_primary(&self) -> bool {
+        self.is_primary
+    }
 }
 
 /// Tags that can be associated with an annotation.
