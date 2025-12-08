@@ -10,6 +10,7 @@ static FILTERS: &[(&str, &str)] = &[(r#""sortText": "[0-9 ]+""#, r#""sortText": 
 #[test]
 fn publish_diagnostics_open() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .enable_diagnostic_related_information(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -219,8 +220,7 @@ fn swap_cells() -> anyhow::Result<()> {
             "href": "https://ty.dev/rules#unresolved-reference"
           },
           "source": "ty",
-          "message": "Name `a` used when not defined",
-          "relatedInformation": []
+          "message": "Name `a` used when not defined"
         }
       ],
       "vscode-notebook-cell://src/test.ipynb#1": [],

@@ -18,12 +18,12 @@ PublishDiagnosticsParams {
         Diagnostic {
             range: Range {
                 start: Position {
-                    line: 1,
-                    character: 11,
+                    line: 3,
+                    character: 0,
                 },
                 end: Position {
-                    line: 1,
-                    character: 13,
+                    line: 3,
+                    character: 30,
                 },
             },
             severity: Some(
@@ -31,7 +31,7 @@ PublishDiagnosticsParams {
             ),
             code: Some(
                 String(
-                    "invalid-return-type",
+                    "type-assertion-failure",
                 ),
             ),
             code_description: Some(
@@ -50,7 +50,7 @@ PublishDiagnosticsParams {
                         path: "/rules",
                         query: None,
                         fragment: Some(
-                            "invalid-return-type",
+                            "type-assertion-failure",
                         ),
                     },
                 },
@@ -58,7 +58,7 @@ PublishDiagnosticsParams {
             source: Some(
                 "ty",
             ),
-            message: "Return type does not match returned value: expected `str`, found `Literal[42]`",
+            message: "Type `list[str]` does not match asserted type `Literal[/"test/"]`",
             related_information: None,
             tags: None,
             data: None,

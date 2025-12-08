@@ -19,6 +19,7 @@ use serde::{Deserialize, Serialize};
 use ty_project::{ProgressReporter, ProjectDatabase};
 
 use crate::PositionEncoding;
+use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::DocumentKey;
 use crate::server::api::diagnostics::{Diagnostics, to_lsp_diagnostic};
 use crate::server::api::traits::{
@@ -318,6 +319,7 @@ struct ResponseWriter<'a> {
     mode: ReportingMode,
     index: &'a Index,
     position_encoding: PositionEncoding,
+    client_capabilities: ResolvedClientCapabilities,
     // It's important that we use `AnySystemPath` over `Url` here because
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
@@ -357,6 +359,7 @@ impl<'a> ResponseWriter<'a> {
             mode,
             index,
             position_encoding,
+            client_capabilities: snapshot.resolved_client_capabilities(),
             previous_result_ids,
         }
     }
@@ -406,7 +409,15 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.position_encoding).1)
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.position_encoding,
+                            self.client_capabilities,
+                        )
+                        .1
+                    })
                     .collect::<Vec<_>>();
 
                 WorkspaceDocumentDiagnosticReport::Full(WorkspaceFullDocumentDiagnosticReport {
