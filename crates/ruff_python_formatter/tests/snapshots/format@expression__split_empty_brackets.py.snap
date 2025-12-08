@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/expression/split_empty_brackets.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -199,7 +198,24 @@ response = await sync_to_async(
 ```diff
 --- Stable
 +++ Preview
-@@ -62,9 +62,9 @@
+@@ -18,10 +18,14 @@
+ ).casefold(1)
+ 
+ ct_match = (
+-    unicodedata.normalize("NFKC", s1).casefold(
++    unicodedata
++    .normalize("NFKC", s1)
++    .casefold(
+         # foo
+     )
+-    == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold(
++    == unicodedata
++    .normalize("NFKCNFKCNFKCNFKCNFKC", s2)
++    .casefold(
+         # foo
+     )
+ )
+@@ -62,9 +66,9 @@
      1
  }.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
  
