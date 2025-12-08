@@ -871,7 +871,31 @@ fn handle_parameter_comment<'a>(
             CommentPlacement::Default(comment)
         }
     } else if comment.start() < parameter.name.start() {
-        CommentPlacement::leading(parameter, comment)
+        // If the comment falls before the parameter, and the grandparent node is a lambda (the
+        // parent node is always `Parameters`), make the comment a dangling lambda parameter, so
+        // that it can be formatted with the other dangling lambda comments in the lambda header.
+        //
+        // This is especially important for niche cases like:
+        //
+        // ```py
+        // (
+        //     lambda # comment 1
+        //     * # comment 2
+        //     x: # comment 3
+        //     x
+        // )
+        // ```
+        //
+        // where `# comment 2` otherwise becomes a leading comment on `*x` in the first format and a
+        // dangling comment on the lambda in the second. Instead, make it a dangling comment on the
+        // enclosing lambda from the start.
+        match comment.enclosing_grandparent() {
+            Some(AnyNodeRef::ExprLambda(lambda)) => CommentPlacement::dangling(lambda, comment),
+            Some(AnyNodeRef::StmtExpr(ast::StmtExpr { value, .. })) if value.is_lambda_expr() => {
+                CommentPlacement::dangling(&**value, comment)
+            }
+            _ => CommentPlacement::leading(parameter, comment),
+        }
     } else {
         CommentPlacement::Default(comment)
     }

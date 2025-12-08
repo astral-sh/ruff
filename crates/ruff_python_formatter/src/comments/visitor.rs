@@ -84,11 +84,13 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
+            let mut parents = self.parents.iter().rev();
             let comment = DecoratedComment {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
-                parent: self.parents.iter().rev().nth(1).copied(),
+                parent: parents.nth(1).copied(),
+                grandparent: parents.next().copied(),
                 line_position: CommentLinePosition::for_range(
                     *comment_range,
                     self.source_code.as_str(),
@@ -127,9 +129,11 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
+            let mut parents = self.parents.iter().rev();
             let comment = DecoratedComment {
                 enclosing: node,
-                parent: self.parents.last().copied(),
+                parent: parents.nth(1).copied(),
+                grandparent: parents.next().copied(),
                 preceding: self.preceding_node,
                 following: None,
                 line_position: CommentLinePosition::for_range(
@@ -181,6 +185,7 @@ pub(crate) struct DecoratedComment<'a> {
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
     parent: Option<AnyNodeRef<'a>>,
+    grandparent: Option<AnyNodeRef<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
 }
@@ -209,6 +214,11 @@ impl<'a> DecoratedComment<'a> {
     /// Returns the parent of the enclosing node, if any
     pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
         self.parent
+    }
+
+    /// Returns the grandparent of the enclosing node, if any
+    pub(super) fn enclosing_grandparent(&self) -> Option<AnyNodeRef<'a>> {
+        self.grandparent
     }
 
     /// Returns the comment's preceding node.
