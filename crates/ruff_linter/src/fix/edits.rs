@@ -3,15 +3,12 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{self, TokenKind, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
-use ruff_python_trivia::{
-    CommentRanges, PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content,
-    is_python_whitespace,
-};
+use ruff_python_trivia::{PythonWhitespace, has_leading_content, is_python_whitespace};
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -208,8 +205,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
     parentheses: Parentheses,
-    source: &str,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -224,23 +220,26 @@ pub(crate) fn remove_argument<T: Ranged>(
         .context("Unable to find argument")?;
 
     let parenthesized_range =
-        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+        token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
             .unwrap_or(arg.range());
 
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
         // argument to the end of the subsequent comma.
-        let mut tokenizer = SimpleTokenizer::starts_at(argument.end(), source);
+        let mut tokens_after = tokens.after(argument.end()).iter();
 
         // Find the trailing comma.
-        tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Comma)
+        tokens_after
+            .find(|token| token.kind() == TokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
         // Find the next non-whitespace token.
-        let next = tokenizer
+        let next = tokens_after
             .find(|token| {
-                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
+                !matches!(
+                    token.kind(),
+                    TokenKind::Newline | TokenKind::NonLogicalNewline
+                )
             })
             .context("Unable to find next token")?;
 
@@ -248,11 +247,11 @@ pub(crate) fn remove_argument<T: Ranged>(
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
-        let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
+        let mut tokens_after = tokens.after(previous).iter();
 
         // Find the trailing comma.
-        let comma = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Comma)
+        let comma = tokens_after
+            .find(|token| token.kind() == TokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
         Ok(Edit::deletion(comma.start(), parenthesized_range.end()))
@@ -270,25 +269,14 @@ pub(crate) fn remove_argument<T: Ranged>(
 ///
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
-pub(crate) fn add_argument(
-    argument: &str,
-    arguments: &Arguments,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> Edit {
+pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
     if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
-        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
-            .unwrap_or(*range);
+        let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
-        let last = parenthesized_range(
-            last.value().into(),
-            arguments.into(),
-            comment_ranges,
-            source,
-        )
-        .unwrap_or(last.range());
+        let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
+            .unwrap_or(last.range());
         Edit::insertion(format!(", {argument}"), last.end())
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.
@@ -297,7 +285,7 @@ pub(crate) fn add_argument(
 }
 
 /// Generic function to add a (regular) parameter to a function definition.
-pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
+pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, tokens: &Tokens) -> Edit {
     if let Some(last) = parameters
         .args
         .iter()
@@ -309,22 +297,21 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
     } else if !parameters.args.is_empty() {
         // Case 2: no regular parameters, but at least one keyword parameter, so add before the
         // first.
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let name = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Name)
+        let name = tokens
+            .after(parameters.start())
+            .iter()
+            .find(|token| token.kind() == TokenKind::Name)
             .expect("Unable to find name token");
         Edit::insertion(format!("{parameter}, "), name.start())
     } else if let Some(last) = parameters.posonlyargs.last() {
         // Case 2: no regular parameter, but a positional-only parameter exists, so add after that.
         // We take care to add it *after* the `/` separator.
-        let pos = last.end();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let slash = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Slash)
+        let mut tokens_after = tokens.after(last.end()).iter();
+        let slash = tokens_after
+            .find(|token| token.kind() == TokenKind::Slash)
             .expect("Unable to find `/` token");
         // Try to find a comma after the slash.
-        let comma = tokenizer.find(|token| token.kind == SimpleTokenKind::Comma);
+        let comma = tokens_after.find(|token| token.kind() == TokenKind::Comma);
         if let Some(comma) = comma {
             Edit::insertion(format!(" {parameter},"), comma.start() + TextSize::from(1))
         } else {
@@ -334,10 +321,10 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &s
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
-        let pos = parameters.start();
-        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
-        let star = tokenizer
-            .find(|token| token.kind == SimpleTokenKind::Star)
+        let star = tokens
+            .after(parameters.start())
+            .iter()
+            .find(|token| token.kind() == TokenKind::Star)
             .expect("Unable to find `*` token");
         Edit::insertion(format!("{parameter}, "), star.start())
     } else {

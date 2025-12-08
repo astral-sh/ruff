@@ -111,18 +111,11 @@ pub(crate) fn exc_info_outside_except_handler(checker: &Checker, call: &ExprCall
     }
 
     let arguments = &call.arguments;
-    let source = checker.source();
 
     let mut diagnostic = checker.report_diagnostic(ExcInfoOutsideExceptHandler, exc_info.range);
 
     diagnostic.try_set_fix(|| {
-        let edit = remove_argument(
-            exc_info,
-            arguments,
-            Parentheses::Preserve,
-            source,
-            checker.comment_ranges(),
-        )?;
+        let edit = remove_argument(exc_info, arguments, Parentheses::Preserve, checker.tokens())?;
         Ok(Fix::unsafe_edit(edit))
     });
 }

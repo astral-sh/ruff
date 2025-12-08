@@ -1,9 +1,8 @@
 use anyhow::Result;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Keyword};
+use ruff_python_ast::{self as ast, Keyword, token::Tokens};
 use ruff_python_semantic::Modules;
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -98,15 +97,7 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 
         let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
         if call.arguments.find_keyword("capture_output").is_none() {
-            diagnostic.try_set_fix(|| {
-                generate_fix(
-                    stdout,
-                    stderr,
-                    call,
-                    checker.locator().contents(),
-                    checker.comment_ranges(),
-                )
-            });
+            diagnostic.try_set_fix(|| generate_fix(stdout, stderr, call, checker.tokens()));
         }
     }
 }
@@ -116,8 +107,7 @@ fn generate_fix(
     stdout: &Keyword,
     stderr: &Keyword,
     call: &ast::ExprCall,
-    source: &str,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
         (stdout, stderr)
@@ -131,8 +121,7 @@ fn generate_fix(
             second,
             &call.arguments,
             Parentheses::Preserve,
-            source,
-            comment_ranges,
+            tokens,
         )?],
     ))
 }

@@ -94,23 +94,18 @@ pub(crate) fn duplicate_bases(checker: &Checker, name: &str, arguments: Option<&
                     base.range(),
                 );
                 diagnostic.try_set_fix(|| {
-                    remove_argument(
-                        base,
-                        arguments,
-                        Parentheses::Remove,
-                        checker.locator().contents(),
-                        checker.comment_ranges(),
+                    remove_argument(base, arguments, Parentheses::Remove, checker.tokens()).map(
+                        |edit| {
+                            Fix::applicable_edit(
+                                edit,
+                                if checker.comment_ranges().intersects(arguments.range()) {
+                                    Applicability::Unsafe
+                                } else {
+                                    Applicability::Safe
+                                },
+                            )
+                        },
                     )
-                    .map(|edit| {
-                        Fix::applicable_edit(
-                            edit,
-                            if checker.comment_ranges().intersects(arguments.range()) {
-                                Applicability::Unsafe
-                            } else {
-                                Applicability::Safe
-                            },
-                        )
-                    })
                 });
             }
         }

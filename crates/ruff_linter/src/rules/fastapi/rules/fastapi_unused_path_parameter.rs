@@ -197,7 +197,7 @@ pub(crate) fn fastapi_unused_path_parameter(
             diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
                 path_param,
                 &function_def.parameters,
-                checker.locator().contents(),
+                checker.tokens(),
             )));
         }
     }

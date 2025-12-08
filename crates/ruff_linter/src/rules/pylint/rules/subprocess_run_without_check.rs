@@ -75,12 +75,7 @@ pub(crate) fn subprocess_run_without_check(checker: &Checker, call: &ast::ExprCa
             let mut diagnostic =
                 checker.report_diagnostic(SubprocessRunWithoutCheck, call.func.range());
             diagnostic.set_fix(Fix::applicable_edit(
-                add_argument(
-                    "check=False",
-                    &call.arguments,
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                ),
+                add_argument("check=False", &call.arguments, checker.tokens()),
                 // If the function call contains `**kwargs`, mark the fix as unsafe.
                 if call
                     .arguments

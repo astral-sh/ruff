@@ -65,13 +65,8 @@ pub(crate) fn useless_class_metaclass_type(checker: &Checker, class_def: &StmtCl
                 );
 
                 diagnostic.try_set_fix(|| {
-                    let edit = remove_argument(
-                        keyword,
-                        arguments,
-                        Parentheses::Remove,
-                        checker.locator().contents(),
-                        checker.comment_ranges(),
-                    )?;
+                    let edit =
+                        remove_argument(keyword, arguments, Parentheses::Remove, checker.tokens())?;
 
                     let range = edit.range();
                     let applicability = if checker.comment_ranges().intersects(range) {
