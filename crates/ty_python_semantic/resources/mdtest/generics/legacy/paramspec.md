@@ -78,28 +78,6 @@ P3 = ParamSpec("P3", covariant=True)
 P4 = ParamSpec("P4", contravariant=True)
 ```
 
-### `default` parameter in `typing_extensions.ParamSpec`
-
-```toml
-[environment]
-python-version = "3.12"
-```
-
-The `default` parameter to `ParamSpec` is available from `typing_extensions` in Python 3.12 and
-earlier.
-
-```py
-from typing import ParamSpec
-from typing_extensions import ParamSpec as ExtParamSpec
-
-# This shouldn't emit a diagnostic
-P1 = ExtParamSpec("P1", default=[int, str])
-
-# But, this should
-# error: [invalid-paramspec] "The `default` parameter of `typing.ParamSpec` was added in Python 3.13"
-P2 = ParamSpec("P2", default=[int, str])
-```
-
 ### Defaults
 
 ```toml
@@ -122,6 +100,38 @@ Other values are invalid.
 ```py
 # error: [invalid-paramspec]
 P4 = ParamSpec("P4", default=int)
+```
+
+### `default` parameter in `typing_extensions.ParamSpec`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The `default` parameter to `ParamSpec` is available from `typing_extensions` in Python 3.12 and
+earlier.
+
+```py
+from typing import ParamSpec
+from typing_extensions import ParamSpec as ExtParamSpec
+
+# This shouldn't emit a diagnostic
+P1 = ExtParamSpec("P1", default=[int, str])
+
+# But, this should
+# error: [invalid-paramspec] "The `default` parameter of `typing.ParamSpec` was added in Python 3.13"
+P2 = ParamSpec("P2", default=[int, str])
+```
+
+And, it allows the same set of values as `typing.ParamSpec`.
+
+```py
+P3 = ExtParamSpec("P3", default=...)
+P4 = ExtParamSpec("P4", default=P3)
+
+# error: [invalid-paramspec]
+P5 = ExtParamSpec("P5", default=int)
 ```
 
 ### Forward references in stub files
