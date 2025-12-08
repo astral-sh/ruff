@@ -4168,6 +4168,8 @@ pub enum KnownClass {
     SpecialForm,
     TypeVar,
     ParamSpec,
+    // typing_extensions.ParamSpec
+    ExtensionsParamSpec, // must be distinct from typing.ParamSpec, backports new features
     ParamSpecArgs,
     ParamSpecKwargs,
     ProtocolMeta,
@@ -4239,6 +4241,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -4371,6 +4374,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4457,6 +4461,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4543,6 +4548,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4634,6 +4640,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -4733,6 +4740,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::ProtocolMeta
@@ -4806,6 +4814,7 @@ impl KnownClass {
             Self::TypeVar => "TypeVar",
             Self::ExtensionsTypeVar => "TypeVar",
             Self::ParamSpec => "ParamSpec",
+            Self::ExtensionsParamSpec => "ParamSpec",
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
@@ -5139,11 +5148,18 @@ impl KnownClass {
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::ParamSpec => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -5247,6 +5263,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5337,6 +5354,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5420,7 +5438,7 @@ impl KnownClass {
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
             "Mapping" => &[Self::Mapping],
-            "ParamSpec" => &[Self::ParamSpec],
+            "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
@@ -5542,6 +5560,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::TypeVar
             | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
@@ -5555,7 +5575,6 @@ impl KnownClass {
             | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::SupportsIndex
-            | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5970,6 +5989,7 @@ mod tests {
                     KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
                         PythonVersion::PY311
                     }
+                    KnownClass::ParamSpec => PythonVersion::PY310,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)
