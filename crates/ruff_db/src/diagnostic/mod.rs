@@ -166,28 +166,8 @@ impl Diagnostic {
     /// Returns the primary message for this diagnostic.
     ///
     /// A diagnostic always has a message, but it may be empty.
-    ///
-    /// NOTE: At present, this routine will return the first primary
-    /// annotation's message as the primary message when the main diagnostic
-    /// message is empty. This is meant to facilitate an incremental migration
-    /// in ty over to the new diagnostic data model. (The old data model
-    /// didn't distinguish between messages on the entire diagnostic and
-    /// messages attached to a particular span.)
     pub fn primary_message(&self) -> &str {
-        if !self.inner.message.as_str().is_empty() {
-            return self.inner.message.as_str();
-        }
-        // FIXME: As a special case, while we're migrating ty
-        // to the new diagnostic data model, we'll look for a primary
-        // message from the primary annotation. This is because most
-        // ty diagnostics are created with an empty diagnostic
-        // message and instead attach the message to the annotation.
-        // Fixing this will require touching basically every diagnostic
-        // in ty, so we do it this way for now to match the old
-        // semantics. ---AG
-        self.primary_annotation()
-            .and_then(|ann| ann.get_message())
-            .unwrap_or_default()
+        self.inner.message.as_str()
     }
 
     /// Introspects this diagnostic and returns what kind of "primary" message
@@ -198,18 +178,6 @@ impl Diagnostic {
     /// to the primary annotation. In particular, the primary annotation often
     /// contains *essential* information or context for understanding the
     /// diagnostic.
-    ///
-    /// The reason why we don't just always return both the main diagnostic
-    /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of ty over to the new
-    /// diagnostic data model. At time of writing, diagnostics were still
-    /// constructed in the old model where the main diagnostic message and the
-    /// primary annotation message were not distinguished from each other. So
-    /// for now, we carefully return what kind of messages this diagnostic
-    /// contains. In effect, if this diagnostic has a non-empty main message
-    /// *and* a non-empty primary annotation message, then the diagnostic is
-    /// 100% using the new diagnostic data model and we can format things
-    /// appropriately.
     ///
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
@@ -224,11 +192,10 @@ impl Diagnostic {
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match (main.is_empty(), annotation.is_empty()) {
-            (false, true) => ConciseMessage::MainDiagnostic(main),
-            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
-            (false, false) => ConciseMessage::Both { main, annotation },
-            (true, true) => ConciseMessage::Empty,
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
     }
 
@@ -693,18 +660,6 @@ impl SubDiagnostic {
     /// contains *essential* information or context for understanding the
     /// diagnostic.
     ///
-    /// The reason why we don't just always return both the main diagnostic
-    /// message and the primary annotation message is because this was written
-    /// in the midst of an incremental migration of ty over to the new
-    /// diagnostic data model. At time of writing, diagnostics were still
-    /// constructed in the old model where the main diagnostic message and the
-    /// primary annotation message were not distinguished from each other. So
-    /// for now, we carefully return what kind of messages this diagnostic
-    /// contains. In effect, if this diagnostic has a non-empty main message
-    /// *and* a non-empty primary annotation message, then the diagnostic is
-    /// 100% using the new diagnostic data model and we can format things
-    /// appropriately.
-    ///
     /// The type returned implements the `std::fmt::Display` trait. In most
     /// cases, just converting it to a string (or printing it) will do what
     /// you want.
@@ -714,11 +669,10 @@ impl SubDiagnostic {
             .primary_annotation()
             .and_then(|ann| ann.get_message())
             .unwrap_or_default();
-        match (main.is_empty(), annotation.is_empty()) {
-            (false, true) => ConciseMessage::MainDiagnostic(main),
-            (true, false) => ConciseMessage::PrimaryAnnotation(annotation),
-            (false, false) => ConciseMessage::Both { main, annotation },
-            (true, true) => ConciseMessage::Empty,
+        if annotation.is_empty() {
+            ConciseMessage::MainDiagnostic(main)
+        } else {
+            ConciseMessage::Both { main, annotation }
         }
     }
 }
@@ -1512,28 +1466,10 @@ pub enum DiagnosticFormat {
 pub enum ConciseMessage<'a> {
     /// A diagnostic contains a non-empty main message and an empty
     /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "new" data model.
     MainDiagnostic(&'a str),
-    /// A diagnostic contains an empty main message and a non-empty
-    /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "old" data model.
-    PrimaryAnnotation(&'a str),
     /// A diagnostic contains a non-empty main message and a non-empty
     /// primary annotation message.
-    ///
-    /// This strongly suggests that the diagnostic is using the
-    /// "new" data model.
     Both { main: &'a str, annotation: &'a str },
-    /// A diagnostic contains an empty main message and an empty
-    /// primary annotation message.
-    ///
-    /// This indicates that the diagnostic is probably using the old
-    /// model.
-    Empty,
     /// A custom concise message has been provided.
     Custom(&'a str),
 }
@@ -1544,13 +1480,9 @@ impl std::fmt::Display for ConciseMessage<'_> {
             ConciseMessage::MainDiagnostic(main) => {
                 write!(f, "{main}")
             }
-            ConciseMessage::PrimaryAnnotation(annotation) => {
-                write!(f, "{annotation}")
-            }
             ConciseMessage::Both { main, annotation } => {
                 write!(f, "{main}: {annotation}")
             }
-            ConciseMessage::Empty => Ok(()),
             ConciseMessage::Custom(message) => {
                 write!(f, "{message}")
             }
