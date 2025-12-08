@@ -2007,9 +2007,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lbrace);
 
-        if self.at(TokenKind::Unknown)
-            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
-        {
+        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
             return Expr::Dict(ast::ExprDict {
                 items: vec![],
                 range: self.node_range(start),
@@ -2126,9 +2124,7 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
         self.bump(TokenKind::Lpar);
 
-        if self.at(TokenKind::Unknown)
-            && (self.peek() == TokenKind::EndOfFile || self.peek() == TokenKind::Newline)
-        {
+        if self.at(TokenKind::Unknown) && END_SEQUENCE_SET.contains(self.peek()) {
             return Expr::Tuple(ast::ExprTuple {
                 elts: vec![],
                 ctx: ExprContext::Load,
