@@ -50,7 +50,7 @@ expression: code_actions
     "isPreferred": true
   },
   {
-    "title": "import typing_extensions.reveal_type",
+    "title": "Ignore 'undefined-reveal' for this line",
     "kind": "quickfix",
     "diagnostics": [
       {
@@ -81,18 +81,18 @@ expression: code_actions
             "range": {
               "start": {
                 "line": 0,
-                "character": 0
+                "character": 14
               },
               "end": {
                 "line": 0,
-                "character": 0
+                "character": 14
               }
             },
-            "newText": "from typing_extensions import reveal_type\n"
+            "newText": "  # ty:ignore[undefined-reveal]"
           }
         ]
       }
     },
-    "isPreferred": true
+    "isPreferred": false
   }
 ]
