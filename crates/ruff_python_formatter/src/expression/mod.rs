@@ -19,7 +19,9 @@ use crate::expression::parentheses::{
     optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
+use crate::preview::{
+    is_fluent_layout_more_often_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
+};
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -883,21 +885,62 @@ pub enum CallChainLayout {
     Default,
 
     /// A nested call chain element that uses fluent style.
-    Fluent,
+    Fluent(AttributeState),
 
     /// A nested call chain element not using fluent style.
     NonFluent,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AttributeState {
+    CallsOrSubscriptsPreceding(u32),
+    FirstCallOrSubscript,
+    BeforeFirstCallOrSubscript,
+}
+
 impl CallChainLayout {
+    pub(crate) fn call_like_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x)) => {
+                if x > 1 {
+                    Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x - 1))
+                } else {
+                    Self::Fluent(AttributeState::FirstCallOrSubscript)
+                }
+            }
+            _ => self,
+        }
+    }
+
+    pub(crate) fn after_attribute(self) -> Self {
+        match self {
+            Self::Fluent(AttributeState::FirstCallOrSubscript) => {
+                Self::Fluent(AttributeState::BeforeFirstCallOrSubscript)
+            }
+            _ => self,
+        }
+    }
+
+    pub(crate) fn is_first_call_like(self) -> bool {
+        matches!(self, Self::Fluent(AttributeState::FirstCallOrSubscript))
+    }
+
     pub(crate) fn from_expression(
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
         source: &str,
+        // This can be deleted once the preview style
+        // is stabilized
+        context: &PyFormatContext,
     ) -> Self {
+        let mut call_like_count = 0;
+        let mut was_in_call_like = false;
         let mut first_attr_value_parenthesized = false;
 
+        // We can delete this and its uses below once
+        // the preview style [] is stabilized.
         let mut attributes_after_parentheses = 0;
+
         loop {
             match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -907,6 +950,7 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
+                    call_like_count += u32::from(was_in_call_like);
                     if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
                         first_attr_value_parenthesized = true;
@@ -914,7 +958,7 @@ impl CallChainLayout {
                     } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
                         attributes_after_parentheses += 1;
                     }
-
+                    was_in_call_like = false;
                     expr = ExprRef::from(value.as_ref());
                 }
                 // ```
@@ -934,9 +978,16 @@ impl CallChainLayout {
                         break;
                     }
 
+                    was_in_call_like = true;
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
+                    // We count the first call in the chain even
+                    // if it is not part of an attribute, e.g.
+                    //
+                    // f().g()
+                    // ^^^ count this
+                    call_like_count += u32::from(was_in_call_like);
                     break;
                 }
             }
@@ -945,7 +996,7 @@ impl CallChainLayout {
         if attributes_after_parentheses + u32::from(first_attr_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent
+            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
         }
     }
 
@@ -963,12 +1014,13 @@ impl CallChainLayout {
                         item.into(),
                         f.context().comments().ranges(),
                         f.context().source(),
+                        f.context(),
                     )
                 } else {
                     CallChainLayout::NonFluent
                 }
             }
-            layout @ (CallChainLayout::Fluent | CallChainLayout::NonFluent) => layout,
+            layout @ (CallChainLayout::Fluent(_) | CallChainLayout::NonFluent) => layout,
         }
     }
 }
