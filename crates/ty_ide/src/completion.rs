@@ -2205,7 +2205,7 @@ def frob(): ...
         // detect this as a definition of `bar`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"<No completions found after filtering out completions>",
+            @"bar",
         );
     }
 
