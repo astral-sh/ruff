@@ -1498,13 +1498,12 @@ impl<'src> CodeExampleMarkdown<'src> {
         // Get content after the fence
         let rest = &line[fence_len..];
 
+        let info_string = rest.trim();
+
         // For backtick fences, info string cannot contain backticks
-        if fence_char == '`' && rest.contains('`') {
+        if fence_char == '`' && info_string.contains('`') {
             return None;
         }
-
-        // Check the language identifier
-        let info_string = rest.trim();
 
         // Empty info string is treated as Python (matches original implementation)
         if info_string.is_empty() {
@@ -1943,11 +1942,16 @@ fn is_rst_option(line: &str) -> bool {
 /// If `s` starts with `prefix` (case-insensitive), returns the remainder of `s`
 /// after the prefix. Otherwise, returns `None`.
 fn strip_prefix_ignore_ascii_case<'a>(s: &'a str, prefix: &str) -> Option<&'a str> {
-    if s.len() < prefix.len() {
-        return None;
-    }
-    if s[..prefix.len()].eq_ignore_ascii_case(prefix) {
-        Some(&s[prefix.len()..])
+    let prefix_len = prefix.len();
+    // Use byte slicing to avoid panic on non-ASCII strings.
+    // This is safe because `prefix` is always ASCII in our usage.
+    if s.as_bytes()
+        .get(..prefix_len)?
+        .eq_ignore_ascii_case(prefix.as_bytes())
+    {
+        // SAFETY: prefix_len is guaranteed to be on a valid UTF-8 boundary
+        // because we only call this function with ASCII prefixes.
+        Some(&s[prefix_len..])
     } else {
         None
     }
@@ -1975,17 +1979,22 @@ fn strip_python_lang_prefix(s: &str) -> Option<&str> {
         return None;
     }
 
+    // SAFETY for all `s.get(n..)` calls below:
+    // We only slice after verifying that the preceding bytes are ASCII characters.
+    // Since ASCII characters are single-byte in UTF-8, slicing at these indices
+    // is guaranteed to be on valid UTF-8 boundaries.
+
     // State 2: "py" matched - check what's next
     match bytes.get(2).map(u8::to_ascii_lowercase) {
         // "py" followed by end or whitespace -> accept "py"
-        None => return Some(&s[2..]),
-        Some(b) if b.is_ascii_whitespace() => return Some(&s[2..]),
+        None => return s.get(2..),
+        Some(b) if b.is_ascii_whitespace() => return s.get(2..),
 
         // "py3" -> accept "py3"
         Some(b'3') => {
             return match bytes.get(3) {
-                None => Some(&s[3..]),
-                Some(b) if b.is_ascii_whitespace() => Some(&s[3..]),
+                None => s.get(3..),
+                Some(b) if b.is_ascii_whitespace() => s.get(3..),
                 Some(_) => None,
             };
         }
@@ -2004,13 +2013,13 @@ fn strip_python_lang_prefix(s: &str) -> Option<&str> {
     // State 6: "python" matched - check what's next
     match bytes.get(6).map(u8::to_ascii_lowercase) {
         // "python" followed by end or whitespace -> accept "python"
-        None => Some(&s[6..]),
-        Some(b) if b.is_ascii_whitespace() => Some(&s[6..]),
+        None => s.get(6..),
+        Some(b) if b.is_ascii_whitespace() => s.get(6..),
 
         // "python3" -> accept "python3"
         Some(b'3') => match bytes.get(7) {
-            None => Some(&s[7..]),
-            Some(b) if b.is_ascii_whitespace() => Some(&s[7..]),
+            None => s.get(7..),
+            Some(b) if b.is_ascii_whitespace() => s.get(7..),
             Some(_) => None,
         },
 
