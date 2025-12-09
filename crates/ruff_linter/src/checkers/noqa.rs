@@ -146,7 +146,7 @@ pub(crate) fn check_noqa(
                         let mut diagnostic = context.report_diagnostic(
                             UnusedNOQA {
                                 codes: None,
-                                kind: ruff::rules::UnusedNOQAKind::NOQA,
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
                             directive.range(),
                         );
@@ -244,7 +244,7 @@ pub(crate) fn check_noqa(
                                         .map(|code| (*code).to_string())
                                         .collect(),
                                 }),
-                                kind: ruff::rules::UnusedNOQAKind::NOQA,
+                                kind: ruff::rules::UnusedNOQAKind::Noqa,
                             },
                             directive.range(),
                         );

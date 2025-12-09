@@ -14,14 +14,14 @@ pub(crate) struct UnusedCodes {
 
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum UnusedNOQAKind {
-    NOQA,
+    Noqa,
     Suppression,
 }
 
 impl UnusedNOQAKind {
     fn as_str(&self) -> &str {
         match self {
-            UnusedNOQAKind::NOQA => "`noqa` directive",
+            UnusedNOQAKind::Noqa => "`noqa` directive",
             UnusedNOQAKind::Suppression => "suppression",
         }
     }
