@@ -505,7 +505,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         //   α | β ≤ T  ⇒ (α ≤ T) ∧ (β ≤ T)
         if let Type::Union(lower_union) = lower {
             let mut result = Node::AlwaysTrue;
-            for lower_element in lower_union.elements(db).iter() {
+            for lower_element in lower_union.elements(db) {
                 result = result.and(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper),
