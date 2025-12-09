@@ -556,6 +556,7 @@ impl<'db> GenericContext<'db> {
                 let partial = PartialSpecialization {
                     generic_context: self,
                     types: &types,
+                    skip: Some(i),
                 };
                 let updated = types[i].apply_type_mapping(
                     db,
@@ -626,6 +627,7 @@ impl<'db> GenericContext<'db> {
             let partial = PartialSpecialization {
                 generic_context: self,
                 types: &expanded[0..idx],
+                skip: None,
             };
             let default = default.apply_type_mapping(
                 db,
@@ -1360,6 +1362,7 @@ impl<'db> Specialization<'db> {
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: &'a [Type<'db>],
+    skip: Option<usize>,
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1374,6 +1377,9 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .generic_context
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
+        if self.skip.is_some_and(|skip| skip == index) {
+            return Some(Type::unknown());
+        }
         self.types.get(index).copied()
     }
 }
