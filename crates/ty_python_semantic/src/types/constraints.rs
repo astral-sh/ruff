@@ -2167,6 +2167,8 @@ impl<'db> InteriorNode<'db> {
                     );
                 }
 
+                // If the intersection doesn't simplify to a single clause, we shouldn't update the
+                // BDD.
                 IntersectionResult::CannotSimplify => {}
 
                 IntersectionResult::Disjoint => {
@@ -2758,7 +2760,12 @@ impl<'db> SequentMap<'db> {
                 self.add_single_implication(db, intersection_constraint, right_constraint);
                 self.enqueue_constraint(intersection_constraint);
             }
+
+            // The sequent map only needs to include constraints that might appear in a BDD. If the
+            // intersection does not collapse to a single constraint, then there's no new
+            // constraint that we need to add to the sequent map.
             IntersectionResult::CannotSimplify => {}
+
             IntersectionResult::Disjoint => {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
