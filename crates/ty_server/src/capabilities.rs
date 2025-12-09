@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
+        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 18;
     }
 }
 
@@ -163,6 +164,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }
 
+    /// Returns `true` if the client has related information support for diagnostics.
+    pub(crate) const fn supports_diagnostic_related_information(self) -> bool {
+        self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
+    }
+
     /// Returns `true` if the client supports dynamic registration for rename capabilities.
     pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
         self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
@@ -211,15 +217,22 @@ impl ResolvedClientCapabilities {
             }
         }
 
-        if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
+        if let Some(diagnostic) =
+            text_document.and_then(|text_document| text_document.diagnostic.as_ref())
+        {
             flags |= Self::PULL_DIAGNOSTICS;
+
+            if diagnostic.dynamic_registration == Some(true) {
+                flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            }
         }
 
-        if text_document
-            .and_then(|text_document| text_document.diagnostic.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
+        if let Some(publish_diagnostics) =
+            text_document.and_then(|text_document| text_document.publish_diagnostics.as_ref())
         {
-            flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            if publish_diagnostics.related_information == Some(true) {
+                flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
+            }
         }
 
         if text_document

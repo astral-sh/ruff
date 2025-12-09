@@ -37,6 +37,38 @@ pub enum ReferencesMode {
     DocumentHighlights,
 }
 
+impl ReferencesMode {
+    pub(super) fn to_import_alias_resolution(self) -> ImportAliasResolution {
+        match self {
+            // Resolve import aliases for find references:
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            //
+            // When finding references on `my_deprecated`, we want to find all usages of `deprecated` across the entire
+            // project.
+            Self::References | Self::ReferencesSkipDeclaration => {
+                ImportAliasResolution::ResolveAliases
+            }
+            // For rename, don't resolve import aliases.
+            //
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            // When renaming `my_deprecated`, only rename the alias, but not the original definition in `warnings`.
+            Self::Rename | Self::RenameMultiFile | Self::DocumentHighlights => {
+                ImportAliasResolution::PreserveAliases
+            }
+        }
+    }
+}
+
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub(crate) fn references(
@@ -45,12 +77,9 @@ pub(crate) fn references(
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
-    // Get the definitions for the symbol at the cursor position
-
-    // When finding references, do not resolve any local aliases.
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
+        .get_definition_targets(&model, mode.to_import_alias_resolution())?
         .declaration_targets(db)?;
 
     // Extract the target text from the goto target for fast comparison
@@ -318,7 +347,7 @@ impl LocalReferencesFinder<'_> {
         {
             // Get the definitions for this goto target
             if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, ImportAliasResolution::PreserveAliases)
+                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 // Check if any of the current definitions match our target definitions

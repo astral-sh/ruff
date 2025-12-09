@@ -32,12 +32,13 @@ use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypes, DATACLASS_FLAGS,
-    DataclassFlags, DataclassParams, DeprecatedInstance, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType,
-    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
-    StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation, TypedDictParams,
-    UnionBuilder, VarianceInferable, binding_type, declaration_type, determine_upper_bound,
+    ApplyTypeMappingVisitor, Binding, BoundSuperType, CallableType, CallableTypeKind,
+    CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
+    KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
+    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1021,8 +1022,11 @@ impl<'db> ClassType<'db> {
 
                         let getitem_signature =
                             CallableSignature::from_overloads(overload_signatures);
-                        let getitem_type =
-                            Type::Callable(CallableType::new(db, getitem_signature, true));
+                        let getitem_type = Type::Callable(CallableType::new(
+                            db,
+                            getitem_signature,
+                            CallableTypeKind::FunctionLike,
+                        ));
                         Member::definitely_declared(getitem_type)
                     })
                     .unwrap_or_else(fallback_member_lookup)
@@ -1133,6 +1137,13 @@ impl<'db> ClassType<'db> {
     /// constructor signature of this class.
     #[salsa::tracked(cycle_initial=into_callable_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn into_callable(self, db: &'db dyn Db) -> CallableTypes<'db> {
+        // TODO: This mimics a lot of the logic in Type::try_call_from_constructor. Can we
+        // consolidate the two? Can we invoke a class by upcasting the class into a Callable, and
+        // then relying on the call binding machinery to Just Work™?
+
+        let (class_literal, _) = self.class_literal(db);
+        let class_generic_context = class_literal.generic_context(db);
+
         let self_ty = Type::from(self);
         let metaclass_dunder_call_function_symbol = self_ty
             .member_lookup_with_policy(
@@ -1181,7 +1192,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                true,
+                CallableTypeKind::FunctionLike,
             );
 
             if returns_non_subclass {
@@ -1206,39 +1217,58 @@ impl<'db> ClassType<'db> {
         // If the class defines an `__init__` method, then we synthesize a callable type with the
         // same parameters as the `__init__` method after it is bound, and with the return type of
         // the concrete type of `Self`.
-        let synthesized_dunder_init_callable =
-            if let Place::Defined(ty, _, _) = dunder_init_function_symbol {
-                let signature = match ty {
-                    Type::FunctionLiteral(dunder_init_function) => {
-                        Some(dunder_init_function.signature(db))
-                    }
-                    Type::Callable(callable) => Some(callable.signatures(db)),
-                    _ => None,
+        let synthesized_dunder_init_callable = if let Place::Defined(ty, _, _) =
+            dunder_init_function_symbol
+        {
+            let signature = match ty {
+                Type::FunctionLiteral(dunder_init_function) => {
+                    Some(dunder_init_function.signature(db))
+                }
+                Type::Callable(callable) => Some(callable.signatures(db)),
+                _ => None,
+            };
+
+            if let Some(signature) = signature {
+                let synthesized_signature = |signature: &Signature<'db>| {
+                    let self_annotation = signature
+                        .parameters()
+                        .get_positional(0)
+                        .and_then(Parameter::annotated_type)
+                        .filter(|ty| {
+                            ty.as_typevar()
+                                .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
+                        });
+                    let return_type = self_annotation.unwrap_or(correct_return_type);
+                    let instance_ty = self_annotation.unwrap_or_else(|| Type::instance(db, self));
+                    let generic_context = GenericContext::merge_optional(
+                        db,
+                        class_generic_context,
+                        signature.generic_context,
+                    );
+                    Signature::new_generic(
+                        generic_context,
+                        signature.parameters().clone(),
+                        Some(return_type),
+                    )
+                    .with_definition(signature.definition())
+                    .bind_self(db, Some(instance_ty))
                 };
 
-                if let Some(signature) = signature {
-                    let synthesized_signature = |signature: &Signature<'db>| {
-                        let instance_ty = Type::instance(db, self);
-                        Signature::new(signature.parameters().clone(), Some(correct_return_type))
-                            .with_definition(signature.definition())
-                            .bind_self(db, Some(instance_ty))
-                    };
+                let synthesized_dunder_init_signature = CallableSignature::from_overloads(
+                    signature.overloads.iter().map(synthesized_signature),
+                );
 
-                    let synthesized_dunder_init_signature = CallableSignature::from_overloads(
-                        signature.overloads.iter().map(synthesized_signature),
-                    );
-
-                    Some(CallableType::new(
-                        db,
-                        synthesized_dunder_init_signature,
-                        true,
-                    ))
-                } else {
-                    None
-                }
+                Some(CallableType::new(
+                    db,
+                    synthesized_dunder_init_signature,
+                    CallableTypeKind::FunctionLike,
+                ))
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         match (dunder_new_function, synthesized_dunder_init_callable) {
             (Some(dunder_new_function), Some(synthesized_dunder_init_callable)) => {
@@ -1261,9 +1291,13 @@ impl<'db> ClassType<'db> {
                     )
                     .place;
 
-                if let Place::Defined(Type::FunctionLiteral(new_function), _, _) =
+                if let Place::Defined(Type::FunctionLiteral(mut new_function), _, _) =
                     new_function_symbol
                 {
+                    if let Some(class_generic_context) = class_generic_context {
+                        new_function =
+                            new_function.with_inherited_generic_context(db, class_generic_context);
+                    }
                     CallableTypes::one(
                         new_function
                             .into_bound_method_type(db, correct_return_type)
@@ -1273,7 +1307,11 @@ impl<'db> ClassType<'db> {
                     // Fallback if no `object.__new__` is found.
                     CallableTypes::one(CallableType::single(
                         db,
-                        Signature::new(Parameters::empty(), Some(correct_return_type)),
+                        Signature::new_generic(
+                            class_generic_context,
+                            Parameters::empty(),
+                            Some(correct_return_type),
+                        ),
                     ))
                 }
             }
@@ -2046,9 +2084,11 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         fn into_function_like_callable<'d>(db: &'d dyn Db, ty: Type<'d>) -> Type<'d> {
             match ty {
-                Type::Callable(callable_ty) => {
-                    Type::Callable(CallableType::new(db, callable_ty.signatures(db), true))
-                }
+                Type::Callable(callable_ty) => Type::Callable(CallableType::new(
+                    db,
+                    callable_ty.signatures(db),
+                    CallableTypeKind::FunctionLike,
+                )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
                 }
@@ -2643,7 +2683,7 @@ impl<'db> ClassLiteral<'db> {
                             ),
                             Some(Type::none(db)),
                         )),
-                        true,
+                        CallableTypeKind::FunctionLike,
                     )));
                 }
 
@@ -2669,7 +2709,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
@@ -2696,7 +2736,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
@@ -2804,7 +2844,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
@@ -2864,7 +2904,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
@@ -2892,7 +2932,7 @@ impl<'db> ClassLiteral<'db> {
                 Some(Type::Callable(CallableType::new(
                     db,
                     CallableSignature::from_overloads(overloads),
-                    true,
+                    CallableTypeKind::FunctionLike,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
@@ -4128,6 +4168,8 @@ pub enum KnownClass {
     SpecialForm,
     TypeVar,
     ParamSpec,
+    // typing_extensions.ParamSpec
+    ExtensionsParamSpec, // must be distinct from typing.ParamSpec, backports new features
     ParamSpecArgs,
     ParamSpecKwargs,
     ProtocolMeta,
@@ -4199,6 +4241,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -4331,6 +4374,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4417,6 +4461,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4503,6 +4548,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::TypeVarTuple
@@ -4594,6 +4640,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -4693,6 +4740,7 @@ impl KnownClass {
             | KnownClass::TypeVar
             | KnownClass::ExtensionsTypeVar
             | KnownClass::ParamSpec
+            | KnownClass::ExtensionsParamSpec
             | KnownClass::ParamSpecArgs
             | KnownClass::ParamSpecKwargs
             | KnownClass::ProtocolMeta
@@ -4766,6 +4814,7 @@ impl KnownClass {
             Self::TypeVar => "TypeVar",
             Self::ExtensionsTypeVar => "TypeVar",
             Self::ParamSpec => "ParamSpec",
+            Self::ExtensionsParamSpec => "ParamSpec",
             Self::ParamSpecArgs => "ParamSpecArgs",
             Self::ParamSpecKwargs => "ParamSpecKwargs",
             Self::TypeVarTuple => "TypeVarTuple",
@@ -5099,11 +5148,18 @@ impl KnownClass {
             Self::TypeAliasType
             | Self::ExtensionsTypeVar
             | Self::TypeVarTuple
-            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::Deprecated
             | Self::NewType => KnownModule::TypingExtensions,
+            Self::ParamSpec => {
+                if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                    KnownModule::Typing
+                } else {
+                    KnownModule::TypingExtensions
+                }
+            }
             Self::NoDefaultType => {
                 let python_version = Program::get(db).python_version(db);
 
@@ -5207,6 +5263,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5297,6 +5354,7 @@ impl KnownClass {
             | Self::TypeVar
             | Self::ExtensionsTypeVar
             | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5380,7 +5438,7 @@ impl KnownClass {
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
             "Mapping" => &[Self::Mapping],
-            "ParamSpec" => &[Self::ParamSpec],
+            "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
             "TypeVarTuple" => &[Self::TypeVarTuple],
@@ -5502,6 +5560,8 @@ impl KnownClass {
             | Self::TypedDictFallback
             | Self::TypeVar
             | Self::ExtensionsTypeVar
+            | Self::ParamSpec
+            | Self::ExtensionsParamSpec
             | Self::NamedTupleLike
             | Self::ConstraintSet
             | Self::GenericContext
@@ -5515,7 +5575,6 @@ impl KnownClass {
             | Self::TypeAliasType
             | Self::NoDefaultType
             | Self::SupportsIndex
-            | Self::ParamSpec
             | Self::ParamSpecArgs
             | Self::ParamSpecKwargs
             | Self::TypeVarTuple
@@ -5930,6 +5989,7 @@ mod tests {
                     KnownClass::Member | KnownClass::Nonmember | KnownClass::StrEnum => {
                         PythonVersion::PY311
                     }
+                    KnownClass::ParamSpec => PythonVersion::PY310,
                     _ => PythonVersion::PY37,
                 };
                 (class, version_added)

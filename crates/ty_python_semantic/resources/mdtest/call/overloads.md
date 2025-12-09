@@ -925,7 +925,7 @@ def _(t: tuple[int, str] | tuple[int, str, int]) -> None:
     f(*t)  # error: [no-matching-overload]
 ```
 
-## Filtering based on variaidic arguments
+## Filtering based on variadic arguments
 
 This is step 4 of the overload call evaluation algorithm which specifies that:
 
@@ -1467,6 +1467,79 @@ def _(arg: list[Any]):
     reveal_type(f3(*arg))  # revealed: A
     # Filters out the final overload but the return types aren't equivalent
     reveal_type(f4(*arg))  # revealed: Unknown
+```
+
+### Varidic argument with generics
+
+`overloaded.pyi`:
+
+```pyi
+from typing import Any, TypeVar, overload
+
+T1 = TypeVar("T1")
+T2 = TypeVar("T2")
+T3 = TypeVar("T3")
+
+@overload
+def f1(x: T1, /) -> tuple[T1]: ...
+@overload
+def f1(x1: T1, x2: T2, /) -> tuple[T1, T2]: ...
+@overload
+def f1(x1: T1, x2: T2, x3: T3, /) -> tuple[T1, T2, T3]: ...
+@overload
+def f1(*args: Any) -> tuple[Any, ...]: ...
+
+@overload
+def f2(x1: T1) -> tuple[T1]: ...
+@overload
+def f2(x1: T1, x2: T2) -> tuple[T1, T2]: ...
+@overload
+def f2(*args: Any, **kwargs: Any) -> tuple[Any, ...]: ...
+
+@overload
+def f3(x: T1) -> tuple[T1]: ...
+@overload
+def f3(x1: T1, x2: T2) -> tuple[T1, T2]: ...
+@overload
+def f3(*args: Any) -> tuple[Any, ...]: ...
+@overload
+def f3(**kwargs: Any) -> dict[str, Any]: ...
+```
+
+```py
+from overloaded import f1, f2, f3
+from typing import Any
+
+# These calls only match the last overload
+reveal_type(f1())  # revealed: tuple[Any, ...]
+reveal_type(f1(1, 2, 3, 4))  # revealed: tuple[Any, ...]
+
+# While these calls match multiple overloads but step 5 filters out all the remaining overloads
+# except the most specific one in terms of the number of arguments.
+reveal_type(f1(1))  # revealed: tuple[Literal[1]]
+reveal_type(f1(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f1(1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
+
+def _(args1: list[int], args2: list[Any]):
+    reveal_type(f1(*args1))  # revealed: tuple[Any, ...]
+    reveal_type(f1(*args2))  # revealed: tuple[Any, ...]
+
+reveal_type(f2())  # revealed: tuple[Any, ...]
+reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+# TODO: Should be `tuple[Literal[1], Literal[2]]`
+reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
+# TODO: Should be `tuple[Literal[2], Literal[1]]`
+reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
+reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
+
+reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
+# TODO: Should be `tuple[Literal[1], Literal[2]]`
+reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
+reveal_type(f3(z=1))  # revealed: dict[str, Any]
+
+# error: [no-matching-overload]
+reveal_type(f3(1, 2, x=3))  # revealed: Unknown
 ```
 
 ### Non-participating fully-static parameter

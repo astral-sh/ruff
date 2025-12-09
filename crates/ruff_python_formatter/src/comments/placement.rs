@@ -1868,7 +1868,7 @@ fn handle_lambda_comment<'a>(
     _preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     if let Some(parameters) = lambda.parameters.as_deref() {
-        // Comments between the `lambda` and the parameters are dangling on the lambda:
+        // End-of-line comments between the `lambda` and the parameters are dangling on the lambda:
         // ```python
         // (
         //     lambda  # comment
@@ -1876,8 +1876,24 @@ fn handle_lambda_comment<'a>(
         //     y
         // )
         // ```
+        //
+        // But own-line comments are leading on the first parameter, if it exists:
+        // ```python
+        // (
+        //     lambda
+        //     # comment
+        //     x:
+        //     y
+        // )
+        // ```
         if comment.start() < parameters.start() {
-            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            return if let Some(first) = parameters.iter().next()
+                && comment.line_position().is_own_line()
+            {
+                CommentPlacement::leading(first.as_parameter(), comment)
+            } else {
+                CommentPlacement::dangling(comment.enclosing_node(), comment)
+            };
         }
 
         // Comments between the parameters and the body are dangling on the lambda:

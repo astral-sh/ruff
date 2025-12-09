@@ -1,11 +1,12 @@
 use std::collections::HashMap;
 
+use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
-use crate::types::signatures::Signature;
+use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{CallDunderError, UnionType};
 use crate::types::{CallableTypes, ClassBase, KnownClass, Type, TypeContext};
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
@@ -24,8 +25,9 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub fn definition_for_name<'db>(
     model: &SemanticModel<'db>,
     name: &ast::ExprName,
+    alias_resolution: ImportAliasResolution,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(model, name.id.as_str(), name.into());
+    let definitions = definitions_for_name(model, name.id.as_str(), name.into(), alias_resolution);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -43,6 +45,7 @@ pub fn definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
     node: AnyNodeRef<'_>,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let file = model.file();
@@ -53,7 +56,7 @@ pub fn definitions_for_name<'db>(
         return vec![];
     };
 
-    let mut all_definitions = Vec::new();
+    let mut all_definitions = FxIndexSet::default();
 
     // Search through the scope hierarchy: start from the current scope and
     // traverse up through parent scopes to find definitions
@@ -89,13 +92,13 @@ pub fn definitions_for_name<'db>(
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
 
                 for declaration in global_declarations {
                     if let Some(def) = declaration.declaration.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
             }
@@ -116,13 +119,13 @@ pub fn definitions_for_name<'db>(
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
@@ -136,21 +139,14 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(
-            db,
-            *definition,
-            Some(name_str),
-            ImportAliasResolution::ResolveAliases,
-        );
+        let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
         resolved_definitions.extend(resolved);
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    if resolved_definitions.is_empty() {
-        let Some(builtins_scope) = builtins_module_scope(db) else {
-            return resolved_definitions;
-        };
-
+    if resolved_definitions.is_empty()
+        && let Some(builtins_scope) = builtins_module_scope(db)
+    {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
         // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
@@ -463,6 +459,12 @@ pub struct CallSignatureDetails<'db> {
     /// This provides easy access to parameter names for documentation lookup.
     pub parameter_names: Vec<String>,
 
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_kinds: Vec<ParameterKind<'db>>,
+
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_types: Vec<Option<Type<'db>>>,
+
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
     pub definition: Option<Definition<'db>>,
@@ -521,6 +523,12 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(|param| (param.kind().clone(), param.annotated_type()))
+                        .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -528,6 +536,8 @@ pub fn call_signature_details<'db>(
                     label: display_details.label,
                     parameter_label_offsets,
                     parameter_names,
+                    parameter_kinds,
+                    parameter_types,
                     argument_to_parameter_mapping,
                 }
             })
@@ -932,6 +942,12 @@ mod resolve_definition {
                 let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
+
                 // Get the full module name being imported
                 let Some(module_name) = ModuleName::new(&alias.name) else {
                     return Vec::new(); // Invalid module name, return empty list
@@ -955,7 +971,13 @@ mod resolve_definition {
                 let file = definition.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
-                let name = &import_from_def.alias(&module).name;
+                let alias = import_from_def.alias(&module);
+
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
@@ -963,7 +985,7 @@ mod resolve_definition {
                     db,
                     file,
                     import_node,
-                    name,
+                    &alias.name,
                     visited,
                     alias_resolution,
                 )

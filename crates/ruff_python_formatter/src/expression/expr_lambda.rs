@@ -41,65 +41,72 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             let (dangling_before_parameters, dangling_after_parameters) = dangling
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
-            let (end_of_line_lambda_keyword_comments, leading_parameter_comments) = if preview {
-                dangling_before_parameters.split_at(
-                    dangling_before_parameters
-                        .iter()
-                        .position(|comment| comment.line_position().is_own_line())
-                        .unwrap_or(dangling_before_parameters.len()),
-                )
+            if dangling_before_parameters.is_empty() {
+                // If the first parameter has a leading comment, insert a hard line break. This
+                // comment is associated as a leading comment on the first parameter:
+                //
+                // ```py
+                // (
+                //     lambda
+                //     * # comment
+                //     x:
+                //     x
+                // )
+                // ```
+                //
+                // so a hard line break is needed to avoid formatting it like:
+                //
+                // ```py
+                // (
+                //     lambda # comment
+                //     *x: x
+                // )
+                // ```
+                //
+                // which is unstable because it's missing the second space before the comment.
+                //
+                // Inserting the line break causes it to format like:
+                //
+                // ```py
+                // (
+                //     lambda
+                //     # comment
+                //     *x :x
+                // )
+                // ```
+                //
+                // which is also consistent with the formatting in the presence of an actual
+                // dangling comment on the lambda:
+                //
+                // ```py
+                // (
+                //     lambda # comment 1
+                //     * # comment 2
+                //     x:
+                //     x
+                // )
+                // ```
+                //
+                // formats to:
+                //
+                // ```py
+                // (
+                //     lambda  # comment 1
+                //     # comment 2
+                //     *x: x
+                // )
+                // ```
+                if parameters
+                    .iter()
+                    .next()
+                    .is_some_and(|parameter| comments.has_leading(parameter.as_parameter()))
+                {
+                    hard_line_break().fmt(f)?;
+                } else {
+                    write!(f, [space()])?;
+                }
             } else {
-                ([].as_slice(), dangling_before_parameters)
-            };
-
-            // To prevent an instability in cases like:
-            //
-            // ```py
-            // (
-            //     lambda # comment 1
-            //     * # comment 2
-            //     x: # comment 3
-            //     x
-            // )
-            // ```
-            //
-            // `# comment 1` and `# comment 2` also become dangling comments on the lambda, so
-            // in preview, we include these in `dangling_after_parameters`, as long as the
-            // parameter list doesn't include any additional comments.
-            //
-            // This ends up formatted as:
-            //
-            // ```py
-            // (
-            //     lambda *x: (  # comment 1  # comment 2  # comment 3
-            //         x
-            //     )
-            // )
-            // ```
-            //
-            // instead of the stable formatting:
-            //
-            // ```py
-            // (
-            //     lambda  # comment 1
-            //     *x:  # comment 2
-            //     # comment 3
-            //     x
-            // )
-            // ```
-
-            trailing_comments(end_of_line_lambda_keyword_comments).fmt(f)?;
-
-            if leading_parameter_comments.is_empty() && !comments.has_leading(parameters) {
-                write!(f, [space()])?;
-            } else {
-                write!(
-                    f,
-                    [
-                        hard_line_break(),
-                        leading_comments(leading_parameter_comments)
-                    ]
-                )?;
+                write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.

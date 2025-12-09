@@ -33,7 +33,7 @@ from collections.abc import Callable
 from dataclasses import KW_ONLY, dataclass
 from functools import partial
 from pathlib import Path
-from typing import NewType, NoReturn, assert_never
+from typing import Final, NewType, NoReturn, assert_never
 
 from pysource_codegen import generate as generate_random_code
 from pysource_minimize import CouldNotMinimize, minimize as minimize_repro
@@ -44,6 +44,12 @@ MinimizedSourceCode = NewType("MinimizedSourceCode", str)
 Seed = NewType("Seed", int)
 ExitCode = NewType("ExitCode", int)
 
+TY_TARGET_PLATFORM: Final = "linux"
+
+# ty supports `--python-version=3.8`, but typeshed only supports 3.9+,
+# so that's probably the oldest version we can usefully test with.
+OLDEST_SUPPORTED_PYTHON: Final = "3.9"
+
 
 def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
     """Return `True` if the code triggers a panic in type-checking code."""
@@ -51,7 +57,17 @@ def ty_contains_bug(code: str, *, ty_executable: Path) -> bool:
         input_file = Path(tempdir, "input.py")
         input_file.write_text(code)
         completed_process = subprocess.run(
-            [ty_executable, "check", input_file], capture_output=True, text=True
+            [
+                ty_executable,
+                "check",
+                input_file,
+                "--python-version",
+                OLDEST_SUPPORTED_PYTHON,
+                "--python-platform",
+                TY_TARGET_PLATFORM,
+            ],
+            capture_output=True,
+            text=True,
         )
     return completed_process.returncode not in {0, 1, 2}
 
@@ -137,7 +153,10 @@ class FuzzResult:
                 case Executable.RUFF:
                     panic_message = f"The following code triggers a {new}parser bug:"
                 case Executable.TY:
-                    panic_message = f"The following code triggers a {new}ty panic:"
+                    panic_message = (
+                        f"The following code triggers a {new}ty panic with "
+                        f"`--python-version={OLDEST_SUPPORTED_PYTHON} --python-platform={TY_TARGET_PLATFORM}`:"
+                    )
                 case _ as unreachable:
                     assert_never(unreachable)
 

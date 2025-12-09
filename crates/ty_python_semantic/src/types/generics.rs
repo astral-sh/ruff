@@ -13,15 +13,17 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::instance::{Protocol, ProtocolInstanceType};
-use crate::types::signatures::Parameters;
+use crate::types::signatures::{Parameters, ParametersKind};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarIdentity, BoundTypeVarInstance, ClassLiteral,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
+    CallableSignature, CallableType, CallableTypeKind, CallableTypes, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity, TypeVarInstance,
-    TypeVarKind, TypeVarVariance, UnionType, declaration_type, walk_bound_type_var_type,
+    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Signature, Type,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -261,6 +263,34 @@ impl<'db> GenericContext<'db> {
         )
     }
 
+    pub(crate) fn merge_optional(
+        db: &'db dyn Db,
+        left: Option<Self>,
+        right: Option<Self>,
+    ) -> Option<Self> {
+        match (left, right) {
+            (None, None) => None,
+            (Some(one), None) | (None, Some(one)) => Some(one),
+            (Some(left), Some(right)) => Some(left.merge(db, right)),
+        }
+    }
+
+    pub(crate) fn remove_self(
+        self,
+        db: &'db dyn Db,
+        binding_context: Option<BindingContext<'db>>,
+    ) -> Self {
+        Self::from_typevar_instances(
+            db,
+            self.variables(db).filter(|bound_typevar| {
+                !(bound_typevar.typevar(db).is_self(db)
+                    && binding_context.is_none_or(|binding_context| {
+                        bound_typevar.binding_context(db) == binding_context
+                    }))
+            }),
+        )
+    }
+
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
@@ -318,6 +348,21 @@ impl<'db> GenericContext<'db> {
         self.variables_inner(db).values().copied()
     }
 
+    /// Returns `true` if this generic context contains exactly one `ParamSpec` and no other type
+    /// variables.
+    ///
+    /// For example:
+    /// ```py
+    /// class Foo[**P]: ...  # true
+    /// class Bar[T, **P]: ...  # false
+    /// class Baz[T]: ...  # false
+    /// ```
+    pub(crate) fn exactly_one_paramspec(self, db: &'db dyn Db) -> bool {
+        self.variables(db)
+            .exactly_one()
+            .is_ok_and(|bound_typevar| bound_typevar.is_paramspec(db))
+    }
+
     fn variable_from_type_param(
         db: &'db dyn Db,
         index: &'db SemanticIndex<'db>,
@@ -334,8 +379,16 @@ impl<'db> GenericContext<'db> {
                 };
                 Some(typevar.with_binding_context(db, binding_context))
             }
-            // TODO: Support these!
-            ast::TypeParam::ParamSpec(_) => None,
+            ast::TypeParam::ParamSpec(node) => {
+                let definition = index.expect_single_definition(node);
+                let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) =
+                    declaration_type(db, definition).inner_type()
+                else {
+                    return None;
+                };
+                Some(typevar.with_binding_context(db, binding_context))
+            }
+            // TODO: Support this!
             ast::TypeParam::TypeVarTuple(_) => None,
         }
     }
@@ -549,7 +602,15 @@ impl<'db> GenericContext<'db> {
         //
         // If there is a mapping for `T`, we want to map `U` to that type, not to `T`. To handle
         // this, we repeatedly apply the specialization to itself, until we reach a fixed point.
-        let mut expanded = vec![Type::unknown(); types.len()];
+        let mut expanded = Vec::with_capacity(types.len());
+        for typevar in variables.clone() {
+            if typevar.is_paramspec(db) {
+                expanded.push(Type::paramspec_value_callable(db, Parameters::unknown()));
+            } else {
+                expanded.push(Type::unknown());
+            }
+        }
+
         for (idx, (ty, typevar)) in types.zip(variables).enumerate() {
             if let Some(ty) = ty {
                 expanded[idx] = ty;
@@ -1380,6 +1441,15 @@ impl<'db> SpecializationBuilder<'db> {
 
         match self.types.entry(identity) {
             Entry::Occupied(mut entry) => {
+                // TODO: The spec says that when a ParamSpec is used multiple times in a signature,
+                // the type checker can solve it to a common behavioral supertype. We don't
+                // implement that yet so in case there are multiple ParamSpecs, use the
+                // specialization from the first occurrence.
+                // https://github.com/astral-sh/ty/issues/1778
+                // https://github.com/astral-sh/ruff/pull/21445#discussion_r2591510145
+                if bound_typevar.is_paramspec(self.db) {
+                    return;
+                }
                 *entry.get_mut() = UnionType::from_elements(self.db, [*entry.get(), ty]);
             }
             Entry::Vacant(entry) => {
@@ -1475,35 +1545,72 @@ impl<'db> SpecializationBuilder<'db> {
                 }
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
-            (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element is assignable
-                // from the actual type, then we don't add any type mapping. This handles a case like
+            (Type::Union(union_formal), _) => {
+                // Second, if the formal is a union, and the actual type is assignable to precisely
+                // one union element, then we don't add any type mapping. This handles a case like
                 //
                 // ```py
-                // def f[T](t: T | None): ...
+                // def f[T](t: T | None) -> T: ...
                 //
-                // f(None)
+                // reveal_type(f(None))  # revealed: Unknown
                 // ```
                 //
                 // without specializing `T` to `None`.
-                //
-                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
-                // typevar), then we add a mapping between that typevar and the actual type.
                 if !actual.is_never() {
-                    let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
-                        actual
-                            .when_subtype_of(self.db, **ty, self.inferable)
-                            .is_always_satisfied(self.db)
-                    });
+                    let assignable_elements =
+                        (union_formal.elements(self.db).iter()).filter(|ty| {
+                            actual
+                                .when_subtype_of(self.db, **ty, self.inferable)
+                                .is_always_satisfied(self.db)
+                        });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
                     }
                 }
 
-                let bound_typevars =
-                    (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
-                if let Ok(bound_typevar) = bound_typevars.exactly_one() {
+                let mut bound_typevars =
+                    (union_formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
+
+                let first_bound_typevar = bound_typevars.next();
+                let has_more_than_one_typevar = bound_typevars.next().is_some();
+
+                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
+                // typevar), then we add a mapping between that typevar and the actual type.
+                if let Some(bound_typevar) = first_bound_typevar
+                    && !has_more_than_one_typevar
+                {
                     self.add_type_mapping(bound_typevar, actual, polarity, f);
+                    return Ok(());
+                }
+
+                // TODO:
+                // Handling more than one bare typevar is something that we can't handle yet.
+                if has_more_than_one_typevar {
+                    return Ok(());
+                }
+
+                // Finally, if there are no bare typevars, we try to infer type mappings by
+                // checking against each union element. This handles cases like
+                // ```py
+                // def f[T](t: P[T] | Q[T]) -> T: ...
+                //
+                // reveal_type(f(P[str]()))  # revealed: str
+                // reveal_type(f(Q[int]()))  # revealed: int
+                // ```
+                let mut first_error = None;
+                let mut found_matching_element = false;
+                for formal_element in union_formal.elements(self.db) {
+                    if !formal_element.is_disjoint_from(self.db, actual) {
+                        let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                        if let Err(err) = result {
+                            first_error.get_or_insert(err);
+                        } else {
+                            found_matching_element = true;
+                        }
+                    }
+                }
+                if !found_matching_element && let Some(error) = first_error {
+                    return Err(error);
                 }
             }
 
@@ -1637,6 +1744,47 @@ impl<'db> SpecializationBuilder<'db> {
                         }
                         return Ok(());
                     }
+                }
+            }
+
+            (Type::Callable(formal_callable), _) => {
+                if let Some(actual_callable) = actual
+                    .try_upcast_to_callable(self.db)
+                    .and_then(CallableTypes::exactly_one)
+                {
+                    // We're only interested in a formal callable of the form `Callable[P, ...]` for
+                    // now where `P` is a `ParamSpec`.
+                    // TODO: This would need to be updated once we support `Concatenate`
+                    // TODO: What to do for overloaded callables?
+                    let [signature] = formal_callable.signatures(self.db).as_slice() else {
+                        return Ok(());
+                    };
+                    let formal_parameters = signature.parameters();
+                    let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
+                        return Ok(());
+                    };
+                    let paramspec_value = match actual_callable.signatures(self.db).as_slice() {
+                        [] => return Ok(()),
+                        [actual_signature] => match actual_signature.parameters().kind() {
+                            ParametersKind::ParamSpec(typevar) => Type::TypeVar(typevar),
+                            _ => Type::Callable(CallableType::new(
+                                self.db,
+                                CallableSignature::single(Signature::new(
+                                    actual_signature.parameters().clone(),
+                                    None,
+                                )),
+                                CallableTypeKind::ParamSpecValue,
+                            )),
+                        },
+                        actual_signatures => Type::Callable(CallableType::new(
+                            self.db,
+                            CallableSignature::from_overloads(actual_signatures.iter().map(
+                                |signature| Signature::new(signature.parameters().clone(), None),
+                            )),
+                            CallableTypeKind::ParamSpecValue,
+                        )),
+                    };
+                    self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
                 }
             }
 

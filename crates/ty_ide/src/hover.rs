@@ -1708,12 +1708,12 @@ def ab(a: int, *, c: int):
             r#"
 def outer():
     x = "outer_value"
-    
+
     def inner():
         nonlocal x
         x = "modified"
         return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
@@ -1747,12 +1747,12 @@ def outer():
             r#"
 def outer():
     xy = "outer_value"
-    
+
     def inner():
         nonlocal x<CURSOR>y
         xy = "modified"
         return x  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
@@ -1960,7 +1960,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=a<CURSOR>b):
@@ -1980,7 +1980,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, button=ab):
@@ -2018,7 +2018,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Cl<CURSOR>ick(x, button=ab):
@@ -2057,7 +2057,7 @@ def function():
                 def __init__(self, pos, btn):
                     self.position: int = pos
                     self.button: str = btn
-            
+
             def my_func(event: Click):
                 match event:
                     case Click(x, but<CURSOR>ton=ab):
@@ -2143,15 +2143,13 @@ def function():
             "#,
         );
 
+        // TODO: This should just be `**AB@Alias2 (<variance>)`
+        // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @r"
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ---------------------------------------------
         ```python
-        (
-            ...
-        ) -> tuple[typing.ParamSpec]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -2292,12 +2290,12 @@ def function():
             "#,
         );
 
-        // TODO: This should be `P@Alias (<variance>)`
+        // TODO: Should this be constravariant instead?
         assert_snapshot!(test.hover(), @r"
-        typing.ParamSpec
+        P@Alias (bivariant)
         ---------------------------------------------
         ```python
-        typing.ParamSpec
+        P@Alias (bivariant)
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3317,6 +3315,297 @@ def function():
           |    ^^^^^- Cursor offset
           |    |
           |    source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The module is correct
+        assert_snapshot!(test.hover(), @r"
+        <module 'mypackage.subpkg'>
+        ---------------------------------------------
+        ```python
+        <module 'mypackage.subpkg'>
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ^^^-^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The module is correct
+        assert_snapshot!(test.hover(), @r"
+        <module 'mypackage.subpkg'>
+        ---------------------------------------------
+        ```python
+        <module 'mypackage.subpkg'>
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg.submod import val
+          |       ^^^-^^
+          |       |  |
+          |       |  Cursor offset
+          |       source
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Unknown is correct
+        assert_snapshot!(test.hover(), @r"
+        Unknown
+        ---------------------------------------------
+        ```python
+        Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = submod
+          |     ^^^-^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // The submodule is correct
+        assert_snapshot!(test.hover(), @r"
+        <module 'mypackage.subpkg.submod'>
+        ---------------------------------------------
+        ```python
+        <module 'mypackage.subpkg.submod'>
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:2:14
+          |
+        2 | from .subpkg.submod import val
+          |              ^^^-^^
+          |              |  |
+          |              |  Cursor offset
+          |              source
+        3 |
+        4 | x = submod
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // The module is correct
+        assert_snapshot!(test.hover(), @r"
+        <module 'mypackage.subpkg'>
+        ---------------------------------------------
+        ```python
+        <module 'mypackage.subpkg'>
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg import subpkg
+          |       ^^^-^^
+          |       |  |
+          |       |  Cursor offset
+          |       source
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // int is correct
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^-^^
+          |                     |  |
+          |                     |  Cursor offset
+          |                     source
+        3 |
+        4 | x = subpkg
+          |
+        ");
+    }
+
+    #[test]
+    fn hover_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // int is correct
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^-^^
+          |     |  |
+          |     |  Cursor offset
+          |     source
           |
         ");
     }

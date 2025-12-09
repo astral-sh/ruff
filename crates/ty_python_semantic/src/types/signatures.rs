@@ -29,10 +29,10 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::{
-    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, ClassLiteral,
+    ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypeKind, ClassLiteral,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, TypeContext, TypeMapping, TypeRelation,
-    VarianceInferable, todo_type,
+    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -151,6 +151,10 @@ impl<'db> CallableSignature<'db> {
         self.overloads.iter()
     }
 
+    pub(crate) fn as_slice(&self) -> &[Signature<'db>] {
+        &self.overloads
+    }
+
     pub(crate) fn with_inherited_generic_context(
         &self,
         db: &'db dyn Db,
@@ -197,6 +201,122 @@ impl<'db> CallableSignature<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        fn try_apply_type_mapping_for_paramspec<'db>(
+            db: &'db dyn Db,
+            self_signature: &Signature<'db>,
+            prefix_parameters: &[Parameter<'db>],
+            paramspec_value: Type<'db>,
+            type_mapping: &TypeMapping<'_, 'db>,
+            tcx: TypeContext<'db>,
+            visitor: &ApplyTypeMappingVisitor<'db>,
+        ) -> Option<CallableSignature<'db>> {
+            match paramspec_value {
+                Type::TypeVar(typevar) if typevar.is_paramspec(db) => {
+                    Some(CallableSignature::single(Signature {
+                        generic_context: self_signature.generic_context.map(|context| {
+                            type_mapping.update_signature_generic_context(db, context)
+                        }),
+                        definition: self_signature.definition,
+                        parameters: Parameters::new(
+                            db,
+                            prefix_parameters
+                                .iter()
+                                .map(|param| {
+                                    param.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                                })
+                                .chain([
+                                    Parameter::variadic(Name::new_static("args"))
+                                        .with_annotated_type(Type::TypeVar(
+                                            typevar
+                                                .with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                                        )),
+                                    Parameter::keyword_variadic(Name::new_static("kwargs"))
+                                        .with_annotated_type(Type::TypeVar(
+                                            typevar
+                                                .with_paramspec_attr(db, ParamSpecAttrKind::Kwargs),
+                                        )),
+                                ]),
+                        ),
+                        return_ty: self_signature
+                            .return_ty
+                            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                    }))
+                }
+                Type::Callable(callable)
+                    if matches!(callable.kind(db), CallableTypeKind::ParamSpecValue) =>
+                {
+                    Some(CallableSignature::from_overloads(
+                        callable.signatures(db).iter().map(|signature| Signature {
+                            generic_context: self_signature.generic_context.map(|context| {
+                                type_mapping.update_signature_generic_context(db, context)
+                            }),
+                            definition: signature.definition,
+                            parameters: Parameters::new(
+                                db,
+                                prefix_parameters
+                                    .iter()
+                                    .map(|param| {
+                                        param.apply_type_mapping_impl(
+                                            db,
+                                            type_mapping,
+                                            tcx,
+                                            visitor,
+                                        )
+                                    })
+                                    .chain(signature.parameters().iter().cloned()),
+                            ),
+                            return_ty: self_signature.return_ty.map(|ty| {
+                                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                            }),
+                        }),
+                    ))
+                }
+                _ => None,
+            }
+        }
+
+        match type_mapping {
+            TypeMapping::Specialization(specialization) => {
+                if let [self_signature] = self.overloads.as_slice()
+                    && let Some((prefix_parameters, paramspec)) = self_signature
+                        .parameters
+                        .find_paramspec_from_args_kwargs(db)
+                    && let Some(paramspec_value) = specialization.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        self_signature,
+                        prefix_parameters,
+                        paramspec_value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    return result;
+                }
+            }
+            TypeMapping::PartialSpecialization(partial) => {
+                if let [self_signature] = self.overloads.as_slice()
+                    && let Some((prefix_parameters, paramspec)) = self_signature
+                        .parameters
+                        .find_paramspec_from_args_kwargs(db)
+                    && let Some(paramspec_value) = partial.get(db, paramspec)
+                    && let Some(result) = try_apply_type_mapping_for_paramspec(
+                        db,
+                        self_signature,
+                        prefix_parameters,
+                        paramspec_value,
+                        type_mapping,
+                        tcx,
+                        visitor,
+                    )
+                {
+                    return result;
+                }
+            }
+            _ => {}
+        }
+
         Self::from_overloads(
             self.overloads
                 .iter()
@@ -667,10 +787,11 @@ impl<'db> Signature<'db> {
 
         let mut parameters = Parameters::new(db, parameters);
         let mut return_ty = self.return_ty;
+        let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
             let self_mapping = TypeMapping::BindSelf {
                 self_type,
-                binding_context: self.definition.map(BindingContext::Definition),
+                binding_context,
             };
             parameters = parameters.apply_type_mapping_impl(
                 db,
@@ -682,7 +803,9 @@ impl<'db> Signature<'db> {
                 .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
         }
         Self {
-            generic_context: self.generic_context,
+            generic_context: self
+                .generic_context
+                .map(|generic_context| generic_context.remove_self(db, binding_context)),
             definition: self.definition,
             parameters,
             return_ty,
@@ -1318,15 +1441,18 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Parameters<'db> {
-    // TODO: use SmallVec here once invariance bug is fixed
-    value: Vec<Parameter<'db>>,
+// TODO: the spec also allows signatures like `Concatenate[int, ...]` or `Concatenate[int, P]`,
+// which have some number of required positional-only parameters followed by a gradual form or a
+// `ParamSpec`. Our representation will need some adjustments to represent that.
 
-    /// Whether this parameter list represents a gradual form using `...` as the only parameter.
-    ///
-    /// If this is `true`, the `value` will still contain the variadic and keyword-variadic
-    /// parameters.
+/// The kind of parameter list represented.
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) enum ParametersKind<'db> {
+    /// A standard parameter list.
+    #[default]
+    Standard,
+
+    /// Represents a gradual parameter list using `...` as the only parameter.
     ///
     /// Per [the typing specification], any signature with a variadic and a keyword-variadic
     /// argument, both annotated (explicitly or implicitly) as `Any` or `Unknown`, is considered
@@ -1337,35 +1463,68 @@ pub(crate) struct Parameters<'db> {
     ///
     /// Note: This flag can also result from invalid forms of `Callable` annotations.
     ///
-    /// TODO: the spec also allows signatures like `Concatenate[int, ...]`, which have some number
-    /// of required positional parameters followed by a gradual form. Our representation will need
-    /// some adjustments to represent that.
+    /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
+    Gradual,
+
+    /// Represents a parameter list containing a `ParamSpec` as the only parameter.
     ///
-    ///   [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
-    is_gradual: bool,
+    /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
+    /// considered a standard parameter list that just contains a `ParamSpec`.
+    // TODO: Maybe we should use `find_paramspec_from_args_kwargs` instead of storing the typevar
+    // here?
+    ParamSpec(BoundTypeVarInstance<'db>),
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+pub(crate) struct Parameters<'db> {
+    // TODO: use SmallVec here once invariance bug is fixed
+    value: Vec<Parameter<'db>>,
+    kind: ParametersKind<'db>,
 }
 
 impl<'db> Parameters<'db> {
+    /// Create a new parameter list from an iterator of parameters.
+    ///
+    /// The kind of the parameter list is determined based on the provided parameters.
+    /// Specifically, if the parameters is made up of `*args` and `**kwargs` only, it checks
+    /// their annotated types to determine if they represent a gradual form or a `ParamSpec`.
     pub(crate) fn new(
-        _db: &'db dyn Db,
+        db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
         let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let is_gradual = value.len() == 2
-            && value
-                .iter()
-                .any(|p| p.is_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic()))
-            && value.iter().any(|p| {
-                p.is_keyword_variadic() && p.annotated_type().is_none_or(|ty| ty.is_dynamic())
-            });
-        Self { value, is_gradual }
+        let mut kind = ParametersKind::Standard;
+        if let [p1, p2] = value.as_slice()
+            && p1.is_variadic()
+            && p2.is_keyword_variadic()
+        {
+            match (p1.annotated_type(), p2.annotated_type()) {
+                (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                    kind = ParametersKind::Gradual;
+                }
+                (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                        args_typevar.paramspec_attr(db),
+                        kwargs_typevar.paramspec_attr(db),
+                    ) {
+                        let typevar = args_typevar.without_paramspec_attr(db);
+                        if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
+                        {
+                            kind = ParametersKind::ParamSpec(typevar);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        Self { value, kind }
     }
 
     /// Create an empty parameter list.
     pub(crate) fn empty() -> Self {
         Self {
             value: Vec::new(),
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
     }
 
@@ -1373,8 +1532,12 @@ impl<'db> Parameters<'db> {
         self.value.as_slice()
     }
 
+    pub(crate) const fn kind(&self) -> ParametersKind<'db> {
+        self.kind
+    }
+
     pub(crate) const fn is_gradual(&self) -> bool {
-        self.is_gradual
+        matches!(self.kind, ParametersKind::Gradual)
     }
 
     /// Return todo parameters: (*args: Todo, **kwargs: Todo)
@@ -1386,7 +1549,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(todo_type!("todo signature **kwargs")),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1403,7 +1566,21 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Any)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
+        }
+    }
+
+    pub(crate) fn paramspec(db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> Self {
+        Self {
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::TypeVar(
+                    typevar.with_paramspec_attr(db, ParamSpecAttrKind::Args),
+                )),
+                Parameter::keyword_variadic(Name::new_static("kwargs")).with_annotated_type(
+                    Type::TypeVar(typevar.with_paramspec_attr(db, ParamSpecAttrKind::Kwargs)),
+                ),
+            ],
+            kind: ParametersKind::ParamSpec(typevar),
         }
     }
 
@@ -1421,7 +1598,7 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::Dynamic(DynamicType::Unknown)),
             ],
-            is_gradual: true,
+            kind: ParametersKind::Gradual,
         }
     }
 
@@ -1433,8 +1610,46 @@ impl<'db> Parameters<'db> {
                 Parameter::keyword_variadic(Name::new_static("kwargs"))
                     .with_annotated_type(Type::object()),
             ],
-            is_gradual: false,
+            kind: ParametersKind::Standard,
         }
+    }
+
+    /// Returns the bound `ParamSpec` type variable if the parameters contain a `ParamSpec`.
+    pub(crate) fn find_paramspec_from_args_kwargs<'a>(
+        &'a self,
+        db: &'db dyn Db,
+    ) -> Option<(&'a [Parameter<'db>], BoundTypeVarInstance<'db>)> {
+        let [prefix @ .., maybe_args, maybe_kwargs] = self.value.as_slice() else {
+            return None;
+        };
+
+        if !maybe_args.is_variadic() || !maybe_kwargs.is_keyword_variadic() {
+            return None;
+        }
+
+        let (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) =
+            (maybe_args.annotated_type()?, maybe_kwargs.annotated_type()?)
+        else {
+            return None;
+        };
+
+        if matches!(
+            (
+                args_typevar.paramspec_attr(db),
+                kwargs_typevar.paramspec_attr(db)
+            ),
+            (
+                Some(ParamSpecAttrKind::Args),
+                Some(ParamSpecAttrKind::Kwargs)
+            )
+        ) {
+            let typevar = args_typevar.without_paramspec_attr(db);
+            if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db)) {
+                return Some((prefix, typevar));
+            }
+        }
+
+        None
     }
 
     fn from_parameters(
@@ -1624,13 +1839,13 @@ impl<'db> Parameters<'db> {
             // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
             // so the "top" materialization here is the bottom materialization of the whole Signature.
             // It might make sense to flip the materialization here instead.
-            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
                 Parameters::object()
             }
             // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
             // The bottom materialization is not currently representable and implementing it
             // properly requires extending the Parameters struct.
-            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual => {
+            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
                 Parameters::empty()
             }
             _ => Self {
@@ -1639,7 +1854,7 @@ impl<'db> Parameters<'db> {
                     .iter()
                     .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
                     .collect(),
-                is_gradual: self.is_gradual,
+                kind: self.kind,
             },
         }
     }
@@ -2077,7 +2292,7 @@ impl<'db> Parameter<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum ParameterKind<'db> {
+pub enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly {
         /// Parameter name.

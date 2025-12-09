@@ -4557,6 +4557,7 @@ dependencies = [
  "anyhow",
  "camino",
  "colored 3.0.0",
+ "dunce",
  "insta",
  "memchr",
  "path-slash",

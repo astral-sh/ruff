@@ -25,7 +25,6 @@ expression: code_actions
         },
         "source": "ty",
         "message": "Unused `ty: ignore` directive",
-        "relatedInformation": [],
         "tags": [
           1
         ]
@@ -74,7 +73,6 @@ expression: code_actions
         },
         "source": "ty",
         "message": "Unused `ty: ignore` directive",
-        "relatedInformation": [],
         "tags": [
           1
         ]

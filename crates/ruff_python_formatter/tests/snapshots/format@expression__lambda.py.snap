@@ -709,6 +709,28 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
     # comment 4
     1
 )
+
+(
+    lambda
+    * # comment 2
+    x:
+    x
+)
+
+(
+    lambda # comment 1
+    * # comment 2
+    x:
+    x
+)
+
+(
+    lambda # comment 1
+    y,
+    * # comment 2
+    x:
+    x
+)
 ```
 
 ## Output
@@ -844,7 +866,8 @@ lambda a, /, c: a
 (
     lambda
     # comment
-    *x, **y: x
+    *x,
+    **y: x
 )
 
 (
@@ -857,8 +880,7 @@ lambda a, /, c: a
 )
 
 (
-    lambda
-    # comment 1
+    lambda  # comment 1
     *x:  # comment 2
     # comment 3
     x
@@ -906,8 +928,7 @@ lambda: (  # comment
 )
 
 (
-    lambda
-    # 1
+    lambda  # 1
     # 2
     x:  # 3
     # 4
@@ -917,8 +938,7 @@ lambda: (  # comment
 )
 
 (
-    lambda
-    # 1
+    lambda  # 1
     # 2
     x,  # 3
     # 4
@@ -1356,35 +1376,32 @@ x = (
 (
     lambda
     # comment
+    *args,
+    **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment
     *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
     + 1
 )
 
 (
-    lambda
-    # comment
-    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
-    + 1
-)
-
-(
-    lambda
-    # comment 1
+    lambda  # comment 1
     # comment 2
+    *args,
+    **kwargs:  # comment 3
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment 1
     *args, **kwargs:  # comment 3
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 )
 
 (
-    lambda
-    # comment 1
-    *args, **kwargs:  # comment 3
-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-)
-
-(
-    lambda
-    # 1
+    lambda  # 1
     # 2
     left,  # 3
     # 4
@@ -1460,6 +1477,23 @@ transform = (
     # comment 3
     # comment 4
     1
+)
+
+(
+    lambda *x:  # comment 2
+    x
+)
+
+(
+    lambda  # comment 1
+    *x:  # comment 2
+    x
+)
+
+(
+    lambda  # comment 1
+    y, *x:  # comment 2
+    x
 )
 ```
 
@@ -1556,7 +1590,7 @@ transform = (
  )
  
  (
-@@ -135,18 +119,17 @@
+@@ -136,17 +120,18 @@
  (
      lambda
      # comment 1
@@ -1572,18 +1606,17 @@ transform = (
  )
  
  (
--    lambda
--    # comment 1
+     lambda  # comment 1
 -    *x:  # comment 2
 -    # comment 3
 -    x
-+    lambda *x: (  # comment 1  # comment 2  # comment 3
++    *x: (  # comment 2  # comment 3
 +        x
 +    )
  )
  
  lambda *x: x
-@@ -162,54 +145,58 @@
+@@ -162,30 +147,34 @@
  )
  
  (
@@ -1630,11 +1663,9 @@ transform = (
          x
      )
  )
- 
+@@ -193,11 +182,12 @@
  (
--    lambda
--    # 1
-+    lambda  # 1
+     lambda  # 1
      # 2
 -    x:  # 3
 -    # 4
@@ -1650,9 +1681,7 @@ transform = (
  )
  
  (
--    lambda
--    # 1
-+    lambda  # 1
+@@ -205,9 +195,10 @@
      # 2
      x,  # 3
      # 4
@@ -1666,7 +1695,7 @@ transform = (
  )
  
  (
-@@ -221,71 +208,79 @@
+@@ -219,71 +210,79 @@
  
  # Leading
  lambda x: (
@@ -1805,7 +1834,7 @@ transform = (
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -294,9 +289,9 @@
+@@ -292,9 +291,9 @@
          c,
          d,
          e,
@@ -1818,7 +1847,7 @@ transform = (
      )
  
  
-@@ -305,15 +300,9 @@
+@@ -303,15 +302,9 @@
          c,
          d,
          e,
@@ -1837,7 +1866,7 @@ transform = (
          g=10,
      )
  
-@@ -323,9 +312,9 @@
+@@ -321,9 +314,9 @@
          c,
          d,
          e,
@@ -1850,7 +1879,7 @@ transform = (
      )
  
  
-@@ -341,9 +330,9 @@
+@@ -339,9 +332,9 @@
  
  class C:
      function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
@@ -1863,7 +1892,7 @@ transform = (
      }
  
  
-@@ -355,42 +344,40 @@
+@@ -353,42 +346,40 @@
  def foo():
      if True:
          if True:
@@ -1922,7 +1951,7 @@ transform = (
          CREATE TABLE {table} AS
          SELECT ROW_NUMBER() OVER () AS id, {var}
          FROM (
-@@ -405,18 +392,19 @@
+@@ -403,18 +394,19 @@
  long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
      # 1
      # 2
@@ -1949,7 +1978,7 @@ transform = (
  )
  
  very_long_variable_name_x, very_long_variable_name_y = (
-@@ -424,8 +412,8 @@
+@@ -422,8 +414,8 @@
      lambda b: b * another_very_long_expression_here,
  )
  
@@ -1960,7 +1989,7 @@ transform = (
          x, more_args, additional_parameters
      )
  )
-@@ -461,12 +449,12 @@
+@@ -459,12 +451,12 @@
      [
          # Not fluent
          param(
@@ -1975,7 +2004,7 @@ transform = (
          ),
          param(
              lambda left, right: (
-@@ -475,9 +463,9 @@
+@@ -473,9 +465,9 @@
          ),
          param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
          param(
@@ -1988,7 +2017,7 @@ transform = (
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -511,16 +499,18 @@
+@@ -509,16 +501,18 @@
  ]
  
  # adds parentheses around the body
@@ -2010,7 +2039,7 @@ transform = (
  
  lambda x, y, z: (
      x + y + z
-@@ -531,7 +521,7 @@
+@@ -529,7 +523,7 @@
      x + y + z  # trailing eol body
  )
  
@@ -2019,7 +2048,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -543,21 +533,23 @@
+@@ -541,21 +535,23 @@
  )
  
  (
@@ -2053,7 +2082,7 @@ transform = (
      # dangling header comment
      source_bucket
      if name == source_bucket_name
-@@ -565,8 +557,7 @@
+@@ -563,8 +559,7 @@
  )
  
  (
@@ -2063,7 +2092,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -574,61 +565,70 @@
+@@ -572,61 +567,70 @@
  )
  
  (
@@ -2166,10 +2195,10 @@ transform = (
  )
  
  (
-@@ -641,51 +641,50 @@
+@@ -645,22 +649,25 @@
+ 
  (
-     lambda
-     # comment
+     lambda  # comment
 -    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
 -    + 1
 +    *args, **kwargs: (
@@ -2178,20 +2207,18 @@ transform = (
  )
  
  (
--    lambda
--    # comment
--    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
--    + 1
-+    lambda *args, **kwargs: (  # comment
+     lambda  # comment 1
+     # comment 2
+     *args,
+-    **kwargs:  # comment 3
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
++    **kwargs: (  # comment 3
 +        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 +    )
  )
  
  (
--    lambda
--    # comment 1
-+    lambda  # comment 1
-     # comment 2
+     lambda  # comment 1
 -    *args, **kwargs:  # comment 3
 -    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 +    *args, **kwargs: (  # comment 3
@@ -2200,19 +2227,7 @@ transform = (
  )
  
  (
--    lambda
--    # comment 1
--    *args, **kwargs:  # comment 3
--    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-+    lambda *args, **kwargs: (  # comment 1  # comment 3
-+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-+    )
- )
- 
- (
--    lambda
--    # 1
-+    lambda  # 1
+@@ -668,19 +675,20 @@
      # 2
      left,  # 3
      # 4
@@ -2243,7 +2258,7 @@ transform = (
          )
      )
  )
-@@ -703,46 +702,50 @@
+@@ -698,63 +706,70 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
@@ -2316,6 +2331,32 @@ transform = (
 +        # comment 3
 +        # comment 4
 +        1
++    )
+ )
+ 
+ (
+-    lambda *x:  # comment 2
+-    x
++    lambda *x: (  # comment 2
++        x
++    )
+ )
+ 
+ (
+     lambda  # comment 1
+-    *x:  # comment 2
+-    x
++    *x: (  # comment 2
++        x
++    )
+ )
+ 
+ (
+     lambda  # comment 1
+-    y, *x:  # comment 2
+-    x
++    y, *x: (  # comment 2
++        x
 +    )
  )
 ```

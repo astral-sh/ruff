@@ -3010,6 +3010,31 @@ class Bar(Protocol[S]):
 z: S | Bar[S]
 ```
 
+### Recursive generic protocols with growing specializations
+
+This snippet caused a stack overflow in <https://github.com/astral-sh/ty/issues/1736> because the
+type parameter grows with each recursive call (`C[set[T]]` leads to `C[set[set[T]]]`, then
+`C[set[set[set[T]]]]`, etc.):
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class C[T](Protocol):
+    a: "C[set[T]]"
+
+def takes_c(c: C[set[int]]) -> None: ...
+def f(c: C[int]) -> None:
+    # The key thing is that we don't stack overflow while checking this.
+    # The cycle detection assumes compatibility when it detects potential
+    # infinite recursion between protocol specializations.
+    takes_c(c)
+```
+
 ### Recursive legacy generic protocol
 
 ```py
@@ -3184,14 +3209,9 @@ from ty_extensions import reveal_protocol_interface
 reveal_protocol_interface(Foo)
 ```
 
-## Known panics
+## Protocols generic over TypeVars bound to forward references
 
-### Protocols generic over TypeVars bound to forward references
-
-This test currently panics because the `ClassLiteral::explicit_bases` query fails to converge. See
-issue <https://github.com/astral-sh/ty/issues/1587>.
-
-<!-- expect-panic: execute: too many cycle iterations -->
+Protocols can have TypeVars with forward reference bounds that form cycles.
 
 ```py
 from typing import Any, Protocol, TypeVar
@@ -3209,6 +3229,19 @@ class A2(Protocol[T2]):
 
 class B1(A1[T3], Protocol[T3]): ...
 class B2(A2[T4], Protocol[T4]): ...
+
+# TODO should just be `B2[Any]`
+reveal_type(T3.__bound__)  # revealed: B2[Any] | @Todo(specialized non-generic class)
+
+# TODO error: [invalid-type-arguments]
+def f(x: B1[int]):
+    pass
+
+reveal_type(T4.__bound__)  # revealed: B1[Any]
+
+# error: [invalid-type-arguments]
+def g(x: B2[int]):
+    pass
 ```
 
 ## TODO

@@ -3,19 +3,21 @@ use ruff_python_ast as ast;
 
 use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
+use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
     self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
+use crate::types::generics::bind_typevar;
 use crate::types::infer::builder::InnerExpressionInferenceState;
-use crate::types::signatures::{Parameter, Parameters, Signature};
+use crate::types::signatures::Signature;
 use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
-use crate::types::visitor::any_over_type;
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, SpecialFormType, SubclassOfType, Type, TypeAliasType,
-    TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
+    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType,
+    any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -821,7 +823,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
         )
     }
 
-    fn infer_subscript_type_expression(
+    pub(super) fn infer_subscript_type_expression(
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
@@ -1170,7 +1172,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                     .in_type_expression(db, self.scope(), None)
                     .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
-                self.store_expression_type(arguments_slice, ty);
+                // Only store on the tuple slice; non-tuple cases are handled by
+                // `infer_subscript_load_impl` via `infer_expression`.
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, ty);
+                }
                 ty
             }
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {
@@ -1749,21 +1755,22 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // `Callable[]`.
                     return None;
                 }
-                if any_over_type(
-                    self.db(),
-                    self.infer_name_load(name),
-                    &|ty| match ty {
-                        Type::KnownInstance(known_instance) => {
-                            known_instance.class(self.db()) == KnownClass::ParamSpec
-                        }
-                        Type::NominalInstance(nominal) => {
-                            nominal.has_known_class(self.db(), KnownClass::ParamSpec)
-                        }
-                        _ => false,
-                    },
-                    true,
-                ) {
-                    return Some(Parameters::todo());
+                let name_ty = self.infer_name_load(name);
+                if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = name_ty
+                    && typevar.is_paramspec(self.db())
+                {
+                    let index = semantic_index(self.db(), self.scope().file(self.db()));
+                    let Some(bound_typevar) = bind_typevar(
+                        self.db(),
+                        index,
+                        self.scope().file_scope_id(self.db()),
+                        self.typevar_binding_context,
+                        typevar,
+                    ) else {
+                        // TODO: What to do here?
+                        return None;
+                    };
+                    return Some(Parameters::paramspec(self.db(), bound_typevar));
                 }
             }
             _ => {}
