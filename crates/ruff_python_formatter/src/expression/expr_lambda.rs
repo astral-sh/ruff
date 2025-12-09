@@ -32,6 +32,60 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
             if dangling_before_parameters.is_empty() {
+                // If the first parameter has a leading comment, insert a hard line break. This
+                // comment is associated as a leading comment on the first parameter:
+                //
+                // ```py
+                // (
+                //     lambda
+                //     * # comment
+                //     x:
+                //     x
+                // )
+                // ```
+                //
+                // so a hard line break is needed to avoid formatting it like:
+                //
+                // ```py
+                // (
+                //     lambda # comment
+                //     *x: x
+                // )
+                // ```
+                //
+                // which is unstable because it's missing the second space before the comment.
+                //
+                // Inserting the line break causes it to format like:
+                //
+                // ```py
+                // (
+                //     lambda
+                //     # comment
+                //     *x :x
+                // )
+                // ```
+                //
+                // which is also consistent with the formatting in the presence of an actual
+                // dangling comment on the lambda:
+                //
+                // ```py
+                // (
+                //     lambda # comment 1
+                //     * # comment 2
+                //     x:
+                //     x
+                // )
+                // ```
+                //
+                // formats to:
+                //
+                // ```py
+                // (
+                //     lambda  # comment 1
+                //     # comment 2
+                //     *x: x
+                // )
+                // ```
                 if parameters
                     .iter()
                     .next()
