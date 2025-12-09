@@ -202,11 +202,16 @@ impl<'a> ProjectFilesWalker<'a> {
                             }
                         } else {
                             // Ignore any non python files to avoid creating too many entries in `Files`.
-                            if entry
-                                .path()
-                                .extension()
-                                .and_then(PySourceType::try_from_extension)
-                                .is_none()
+                            // Unless the file is explicitly passed, we then always assume it's a python file.
+                            let source_type = entry.path().extension().and_then(PySourceType::try_from_extension).or_else(|| {
+                                if entry.depth() == 0 {
+                                    Some(PySourceType::Python)
+                                } else {
+                                    db.system().source_type(entry.path())
+                                }
+                            });
+
+                            if source_type.is_none()
                             {
                                 return WalkState::Continue;
                             }
