@@ -1,16 +1,16 @@
 use crate::db::{Db, ProjectDatabase};
 use crate::metadata::options::ProjectOptionsOverrides;
-use crate::walk::ProjectFilesWalker;
 use crate::watch::{ChangeEvent, CreatedKind, DeletedKind};
 use crate::{Project, ProjectMetadata};
+use std::collections::BTreeSet;
 
+use crate::walk::ProjectFilesWalker;
 use ruff_db::Db as _;
 use ruff_db::file_revision::FileRevision;
 use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
-use std::collections::BTreeSet;
 use ty_python_semantic::Program;
 
 /// Represents the result of applying changes to the project database.
@@ -91,7 +91,6 @@ impl ProjectDatabase {
                         let absolute =
                             SystemPath::absolute(&path, self.system().current_directory());
                         File::sync_path_only(self, &absolute);
-
                         if let Some(root) = self.files().root(self, &absolute) {
                             match root.kind_at_time_of_creation(self) {
                                 // When a file inside the root of
