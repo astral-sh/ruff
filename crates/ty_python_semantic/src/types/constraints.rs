@@ -3449,9 +3449,7 @@ mod tests {
                 │   └─₀ (U = bool)
                 │       ┡━₁ always
                 │       └─₀ never
-                └─₀ (U = str)
-                    ┡━₁ never
-                    └─₀ never
+                └─₀ never
         "#}
         .trim_end();
 
