@@ -289,12 +289,7 @@ impl Workspace {
     pub fn comments(&self, contents: &str) -> Result<String, Error> {
         let parsed = ParsedModule::from_source(contents)?;
         let comment_ranges = CommentRanges::from(parsed.parsed.tokens());
-        let comments = pretty_comments(
-            parsed.parsed.syntax(),
-            &comment_ranges,
-            contents,
-            self.settings.formatter.preview,
-        );
+        let comments = pretty_comments(parsed.parsed.syntax(), &comment_ranges, contents);
         Ok(comments)
     }
 

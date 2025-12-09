@@ -1,8 +1,7 @@
 use ast::helpers::comment_indentation_after;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{
-    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, ParameterWithDefault,
-    Parameters, StringLike,
+    self as ast, AnyNodeRef, Comprehension, Expr, ModModule, Parameter, Parameters, StringLike,
 };
 use ruff_python_trivia::{
     BackwardsTokenizer, CommentRanges, SimpleToken, SimpleTokenKind, SimpleTokenizer,
@@ -12,7 +11,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
 
-use crate::PreviewMode;
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
@@ -26,12 +24,11 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
-    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     handle_parenthesized_comment(comment, source)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source))
-        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source, preview))
+        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -196,7 +193,6 @@ fn handle_enclosed_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
-    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
         AnyNodeRef::Parameters(parameters) => {
@@ -209,9 +205,6 @@ fn handle_enclosed_comment<'a>(
             })
         }
         AnyNodeRef::Parameter(parameter) => handle_parameter_comment(comment, parameter, source),
-        AnyNodeRef::ParameterWithDefault(parameter) => {
-            handle_parameter_with_default_comment(comment, parameter, source)
-        }
         AnyNodeRef::Arguments(_) | AnyNodeRef::TypeParams(_) | AnyNodeRef::PatternArguments(_) => {
             handle_bracketed_end_of_line_comment(comment, source)
         }
@@ -238,7 +231,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
         AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, source),
-        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source, preview),
+        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source))
             .or_else(|comment| handle_key_value_comment(comment, source)),
@@ -871,60 +864,16 @@ fn handle_parameter_comment<'a>(
 
         assert_eq!(colon.kind(), SimpleTokenKind::Colon);
 
-        return if comment.start() < colon.start() {
+        if comment.start() < colon.start() {
             // The comment is before the colon, pull it out and make it a leading comment of the parameter.
             CommentPlacement::leading(parameter, comment)
         } else {
             CommentPlacement::Default(comment)
-        };
-    }
-
-    // If the comment falls before the parameter, and the grandparent node is a lambda (the
-    // parent node is always `Parameters`), make the comment a dangling lambda parameter, so
-    // that it can be formatted with the other dangling lambda comments in the lambda header.
-    //
-    // This is especially important for niche cases like:
-    //
-    // ```py
-    // (
-    //     lambda # comment 1
-    //     * # comment 2
-    //     x: # comment 3
-    //     x
-    // )
-    // ```
-    //
-    // where `# comment 2` otherwise becomes a leading comment on `*x` in the first format and a
-    // dangling comment on the lambda in the second. Instead, make it a dangling comment on the
-    // enclosing lambda from the start.
-    match comment.enclosing_grandparent() {
-        Some(AnyNodeRef::ExprLambda(lambda)) => return CommentPlacement::dangling(lambda, comment),
-        Some(AnyNodeRef::StmtExpr(ast::StmtExpr { value, .. })) if value.is_lambda_expr() => {
-            return CommentPlacement::dangling(&**value, comment);
         }
-        _ => {}
-    }
-
-    if comment.start() < parameter.name.start() {
+    } else if comment.start() < parameter.name.start() {
         CommentPlacement::leading(parameter, comment)
     } else {
         CommentPlacement::Default(comment)
-    }
-}
-
-/// Handles parameters with defaults inside of lambda expressions by making them dangling comments
-/// on the lambda itself.
-fn handle_parameter_with_default_comment<'a>(
-    comment: DecoratedComment<'a>,
-    _parameter: &'a ParameterWithDefault,
-    _source: &str,
-) -> CommentPlacement<'a> {
-    match comment.enclosing_grandparent() {
-        Some(AnyNodeRef::ExprLambda(lambda)) => CommentPlacement::dangling(lambda, comment),
-        Some(AnyNodeRef::StmtExpr(ast::StmtExpr { value, .. })) if value.is_lambda_expr() => {
-            CommentPlacement::dangling(&**value, comment)
-        }
-        _ => CommentPlacement::Default(comment),
     }
 }
 
@@ -1865,7 +1814,6 @@ fn handle_lambda_comment<'a>(
     comment: DecoratedComment<'a>,
     lambda: &'a ast::ExprLambda,
     source: &str,
-    _preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     if let Some(parameters) = lambda.parameters.as_deref() {
         // End-of-line comments between the `lambda` and the parameters are dangling on the lambda:

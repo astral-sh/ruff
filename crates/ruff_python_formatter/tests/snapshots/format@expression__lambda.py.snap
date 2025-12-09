@@ -894,16 +894,16 @@ lambda a, /, c: a
 (
     lambda
     # comment 1
-    *x:
     # comment 2
+    *x:
     # comment 3
     x
 )
 
 (
     lambda  # comment 1
-    *x:  # comment 2
-    # comment 3
+    # comment 2
+    *x:  # comment 3
     x
 )
 
@@ -1500,20 +1500,22 @@ transform = (
 )
 
 (
-    lambda *x:  # comment 2
-    x
+    lambda
+    # comment 2
+    *x: x
 )
 
 (
     lambda  # comment 1
-    *x:  # comment 2
-    x
+    # comment 2
+    *x: x
 )
 
 (
     lambda  # comment 1
-    y, *x:  # comment 2
-    x
+    y,
+    # comment 2
+    *x: x
 )
 
 (
@@ -1523,13 +1525,15 @@ transform = (
 )
 
 (
-    lambda *x, **y:  # comment 2
-    x
+    lambda
+    # comment 2
+    *x, **y: x
 )
 
 (
-    lambda **x:  # comment 1
-    x
+    lambda
+    # comment 1
+    **x: x
 )
 ```
 
@@ -1626,16 +1630,14 @@ transform = (
  )
  
  (
-@@ -135,17 +119,18 @@
- (
+@@ -136,16 +120,18 @@
      lambda
      # comment 1
+     # comment 2
 -    *x:
--    # comment 2
 -    # comment 3
 -    x
 +    *x: (
-+        # comment 2
 +        # comment 3
 +        x
 +    )
@@ -1643,16 +1645,16 @@ transform = (
  
  (
      lambda  # comment 1
--    *x:  # comment 2
--    # comment 3
+     # comment 2
+-    *x:  # comment 3
 -    x
-+    *x: (  # comment 2  # comment 3
++    *x: (  # comment 3
 +        x
 +    )
  )
  
  lambda *x: x
-@@ -161,30 +146,34 @@
+@@ -161,30 +147,34 @@
  )
  
  (
@@ -1699,7 +1701,7 @@ transform = (
          x
      )
  )
-@@ -192,11 +181,12 @@
+@@ -192,11 +182,12 @@
  (
      lambda  # 1
      # 2
@@ -1717,7 +1719,7 @@ transform = (
  )
  
  (
-@@ -204,9 +194,10 @@
+@@ -204,9 +195,10 @@
      # 2
      x,  # 3
      # 4
@@ -1731,7 +1733,7 @@ transform = (
  )
  
  (
-@@ -218,71 +209,79 @@
+@@ -218,71 +210,79 @@
  
  # Leading
  lambda x: (
@@ -1870,7 +1872,7 @@ transform = (
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -291,9 +290,9 @@
+@@ -291,9 +291,9 @@
          c,
          d,
          e,
@@ -1883,7 +1885,7 @@ transform = (
      )
  
  
-@@ -302,15 +301,9 @@
+@@ -302,15 +302,9 @@
          c,
          d,
          e,
@@ -1902,7 +1904,7 @@ transform = (
          g=10,
      )
  
-@@ -320,9 +313,9 @@
+@@ -320,9 +314,9 @@
          c,
          d,
          e,
@@ -1915,7 +1917,7 @@ transform = (
      )
  
  
-@@ -338,9 +331,9 @@
+@@ -338,9 +332,9 @@
  
  class C:
      function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
@@ -1928,7 +1930,7 @@ transform = (
      }
  
  
-@@ -352,42 +345,40 @@
+@@ -352,42 +346,40 @@
  def foo():
      if True:
          if True:
@@ -1987,7 +1989,7 @@ transform = (
          CREATE TABLE {table} AS
          SELECT ROW_NUMBER() OVER () AS id, {var}
          FROM (
-@@ -402,18 +393,19 @@
+@@ -402,18 +394,19 @@
  long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
      # 1
      # 2
@@ -2014,7 +2016,7 @@ transform = (
  )
  
  very_long_variable_name_x, very_long_variable_name_y = (
-@@ -421,8 +413,8 @@
+@@ -421,8 +414,8 @@
      lambda b: b * another_very_long_expression_here,
  )
  
@@ -2025,7 +2027,7 @@ transform = (
          x, more_args, additional_parameters
      )
  )
-@@ -458,12 +450,12 @@
+@@ -458,12 +451,12 @@
      [
          # Not fluent
          param(
@@ -2040,7 +2042,7 @@ transform = (
          ),
          param(
              lambda left, right: (
-@@ -472,9 +464,9 @@
+@@ -472,9 +465,9 @@
          ),
          param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
          param(
@@ -2053,7 +2055,7 @@ transform = (
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -508,16 +500,18 @@
+@@ -508,16 +501,18 @@
  ]
  
  # adds parentheses around the body
@@ -2075,7 +2077,7 @@ transform = (
  
  lambda x, y, z: (
      x + y + z
-@@ -528,7 +522,7 @@
+@@ -528,7 +523,7 @@
      x + y + z  # trailing eol body
  )
  
@@ -2084,7 +2086,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -540,21 +534,23 @@
+@@ -540,21 +535,23 @@
  )
  
  (
@@ -2118,7 +2120,7 @@ transform = (
      # dangling header comment
      source_bucket
      if name == source_bucket_name
-@@ -562,8 +558,7 @@
+@@ -562,8 +559,7 @@
  )
  
  (
@@ -2128,7 +2130,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -571,61 +566,70 @@
+@@ -571,61 +567,70 @@
  )
  
  (
@@ -2231,7 +2233,7 @@ transform = (
  )
  
  (
-@@ -638,27 +642,31 @@
+@@ -638,27 +643,31 @@
  (
      lambda
      # comment
@@ -2271,7 +2273,7 @@ transform = (
  )
  
  (
-@@ -666,19 +674,20 @@
+@@ -666,19 +675,20 @@
      # 2
      left,  # 3
      # 4
@@ -2302,7 +2304,7 @@ transform = (
          )
      )
  )
-@@ -696,65 +705,72 @@
+@@ -696,48 +706,52 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
@@ -2379,48 +2381,4 @@ transform = (
  )
  
  (
--    lambda *x:  # comment 2
--    x
-+    lambda *x: (  # comment 2
-+        x
-+    )
- )
- 
- (
-     lambda  # comment 1
--    *x:  # comment 2
--    x
-+    *x: (  # comment 2
-+        x
-+    )
- )
- 
- (
-     lambda  # comment 1
--    y, *x:  # comment 2
--    x
-+    y, *x: (  # comment 2
-+        x
-+    )
- )
- 
- (
-@@ -764,11 +780,13 @@
- )
- 
- (
--    lambda *x, **y:  # comment 2
--    x
-+    lambda *x, **y: (  # comment 2
-+        x
-+    )
- )
- 
- (
--    lambda **x:  # comment 1
--    x
-+    lambda **x: (  # comment 1
-+        x
-+    )
- )
 ```

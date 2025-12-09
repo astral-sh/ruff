@@ -11,7 +11,6 @@ use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::PreviewMode;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentsMap, SourceComment};
@@ -85,13 +84,11 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
-            let mut parents = self.parents.iter().rev();
             let comment = DecoratedComment {
                 enclosing: enclosing_node,
                 preceding: self.preceding_node,
                 following: Some(node),
-                parent: parents.nth(1).copied(),
-                grandparent: parents.next().copied(),
+                parent: self.parents.iter().rev().nth(1).copied(),
                 line_position: CommentLinePosition::for_range(
                     *comment_range,
                     self.source_code.as_str(),
@@ -130,11 +127,9 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
                 break;
             }
 
-            let mut parents = self.parents.iter().rev();
             let comment = DecoratedComment {
                 enclosing: node,
-                parent: parents.nth(1).copied(),
-                grandparent: parents.next().copied(),
+                parent: self.parents.last().copied(),
                 preceding: self.preceding_node,
                 following: None,
                 line_position: CommentLinePosition::for_range(
@@ -186,7 +181,6 @@ pub(crate) struct DecoratedComment<'a> {
     preceding: Option<AnyNodeRef<'a>>,
     following: Option<AnyNodeRef<'a>>,
     parent: Option<AnyNodeRef<'a>>,
-    grandparent: Option<AnyNodeRef<'a>>,
     line_position: CommentLinePosition,
     slice: SourceCodeSlice,
 }
@@ -215,11 +209,6 @@ impl<'a> DecoratedComment<'a> {
     /// Returns the parent of the enclosing node, if any
     pub(super) fn enclosing_parent(&self) -> Option<AnyNodeRef<'a>> {
         self.parent
-    }
-
-    /// Returns the grandparent of the enclosing node, if any
-    pub(super) fn enclosing_grandparent(&self) -> Option<AnyNodeRef<'a>> {
-        self.grandparent
     }
 
     /// Returns the comment's preceding node.
@@ -546,12 +535,11 @@ pub(super) struct CommentsMapBuilder<'a> {
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
     source: &'a str,
-    preview: PreviewMode,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.comment_ranges, self.source, self.preview);
+        let placement = place_comment(placement, self.comment_ranges, self.source);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -613,16 +601,11 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(
-        source: &'a str,
-        comment_ranges: &'a CommentRanges,
-        preview: PreviewMode,
-    ) -> Self {
+    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
         Self {
             comments: CommentsMap::default(),
             comment_ranges,
             source,
-            preview,
         }
     }
 
