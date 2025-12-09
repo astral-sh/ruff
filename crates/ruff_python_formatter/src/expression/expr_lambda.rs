@@ -1,10 +1,13 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
-use ruff_text_size::Ranged;
+use ruff_python_trivia::SimpleTokenizer;
+use ruff_text_size::{Ranged, TextRange};
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{dangling_comments, leading_comments, trailing_comments};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
+};
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -24,6 +27,9 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             body,
         } = item;
 
+        let body = &**body;
+        let parameters = parameters.as_deref();
+
         let comments = f.context().comments().clone();
         let dangling = comments.dangling(item);
         let preview = is_parenthesize_lambda_bodies_enabled(f.context());
@@ -31,58 +37,72 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         write!(f, [token("lambda")])?;
 
         if let Some(parameters) = parameters {
-            let parameters_have_comments = comments.contains_comments(parameters.as_ref().into());
+            let parameters_have_comments = comments.contains_comments(parameters.into());
 
             // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
-            let (dangling_before_parameters, dangling_after_parameters) =
-                // To prevent an instability in cases like:
-                //
-                // ```py
-                // (
-                //     lambda # comment 1
-                //     * # comment 2
-                //     x: # comment 3
-                //     x
-                // )
-                // ```
-                //
-                // `# comment 1` and `# comment 2` also become dangling comments on the lambda, so
-                // in preview, we include these in `dangling_after_parameters`, as long as the
-                // parameter list doesn't include any additional comments.
-                //
-                // This ends up formatted as:
-                //
-                // ```py
-                // (
-                //     lambda *x: (  # comment 1  # comment 2  # comment 3
-                //         x
-                //     )
-                // )
-                // ```
-                //
-                // instead of the stable formatting:
-                //
-                // ```py
-                // (
-                //     lambda  # comment 1
-                //     *x:  # comment 2
-                //     # comment 3
-                //     x
-                // )
-                // ```
-                if preview && !parameters_have_comments {
-                    ([].as_slice(), dangling)
-                } else {
-                    dangling.split_at(
-                        dangling.partition_point(|comment| comment.end() < parameters.start()),
-                    )
-                };
+            let (dangling_before_parameters, dangling_after_parameters) = dangling
+                .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
-            if dangling_before_parameters.is_empty() {
+            let (end_of_line_lambda_keyword_comments, leading_parameter_comments) = if preview {
+                dangling_before_parameters.split_at(
+                    dangling_before_parameters
+                        .iter()
+                        .position(|comment| comment.line_position().is_own_line())
+                        .unwrap_or(dangling_before_parameters.len()),
+                )
+            } else {
+                ([].as_slice(), dangling_before_parameters)
+            };
+
+            // To prevent an instability in cases like:
+            //
+            // ```py
+            // (
+            //     lambda # comment 1
+            //     * # comment 2
+            //     x: # comment 3
+            //     x
+            // )
+            // ```
+            //
+            // `# comment 1` and `# comment 2` also become dangling comments on the lambda, so
+            // in preview, we include these in `dangling_after_parameters`, as long as the
+            // parameter list doesn't include any additional comments.
+            //
+            // This ends up formatted as:
+            //
+            // ```py
+            // (
+            //     lambda *x: (  # comment 1  # comment 2  # comment 3
+            //         x
+            //     )
+            // )
+            // ```
+            //
+            // instead of the stable formatting:
+            //
+            // ```py
+            // (
+            //     lambda  # comment 1
+            //     *x:  # comment 2
+            //     # comment 3
+            //     x
+            // )
+            // ```
+
+            trailing_comments(end_of_line_lambda_keyword_comments).fmt(f)?;
+
+            if leading_parameter_comments.is_empty() && !comments.has_leading(parameters) {
                 write!(f, [space()])?;
             } else {
-                write!(f, [dangling_comments(dangling_before_parameters)])?;
+                write!(
+                    f,
+                    [
+                        hard_line_break(),
+                        leading_comments(leading_parameter_comments)
+                    ]
+                )?;
             }
 
             // Try to keep the parameters on a single line, unless there are intervening comments.
@@ -124,12 +144,13 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 // ```
                 //
                 // and alternate between own line and end of line.
-                let (dangling_end_of_line, dangling_own_line) = dangling_after_parameters.split_at(
-                    dangling_after_parameters
-                        .iter()
-                        .position(|comment| comment.line_position().is_own_line())
-                        .unwrap_or(dangling_after_parameters.len()),
-                );
+                let (after_parameters_end_of_line, leading_body_comments) =
+                    dangling_after_parameters.split_at(
+                        dangling_after_parameters
+                            .iter()
+                            .position(|comment| comment.line_position().is_own_line())
+                            .unwrap_or(dangling_after_parameters.len()),
+                    );
 
                 let fmt_body = format_with(|f: &mut PyFormatter| {
                     write!(
@@ -137,9 +158,9 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                         [
                             space(),
                             token("("),
-                            trailing_comments(dangling_end_of_line),
+                            trailing_comments(after_parameters_end_of_line),
                             block_indent(&format_args!(
-                                leading_comments(dangling_own_line),
+                                leading_comments(leading_body_comments),
                                 body.format().with_options(Parentheses::Never)
                             )),
                             token(")")
@@ -196,7 +217,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
         }
 
         if preview {
-            let body_comments = comments.leading_dangling_trailing(&**body);
+            let body_comments = comments.leading_dangling_trailing(body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
                 // If the body has comments, we always want to preserve the parentheses. This also
                 // ensures that we correctly handle parenthesized comments, and don't need to worry
@@ -232,7 +253,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     ),
                 // )
                 // ```
-                else if matches!(&**body, Expr::Call(_) | Expr::Subscript(_)) {
+                else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
                     let unparenthesized = body.format().with_options(Parentheses::Never);
                     if CallChainLayout::from_expression(
                         body.into(),
