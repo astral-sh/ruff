@@ -241,32 +241,6 @@ impl FormatNodeRule<Parameters> for FormatParameters {
         let num_parameters = item.len();
 
         if self.parentheses == ParametersParentheses::Never {
-            // In a lambda, format any leading comments on the first parameter outside of the
-            // parameters group so that the parameters don't break. For example, format this input:
-            //
-            // ```py
-            // (
-            //     lambda
-            //     * # this becomes a leading comment on *x
-            //     x, **y:
-            //     x
-            // )
-            // ```
-            //
-            // as:
-            //
-            // ```py
-            // (
-            //     lambda
-            //     # this becomes a leading comment on *x
-            //     *x, **y: x
-            // )
-            // ```
-            if let Some(first) = item.iter().next()
-                && comments.has_leading(first.as_parameter())
-            {
-                leading_node_comments(first.as_parameter()).fmt(f)?;
-            }
             write!(f, [group(&format_inner), dangling_comments(dangling)])
         } else if num_parameters == 0 {
             let mut f = WithNodeLevel::new(NodeLevel::ParenthesizedExpression, f);
