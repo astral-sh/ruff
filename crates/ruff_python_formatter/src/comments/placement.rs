@@ -1848,7 +1848,7 @@ fn handle_lambda_comment<'a>(
         // )
         // ```
         if comment.start() < parameters.start() {
-            return if parameters.iter().next().is_some() && comment.line_position().is_own_line() {
+            return if comment.line_position().is_own_line() {
                 CommentPlacement::leading(parameters, comment)
             } else {
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
