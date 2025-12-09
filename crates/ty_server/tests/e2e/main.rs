@@ -1103,6 +1103,16 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .publish_diagnostics
+            .get_or_insert_default()
+            .related_information = Some(enabled);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
