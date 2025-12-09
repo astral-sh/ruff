@@ -865,8 +865,7 @@ fn handle_parameter_comment<'a>(
         assert_eq!(colon.kind(), SimpleTokenKind::Colon);
 
         if comment.start() < colon.start() {
-            // The comment is before the colon, pull it out and make it a leading comment of the
-            // parameter, or of the whole parameters list, if it's the first parameter.
+            // The comment is before the colon, pull it out and make it a leading comment of the parameter.
             CommentPlacement::leading(parameter, comment)
         } else {
             CommentPlacement::Default(comment)
@@ -876,6 +875,9 @@ fn handle_parameter_comment<'a>(
         // starts at the same position as the parent parameters, mark a comment before the first
         // parameter as leading on the parameters rather than the individual parameter to prevent
         // the whole parameter list from breaking.
+        //
+        // Note that this check is not needed above because lambda parameters cannot have
+        // annotations.
         if let Some(AnyNodeRef::Parameters(parameters)) = comment.enclosing_parent()
             && parameters.start() == parameter.start()
         {
