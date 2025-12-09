@@ -794,6 +794,9 @@ impl<'db> Node<'db> {
                 root_constraint.ordering(db) > constraint.ordering(db)
             })
         );
+        if if_true == Node::AlwaysFalse && if_false == Node::AlwaysFalse {
+            return Node::AlwaysFalse;
+        }
         Self::Interior(InteriorNode::new(db, constraint, if_true, if_false))
     }
 
@@ -3446,9 +3449,7 @@ mod tests {
                 │   └─₀ (U = bool)
                 │       ┡━₁ always
                 │       └─₀ never
-                └─₀ (U = str)
-                    ┡━₁ never
-                    └─₀ never
+                └─₀ never
         "#}
         .trim_end();
 
