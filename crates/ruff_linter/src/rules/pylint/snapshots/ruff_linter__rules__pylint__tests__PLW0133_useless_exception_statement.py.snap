@@ -8,8 +8,8 @@ PLW0133 [*] Missing `raise` statement on exception
 25 | def func():
 26 |     AssertionError("This is an assertion error")  # PLW0133
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-27 |     MyError("This is a custom error")  # PLW0133 (review)
-28 |     MySubError("This is a custom error")  # PLW0133 (review)
+27 |     MyError("This is a custom error")  # PLW0133
+28 |     MySubError("This is a custom error")  # PLW0133
    |
 help: Add `raise` keyword
 23 | 
@@ -17,9 +17,9 @@ help: Add `raise` keyword
 25 | def func():
    -     AssertionError("This is an assertion error")  # PLW0133
 26 +     raise AssertionError("This is an assertion error")  # PLW0133
-27 |     MyError("This is a custom error")  # PLW0133 (review)
-28 |     MySubError("This is a custom error")  # PLW0133 (review)
-29 |     MyValueError("This is a custom value error")  # PLW0133 (review)
+27 |     MyError("This is a custom error")  # PLW0133
+28 |     MySubError("This is a custom error")  # PLW0133
+29 |     MyValueError("This is a custom value error")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -29,8 +29,8 @@ PLW0133 [*] Missing `raise` statement on exception
 34 |     try:
 35 |         Exception("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-36 |         MyError("This is an exception")  # PLW0133 (review)
-37 |         MySubError("This is an exception")  # PLW0133 (review)
+36 |         MyError("This is an exception")  # PLW0133
+37 |         MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 32 | # Test case 2: Useless exception statement in try-except block
@@ -38,9 +38,9 @@ help: Add `raise` keyword
 34 |     try:
    -         Exception("This is an exception")  # PLW0133
 35 +         raise Exception("This is an exception")  # PLW0133
-36 |         MyError("This is an exception")  # PLW0133 (review)
-37 |         MySubError("This is an exception")  # PLW0133 (review)
-38 |         MyValueError("This is an exception")  # PLW0133 (review)
+36 |         MyError("This is an exception")  # PLW0133
+37 |         MySubError("This is an exception")  # PLW0133
+38 |         MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -50,8 +50,8 @@ PLW0133 [*] Missing `raise` statement on exception
 45 |     if True:
 46 |         RuntimeError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-47 |         MyError("This is an exception")  # PLW0133 (review)
-48 |         MySubError("This is an exception")  # PLW0133 (review)
+47 |         MyError("This is an exception")  # PLW0133
+48 |         MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 43 | # Test case 3: Useless exception statement in if statement
@@ -59,9 +59,9 @@ help: Add `raise` keyword
 45 |     if True:
    -         RuntimeError("This is an exception")  # PLW0133
 46 +         raise RuntimeError("This is an exception")  # PLW0133
-47 |         MyError("This is an exception")  # PLW0133 (review)
-48 |         MySubError("This is an exception")  # PLW0133 (review)
-49 |         MyValueError("This is an exception")  # PLW0133 (review)
+47 |         MyError("This is an exception")  # PLW0133
+48 |         MySubError("This is an exception")  # PLW0133
+49 |         MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -71,8 +71,8 @@ PLW0133 [*] Missing `raise` statement on exception
 55 |         def __init__(self):
 56 |             TypeError("This is an exception")  # PLW0133
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-57 |             MyError("This is an exception")  # PLW0133 (review)
-58 |             MySubError("This is an exception")  # PLW0133 (review)
+57 |             MyError("This is an exception")  # PLW0133
+58 |             MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 53 | def func():
@@ -80,9 +80,9 @@ help: Add `raise` keyword
 55 |         def __init__(self):
    -             TypeError("This is an exception")  # PLW0133
 56 +             raise TypeError("This is an exception")  # PLW0133
-57 |             MyError("This is an exception")  # PLW0133 (review)
-58 |             MySubError("This is an exception")  # PLW0133 (review)
-59 |             MyValueError("This is an exception")  # PLW0133 (review)
+57 |             MyError("This is an exception")  # PLW0133
+58 |             MySubError("This is an exception")  # PLW0133
+59 |             MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -92,8 +92,8 @@ PLW0133 [*] Missing `raise` statement on exception
 64 |     def inner():
 65 |         IndexError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-66 |         MyError("This is an exception")  # PLW0133 (review)
-67 |         MySubError("This is an exception")  # PLW0133 (review)
+66 |         MyError("This is an exception")  # PLW0133
+67 |         MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 62 | # Test case 5: Useless exception statement in function
@@ -101,9 +101,9 @@ help: Add `raise` keyword
 64 |     def inner():
    -         IndexError("This is an exception")  # PLW0133
 65 +         raise IndexError("This is an exception")  # PLW0133
-66 |         MyError("This is an exception")  # PLW0133 (review)
-67 |         MySubError("This is an exception")  # PLW0133 (review)
-68 |         MyValueError("This is an exception")  # PLW0133 (review)
+66 |         MyError("This is an exception")  # PLW0133
+67 |         MySubError("This is an exception")  # PLW0133
+68 |         MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -113,8 +113,8 @@ PLW0133 [*] Missing `raise` statement on exception
 75 |     while True:
 76 |         KeyError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-77 |         MyError("This is an exception")  # PLW0133 (review)
-78 |         MySubError("This is an exception")  # PLW0133 (review)
+77 |         MyError("This is an exception")  # PLW0133
+78 |         MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 73 | # Test case 6: Useless exception statement in while loop
@@ -122,9 +122,9 @@ help: Add `raise` keyword
 75 |     while True:
    -         KeyError("This is an exception")  # PLW0133
 76 +         raise KeyError("This is an exception")  # PLW0133
-77 |         MyError("This is an exception")  # PLW0133 (review)
-78 |         MySubError("This is an exception")  # PLW0133 (review)
-79 |         MyValueError("This is an exception")  # PLW0133 (review)
+77 |         MyError("This is an exception")  # PLW0133
+78 |         MySubError("This is an exception")  # PLW0133
+79 |         MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -134,8 +134,8 @@ PLW0133 [*] Missing `raise` statement on exception
 86 |         def method(self):
 87 |             NotImplementedError("This is an exception")  # PLW0133
    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-88 |             MyError("This is an exception")  # PLW0133 (review)
-89 |             MySubError("This is an exception")  # PLW0133 (review)
+88 |             MyError("This is an exception")  # PLW0133
+89 |             MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 84 |     class Class(ABC):
@@ -143,9 +143,9 @@ help: Add `raise` keyword
 86 |         def method(self):
    -             NotImplementedError("This is an exception")  # PLW0133
 87 +             raise NotImplementedError("This is an exception")  # PLW0133
-88 |             MyError("This is an exception")  # PLW0133 (review)
-89 |             MySubError("This is an exception")  # PLW0133 (review)
-90 |             MyValueError("This is an exception")  # PLW0133 (review)
+88 |             MyError("This is an exception")  # PLW0133
+89 |             MySubError("This is an exception")  # PLW0133
+90 |             MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -155,8 +155,8 @@ PLW0133 [*] Missing `raise` statement on exception
 95 |     with suppress(Exception):
 96 |         AttributeError("This is an exception")  # PLW0133
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-97 |         MyError("This is an exception")  # PLW0133 (review)
-98 |         MySubError("This is an exception")  # PLW0133 (review)
+97 |         MyError("This is an exception")  # PLW0133
+98 |         MySubError("This is an exception")  # PLW0133
    |
 help: Add `raise` keyword
 93 | # Test case 8: Useless exception statement inside context manager
@@ -164,9 +164,9 @@ help: Add `raise` keyword
 95 |     with suppress(Exception):
    -         AttributeError("This is an exception")  # PLW0133
 96 +         raise AttributeError("This is an exception")  # PLW0133
-97 |         MyError("This is an exception")  # PLW0133 (review)
-98 |         MySubError("This is an exception")  # PLW0133 (review)
-99 |         MyValueError("This is an exception")  # PLW0133 (review)
+97 |         MyError("This is an exception")  # PLW0133
+98 |         MySubError("This is an exception")  # PLW0133
+99 |         MyValueError("This is an exception")  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -176,8 +176,8 @@ PLW0133 [*] Missing `raise` statement on exception
 103 | def func():
 104 |     (RuntimeError("This is an exception"))  # PLW0133
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-105 |     (MyError("This is an exception"))  # PLW0133 (review)
-106 |     (MySubError("This is an exception"))  # PLW0133 (review)
+105 |     (MyError("This is an exception"))  # PLW0133
+106 |     (MySubError("This is an exception"))  # PLW0133
     |
 help: Add `raise` keyword
 101 | 
@@ -185,9 +185,9 @@ help: Add `raise` keyword
 103 | def func():
     -     (RuntimeError("This is an exception"))  # PLW0133
 104 +     raise (RuntimeError("This is an exception"))  # PLW0133
-105 |     (MyError("This is an exception"))  # PLW0133 (review)
-106 |     (MySubError("This is an exception"))  # PLW0133 (review)
-107 |     (MyValueError("This is an exception"))  # PLW0133 (review)
+105 |     (MyError("This is an exception"))  # PLW0133
+106 |     (MySubError("This is an exception"))  # PLW0133
+107 |     (MyValueError("This is an exception"))  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -197,8 +197,8 @@ PLW0133 [*] Missing `raise` statement on exception
 111 | def func():
 112 |     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-113 |     x = 1; (MyError("This is an exception")); y = 2  # PLW0133 (review)
-114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133 (review)
+113 |     x = 1; (MyError("This is an exception")); y = 2  # PLW0133
+114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
     |
 help: Add `raise` keyword
 109 | 
@@ -206,9 +206,9 @@ help: Add `raise` keyword
 111 | def func():
     -     x = 1; (RuntimeError("This is an exception")); y = 2  # PLW0133
 112 +     x = 1; raise (RuntimeError("This is an exception")); y = 2  # PLW0133
-113 |     x = 1; (MyError("This is an exception")); y = 2  # PLW0133 (review)
-114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133 (review)
-115 |     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133 (review)
+113 |     x = 1; (MyError("This is an exception")); y = 2  # PLW0133
+114 |     x = 1; (MySubError("This is an exception")); y = 2  # PLW0133
+115 |     x = 1; (MyValueError("This is an exception")); y = 2  # PLW0133
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
@@ -218,7 +218,7 @@ PLW0133 [*] Missing `raise` statement on exception
 119 | def func():
 120 |     UserWarning("This is a user warning")  # PLW0133
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-121 |     MyUserWarning("This is a custom user warning")  # PLW0133 (review)
+121 |     MyUserWarning("This is a custom user warning")  # PLW0133
     |
 help: Add `raise` keyword
 117 | 
@@ -226,7 +226,7 @@ help: Add `raise` keyword
 119 | def func():
     -     UserWarning("This is a user warning")  # PLW0133
 120 +     raise UserWarning("This is a user warning")  # PLW0133
-121 |     MyUserWarning("This is a custom user warning")  # PLW0133 (review)
+121 |     MyUserWarning("This is a custom user warning")  # PLW0133
 122 | 
 123 | 
 note: This is an unsafe fix and may change runtime behavior
@@ -260,7 +260,7 @@ PLW0133 [*] Missing `raise` statement on exception
 129 | PythonFinalizationError("Added in Python 3.13")  # PLW0133
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 130 |
-131 | MyError("This is an exception")  # PLW0133 (review)
+131 | MyError("This is an exception")  # PLW0133
     |
 help: Add `raise` keyword
 126 | 
@@ -269,27 +269,27 @@ help: Add `raise` keyword
     - PythonFinalizationError("Added in Python 3.13")  # PLW0133
 129 + raise PythonFinalizationError("Added in Python 3.13")  # PLW0133
 130 | 
-131 | MyError("This is an exception")  # PLW0133 (review)
+131 | MyError("This is an exception")  # PLW0133
 132 | 
 note: This is an unsafe fix and may change runtime behavior
 
 PLW0133 [*] Missing `raise` statement on exception
    --> useless_exception_statement.py:137:1
     |
-135 | MyValueError("This is an exception")  # PLW0133 (review)
+135 | MyValueError("This is an exception")  # PLW0133
 136 |
 137 | UserWarning("This is a user warning")  # PLW0133
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 138 |
-139 | MyUserWarning("This is a custom user warning")  # PLW0133 (review)
+139 | MyUserWarning("This is a custom user warning")  # PLW0133
     |
 help: Add `raise` keyword
 134 | 
-135 | MyValueError("This is an exception")  # PLW0133 (review)
+135 | MyValueError("This is an exception")  # PLW0133
 136 | 
     - UserWarning("This is a user warning")  # PLW0133
 137 + raise UserWarning("This is a user warning")  # PLW0133
 138 | 
-139 | MyUserWarning("This is a custom user warning")  # PLW0133 (review)
+139 | MyUserWarning("This is a custom user warning")  # PLW0133
 140 | 
 note: This is an unsafe fix and may change runtime behavior
