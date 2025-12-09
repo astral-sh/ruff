@@ -3457,7 +3457,7 @@ impl<'db> ClassLiteral<'db> {
                         .symbol_id(&method_def.node(&module).name)
                         .unwrap();
                     class_map
-                        .all_reachable_symbol_bindings(method_place)
+                        .reachable_symbol_bindings(method_place)
                         .find_map(|bind| {
                             (bind.binding.is_defined_and(|def| def == method))
                                 .then(|| class_map.binding_reachability(db, &bind))

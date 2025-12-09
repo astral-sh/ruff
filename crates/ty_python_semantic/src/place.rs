@@ -783,7 +783,7 @@ pub(crate) fn place_by_id<'db>(
 
     let declarations = match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_declarations(place_id),
-        ConsideredDefinitions::AllReachable => use_def.all_reachable_declarations(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_declarations(place_id),
     };
 
     let declared = place_from_declarations_impl(db, declarations, requires_explicit_reexport)
@@ -791,7 +791,7 @@ pub(crate) fn place_by_id<'db>(
 
     let all_considered_bindings = || match considered_definitions {
         ConsideredDefinitions::EndOfScope => use_def.end_of_scope_bindings(place_id),
-        ConsideredDefinitions::AllReachable => use_def.all_reachable_bindings(place_id),
+        ConsideredDefinitions::AllReachable => use_def.reachable_bindings(place_id),
     };
 
     // If a symbol is undeclared, but qualified with `typing.Final`, we use the right-hand side
