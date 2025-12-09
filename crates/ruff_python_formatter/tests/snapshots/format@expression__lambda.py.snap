@@ -255,6 +255,28 @@ def a():
     x:
     x
 )
+
+(
+    lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
+    * # comment 2
+    x,
+    **y:
+    x
+)
+
+(
+    lambda
+    ** # comment 1
+    x:
+    x
+)
 ```
 
 ## Output
@@ -512,5 +534,23 @@ def a():
     y,
     # comment 2
     *x: x
+)
+
+(
+    lambda
+    # comment
+    *x, **y: x
+)
+
+(
+    lambda
+    # comment 2
+    *x, **y: x
+)
+
+(
+    lambda
+    # comment 1
+    **x: x
 )
 ```

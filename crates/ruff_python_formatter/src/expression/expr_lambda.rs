@@ -32,8 +32,8 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
             if dangling_before_parameters.is_empty() {
-                // If the first parameter has a leading comment, insert a hard line break. This
-                // comment is associated as a leading comment on the first parameter:
+                // If the parameters have a leading comment, insert a hard line break. This
+                // comment is associated as a leading comment on the parameters:
                 //
                 // ```py
                 // (
@@ -86,11 +86,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     *x: x
                 // )
                 // ```
-                if parameters
-                    .iter()
-                    .next()
-                    .is_some_and(|parameter| comments.has_leading(parameter.as_parameter()))
-                {
+                if comments.has_leading(&**parameters) {
                     hard_line_break().fmt(f)?;
                 } else {
                     write!(f, [space()])?;
