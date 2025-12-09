@@ -86,11 +86,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 //     *x: x
                 // )
                 // ```
-                if parameters
-                    .iter()
-                    .next()
-                    .is_some_and(|parameter| comments.has_leading(parameter.as_parameter()))
-                {
+                if comments.has_leading(&**parameters) {
                     hard_line_break().fmt(f)?;
                 } else {
                     write!(f, [space()])?;

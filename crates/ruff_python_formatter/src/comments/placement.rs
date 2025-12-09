@@ -857,6 +857,19 @@ fn handle_parameter_comment<'a>(
     parameter: &'a Parameter,
     source: &str,
 ) -> CommentPlacement<'a> {
+    let parent = if let Some(parent @ AnyNodeRef::Parameters(parameters)) =
+        comment.enclosing_parent()
+        && parameters
+            .iter()
+            .next()
+            .is_some_and(|first| first.range() == parameter.range())
+        && !are_parameters_parenthesized(parameters, source)
+    {
+        Some(parent)
+    } else {
+        None
+    };
+
     if parameter.annotation().is_some() {
         let colon = first_non_trivia_token(parameter.name.end(), source).expect(
             "A annotated parameter should have a colon following its name when it is valid syntax.",
@@ -865,13 +878,22 @@ fn handle_parameter_comment<'a>(
         assert_eq!(colon.kind(), SimpleTokenKind::Colon);
 
         if comment.start() < colon.start() {
-            // The comment is before the colon, pull it out and make it a leading comment of the parameter.
-            CommentPlacement::leading(parameter, comment)
+            // The comment is before the colon, pull it out and make it a leading comment of the
+            // parameter, or of the whole parameters list, if it's the first parameter.
+            if let Some(parent) = parent {
+                CommentPlacement::leading(parent, comment)
+            } else {
+                CommentPlacement::leading(parameter, comment)
+            }
         } else {
             CommentPlacement::Default(comment)
         }
     } else if comment.start() < parameter.name.start() {
-        CommentPlacement::leading(parameter, comment)
+        if let Some(parent) = parent {
+            CommentPlacement::leading(parent, comment)
+        } else {
+            CommentPlacement::leading(parameter, comment)
+        }
     } else {
         CommentPlacement::Default(comment)
     }
@@ -1835,10 +1857,8 @@ fn handle_lambda_comment<'a>(
         // )
         // ```
         if comment.start() < parameters.start() {
-            return if let Some(first) = parameters.iter().next()
-                && comment.line_position().is_own_line()
-            {
-                CommentPlacement::leading(first.as_parameter(), comment)
+            return if parameters.iter().next().is_some() && comment.line_position().is_own_line() {
+                CommentPlacement::leading(parameters, comment)
             } else {
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
             };
