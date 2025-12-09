@@ -1,13 +1,10 @@
 use ruff_formatter::{FormatRuleWithOptions, RemoveSoftLinesBuffer, format_args, write};
 use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
-use ruff_python_trivia::SimpleTokenizer;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{dangling_comments, leading_comments, trailing_comments};
-use crate::expression::parentheses::{
-    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
-};
+use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
