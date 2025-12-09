@@ -335,6 +335,12 @@ pub enum KnownModule {
     #[cfg(test)]
     Uuid,
     Warnings,
+    #[strum(serialize = "sqlalchemy.sql.selectable")]
+    SqlalchemySqlSelectable,
+    #[strum(serialize = "sqlalchemy.sql._selectable_constructors")]
+    SqlalchemySqlSelectableConstructors,
+    #[strum(serialize = "sqlalchemy.orm.attributes")]
+    SqlalchemyOrmAttributes,
 }
 
 impl KnownModule {
@@ -363,6 +369,9 @@ impl KnownModule {
             #[cfg(test)]
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
+            Self::SqlalchemySqlSelectable => "sqlalchemy.sql.selectable",
+            Self::SqlalchemySqlSelectableConstructors => "sqlalchemy.sql._selectable_constructors",
+            Self::SqlalchemyOrmAttributes => "sqlalchemy.orm.attributes",
         }
     }
 
@@ -378,7 +387,20 @@ impl KnownModule {
         if search_path.is_standard_library() {
             Self::from_str(name.as_str()).ok()
         } else {
-            None
+            // For non-stdlib search paths, check for known third-party modules
+            Self::try_from_third_party_name(name)
+        }
+    }
+
+    /// Returns a known module for third-party packages, if applicable.
+    fn try_from_third_party_name(name: &ModuleName) -> Option<Self> {
+        match name.as_str() {
+            "sqlalchemy.sql.selectable" => Some(Self::SqlalchemySqlSelectable),
+            "sqlalchemy.sql._selectable_constructors" => {
+                Some(Self::SqlalchemySqlSelectableConstructors)
+            }
+            "sqlalchemy.orm.attributes" => Some(Self::SqlalchemyOrmAttributes),
+            _ => None,
         }
     }
 
@@ -419,6 +441,11 @@ mod tests {
         let stdlib_search_path = SearchPath::vendored_stdlib();
 
         for module in KnownModule::iter() {
+            // Third-party modules aren't available in the vendored stdlib
+            if module.is_third_party() {
+                continue;
+            }
+
             let module_name = module.name();
 
             assert_eq!(

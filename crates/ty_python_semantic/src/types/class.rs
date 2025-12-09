@@ -4207,6 +4207,9 @@ pub enum KnownClass {
     ConstraintSet,
     GenericContext,
     Specialization,
+    // sqlalchemy
+    SqlalchemySelect,
+    SqlalchemyInstrumentedAttribute,
 }
 
 impl KnownClass {
@@ -4315,7 +4318,9 @@ impl KnownClass {
             | Self::GenericContext
             | Self::Specialization
             | Self::ProtocolMeta
-            | Self::TypedDictFallback => Some(Truthiness::Ambiguous),
+            | Self::TypedDictFallback
+            | Self::SqlalchemySelect
+            | Self::SqlalchemyInstrumentedAttribute => Some(Truthiness::Ambiguous),
 
             Self::Tuple => None,
         }
@@ -4405,7 +4410,9 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::SqlalchemySelect
+            | KnownClass::SqlalchemyInstrumentedAttribute => false,
         }
     }
 
@@ -4492,7 +4499,9 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::SqlalchemySelect
+            | KnownClass::SqlalchemyInstrumentedAttribute => false,
         }
     }
 
@@ -4578,7 +4587,9 @@ impl KnownClass {
             | KnownClass::BuiltinFunctionType
             | KnownClass::ProtocolMeta
             | KnownClass::Template
-            | KnownClass::Path => false,
+            | KnownClass::Path
+            | KnownClass::SqlalchemySelect
+            | KnownClass::SqlalchemyInstrumentedAttribute => false,
         }
     }
 
@@ -4677,7 +4688,9 @@ impl KnownClass {
             | Self::ProtocolMeta
             | Self::Template
             | Self::Path
-            | Self::Mapping => false,
+            | Self::Mapping
+            | Self::SqlalchemySelect
+            | Self::SqlalchemyInstrumentedAttribute => false,
         }
     }
 
@@ -4766,7 +4779,9 @@ impl KnownClass {
             | KnownClass::ConstraintSet
             | KnownClass::GenericContext
             | KnownClass::Specialization
-            | KnownClass::InitVar => false,
+            | KnownClass::InitVar
+            | KnownClass::SqlalchemySelect
+            | KnownClass::SqlalchemyInstrumentedAttribute => false,
             KnownClass::NamedTupleFallback | KnownClass::TypedDictFallback => true,
         }
     }
@@ -4882,6 +4897,8 @@ impl KnownClass {
             Self::Template => "Template",
             Self::Path => "Path",
             Self::ProtocolMeta => "_ProtocolMeta",
+            Self::SqlalchemySelect => "Select",
+            Self::SqlalchemyInstrumentedAttribute => "InstrumentedAttribute",
         }
     }
 
@@ -5203,6 +5220,8 @@ impl KnownClass {
             | Self::Specialization => KnownModule::TyExtensions,
             Self::Template => KnownModule::Templatelib,
             Self::Path => KnownModule::Pathlib,
+            Self::SqlalchemySelect => KnownModule::SqlalchemySqlSelectable,
+            Self::SqlalchemyInstrumentedAttribute => KnownModule::SqlalchemyOrmAttributes,
         }
     }
 
@@ -5291,7 +5310,9 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | Self::Path => Some(false),
+            | Self::Path
+            | Self::SqlalchemySelect
+            | Self::SqlalchemyInstrumentedAttribute => Some(false),
 
             Self::Tuple => None,
         }
@@ -5383,7 +5404,9 @@ impl KnownClass {
             | Self::BuiltinFunctionType
             | Self::ProtocolMeta
             | Self::Template
-            | Self::Path => false,
+            | Self::Path
+            | Self::SqlalchemySelect
+            | Self::SqlalchemyInstrumentedAttribute => false,
         }
     }
 
@@ -5489,6 +5512,8 @@ impl KnownClass {
             "Template" => &[Self::Template],
             "Path" => &[Self::Path],
             "_ProtocolMeta" => &[Self::ProtocolMeta],
+            "Select" => &[Self::SqlalchemySelect],
+            "InstrumentedAttribute" => &[Self::SqlalchemyInstrumentedAttribute],
             _ => return None,
         };
 
@@ -5569,7 +5594,9 @@ impl KnownClass {
             | Self::Awaitable
             | Self::Generator
             | Self::Template
-            | Self::Path => module == self.canonical_module(db),
+            | Self::Path
+            | Self::SqlalchemySelect
+            | Self::SqlalchemyInstrumentedAttribute => module == self.canonical_module(db),
             Self::NoneType => matches!(module, KnownModule::Typeshed | KnownModule::Types),
             Self::SpecialForm
             | Self::TypeAliasType
@@ -5924,6 +5951,10 @@ mod tests {
                 source: PythonVersionSource::default(),
             });
         for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
+
             let class_name = class.name(&db);
             let class_module =
                 resolve_module_confident(&db, &class.canonical_module(&db).name()).unwrap();
@@ -5952,6 +5983,10 @@ mod tests {
             });
 
         for class in KnownClass::iter() {
+            if class.canonical_module(&db).is_third_party() {
+                continue;
+            }
+
             // Check the class can be looked up successfully
             class.try_to_class_literal_without_logging(&db).unwrap();
 
@@ -5977,6 +6012,7 @@ mod tests {
         // This makes the test far faster as it minimizes the number of times
         // we need to change the Python version in the loop.
         let mut classes: Vec<(KnownClass, PythonVersion)> = KnownClass::iter()
+            .filter(|class| !class.canonical_module(&db).is_third_party())
             .map(|class| {
                 let version_added = match class {
                     KnownClass::Template => PythonVersion::PY314,

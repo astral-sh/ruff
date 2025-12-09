@@ -1353,6 +1353,10 @@ pub enum KnownFunction {
     RevealProtocolInterface,
     /// `ty_extensions.reveal_mro`
     RevealMro,
+
+    /// `sqlalchemy.select`
+    #[strum(serialize = "select")]
+    SqlalchemySelect,
 }
 
 impl KnownFunction {
@@ -1425,6 +1429,9 @@ impl KnownFunction {
 
             Self::TypeCheckOnly => matches!(module, KnownModule::Typing),
             Self::NamedTuple => matches!(module, KnownModule::Collections),
+            Self::SqlalchemySelect => {
+                matches!(module, KnownModule::SqlalchemySqlSelectableConstructors)
+            }
         }
     }
 
@@ -1896,6 +1903,56 @@ impl KnownFunction {
 
                 overload.set_return_type(Type::module_literal(db, file, module));
             }
+
+            KnownFunction::SqlalchemySelect => {
+                // Try to extract types from InstrumentedAttribute[T] arguments.
+                // If all arguments are InstrumentedAttribute instances, we construct
+                // Select[tuple[T_1, T_2, ...]] where T_i are the inner types.
+                //
+                // We check the class via `class_literal.known(db)` rather than using
+                // `known_specialization` because the class may be re-exported and not
+                // directly importable from its canonical module.
+                let inner_types: Option<Vec<_>> = parameter_types
+                    .iter()
+                    .flatten()
+                    .map(|param_type| {
+                        let Type::NominalInstance(instance) = param_type else {
+                            return None;
+                        };
+                        let class = instance.class(db);
+                        let (class_literal, specialization) = class.class_literal(db);
+                        if class_literal.known(db)
+                            != Some(KnownClass::SqlalchemyInstrumentedAttribute)
+                        {
+                            return None;
+                        }
+                        specialization?.types(db).first().copied()
+                    })
+                    .collect();
+
+                let Some(inner_types) = inner_types else {
+                    // Fall back to whatever we infer from the function signature
+                    return;
+                };
+
+                if inner_types.is_empty() {
+                    return;
+                }
+
+                // Construct Select[tuple[T1, T2, ...]]
+                // We get the return type's class from the overload rather than looking
+                // it up via try_to_class_literal, since the class may be re-exported.
+                let Type::NominalInstance(return_instance) = overload.return_type() else {
+                    return;
+                };
+                let select_class = return_instance.class(db).class_literal(db).0;
+                let tuple_type = Type::heterogeneous_tuple(db, inner_types);
+                let class_type = select_class.apply_specialization(db, |generic_context| {
+                    generic_context.specialize(db, vec![tuple_type].into())
+                });
+                overload.set_return_type(Type::instance(db, class_type));
+            }
+
             _ => {}
         }
     }
@@ -1964,6 +2021,8 @@ pub(crate) mod tests {
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
+
+                KnownFunction::SqlalchemySelect => continue,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
