@@ -211,10 +211,7 @@ impl Suppressions {
 
                 let mut diagnostic = context.report_diagnostic(
                     UnusedNOQA {
-                        codes: Some(UnusedCodes {
-                            unmatched: vec![suppression.code.to_string()],
-                            ..UnusedCodes::default()
-                        }),
+                        codes: Some(codes),
                         kind: UnusedNOQAKind::Suppression,
                     },
                     range,

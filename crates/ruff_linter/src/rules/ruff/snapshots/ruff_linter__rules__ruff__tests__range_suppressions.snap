@@ -150,7 +150,7 @@ note: This is an unsafe fix and may change runtime behavior
 
 
 --- Added ---
-RUF100 [*] Unused suppression (unused: `E501`)
+RUF100 [*] Unused suppression (non-enabled: `E501`)
   --> suppressions.py:46:5
    |
 44 |     # Neither of these are ignored and warnings are
@@ -170,7 +170,7 @@ help: Remove unused suppression
 48 | 
 
 
-RUF100 [*] Unused suppression (unused: `E501`)
+RUF100 [*] Unused suppression (non-enabled: `E501`)
   --> suppressions.py:48:5
    |
 46 |     # ruff: disable[E501]
