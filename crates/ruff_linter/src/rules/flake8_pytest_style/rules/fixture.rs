@@ -768,6 +768,7 @@ fn check_fixture_decorator(checker: &Checker, func_name: &str, decorator: &Decor
                                 keyword,
                                 arguments,
                                 edits::Parentheses::Preserve,
+                                checker.source(),
                                 checker.tokens(),
                             )
                             .map(Fix::unsafe_edit)

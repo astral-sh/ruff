@@ -123,8 +123,14 @@ fn convert_inplace_argument_to_assignment(
     );
 
     // Remove the `inplace` argument.
-    let remove_argument =
-        remove_argument(keyword, &call.arguments, Parentheses::Preserve, tokens).ok()?;
+    let remove_argument = remove_argument(
+        keyword,
+        &call.arguments,
+        Parentheses::Preserve,
+        locator.contents(),
+        tokens,
+    )
+    .ok()?;
 
     Some(Fix::unsafe_edits(insert_assignment, [remove_argument]))
 }

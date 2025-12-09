@@ -76,6 +76,7 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
             start,
             &call.arguments,
             Parentheses::Preserve,
+            checker.source(),
             checker.tokens(),
         )
         .map(Fix::safe_edit)

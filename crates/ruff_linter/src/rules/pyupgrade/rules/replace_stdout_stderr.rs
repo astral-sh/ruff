@@ -97,7 +97,15 @@ pub(crate) fn replace_stdout_stderr(checker: &Checker, call: &ast::ExprCall) {
 
         let mut diagnostic = checker.report_diagnostic(ReplaceStdoutStderr, call.range());
         if call.arguments.find_keyword("capture_output").is_none() {
-            diagnostic.try_set_fix(|| generate_fix(stdout, stderr, call, checker.tokens()));
+            diagnostic.try_set_fix(|| {
+                generate_fix(
+                    stdout,
+                    stderr,
+                    call,
+                    checker.locator().contents(),
+                    checker.tokens(),
+                )
+            });
         }
     }
 }
@@ -107,6 +115,7 @@ fn generate_fix(
     stdout: &Keyword,
     stderr: &Keyword,
     call: &ast::ExprCall,
+    source: &str,
     tokens: &Tokens,
 ) -> Result<Fix> {
     let (first, second) = if stdout.start() < stderr.start() {
@@ -121,6 +130,7 @@ fn generate_fix(
             second,
             &call.arguments,
             Parentheses::Preserve,
+            source,
             tokens,
         )?],
     ))

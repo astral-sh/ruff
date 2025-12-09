@@ -187,6 +187,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             kwarg,
                             &call.arguments,
                             Parentheses::Preserve,
+                            checker.locator().contents(),
                             checker.tokens(),
                         )
                         .map(Fix::safe_edit)
@@ -204,6 +205,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             arg,
                             &call.arguments,
                             Parentheses::Preserve,
+                            checker.locator().contents(),
                             checker.tokens(),
                         )
                         .map(Fix::safe_edit)
@@ -228,6 +230,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             kwarg,
                             &call.arguments,
                             Parentheses::Preserve,
+                            checker.locator().contents(),
                             checker.tokens(),
                         )
                         .map(Fix::safe_edit)
@@ -245,6 +248,7 @@ pub(crate) fn unnecessary_encode_utf8(checker: &Checker, call: &ast::ExprCall) {
                             arg,
                             &call.arguments,
                             Parentheses::Preserve,
+                            checker.locator().contents(),
                             checker.tokens(),
                         )
                         .map(Fix::safe_edit)

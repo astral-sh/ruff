@@ -151,6 +151,7 @@ fn fix_unnecessary_literal_in_deque(
             &iterable,
             &deque.arguments,
             Parentheses::Preserve,
+            checker.source(),
             checker.tokens(),
         )?
     };

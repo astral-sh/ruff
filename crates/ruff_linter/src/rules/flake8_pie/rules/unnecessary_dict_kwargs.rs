@@ -129,6 +129,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                     keyword,
                     &call.arguments,
                     Parentheses::Preserve,
+                    checker.source(),
                     checker.tokens(),
                 )
                 .map(Fix::safe_edit)

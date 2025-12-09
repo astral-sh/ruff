@@ -68,7 +68,13 @@ pub(crate) fn useless_object_inheritance(checker: &Checker, class_def: &ast::Stm
         );
 
         diagnostic.try_set_fix(|| {
-            let edit = remove_argument(base, arguments, Parentheses::Remove, checker.tokens())?;
+            let edit = remove_argument(
+                base,
+                arguments,
+                Parentheses::Remove,
+                checker.locator().contents(),
+                checker.tokens(),
+            )?;
 
             let range = edit.range();
             let applicability = if checker.comment_ranges().intersects(range) {

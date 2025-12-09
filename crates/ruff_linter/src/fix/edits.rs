@@ -8,7 +8,9 @@ use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Par
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
-use ruff_python_trivia::{PythonWhitespace, has_leading_content, is_python_whitespace};
+use ruff_python_trivia::{
+    PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content, is_python_whitespace,
+};
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -205,6 +207,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     argument: &T,
     arguments: &Arguments,
     parentheses: Parentheses,
+    source: &str,
     tokens: &Tokens,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
@@ -226,20 +229,17 @@ pub(crate) fn remove_argument<T: Ranged>(
     if !after.is_empty() {
         // Case 1: argument or keyword is _not_ the last node, so delete from the start of the
         // argument to the end of the subsequent comma.
-        let mut tokens_after = tokens.after(argument.end()).iter();
+        let mut tokenizer = SimpleTokenizer::starts_at(argument.end(), source);
 
         // Find the trailing comma.
-        tokens_after
-            .find(|token| token.kind() == TokenKind::Comma)
+        tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
         // Find the next non-whitespace token.
-        let next = tokens_after
+        let next = tokenizer
             .find(|token| {
-                !matches!(
-                    token.kind(),
-                    TokenKind::Newline | TokenKind::NonLogicalNewline
-                )
+                token.kind != SimpleTokenKind::Whitespace && token.kind != SimpleTokenKind::Newline
             })
             .context("Unable to find next token")?;
 
@@ -247,11 +247,11 @@ pub(crate) fn remove_argument<T: Ranged>(
     } else if let Some(previous) = before.iter().map(Ranged::end).max() {
         // Case 2: argument or keyword is the last node, so delete from the start of the
         // previous comma to the end of the argument.
-        let mut tokens_after = tokens.after(previous).iter();
+        let mut tokenizer = SimpleTokenizer::starts_at(previous, source);
 
         // Find the trailing comma.
-        let comma = tokens_after
-            .find(|token| token.kind() == TokenKind::Comma)
+        let comma = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Comma)
             .context("Unable to find trailing comma")?;
 
         Ok(Edit::deletion(comma.start(), parenthesized_range.end()))

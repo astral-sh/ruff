@@ -151,6 +151,7 @@ fn convert_to_positional(
             default_factory,
             &call.arguments,
             Parentheses::Preserve,
+            locator.contents(),
             tokens,
         )?;
 

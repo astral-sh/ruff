@@ -106,7 +106,13 @@ pub(crate) fn path_constructor_current_directory(
             diagnostic.set_fix(Fix::applicable_edit(edit, applicability(parent_range)));
         }
         None => diagnostic.try_set_fix(|| {
-            let edit = remove_argument(arg, arguments, Parentheses::Preserve, checker.tokens())?;
+            let edit = remove_argument(
+                arg,
+                arguments,
+                Parentheses::Preserve,
+                checker.source(),
+                checker.tokens(),
+            )?;
             Ok(Fix::applicable_edit(edit, applicability(call.range())))
         }),
     }

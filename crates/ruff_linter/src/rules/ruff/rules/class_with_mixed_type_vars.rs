@@ -162,6 +162,7 @@ fn convert_type_vars(
         generic_base,
         class_arguments,
         Parentheses::Remove,
+        source,
         checker.tokens(),
     )?;
     let replace_type_params =
