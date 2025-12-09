@@ -9,6 +9,11 @@ use crate::settings::LinterSettings;
 
 // Rule-specific behavior
 
+// https://github.com/astral-sh/ruff/pull/21382
+pub(crate) const fn is_custom_exception_checking_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
+
 // https://github.com/astral-sh/ruff/pull/15541
 pub(crate) const fn is_suspicious_function_reference_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
