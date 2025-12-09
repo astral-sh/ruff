@@ -1488,10 +1488,26 @@ def f1(x1: T1, x2: T2, /) -> tuple[T1, T2]: ...
 def f1(x1: T1, x2: T2, x3: T3, /) -> tuple[T1, T2, T3]: ...
 @overload
 def f1(*args: Any) -> tuple[Any, ...]: ...
+
+@overload
+def f2(x1: T1) -> tuple[T1]: ...
+@overload
+def f2(x1: T1, x2: T2) -> tuple[T1, T2]: ...
+@overload
+def f2(*args: Any, **kwargs: Any) -> tuple[Any, ...]: ...
+
+@overload
+def f3(x: T1) -> tuple[T1]: ...
+@overload
+def f3(x1: T1, x2: T2) -> tuple[T1, T2]: ...
+@overload
+def f3(*args: Any) -> tuple[Any, ...]: ...
+@overload
+def f3(**kwargs: Any) -> dict[str, Any]: ...
 ```
 
 ```py
-from overloaded import f1
+from overloaded import f1, f2, f3
 from typing import Any
 
 # These calls only match the last overload
@@ -1507,6 +1523,20 @@ reveal_type(f1(1, 2, 3))  # revealed: tuple[Literal[1], Literal[2], Literal[3]]
 def _(args1: list[int], args2: list[Any]):
     reveal_type(f1(*args1))  # revealed: tuple[Any, ...]
     reveal_type(f1(*args2))  # revealed: tuple[Any, ...]
+
+reveal_type(f2())  # revealed: tuple[Any, ...]
+reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f2(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f2(x2=1, x1=2))  # revealed: tuple[Literal[2], Literal[1]]
+reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
+
+reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
+reveal_type(f3(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+reveal_type(f3(z=1))  # revealed: dict[str, Any]
+
+# error: [no-matching-overload]
+reveal_type(f3(1, 2, x=3))  # revealed: Unknown
 ```
 
 ### Non-participating fully-static parameter

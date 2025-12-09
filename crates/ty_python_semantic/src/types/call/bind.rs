@@ -1939,6 +1939,29 @@ impl<'db> CallableBinding<'db> {
         arguments: &CallArguments<'_, 'db>,
         matching_overload_indexes: &[usize],
     ) {
+        // Exclude overloads with variadic parameters (`*args` or `**kwargs`) from step 5
+        // filtering. This is because the same argument can map to different parameter indexes
+        // in different overloads (e.g., a keyword argument maps to a named parameter in one
+        // overload and to `**kwargs` in another), which makes the filtering logic unreliable.
+        let non_variadic_overload_indexes: Vec<usize> = matching_overload_indexes
+            .iter()
+            .copied()
+            .filter(|&index| {
+                !self.overloads[index]
+                    .signature
+                    .parameters()
+                    .iter()
+                    .any(|param| param.is_variadic() || param.is_keyword_variadic())
+            })
+            .collect();
+
+        // If there are no non-variadic overloads, or only one, skip step 5 filtering.
+        if non_variadic_overload_indexes.len() <= 1 {
+            return;
+        }
+
+        let matching_overload_indexes = &non_variadic_overload_indexes[..];
+
         // The maximum number of parameters across all the overloads that are being considered
         // for filtering.
         let max_parameter_count = matching_overload_indexes
@@ -1990,37 +2013,12 @@ impl<'db> CallableBinding<'db> {
             .take(max_parameter_count)
             .collect::<Vec<_>>();
 
-        // The following loop is trying to construct a tuple of argument types that correspond to
-        // the participating parameter indexes. Considering the following example:
-        //
-        // ```python
-        // @overload
-        // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
-        // @overload
-        // def f(*args: Any) -> tuple[Any, ...]: ...
-        //
-        // f(1, 2)
-        // ```
-        //
-        // Here, only the first parameter participates in the filtering process because only one
-        // overload has the second parameter. So, while going through the argument types, the
-        // second argument needs to be skipped but for the second overload both arguments map to
-        // the first parameter and that parameter is considered for the filtering process. This
-        // flag is to handle that special case of many-to-one mapping from arguments to parameters.
-        let mut variadic_parameter_handled = false;
-
         for (argument_index, argument_type) in arguments.iter_types().enumerate() {
-            if variadic_parameter_handled {
-                continue;
-            }
             for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
                 for (parameter_index, variadic_argument_type) in
                     overload.argument_matches[argument_index].iter()
                 {
-                    if overload.signature.parameters()[parameter_index].is_variadic() {
-                        variadic_parameter_handled = true;
-                    }
                     if !participating_parameter_indexes.contains(&parameter_index) {
                         continue;
                     }
