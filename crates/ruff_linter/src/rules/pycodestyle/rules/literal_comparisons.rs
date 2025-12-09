@@ -378,7 +378,6 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
             .copied()
             .collect::<Vec<_>>();
 
-        let comment_ranges = checker.comment_ranges();
         let tokens = checker.tokens();
         let source = checker.source();
 
@@ -405,7 +404,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                         &ops,
                         &compare.comparators,
                         compare.into(),
-                        comment_ranges,
+                        tokens,
                         source,
                     )
                 }
@@ -415,7 +414,7 @@ pub(crate) fn literal_comparisons(checker: &Checker, compare: &ast::ExprCompare)
                 &ops,
                 &compare.comparators,
                 compare.into(),
-                comment_ranges,
+                tokens,
                 source,
             ),
         };
