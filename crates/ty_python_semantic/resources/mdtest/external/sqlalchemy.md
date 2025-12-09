@@ -107,44 +107,34 @@ We can also specify particular columns to select:
 
 ```py
 stmt = select(User.id, User.name)
-# TODO: should be `Select[tuple[int, str]]`
-reveal_type(stmt)  # revealed: Select[tuple[Unknown, Unknown]]
+reveal_type(stmt)  # revealed: Select[tuple[int, str]]
 
 ids_and_names = session.execute(stmt).all()
-# TODO: should be `Sequence[Row[tuple[int, str]]]`
-reveal_type(ids_and_names)  # revealed: Sequence[Row[tuple[Unknown, Unknown]]]
+reveal_type(ids_and_names)  # revealed: Sequence[Row[tuple[int, str]]]
 
 for row in session.execute(stmt):
-    # TODO: should be `Row[tuple[int, str]]`
-    reveal_type(row)  # revealed: Row[tuple[Unknown, Unknown]]
+    reveal_type(row)  # revealed: Row[tuple[int, str]]
 
 for user_id, name in session.execute(stmt).tuples():
-    # TODO: should be `int`
-    reveal_type(user_id)  # revealed: Unknown
-    # TODO: should be `str`
-    reveal_type(name)  # revealed: Unknown
+    reveal_type(user_id)  # revealed: int
+    reveal_type(name)  # revealed: str
 
 result = session.execute(stmt)
 row = result.one_or_none()
 assert row is not None
 (user_id, name) = row._tuple()
-# TODO: should be `int`
-reveal_type(user_id)  # revealed: Unknown
-# TODO: should be `str`
-reveal_type(name)  # revealed: Unknown
+reveal_type(user_id)  # revealed: int
+reveal_type(name)  # revealed: str
 
 stmt = select(User.id).where(User.name == "Alice")
 
-# TODO: should be `Select[tuple[int]]`
-reveal_type(stmt)  # revealed: Select[tuple[Unknown]]
+reveal_type(stmt)  # revealed: Select[tuple[int]]
 
 alice_id = session.scalars(stmt).first()
-# TODO: should be `int | None`
-reveal_type(alice_id)  # revealed: Unknown | None
+reveal_type(alice_id)  # revealed: int | None
 
 alice_id = session.scalar(stmt)
-# TODO: should be `int | None`
-reveal_type(alice_id)  # revealed: Unknown | None
+reveal_type(alice_id)  # revealed: int | None
 ```
 
 Using the legacy `query` API also works:
@@ -166,15 +156,12 @@ And similarly when specifying particular columns:
 
 ```py
 query = session.query(User.id, User.name)
-# TODO: should be `RowReturningQuery[tuple[int, str]]`
-reveal_type(query)  # revealed: RowReturningQuery[tuple[Unknown, Unknown]]
+reveal_type(query)  # revealed: RowReturningQuery[tuple[int, str]]
 
-# TODO: should be `list[Row[tuple[int, str]]]`
-reveal_type(query.all())  # revealed: list[Row[tuple[Unknown, Unknown]]]
+reveal_type(query.all())  # revealed: list[Row[tuple[int, str]]]
 
 for row in query:
-    # TODO: should be `Row[tuple[int, str]]`
-    reveal_type(row)  # revealed: Row[tuple[Unknown, Unknown]]
+    reveal_type(row)  # revealed: Row[tuple[int, str]]
 ```
 
 ## Async API
@@ -203,8 +190,6 @@ async def test_async(session: AsyncSession):
     stmt = select(User.id, User.name)
     result = await session.execute(stmt)
     for user_id, name in result.tuples():
-        # TODO: should be `int`
-        reveal_type(user_id)  # revealed: Unknown
-        # TODO: should be `str`
-        reveal_type(name)  # revealed: Unknown
+        reveal_type(user_id)  # revealed: int
+        reveal_type(name)  # revealed: str
 ```
