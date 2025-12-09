@@ -249,3 +249,25 @@ def a():
     x:
     x
 )
+
+(
+    lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
+    * # comment 2
+    x,
+    **y:
+    x
+)
+
+(
+    lambda
+    ** # comment 1
+    x:
+    x
+)
