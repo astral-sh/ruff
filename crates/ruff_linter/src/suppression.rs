@@ -20,7 +20,6 @@ use crate::preview::is_range_suppressions_enabled;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA, UnusedNOQAKind};
 use crate::settings::LinterSettings;
 
-#[allow(unused)]
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
     Disable,
@@ -42,7 +41,6 @@ pub(crate) struct SuppressionComment {
     reason: TextRange,
 }
 
-#[allow(unused)]
 impl SuppressionComment {
     /// Return the suppressed codes as strings
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
@@ -59,7 +57,6 @@ pub(crate) struct PendingSuppressionComment<'a> {
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 impl PendingSuppressionComment<'_> {
     /// Whether the comment "matches" another comment, based on indentation and suppressed codes
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
@@ -75,7 +72,6 @@ impl PendingSuppressionComment<'_> {
     }
 }
 
-#[allow(unused)]
 #[derive(Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
@@ -91,7 +87,6 @@ pub(crate) struct Suppression {
     used: Cell<bool>,
 }
 
-#[allow(unused)]
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InvalidSuppressionKind {
     /// Trailing suppression not supported
@@ -124,7 +119,6 @@ pub struct Suppressions {
     errors: Vec<ParseError>,
 }
 
-#[allow(unused)]
 impl Suppressions {
     pub fn from_tokens(settings: &LinterSettings, source: &str, tokens: &Tokens) -> Suppressions {
         if is_range_suppressions_enabled(settings) {
