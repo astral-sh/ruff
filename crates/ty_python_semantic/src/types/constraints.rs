@@ -497,8 +497,8 @@ impl<'db> ConstrainedTypeVar<'db> {
         debug_assert_eq!(lower, lower.bottom_materialization(db));
         debug_assert_eq!(upper, upper.top_materialization(db));
 
-        // It is not useful to have an upper bound be an intersection type, or a lower bound to be
-        // a union type. Both of those can be rewritten as simpler BDDs:
+        // It's not useful for an upper bound to be an intersection type, or for a lower bound to
+        // be a union type. Both of those can be rewritten as simpler BDDs:
         //
         //   T ≤ α & β  ⇒ (T ≤ α) ∧ (T ≤ β)
         //   T ≤ α & ¬β ⇒ (T ≤ α) ∧ ¬(T ≤ β)
