@@ -659,6 +659,16 @@ impl<'db> ProtocolInstanceType<'db> {
         }
     }
 
+    /// If this is a class-based protocol, return its class literal (without specialization).
+    ///
+    /// Returns `None` for synthesized protocols that don't correspond to a class definition.
+    pub(super) fn class_literal(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+        match self.inner {
+            Protocol::FromClass(class) => Some(class.class_literal(db).0),
+            Protocol::Synthesized(_) => None,
+        }
+    }
+
     /// Return the meta-type of this protocol-instance type.
     pub(super) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
         match self.inner {
