@@ -3,7 +3,7 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::token::{self, TokenKind, Tokens, parenthesized_range};
+use ruff_python_ast::token::{self, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
@@ -285,7 +285,7 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
 }
 
 /// Generic function to add a (regular) parameter to a function definition.
-pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, tokens: &Tokens) -> Edit {
+pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
     if let Some(last) = parameters
         .args
         .iter()
@@ -297,21 +297,22 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, tokens: &T
     } else if !parameters.args.is_empty() {
         // Case 2: no regular parameters, but at least one keyword parameter, so add before the
         // first.
-        let name = tokens
-            .after(parameters.start())
-            .iter()
-            .find(|token| token.kind() == TokenKind::Name)
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let name = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Name)
             .expect("Unable to find name token");
         Edit::insertion(format!("{parameter}, "), name.start())
     } else if let Some(last) = parameters.posonlyargs.last() {
         // Case 2: no regular parameter, but a positional-only parameter exists, so add after that.
         // We take care to add it *after* the `/` separator.
-        let mut tokens_after = tokens.after(last.end()).iter();
-        let slash = tokens_after
-            .find(|token| token.kind() == TokenKind::Slash)
+        let pos = last.end();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let slash = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Slash)
             .expect("Unable to find `/` token");
         // Try to find a comma after the slash.
-        let comma = tokens_after.find(|token| token.kind() == TokenKind::Comma);
+        let comma = tokenizer.find(|token| token.kind == SimpleTokenKind::Comma);
         if let Some(comma) = comma {
             Edit::insertion(format!(" {parameter},"), comma.start() + TextSize::from(1))
         } else {
@@ -321,10 +322,10 @@ pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, tokens: &T
         // Case 3: no regular parameter, but a keyword-only parameter exist, so add parameter before that.
         // We need to backtrack to before the `*` separator.
         // We know there is no non-keyword-only params, so we can safely assume that the `*` separator is the first
-        let star = tokens
-            .after(parameters.start())
-            .iter()
-            .find(|token| token.kind() == TokenKind::Star)
+        let pos = parameters.start();
+        let mut tokenizer = SimpleTokenizer::starts_at(pos, source);
+        let star = tokenizer
+            .find(|token| token.kind == SimpleTokenKind::Star)
             .expect("Unable to find `*` token");
         Edit::insertion(format!("{parameter}, "), star.start())
     } else {
