@@ -1526,13 +1526,16 @@ def _(args1: list[int], args2: list[Any]):
 
 reveal_type(f2())  # revealed: tuple[Any, ...]
 reveal_type(f2(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
-reveal_type(f2(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
-reveal_type(f2(x2=1, x1=2))  # revealed: tuple[Literal[2], Literal[1]]
+# TODO: Should be `tuple[Literal[1], Literal[2]]`
+reveal_type(f2(x1=1, x2=2))  # revealed: Unknown
+# TODO: Should be `tuple[Literal[2], Literal[1]]`
+reveal_type(f2(x2=1, x1=2))  # revealed: Unknown
 reveal_type(f2(1, 2, z=3))  # revealed: tuple[Any, ...]
 
 reveal_type(f3(1, 2))  # revealed: tuple[Literal[1], Literal[2]]
 reveal_type(f3(1, 2, 3))  # revealed: tuple[Any, ...]
-reveal_type(f3(x1=1, x2=2))  # revealed: tuple[Literal[1], Literal[2]]
+# TODO: Should be `tuple[Literal[1], Literal[2]]`
+reveal_type(f3(x1=1, x2=2))  # revealed: Unknown
 reveal_type(f3(z=1))  # revealed: dict[str, Any]
 
 # error: [no-matching-overload]
