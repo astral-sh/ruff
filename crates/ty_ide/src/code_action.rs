@@ -86,7 +86,10 @@ mod tests {
     use ruff_diagnostics::Fix;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{lint::LintMetadata, types::UNRESOLVED_REFERENCE};
+    use ty_python_semantic::{
+        lint::LintMetadata,
+        types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE},
+    };
 
     #[test]
     fn add_ignore() {
@@ -439,6 +442,40 @@ mod tests {
         3 +             + "test"  # ty:ignore[unresolved-reference]
         4 |
         "#);
+    }
+
+    #[test]
+    fn undefined_reveal_type() {
+        let test = CodeActionTest::with_source(
+            r#"
+            <START>reveal_type<END>(1)
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @r"
+        info[code-action]: import typing.reveal_type
+         --> main.py:2:13
+          |
+        2 |             reveal_type(1)
+          |             ^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 + from typing import reveal_type
+        2 | 
+        3 |             reveal_type(1)
+        4 |         
+
+        info[code-action]: Ignore 'undefined-reveal' for this line
+         --> main.py:2:13
+          |
+        2 |             reveal_type(1)
+          |             ^^^^^^^^^^^
+          |
+        1 | 
+          -             reveal_type(1)
+        2 +             reveal_type(1)  # ty:ignore[undefined-reveal]
+        3 |
+        ");
     }
 
     pub(super) struct CodeActionTest {
