@@ -32,8 +32,8 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
             if dangling_before_parameters.is_empty() {
-                // If the first parameter has a leading comment, insert a hard line break. This
-                // comment is associated as a leading comment on the first parameter:
+                // If the parameters have a leading comment, insert a hard line break. This
+                // comment is associated as a leading comment on the parameters:
                 //
                 // ```py
                 // (
