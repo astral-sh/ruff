@@ -539,15 +539,13 @@ def a():
 (
     lambda
     # comment
-    *x,
-    **y: x
+    *x, **y: x
 )
 
 (
     lambda
     # comment 2
-    *x,
-    **y: x
+    *x, **y: x
 )
 
 (
