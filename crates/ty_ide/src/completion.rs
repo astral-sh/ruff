@@ -1835,7 +1835,7 @@ x = foo<CURSOR>bad
         );
 
         assert_snapshot!(
-            test.skip_builtins().build().snapshot(),
+            test.skip_builtins().skip_auto_import().build().snapshot(),
             @"foo_bar_baz",
         );
     }
@@ -1849,7 +1849,7 @@ type<CURSOR>
         );
 
         assert_snapshot!(
-            test.type_signatures().build().snapshot(),
+            test.type_signatures().skip_auto_import().build().snapshot(),
             @r"
         TypeError :: <class 'TypeError'>
         type :: <class 'type'>
@@ -2044,7 +2044,10 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2058,7 +2061,7 @@ g<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -2089,7 +2092,10 @@ f<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2118,7 +2124,9 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
         foo
         foofoo
         ");
@@ -2168,9 +2176,11 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        foofoo
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            foofoo
         ");
     }
 
@@ -2184,9 +2194,11 @@ def foo():
     f<CURSOR>",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        foofoo
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            foofoo
         ");
     }
 
@@ -2202,10 +2214,12 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        foofoo
-        frob
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            foofoo
+            frob
         ");
     }
 
@@ -2221,9 +2235,11 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        frob
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            frob
         ");
     }
 
@@ -2239,11 +2255,13 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        foofoo
-        foofoofoo
-        frob
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            foofoo
+            foofoofoo
+            frob
         ");
     }
 
@@ -2390,7 +2408,10 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2401,7 +2422,10 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2412,7 +2436,10 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2423,7 +2450,10 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2434,7 +2464,10 @@ def frob(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"foo",
+        );
     }
 
     #[test]
@@ -2516,10 +2549,13 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
         bar
         frob
-        ");
+        ",
+        );
     }
 
     #[test]
@@ -2532,7 +2568,10 @@ class Foo:
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"bar");
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @"bar",
+        );
     }
 
     #[test]
@@ -3149,7 +3188,7 @@ bar(o<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
         okay
@@ -3170,7 +3209,7 @@ bar(o<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
         okay
@@ -3189,7 +3228,7 @@ foo(b<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         bar
         barbaz
@@ -3209,7 +3248,7 @@ foo(bar=1, b<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         baz
         "
@@ -3229,7 +3268,7 @@ abc(o<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         okay
         "
@@ -3247,7 +3286,7 @@ abc(okay=1, ba<CURSOR> baz=5
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         bar
         "
@@ -3270,7 +3309,7 @@ bar(o<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"foo"
         );
     }
@@ -3291,7 +3330,7 @@ bar(o<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
         okay
@@ -3333,9 +3372,11 @@ class C:
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        self
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
+            foo
+            self
         ");
     }
 
@@ -3367,7 +3408,9 @@ class C:
         // FIXME: Should NOT include `foo` here, since
         // that is only a method that can be called on
         // `self`.
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
+            @r"
         foo
         self
         ");
@@ -3384,7 +3427,7 @@ class<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"classy_variable_name",
         );
     }
@@ -3400,7 +3443,7 @@ print(f\"{some<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"some_symbol",
         );
     }
@@ -3439,7 +3482,7 @@ if sys.platform == \"not-my-current-platform\":
         // currently make no effort to provide a good IDE experience within sections that
         // are unreachable
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -3925,7 +3968,7 @@ Fo<CURSOR> = float
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"Fo",
         );
     }
@@ -4047,7 +4090,7 @@ except Type<CURSOR>:
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -4063,7 +4106,7 @@ def _():
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().build().snapshot(),
+            builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -4597,7 +4640,6 @@ from os.<CURSOR>
             .source("main.py", "Abra<CURSOR>")
             .source("package/__init__.py", "AbraKadabra = 1")
             .completion_test_builder()
-            .auto_import()
             .build()
             .contains("AbraKadabra");
     }
@@ -4608,7 +4650,6 @@ from os.<CURSOR>
             .source("main.py", "Kadabra = 1\nKad<CURSOR>")
             .source("package/__init__.py", "AbraKadabra = 1")
             .completion_test_builder()
-            .auto_import()
             .type_signatures()
             .module_names()
             .filter(|c| c.name.contains("Kadabra"))
@@ -4691,7 +4732,7 @@ from os.<CURSOR>
         );
 
         assert_snapshot!(
-            test.skip_keywords().skip_builtins().build().snapshot(),
+            test.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"<No completions found after filtering out completions>",
         );
     }
@@ -5790,7 +5831,6 @@ def foo(param: s<CURSOR>)
             .source("foo.py", "def long_namea(): ...")
             .completion_test_builder()
             .type_signatures()
-            .auto_import()
             .module_names()
             .filter(|c| c.name.contains("long_name"))
             .build()
@@ -5809,6 +5849,7 @@ def foo(param: s<CURSOR>)
         let snapshot =
             completion_test_builder("from typing import Protocol\nclass Foo(P<CURSOR>: ...")
                 .filter(|c| c.name.starts_with('P'))
+                .skip_auto_import()
                 .build()
                 .snapshot();
 
@@ -6074,9 +6115,7 @@ from .imp<CURSOR>
 
     #[test]
     fn typing_extensions_excluded_from_auto_import() {
-        let builder = completion_test_builder("deprecated<CURSOR>")
-            .auto_import()
-            .module_names();
+        let builder = completion_test_builder("deprecated<CURSOR>").module_names();
         assert_snapshot!(builder.build().snapshot(), @"deprecated :: warnings");
     }
 
@@ -6099,7 +6138,6 @@ from .imp<CURSOR>
             .source("typing_extensions.py", "deprecated = 1")
             .source("foo.py", "deprecated<CURSOR>")
             .completion_test_builder()
-            .auto_import()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
         deprecated :: typing_extensions
@@ -6124,7 +6162,6 @@ from .imp<CURSOR>
         let builder = CursorTest::builder()
             .source("foo.pyi", "deprecated<CURSOR>")
             .completion_test_builder()
-            .auto_import()
             .module_names();
         assert_snapshot!(builder.build().snapshot(), @r"
         deprecated :: typing_extensions
@@ -6163,7 +6200,6 @@ ZQ<CURSOR>
             .source("foo.py", r#"from bar import ZQZQ"#)
             .source("bar.py", r#"ZQZQ = 1"#)
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6205,7 +6241,6 @@ ZQ<CURSOR>
             .source("foo.py", r#"from bar import ZQZQ as ZQZQ"#)
             .source("bar.py", r#"ZQZQ = 1"#)
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6233,7 +6268,6 @@ ZQ<CURSOR>
             "#,
             )
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6268,7 +6302,6 @@ bar.ZQ<CURSOR>
             "#,
             )
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6290,7 +6323,6 @@ Quitter<CURSOR>
 "#,
             )
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6322,7 +6354,6 @@ ZQ<CURSOR>
             "#,
             )
             .completion_test_builder()
-            .auto_import()
             .module_names()
             .build()
             .snapshot();
@@ -6342,7 +6373,6 @@ multiprocess<CURSOR>
 "#,
             )
             .completion_test_builder()
-            .auto_import()
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @r"
@@ -6383,7 +6413,6 @@ zqzqzq<CURSOR>
             )
             .source("zqzqzqzqzq.py", "")
             .completion_test_builder()
-            .auto_import()
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @"zqzqzqzqzq");
@@ -6399,7 +6428,6 @@ collabc<CURSOR>
 "#,
             )
             .completion_test_builder()
-            .auto_import()
             .build()
             .snapshot();
         assert_snapshot!(snapshot, @"collections.abc");
@@ -6471,12 +6499,19 @@ collabc<CURSOR>
             &self.cursor_test.db
         }
 
-        /// When enabled, symbols that aren't in scope but available
-        /// in the environment will be included.
+        /// When set, symbols that aren't in scope but available
+        /// in the environment will NOT be included.
         ///
-        /// Not enabled by default.
-        fn auto_import(mut self) -> CompletionTestBuilder {
-            self.settings.auto_import = true;
+        /// Auto-import is enabled by default. So one must opt into
+        /// skipping them with this method if one wants to test
+        /// completions without auto-import enabled.
+        ///
+        /// It's somewhat common to want to skip auto-import
+        /// completions because they can otherwise inflate the
+        /// snapshot size quite a bit and obscure what is actually
+        /// being tested.
+        fn skip_auto_import(mut self) -> CompletionTestBuilder {
+            self.settings.auto_import = false;
             self
         }
 
@@ -6621,14 +6656,12 @@ collabc<CURSOR>
         fn completion_test_builder(&self) -> CompletionTestBuilder {
             CompletionTestBuilder {
                 cursor_test: self.build(),
-                settings: CompletionSettings {
-                    // The tests were originally written with auto-import
-                    // disabled, since it was disabled by default. But then
-                    // we enabled it by default. However, we kept the tests
-                    // as written with the assumption that auto-import was
-                    // disabled unless opted into. ---AG
-                    auto_import: false,
-                },
+                // N.B. We very much want to use the default settings
+                // here, so that our test environment matches the
+                // production environment. If a default changes, the
+                // tests should be fixed to accomodate that change
+                // as well. ---AG
+                settings: CompletionSettings::default(),
                 skip_builtins: false,
                 skip_keywords: false,
                 type_signatures: false,
