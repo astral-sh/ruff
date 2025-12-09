@@ -1,0 +1,168 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 9
+Added: 1
+
+--- Removed ---
+E741 Ambiguous variable name: `I`
+ --> suppressions.py:4:5
+  |
+2 |     # These should both be ignored by the range suppression.
+3 |     # ruff: disable[E741, F841]
+4 |     I = 1
+  |     ^
+5 |     # ruff: enable[E741, F841]
+  |
+
+
+F841 [*] Local variable `I` is assigned to but never used
+ --> suppressions.py:4:5
+  |
+2 |     # These should both be ignored by the range suppression.
+3 |     # ruff: disable[E741, F841]
+4 |     I = 1
+  |     ^
+5 |     # ruff: enable[E741, F841]
+  |
+help: Remove assignment to unused variable `I`
+1 | def f():
+2 |     # These should both be ignored by the range suppression.
+3 |     # ruff: disable[E741, F841]
+  -     I = 1
+4 +     pass
+5 |     # ruff: enable[E741, F841]
+6 | 
+7 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+E741 Ambiguous variable name: `I`
+  --> suppressions.py:12:5
+   |
+10 |     # Should also generate an "unmatched suppression" warning.
+11 |     # ruff:disable[E741,F841]
+12 |     I = 1
+   |     ^
+   |
+
+
+F841 [*] Local variable `I` is assigned to but never used
+  --> suppressions.py:12:5
+   |
+10 |     # Should also generate an "unmatched suppression" warning.
+11 |     # ruff:disable[E741,F841]
+12 |     I = 1
+   |     ^
+   |
+help: Remove assignment to unused variable `I`
+9  |     # These should both be ignored by the implicit range suppression.
+10 |     # Should also generate an "unmatched suppression" warning.
+11 |     # ruff:disable[E741,F841]
+   -     I = 1
+12 +     pass
+13 | 
+14 | 
+15 | def f():
+note: This is an unsafe fix and may change runtime behavior
+
+
+E741 Ambiguous variable name: `I`
+  --> suppressions.py:26:5
+   |
+24 |     # the other logged to the user.
+25 |     # ruff: disable[E741]
+26 |     I = 1
+   |     ^
+27 |     # ruff: enable[E741]
+   |
+
+
+E741 Ambiguous variable name: `l`
+  --> suppressions.py:35:5
+   |
+33 |     # middle line should be completely silenced.
+34 |     # ruff: disable[E741]
+35 |     l = 0
+   |     ^
+36 |     # ruff: disable[F841]
+37 |     O = 1
+   |
+
+
+E741 Ambiguous variable name: `O`
+  --> suppressions.py:37:5
+   |
+35 |     l = 0
+36 |     # ruff: disable[F841]
+37 |     O = 1
+   |     ^
+38 |     # ruff: enable[E741]
+39 |     I = 2
+   |
+
+
+F841 [*] Local variable `O` is assigned to but never used
+  --> suppressions.py:37:5
+   |
+35 |     l = 0
+36 |     # ruff: disable[F841]
+37 |     O = 1
+   |     ^
+38 |     # ruff: enable[E741]
+39 |     I = 2
+   |
+help: Remove assignment to unused variable `O`
+34 |     # ruff: disable[E741]
+35 |     l = 0
+36 |     # ruff: disable[F841]
+   -     O = 1
+37 |     # ruff: enable[E741]
+38 |     I = 2
+39 |     # ruff: enable[F841]
+note: This is an unsafe fix and may change runtime behavior
+
+
+F841 [*] Local variable `I` is assigned to but never used
+  --> suppressions.py:39:5
+   |
+37 |     O = 1
+38 |     # ruff: enable[E741]
+39 |     I = 2
+   |     ^
+40 |     # ruff: enable[F841]
+   |
+help: Remove assignment to unused variable `I`
+36 |     # ruff: disable[F841]
+37 |     O = 1
+38 |     # ruff: enable[E741]
+   -     I = 2
+39 |     # ruff: enable[F841]
+40 | 
+41 | 
+note: This is an unsafe fix and may change runtime behavior
+
+
+
+--- Added ---
+RUF100 [*] Unused `noqa` directive (unused: `E741`, `F841`)
+  --> suppressions.py:55:12
+   |
+53 |     # and an unusued noqa diagnostic should be logged.
+54 |     # ruff:disable[E741,F841]
+55 |     I = 1  # noqa: E741,F841
+   |            ^^^^^^^^^^^^^^^^^
+56 |     # ruff:enable[E741,F841]
+   |
+help: Remove unused `noqa` directive
+52 |     # These should both be ignored by the range suppression,
+53 |     # and an unusued noqa diagnostic should be logged.
+54 |     # ruff:disable[E741,F841]
+   -     I = 1  # noqa: E741,F841
+55 +     I = 1
+56 |     # ruff:enable[E741,F841]
