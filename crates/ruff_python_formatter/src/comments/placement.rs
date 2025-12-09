@@ -857,15 +857,10 @@ fn handle_parameter_comment<'a>(
     parameter: &'a Parameter,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let parent = if let Some(parent @ AnyNodeRef::Parameters(parameters)) =
-        comment.enclosing_parent()
-        && parameters
-            .iter()
-            .next()
-            .is_some_and(|first| first.range() == parameter.range())
-        && !are_parameters_parenthesized(parameters, source)
+    let parameters = if let Some(AnyNodeRef::Parameters(parameters)) = comment.enclosing_parent()
+        && parameters.start() == parameter.start()
     {
-        Some(parent)
+        Some(parameters)
     } else {
         None
     };
@@ -880,17 +875,13 @@ fn handle_parameter_comment<'a>(
         if comment.start() < colon.start() {
             // The comment is before the colon, pull it out and make it a leading comment of the
             // parameter, or of the whole parameters list, if it's the first parameter.
-            if let Some(parent) = parent {
-                CommentPlacement::leading(parent, comment)
-            } else {
-                CommentPlacement::leading(parameter, comment)
-            }
+            CommentPlacement::leading(parameter, comment)
         } else {
             CommentPlacement::Default(comment)
         }
     } else if comment.start() < parameter.name.start() {
-        if let Some(parent) = parent {
-            CommentPlacement::leading(parent, comment)
+        if let Some(parameters) = parameters {
+            CommentPlacement::leading(parameters, comment)
         } else {
             CommentPlacement::leading(parameter, comment)
         }
