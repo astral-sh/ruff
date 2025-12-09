@@ -24,7 +24,8 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{Definedness, Place};
+use crate::module_resolver::KnownModule;
+use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -43,13 +44,14 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature,
+    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
     TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members, todo_type,
 };
+use crate::unpack::EvaluationMode;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -938,6 +940,18 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::Cast) => {
                             if let [Some(casted_ty), Some(_)] = overload.parameter_types() {
                                 overload.set_return_type(*casted_ty);
+                            }
+                        }
+
+                        // TODO: Remove this special handling once we have full support for
+                        // generic protocols in the solver.
+                        Some(KnownFunction::AsyncContextManager) => {
+                            if let [Some(callable)] = overload.parameter_types() {
+                                if let Some(return_ty) =
+                                    asynccontextmanager_return_type(db, *callable)
+                                {
+                                    overload.set_return_type(return_ty);
+                                }
                             }
                         }
 
@@ -4622,3 +4636,55 @@ impl fmt::Display for FunctionKind {
 // An example of a routine with many many overloads:
 // https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
 const MAXIMUM_OVERLOADS: usize = 50;
+
+/// Infer the return type for a call to `asynccontextmanager`.
+///
+/// The `@asynccontextmanager` decorator transforms a function that returns (a subtype of) `AsyncIterator[T]`
+/// into a function that returns `_AsyncGeneratorContextManager[T]`.
+///
+/// TODO: This function only handles the most basic case. It should be removed once we have
+/// full support for generic protocols in the solver.
+fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> Option<Type<'db>> {
+    let bindings = func_ty.bindings(db);
+    let binding = bindings
+        .single_element()?
+        .overloads
+        .iter()
+        .exactly_one()
+        .ok()?;
+    let signature = &binding.signature;
+    let return_ty = signature.return_ty?;
+
+    let yield_ty = return_ty
+        .try_iterate_with_mode(db, EvaluationMode::Async)
+        .ok()?
+        .homogeneous_element_type(db);
+
+    if yield_ty.is_divergent()
+        || signature
+            .parameters()
+            .iter()
+            .any(|param| param.annotated_type().is_some_and(|ty| ty.is_divergent()))
+    {
+        return Some(yield_ty);
+    }
+
+    let context_manager =
+        known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
+            .place
+            .ignore_possibly_undefined()?
+            .as_class_literal()?;
+
+    let context_manager = context_manager.apply_specialization(db, |generic_context| {
+        generic_context.specialize_partial(db, [Some(yield_ty), None])
+    });
+
+    let new_return_ty = Type::from(context_manager).to_instance(db)?;
+    let new_signature = Signature::new(signature.parameters().clone(), Some(new_return_ty));
+
+    Some(Type::Callable(CallableType::new(
+        db,
+        CallableSignature::single(new_signature),
+        CallableTypeKind::FunctionLike,
+    )))
+}

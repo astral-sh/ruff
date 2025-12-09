@@ -6,7 +6,11 @@ python-version = "3.13"
 python-platform = "linux"
 
 [project]
-dependencies = ["sqlmodel==0.0.27"]
+dependencies = [
+    "sqlmodel==0.0.27",
+    # TODO: remove this pin, once we have a lockfile
+    "sqlalchemy==2.0.44"
+]
 ```
 
 ## Basic model
