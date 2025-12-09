@@ -888,8 +888,7 @@ lambda a, /, c: a
 (
     lambda
     # comment
-    *x,
-    **y: x
+    *x, **y: x
 )
 
 (
@@ -1398,8 +1397,8 @@ x = (
 (
     lambda
     # comment
-    *args,
-    **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+    + 1
 )
 
 (
@@ -1411,8 +1410,7 @@ x = (
 (
     lambda  # comment 1
     # comment 2
-    *args,
-    **kwargs:  # comment 3
+    *args, **kwargs:  # comment 3
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 )
 
@@ -1525,15 +1523,13 @@ transform = (
 )
 
 (
-    lambda
-    # comment 2
-    *x, **y: x
+    lambda *x, **y:  # comment 2
+    x
 )
 
 (
-    lambda
-    # comment 1
-    **x: x
+    lambda **x:  # comment 1
+    x
 )
 ```
 
@@ -1630,7 +1626,7 @@ transform = (
  )
  
  (
-@@ -136,17 +120,18 @@
+@@ -135,17 +119,18 @@
  (
      lambda
      # comment 1
@@ -1656,7 +1652,7 @@ transform = (
  )
  
  lambda *x: x
-@@ -162,30 +147,34 @@
+@@ -161,30 +146,34 @@
  )
  
  (
@@ -1703,7 +1699,7 @@ transform = (
          x
      )
  )
-@@ -193,11 +182,12 @@
+@@ -192,11 +181,12 @@
  (
      lambda  # 1
      # 2
@@ -1721,7 +1717,7 @@ transform = (
  )
  
  (
-@@ -205,9 +195,10 @@
+@@ -204,9 +194,10 @@
      # 2
      x,  # 3
      # 4
@@ -1735,7 +1731,7 @@ transform = (
  )
  
  (
-@@ -219,71 +210,79 @@
+@@ -218,71 +209,79 @@
  
  # Leading
  lambda x: (
@@ -1874,7 +1870,7 @@ transform = (
  
  
  # Regression tests for https://github.com/astral-sh/ruff/issues/8179
-@@ -292,9 +291,9 @@
+@@ -291,9 +290,9 @@
          c,
          d,
          e,
@@ -1887,7 +1883,7 @@ transform = (
      )
  
  
-@@ -303,15 +302,9 @@
+@@ -302,15 +301,9 @@
          c,
          d,
          e,
@@ -1906,7 +1902,7 @@ transform = (
          g=10,
      )
  
-@@ -321,9 +314,9 @@
+@@ -320,9 +313,9 @@
          c,
          d,
          e,
@@ -1919,7 +1915,7 @@ transform = (
      )
  
  
-@@ -339,9 +332,9 @@
+@@ -338,9 +331,9 @@
  
  class C:
      function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
@@ -1932,7 +1928,7 @@ transform = (
      }
  
  
-@@ -353,42 +346,40 @@
+@@ -352,42 +345,40 @@
  def foo():
      if True:
          if True:
@@ -1991,7 +1987,7 @@ transform = (
          CREATE TABLE {table} AS
          SELECT ROW_NUMBER() OVER () AS id, {var}
          FROM (
-@@ -403,18 +394,19 @@
+@@ -402,18 +393,19 @@
  long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
      # 1
      # 2
@@ -2018,7 +2014,7 @@ transform = (
  )
  
  very_long_variable_name_x, very_long_variable_name_y = (
-@@ -422,8 +414,8 @@
+@@ -421,8 +413,8 @@
      lambda b: b * another_very_long_expression_here,
  )
  
@@ -2029,7 +2025,7 @@ transform = (
          x, more_args, additional_parameters
      )
  )
-@@ -459,12 +451,12 @@
+@@ -458,12 +450,12 @@
      [
          # Not fluent
          param(
@@ -2044,7 +2040,7 @@ transform = (
          ),
          param(
              lambda left, right: (
-@@ -473,9 +465,9 @@
+@@ -472,9 +464,9 @@
          ),
          param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
          param(
@@ -2057,7 +2053,7 @@ transform = (
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -509,16 +501,18 @@
+@@ -508,16 +500,18 @@
  ]
  
  # adds parentheses around the body
@@ -2079,7 +2075,7 @@ transform = (
  
  lambda x, y, z: (
      x + y + z
-@@ -529,7 +523,7 @@
+@@ -528,7 +522,7 @@
      x + y + z  # trailing eol body
  )
  
@@ -2088,7 +2084,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -541,21 +535,23 @@
+@@ -540,21 +534,23 @@
  )
  
  (
@@ -2122,7 +2118,7 @@ transform = (
      # dangling header comment
      source_bucket
      if name == source_bucket_name
-@@ -563,8 +559,7 @@
+@@ -562,8 +558,7 @@
  )
  
  (
@@ -2132,7 +2128,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -572,61 +567,70 @@
+@@ -571,61 +566,70 @@
  )
  
  (
@@ -2235,7 +2231,16 @@ transform = (
  )
  
  (
-@@ -645,22 +649,25 @@
+@@ -638,27 +642,31 @@
+ (
+     lambda
+     # comment
+-    *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+-    + 1
++    *args, **kwargs: (
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
++    )
+ )
  
  (
      lambda  # comment
@@ -2249,10 +2254,9 @@ transform = (
  (
      lambda  # comment 1
      # comment 2
-     *args,
--    **kwargs:  # comment 3
+-    *args, **kwargs:  # comment 3
 -    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
-+    **kwargs: (  # comment 3
++    *args, **kwargs: (  # comment 3
 +        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
 +    )
  )
@@ -2267,7 +2271,7 @@ transform = (
  )
  
  (
-@@ -668,19 +675,20 @@
+@@ -666,19 +674,20 @@
      # 2
      left,  # 3
      # 4
@@ -2298,7 +2302,7 @@ transform = (
          )
      )
  )
-@@ -698,63 +706,70 @@
+@@ -696,65 +705,72 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
@@ -2396,6 +2400,26 @@ transform = (
 -    y, *x:  # comment 2
 -    x
 +    y, *x: (  # comment 2
++        x
++    )
+ )
+ 
+ (
+@@ -764,11 +780,13 @@
+ )
+ 
+ (
+-    lambda *x, **y:  # comment 2
+-    x
++    lambda *x, **y: (  # comment 2
++        x
++    )
+ )
+ 
+ (
+-    lambda **x:  # comment 1
+-    x
++    lambda **x: (  # comment 1
 +        x
 +    )
  )
