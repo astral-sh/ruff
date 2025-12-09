@@ -22,6 +22,8 @@ use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_project::metadata::Options;
+use ty_project::metadata::options::{ProjectOptionsOverrides, SrcOptions};
+use ty_project::metadata::value::{RangedValue, RelativeGlobPattern};
 use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
@@ -494,10 +496,13 @@ impl Session {
             combined_global_options.combine_with(Some(global));
 
             let workspace_settings = workspace.into_settings();
-            let Some((root, workspace)) = self.workspaces.initialize(&url, workspace_settings)
+            let Some((workspace_root, workspace)) =
+                self.workspaces.initialize(&url, workspace_settings)
             else {
                 continue;
             };
+
+            let workspace_overrides = workspace.settings().project_options_overrides().cloned();
 
             // For now, create one project database per workspace.
             // In the future, index the workspace directories to find all projects
@@ -507,61 +512,112 @@ impl Session {
                 self.native_system.clone(),
             );
 
-            let project = ProjectMetadata::discover(&root, &system)
-                .context("Failed to discover project configuration")
-                .and_then(|mut metadata| {
-                    metadata
-                        .apply_configuration_files(&system)
-                        .context("Failed to apply configuration files")?;
+            // We probably want something similar to our current logic but that now loops over every project.
 
-                    if let Some(overrides) = workspace.settings.project_options_overrides() {
-                        metadata.apply_overrides(overrides);
-                    }
-
-                    ProjectDatabase::new(metadata, system.clone())
-                });
-
-            let (root, db) = match project {
-                Ok(db) => (root, db),
+            let projects = match ProjectMetadata::discover_all(&workspace_root, &system)
+                .context("Failed to discover projects")
+            {
+                Ok(projects) => projects,
                 Err(err) => {
-                    tracing::error!(
-                        "Failed to create project for `{root}`: {err:#}. \
-                        Falling back to default settings"
-                    );
+                    tracing::error!("Failed to discover projects: {}", err);
 
                     client.show_error_message(format!(
-                        "Failed to load project rooted at {root}. \
+                        "Failed to discover projects in {workspace_root}. \
                         Please refer to the logs for more details.",
                     ));
 
-                    let db_with_default_settings =
-                        ProjectMetadata::from_options(Options::default(), root, None)
-                            .context("Failed to convert default options to metadata")
-                            .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                            .expect("Default configuration to be valid");
-                    let default_root = db_with_default_settings
-                        .project()
-                        .root(&db_with_default_settings)
-                        .to_path_buf();
-
-                    (default_root, db_with_default_settings)
+                    BTreeMap::from_iter([(
+                        workspace_root.clone(),
+                        ProjectMetadata::new(
+                            workspace_root.file_name().unwrap_or("root").into(),
+                            workspace_root,
+                        ),
+                    )])
                 }
             };
 
-            // Carry forward diagnostic state if any exists
-            let previous = self.projects.remove(&root);
-            let untracked = previous
-                .map(|state| state.untracked_files_with_pushed_diagnostics)
-                .unwrap_or_default();
-            self.projects.insert(
-                root.clone(),
-                ProjectState {
-                    db,
-                    untracked_files_with_pushed_diagnostics: untracked,
-                },
-            );
+            for (project_root, metadata) in &projects {
+                let mut metadata = metadata.clone();
+                if let Err(err) = metadata.apply_configuration_files(&system) {
+                    tracing::error!(
+                        "Failed to apply configuration files for `{project_root}`: {err:#}."
+                    );
 
-            publish_settings_diagnostics(self, client, root);
+                    client.show_error_message(format!(
+                        "Failed to apply configuration files for `{project_root}` \
+                        Please refer to the logs for more details.",
+                    ));
+                };
+
+                // TODO: Request python interpreter path per project.
+                if let Some(overrides) = workspace_overrides.as_ref() {
+                    metadata.apply_overrides(overrides);
+                }
+
+                // Only add outer most escape
+                for (nested, _) in projects
+                    .range(project_root.to_path_buf()..)
+                    .take_while(|(path, _)| path.starts_with(project_root))
+                {
+                    let exclude = Some(RangedValue::cli(vec![
+                        RelativeGlobPattern::cli(format!("{nested}/**/*")),
+                        RelativeGlobPattern::cli("**/*.ipynb"),
+                    ]));
+
+                    tracing::debug!("Adding exclude pattern: {:?}", exclude);
+                    metadata.apply_overrides(&ProjectOptionsOverrides {
+                        config_file_override: None,
+                        fallback_python_version: None,
+                        fallback_python: None,
+                        options: Options {
+                            src: Some(SrcOptions {
+                                exclude,
+                                ..SrcOptions::default()
+                            }),
+                            ..Options::default()
+                        },
+                    });
+                }
+
+                let db = match ProjectDatabase::new(metadata, system.clone()) {
+                    Ok(db) => db,
+                    Err(err) => {
+                        tracing::error!(
+                            "Failed to create project for `{project_root}`: {err:#}. \
+                            Falling back to default settings"
+                        );
+
+                        client.show_error_message(format!(
+                            "Failed to load project rooted at {project_root}. \
+                            Please refer to the logs for more details.",
+                        ));
+
+                        ProjectMetadata::from_options(
+                            Options::default(),
+                            project_root.clone(),
+                            None,
+                        )
+                        .context("Failed to convert default options to metadata")
+                        .and_then(|metadata| ProjectDatabase::new(metadata, system.clone()))
+                        .expect("Default configuration to be valid")
+                    }
+                };
+
+                // Carry forward diagnostic state if any exists
+                let previous = self.projects.remove(project_root);
+                let untracked = previous
+                    .map(|state| state.untracked_files_with_pushed_diagnostics)
+                    .unwrap_or_default();
+                self.projects.insert(
+                    project_root.clone(),
+                    ProjectState {
+                        db,
+                        untracked_files_with_pushed_diagnostics: untracked,
+                    },
+                );
+
+                publish_settings_diagnostics(self, client, project_root);
+            }
         }
 
         if let Some(global_options) = combined_global_options {
@@ -1175,8 +1231,7 @@ impl Workspaces {
     ) -> Option<(SystemPathBuf, &mut Workspace)> {
         let path = url.to_file_path().ok()?;
 
-        // Realistically I don't think this can fail because we got the path from a Url
-        let system_path = SystemPathBuf::from_path_buf(path).ok()?;
+        let system_path = SystemPathBuf::from_path_buf(path).expect("URL to be valid UTF-8");
 
         if let Some(workspace) = self.workspaces.get_mut(&system_path) {
             workspace.settings = Arc::new(settings);
