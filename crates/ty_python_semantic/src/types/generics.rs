@@ -1545,35 +1545,72 @@ impl<'db> SpecializationBuilder<'db> {
                 }
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
-            (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element is assignable
-                // from the actual type, then we don't add any type mapping. This handles a case like
+            (Type::Union(union_formal), _) => {
+                // Second, if the formal is a union, and the actual type is assignable to precisely
+                // one union element, then we don't add any type mapping. This handles a case like
                 //
                 // ```py
-                // def f[T](t: T | None): ...
+                // def f[T](t: T | None) -> T: ...
                 //
-                // f(None)
+                // reveal_type(f(None))  # revealed: Unknown
                 // ```
                 //
                 // without specializing `T` to `None`.
-                //
-                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
-                // typevar), then we add a mapping between that typevar and the actual type.
                 if !actual.is_never() {
-                    let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
-                        actual
-                            .when_subtype_of(self.db, **ty, self.inferable)
-                            .is_always_satisfied(self.db)
-                    });
+                    let assignable_elements =
+                        (union_formal.elements(self.db).iter()).filter(|ty| {
+                            actual
+                                .when_subtype_of(self.db, **ty, self.inferable)
+                                .is_always_satisfied(self.db)
+                        });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
                     }
                 }
 
-                let bound_typevars =
-                    (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
-                if let Ok(bound_typevar) = bound_typevars.exactly_one() {
+                let mut bound_typevars =
+                    (union_formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
+
+                let first_bound_typevar = bound_typevars.next();
+                let has_more_than_one_typevar = bound_typevars.next().is_some();
+
+                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
+                // typevar), then we add a mapping between that typevar and the actual type.
+                if let Some(bound_typevar) = first_bound_typevar
+                    && !has_more_than_one_typevar
+                {
                     self.add_type_mapping(bound_typevar, actual, polarity, f);
+                    return Ok(());
+                }
+
+                // TODO:
+                // Handling more than one bare typevar is something that we can't handle yet.
+                if has_more_than_one_typevar {
+                    return Ok(());
+                }
+
+                // Finally, if there are no bare typevars, we try to infer type mappings by
+                // checking against each union element. This handles cases like
+                // ```py
+                // def f[T](t: P[T] | Q[T]) -> T: ...
+                //
+                // reveal_type(f(P[str]()))  # revealed: str
+                // reveal_type(f(Q[int]()))  # revealed: int
+                // ```
+                let mut first_error = None;
+                let mut found_matching_element = false;
+                for formal_element in union_formal.elements(self.db) {
+                    if !formal_element.is_disjoint_from(self.db, actual) {
+                        let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                        if let Err(err) = result {
+                            first_error.get_or_insert(err);
+                        } else {
+                            found_matching_element = true;
+                        }
+                    }
+                }
+                if !found_matching_element && let Some(error) = first_error {
+                    return Err(error);
                 }
             }
 
