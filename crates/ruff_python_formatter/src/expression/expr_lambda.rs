@@ -32,7 +32,15 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 .split_at(dangling.partition_point(|comment| comment.end() < parameters.start()));
 
             if dangling_before_parameters.is_empty() {
-                write!(f, [space()])?;
+                if parameters
+                    .iter()
+                    .next()
+                    .is_some_and(|parameter| comments.has_leading(parameter.as_parameter()))
+                {
+                    hard_line_break().fmt(f)?;
+                } else {
+                    write!(f, [space()])?;
+                }
             } else {
                 write!(f, [dangling_comments(dangling_before_parameters)])?;
             }
