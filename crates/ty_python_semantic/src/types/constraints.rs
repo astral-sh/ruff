@@ -76,7 +76,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
@@ -1730,22 +1732,27 @@ impl<'db> InteriorNode<'db> {
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
+        let mentions_typevar = |ty: Type<'db>| match ty {
+            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            _ => false,
+        };
         self.abstract_one_inner(
             db,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound of
-            // `bound_typevar`.
+            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
+            // that mentions `bound_typevar`.
+            // TODO: This will currently remove constraints that mention a typevar, but the sequent
+            // map is not yet propagating all derived facts about those constraints. For instance,
+            // removing `T` from `T ≤ int ∧ U ≤ Sequence[T]` should produce `U ≤ Sequence[int]`.
+            // But that requires `T ≤ int ∧ U ≤ Sequence[T] → U ≤ Sequence[int]` to exist in the
+            // sequent map. It doesn't, and so we currently produce `U ≤ Unknown` in this case.
             &mut |constraint| {
                 if constraint.typevar(db).identity(db) == bound_typevar {
                     return true;
                 }
-                if let Type::TypeVar(lower_bound_typevar) = constraint.lower(db)
-                    && lower_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.lower(db), &mentions_typevar, false) {
                     return true;
                 }
-                if let Type::TypeVar(upper_bound_typevar) = constraint.upper(db)
-                    && upper_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.upper(db), &mentions_typevar, false) {
                     return true;
                 }
                 false
@@ -1769,9 +1776,7 @@ impl<'db> InteriorNode<'db> {
                 if constraint.typevar(db).identity(db) != bound_typevar {
                     return true;
                 }
-                if matches!(constraint.lower(db), Type::TypeVar(_))
-                    || matches!(constraint.upper(db), Type::TypeVar(_))
-                {
+                if constraint.lower(db).has_typevar(db) || constraint.upper(db).has_typevar(db) {
                     return true;
                 }
                 false
