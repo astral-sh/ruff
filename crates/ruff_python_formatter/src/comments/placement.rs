@@ -857,14 +857,6 @@ fn handle_parameter_comment<'a>(
     parameter: &'a Parameter,
     source: &str,
 ) -> CommentPlacement<'a> {
-    let parameters = if let Some(AnyNodeRef::Parameters(parameters)) = comment.enclosing_parent()
-        && parameters.start() == parameter.start()
-    {
-        Some(parameters)
-    } else {
-        None
-    };
-
     if parameter.annotation().is_some() {
         let colon = first_non_trivia_token(parameter.name.end(), source).expect(
             "A annotated parameter should have a colon following its name when it is valid syntax.",
@@ -880,7 +872,13 @@ fn handle_parameter_comment<'a>(
             CommentPlacement::Default(comment)
         }
     } else if comment.start() < parameter.name.start() {
-        if let Some(parameters) = parameters {
+        // For lambdas, where the parameters cannot be parenthesized and the first parameter thus
+        // starts at the same position as the parent parameters, mark a comment before the first
+        // parameter as leading on the parameters rather than the individual parameter to prevent
+        // the whole parameter list from breaking.
+        if let Some(AnyNodeRef::Parameters(parameters)) = comment.enclosing_parent()
+            && parameters.start() == parameter.start()
+        {
             CommentPlacement::leading(parameters, comment)
         } else {
             CommentPlacement::leading(parameter, comment)
