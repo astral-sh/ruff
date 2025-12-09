@@ -54,3 +54,35 @@ def f():
     # ruff:disable[E741,F841]
     I = 1  # noqa: E741,F841
     # ruff:enable[E741,F841]
+
+
+def f():
+    # TODO: Duplicate codes should be counted as duplicate, not unused
+    # ruff: disable[F841, F841]
+    foo = 0
+
+
+def f():
+    # Overlapping range suppressions, one should be marked as used,
+    # and the other should trigger an unused suppression diagnostic
+    # ruff: disable[F841]
+    # ruff: disable[F841]
+    foo = 0
+
+
+def f():
+    # Multiple codes but only one is used
+    # ruff: disable[E741, F401, F841]
+    foo = 0
+
+
+def f():
+    # Multiple codes but only two are used
+    # ruff: disable[E741, F401, F841]
+    I = 0
+
+
+def f():
+    # Multiple codes but none are used
+    # ruff: disable[E741, F401, F841]
+    print("hello")
