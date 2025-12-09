@@ -646,7 +646,11 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db).identity(db), self.as_id())
+        (
+            self.typevar(db).binding_context(db),
+            self.typevar(db).identity(db),
+            self.as_id(),
+        )
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
