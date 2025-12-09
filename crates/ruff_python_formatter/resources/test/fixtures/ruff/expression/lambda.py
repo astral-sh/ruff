@@ -241,3 +241,11 @@ def a():
     x:
     x
 )
+
+(
+    lambda # comment 1
+    y,
+    * # comment 2
+    x:
+    x
+)
