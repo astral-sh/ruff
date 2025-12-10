@@ -1028,18 +1028,6 @@ impl<'db> FunctionType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // A function type is the subtype of itself, and not of any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only subtypes
-        // of each other if they result in subtype signatures.
-        if matches!(
-            relation,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
-        ) && self.normalized(db) == other.normalized(db)
-        {
-            return ConstraintSet::from(true);
-        }
-
         if self.literal(db) != other.literal(db) {
             return ConstraintSet::from(false);
         }
