@@ -608,10 +608,7 @@ impl FormatString {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
                     cur_text = remaining;
-
-                    if next_char == '\\' {
-                        pending_escape = !pending_escape
-                    }
+                    pending_escape = next_char == '\\' && !pending_escape
                 }
                 Err(err) => {
                     return if result_string.is_empty() {
