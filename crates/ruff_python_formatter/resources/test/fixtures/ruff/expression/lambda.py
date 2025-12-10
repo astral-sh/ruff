@@ -631,6 +631,48 @@ x = (
 )
 
 (
+    lambda *args, **kwargs:
+    # comment 1
+    ( # comment 2
+        # comment 3
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1 # comment 4
+        # comment 5
+    ) # comment 6
+)
+
+(
+    lambda *brgs, **kwargs:
+    # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa( # comment 2
+        # comment 3
+        *brgs, **kwargs) + 1 # comment 4
+    # comment 5
+)
+
+(
+    lambda *crgs, **kwargs: # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
+)
+
+(
+    lambda *drgs, **kwargs: # comment 1
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1
+    )
+)
+
+(
+    lambda * # comment 1
+    ergs, **
+    # comment 2
+    kwargs # comment 3
+    : # comment 4
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1
+    )
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3

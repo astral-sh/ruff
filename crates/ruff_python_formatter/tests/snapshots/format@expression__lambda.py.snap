@@ -637,6 +637,48 @@ x = (
 )
 
 (
+    lambda *args, **kwargs:
+    # comment 1
+    ( # comment 2
+        # comment 3
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1 # comment 4
+        # comment 5
+    ) # comment 6
+)
+
+(
+    lambda *brgs, **kwargs:
+    # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa( # comment 2
+        # comment 3
+        *brgs, **kwargs) + 1 # comment 4
+    # comment 5
+)
+
+(
+    lambda *crgs, **kwargs: # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
+)
+
+(
+    lambda *drgs, **kwargs: # comment 1
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1
+    )
+)
+
+(
+    lambda * # comemnt 1
+    ergs, **
+    # comment 2
+    kwargs # comment 3
+    : # comment 4
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1
+    )
+)
+
+(
     lambda  # 1
     # 2
     left,  # 3
@@ -1417,6 +1459,49 @@ x = (
     lambda  # comment 1
     *args, **kwargs:  # comment 3
     aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda *args, **kwargs:
+    # comment 1
+    (  # comment 2
+        # comment 3
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+        + 1  # comment 4
+        # comment 5
+    )  # comment 6
+)
+
+(
+    lambda *brgs, **kwargs:
+    # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(  # comment 2
+        # comment 3
+        *brgs,
+        **kwargs,
+    )
+    + 1  # comment 4
+    # comment 5
+)
+
+(
+    lambda *crgs, **kwargs:  # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
+)
+
+(
+    lambda *drgs, **kwargs:  # comment 1
+    (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1)
+)
+
+(
+    lambda
+    # comemnt 1
+    *ergs,
+    # comment 2
+    **kwargs:  # comment 3
+    # comment 4
+    (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1)
 )
 
 (
@@ -2231,7 +2316,7 @@ transform = (
  )
  
  (
-@@ -637,27 +641,31 @@
+@@ -637,33 +641,37 @@
  (
      lambda
      # comment
@@ -2271,7 +2356,70 @@ transform = (
  )
  
  (
-@@ -665,19 +673,20 @@
+-    lambda *args, **kwargs:
+-    # comment 1
+-    (  # comment 2
++    lambda *args, **kwargs: (
++        # comment 1
++        # comment 2
+         # comment 3
+         aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+         + 1  # comment 4
+@@ -672,25 +680,28 @@
+ )
+ 
+ (
+-    lambda *brgs, **kwargs:
+-    # comment 1
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(  # comment 2
+-        # comment 3
+-        *brgs,
+-        **kwargs,
+-    )
+-    + 1  # comment 4
++    lambda *brgs, **kwargs: (
++        # comment 1
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(  # comment 2
++            # comment 3
++            *brgs,
++            **kwargs,
++        )
++        + 1
++    )  # comment 4
+     # comment 5
+ )
+ 
+ (
+-    lambda *crgs, **kwargs:  # comment 1
+-    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
++    lambda *crgs, **kwargs: (  # comment 1
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
++    )
+ )
+ 
+ (
+-    lambda *drgs, **kwargs:  # comment 1
+-    (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1)
++    lambda *drgs, **kwargs: (  # comment 1
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1
++    )
+ )
+ 
+ (
+@@ -698,9 +709,9 @@
+     # comemnt 1
+     *ergs,
+     # comment 2
+-    **kwargs:  # comment 3
+-    # comment 4
+-    (aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1)
++    **kwargs: (  # comment 3  # comment 4
++        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1
++    )
+ )
+ 
+ (
+@@ -708,19 +719,20 @@
      # 2
      left,  # 3
      # 4
@@ -2302,7 +2450,7 @@ transform = (
          )
      )
  )
-@@ -695,48 +704,52 @@
+@@ -738,48 +750,52 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
