@@ -1498,6 +1498,8 @@ impl<'db> SpecializationBuilder<'db> {
                 let upper = constraint.upper(self.db);
                 if !upper.is_object() {
                     self.add_type_mapping(typevar, upper, variance, &mut f);
+                } else if !lower.is_never() {
+                    self.add_type_mapping(typevar, lower, variance.flip(), &mut f);
                 }
                 if let Type::TypeVar(lower_bound_typevar) = lower {
                     self.add_type_mapping(
