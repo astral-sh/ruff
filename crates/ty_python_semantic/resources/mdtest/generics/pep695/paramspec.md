@@ -237,7 +237,7 @@ def func[**P2](c: Callable[P2, None]):
 
 P2 = ParamSpec("P2")
 
-# error: [invalid-type-form] "ParamSpec `P2` is unbound"
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
 
 # error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
@@ -281,7 +281,7 @@ reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str,
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
-# error: [invalid-type-form] "ParamSpec `P2` is unbound"
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
 # error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int

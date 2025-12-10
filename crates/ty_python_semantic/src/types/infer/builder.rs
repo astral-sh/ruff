@@ -3531,7 +3531,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         if known_instance.class(self.db()) == KnownClass::ParamSpec =>
                     {
                         if let Some(diagnostic_builder) =
-                            self.context.report_lint(&INVALID_TYPE_FORM, expr)
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr)
                         {
                             diagnostic_builder.into_diagnostic(format_args!(
                                 "ParamSpec `{}` is unbound",
