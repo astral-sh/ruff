@@ -608,7 +608,7 @@ impl FormatString {
                 Ok((next_char, remaining)) => {
                     result_string.push(next_char);
                     cur_text = remaining;
-                    pending_escape = next_char == '\\' && !pending_escape
+                    pending_escape = next_char == '\\' && !pending_escape;
                 }
                 Err(err) => {
                     return if result_string.is_empty() {
@@ -692,7 +692,7 @@ impl FormatString {
     }
 
     fn parse_escaped_unicode_string(text: &str) -> Option<(&str, &str)> {
-        text.strip_prefix("N{")?.find("}").map(|idx| {
+        text.strip_prefix("N{")?.find('}').map(|idx| {
             let end_idx = idx + 3; // 3 for "N{"
             (&text[..end_idx], &text[end_idx..])
         })
