@@ -305,7 +305,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return maybe_parenthesize_lambda(value, *statement).fmt(f);
+                    return maybe_parenthesize_value(value, *statement).fmt(f);
                 }
 
                 let comments = f.context().comments().clone();
@@ -583,7 +583,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                             space(),
                             operator,
                             space(),
-                            maybe_parenthesize_lambda(value, *statement)
+                            maybe_parenthesize_value(value, *statement)
                         ]
                     );
                 }
@@ -1365,21 +1365,21 @@ fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContex
 }
 
 /// Like [`maybe_parenthesize_expression`] but with special handling for lambdas in preview.
-fn maybe_parenthesize_lambda<'a>(
+fn maybe_parenthesize_value<'a>(
     expression: &'a Expr,
     parent: AnyNodeRef<'a>,
-) -> MaybeParenthesizeLambda<'a> {
-    MaybeParenthesizeLambda { expression, parent }
+) -> MaybeParenthesizeValue<'a> {
+    MaybeParenthesizeValue { expression, parent }
 }
 
-struct MaybeParenthesizeLambda<'a> {
+struct MaybeParenthesizeValue<'a> {
     expression: &'a Expr,
     parent: AnyNodeRef<'a>,
 }
 
-impl Format<PyFormatContext<'_>> for MaybeParenthesizeLambda<'_> {
+impl Format<PyFormatContext<'_>> for MaybeParenthesizeValue<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let MaybeParenthesizeLambda { expression, parent } = self;
+        let MaybeParenthesizeValue { expression, parent } = self;
 
         if is_parenthesize_lambda_bodies_enabled(f.context())
             && let Expr::Lambda(lambda) = expression
