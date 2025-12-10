@@ -13,7 +13,7 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, DynamicType, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable,
 };
@@ -91,43 +91,6 @@ impl<'db> Type<'db> {
 
     pub(crate) const fn is_nominal_instance(self) -> bool {
         matches!(self, Type::NominalInstance(_))
-    }
-
-    /// Returns whether the definition of this type is generic
-    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
-    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|ty| ty.is_definition_generic(db)),
-            Type::Intersection(intersection) => {
-                intersection
-                    .positive(db)
-                    .iter()
-                    .any(|ty| ty.is_definition_generic(db))
-                    || intersection
-                        .negative(db)
-                        .iter()
-                        .any(|ty| ty.is_definition_generic(db))
-            }
-            Type::NominalInstance(instance_type) => match instance_type.0 {
-                NominalInstanceInner::NonTuple(class) => class.is_generic(),
-                NominalInstanceInner::ExactTuple(_) => true,
-                NominalInstanceInner::Object => false,
-            },
-            Type::ProtocolInstance(protocol) => {
-                matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
-            }
-            Type::TypedDict(typed_dict) => typed_dict.defining_class().is_generic(),
-            Type::Dynamic(dynamic) => {
-                matches!(dynamic, DynamicType::UnknownGeneric(_))
-            }
-            // Due to inheritance rules, enums cannot be generic.
-            Type::EnumLiteral(_) => false,
-            // Once generic NewType is officially specified, handle it.
-            _ => false,
-        }
     }
 
     pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
@@ -339,6 +302,14 @@ impl<'db> NominalInstanceType<'db> {
     /// Return `true` if this type represents instances of the class `builtins.object`.
     pub(super) const fn is_object(self) -> bool {
         matches!(self.0, NominalInstanceInner::Object)
+    }
+
+    pub(super) fn is_definition_generic(self) -> bool {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => class.is_generic(),
+            NominalInstanceInner::ExactTuple(_) => true,
+            NominalInstanceInner::Object => false,
+        }
     }
 
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
