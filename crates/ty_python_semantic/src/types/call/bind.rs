@@ -51,6 +51,7 @@ use crate::types::{
     TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members, todo_type,
 };
+use crate::types::variance::VarianceInferable;
 use crate::unpack::EvaluationMode;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -3014,6 +3015,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
+        let generic_variables: SmallVec<[(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>); 8]> =
+            generic_context
+                .variables(self.db)
+                .map(|typevar| (typevar.identity(self.db), typevar))
+                .collect();
+        let mut record_argument_variance =
+            |identity: BoundTypeVarIdentity<'db>, variance: TypeVarVariance| {
+                variance_in_arguments
+                    .entry(identity)
+                    .and_modify(|current| *current = current.join(variance))
+                    .or_insert(variance);
+            };
+
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
@@ -3026,10 +3040,23 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
+                if parameter.form == ParameterForm::Value && expected_type.has_typevar(self.db) {
+                    for (identity, typevar) in generic_variables.iter().copied() {
+                        if !typevar.is_inferable(self.db, self.inferable_typevars) {
+                            continue;
+                        }
+
+                        let variance = expected_type.variance_of(self.db, typevar);
+                        if variance != TypeVarVariance::Bivariant {
+                            record_argument_variance(identity, variance);
+                        }
+                    }
+                }
+
                 let specialization_result = builder.infer_map(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(identity, _variance, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if preferred_type_mappings
@@ -3041,11 +3068,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         {
                             return None;
                         }
-
-                        variance_in_arguments
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
 
                         Some(inferred_ty)
                     },
