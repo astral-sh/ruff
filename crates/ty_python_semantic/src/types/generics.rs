@@ -1570,21 +1570,9 @@ impl<'db> SpecializationBuilder<'db> {
                 let mut bound_typevars =
                     (union_formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
 
-                let first_bound_typevar = bound_typevars.next();
-                let has_more_than_one_typevar = bound_typevars.next().is_some();
-
-                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
-                // typevar), then we add a mapping between that typevar and the actual type.
-                if let Some(bound_typevar) = first_bound_typevar
-                    && !has_more_than_one_typevar
-                {
-                    self.add_type_mapping(bound_typevar, actual, polarity, f);
-                    return Ok(());
-                }
-
                 // TODO:
                 // Handling more than one bare typevar is something that we can't handle yet.
-                if has_more_than_one_typevar {
+                if bound_typevars.nth(1).is_some() {
                     return Ok(());
                 }
 
@@ -1599,15 +1587,21 @@ impl<'db> SpecializationBuilder<'db> {
                 let mut first_error = None;
                 let mut found_matching_element = false;
                 for formal_element in union_formal.elements(self.db) {
-                    if !formal_element.is_disjoint_from(self.db, actual) {
-                        let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
-                        if let Err(err) = result {
-                            first_error.get_or_insert(err);
-                        } else {
+                    let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                    if let Err(err) = result {
+                        first_error.get_or_insert(err);
+                    } else {
+                        // The recursive call to `infer_map_impl` may succeed even if the actual type is
+                        // not assignable to the formal element.
+                        if !actual
+                            .when_assignable_to(self.db, *formal_element, self.inferable)
+                            .is_never_satisfied(self.db)
+                        {
                             found_matching_element = true;
                         }
                     }
                 }
+
                 if !found_matching_element && let Some(error) = first_error {
                     return Err(error);
                 }
