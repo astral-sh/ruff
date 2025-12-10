@@ -1247,10 +1247,9 @@ fn is_instance_truthiness<'db>(
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
-        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
-            db,
-            newtype.base_class_type(db),
-        ))),
+        Type::NewTypeInstance(newtype) => {
+            always_true_if(is_instance(&newtype.concrete_base_type(db)))
+        }
 
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)

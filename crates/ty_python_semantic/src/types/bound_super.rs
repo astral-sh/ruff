@@ -429,7 +429,7 @@ impl<'db> BoundSuperType<'db> {
                 );
             }
             Type::NewTypeInstance(newtype) => {
-                return delegate_to(Type::instance(db, newtype.base_class_type(db)));
+                return delegate_to(newtype.concrete_base_type(db));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));

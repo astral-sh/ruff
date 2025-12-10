@@ -5631,6 +5631,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
         match self.infer_type_expression(&arguments.args[1]) {
             Type::NominalInstance(_) | Type::NewTypeInstance(_) => {}
+            // There are exactly two union types allowed as bases for NewType: `int | float` and
+            // `int | float | complex`. These are allowed because that's what `float` and `complex`
+            // expand into in type position. We don't currently ask whether the union was implicit
+            // or explicit, so the explicit version is also allowed.
+            Type::Union(union_ty)
+                if union_ty.is_int_float(self.db()) || union_ty.is_int_float_complex(self.db()) => {
+            }
             // `Unknown` is likely to be the result of an unresolved import or a typo, which will
             // already get a diagnostic, so don't pile on an extra diagnostic here.
             Type::Dynamic(DynamicType::Unknown) => {}

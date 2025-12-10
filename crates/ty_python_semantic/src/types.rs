@@ -1785,7 +1785,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).try_upcast_to_callable(db)
+                newtype.concrete_base_type(db).try_upcast_to_callable(db)
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
@@ -2906,17 +2906,16 @@ impl<'db> Type<'db> {
                 self_newtype.has_relation_to_impl(db, target_newtype)
             }
 
-            (
-                Type::NewTypeInstance(self_newtype),
-                Type::NominalInstance(target_nominal_instance),
-            ) => self_newtype.base_class_type(db).has_relation_to_impl(
-                db,
-                target_nominal_instance.class(db),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
+            (Type::NewTypeInstance(self_newtype), _) => {
+                self_newtype.concrete_base_type(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
 
             (Type::PropertyInstance(_), _) => {
                 KnownClass::Property.to_instance(db).has_relation_to_impl(
@@ -2937,10 +2936,9 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            // Other than the special cases enumerated above, nominal-instance types, and
-            // newtype-instance types are never subtypes of any other variants
+            // Other than the special cases enumerated above, nominal-instance types are never
+            // subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
-            (Type::NewTypeInstance(_), _) => ConstraintSet::from(false),
         }
     }
 
@@ -3869,7 +3867,7 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from_impl(db, right)
             }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-                Type::instance(db, newtype.base_class_type(db)).is_disjoint_from_impl(
+                newtype.concrete_base_type(db).is_disjoint_from_impl(
                     db,
                     other,
                     inferable,
@@ -4100,9 +4098,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
-            Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).is_singleton(db)
-            }
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
         }
     }
 
@@ -4153,9 +4149,7 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance) => instance.is_single_valued(db),
-            Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).is_single_valued(db)
-            }
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
@@ -4407,7 +4401,9 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
-            Type::NewTypeInstance(newtype) => newtype.base_class_type(db).instance_member(db, name),
+            Type::NewTypeInstance(newtype) => {
+                newtype.concrete_base_type(db).instance_member(db, name)
+            }
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
@@ -5523,8 +5519,11 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)
             })?,
-            Type::NewTypeInstance(newtype) => Type::instance(db, newtype.base_class_type(db))
-                .try_bool_impl(db, allow_short_circuit, visitor)?,
+            Type::NewTypeInstance(newtype) => {
+                newtype
+                    .concrete_base_type(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)?
+            }
         };
 
         Ok(truthiness)
@@ -6492,7 +6491,7 @@ impl<'db> Type<'db> {
 
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, Type::instance(db, newtype.base_class_type(db))),
+                Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
@@ -7605,7 +7604,7 @@ impl<'db> Type<'db> {
                 ),
             },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
-            Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
         }
     }
 
@@ -8811,9 +8810,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
-                visitor.visit_generic_alias_type(db, generic_alias);
-            }
+            visitor.visit_type(db, newtype.concrete_base_type(db));
         }
     }
 }
@@ -13917,6 +13914,54 @@ impl<'db> UnionType<'db> {
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
+    }
+
+    /// Returns true if this union is equivalent to `int | float`, which is what `float` expands
+    /// into in type position.
+    pub(crate) fn is_int_float(self, db: &'db dyn Db) -> bool {
+        let elements = self.elements(db);
+        if elements.len() != 2 {
+            return false;
+        }
+        let mut has_int = false;
+        let mut has_float = false;
+        for element in elements {
+            if let Type::NominalInstance(nominal) = element
+                && let Some(known) = nominal.known_class(db)
+            {
+                match known {
+                    KnownClass::Int => has_int = true,
+                    KnownClass::Float => has_float = true,
+                    _ => {}
+                }
+            }
+        }
+        has_int && has_float
+    }
+
+    /// Returns true if this union is equivalent to `int | float | complex`, which is what
+    /// `complex` expands into in type position.
+    pub(crate) fn is_int_float_complex(self, db: &'db dyn Db) -> bool {
+        let elements = self.elements(db);
+        if elements.len() != 3 {
+            return false;
+        }
+        let mut has_int = false;
+        let mut has_float = false;
+        let mut has_complex = false;
+        for element in elements {
+            if let Type::NominalInstance(nominal) = element
+                && let Some(known) = nominal.known_class(db)
+            {
+                match known {
+                    KnownClass::Int => has_int = true,
+                    KnownClass::Float => has_float = true,
+                    KnownClass::Complex => has_complex = true,
+                    _ => {}
+                }
+            }
+        }
+        has_int && has_float && has_complex
     }
 }
 
