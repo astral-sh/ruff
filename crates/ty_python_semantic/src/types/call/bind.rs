@@ -3029,9 +3029,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             };
 
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, _, argument_type) in
+        for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
+            // Synthetic arguments (e.g., implicit `self`/`cls`) are not provided by the caller.
+            // Counting their types when computing variance would incorrectly block literal
+            // promotion (they often carry the class typevars in invariant position), so we ignore
+            // them for argument variance tracking.
+            let record_variance = !matches!(argument, Argument::Synthetic);
+
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
@@ -3040,7 +3046,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                if parameter.form == ParameterForm::Value && expected_type.has_typevar(self.db) {
+                if record_variance
+                    && parameter.form == ParameterForm::Value
+                    && expected_type.has_typevar(self.db)
+                {
                     for (identity, typevar) in generic_variables.iter().copied() {
                         if !typevar.is_inferable(self.db, self.inferable_typevars) {
                             continue;
