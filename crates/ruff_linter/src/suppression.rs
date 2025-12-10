@@ -1,7 +1,10 @@
 use compact_str::CompactString;
 use core::fmt;
+use ruff_db::diagnostic::Diagnostic;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
+use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
 
@@ -9,7 +12,14 @@ use ruff_python_trivia::Cursor;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize, TextSlice};
 use smallvec::{SmallVec, smallvec};
 
-#[allow(unused)]
+use crate::Locator;
+use crate::checkers::ast::LintContext;
+use crate::codes::Rule;
+use crate::fix::edits::delete_comment;
+use crate::preview::is_range_suppressions_enabled;
+use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA, UnusedNOQAKind};
+use crate::settings::LinterSettings;
+
 #[derive(Clone, Debug, Eq, PartialEq)]
 enum SuppressionAction {
     Disable,
@@ -31,7 +41,6 @@ pub(crate) struct SuppressionComment {
     reason: TextRange,
 }
 
-#[allow(unused)]
 impl SuppressionComment {
     /// Return the suppressed codes as strings
     fn codes_as_str<'src>(&self, source: &'src str) -> impl Iterator<Item = &'src str> {
@@ -48,7 +57,6 @@ pub(crate) struct PendingSuppressionComment<'a> {
     comment: SuppressionComment,
 }
 
-#[allow(unused)]
 impl PendingSuppressionComment<'_> {
     /// Whether the comment "matches" another comment, based on indentation and suppressed codes
     /// Expects a "forward search" for matches, ie, will only match if the current comment is a
@@ -64,8 +72,7 @@ impl PendingSuppressionComment<'_> {
     }
 }
 
-#[allow(unused)]
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Suppression {
     /// The lint code being suppressed
     code: CompactString,
@@ -75,9 +82,11 @@ pub(crate) struct Suppression {
 
     /// Any comments associated with the suppression
     comments: SmallVec<[SuppressionComment; 2]>,
+
+    /// Whether this suppression actually suppressed a diagnostic
+    used: Cell<bool>,
 }
 
-#[allow(unused)]
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InvalidSuppressionKind {
     /// Trailing suppression not supported
@@ -98,8 +107,8 @@ pub(crate) struct InvalidSuppression {
 }
 
 #[allow(unused)]
-#[derive(Debug)]
-pub(crate) struct Suppressions {
+#[derive(Debug, Default)]
+pub struct Suppressions {
     /// Valid suppression ranges with associated comments
     valid: Vec<Suppression>,
 
@@ -110,11 +119,121 @@ pub(crate) struct Suppressions {
     errors: Vec<ParseError>,
 }
 
-#[allow(unused)]
 impl Suppressions {
-    pub(crate) fn from_tokens(source: &str, tokens: &Tokens) -> Suppressions {
-        let builder = SuppressionsBuilder::new(source);
-        builder.load_from_tokens(tokens)
+    pub fn from_tokens(settings: &LinterSettings, source: &str, tokens: &Tokens) -> Suppressions {
+        if is_range_suppressions_enabled(settings) {
+            let builder = SuppressionsBuilder::new(source);
+            builder.load_from_tokens(tokens)
+        } else {
+            Suppressions::default()
+        }
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.valid.is_empty()
+    }
+
+    /// Check if a diagnostic is suppressed by any known range suppressions
+    pub(crate) fn check_diagnostic(&self, diagnostic: &Diagnostic) -> bool {
+        if self.valid.is_empty() {
+            return false;
+        }
+
+        let Some(code) = diagnostic.secondary_code() else {
+            return false;
+        };
+        let Some(span) = diagnostic.primary_span() else {
+            return false;
+        };
+        let Some(range) = span.range() else {
+            return false;
+        };
+
+        for suppression in &self.valid {
+            if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+                suppression.used.set(true);
+                return true;
+            }
+        }
+        false
+    }
+
+    pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        if !context.any_rule_enabled(&[Rule::UnusedNOQA, Rule::InvalidRuleCode]) {
+            return;
+        }
+
+        let unused = self
+            .valid
+            .iter()
+            .filter(|suppression| !suppression.used.get());
+
+        for suppression in unused {
+            let Ok(rule) = Rule::from_code(&suppression.code) else {
+                continue; // TODO: invalid code
+            };
+            for comment in &suppression.comments {
+                let mut range = comment.range;
+                let edit = if comment.codes.len() == 1 {
+                    delete_comment(comment.range, locator)
+                } else {
+                    let code_index = comment
+                        .codes
+                        .iter()
+                        .position(|range| locator.slice(range) == suppression.code)
+                        .unwrap();
+                    range = comment.codes[code_index];
+                    let code_range = if code_index < (comment.codes.len() - 1) {
+                        TextRange::new(
+                            comment.codes[code_index].start(),
+                            comment.codes[code_index + 1].start(),
+                        )
+                    } else {
+                        TextRange::new(
+                            comment.codes[code_index - 1].end(),
+                            comment.codes[code_index].end(),
+                        )
+                    };
+                    Edit::range_deletion(code_range)
+                };
+
+                let codes = if context.is_rule_enabled(rule) {
+                    UnusedCodes {
+                        unmatched: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                } else {
+                    UnusedCodes {
+                        disabled: vec![suppression.code.to_string()],
+                        ..Default::default()
+                    }
+                };
+
+                let mut diagnostic = context.report_diagnostic(
+                    UnusedNOQA {
+                        codes: Some(codes),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                    range,
+                );
+                diagnostic.set_fix(Fix::safe_edit(edit));
+            }
+        }
+
+        for error in self
+            .errors
+            .iter()
+            .filter(|error| error.kind == ParseErrorKind::MissingCodes)
+        {
+            let mut diagnostic = context.report_diagnostic(
+                UnusedNOQA {
+                    codes: Some(UnusedCodes::default()),
+                    kind: UnusedNOQAKind::Suppression,
+                },
+                error.range,
+            );
+            diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+        }
     }
 }
 
@@ -240,6 +359,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: combined_range,
                         comments: smallvec![comment.comment.clone(), other.comment.clone()],
+                        used: false.into(),
                     });
                 }
 
@@ -256,6 +376,7 @@ impl<'a> SuppressionsBuilder<'a> {
                         code: code.into(),
                         range: implicit_range,
                         comments: smallvec![comment.comment.clone()],
+                        used: false.into(),
                     });
                 }
                 self.pending.remove(comment_index);
@@ -457,9 +578,12 @@ mod tests {
     use ruff_text_size::{TextRange, TextSize};
     use similar::DiffableStr;
 
-    use crate::suppression::{
-        InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
-        SuppressionParser, Suppressions,
+    use crate::{
+        settings::LinterSettings,
+        suppression::{
+            InvalidSuppression, ParseError, Suppression, SuppressionAction, SuppressionComment,
+            SuppressionParser, Suppressions,
+        },
     };
 
     #[test]
@@ -1376,7 +1500,11 @@ def bar():
         /// Parse all suppressions and errors in a module for testing
         fn debug(source: &'_ str) -> DebugSuppressions<'_> {
             let parsed = parse(source, ParseOptions::from(Mode::Module)).unwrap();
-            let suppressions = Suppressions::from_tokens(source, parsed.tokens());
+            let suppressions = Suppressions::from_tokens(
+                &LinterSettings::default().with_preview_mode(),
+                source,
+                parsed.tokens(),
+            );
             DebugSuppressions {
                 source,
                 suppressions,

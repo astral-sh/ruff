@@ -5,7 +5,8 @@ use ruff_diagnostics::Edit;
 use ruff_text_size::TextRange;
 use ty_project::Db;
 use ty_python_semantic::create_suppression_fix;
-use ty_python_semantic::types::UNRESOLVED_REFERENCE;
+use ty_python_semantic::lint::LintId;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
 /// A `QuickFix` Code Action
 #[derive(Debug, Clone)]
@@ -28,12 +29,17 @@ pub fn code_actions(
 
     let mut actions = Vec::new();
 
-    if lint_id.name() == UNRESOLVED_REFERENCE.name()
+    // Suggest imports for unresolved references (often ideal)
+    // TODO: suggest qualifying with an already imported symbol
+    let is_unresolved_reference =
+        lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
+    if is_unresolved_reference
         && let Some(import_quick_fix) = create_import_symbol_quick_fix(db, file, diagnostic_range)
     {
         actions.extend(import_quick_fix);
     }
 
+    // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
         title: format!("Ignore '{}' for this line", lint_id.name()),
         edits: create_suppression_fix(db, file, lint_id, diagnostic_range).into_edits(),
@@ -80,7 +86,10 @@ mod tests {
     use ruff_diagnostics::Fix;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{lint::LintMetadata, types::UNRESOLVED_REFERENCE};
+    use ty_python_semantic::{
+        lint::LintMetadata,
+        types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE},
+    };
 
     #[test]
     fn add_ignore() {
@@ -433,6 +442,40 @@ mod tests {
         3 +             + "test"  # ty:ignore[unresolved-reference]
         4 |
         "#);
+    }
+
+    #[test]
+    fn undefined_reveal_type() {
+        let test = CodeActionTest::with_source(
+            r#"
+            <START>reveal_type<END>(1)
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @r"
+        info[code-action]: import typing.reveal_type
+         --> main.py:2:13
+          |
+        2 |             reveal_type(1)
+          |             ^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 + from typing import reveal_type
+        2 | 
+        3 |             reveal_type(1)
+        4 |         
+
+        info[code-action]: Ignore 'undefined-reveal' for this line
+         --> main.py:2:13
+          |
+        2 |             reveal_type(1)
+          |             ^^^^^^^^^^^
+          |
+        1 | 
+          -             reveal_type(1)
+        2 +             reveal_type(1)  # ty:ignore[undefined-reveal]
+        3 |
+        ");
     }
 
     pub(super) struct CodeActionTest {

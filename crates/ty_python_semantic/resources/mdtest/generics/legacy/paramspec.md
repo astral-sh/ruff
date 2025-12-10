@@ -102,6 +102,38 @@ Other values are invalid.
 P4 = ParamSpec("P4", default=int)
 ```
 
+### `default` parameter in `typing_extensions.ParamSpec`
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+The `default` parameter to `ParamSpec` is available from `typing_extensions` in Python 3.12 and
+earlier.
+
+```py
+from typing import ParamSpec
+from typing_extensions import ParamSpec as ExtParamSpec
+
+# This shouldn't emit a diagnostic
+P1 = ExtParamSpec("P1", default=[int, str])
+
+# But, this should
+# error: [invalid-paramspec] "The `default` parameter of `typing.ParamSpec` was added in Python 3.13"
+P2 = ParamSpec("P2", default=[int, str])
+```
+
+And, it allows the same set of values as `typing.ParamSpec`.
+
+```py
+P3 = ExtParamSpec("P3", default=...)
+P4 = ExtParamSpec("P4", default=P3)
+
+# error: [invalid-paramspec]
+P5 = ExtParamSpec("P5", default=int)
+```
+
 ### Forward references in stub files
 
 Stubs natively support forward references, so patterns that would raise `NameError` at runtime are
@@ -244,6 +276,7 @@ Explicit specialization of a generic class involving `ParamSpec` is done by prov
 of types, `...`, or another in-scope `ParamSpec`.
 
 ```py
+reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
@@ -252,7 +285,27 @@ def func(c: Callable[P2, None]):
 
 # TODO: error: paramspec is unbound
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
+reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 ```
+
+An explicit tuple expression (unlike an implicit one that omits the parentheses) is also accepted
+when the `ParamSpec` is the only type variable. But, this isn't recommended is mainly a fallout of
+it having the same AST as the one without the parentheses. Both mypy and Pyright also allow this.
+
+```py
+reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
+```
+
+<!-- blacken-docs:off -->
+
+```py
+# error: [invalid-syntax]
+reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
+```
+
+<!-- blacken-docs:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -269,6 +322,7 @@ reveal_type(OnlyParamSpec[int]().attr)  # revealed: (int, /) -> None
 But, they cannot be omitted when there are multiple type variables.
 
 ```py
+reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
@@ -276,8 +330,12 @@ reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 # TODO: We could still specialize for `T1` as the type is valid which would reveal `(...) -> int`
 # TODO: error: paramspec is unbound
 reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
-# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be either a list of types, `ParamSpec`, `Concatenate`, or `...`"
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
 reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, (int, str)]().attr)  # revealed: (...) -> Unknown
 ```
 
 Nor can they be omitted when there are more than one `ParamSpec`s.

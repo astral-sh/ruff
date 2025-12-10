@@ -63,6 +63,12 @@ python-version = "3.12"
 from typing import Self
 
 class A:
+    def __init__(self):
+        reveal_type(self)  # revealed: Self@__init__
+
+    def __init_subclass__(cls, default_name, **kwargs):
+        reveal_type(cls)  # revealed: type[Self@__init_subclass__]
+
     def implicit_self(self) -> Self:
         reveal_type(self)  # revealed: Self@implicit_self
 
@@ -91,8 +97,7 @@ class A:
 
     @classmethod
     def a_classmethod(cls) -> Self:
-        # TODO: This should be type[Self@bar]
-        reveal_type(cls)  # revealed: Unknown
+        reveal_type(cls)  # revealed: type[Self@a_classmethod]
         return cls()
 
     @staticmethod

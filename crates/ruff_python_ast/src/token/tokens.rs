@@ -154,9 +154,7 @@ impl Tokens {
             // the tokens which is valid as well.
             assert!(
                 offset >= last.end(),
-                "Offset {:?} is inside a token range {:?}",
-                offset,
-                last.range()
+                "Offset {offset:?} is inside token `{last:?}`",
             );
         }
         before
@@ -181,9 +179,7 @@ impl Tokens {
             // the tokens which is valid as well.
             assert!(
                 offset <= first.start(),
-                "Offset {:?} is inside a token range {:?}",
-                offset,
-                first.range()
+                "Offset {offset:?} is inside token `{first:?}`",
             );
         }
 
@@ -391,7 +387,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
     fn tokens_after_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.after(TextSize::new(5));
@@ -453,7 +449,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
     fn tokens_before_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.before(TextSize::new(5));
@@ -505,14 +501,14 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Offset 5 is inside a token range 4..7")]
+    #[should_panic(expected = "Offset 5 is inside token `Name 4..7`")]
     fn tokens_in_range_start_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(5.into(), 10.into()));
     }
 
     #[test]
-    #[should_panic(expected = "Offset 6 is inside a token range 4..7")]
+    #[should_panic(expected = "Offset 6 is inside token `Name 4..7`")]
     fn tokens_in_range_end_offset_inside_token() {
         let tokens = new_tokens(TEST_CASE_WITH_GAP.into_iter());
         tokens.in_range(TextRange::new(0.into(), 6.into()));

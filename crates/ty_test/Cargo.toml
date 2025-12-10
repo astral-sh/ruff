@@ -25,6 +25,7 @@ ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
 camino = { workspace = true }
+dunce = { workspace = true }
 colored = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }

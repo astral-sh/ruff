@@ -58,9 +58,8 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                     SubDiagnosticSeverity::Info,
                     format_args!("Python {version} was assumed when {action}"),
                 );
-                sub_diagnostic.annotate(Annotation::primary(span).message(format_args!(
-                    "Python {version} assumed due to this configuration setting"
-                )));
+                sub_diagnostic
+                    .annotate(Annotation::primary(span).message("Python version configuration"));
                 diagnostic.sub(sub_diagnostic);
             } else {
                 diagnostic.info(format_args!(
@@ -76,10 +75,8 @@ pub fn add_inferred_python_version_hint_to_diagnostic(
                         "Python {version} was assumed when {action} because of your virtual environment"
                     ),
                 );
-                sub_diagnostic.annotate(
-                    Annotation::primary(span)
-                        .message("Python version inferred from virtual environment metadata file"),
-                );
+                sub_diagnostic
+                    .annotate(Annotation::primary(span).message("Virtual environment metadata"));
                 // TODO: it would also be nice to tell them how we resolved their virtual environment...
                 diagnostic.sub(sub_diagnostic);
             } else {

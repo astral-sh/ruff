@@ -228,7 +228,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 if expansion_size > MAX_EXPANSIONS {
                     tracing::debug!(
                         "Skipping argument type expansion as it would exceed the \
-                    maximum number of expansions ({MAX_EXPANSIONS})"
+                            maximum number of expansions ({MAX_EXPANSIONS})"
                     );
                     return Some(State::LimitReached(index));
                 }

@@ -1,6 +1,6 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
@@ -467,28 +467,7 @@ impl Session {
 
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {
-                // HACK: This is to ensure that users with an older version of the ty VS Code
-                // extension don't get warnings about unknown options when they are using a newer
-                // version of the language server. This should be removed after a few releases.
-                if !unknown_options.contains_key("importStrategy")
-                    && !unknown_options.contains_key("interpreter")
-                {
-                    tracing::warn!(
-                        "Received unknown options for workspace `{url}`: {}",
-                        serde_json::to_string_pretty(unknown_options)
-                            .unwrap_or_else(|_| format!("{unknown_options:?}"))
-                    );
-
-                    client.show_warning_message(format!(
-                        "Received unknown options for workspace `{url}`: '{}'. \
-                        Refer to the logs for more details.",
-                        unknown_options
-                            .keys()
-                            .map(String::as_str)
-                            .collect::<Vec<_>>()
-                            .join("', '")
-                    ));
-                }
+                warn_about_unknown_options(client, Some(&url), unknown_options);
             }
 
             combined_global_options.combine_with(Some(global));
@@ -1594,4 +1573,30 @@ impl DocumentHandle {
 
         Ok(requires_clear_diagnostics)
     }
+}
+
+/// Warns about unknown options received by the server.
+///
+/// If `workspace_url` is `Some`, it indicates that the unknown options were received during a
+/// workspace initialization, otherwise they were received during the server initialization.
+pub(super) fn warn_about_unknown_options(
+    client: &Client,
+    workspace_url: Option<&Url>,
+    unknown_options: &HashMap<String, serde_json::Value>,
+) {
+    let message = if let Some(workspace_url) = workspace_url {
+        format!(
+            "Received unknown options for workspace `{workspace_url}`: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    } else {
+        format!(
+            "Received unknown options during initialization: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    };
+    tracing::warn!("{message}");
+    client.show_warning_message(message);
 }

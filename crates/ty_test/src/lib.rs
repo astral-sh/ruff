@@ -28,6 +28,7 @@ mod assertion;
 mod config;
 mod db;
 mod diagnostic;
+mod external_dependencies;
 mod matcher;
 mod parser;
 
@@ -70,16 +71,21 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
-        let inconsistencies = run_module_resolution_consistency_test(&db);
-        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+            Ok(())
+        } else {
+            run_module_resolution_consistency_test(&db)
+        };
+
+        let this_test_failed = result.is_err() || inconsistencies.is_err();
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = failures {
+        if let Err(failures) = result {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -212,12 +218,24 @@ impl OutputFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestOutcome {
+    Success,
+    Skipped,
+}
+
+impl TestOutcome {
+    const fn has_been_skipped(self) -> bool {
+        matches!(self, TestOutcome::Skipped)
+    }
+}
+
 fn run_test(
     db: &mut db::Db,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
-) -> Result<(), Failures> {
+) -> Result<TestOutcome, Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -247,6 +265,27 @@ fn run_test(
     let src_path = project_root.clone();
     let custom_typeshed_path = test.configuration().typeshed();
     let python_version = test.configuration().python_version().unwrap_or_default();
+
+    // Setup virtual environment with dependencies if specified
+    let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
+    if let Some(dependencies) = test.configuration().dependencies() {
+        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
+            return Ok(TestOutcome::Skipped);
+        }
+
+        let python_platform = test.configuration().python_platform().expect(
+            "Tests with external dependencies must specify `python-platform` in the configuration",
+        );
+
+        external_dependencies::setup_venv(
+            db,
+            dependencies,
+            python_version,
+            &python_platform,
+            &venv_for_external_dependencies,
+        )
+        .expect("Failed to setup in-memory virtual environment with dependencies");
+    }
 
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
@@ -350,7 +389,19 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let site_packages_paths = if let Some(python) = configuration.python() {
+    let site_packages_paths = if configuration.dependencies().is_some() {
+        // If dependencies were specified, use the venv we just set up
+        let environment = PythonEnvironment::new(
+            &venv_for_external_dependencies,
+            SysPrefixPathOrigin::PythonCliFlag,
+            db.system(),
+        )
+        .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else if let Some(python) = configuration.python() {
         let environment =
             PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
                 .expect("Python environment to point to a valid path");
@@ -551,7 +602,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(())
+        Ok(TestOutcome::Success)
     } else {
         Err(failures)
     }

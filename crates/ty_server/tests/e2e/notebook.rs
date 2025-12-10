@@ -1,5 +1,5 @@
 use insta::assert_json_snapshot;
-use lsp_types::{CompletionResponse, CompletionTriggerKind, NotebookCellKind, Position, Range};
+use lsp_types::{NotebookCellKind, Position, Range};
 use ruff_db::system::SystemPath;
 use ty_server::ClientOptions;
 
@@ -10,6 +10,7 @@ static FILTERS: &[(&str, &str)] = &[(r#""sortText": "[0-9 ]+""#, r#""sortText": 
 #[test]
 fn publish_diagnostics_open() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
+        .enable_diagnostic_related_information(true)
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -219,8 +220,7 @@ fn swap_cells() -> anyhow::Result<()> {
             "href": "https://ty.dev/rules#unresolved-reference"
           },
           "source": "ty",
-          "message": "Name `a` used when not defined",
-          "relatedInformation": []
+          "message": "Name `a` used when not defined"
         }
       ],
       "vscode-notebook-cell://src/test.ipynb#1": [],
@@ -285,7 +285,7 @@ fn auto_import() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             SystemPath::new("src"),
-            Some(ClientOptions::default().with_experimental_auto_import(true)),
+            Some(ClientOptions::default().with_auto_import(true)),
         )?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -325,7 +325,7 @@ fn auto_import_same_cell() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             SystemPath::new("src"),
-            Some(ClientOptions::default().with_experimental_auto_import(true)),
+            Some(ClientOptions::default().with_auto_import(true)),
         )?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -360,7 +360,7 @@ fn auto_import_from_future() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             SystemPath::new("src"),
-            Some(ClientOptions::default().with_experimental_auto_import(true)),
+            Some(ClientOptions::default().with_auto_import(true)),
         )?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -397,7 +397,7 @@ fn auto_import_docstring() -> anyhow::Result<()> {
     let mut server = TestServerBuilder::new()?
         .with_workspace(
             SystemPath::new("src"),
-            Some(ClientOptions::default().with_experimental_auto_import(true)),
+            Some(ClientOptions::default().with_auto_import(true)),
         )?
         .build()
         .wait_until_workspaces_are_initialized();
@@ -521,31 +521,10 @@ fn literal_completions(
     cell: &lsp_types::Url,
     position: Position,
 ) -> Vec<lsp_types::CompletionItem> {
-    let completions_id =
-        server.send_request::<lsp_types::request::Completion>(lsp_types::CompletionParams {
-            text_document_position: lsp_types::TextDocumentPositionParams {
-                text_document: lsp_types::TextDocumentIdentifier { uri: cell.clone() },
-                position,
-            },
-            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
-            partial_result_params: lsp_types::PartialResultParams::default(),
-            context: Some(lsp_types::CompletionContext {
-                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
-                trigger_character: None,
-            }),
-        });
-
+    let mut items = server.completion_request(cell, position);
     // There are a ton of imports we don't care about in here...
     // The import bit is that an edit is always restricted to the current cell. That means,
     // we can't add `Literal` to the `from typing import TYPE_CHECKING` import in cell 1
-    let completions = server.await_response::<lsp_types::request::Completion>(&completions_id);
-    let mut items = match completions {
-        Some(CompletionResponse::Array(array)) => array,
-        Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
-        None => return vec![],
-    };
-
     items.retain(|item| item.label.starts_with("Litera"));
-
     items
 }

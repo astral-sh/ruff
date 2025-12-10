@@ -2155,7 +2155,7 @@ impl<'db> Parameter<'db> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum ParameterKind<'db> {
+pub enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly {
         /// Parameter name.

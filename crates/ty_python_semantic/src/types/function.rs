@@ -559,10 +559,12 @@ impl<'db> OverloadLiteral<'db> {
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
                 Some(
-                    typing_self(db, scope_id, typevar_binding_context, class).expect(
-                        "We should always find the surrounding class \
+                    typing_self(db, scope_id, typevar_binding_context, class)
+                        .map(Type::TypeVar)
+                        .expect(
+                            "We should always find the surrounding class \
                          for an implicit self: Self annotation",
-                    ),
+                        ),
                 )
             } else {
                 // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
@@ -1380,6 +1382,10 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
+    /// `contextlib.asynccontextmanager`
+    #[strum(serialize = "asynccontextmanager")]
+    AsyncContextManager,
+
     /// `dataclasses.dataclass`
     Dataclass,
     /// `dataclasses.field`
@@ -1466,6 +1472,9 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::AsyncContextManager => {
+                matches!(module, KnownModule::Contextlib)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -1990,6 +1999,8 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 
