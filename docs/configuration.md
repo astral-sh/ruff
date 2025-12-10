@@ -351,7 +351,7 @@ For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file
 
 ### Default inclusions
 
-By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
+By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.pyw`, `*.ipynb`, or `pyproject.toml`.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 You can also change the default selection using the [`include`](settings.md#include) setting.
