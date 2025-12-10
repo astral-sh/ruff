@@ -402,7 +402,7 @@ fn unknown_initialization_options() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options during initialization: 'bar'. Refer to the logs for more details"
+      "message": "Received unknown options during initialization: {\n  /"bar/": null\n}"
     }
     "#);
 
@@ -427,7 +427,7 @@ fn unknown_options_in_workspace_configuration() -> Result<()> {
     insta::assert_json_snapshot!(show_message_params, @r#"
     {
       "type": 2,
-      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: 'bar'. Refer to the logs for more details."
+      "message": "Received unknown options for workspace `file://<temp_dir>/foo`: {\n  /"bar/": null\n}"
     }
     "#);
 
