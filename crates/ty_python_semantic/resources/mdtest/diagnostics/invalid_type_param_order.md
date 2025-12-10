@@ -13,6 +13,13 @@ from typing import TypeVar, Generic
 T1 = TypeVar("T1", default=int)
 T2 = TypeVar("T2")
 T3 = TypeVar("T3")
+DefaultStrT = TypeVar("DefaultStrT", default=str)
+
+class SubclassMe(Generic[T1, DefaultStrT]):
+    x: DefaultStrT
+
+class Baz(SubclassMe[int, DefaultStrT]):
+    pass
 
 class Foo(Generic[T1, T2]):  # error: [invalid-type-param-order]
     pass
