@@ -20,6 +20,7 @@ use lsp_types::{
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
@@ -1522,7 +1523,8 @@ impl DocumentHandle {
     pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
-        session.index_mut().close_document(&self.key())?;
+
+        let removed_document = session.index_mut().close_document(&self.key())?;
 
         // Close the text or notebook file in the database but skip this
         // step for cells because closing a cell doesn't close its notebook.
@@ -1535,6 +1537,19 @@ impl DocumentHandle {
                 AnySystemPath::System(system_path) => {
                     if let Some(file) = db.files().try_system(db, system_path) {
                         db.project().close_file(db, file);
+
+                        // In case we preferred the language given by the Client
+                        // over the one detected by the file extension, remove the file
+                        // from the project to handle cases where a user changes the language
+                        // of a file (which results in a didClose and didOpen for the same path but with different languages).
+                        if removed_document.language_id().is_some()
+                            && system_path
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_none()
+                        {
+                            db.project().remove_file(db, file);
+                        }
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
