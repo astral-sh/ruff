@@ -91,11 +91,11 @@ def _(l: ListOfInts[int]):
 
 type List[T] = list[T]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: double specialization is not allowed"
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):

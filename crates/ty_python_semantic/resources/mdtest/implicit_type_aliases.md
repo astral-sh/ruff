@@ -661,7 +661,7 @@ python-version = "3.12"
 ```py
 ListOfInts = list[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[int]'>` is already specialized"
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
 def _(doubly_specialized: ListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -672,7 +672,7 @@ DoublySpecialized = ListOfInts2[int]
 def _(doubly_specialized: DoublySpecialized):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `<class 'list[int]'>` is already specialized"
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
 List = list[int][int]
 
 def _(doubly_specialized: List):
@@ -712,7 +712,7 @@ def this_does_not_work() -> TypeOf[IntOrStr]:
     raise NotImplementedError()
 
 def _(
-    # error: [non-subscriptable] "Cannot subscript non-generic type alias"
+    # error: [non-subscriptable] "Cannot subscript non-generic type"
     specialized: this_does_not_work()[int],
 ):
     reveal_type(specialized)  # revealed: Unknown
@@ -721,7 +721,7 @@ def _(
 Similarly, if you try to specialize a union type without a binding context, we emit an error:
 
 ```py
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [non-subscriptable] "Cannot subscript non-generic type"
 x: (list[T] | set[T])[int]
 
 def _():

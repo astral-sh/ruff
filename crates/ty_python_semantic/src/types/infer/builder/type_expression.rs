@@ -918,9 +918,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         if let Some(builder) =
                             self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
                         {
-                            builder.into_diagnostic(format_args!(
-                                "Cannot subscript non-generic type alias: double specialization is not allowed",
-                            ));
+                            let mut diagnostic =
+                                builder.into_diagnostic("Cannot subscript non-generic type alias");
+                            diagnostic.set_primary_message("Double specialization is not allowed");
                         }
                         return Type::unknown();
                     }
@@ -949,14 +949,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
                             {
                                 let value_type = type_alias.raw_value_type(self.db());
+                                let mut diagnostic = builder.into_diagnostic(format_args!(
+                                    "Cannot subscript non-generic type alias",
+                                ));
                                 if value_type.is_generic_nominal_instance() {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot subscript non-generic type alias: `{}` is already specialized",
+                                    diagnostic.set_primary_message(format_args!(
+                                        "`{}` is already specialized",
                                         value_type.display(self.db()),
-                                    ));
-                                } else {
-                                    builder.into_diagnostic(format_args!(
-                                        "Cannot subscript non-generic type alias"
                                     ));
                                 }
                             }

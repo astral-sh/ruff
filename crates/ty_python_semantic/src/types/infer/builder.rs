@@ -11818,14 +11818,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .context
                     .report_lint(&NON_SUBSCRIPTABLE, &*subscript.value)
                 {
+                    let mut diagnostic =
+                        builder.into_diagnostic(format_args!("Cannot subscript non-generic type",));
                     if value_ty.is_generic_alias() {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot subscript non-generic type alias: `{}` is already specialized",
-                            value_ty.display(db),
-                        ));
-                    } else {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot subscript non-generic type alias"
+                        diagnostic.set_primary_message(format_args!(
+                            "`{}` is already specialized",
+                            value_ty.display(db)
                         ));
                     }
                 }
@@ -12072,14 +12070,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 debug_assert!(alias.specialization(db).is_none());
                 if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
                     let value_type = alias.raw_value_type(db);
+                    let mut diagnostic = builder
+                        .into_diagnostic(format_args!("Cannot subscript non-generic type alias",));
                     if value_type.is_generic_nominal_instance() {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot subscript non-generic type alias: `{}` is already specialized",
-                            value_type.display(db),
-                        ));
-                    } else {
-                        builder.into_diagnostic(format_args!(
-                            "Cannot subscript non-generic type alias"
+                        diagnostic.set_primary_message(format_args!(
+                            "`{}` is already specialized",
+                            value_type.display(db)
                         ));
                     }
                 }
