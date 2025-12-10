@@ -1380,7 +1380,7 @@ pub(crate) struct SpecializationBuilder<'db> {
 
 /// An assignment from a bound type variable to a given type, along with the variance of the outermost
 /// type with respect to the type variable.
-pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
+pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, Type<'db>);
 
 impl<'db> SpecializationBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db, 'db>) -> Self {
@@ -1430,11 +1430,10 @@ impl<'db> SpecializationBuilder<'db> {
         &mut self,
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
-        variance: TypeVarVariance,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
         let identity = bound_typevar.identity(self.db);
-        let Some(ty) = f((identity, variance, ty)) else {
+        let Some(ty) = f((identity, ty)) else {
             return;
         };
 
@@ -1463,7 +1462,7 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
     ) -> Result<(), SpecializationError<'db>> {
-        self.infer_map(formal, actual, |(_, _, ty)| Some(ty))
+        self.infer_map(formal, actual, |(_, ty)| Some(ty))
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
@@ -1476,14 +1475,13 @@ impl<'db> SpecializationBuilder<'db> {
         actual: Type<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
-        self.infer_map_impl(formal, actual, TypeVarVariance::Covariant, &mut f)
+        self.infer_map_impl(formal, actual, &mut f)
     }
 
     fn infer_map_impl(
         &mut self,
         formal: Type<'db>,
         actual: Type<'db>,
-        polarity: TypeVarVariance,
         mut f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
         if formal == actual {
@@ -1542,7 +1540,7 @@ impl<'db> SpecializationBuilder<'db> {
                 if remaining_actual.is_never() {
                     return Ok(());
                 }
-                self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
+                self.add_type_mapping(*formal_bound_typevar, remaining_actual, f);
             }
             (Type::Union(union_formal), _) => {
                 // Second, if the formal is a union, and the actual type is assignable to precisely
@@ -1587,7 +1585,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let mut first_error = None;
                 let mut found_matching_element = false;
                 for formal_element in union_formal.elements(self.db) {
-                    let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                    let result = self.infer_map_impl(*formal_element, actual, &mut f);
                     if let Err(err) = result {
                         first_error.get_or_insert(err);
                     } else {
@@ -1613,7 +1611,7 @@ impl<'db> SpecializationBuilder<'db> {
                 // actual type must also be disjoint from every negative element of the
                 // intersection, but that doesn't help us infer any type mappings.)
                 for positive in formal.iter_positive(self.db) {
-                    self.infer_map_impl(positive, actual, polarity, f)?;
+                    self.infer_map_impl(positive, actual, f)?;
                 }
             }
 
@@ -1631,13 +1629,13 @@ impl<'db> SpecializationBuilder<'db> {
                                 argument: ty,
                             });
                         }
-                        self.add_type_mapping(bound_typevar, ty, polarity, f);
+                        self.add_type_mapping(bound_typevar, ty, f);
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                         // Prefer an exact match first.
                         for constraint in constraints.elements(self.db) {
                             if ty == *constraint {
-                                self.add_type_mapping(bound_typevar, ty, polarity, f);
+                                self.add_type_mapping(bound_typevar, ty, f);
                                 return Ok(());
                             }
                         }
@@ -1647,7 +1645,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 .when_assignable_to(self.db, *constraint, self.inferable)
                                 .is_always_satisfied(self.db)
                             {
-                                self.add_type_mapping(bound_typevar, *constraint, polarity, f);
+                                self.add_type_mapping(bound_typevar, *constraint, f);
                                 return Ok(());
                             }
                         }
@@ -1656,7 +1654,7 @@ impl<'db> SpecializationBuilder<'db> {
                             argument: ty,
                         });
                     }
-                    _ => self.add_type_mapping(bound_typevar, ty, polarity, f),
+                    _ => self.add_type_mapping(bound_typevar, ty, f),
                 }
             }
 
@@ -1665,7 +1663,7 @@ impl<'db> SpecializationBuilder<'db> {
             {
                 let formal_instance = Type::TypeVar(subclass_of.into_type_var().unwrap());
                 if let Some(actual_instance) = ty.to_instance(self.db) {
-                    return self.infer_map_impl(formal_instance, actual_instance, polarity, f);
+                    return self.infer_map_impl(formal_instance, actual_instance, f);
                 }
             }
 
@@ -1689,8 +1687,7 @@ impl<'db> SpecializationBuilder<'db> {
                     for (formal_element, actual_element) in
                         formal_tuple.all_elements().zip(actual_tuple.all_elements())
                     {
-                        let variance = TypeVarVariance::Covariant.compose(polarity);
-                        self.infer_map_impl(*formal_element, *actual_element, variance, &mut f)?;
+                        self.infer_map_impl(*formal_element, *actual_element, &mut f)?;
                     }
                     return Ok(());
                 }
@@ -1720,20 +1717,13 @@ impl<'db> SpecializationBuilder<'db> {
                         if formal_origin != base_alias.origin(self.db) {
                             continue;
                         }
-                        let generic_context = formal_alias
-                            .specialization(self.db)
-                            .generic_context(self.db)
-                            .variables(self.db);
                         let formal_specialization =
                             formal_alias.specialization(self.db).types(self.db);
                         let base_specialization = base_alias.specialization(self.db).types(self.db);
-                        for (typevar, formal_ty, base_ty) in itertools::izip!(
-                            generic_context,
-                            formal_specialization,
-                            base_specialization
-                        ) {
-                            let variance = typevar.variance_with_polarity(self.db, polarity);
-                            self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f)?;
+                        for (formal_ty, base_ty) in
+                            std::iter::zip(formal_specialization, base_specialization)
+                        {
+                            self.infer_map_impl(*formal_ty, *base_ty, &mut f)?;
                         }
                         return Ok(());
                     }
@@ -1777,7 +1767,7 @@ impl<'db> SpecializationBuilder<'db> {
                             CallableTypeKind::ParamSpecValue,
                         )),
                     };
-                    self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
+                    self.add_type_mapping(typevar, paramspec_value, &mut f);
                 }
             }
 

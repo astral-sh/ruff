@@ -3065,7 +3065,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 let specialization_result = builder.infer_map(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, _variance, inferred_ty)| {
+                    |(identity, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if preferred_type_mappings
