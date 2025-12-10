@@ -4,6 +4,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
+use rustc_hash::FxHashSet;
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
@@ -17,7 +18,9 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
-use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA, UnusedNOQAKind};
+use crate::rules::ruff::rules::{
+    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
+};
 use crate::settings::LinterSettings;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -218,6 +221,19 @@ impl Suppressions {
                 );
                 diagnostic.set_fix(Fix::safe_edit(edit));
             }
+        }
+
+        let unmatched = self
+            .valid
+            .iter()
+            .filter(|suppression| {
+                suppression.comments.len() == 1
+                    && suppression.comments[0].action == SuppressionAction::Disable
+            })
+            .map(|suppression| suppression.comments[0].range)
+            .collect::<FxHashSet<TextRange>>();
+        for range in unmatched {
+            context.report_diagnostic(UnmatchedSuppressionComment {}, range);
         }
 
         for error in self
