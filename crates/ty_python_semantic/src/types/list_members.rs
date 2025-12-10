@@ -25,7 +25,8 @@ use crate::{
     },
 };
 
-/// Iterate over all declarations and bindings in the given scope.
+/// Iterate over all declarations and bindings that exist at the end
+/// of the given scope.
 pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
@@ -73,6 +74,60 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 })
             },
         ))
+}
+
+/// Iterate over all declarations and bindings that are reachable anywhere
+/// in the given scope.
+pub(crate) fn all_reachable_members<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    use_def_map
+        .all_reachable_symbols()
+        .flat_map(move |(symbol_id, declarations, bindings)| {
+            let symbol = table.symbol(symbol_id);
+
+            let declaration_place_result = place_from_declarations(db, declarations);
+            let declaration =
+                declaration_place_result
+                    .first_declaration
+                    .and_then(|first_reachable_definition| {
+                        let ty = declaration_place_result
+                            .ignore_conflicting_declarations()
+                            .place
+                            .ignore_possibly_undefined()?;
+                        let member = Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        };
+                        Some(MemberWithDefinition {
+                            member,
+                            first_reachable_definition,
+                        })
+                    });
+
+            let place_with_definition = place_from_bindings(db, bindings);
+            let binding =
+                place_with_definition
+                    .first_definition
+                    .and_then(|first_reachable_definition| {
+                        let ty = place_with_definition.place.ignore_possibly_undefined()?;
+                        let member = Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        };
+                        Some(MemberWithDefinition {
+                            member,
+                            first_reachable_definition,
+                        })
+                    });
+
+            [declaration, binding]
+        })
+        .flatten()
 }
 
 // `__init__`, `__repr__`, `__eq__`, `__ne__` and `__hash__` are always included via `object`,
