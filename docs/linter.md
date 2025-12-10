@@ -438,16 +438,28 @@ The file-level suppression comment specification is as follows:
 Ruff implements a special rule, [`unused-noqa`](https://docs.astral.sh/ruff/rules/unused-noqa/),
 under the `RUF100` code, to enforce that your suppressions are "valid", in that the violations
 they _say_ they ignore are actually being triggered and suppressed. To flag
-unused suppression comments, run: `ruff check /path/to/file.py --extend-select RUF100`.
+unused suppression comments, run Ruff with `--extend-select RUF100`, like so:
 
-Ruff can also _remove_ any unused suppression comments via its fix functionality. To remove any
-unused suppressions, run: `ruff check /path/to/file.py --extend-select RUF100 --fix`.
+```shell-session
+$ ruff check /path/to/file.py --extend-select RUF100
+```
 
-### Inserting necessary suppressions
+Ruff can also _remove_ any unused suppression comments via its fix functionality.
+To remove any unused suppressions, run Ruff with `--fix`, like so:
+
+```shell-session
+$ ruff check /path/to/file.py --extend-select RUF100 --fix
+```
+
+### Inserting necessary suppression comments
 
 Ruff can _automatically add_ `noqa` directives to all lines that contain violations, which is
 useful when migrating a new codebase to Ruff. To automatically add `noqa` directives to all
-relevant lines (with the appropriate rule codes), run: `ruff check /path/to/file.py --add-noqa`.
+relevant lines (with the appropriate rule codes), run Ruff with `--add-noqa`, like so:
+
+```shell-session
+$ ruff check /path/to/file.py --add-noqa
+```
 
 ### Action comments
 
