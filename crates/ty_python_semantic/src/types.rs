@@ -912,8 +912,18 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, cycle)
+        // Avoid unioning two class-literals or generic-aliases together; this union will never
+        // simplify and is likely to cause downstream problems. This introduces the theoretical
+        // possibility of cycle oscillation involving such types (because we are not strictly
+        // widening the type on each iteration), but so far we have not seen an example of that.
+        let base_ty = if (self.is_class_literal() && previous.is_class_literal())
+            || (self.is_generic_alias() && previous.is_generic_alias())
+        {
+            self
+        } else {
+            UnionType::from_elements_cycle_recovery(db, [self, previous])
+        };
+        base_ty.recursive_type_normalized(db, cycle)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
