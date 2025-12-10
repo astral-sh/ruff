@@ -305,18 +305,7 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return if is_parenthesize_lambda_bodies_enabled(f.context())
-                        && let Expr::Lambda(lambda) = value
-                        && !f.context().comments().has_leading(lambda)
-                    {
-                        parenthesize_if_expands(
-                            &lambda.format().with_options(ExprLambdaLayout::Assignment),
-                        )
-                        .fmt(f)
-                    } else {
-                        maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
-                            .fmt(f)
-                    };
+                    return maybe_parenthesize_lambda(value, *statement).fmt(f);
                 }
 
                 let comments = f.context().comments().clone();
@@ -587,24 +576,15 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    let formatted_value = format_with(|f| {
-                        if is_parenthesize_lambda_bodies_enabled(f.context())
-                            && let Expr::Lambda(lambda) = value
-                            && !f.context().comments().has_leading(lambda)
-                        {
-                            parenthesize_if_expands(
-                                &lambda.format().with_options(ExprLambdaLayout::Assignment),
-                            )
-                            .fmt(f)
-                        } else {
-                            maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
-                                .fmt(f)
-                        }
-                    });
-
                     return write!(
                         f,
-                        [before_operator, space(), operator, space(), formatted_value]
+                        [
+                            before_operator,
+                            space(),
+                            operator,
+                            space(),
+                            maybe_parenthesize_lambda(value, *statement)
+                        ]
                     );
                 }
 
@@ -1381,5 +1361,34 @@ fn is_attribute_with_parenthesized_value(target: &Expr, context: &PyFormatContex
         Expr::Subscript(_) => true,
         Expr::Call(ExprCall { arguments, .. }) => !arguments.is_empty(),
         _ => false,
+    }
+}
+
+/// Like [`maybe_parenthesize_expression`] but with special handling for lambdas in preview.
+fn maybe_parenthesize_lambda<'a>(
+    expression: &'a Expr,
+    parent: AnyNodeRef<'a>,
+) -> MaybeParenthesizeLambda<'a> {
+    MaybeParenthesizeLambda { expression, parent }
+}
+
+struct MaybeParenthesizeLambda<'a> {
+    expression: &'a Expr,
+    parent: AnyNodeRef<'a>,
+}
+
+impl Format<PyFormatContext<'_>> for MaybeParenthesizeLambda<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let MaybeParenthesizeLambda { expression, parent } = self;
+
+        if is_parenthesize_lambda_bodies_enabled(f.context())
+            && let Expr::Lambda(lambda) = expression
+            && !f.context().comments().has_leading(lambda)
+        {
+            parenthesize_if_expands(&lambda.format().with_options(ExprLambdaLayout::Assignment))
+                .fmt(f)
+        } else {
+            maybe_parenthesize_expression(expression, *parent, Parenthesize::IfBreaks).fmt(f)
+        }
     }
 }
