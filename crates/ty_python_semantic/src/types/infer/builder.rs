@@ -951,22 +951,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             if self.context.is_lint_enabled(&INVALID_TYPE_PARAM_ORDER) {
-                let type_vars = class.typevars_referenced_in_definition(self.db());
-                let mut seen_default = false;
-                for type_var in type_vars {
-                    let has_default = type_var
-                        .typevar(self.db())
-                        .default_type(self.db())
-                        .is_some();
-                    if seen_default && !has_default {
-                        report_invalid_type_param_order(
-                            &self.context,
-                            class,
-                            type_var.typevar(self.db()).name(self.db()).as_str(),
-                        );
-                    }
-                    if has_default {
-                        seen_default = true;
+                if let Some(generic_context) = class.generic_context(self.db()) {
+                    let mut seen_default = false;
+
+                    for bound_typevar in generic_context.variables(self.db()) {
+                        let typevar = bound_typevar.typevar(self.db());
+                        let has_default = typevar.default_type(self.db()).is_some();
+
+                        if seen_default && !has_default {
+                            report_invalid_type_param_order(
+                                &self.context,
+                                class,
+                                typevar.name(self.db()).as_str(),
+                            );
+                        }
+                        if has_default {
+                            seen_default = true;
+                        }
                     }
                 }
             }
