@@ -2710,10 +2710,10 @@ impl<'db> Type<'db> {
                 })
                 .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
 
-            // Similarly, `Literal[<class 'C'>]` is assignable to `C[...]` (a generic-alias type)
-            // if the default specialization of `C` is assignable to `C[...]`. This scenario
-            // occurs with final generic types, where `type[C[...]]` is simplified to the
-            // generic-alias type `C[...]`, due to the fact that `C[...]` has no subclasses.
+            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
+            // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
+            // with final generic types, where `type[C[...]]` is simplified to the generic-alias
+            // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
             (Type::ClassLiteral(class), Type::GenericAlias(target_alias)) => {
                 class.default_specialization(db).has_relation_to_impl(
                     db,
