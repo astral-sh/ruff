@@ -10,10 +10,7 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
-use crate::types::class::ClassType;
-use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
-use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::relation::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
@@ -1945,49 +1942,9 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 }
 
-                // Extract formal_alias if this is a generic class
-                let formal_alias = match formal {
-                    Type::NominalInstance(formal_nominal) => {
-                        formal_nominal.class(self.db).into_generic_alias()
-                    }
-                    // TODO: This will only handle classes that explicit implement a generic protocol
-                    // by listing it as a base class. To handle classes that implicitly implement a
-                    // generic protocol, we will need to check the types of the protocol members to be
-                    // able to infer the specialization of the protocol that the class implements.
-                    Type::ProtocolInstance(ProtocolInstanceType {
-                        inner: Protocol::FromClass(class),
-                        ..
-                    }) => class.into_generic_alias(),
-                    _ => None,
-                };
-
-                if let Some(formal_alias) = formal_alias {
-                    let formal_origin = formal_alias.origin(self.db);
-                    for base in actual_nominal.class(self.db).iter_mro(self.db) {
-                        let ClassBase::Class(ClassType::Generic(base_alias)) = base else {
-                            continue;
-                        };
-                        if formal_origin != base_alias.origin(self.db) {
-                            continue;
-                        }
-                        let generic_context = formal_alias
-                            .specialization(self.db)
-                            .generic_context(self.db)
-                            .variables(self.db);
-                        let formal_specialization =
-                            formal_alias.specialization(self.db).types(self.db);
-                        let base_specialization = base_alias.specialization(self.db).types(self.db);
-                        for (typevar, formal_ty, base_ty) in itertools::izip!(
-                            generic_context,
-                            formal_specialization,
-                            base_specialization
-                        ) {
-                            let variance = typevar.variance_with_polarity(self.db, polarity);
-                            self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f)?;
-                        }
-                        return Ok(());
-                    }
-                }
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.inferable);
+                self.add_type_mappings_from_constraint_set(formal, when, &mut f);
             }
 
             (Type::Callable(formal_callable), _) => {
