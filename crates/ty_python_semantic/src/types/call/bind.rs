@@ -3028,10 +3028,17 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                // Synthetic arguments (e.g., implicit `self`/`cls`) are not provided by the caller.
-                // Counting their types when computing variance would incorrectly block literal
-                // promotion (they often carry the class typevars in invariant position), so we ignore
-                // them for argument variance tracking.
+                // Below, we will possibly perform literal promotion on the types that we infer for
+                // each typevar. Whether we do so will depend on the variance of the typevar in the
+                // parameter type that each argument is mapped to.
+                //
+                // Note that we do not track the variance for synthetic `self` arguments. Those
+                // only exist for generic methods of a (possibly generic) class. The class instance
+                // is fixed for any generic method call, and shouldn't affect literal promotion.
+                // (This is true even for the constructors of a generic class: a `self` annotation
+                // on `__init__` limits which specializations the constructor overload applies to,
+                // but we rely on occurrences of a typevar in other parameters to determine whether
+                // to promote literals in the specialized generic class type.)
                 if !matches!(argument, Argument::Synthetic)
                     && parameter.form == ParameterForm::Value
                     && expected_type.has_typevar(self.db)
