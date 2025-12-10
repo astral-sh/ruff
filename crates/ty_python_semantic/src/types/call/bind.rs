@@ -2819,13 +2819,16 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         // Prefer the declared type of generic classes.
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
             let tcx = tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
-            let return_ty =
-                return_ty.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
+            tcx.class_specialization(self.db)?;
+
+            let return_specialization = return_ty
+                .filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+                .class_specialization(self.db);
 
             // TODO: We should use the constraint solver here to determine the type mappings for more
-            // complex subtyping relationships, e.g., `type[C[T]]` to `Callable[..., T]`, or unions
-            // containing multiple generic elements.
-            if let Some((class_literal, _)) = return_ty.class_specialization(self.db)
+            // complex subtyping relationships, e.g., callables, protocols, or unions containing multiple
+            // generic elements.
+            if let Some((class_literal, _)) = return_specialization
                 && let Some(generic_alias) = class_literal.into_generic_alias()
             {
                 let specialization = generic_alias.specialization(self.db);
@@ -2842,6 +2845,8 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         builder.infer(*return_ty, ty).ok()?;
                     }
                 }
+            } else {
+                builder.infer(return_ty, tcx).ok()?;
             }
 
             Some(builder.type_mappings().clone())

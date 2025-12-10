@@ -37,7 +37,7 @@ class Data:
     content: list[int] = field(default_factory=list)
     timestamp: datetime = field(default_factory=datetime.now, init=False)
 
-# revealed: (self: Data, content: list[int] = Unknown) -> None
+# revealed: (self: Data, content: list[int] = list[int]) -> None
 reveal_type(Data.__init__)
 
 data = Data([1, 2, 3])
