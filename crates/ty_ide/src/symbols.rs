@@ -470,6 +470,11 @@ impl<'db> SymbolVisitor<'db> {
     }
 
     fn into_flat_symbols(mut self) -> FlatSymbols {
+        // If `__all__` was found but wasn't recognized,
+        // then we emit a diagnostic message indicating as such.
+        if self.all_invalid {
+            tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
+        }
         // We want to filter out some of the symbols we collected.
         // Specifically, to respect conventions around library
         // interface.
@@ -810,14 +815,11 @@ impl<'db> SymbolVisitor<'db> {
         // if a name should be part of the exported API of a module
         // or not. When there is `__all__`, we currently follow it
         // strictly.
-        if self.all_origin.is_some() {
-            // If `__all__` is somehow invalid, ignore it and fall
-            // through as-if `__all__` didn't exist.
-            if self.all_invalid {
-                tracing::debug!("Invalid `__all__` in `{}`", self.file.path(self.db));
-            } else {
-                return self.all_names.contains(&*symbol.name);
-            }
+        //
+        // If `__all__` is somehow invalid, ignore it and fall
+        // through as-if `__all__` didn't exist.
+        if self.all_origin.is_some() && !self.all_invalid {
+            return self.all_names.contains(&*symbol.name);
         }
 
         // "Imported symbols are considered private by default. A fixed
