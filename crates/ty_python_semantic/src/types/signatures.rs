@@ -443,6 +443,10 @@ impl<'db> CallableSignature<'db> {
             let self_is_single_paramspec = Self::signatures_is_single_paramspec(self_signatures);
             let other_is_single_paramspec = Self::signatures_is_single_paramspec(other_signatures);
 
+            // If either callable is a ParamSpec, the constraint set should bind the ParamSpec to
+            // the other callable's signature. We also need to compare the return types — for
+            // instance, to verify in `Callable[P, int]` that the return type is assignable to
+            // `int`, or in `Callable[P, T]` to bind `T` to the return type of the other callable.
             match (self_is_single_paramspec, other_is_single_paramspec) {
                 (
                     Some((self_bound_typevar, self_return_type)),
