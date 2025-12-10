@@ -538,6 +538,8 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
 class D[T, U]:
+    t: T  # invariant
+
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
