@@ -1252,7 +1252,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn is_union(&self) -> bool {
+    pub(crate) const fn is_union(self) -> bool {
         matches!(self, Type::Union(_))
     }
 
@@ -1266,6 +1266,10 @@ impl<'db> Type<'db> {
     #[track_caller]
     pub(crate) const fn expect_union(self) -> UnionType<'db> {
         self.as_union().expect("Expected a Type::Union variant")
+    }
+
+    pub(crate) const fn is_intersection(self) -> bool {
+        matches!(self, Type::Intersection(_))
     }
 
     pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
@@ -14107,6 +14111,10 @@ impl<'db> IntersectionType<'db> {
 
     pub fn iter_positive(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
         self.positive(db).iter().copied()
+    }
+
+    pub fn iter_negative(self, db: &'db dyn Db) -> impl Iterator<Item = Type<'db>> {
+        self.negative(db).iter().copied()
     }
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
