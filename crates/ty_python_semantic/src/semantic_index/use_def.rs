@@ -590,6 +590,30 @@ impl<'db> UseDefMap<'db> {
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
     }
 
+    pub(crate) fn all_reachable_symbols<'map>(
+        &'map self,
+    ) -> impl Iterator<
+        Item = (
+            ScopedSymbolId,
+            DeclarationsIterator<'map, 'db>,
+            BindingWithConstraintsIterator<'map, 'db>,
+        ),
+    > + 'map {
+        self.reachable_definitions_by_symbol.iter_enumerated().map(
+            |(symbol_id, reachable_definitions)| {
+                let declarations = self.declarations_iterator(
+                    &reachable_definitions.declarations,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                let bindings = self.bindings_iterator(
+                    &reachable_definitions.bindings,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                (symbol_id, declarations, bindings)
+            },
+        )
+    }
+
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
     pub(crate) fn can_implicitly_return_none(&self, db: &dyn crate::Db) -> bool {
         !self

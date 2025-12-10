@@ -11,7 +11,7 @@ use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
-use crate::types::list_members::{Member, all_end_of_scope_members, all_members};
+use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{Type, binding_type, infer_scope_types};
 use crate::{Db, resolve_real_shadowable_module};
 
@@ -76,7 +76,7 @@ impl<'db> SemanticModel<'db> {
 
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             for memberdef in
-                all_end_of_scope_members(self.db, file_scope.to_scope_id(self.db, self.file))
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file))
             {
                 members.insert(
                     memberdef.member.name,
@@ -221,7 +221,7 @@ impl<'db> SemanticModel<'db> {
         let mut completions = vec![];
         for (file_scope, _) in index.ancestor_scopes(file_scope) {
             completions.extend(
-                all_end_of_scope_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
+                all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
                     |memberdef| Completion {
                         name: memberdef.member.name,
                         ty: Some(memberdef.member.ty),
