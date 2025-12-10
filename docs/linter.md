@@ -287,12 +287,12 @@ setting, either on the command-line or in your `pyproject.toml` or `ruff.toml` f
 To omit a lint rule within specific files based on file path prefixes or patterns,
 see the [`lint.per-file-ignores`](settings.md#lint_per-file-ignores) setting.
 
-### Suppression comments
+### Comments
 
 Ruff supports multiple forms of suppression comments, including inline and file-level `noqa`
 comments, and range suppressions.
 
-#### Inline suppressions
+#### Line-level
 
 Ruff supports a `noqa` system similar to [Flake8](https://flake8.pycqa.org/en/3.1.1/user/ignoring-errors.html).
 To ignore an individual violation, add `# noqa: {code}` to the end of the line, like so:
@@ -341,7 +341,7 @@ The full inline comment specification is as follows:
   missing delimiter (e.g. `F401F841`), though a warning will be emitted in this
   case.
 
-#### Range suppressions
+#### Block-level
 
 *Range suppressions are currently only available in [preview mode](preview.md#preview).*
 
@@ -383,12 +383,12 @@ def foo():
 foo()
 ```
 
-It is strongly suggested using explicit range suppressions, in order to prevent
+It is strongly suggested to use explicit range suppressions, in order to prevent
 accidental suppressions of violations, especially at global module scope. If implicit
 range suppressions are desired, the RUF10x lint can be disabled, or an inline `noqa`
 suppression can be added to the end of the "disable" comment.
 
-Range suppressions can not be used to enable or select rules that aren't already
+Range suppressions cannot be used to enable or select rules that aren't already
 selected by the project configuration or runtime flags. An "enable" comment can only
 be used to terminate a preceding "disable" comment with identical codes.
 
@@ -404,7 +404,7 @@ The full range suppression comment specification is as follows:
 - Codes to be suppressed must be separated by commas, with optional whitespace
   before or after each code.
 
-#### File-level suppressions
+#### File-level
 
 To ignore all violations across an entire file, add the line `# ruff: noqa` anywhere in the file,
 preferably towards the top, like so:
