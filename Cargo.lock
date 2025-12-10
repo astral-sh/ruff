@@ -1016,7 +1016,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1108,7 +1108,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1238,9 +1238,9 @@ dependencies = [
 
 [[package]]
 name = "get-size-derive2"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff47daa61505c85af126e9dd64af6a342a33dc0cccfe1be74ceadc7d352e6efd"
+checksum = "ab21d7bd2c625f2064f04ce54bcb88bc57c45724cde45cba326d784e22d3f71a"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -1249,14 +1249,15 @@ dependencies = [
 
 [[package]]
 name = "get-size2"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac7bb8710e1f09672102be7ddf39f764d8440ae74a9f4e30aaa4820dcdffa4af"
+checksum = "879272b0de109e2b67b39fcfe3d25fdbba96ac07e44a254f5a0b4d7ff55340cb"
 dependencies = [
  "compact_str",
  "get-size-derive2",
  "hashbrown 0.16.1",
  "indexmap",
+ "ordermap",
  "smallvec",
 ]
 
@@ -1763,7 +1764,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -2233,9 +2234,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordermap"
-version = "0.5.12"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b100f7dd605611822d30e182214d3c02fdefce2d801d23993f6b6ba6ca1392af"
+checksum = "ed637741ced8fb240855d22a2b4f208dab7a06bcce73380162e5253000c16758"
 dependencies = [
  "indexmap",
  "serde",
@@ -3571,7 +3572,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -3589,7 +3590,7 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 [[package]]
 name = "salsa"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=55e5e7d32fa3fc189276f35bb04c9438f9aedbd1#55e5e7d32fa3fc189276f35bb04c9438f9aedbd1"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3600,6 +3601,7 @@ dependencies = [
  "indexmap",
  "intrusive-collections",
  "inventory",
+ "ordermap",
  "parking_lot",
  "portable-atomic",
  "rustc-hash",
@@ -3613,12 +3615,12 @@ dependencies = [
 [[package]]
 name = "salsa-macro-rules"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=55e5e7d32fa3fc189276f35bb04c9438f9aedbd1#55e5e7d32fa3fc189276f35bb04c9438f9aedbd1"
 
 [[package]]
 name = "salsa-macros"
 version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=55e5e7d32fa3fc189276f35bb04c9438f9aedbd1#55e5e7d32fa3fc189276f35bb04c9438f9aedbd1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3972,7 +3974,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -5026,7 +5028,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
