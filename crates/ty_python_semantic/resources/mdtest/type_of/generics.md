@@ -449,3 +449,24 @@ expects_type_c_default(C[int])
 expects_type_c_default_of_int(C[str])
 expects_type_c_default_of_int_str(C[str, int])
 ```
+
+## Narrowing for generic `@final` classes
+
+When narrowing a `type[GenericFinal]` where `GenericFinal` is a generic `@final` class, we can
+conclude that the `issubclass` check always succeeds:
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    x: T
+
+def f(x: type[GenericFinal]):
+    reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+
+    if issubclass(x, GenericFinal):
+        reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+    else:
+        reveal_type(x)  # revealed: Never
+```
