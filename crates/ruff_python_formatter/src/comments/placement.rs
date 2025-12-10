@@ -1830,7 +1830,7 @@ fn handle_lambda_comment<'a>(
     comment: DecoratedComment<'a>,
     lambda: &'a ast::ExprLambda,
     source: &str,
-    _preview: PreviewMode,
+    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     if let Some(parameters) = lambda.parameters.as_deref() {
         // End-of-line comments between the `lambda` and the parameters are dangling on the lambda:
@@ -1885,7 +1885,11 @@ fn handle_lambda_comment<'a>(
                 return CommentPlacement::Default(comment);
             }
 
-            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            return if preview.is_enabled() {
+                CommentPlacement::leading(&*lambda.body, comment)
+            } else {
+                CommentPlacement::dangling(comment.enclosing_node(), comment)
+            };
         }
     } else {
         // Comments between the lambda and the body are dangling on the lambda:
@@ -1914,7 +1918,11 @@ fn handle_lambda_comment<'a>(
                 return CommentPlacement::Default(comment);
             }
 
-            return CommentPlacement::dangling(comment.enclosing_node(), comment);
+            return if preview.is_enabled() {
+                CommentPlacement::leading(&*lambda.body, comment)
+            } else {
+                CommentPlacement::dangling(comment.enclosing_node(), comment)
+            };
         }
     }
 
