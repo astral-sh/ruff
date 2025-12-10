@@ -3349,6 +3349,7 @@ dependencies = [
  "compact_str",
  "get-size2",
  "insta",
+ "itertools 0.14.0",
  "memchr",
  "ruff_annotate_snippets",
  "ruff_python_ast",
