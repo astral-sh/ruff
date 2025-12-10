@@ -301,7 +301,7 @@ pub(crate) fn quoted_type_alias(
             // Check for parentheses outside the string ("""...""")
             annotation_expr.into(),
             checker.semantic().current_statement().into(),
-            checker.tokens(),
+            checker.source_tokens(),
         )
         .is_none()
         && parenthesized_range(
