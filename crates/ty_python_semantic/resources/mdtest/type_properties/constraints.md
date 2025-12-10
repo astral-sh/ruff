@@ -126,7 +126,7 @@ strict subtype of the lower bound, a strict supertype of the upper bound, or inc
 
 ```py
 from typing import Any, final, Never, Sequence
-from ty_extensions import ConstraintSet, static_assert
+from ty_extensions import ConstraintSet, Not, static_assert
 
 class Super: ...
 class Base(Super): ...
@@ -205,6 +205,15 @@ def _[T]() -> None:
     constraints = ~ConstraintSet.range(Sequence[Any], T, Sequence[Base])
     expected = ~ConstraintSet.range(Sequence[Never], T, Sequence[Base])
     static_assert(constraints == expected)
+```
+
+A negated _type_ is not the same thing as a negated _range_.
+
+```py
+def _[T]() -> None:
+    negated_type = ConstraintSet.range(Never, T, Not[int])
+    negated_constraint = ~ConstraintSet.range(Never, T, int)
+    static_assert(negated_type != negated_constraint)
 ```
 
 ## Intersection
