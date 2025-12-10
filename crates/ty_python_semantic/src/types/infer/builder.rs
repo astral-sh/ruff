@@ -2955,7 +2955,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
-            DeferredExpressionState::Deferred,
+            self.defer_annotations().into(),
         );
         self.infer_parameters(function.parameters.as_ref());
         self.typevar_binding_context = previous_typevar_binding_context;
