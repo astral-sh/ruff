@@ -21,7 +21,9 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
 use crate::types::enums::enum_metadata;
-use crate::types::function::{DataclassTransformerParams, KnownFunction};
+use crate::types::function::{
+    DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
+};
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
@@ -2347,6 +2349,8 @@ impl<'db> ClassLiteral<'db> {
             };
 
         // Dataclass transformer flags can be overwritten using class arguments.
+        // TODO this should be done more generally, not just in `own_synthesized_member`, so that
+        // `dataclass_params` always reflects the transformer params.
         if let Some(transformer_params) = transformer_params.as_mut() {
             if let Some(class_def) = self.definition(db).kind(db).as_class() {
                 let module = parsed_module(db, self.file(db)).load(db);
@@ -2376,6 +2380,8 @@ impl<'db> ClassLiteral<'db> {
 
         let has_dataclass_param = |param| {
             dataclass_params.is_some_and(|params| params.flags(db).contains(param))
+                // TODO if we were correctly initializing `dataclass_params` from the
+                // transformer params, this fallback shouldn't be needed here.
                 || transformer_params.is_some_and(|params| params.flags(db).contains(param))
         };
 
@@ -2455,8 +2461,7 @@ impl<'db> ClassLiteral<'db> {
                     }
                 }
 
-                let is_kw_only = name == "__replace__"
-                    || kw_only.unwrap_or(has_dataclass_param(DataclassFlags::KW_ONLY));
+                let is_kw_only = name == "__replace__" || kw_only.unwrap_or(false);
 
                 // Use the alias name if provided, otherwise use the field name
                 let parameter_name =
@@ -3173,6 +3178,27 @@ impl<'db> ClassLiteral<'db> {
                     {
                         *kw = Some(true);
                     }
+                }
+
+                // Resolve the kw_only to the class-level default. This ensures that when fields
+                // are inherited by child classes, they use their defining class's kw_only default.
+                if let FieldKind::Dataclass {
+                    kw_only: ref mut kw @ None,
+                    ..
+                } = field.kind
+                {
+                    let class_kw_only_default = self
+                        .dataclass_params(db)
+                        .is_some_and(|params| params.flags(db).contains(DataclassFlags::KW_ONLY))
+                        // TODO this next part should not be necessary, if we were properly
+                        // initializing `dataclass_params` from the dataclass-transform params, for
+                        // metaclass and base-class-based dataclass-transformers.
+                        || matches!(
+                            field_policy,
+                            CodeGeneratorKind::DataclassLike(Some(transformer_params))
+                                if transformer_params.flags(db).contains(DataclassTransformerFlags::KW_ONLY_DEFAULT)
+                        );
+                    *kw = Some(class_kw_only_default);
                 }
 
                 attributes.insert(symbol.name().clone(), field);
