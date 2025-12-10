@@ -19,6 +19,7 @@ use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
 use crate::pattern::pattern_match_sequence::SequenceType;
+use crate::preview::is_parenthesize_lambda_bodies_enabled_preview;
 
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
@@ -1885,7 +1886,7 @@ fn handle_lambda_comment<'a>(
                 return CommentPlacement::Default(comment);
             }
 
-            return if preview.is_enabled() {
+            return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
             } else {
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
@@ -1918,7 +1919,7 @@ fn handle_lambda_comment<'a>(
                 return CommentPlacement::Default(comment);
             }
 
-            return if preview.is_enabled() {
+            return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
             } else {
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
