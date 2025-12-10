@@ -127,6 +127,51 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
+            }
+            // In preview, always parenthesize the body if there are dangling comments.
+            else if preview {
+                // Can't use partition_point because there can be additional end of line comments
+                // after the initial set. All of these comments are dangling, for example:
+                //
+                // ```python
+                // (
+                //     lambda  # 1
+                //     # 2
+                //     :  # 3
+                //     # 4
+                //     y
+                // )
+                // ```
+                //
+                // and alternate between own line and end of line.
+                let (after_parameters_end_of_line, leading_body_comments) =
+                    dangling_after_parameters.split_at(
+                        dangling_after_parameters
+                            .iter()
+                            .position(|comment| comment.line_position().is_own_line())
+                            .unwrap_or(dangling_after_parameters.len()),
+                    );
+
+                let fmt_body = format_with(|f: &mut PyFormatter| {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            token("("),
+                            trailing_comments(after_parameters_end_of_line),
+                            block_indent(&format_args!(
+                                leading_comments(leading_body_comments),
+                                body.format().with_options(Parentheses::Never)
+                            )),
+                            token(")")
+                        ]
+                    )
+                });
+
+                return match self.layout {
+                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+                    ExprLambdaLayout::Default => fmt_body.fmt(f),
+                };
             } else {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
@@ -136,6 +181,36 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             // In this context, a dangling comment is a comment between the `lambda` and the body.
             if dangling.is_empty() {
                 write!(f, [space()])?;
+            }
+            // In preview, always parenthesize the body if there are dangling comments.
+            else if preview {
+                let (dangling_end_of_line, dangling_own_line) = dangling.split_at(
+                    dangling
+                        .iter()
+                        .position(|comment| comment.line_position().is_own_line())
+                        .unwrap_or(dangling.len()),
+                );
+
+                let fmt_body = format_with(|f: &mut PyFormatter| {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            token("("),
+                            trailing_comments(dangling_end_of_line),
+                            block_indent(&format_args!(
+                                leading_comments(dangling_own_line),
+                                body.format().with_options(Parentheses::Never)
+                            )),
+                            token(")")
+                        ]
+                    )
+                });
+
+                return match self.layout {
+                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+                    ExprLambdaLayout::Default => fmt_body.fmt(f),
+                };
             } else {
                 write!(f, [dangling_comments(dangling)])?;
             }
@@ -148,25 +223,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 // ensures that we correctly handle parenthesized comments, and don't need to worry
                 // about them in the implementation below.
                 if body_comments.has_leading() || body_comments.has_trailing_own_line() {
-                    let (leading_end_of_line, leading_own_line) = body_comments.leading.split_at(
-                        body_comments
-                            .leading
-                            .iter()
-                            .position(|comment| comment.line_position().is_own_line())
-                            .unwrap_or(body_comments.leading.len()),
-                    );
-                    write!(
-                        f,
-                        [
-                            token("("),
-                            trailing_comments(leading_end_of_line),
-                            block_indent(&format_args!(
-                                leading_comments(leading_own_line),
-                                body.format().with_options(Parentheses::Never)
-                            )),
-                            token(")")
-                        ]
-                    )
+                    body.format().with_options(Parentheses::Always).fmt(f)
                 }
                 // Calls and subscripts require special formatting because they have their own
                 // parentheses, but they can also have an arbitrary amount of text before the

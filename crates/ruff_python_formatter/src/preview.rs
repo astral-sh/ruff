@@ -5,7 +5,7 @@
 //! for which specific feature this preview check is for. Having named functions simplifies the promotion:
 //! Simply delete the function and let Rust tell you which checks you have to remove.
 
-use crate::{PreviewMode, PyFormatContext};
+use crate::PyFormatContext;
 
 /// Returns `true` if the [`hug_parens_with_braces_and_square_brackets`](https://github.com/astral-sh/ruff/issues/8279) preview style is enabled.
 pub(crate) const fn is_hug_parens_with_braces_and_square_brackets_enabled(
@@ -58,7 +58,4 @@ pub(crate) const fn is_avoid_parens_for_long_as_captures_enabled(
 /// enabled.
 pub(crate) const fn is_parenthesize_lambda_bodies_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
-}
-pub(crate) const fn is_parenthesize_lambda_bodies_enabled_preview(preview: PreviewMode) -> bool {
-    preview.is_enabled()
 }

@@ -101,7 +101,6 @@ use ruff_python_trivia::{CommentLinePosition, CommentRanges, SuppressionKind};
 use ruff_text_size::{Ranged, TextRange};
 pub(crate) use visitor::collect_comments;
 
-use crate::PreviewMode;
 use crate::comments::debug::{DebugComment, DebugComments};
 use crate::comments::map::{LeadingDanglingTrailing, MultiMap};
 use crate::comments::node_key::NodeRefEqualityKey;
@@ -249,19 +248,16 @@ impl<'a> Comments<'a> {
         root: impl Into<AnyNodeRef<'a>>,
         source_code: SourceCode<'a>,
         comment_ranges: &'a CommentRanges,
-        preview: PreviewMode,
     ) -> Self {
         fn collect_comments<'a>(
             root: AnyNodeRef<'a>,
             source_code: SourceCode<'a>,
             comment_ranges: &'a CommentRanges,
-            preview: PreviewMode,
         ) -> Comments<'a> {
             let map = if comment_ranges.is_empty() {
                 CommentsMap::new()
             } else {
-                let mut builder =
-                    CommentsMapBuilder::new(source_code.as_str(), comment_ranges, preview);
+                let mut builder = CommentsMapBuilder::new(source_code.as_str(), comment_ranges);
                 CommentsVisitor::new(source_code, comment_ranges, &mut builder).visit(root);
                 builder.finish()
             };
@@ -269,7 +265,7 @@ impl<'a> Comments<'a> {
             Comments::new(map, comment_ranges)
         }
 
-        collect_comments(root.into(), source_code, comment_ranges, preview)
+        collect_comments(root.into(), source_code, comment_ranges)
     }
 
     /// Returns `true` if the given `node` has any comments.
@@ -524,7 +520,7 @@ mod tests {
     use ruff_python_parser::{ParseOptions, Parsed, parse};
     use ruff_python_trivia::CommentRanges;
 
-    use crate::{PreviewMode, comments::Comments};
+    use crate::comments::Comments;
 
     struct CommentsTestCase<'a> {
         parsed: Parsed<Mod>,
@@ -548,12 +544,7 @@ mod tests {
         }
 
         fn to_comments(&self) -> Comments<'_> {
-            Comments::from_ast(
-                self.parsed.syntax(),
-                self.source_code,
-                &self.comment_ranges,
-                PreviewMode::Disabled,
-            )
+            Comments::from_ast(self.parsed.syntax(), self.source_code, &self.comment_ranges)
         }
     }
 

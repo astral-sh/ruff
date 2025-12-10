@@ -11,7 +11,6 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
 
-use crate::PreviewMode;
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
@@ -19,19 +18,17 @@ use crate::other::parameters::{
     assign_argument_separator_comment_placement, find_parameter_separators,
 };
 use crate::pattern::pattern_match_sequence::SequenceType;
-use crate::preview::is_parenthesize_lambda_bodies_enabled_preview;
 
 /// Manually attach comments to nodes that the default placement gets wrong.
 pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
-    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     handle_parenthesized_comment(comment, source)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source))
-        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source, preview))
+        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -196,7 +193,6 @@ fn handle_enclosed_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
-    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
         AnyNodeRef::Parameters(parameters) => {
@@ -235,7 +231,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
         AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, source),
-        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source, preview),
+        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source))
             .or_else(|comment| handle_key_value_comment(comment, source)),
@@ -1800,34 +1796,20 @@ fn handle_named_expr_comment<'a>(
 
 /// Handles comments around the `:` token in a lambda expression.
 ///
-/// For parameterized lambdas, comments will have the following placements:
+/// For parameterized lambdas, both the comments between the `lambda` and the parameters, and the
+/// comments between the parameters and the body, are considered dangling, as is the case for all
+/// of the following:
 ///
 /// ```python
 /// (
-///     lambda  # dangling lambda
-///     # leading parameters
+///     lambda  # 1
+///     # 2
 ///     x
-///     :  # dangling lambda
-///     # dangling lambda
+///     :  # 3
+///     # 4
 ///     y
 /// )
 /// ```
-///
-/// In [preview](is_parenthesize_lambda_bodies_enabled_preview), the comment placement is instead:
-///
-/// ```python
-/// (
-///     lambda  # dangling lambda
-///     # leading parameters
-///     x
-///     :  # leading body
-///     # leading body
-///     y
-/// )
-/// ```
-///
-/// Note that the final two comments are now leading on the body expression instead of dangling on
-/// the lambda, which allows them to be moved into the parenthesized body.
 ///
 /// For non-parameterized lambdas, all comments before the body are considered dangling, as is the
 /// case for all of the following:
@@ -1841,25 +1823,10 @@ fn handle_named_expr_comment<'a>(
 ///     y
 /// )
 /// ```
-///
-/// In [preview](is_parenthesize_lambda_bodies_enabled_preview), these all instead become leading
-/// comments on the body, allowing this formatting:
-///
-/// ```python
-/// (
-///     lambda: (  # 1
-///         # 2
-///         # 3
-///         # 4
-///         y
-///     )
-/// )
-/// ```
 fn handle_lambda_comment<'a>(
     comment: DecoratedComment<'a>,
     lambda: &'a ast::ExprLambda,
     source: &str,
-    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     if let Some(parameters) = lambda.parameters.as_deref() {
         // End-of-line comments between the `lambda` and the parameters are dangling on the lambda:
@@ -1895,32 +1862,26 @@ fn handle_lambda_comment<'a>(
         //     y
         // )
         // ```
-        // Except in preview, where they become leading on the body instead, regardless of
-        // parenthesization.
         if parameters.end() < comment.start() && comment.start() < lambda.body.start() {
-            return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
-                CommentPlacement::leading(&*lambda.body, comment)
-            } else {
-                // If the value is parenthesized, and the comment is within the parentheses, it should
-                // be a leading comment on the value, not a dangling comment in the lambda, as in:
-                // ```python
-                // (
-                //     lambda x:  (  # comment
-                //         y
-                //     )
-                // )
-                // ```
-                let tokenizer =
-                    SimpleTokenizer::new(source, TextRange::new(parameters.end(), comment.start()));
-                if tokenizer
-                    .skip_trivia()
-                    .any(|token| token.kind == SimpleTokenKind::LParen)
-                {
-                    return CommentPlacement::Default(comment);
-                }
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda x:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer =
+                SimpleTokenizer::new(source, TextRange::new(parameters.end(), comment.start()));
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
 
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
-            };
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
     } else {
         // Comments between the lambda and the body are dangling on the lambda:
@@ -1930,32 +1891,26 @@ fn handle_lambda_comment<'a>(
         //     y
         // )
         // ```
-        // Except in preview, where they become leading on the body instead, regardless of
-        // parenthesization.
         if comment.start() < lambda.body.start() {
-            return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
-                CommentPlacement::leading(&*lambda.body, comment)
-            } else {
-                // If the value is parenthesized, and the comment is within the parentheses, it should
-                // be a leading comment on the value, not a dangling comment in the lambda, as in:
-                // ```python
-                // (
-                //     lambda:  (  # comment
-                //         y
-                //     )
-                // )
-                // ```
-                let tokenizer =
-                    SimpleTokenizer::new(source, TextRange::new(lambda.start(), comment.start()));
-                if tokenizer
-                    .skip_trivia()
-                    .any(|token| token.kind == SimpleTokenKind::LParen)
-                {
-                    return CommentPlacement::Default(comment);
-                }
+            // If the value is parenthesized, and the comment is within the parentheses, it should
+            // be a leading comment on the value, not a dangling comment in the lambda, as in:
+            // ```python
+            // (
+            //     lambda:  (  # comment
+            //         y
+            //     )
+            // )
+            // ```
+            let tokenizer =
+                SimpleTokenizer::new(source, TextRange::new(lambda.start(), comment.start()));
+            if tokenizer
+                .skip_trivia()
+                .any(|token| token.kind == SimpleTokenKind::LParen)
+            {
+                return CommentPlacement::Default(comment);
+            }
 
-                CommentPlacement::dangling(comment.enclosing_node(), comment)
-            };
+            return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
     }
 

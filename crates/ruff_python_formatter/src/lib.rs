@@ -177,12 +177,7 @@ where
     &'a N: Into<AnyNodeRef<'a>>,
 {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(
-        parsed.syntax(),
-        source_code,
-        comment_ranges,
-        options.preview(),
-    );
+    let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
 
     let formatted = format!(
         PyFormatContext::new(options, source, comments, parsed.tokens()),
@@ -218,14 +213,9 @@ pub fn formatted_file(db: &dyn Db, file: File) -> Result<Option<String>, FormatM
 }
 
 /// Public function for generating a printable string of the debug comments.
-pub fn pretty_comments(
-    module: &Mod,
-    comment_ranges: &CommentRanges,
-    source: &str,
-    preview: PreviewMode,
-) -> String {
+pub fn pretty_comments(module: &Mod, comment_ranges: &CommentRanges, source: &str) -> String {
     let source_code = SourceCode::new(source);
-    let comments = Comments::from_ast(module, source_code, comment_ranges, preview);
+    let comments = Comments::from_ast(module, source_code, comment_ranges);
 
     std::format!("{comments:#?}", comments = comments.debug(source_code))
 }

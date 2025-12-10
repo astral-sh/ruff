@@ -76,12 +76,7 @@ pub fn format_range(
     let parsed = parse(source, ParseOptions::from(options.source_type()))?;
     let source_code = SourceCode::new(source);
     let comment_ranges = CommentRanges::from(parsed.tokens());
-    let comments = Comments::from_ast(
-        parsed.syntax(),
-        source_code,
-        &comment_ranges,
-        options.preview(),
-    );
+    let comments = Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
 
     let mut context = PyFormatContext::new(
         options.with_source_map_generation(SourceMapGeneration::Enabled),
