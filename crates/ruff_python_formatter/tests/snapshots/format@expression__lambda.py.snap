@@ -1158,8 +1158,7 @@ def ddb():
     )
 
 
-long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
-    # 1
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = (  # 1
     # 2
     lambda x, y, z:  # 3
     # 4
@@ -1989,9 +1988,9 @@ transform = (
          CREATE TABLE {table} AS
          SELECT ROW_NUMBER() OVER () AS id, {var}
          FROM (
-@@ -402,18 +394,19 @@
- long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
-     # 1
+@@ -401,18 +393,19 @@
+ 
+ long_assignment_target.with_attribute.and_a_slice[with_an_index] = (  # 1
      # 2
 -    lambda x, y, z:  # 3
 -    # 4
@@ -2016,7 +2015,7 @@ transform = (
  )
  
  very_long_variable_name_x, very_long_variable_name_y = (
-@@ -421,8 +414,8 @@
+@@ -420,8 +413,8 @@
      lambda b: b * another_very_long_expression_here,
  )
  
@@ -2027,7 +2026,7 @@ transform = (
          x, more_args, additional_parameters
      )
  )
-@@ -458,12 +451,12 @@
+@@ -457,12 +450,12 @@
      [
          # Not fluent
          param(
@@ -2042,7 +2041,7 @@ transform = (
          ),
          param(
              lambda left, right: (
-@@ -472,9 +465,9 @@
+@@ -471,9 +464,9 @@
          ),
          param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
          param(
@@ -2055,7 +2054,7 @@ transform = (
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -508,16 +501,18 @@
+@@ -507,16 +500,18 @@
  ]
  
  # adds parentheses around the body
@@ -2077,7 +2076,7 @@ transform = (
  
  lambda x, y, z: (
      x + y + z
-@@ -528,7 +523,7 @@
+@@ -527,7 +522,7 @@
      x + y + z  # trailing eol body
  )
  
@@ -2086,7 +2085,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -540,21 +535,23 @@
+@@ -539,21 +534,23 @@
  )
  
  (
@@ -2120,7 +2119,7 @@ transform = (
      # dangling header comment
      source_bucket
      if name == source_bucket_name
-@@ -562,8 +559,7 @@
+@@ -561,8 +558,7 @@
  )
  
  (
@@ -2130,7 +2129,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -571,61 +567,70 @@
+@@ -570,61 +566,70 @@
  )
  
  (
@@ -2233,7 +2232,7 @@ transform = (
  )
  
  (
-@@ -638,27 +643,31 @@
+@@ -637,27 +642,31 @@
  (
      lambda
      # comment
@@ -2273,7 +2272,7 @@ transform = (
  )
  
  (
-@@ -666,19 +675,20 @@
+@@ -665,19 +674,20 @@
      # 2
      left,  # 3
      # 4
@@ -2304,7 +2303,7 @@ transform = (
          )
      )
  )
-@@ -696,48 +706,52 @@
+@@ -695,48 +705,52 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,

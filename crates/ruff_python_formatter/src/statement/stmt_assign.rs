@@ -305,18 +305,14 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_implicit_flat.is_none()
                     && format_interpolated_string.is_none()
                 {
-                    return if let Expr::Lambda(lambda) = value {
-                        let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
-                        // See the lambda comment in `can_omit_optional_parentheses` for more
-                        // details. The preview behavior resolves this, but we still need this
-                        // branch for now on stable.
-                        if !is_parenthesize_lambda_bodies_enabled(f.context())
-                            && can_omit_optional_parentheses(value, f.context())
-                        {
-                            optional_parentheses(&lambda).fmt(f)
-                        } else {
-                            parenthesize_if_expands(&lambda).fmt(f)
-                        }
+                    return if is_parenthesize_lambda_bodies_enabled(f.context())
+                        && let Expr::Lambda(lambda) = value
+                        && !f.context().comments().has_leading(lambda)
+                    {
+                        parenthesize_if_expands(
+                            &lambda.format().with_options(ExprLambdaLayout::Assignment),
+                        )
+                        .fmt(f)
                     } else {
                         maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
                             .fmt(f)
@@ -592,18 +588,14 @@ impl Format<PyFormatContext<'_>> for FormatStatementsLastExpression<'_> {
                     && format_interpolated_string.is_none()
                 {
                     let formatted_value = format_with(|f| {
-                        if let Expr::Lambda(lambda) = value {
-                            let lambda = lambda.format().with_options(ExprLambdaLayout::Assignment);
-                            // See the lambda comment in `can_omit_optional_parentheses` for more
-                            // details. The preview behavior resolves this, but we still need this
-                            // branch for now on stable.
-                            if !is_parenthesize_lambda_bodies_enabled(f.context())
-                                && can_omit_optional_parentheses(value, f.context())
-                            {
-                                optional_parentheses(&lambda).fmt(f)
-                            } else {
-                                parenthesize_if_expands(&lambda).fmt(f)
-                            }
+                        if is_parenthesize_lambda_bodies_enabled(f.context())
+                            && let Expr::Lambda(lambda) = value
+                            && !f.context().comments().has_leading(lambda)
+                        {
+                            parenthesize_if_expands(
+                                &lambda.format().with_options(ExprLambdaLayout::Assignment),
+                            )
+                            .fmt(f)
                         } else {
                             maybe_parenthesize_expression(value, *statement, Parenthesize::IfBreaks)
                                 .fmt(f)
