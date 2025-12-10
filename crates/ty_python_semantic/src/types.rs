@@ -2717,7 +2717,7 @@ impl<'db> Type<'db> {
             (Type::ClassLiteral(class), Type::GenericAlias(target_alias)) => {
                 class.default_specialization(db).has_relation_to_impl(
                     db,
-                    ClassType::from(target_alias),
+                    ClassType::Generic(target_alias),
                     inferable,
                     relation,
                     relation_visitor,
@@ -2727,9 +2727,9 @@ impl<'db> Type<'db> {
 
             // For generic aliases, we delegate to the underlying class type.
             (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
-                ClassType::from(self_alias).has_relation_to_impl(
+                ClassType::Generic(self_alias).has_relation_to_impl(
                     db,
-                    ClassType::from(target_alias),
+                    ClassType::Generic(target_alias),
                     inferable,
                     relation,
                     relation_visitor,
