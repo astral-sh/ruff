@@ -310,6 +310,127 @@ reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 ```
 
+When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
+the actual argument even for non-final classes.
+
+```py
+class P[T]:
+    x: T  # invariant
+
+class Q[T]:
+    x: T  # invariant
+
+def extract_t[T](x: P[T] | Q[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_t(P[int]()))  # revealed: int
+reveal_type(extract_t(Q[str]()))  # revealed: str
+```
+
+Passing anything else results in an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(extract_t([1, 2]))  # revealed: Unknown
+```
+
+This also works when different union elements have different typevars:
+
+```py
+def extract_both[T, S](x: P[T] | Q[S]) -> tuple[T, S]:
+    raise NotImplementedError
+
+reveal_type(extract_both(P[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(extract_both(Q[str]()))  # revealed: tuple[Unknown, str]
+```
+
+Inference also works when passing subclasses of the generic classes in the union.
+
+```py
+class SubP[T](P[T]):
+    pass
+
+class SubQ[T](Q[T]):
+    pass
+
+reveal_type(extract_t(SubP[int]()))  # revealed: int
+reveal_type(extract_t(SubQ[str]()))  # revealed: str
+
+reveal_type(extract_both(SubP[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(extract_both(SubQ[str]()))  # revealed: tuple[Unknown, str]
+```
+
+When a type is a subclass of both `P` and `Q` with different specializations, we cannot infer a
+single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, we can still infer
+both types in a call to `extract_both`:
+
+```py
+class PandQ(P[int], Q[str]):
+    pass
+
+# TODO: Ideally, we would return `Unknown` here.
+# error: [invalid-argument-type]
+reveal_type(extract_t(PandQ()))  # revealed: int | str
+
+reveal_type(extract_both(PandQ()))  # revealed: tuple[int, str]
+```
+
+When non-generic types are part of the union, we can still infer typevars for the remaining generic
+types:
+
+```py
+def extract_optional_t[T](x: None | P[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_optional_t(None))  # revealed: Unknown
+reveal_type(extract_optional_t(P[int]()))  # revealed: int
+```
+
+Passing anything else results in an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
+```
+
+If the union contains contains parent and child of a generic class, we ideally pick the union
+element that is more precise:
+
+```py
+class Base[T]:
+    x: T
+
+class Sub[T](Base[T]): ...
+
+def f[T](t: Base[T] | Sub[T | None]) -> T:
+    raise NotImplementedError
+
+reveal_type(f(Base[int]()))  # revealed: int
+# TODO: Should ideally be `str`
+reveal_type(f(Sub[str | None]()))  # revealed: str | None
+```
+
+If we have a case like the following, where only one of the union elements matches due to the
+typevar bound, we do not emit a specialization error:
+
+```py
+class P[T]:
+    value: T
+
+def f[I: int, S: str](t: P[I] | P[S]) -> tuple[I, S]:
+    raise NotImplementedError
+
+reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
+```
+
+However, if we pass something that does not match _any_ union element, we do emit an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
+```
+
 ## Inferring nested generic function calls
 
 We can infer type assignments in nested calls to multiple generic functions. If they use the same

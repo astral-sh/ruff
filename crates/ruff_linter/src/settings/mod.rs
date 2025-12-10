@@ -465,6 +465,12 @@ impl LinterSettings {
         self
     }
 
+    #[must_use]
+    pub fn with_preview_mode(mut self) -> Self {
+        self.preview = PreviewMode::Enabled;
+        self
+    }
+
     /// Resolve the [`TargetVersion`] to use for linting.
     ///
     /// This method respects the per-file version overrides in

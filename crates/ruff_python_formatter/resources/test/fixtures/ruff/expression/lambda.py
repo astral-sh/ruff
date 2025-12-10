@@ -228,3 +228,46 @@ def a():
         g = 10
     )
 
+(
+    lambda
+    * # comment 2
+    x:
+    x
+)
+
+(
+    lambda # comment 1
+    * # comment 2
+    x:
+    x
+)
+
+(
+    lambda # comment 1
+    y,
+    * # comment 2
+    x:
+    x
+)
+
+(
+    lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
+    * # comment 2
+    x,
+    **y:
+    x
+)
+
+(
+    lambda
+    ** # comment 1
+    x:
+    x
+)

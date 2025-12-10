@@ -6,7 +6,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
-use crate::types::signatures::Signature;
+use crate::types::signatures::{ParameterKind, Signature};
 use crate::types::{CallDunderError, UnionType};
 use crate::types::{CallableTypes, ClassBase, KnownClass, Type, TypeContext};
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
@@ -459,6 +459,12 @@ pub struct CallSignatureDetails<'db> {
     /// This provides easy access to parameter names for documentation lookup.
     pub parameter_names: Vec<String>,
 
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_kinds: Vec<ParameterKind<'db>>,
+
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_types: Vec<Option<Type<'db>>>,
+
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
     pub definition: Option<Definition<'db>>,
@@ -517,6 +523,12 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(|param| (param.kind().clone(), param.annotated_type()))
+                        .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -524,6 +536,8 @@ pub fn call_signature_details<'db>(
                     label: display_details.label,
                     parameter_label_offsets,
                     parameter_names,
+                    parameter_kinds,
+                    parameter_types,
                     argument_to_parameter_mapping,
                 }
             })

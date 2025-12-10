@@ -33,26 +33,29 @@ impl LineIndex {
         line_starts.push(TextSize::default());
 
         let bytes = text.as_bytes();
-        let mut utf8 = false;
 
         assert!(u32::try_from(bytes.len()).is_ok());
 
-        for (i, byte) in bytes.iter().enumerate() {
-            utf8 |= !byte.is_ascii();
-
-            match byte {
-                // Only track one line break for `\r\n`.
-                b'\r' if bytes.get(i + 1) == Some(&b'\n') => continue,
-                b'\n' | b'\r' => {
-                    // SAFETY: Assertion above guarantees `i <= u32::MAX`
-                    #[expect(clippy::cast_possible_truncation)]
-                    line_starts.push(TextSize::from(i as u32) + TextSize::from(1));
-                }
-                _ => {}
+        for i in memchr::memchr2_iter(b'\n', b'\r', bytes) {
+            // Skip `\r` in `\r\n` sequences (only count the `\n`).
+            if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
+                continue;
             }
+            // SAFETY: Assertion above guarantees `i <= u32::MAX`
+            #[expect(clippy::cast_possible_truncation)]
+            line_starts.push(TextSize::from(i as u32) + TextSize::from(1));
         }
 
-        let kind = if utf8 {
+        // Determine whether the source text is ASCII.
+        //
+        // Empirically, this simple loop is auto-vectorized by LLVM and benchmarks faster than both
+        // `str::is_ascii()` and hand-written SIMD.
+        let mut has_non_ascii = false;
+        for byte in bytes {
+            has_non_ascii |= !byte.is_ascii();
+        }
+
+        let kind = if has_non_ascii {
             IndexKind::Utf8
         } else {
             IndexKind::Ascii

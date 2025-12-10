@@ -19,7 +19,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [dependency-groups]
-dev = ["mypy", "ruff"]
+dev = ["mypy", "ruff", "ty"]
 
 [tool.hatch.build.targets.wheel]
 include = ["fuzz.py"]

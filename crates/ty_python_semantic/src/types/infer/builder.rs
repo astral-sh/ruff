@@ -3472,17 +3472,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ));
             }
 
+            ast::Expr::Tuple(_) if !exactly_one_paramspec => {
+                // Tuple expression is only allowed when the generic context contains only one
+                // `ParamSpec` type variable and no other type variables.
+            }
+
             ast::Expr::Tuple(ast::ExprTuple { elts, .. })
             | ast::Expr::List(ast::ExprList { elts, .. }) => {
-                // This should be taken care of by the caller.
-                if expr.is_tuple_expr() {
-                    assert!(
-                        exactly_one_paramspec,
-                        "Inferring ParamSpec value during explicit specialization for a \
-                    tuple expression should only happen when it contains exactly one ParamSpec"
-                    );
-                }
-
                 let mut parameter_types = Vec::with_capacity(elts.len());
 
                 // Whether to infer `Todo` for the parameters
@@ -3519,7 +3515,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return Ok(Type::paramspec_value_callable(db, Parameters::todo()));
             }
 
-            ast::Expr::Name(_) => {
+            ast::Expr::Name(name) => {
+                if name.is_invalid() {
+                    return Err(());
+                }
+
                 let param_type = self.infer_type_expression(expr);
 
                 match param_type {
@@ -5033,9 +5033,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ) => {
                             self.infer_legacy_typevar(target, call_expr, definition, typevar_class)
                         }
-                        Some(KnownClass::ParamSpec) => {
-                            self.infer_paramspec(target, call_expr, definition)
-                        }
+                        Some(
+                            paramspec_class @ (KnownClass::ParamSpec
+                            | KnownClass::ExtensionsParamSpec),
+                        ) => self.infer_legacy_paramspec(
+                            target,
+                            call_expr,
+                            definition,
+                            paramspec_class,
+                        ),
                         Some(KnownClass::NewType) => {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
@@ -5080,11 +5086,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         target_ty
     }
 
-    fn infer_paramspec(
+    fn infer_legacy_paramspec(
         &mut self,
         target: &ast::Expr,
         call_expr: &ast::ExprCall,
         definition: Definition<'db>,
+        known_class: KnownClass,
     ) -> Type<'db> {
         fn error<'db>(
             context: &InferContext<'db, '_>,
@@ -5101,7 +5108,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let db = self.db();
         let arguments = &call_expr.arguments;
-        let assume_all_features = self.in_stub();
+        let is_typing_extensions = known_class == KnownClass::ExtensionsParamSpec;
+        let assume_all_features = self.in_stub() || is_typing_extensions;
         let python_version = Program::get(db).python_version(db);
         let have_features_from =
             |version: PythonVersion| assume_all_features || python_version >= version;
@@ -5594,7 +5602,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_type_expression(&bound.value);
         }
         if let Some(default) = arguments.find_keyword("default") {
-            if let Some(KnownClass::ParamSpec) = known_class {
+            if matches!(
+                known_class,
+                Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec)
+            ) {
                 self.infer_paramspec_default(&default.value);
             } else {
                 self.infer_type_expression(&default.value);
@@ -8440,7 +8451,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             );
                         }
                     }
-                    Some(KnownClass::ParamSpec) => {
+                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec) => {
                         if let Some(builder) = self
                             .context
                             .report_lint(&INVALID_PARAMSPEC, call_expression)
@@ -11632,7 +11643,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let exactly_one_paramspec = generic_context.exactly_one_paramspec(db);
         let (type_arguments, store_inferred_type_arguments) = match slice_node {
             ast::Expr::Tuple(tuple) => {
-                if exactly_one_paramspec {
+                if exactly_one_paramspec && !tuple.elts.is_empty() {
                     (std::slice::from_ref(slice_node), false)
                 } else {
                     (tuple.elts.as_slice(), true)
