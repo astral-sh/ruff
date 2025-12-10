@@ -2709,6 +2709,34 @@ impl<'db> Type<'db> {
                     )
                 })
                 .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
+
+            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
+            // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
+            // with final generic types, where `type[C[...]]` is simplified to the generic-alias
+            // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
+            (Type::ClassLiteral(class), Type::GenericAlias(target_alias)) => {
+                class.default_specialization(db).has_relation_to_impl(
+                    db,
+                    ClassType::Generic(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
+            // For generic aliases, we delegate to the underlying class type.
+            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
+                ClassType::Generic(self_alias).has_relation_to_impl(
+                    db,
+                    ClassType::Generic(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class(db)
