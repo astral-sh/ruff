@@ -1868,27 +1868,27 @@ fn handle_lambda_comment<'a>(
         // )
         // ```
         if parameters.end() < comment.start() && comment.start() < lambda.body.start() {
-            // If the value is parenthesized, and the comment is within the parentheses, it should
-            // be a leading comment on the value, not a dangling comment in the lambda, as in:
-            // ```python
-            // (
-            //     lambda x:  (  # comment
-            //         y
-            //     )
-            // )
-            // ```
-            let tokenizer =
-                SimpleTokenizer::new(source, TextRange::new(parameters.end(), comment.start()));
-            if tokenizer
-                .skip_trivia()
-                .any(|token| token.kind == SimpleTokenKind::LParen)
-            {
-                return CommentPlacement::Default(comment);
-            }
-
             return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
             } else {
+                // If the value is parenthesized, and the comment is within the parentheses, it should
+                // be a leading comment on the value, not a dangling comment in the lambda, as in:
+                // ```python
+                // (
+                //     lambda x:  (  # comment
+                //         y
+                //     )
+                // )
+                // ```
+                let tokenizer =
+                    SimpleTokenizer::new(source, TextRange::new(parameters.end(), comment.start()));
+                if tokenizer
+                    .skip_trivia()
+                    .any(|token| token.kind == SimpleTokenKind::LParen)
+                {
+                    return CommentPlacement::Default(comment);
+                }
+
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
             };
         }
@@ -1901,27 +1901,27 @@ fn handle_lambda_comment<'a>(
         // )
         // ```
         if comment.start() < lambda.body.start() {
-            // If the value is parenthesized, and the comment is within the parentheses, it should
-            // be a leading comment on the value, not a dangling comment in the lambda, as in:
-            // ```python
-            // (
-            //     lambda:  (  # comment
-            //         y
-            //     )
-            // )
-            // ```
-            let tokenizer =
-                SimpleTokenizer::new(source, TextRange::new(lambda.start(), comment.start()));
-            if tokenizer
-                .skip_trivia()
-                .any(|token| token.kind == SimpleTokenKind::LParen)
-            {
-                return CommentPlacement::Default(comment);
-            }
-
             return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
             } else {
+                // If the value is parenthesized, and the comment is within the parentheses, it should
+                // be a leading comment on the value, not a dangling comment in the lambda, as in:
+                // ```python
+                // (
+                //     lambda:  (  # comment
+                //         y
+                //     )
+                // )
+                // ```
+                let tokenizer =
+                    SimpleTokenizer::new(source, TextRange::new(lambda.start(), comment.start()));
+                if tokenizer
+                    .skip_trivia()
+                    .any(|token| token.kind == SimpleTokenKind::LParen)
+                {
+                    return CommentPlacement::Default(comment);
+                }
+
                 CommentPlacement::dangling(comment.enclosing_node(), comment)
             };
         }
