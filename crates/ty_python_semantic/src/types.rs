@@ -2725,6 +2725,18 @@ impl<'db> Type<'db> {
                 )
             }
 
+            // For generic aliases, we delegate to the underlying class type.
+            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
+                ClassType::from(self_alias).has_relation_to_impl(
+                    db,
+                    ClassType::from(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class(db)

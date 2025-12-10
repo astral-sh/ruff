@@ -356,8 +356,16 @@ def expects_type_p_of_int(x: type[P[int]]):
 # OK, the default specialization of `P` is assignable to `type[P[Unknown]]`
 expects_type_p(P)
 
-# also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
+# Also OK, because `P[int]` and `P[str]` are both assignable to `P[Unknown]`
+expects_type_p(P[int])
+expects_type_p(P[str])
+
+# Also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
 expects_type_p_of_int(P)
+expects_type_p_of_int(P[int])
+
+# Not OK, because `P[str]` is not assignable to `P[int]`
+expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
 ```
 
 The same principles apply when typevar defaults are used, but the results are a bit different
@@ -389,4 +397,55 @@ expects_type_p_of_str(P)
 expects_type_p(P[int])  # error: [invalid-argument-type]
 expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
 expects_type_p_of_str(P[int])  # error: [invalid-argument-type]
+```
+
+This also works with `ParamSpec`:
+
+```py
+@final
+class C[**P]: ...
+
+def expects_type_c(f: type[C]): ...
+def expects_type_c_of_int_and_str(x: type[C[int, str]]): ...
+
+# OK, the unspecialized `C` is assignable to `type[C[...]]`
+expects_type_c(C)
+
+# Also OK, any specialization is assignable to the unspecialized `C`
+expects_type_c(C[int])
+expects_type_c(C[str, int, bytes])
+
+# Ok, the unspecialized `C` is assignable to `type[C[int, str]]`
+expects_type_c_of_int_and_str(C)
+
+# Also OK, the specialized `C[int, str]` is assignable to `type[C[int, str]]`
+expects_type_c_of_int_and_str(C[int, str])
+
+# TODO: these should be errors
+expects_type_c_of_int_and_str(C[str])
+expects_type_c_of_int_and_str(C[int, str, bytes])
+expects_type_c_of_int_and_str(C[str, int])
+```
+
+And with a `ParamSpec` that has a default:
+
+```py
+@final
+class C[**P = [int, str]]: ...
+
+def expects_type_c_default(f: type[C]): ...
+def expects_type_c_default_of_int(f: type[C[int]]): ...
+def expects_type_c_default_of_int_str(f: type[C[int, str]]): ...
+
+expects_type_c_default(C)
+expects_type_c_default(C[int, str])
+expects_type_c_default_of_int(C)
+expects_type_c_default_of_int(C[int])
+expects_type_c_default_of_int_str(C)
+expects_type_c_default_of_int_str(C[int, str])
+
+# TODO: these should be errors
+expects_type_c_default(C[int])
+expects_type_c_default_of_int(C[str])
+expects_type_c_default_of_int_str(C[str, int])
 ```
