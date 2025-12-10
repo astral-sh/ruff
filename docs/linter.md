@@ -343,6 +343,8 @@ The full inline comment specification is as follows:
 
 #### Range suppressions
 
+*Range suppressions are currently only available in [preview mode](preview.md#preview).*
+
 To ignore one or more violations within a range or block of code, a "disable" comment
 followed by a matching "enable" comment can be used, like so:
 
