@@ -684,9 +684,8 @@ class GenericClass[T]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))
-# TODO: these should not error
-static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))  # error: [static-assert-error]
-static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))  # error: [static-assert-error]
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
 
@@ -694,19 +693,17 @@ class GenericClassIntBound[T: int]:
     x: T  # invariant
 
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
-# TODO: these should not error
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))  # error: [static-assert-error]
-static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))  # error: [static-assert-error]
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
 
 @final
 class GenericFinalClass[T]:
     x: T  # invariant
 
-# TODO: these should not error
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))  # error: [static-assert-error]
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))  # error: [static-assert-error]
-static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))  # error: [static-assert-error]
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
 static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
 static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```

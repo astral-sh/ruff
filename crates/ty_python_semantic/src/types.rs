@@ -3554,6 +3554,20 @@ impl<'db> Type<'db> {
                 })
             }
 
+            (Type::ClassLiteral(class_literal), other @ Type::GenericAlias(_))
+            | (other @ Type::GenericAlias(_), Type::ClassLiteral(class_literal)) => class_literal
+                .default_specialization(db)
+                .into_generic_alias()
+                .when_none_or(|alias| {
+                    other.is_disjoint_from_impl(
+                        db,
+                        Type::GenericAlias(alias),
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                }),
+
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
