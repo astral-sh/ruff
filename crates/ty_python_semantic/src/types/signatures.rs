@@ -32,13 +32,12 @@ use ruff_python_ast::{self as ast, name::Name};
 
 /// Infer the type of a parameter or return annotation in a function signature.
 ///
-/// This is very similar to
-/// [`definition_expression_type`][crate::types::definition_expression_type], but knows that
-/// `TypeInferenceBuilder` will always infer the parameters and return of a function in its PEP-695
-/// typevar scope, if there is one; otherwise they will be inferred in the function definition
-/// scope, but will always be deferred. (This prevents spurious salsa cycles when we need the
-/// signature of the function while in the middle of inferring its definition scope — for instance,
-/// when applying decorators.)
+/// This is very similar to [`definition_expression_type`], but knows that `TypeInferenceBuilder`
+/// will always infer the parameters and return of a function in its PEP-695 typevar scope, if
+/// there is one; otherwise they will be inferred in the function definition scope, but will always
+/// be deferred. (This prevents spurious salsa cycles when we need the signature of the function
+/// while in the middle of inferring its definition scope — for instance, when applying
+/// decorators.)
 fn function_signature_expression_type<'db>(
     db: &'db dyn Db,
     definition: Definition<'db>,
