@@ -3,7 +3,7 @@ use std::ops::Deref;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast as ast;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::Db;
 use crate::ast_node_ref::AstNodeRef;
@@ -374,6 +374,8 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
+    pub(crate) module: &'ast ast::Identifier,
+    pub(crate) module_index: usize,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -456,8 +458,12 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
             }),
             DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
                 node,
+                module,
+                module_index,
             }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
                 node: AstNodeRef::new(parsed, node),
+                module: AstNodeRef::new(parsed, module),
+                module_index,
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -584,7 +590,9 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node }) => node.into(),
+            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node, .. }) => {
+                node.into()
+            }
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
             Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
@@ -755,7 +763,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.target_range(module),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -793,7 +801,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
-            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.module(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -1033,11 +1041,36 @@ impl ImportFromDefinitionKind {
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct ImportFromSubmoduleDefinitionKind {
     node: AstNodeRef<ast::StmtImportFrom>,
+    module: AstNodeRef<ast::Identifier>,
+    module_index: usize,
 }
 
 impl ImportFromSubmoduleDefinitionKind {
     pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
         self.node.node(module)
+    }
+
+    pub fn module<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Identifier {
+        self.module.node(module)
+    }
+
+    pub fn target_range(&self, module: &ParsedModuleRef) -> TextRange {
+        let module_ident = self.module(module);
+        let module_str = module_ident.as_str();
+        let Some(component_str) = module_str.split('.').nth(self.module_index) else {
+            // This shouldn't happen but just in case, provide a safe default
+            return module_ident.range();
+        };
+        let base_addr = module_str.as_ptr().addr();
+        let component_addr = component_str.as_ptr().addr();
+        let offset = base_addr.saturating_sub(component_addr);
+        let Ok(offset_size) = TextSize::try_from(offset) else {
+            // This shouldn't happen but just in case, provide a safe default
+            return module_ident.range();
+        };
+        let start = module_ident.start().saturating_add(offset_size);
+        let end = start.saturating_add(component_str.text_len());
+        TextRange::new(start, end)
     }
 }
 
