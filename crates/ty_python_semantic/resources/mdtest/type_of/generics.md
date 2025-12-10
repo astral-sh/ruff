@@ -392,10 +392,12 @@ expects_type_p(P)
 # Also OK if the explicit specialization lines up with the default, in either direction:
 expects_type_p(P[str])
 expects_type_p_of_str(P)
+expects_type_p_of_str(P[str])
 
 # Not OK if the specializations don't line up:
 expects_type_p(P[int])  # error: [invalid-argument-type]
 expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
+expects_type_p_of_int(P)  # error: [invalid-argument-type]
 expects_type_p_of_str(P[int])  # error: [invalid-argument-type]
 ```
 
