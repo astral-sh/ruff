@@ -3,7 +3,7 @@ use ruff_python_ast::{AnyNodeRef, Expr, ExprLambda};
 use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
-use crate::comments::{dangling_comments, leading_comments, trailing_comments};
+use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
 use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
@@ -130,48 +130,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
             // In preview, always parenthesize the body if there are dangling comments.
             else if preview {
-                // Can't use partition_point because there can be additional end of line comments
-                // after the initial set. All of these comments are dangling, for example:
-                //
-                // ```python
-                // (
-                //     lambda  # 1
-                //     # 2
-                //     :  # 3
-                //     # 4
-                //     y
-                // )
-                // ```
-                //
-                // and alternate between own line and end of line.
-                let (after_parameters_end_of_line, leading_body_comments) =
-                    dangling_after_parameters.split_at(
-                        dangling_after_parameters
-                            .iter()
-                            .position(|comment| comment.line_position().is_own_line())
-                            .unwrap_or(dangling_after_parameters.len()),
-                    );
-
-                let fmt_body = format_with(|f: &mut PyFormatter| {
-                    write!(
-                        f,
-                        [
-                            space(),
-                            token("("),
-                            trailing_comments(after_parameters_end_of_line),
-                            block_indent(&format_args!(
-                                leading_comments(leading_body_comments),
-                                body.format().with_options(Parentheses::Never)
-                            )),
-                            token(")")
-                        ]
-                    )
-                });
-
-                return match self.layout {
-                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
-                    ExprLambdaLayout::Default => fmt_body.fmt(f),
-                };
+                return format_body(body, dangling_after_parameters, self.layout).fmt(f);
             } else {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
@@ -184,33 +143,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
             // In preview, always parenthesize the body if there are dangling comments.
             else if preview {
-                let (dangling_end_of_line, dangling_own_line) = dangling.split_at(
-                    dangling
-                        .iter()
-                        .position(|comment| comment.line_position().is_own_line())
-                        .unwrap_or(dangling.len()),
-                );
-
-                let fmt_body = format_with(|f: &mut PyFormatter| {
-                    write!(
-                        f,
-                        [
-                            space(),
-                            token("("),
-                            trailing_comments(dangling_end_of_line),
-                            block_indent(&format_args!(
-                                leading_comments(dangling_own_line),
-                                body.format().with_options(Parentheses::Never)
-                            )),
-                            token(")")
-                        ]
-                    )
-                });
-
-                return match self.layout {
-                    ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
-                    ExprLambdaLayout::Default => fmt_body.fmt(f),
-                };
+                return format_body(body, dangling, self.layout).fmt(f);
             } else {
                 write!(f, [dangling_comments(dangling)])?;
             }
@@ -392,6 +325,76 @@ impl NeedsParentheses for ExprLambda {
             OptionalParentheses::Always
         } else {
             OptionalParentheses::Multiline
+        }
+    }
+}
+
+fn format_body<'a>(
+    body: &'a Expr,
+    dangling: &'a [SourceComment],
+    layout: ExprLambdaLayout,
+) -> FormatBody<'a> {
+    FormatBody {
+        body,
+        dangling,
+        layout,
+    }
+}
+
+struct FormatBody<'a> {
+    body: &'a Expr,
+    dangling: &'a [SourceComment],
+    layout: ExprLambdaLayout,
+}
+
+impl Format<PyFormatContext<'_>> for FormatBody<'_> {
+    fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
+        let FormatBody {
+            dangling,
+            body,
+            layout,
+        } = self;
+
+        // Can't use partition_point because there can be additional end of line comments after the
+        // initial set. All of these comments are dangling, for example:
+        //
+        // ```python
+        // (
+        //     lambda  # 1
+        //     # 2
+        //     :  # 3
+        //     # 4
+        //     y
+        // )
+        // ```
+        //
+        // and alternate between own line and end of line.
+        let (after_parameters_end_of_line, leading_body_comments) = dangling.split_at(
+            dangling
+                .iter()
+                .position(|comment| comment.line_position().is_own_line())
+                .unwrap_or(dangling.len()),
+        );
+
+        let fmt_body = format_with(|f: &mut PyFormatter| {
+            write!(
+                f,
+                [
+                    space(),
+                    token("("),
+                    trailing_comments(after_parameters_end_of_line),
+                    block_indent(&format_args!(
+                        leading_comments(leading_body_comments),
+                        body.format().with_options(Parentheses::Never)
+                    )),
+                    token(")")
+                ]
+            )
+        });
+
+        match layout {
+            ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
+            ExprLambdaLayout::Default => fmt_body.fmt(f),
         }
     }
 }
