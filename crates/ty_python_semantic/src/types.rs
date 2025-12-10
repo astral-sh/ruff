@@ -7324,7 +7324,9 @@ impl<'db> Type<'db> {
                         });
                     };
 
-                    Ok(typing_self(db, scope_id, typevar_binding_context, class).unwrap_or(*self))
+                    Ok(typing_self(db, scope_id, typevar_binding_context, class)
+                        .map(Type::TypeVar)
+                        .unwrap_or(*self))
                 }
                 // We ensure that `typing.TypeAlias` used in the expected position (annotating an
                 // annotated assignment statement) doesn't reach here. Using it in any other type
