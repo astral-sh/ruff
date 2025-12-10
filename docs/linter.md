@@ -402,7 +402,8 @@ The full range suppression comment specification is as follows:
   to start or end a range respectively, immediately followed by `[`, any codes to
   be suppressed, and ending with `]`. 
 - Codes to be suppressed must be separated by commas, with optional whitespace
-  before or after each code.
+  before or after each code, and may be followed by an optional trailing comma
+  after the last code.
 
 #### File-level
 
