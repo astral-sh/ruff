@@ -14130,7 +14130,7 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
-        self.positive(db).len() == 0 && self.negative(db).len() == 1
+        self.positive(db).is_empty() && self.negative(db).len() == 1
     }
 
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {

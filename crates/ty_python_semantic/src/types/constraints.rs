@@ -1591,7 +1591,6 @@ impl<'db> Node<'db> {
     ///     │       └─₀ never
     ///     └─₀ never
     /// ```
-    #[cfg_attr(not(test), expect(dead_code))] // Keep this around for debugging purposes
     fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         struct DisplayNode<'a, 'db> {
             db: &'db dyn Db,
