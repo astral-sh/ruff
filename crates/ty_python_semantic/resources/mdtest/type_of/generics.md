@@ -274,3 +274,119 @@ class Foo[T]: ...
 # error: [invalid-parameter-default] "Default value of type `<class 'Foo'>` is not assignable to annotated parameter type `type[T@f]`"
 def f[T: Foo[Any]](x: type[T] = Foo): ...
 ```
+
+## Display of generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Generic, TypeVar
+
+class Foo[T]: ...
+
+S = TypeVar("S")
+
+class Bar(Generic[S]): ...
+
+def _(x: Foo[int], y: Bar[str], z: list[bytes]):
+    reveal_type(type(x))  # revealed: type[Foo[int]]
+    reveal_type(type(y))  # revealed: type[Bar[str]]
+    reveal_type(type(z))  # revealed: type[list[bytes]]
+```
+
+## Checking generic `type[]` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class C[T]:
+    pass
+
+class D[T]:
+    pass
+
+var: type[C[int]] = C[int]
+var: type[C[int]] = D[int]  # error: [invalid-assignment] "Object of type `<class 'D[int]'>` is not assignable to `type[C[int]]`"
+```
+
+However, generic `Protocol` classes are still TODO:
+
+```py
+from typing import Protocol
+
+class Proto[U](Protocol):
+    def some_method(self): ...
+
+# TODO: should be error: [invalid-assignment]
+var: type[Proto[int]] = C[int]
+
+def _(p: type[Proto[int]]):
+    reveal_type(p)  # revealed: type[@Todo(type[T] for protocols)]
+```
+
+## Generic `@final` classes
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+An unspecialized generic final class object is assignable to its default-specialized `type[]` type
+(which is actually internally simplified to a GenericAlias type, since there cannot be subclasses.)
+
+```py
+from typing import final
+
+@final
+class P[T]:
+    x: T
+
+def expects_type_p(x: type[P]):
+    pass
+
+def expects_type_p_of_int(x: type[P[int]]):
+    pass
+
+# OK, the default specialization of `P` is assignable to `type[P[Unknown]]`
+expects_type_p(P)
+
+# also OK, because the default specialization is `P[Unknown]` which is assignable to `P[int]`
+expects_type_p_of_int(P)
+```
+
+The same principles apply when typevar defaults are used, but the results are a bit different
+because the default-specialization is no longer a forgiving `Unknown` type:
+
+```py
+@final
+class P[T = str]:
+    x: T
+
+def expects_type_p(x: type[P]):
+    pass
+
+def expects_type_p_of_int(x: type[P[int]]):
+    pass
+
+def expects_type_p_of_str(x: type[P[str]]):
+    pass
+
+# OK, the default specialization is now `P[str]`, but we have the default specialization on both
+# sides, so it is assignable.
+expects_type_p(P)
+
+# Also OK if the explicit specialization lines up with the default, in either direction:
+expects_type_p(P[str])
+expects_type_p_of_str(P)
+
+# Not OK if the specializations don't line up:
+expects_type_p(P[int])  # error: [invalid-argument-type]
+expects_type_p_of_int(P[str])  # error: [invalid-argument-type]
+expects_type_p_of_str(P[int])  # error: [invalid-argument-type]
+```
