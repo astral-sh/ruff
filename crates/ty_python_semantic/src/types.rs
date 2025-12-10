@@ -1465,6 +1465,7 @@ impl<'db> Type<'db> {
     /// - Strips the types of default values from parameters in `Callable` types: only whether a parameter
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     /// - Converts class-based protocols into synthesized protocols
+    /// - Converts class-based typeddicts into synthesized typeddicts
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())
@@ -1523,10 +1524,9 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                self
-            }
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                Type::TypedDict(typed_dict.normalized_impl(db, visitor))
+            }),
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
             Type::NewTypeInstance(newtype) => {
                 visitor.visit(self, || {
@@ -3046,6 +3046,10 @@ impl<'db> Type<'db> {
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
                 left.is_equivalent_to_impl(db, right, inferable, visitor)
             }
+
+            (Type::TypedDict(left), Type::TypedDict(right)) => visitor.visit((self, other), || {
+                left.is_equivalent_to_impl(db, right, inferable, visitor)
+            }),
 
             _ => ConstraintSet::from(false),
         }
@@ -7550,7 +7554,13 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::Class(class) => SubclassOfType::from(db, class),
+                TypedDictType::Synthesized(_) => SubclassOfType::from(
+                    db,
+                    todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
+                ),
+            },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
             Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
         }
@@ -8259,7 +8269,7 @@ impl<'db> Type<'db> {
             },
 
             Self::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
+                typed_dict.definition(db).map(TypeDefinition::Class)
             }
 
             Self::Union(_) | Self::Intersection(_) => None,

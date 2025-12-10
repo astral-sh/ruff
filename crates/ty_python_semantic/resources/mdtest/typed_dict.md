@@ -868,6 +868,172 @@ def _(o1: Outer1, o2: Outer2, o3: Outer3, o4: Outer4):
     static_assert(is_subtype_of(Outer4, Outer4))
 ```
 
+## Structural equivalence
+
+Two `TypedDict`s with equivalent fields are equivalent types. This includes fields with gradual
+types:
+
+```py
+from typing_extensions import Any, TypedDict, ReadOnly, assert_type
+from ty_extensions import is_assignable_to, is_equivalent_to, static_assert
+
+class Foo(TypedDict):
+    x: int
+    y: Any
+
+# exactly the same fields
+class Bar(TypedDict):
+    x: int
+    y: Any
+
+# the same fields but in a different order
+class Baz(TypedDict):
+    y: Any
+    x: int
+
+static_assert(is_assignable_to(Foo, Bar))
+static_assert(is_equivalent_to(Foo, Bar))
+static_assert(is_assignable_to(Foo, Baz))
+static_assert(is_equivalent_to(Foo, Baz))
+
+foo: Foo = {"x": 1, "y": "hello"}
+assert_type(foo, Foo)
+assert_type(foo, Bar)
+assert_type(foo, Baz)
+```
+
+Equivalent `TypedDict`s within unions can also produce equivalent unions, which currently relies on
+"normalization" machinery:
+
+```py
+def f(var: Foo | int):
+    assert_type(var, Foo | int)
+    assert_type(var, Bar | int)
+    assert_type(var, Baz | int)
+    # TODO: Union simplification compares `TypedDict`s by name/identity to avoid cycles. This assert
+    # should also pass once that's fixed.
+    assert_type(var, Foo | Bar | Baz | int)  # error: [type-assertion-failure]
+```
+
+Here are several cases that are not equivalent. In particular, assignability does not imply
+equivalence:
+
+```py
+class FewerFields(TypedDict):
+    x: int
+
+static_assert(is_assignable_to(Foo, FewerFields))
+static_assert(not is_equivalent_to(Foo, FewerFields))
+
+class DifferentMutability(TypedDict):
+    x: int
+    y: ReadOnly[Any]
+
+static_assert(is_assignable_to(Foo, DifferentMutability))
+static_assert(not is_equivalent_to(Foo, DifferentMutability))
+
+class MoreFields(TypedDict):
+    x: int
+    y: Any
+    z: str
+
+static_assert(not is_assignable_to(Foo, MoreFields))
+static_assert(not is_equivalent_to(Foo, MoreFields))
+
+class DifferentFieldStaticType(TypedDict):
+    x: str
+    y: Any
+
+static_assert(not is_assignable_to(Foo, DifferentFieldStaticType))
+static_assert(not is_equivalent_to(Foo, DifferentFieldStaticType))
+
+class DifferentFieldGradualType(TypedDict):
+    x: int
+    y: Any | str
+
+static_assert(is_assignable_to(Foo, DifferentFieldGradualType))
+static_assert(not is_equivalent_to(Foo, DifferentFieldGradualType))
+```
+
+## Structural equivalence understands the interaction between `Required`/`NotRequired` and `total`
+
+```py
+from ty_extensions import static_assert, is_equivalent_to
+from typing_extensions import TypedDict, Required, NotRequired
+
+class Foo1(TypedDict, total=False):
+    x: int
+    y: str
+
+class Foo2(TypedDict):
+    y: NotRequired[str]
+    x: NotRequired[int]
+
+static_assert(is_equivalent_to(Foo1, Foo2))
+static_assert(is_equivalent_to(Foo1 | int, int | Foo2))
+
+class Bar1(TypedDict, total=False):
+    x: int
+    y: Required[str]
+
+class Bar2(TypedDict):
+    y: str
+    x: NotRequired[int]
+
+static_assert(is_equivalent_to(Bar1, Bar2))
+static_assert(is_equivalent_to(Bar1 | int, int | Bar2))
+```
+
+## Assignability and equivalence work with recursive `TypedDict`s
+
+```py
+from typing_extensions import TypedDict
+from ty_extensions import static_assert, is_assignable_to, is_equivalent_to
+
+class Node1(TypedDict):
+    value: int
+    next: "Node1" | None
+
+class Node2(TypedDict):
+    value: int
+    next: "Node2" | None
+
+static_assert(is_assignable_to(Node1, Node2))
+static_assert(is_equivalent_to(Node1, Node2))
+
+class Person1(TypedDict):
+    name: str
+    friends: list["Person1"]
+
+class Person2(TypedDict):
+    name: str
+    friends: list["Person2"]
+
+static_assert(is_assignable_to(Person1, Person2))
+static_assert(is_equivalent_to(Person1, Person2))
+```
+
+## Redundant cast warnings
+
+<!-- snapshot-diagnostics -->
+
+Casting between equivalent types produces a redundant cast warning. When the types have different
+names, the warning makes that clear:
+
+```py
+from typing import TypedDict, cast
+
+class Foo2(TypedDict):
+    x: int
+
+class Bar2(TypedDict):
+    x: int
+
+foo: Foo2 = {"x": 1}
+_ = cast(Foo2, foo)  # error: [redundant-cast]
+_ = cast(Bar2, foo)  # error: [redundant-cast]
+```
+
 ## Key-based access
 
 ### Reading

@@ -1621,10 +1621,16 @@ impl KnownFunction {
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        builder.into_diagnostic(format_args!(
-                            "Value is already of type `{}`",
-                            casted_type.display(db),
+                        let source_display = source_type.display(db).to_string();
+                        let casted_display = casted_type.display(db).to_string();
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Value is already of type `{casted_display}`",
                         ));
+                        if source_display != casted_display {
+                            diagnostic.info(format_args!(
+                                "`{casted_display}` is equivalent to `{source_display}`",
+                            ));
+                        }
                     }
                 }
             }
