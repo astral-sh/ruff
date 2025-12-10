@@ -43,6 +43,7 @@ use crate::types::generics::{
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
@@ -51,7 +52,6 @@ use crate::types::{
     TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members, todo_type,
 };
-use crate::types::variance::VarianceInferable;
 use crate::unpack::EvaluationMode;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
@@ -2999,6 +2999,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
+        let generic_context_variables = generic_context.variables(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
         // Prefer the declared type of generic classes.
@@ -3015,29 +3016,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
-        let generic_variables: SmallVec<[(BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>); 8]> =
-            generic_context
-                .variables(self.db)
-                .map(|typevar| (typevar.identity(self.db), typevar))
-                .collect();
-        let mut record_argument_variance =
-            |identity: BoundTypeVarIdentity<'db>, variance: TypeVarVariance| {
-                variance_in_arguments
-                    .entry(identity)
-                    .and_modify(|current| *current = current.join(variance))
-                    .or_insert(variance);
-            };
-
         let parameters = self.signature.parameters();
         for (argument_index, adjusted_argument_index, argument, argument_type) in
             self.enumerate_argument_types()
         {
-            // Synthetic arguments (e.g., implicit `self`/`cls`) are not provided by the caller.
-            // Counting their types when computing variance would incorrectly block literal
-            // promotion (they often carry the class typevars in invariant position), so we ignore
-            // them for argument variance tracking.
-            let record_variance = !matches!(argument, Argument::Synthetic);
-
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
@@ -3046,18 +3028,21 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                if record_variance
+                // Synthetic arguments (e.g., implicit `self`/`cls`) are not provided by the caller.
+                // Counting their types when computing variance would incorrectly block literal
+                // promotion (they often carry the class typevars in invariant position), so we ignore
+                // them for argument variance tracking.
+                if !matches!(argument, Argument::Synthetic)
                     && parameter.form == ParameterForm::Value
                     && expected_type.has_typevar(self.db)
                 {
-                    for (identity, typevar) in generic_variables.iter().copied() {
-                        if !typevar.is_inferable(self.db, self.inferable_typevars) {
-                            continue;
-                        }
-
-                        let variance = expected_type.variance_of(self.db, typevar);
+                    for bound_typevar in generic_context_variables.clone() {
+                        let variance = expected_type.variance_of(self.db, bound_typevar);
                         if variance != TypeVarVariance::Bivariant {
-                            record_argument_variance(identity, variance);
+                            variance_in_arguments
+                                .entry(bound_typevar.identity(self.db))
+                                .and_modify(|current| *current = current.join(variance))
+                                .or_insert(variance);
                         }
                     }
                 }

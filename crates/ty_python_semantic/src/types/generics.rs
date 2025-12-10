@@ -1,6 +1,7 @@
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
+use std::iter::zip;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -1720,8 +1721,7 @@ impl<'db> SpecializationBuilder<'db> {
                         let formal_specialization =
                             formal_alias.specialization(self.db).types(self.db);
                         let base_specialization = base_alias.specialization(self.db).types(self.db);
-                        for (formal_ty, base_ty) in
-                            std::iter::zip(formal_specialization, base_specialization)
+                        for (formal_ty, base_ty) in zip(formal_specialization, base_specialization)
                         {
                             self.infer_map_impl(*formal_ty, *base_ty, &mut f)?;
                         }
