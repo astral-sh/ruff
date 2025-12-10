@@ -214,7 +214,7 @@ impl Format<PyFormatContext<'_>> for MaybeParenthesizePattern<'_> {
     }
 }
 
-/// This function is very similar to [`can_omit_optional_parentheses`] with the only difference that it is for patterns
+/// This function is very similar to [`can_omit_optional_parentheses`](crate::expression::can_omit_optional_parentheses) with the only difference that it is for patterns
 /// and not expressions.
 ///
 /// The base idea of the omit optional parentheses layout is to prefer using parentheses of sub-patterns

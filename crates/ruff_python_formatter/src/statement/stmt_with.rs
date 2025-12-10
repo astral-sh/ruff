@@ -177,7 +177,7 @@ enum WithItemsLayout<'a> {
     ///     ...
     /// ```
     ///
-    /// In this case, use [`maybe_parenthesize_expression`] to format the context expression
+    /// In this case, use [`maybe_parenthesize_expression`](crate::expression::maybe_parenthesize_expression) to format the context expression
     /// to get the exact same formatting as when formatting an expression in any other clause header.
     ///
     /// Only used for Python 3.9+
