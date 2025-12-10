@@ -1800,20 +1800,34 @@ fn handle_named_expr_comment<'a>(
 
 /// Handles comments around the `:` token in a lambda expression.
 ///
-/// For parameterized lambdas, both the comments between the `lambda` and the parameters, and the
-/// comments between the parameters and the body, are considered dangling, as is the case for all
-/// of the following:
+/// For parameterized lambdas, comments will have the following placements:
 ///
 /// ```python
 /// (
-///     lambda  # 1
-///     # 2
+///     lambda  # dangling lambda
+///     # leading parameters
 ///     x
-///     :  # 3
-///     # 4
+///     :  # dangling lambda
+///     # dangling lambda
 ///     y
 /// )
 /// ```
+///
+/// In [preview](is_parenthesize_lambda_bodies_enabled_preview), the comment placement is instead:
+///
+/// ```python
+/// (
+///     lambda  # dangling lambda
+///     # leading parameters
+///     x
+///     :  # leading body
+///     # leading body
+///     y
+/// )
+/// ```
+///
+/// Note that the final two comments are now leading on the body expression instead of dangling on
+/// the lambda, which allows them to be moved into the parenthesized body.
 ///
 /// For non-parameterized lambdas, all comments before the body are considered dangling, as is the
 /// case for all of the following:
@@ -1825,6 +1839,20 @@ fn handle_named_expr_comment<'a>(
 ///     :  # 3
 ///     # 4
 ///     y
+/// )
+/// ```
+///
+/// In [preview](is_parenthesize_lambda_bodies_enabled_preview), these all instead become leading
+/// comments on the body, allowing this formatting:
+///
+/// ```python
+/// (
+///     lambda: (  # 1
+///         # 2
+///         # 3
+///         # 4
+///         y
+///     )
 /// )
 /// ```
 fn handle_lambda_comment<'a>(
@@ -1867,6 +1895,8 @@ fn handle_lambda_comment<'a>(
         //     y
         // )
         // ```
+        // Except in preview, where they become leading on the body instead, regardless of
+        // parenthesization.
         if parameters.end() < comment.start() && comment.start() < lambda.body.start() {
             return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
@@ -1900,6 +1930,8 @@ fn handle_lambda_comment<'a>(
         //     y
         // )
         // ```
+        // Except in preview, where they become leading on the body instead, regardless of
+        // parenthesization.
         if comment.start() < lambda.body.start() {
             return if is_parenthesize_lambda_bodies_enabled_preview(preview) {
                 CommentPlacement::leading(&*lambda.body, comment)
