@@ -17,8 +17,10 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
 use crate::semantic_index::definition::Definition;
+use crate::semantic_index::semantic_index;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
+use crate::types::infer::{infer_deferred_types, infer_scope_types};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableTypeKind,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
@@ -27,6 +29,33 @@ use crate::types::{
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
+
+/// Infer the type of a parameter or return annotation in a function signature.
+///
+/// This is very similar to
+/// [`definition_expression_type`][crate::types::definition_expression_type], but knows that
+/// `TypeInferenceBuilder` will always infer the parameters and return of a function in its PEP-695
+/// typevar scope, if there is one; otherwise they will be inferred in the function definition
+/// scope, but will always be deferred. (This prevents spurious salsa cycles when we need the
+/// signature of the function while in the middle of inferring its definition scope — for instance,
+/// when applying decorators.)
+fn function_signature_expression_type<'db>(
+    db: &'db dyn Db,
+    definition: Definition<'db>,
+    expression: &ast::Expr,
+) -> Type<'db> {
+    let file = definition.file(db);
+    let index = semantic_index(db, file);
+    let file_scope = index.expression_scope_id(expression);
+    let scope = file_scope.to_scope_id(db, file);
+    if scope == definition.scope(db) {
+        // expression is in the function definition scope, but always deferred
+        infer_deferred_types(db, definition).expression_type(expression)
+    } else {
+        // expression is in the PEP-695 type params sub-scope
+        infer_scope_types(db, scope).expression_type(expression)
+    }
+}
 
 /// The signature of a single callable. If the callable is overloaded, there is a separate
 /// [`Signature`] for each overload.
@@ -527,7 +556,7 @@ impl<'db> Signature<'db> {
         let return_ty = function_node
             .returns
             .as_ref()
-            .map(|returns| definition_expression_type(db, definition, returns.as_ref()));
+            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()));
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
@@ -2089,7 +2118,7 @@ impl<'db> Parameter<'db> {
         Self {
             annotated_type: parameter
                 .annotation()
-                .map(|annotation| definition_expression_type(db, definition, annotation)),
+                .map(|annotation| function_signature_expression_type(db, definition, annotation)),
             kind,
             form: ParameterForm::Value,
             inferred_annotation: false,

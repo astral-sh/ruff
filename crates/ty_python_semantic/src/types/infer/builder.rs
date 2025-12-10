@@ -2241,7 +2241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name,
             type_params,
             parameters,
-            returns,
+            returns: _,
             body: _,
             decorator_list,
         } = function;
@@ -2288,21 +2288,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(default, TypeContext::default());
         }
 
-        // If there are type params, parameters and returns are evaluated in that scope, that is, in
-        // `infer_function_type_params`, rather than here.
+        // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
+        // we always defer the inference of the parameters and returns. That ensures that we do not
+        // add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // requires getting the signature of this function definition, which in turn requires
+        // (lazily) inferring the parameter and return types.)
         if type_params.is_none() {
-            if self.defer_annotations() {
-                self.deferred.insert(definition, self.multi_inference_state);
-            } else {
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
-                self.infer_return_type_annotation(
-                    returns.as_deref(),
-                    DeferredExpressionState::None,
-                );
-                self.infer_parameters(parameters);
-                self.typevar_binding_context = previous_typevar_binding_context;
-            }
+            self.deferred.insert(definition, self.multi_inference_state);
         }
 
         let known_function =
