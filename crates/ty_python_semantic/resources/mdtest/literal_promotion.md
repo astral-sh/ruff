@@ -376,10 +376,13 @@ reveal_type(x6)  # revealed: Sub1[Literal[1]]
 x7: Sup1[Literal[1]] | None = sub1(1)
 reveal_type(x7)  # revealed: Sub1[Literal[1]]
 
-class Sup2[T, U]:
+class Sup2A[T, U]:
     value: tuple[T, U]
 
-class Sub2[T, U](Sup2[T, Any], Sup2[Any, U]): ...
+class Sup2B[T, U]:
+    value: tuple[T, U]
+
+class Sub2[T, U](Sup2A[T, Any], Sup2B[Any, U]): ...
 
 def sub2[T, U](x: T, y: U) -> Sub2[T, U]:
     return Sub2()
@@ -387,6 +390,9 @@ def sub2[T, U](x: T, y: U) -> Sub2[T, U]:
 x8 = sub2(1, 2)
 reveal_type(x8)  # revealed: Sub2[int, int]
 
-x9: Sup2[Literal[1], Literal[2]] = sub2(1, 2)
-reveal_type(x9)  # revealed: Sub2[Literal[1], Literal[2]]
+x9: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x9)  # revealed: Sub2[Literal[1], int]
+
+x10: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x10)  # revealed: Sub2[int, Literal[2]]
 ```

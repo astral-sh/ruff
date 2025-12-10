@@ -2,7 +2,6 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
-use rustc_hash::FxHashSet;
 
 use std::borrow::Cow;
 use std::time::Duration;
@@ -1041,55 +1040,40 @@ impl<'db> Type<'db> {
 
     /// Given a type variable `T` from the generic context of a class `C`:
     /// - If `self` is a specialized instance of `C`, returns the type assigned to `T` on `self`.
-    /// - If `self` is a specialized instance of some class `A`, and `C` is a subclass of `A`
-    ///   such that the type variable `U` on `A` is specialized to `T`, returns the type
-    ///   assigned to `U` on `self`.
+    /// - If `self` is a specialized instance of some class `A[T]`, and `C[T]` is a subclass of
+    ///   `A[T]`, returns the type assigned to `T` on `self`.
     pub(crate) fn find_type_var_from(
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarInstance<'db>,
         class: ClassLiteral<'db>,
     ) -> Option<Type<'db>> {
-        self.find_type_var_from_impl(db, bound_typevar, class, &mut FxHashSet::default())
-    }
-
-    pub(crate) fn find_type_var_from_impl(
-        self,
-        db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
-        class: ClassLiteral<'db>,
-        visited: &mut FxHashSet<(ClassLiteral<'db>, BoundTypeVarIdentity<'db>)>,
-    ) -> Option<Type<'db>> {
         if let Some(specialization) = self.specialization_of(db, class) {
             return specialization.get(db, bound_typevar);
         }
 
         // TODO: We should use the constraint solver here to determine the type mappings for more
-        // complex subtyping relationships, e.g., `type[C[T]]` to `Callable[..., T]`, or unions
-        // containing multiple generic elements.
-        for base in class.iter_mro(db, None) {
-            let Some((origin, Some(specialization))) =
+        // complex subtyping relationships, e.g., callables, protocols, or unions containing multiple
+        // generic elements.
+        for base in class.iter_mro(db, None).skip(1) {
+            let Some((base, Some(base_specialization))) =
                 base.into_class().map(|class| class.class_literal(db))
             else {
                 continue;
             };
 
-            for (base_typevar, base_ty) in specialization
-                .generic_context(db)
-                .variables(db)
-                .zip(specialization.types(db))
-            {
-                if *base_ty == Type::TypeVar(bound_typevar) {
-                    if !visited.insert((origin, base_typevar.identity(db))) {
-                        return None;
-                    }
-
-                    if let Some(ty) =
-                        self.find_type_var_from_impl(db, base_typevar, origin, visited)
-                    {
-                        return Some(ty);
+            if let Some(specialization) = self.specialization_of(db, base) {
+                for (base_typevar, base_ty) in base_specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(base_specialization.types(db))
+                {
+                    if *base_ty == Type::TypeVar(bound_typevar) {
+                        return specialization.get(db, base_typevar);
                     }
                 }
+
+                return None;
             }
         }
 
