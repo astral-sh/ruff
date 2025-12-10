@@ -15,9 +15,8 @@ use std::{collections::HashMap, slice::Iter};
 use itertools::{EitherOrBoth, Itertools};
 use smallvec::{SmallVec, smallvec_inline};
 
-use super::{DynamicType, Type, TypeVarVariance, definition_expression_type};
+use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
 use crate::semantic_index::definition::Definition;
-use crate::semantic_index::semantic_index;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};

@@ -83,8 +83,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
+    NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, definition_expression_type,
+    infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -510,7 +511,7 @@ impl<'db> OverloadLiteral<'db> {
 
         let generic_context = raw_signature.generic_context;
         raw_signature.add_implicit_self_annotation(db, || {
-            if self.is_staticmethod(db) || self.is_classmethod(db) {
+            if self.is_staticmethod(db) {
                 return None;
             }
 
@@ -543,19 +544,32 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                Some(
-                    typing_self(db, scope_id, typevar_binding_context, class)
-                        .map(Type::TypeVar)
-                        .expect(
-                            "We should always find the surrounding class \
-                             for an implicit self: Self annotation",
-                        ),
-                )
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
+                    "We should always find the surrounding class \
+                     for an implicit self: Self annotation",
+                );
+
+                if self.is_classmethod(db) {
+                    Some(SubclassOfType::from(
+                        db,
+                        SubclassOfInner::TypeVar(typing_self),
+                    ))
+                } else {
+                    Some(Type::TypeVar(typing_self))
+                }
             } else {
                 // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
-                // have additional type parameters), the implicit `Self` type of the `self` parameter would
-                // be the only type variable, so we can just use the class directly.
-                Some(class_literal.to_non_generic_instance(db))
+                // have additional type parameters), the implicit `Self` type of the `self`, or the implicit
+                // `type[Self]` type of the `cls` parameter, would be the only type variable, so we can just
+                // use the class directly.
+                if self.is_classmethod(db) {
+                    Some(SubclassOfType::from(
+                        db,
+                        SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),
+                    ))
+                } else {
+                    Some(class_literal.to_non_generic_instance(db))
+                }
             }
         });
 
@@ -1082,18 +1096,6 @@ impl<'db> FunctionType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // A function type is the subtype of itself, and not of any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only subtypes
-        // of each other if they result in subtype signatures.
-        if matches!(
-            relation,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
-        ) && self.normalized(db) == other.normalized(db)
-        {
-            return ConstraintSet::from(true);
-        }
-
         if self.literal(db) != other.literal(db) {
             return ConstraintSet::from(false);
         }
@@ -1675,10 +1677,16 @@ impl KnownFunction {
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        builder.into_diagnostic(format_args!(
-                            "Value is already of type `{}`",
-                            casted_type.display(db),
+                        let source_display = source_type.display(db).to_string();
+                        let casted_display = casted_type.display(db).to_string();
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Value is already of type `{casted_display}`",
                         ));
+                        if source_display != casted_display {
+                            diagnostic.info(format_args!(
+                                "`{casted_display}` is equivalent to `{source_display}`",
+                            ));
+                        }
                     }
                 }
             }

@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+use std::ops::{Deref, DerefMut};
+
 use bitflags::bitflags;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
@@ -12,10 +15,15 @@ use super::diagnostic::{
     report_missing_typed_dict_key,
 };
 use super::{ApplyTypeMappingVisitor, Type, TypeMapping, visitor};
-use crate::types::constraints::ConstraintSet;
+use crate::Db;
+use crate::semantic_index::definition::Definition;
+use crate::types::class::FieldKind;
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::{HasRelationToVisitor, IsDisjointVisitor, TypeContext, TypeRelation};
-use crate::{Db, FxIndexMap};
+use crate::types::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
+    TypeRelation,
+};
 
 use ordermap::OrderSet;
 
@@ -41,24 +49,60 @@ impl Default for TypedDictParams {
 /// Type that represents the set of all inhabitants (`dict` instances) that conform to
 /// a given `TypedDict` schema.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, salsa::Update, Hash, get_size2::GetSize)]
-pub struct TypedDictType<'db> {
+pub enum TypedDictType<'db> {
     /// A reference to the class (inheriting from `typing.TypedDict`) that specifies the
     /// schema of this `TypedDict`.
-    defining_class: ClassType<'db>,
+    Class(ClassType<'db>),
+    /// A `TypedDict` that doesn't correspond to a class definition, either because it's been
+    /// `normalized`, or because it's been synthesized to represent constraints.
+    Synthesized(SynthesizedTypedDictType<'db>),
 }
 
 impl<'db> TypedDictType<'db> {
     pub(crate) fn new(defining_class: ClassType<'db>) -> Self {
-        Self { defining_class }
+        Self::Class(defining_class)
     }
 
-    pub(crate) fn defining_class(self) -> ClassType<'db> {
-        self.defining_class
+    pub(crate) fn defining_class(self) -> Option<ClassType<'db>> {
+        match self {
+            Self::Class(defining_class) => Some(defining_class),
+            Self::Synthesized(_) => None,
+        }
     }
 
-    pub(crate) fn items(self, db: &'db dyn Db) -> &'db FxIndexMap<Name, Field<'db>> {
-        let (class_literal, specialization) = self.defining_class.class_literal(db);
-        class_literal.fields(db, specialization, CodeGeneratorKind::TypedDict)
+    pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
+        #[salsa::tracked(returns(ref))]
+        fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
+            let (class_literal, specialization) = class.class_literal(db);
+            class_literal
+                .fields(db, specialization, CodeGeneratorKind::TypedDict)
+                .into_iter()
+                .map(|(name, field)| {
+                    let field = match field {
+                        Field {
+                            first_declaration,
+                            declared_ty,
+                            kind:
+                                FieldKind::TypedDict {
+                                    is_required,
+                                    is_read_only,
+                                },
+                        } => TypedDictFieldBuilder::new(*declared_ty)
+                            .required(*is_required)
+                            .read_only(*is_read_only)
+                            .first_declaration(*first_declaration)
+                            .build(),
+                        _ => unreachable!("TypedDict field expected"),
+                    };
+                    (name.clone(), field)
+                })
+                .collect()
+        }
+
+        match self {
+            Self::Class(defining_class) => class_based_items(db, defining_class),
+            Self::Synthesized(synthesized) => synthesized.items(db),
+        }
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
@@ -69,12 +113,12 @@ impl<'db> TypedDictType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         // TODO: Materialization of gradual TypedDicts needs more logic
-        Self {
-            defining_class: self.defining_class.apply_type_mapping_impl(
-                db,
-                type_mapping,
-                tcx,
-                visitor,
+        match self {
+            Self::Class(defining_class) => {
+                Self::Class(defining_class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+            }
+            Self::Synthesized(synthesized) => Self::Synthesized(
+                synthesized.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             ),
         }
     }
@@ -93,9 +137,9 @@ impl<'db> TypedDictType<'db> {
         // First do a quick nominal check that (if it succeeds) means that we can avoid
         // materializing the full `TypedDict` schema for either `self` or `target`.
         // This should be cheaper in many cases, and also helps us avoid some cycles.
-        if self
-            .defining_class
-            .is_subclass_of(db, target.defining_class)
+        if let Some(defining_class) = self.defining_class()
+            && let Some(target_defining_class) = target.defining_class()
+            && defining_class.is_subclass_of(db, target_defining_class)
         {
             return ConstraintSet::from(true);
         }
@@ -246,6 +290,57 @@ impl<'db> TypedDictType<'db> {
         }
         constraints
     }
+
+    pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        match self {
+            TypedDictType::Class(defining_class) => Some(defining_class.definition(db)),
+            TypedDictType::Synthesized(_) => None,
+        }
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        match self {
+            TypedDictType::Class(_) => {
+                let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+            }
+            TypedDictType::Synthesized(synthesized) => {
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+            }
+        }
+    }
+
+    pub(crate) fn is_equivalent_to_impl(
+        self,
+        db: &'db dyn Db,
+        other: TypedDictType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the
+        // params at all, because `total` is already incorporated into `FieldKind`.
+
+        // Since both sides' fields are pre-sorted into `BTreeMap`s, we can iterate over them in
+        // sorted order instead of paying for a lookup for each field, as long as their lengths are
+        // the same.
+        if self.items(db).len() != other.items(db).len() {
+            return ConstraintSet::from(false);
+        }
+        self.items(db).iter().zip(other.items(db)).when_all(
+            db,
+            |((name, field), (other_name, other_field))| {
+                if name != other_name || field.flags != other_field.flags {
+                    return ConstraintSet::from(false);
+                }
+                field.declared_ty.is_equivalent_to_impl(
+                    db,
+                    other_field.declared_ty,
+                    inferable,
+                    visitor,
+                )
+            },
+        )
+    }
 }
 
 pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -253,7 +348,16 @@ pub(crate) fn walk_typed_dict_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     typed_dict: TypedDictType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, typed_dict.defining_class.into());
+    match typed_dict {
+        TypedDictType::Class(defining_class) => {
+            visitor.visit_type(db, defining_class.into());
+        }
+        TypedDictType::Synthesized(synthesized) => {
+            for field in synthesized.items(db).values() {
+                visitor.visit_type(db, field.declared_ty);
+            }
+        }
+    }
 }
 
 pub(super) fn typed_dict_params_from_class_def(class_stmt: &StmtClassDef) -> TypedDictParams {
@@ -631,3 +735,173 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
         Err(provided_keys)
     }
 }
+
+#[salsa::interned(debug)]
+pub struct SynthesizedTypedDictType<'db> {
+    #[returns(ref)]
+    pub(crate) items: TypedDictSchema<'db>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for SynthesizedTypedDictType<'_> {}
+
+impl<'db> SynthesizedTypedDictType<'db> {
+    pub(super) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        let items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field
+                    .clone()
+                    .apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
+                (name.clone(), field)
+            })
+            .collect::<TypedDictSchema<'db>>();
+
+        SynthesizedTypedDictType::new(db, items)
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        let items = self
+            .items(db)
+            .iter()
+            .map(|(name, field)| {
+                let field = field.clone().normalized_impl(db, visitor);
+                (name.clone(), field)
+            })
+            .collect::<TypedDictSchema<'db>>();
+        Self::new(db, items)
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default, get_size2::GetSize, salsa::Update)]
+pub struct TypedDictSchema<'db>(BTreeMap<Name, TypedDictField<'db>>);
+
+impl<'db> Deref for TypedDictSchema<'db> {
+    type Target = BTreeMap<Name, TypedDictField<'db>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for TypedDictSchema<'_> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl<'a> IntoIterator for &'a TypedDictSchema<'_> {
+    type Item = (&'a Name, &'a TypedDictField<'a>);
+    type IntoIter = std::collections::btree_map::Iter<'a, Name, TypedDictField<'a>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
+    }
+}
+
+impl<'db> FromIterator<(Name, TypedDictField<'db>)> for TypedDictSchema<'db> {
+    fn from_iter<T: IntoIterator<Item = (Name, TypedDictField<'db>)>>(iter: T) -> Self {
+        Self(iter.into_iter().collect())
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
+pub struct TypedDictField<'db> {
+    pub(super) declared_ty: Type<'db>,
+    flags: TypedDictFieldFlags,
+    first_declaration: Option<Definition<'db>>,
+}
+
+impl<'db> TypedDictField<'db> {
+    pub(crate) const fn is_required(&self) -> bool {
+        self.flags.contains(TypedDictFieldFlags::REQUIRED)
+    }
+
+    pub(crate) const fn is_read_only(&self) -> bool {
+        self.flags.contains(TypedDictFieldFlags::READ_ONLY)
+    }
+
+    pub(crate) fn apply_type_mapping_impl<'a>(
+        self,
+        db: &'db dyn Db,
+        type_mapping: &TypeMapping<'a, 'db>,
+        tcx: TypeContext<'db>,
+        visitor: &ApplyTypeMappingVisitor<'db>,
+    ) -> Self {
+        Self {
+            declared_ty: self
+                .declared_ty
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+            flags: self.flags,
+            first_declaration: self.first_declaration,
+        }
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        Self {
+            declared_ty: self.declared_ty.normalized_impl(db, visitor),
+            flags: self.flags,
+            // A normalized typed-dict field does not hold onto the original declaration,
+            // since a normalized typed-dict is an abstract type where equality does not depend
+            // on the source-code definition.
+            first_declaration: None,
+        }
+    }
+}
+
+pub(super) struct TypedDictFieldBuilder<'db> {
+    declared_ty: Type<'db>,
+    flags: TypedDictFieldFlags,
+    first_declaration: Option<Definition<'db>>,
+}
+
+impl<'db> TypedDictFieldBuilder<'db> {
+    pub(crate) fn new(declared_ty: Type<'db>) -> Self {
+        Self {
+            declared_ty,
+            flags: TypedDictFieldFlags::empty(),
+            first_declaration: None,
+        }
+    }
+
+    pub(crate) fn required(mut self, yes: bool) -> Self {
+        self.flags.set(TypedDictFieldFlags::REQUIRED, yes);
+        self
+    }
+
+    pub(crate) fn read_only(mut self, yes: bool) -> Self {
+        self.flags.set(TypedDictFieldFlags::READ_ONLY, yes);
+        self
+    }
+
+    pub(crate) fn first_declaration(mut self, definition: Option<Definition<'db>>) -> Self {
+        self.first_declaration = definition;
+        self
+    }
+
+    pub(crate) fn build(self) -> TypedDictField<'db> {
+        TypedDictField {
+            declared_ty: self.declared_ty,
+            flags: self.flags,
+            first_declaration: self.first_declaration,
+        }
+    }
+}
+
+bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    struct TypedDictFieldFlags: u8 {
+        const REQUIRED = 1 << 0;
+        const READ_ONLY = 1 << 1;
+    }
+}
+
+impl get_size2::GetSize for TypedDictFieldFlags {}
