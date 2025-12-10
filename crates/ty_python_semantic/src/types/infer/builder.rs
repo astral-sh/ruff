@@ -8945,10 +8945,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let place = if let Some(place_id) = place_table.place_id(expr) {
                 place_from_bindings(db, use_def.all_reachable_bindings(place_id)).place
             } else {
-                assert!(
-                    self.deferred_state.in_string_annotation(),
-                    "Expected the place table to create a place for every valid PlaceExpr node"
-                );
                 Place::Undefined
             };
             (place, None)
