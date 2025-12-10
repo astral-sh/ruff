@@ -902,6 +902,25 @@ help: Convert to f-string
 132 | # Non-errors
 
 UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:136:1
+    |
+135 | # False-negative: RustPython doesn't parse the `\N{snowman}`.
+136 | "\N{snowman} {}".format(a)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^
+137 |
+138 | "{".format(a)
+    |
+help: Convert to f-string
+133 | ###
+134 | 
+135 | # False-negative: RustPython doesn't parse the `\N{snowman}`.
+    - "\N{snowman} {}".format(a)
+136 + f"\N{snowman} {a}"
+137 | 
+138 | "{".format(a)
+139 | 
+
+UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:160:1
     |
 158 |   r'"\N{snowman} {}".format(a)'
