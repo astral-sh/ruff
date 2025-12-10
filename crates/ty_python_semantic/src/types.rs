@@ -1268,8 +1268,14 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
-    pub(crate) const fn is_intersection(self) -> bool {
-        matches!(self, Type::Intersection(_))
+    /// Returns whether this is a "real" intersection type. (Negated types are represented by an
+    /// intersection containing a single negative branch, which this method does _not_ consider a
+    /// "real" intersection.)
+    pub(crate) fn is_nontrivial_intersection(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Intersection(intersection) => !intersection.is_simple_negation(db),
+            _ => false,
+        }
     }
 
     pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
@@ -14121,6 +14127,10 @@ impl<'db> IntersectionType<'db> {
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
+    }
+
+    pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
+        self.positive(db).len() == 0 && self.negative(db).len() == 1
     }
 
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {

@@ -10844,19 +10844,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-            ) => {
-                let result = match op {
-                    ast::CmpOp::Eq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db()))
-                    ),
-                    ast::CmpOp::NotEq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).negate(self.db())
-                    ),
-                    _ => None,
-                };
-                result.map(|constraints| Ok(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), constraints)
-                ))))
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                _ => None,
             }
 
             (
