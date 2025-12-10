@@ -1543,8 +1543,6 @@ impl<'src> Lexer<'src> {
             }
         }
 
-        dbg!("Handle unclosed string");
-
         if self.errors.last().is_some_and(|error| {
             error.location() == self.current_range
                 && matches!(error.error(), LexicalErrorType::UnclosedStringError)
