@@ -23,7 +23,8 @@ use crate::{FormatModuleError, PyFormatOptions, format_module_source};
 ///
 /// The returned formatted range guarantees to cover at least `range` (excluding whitespace), but the range might be larger.
 /// Some cases in which the returned range is larger than `range` are:
-/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth).
+/// * The logical lines in `range` use a indentation different from the configured [`IndentStyle`]
+///   and [`IndentWidth`](ruff_formatter::IndentWidth).
 /// * `range` is smaller than a logical lines and the formatter needs to format the entire logical line.
 /// * `range` falls on a single line body.
 ///
@@ -129,16 +130,19 @@ pub fn format_range(
 /// b) formatting a sub-expression has fewer split points than formatting the entire expressions.
 ///
 /// ### Possible docstrings
-/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing suite instead
-/// so that the formatter's docstring detection in [`FormatSuite`](crate::statement::suite::FormatSuite) correctly detects and formats the docstrings.
+/// Strings that are suspected to be docstrings are excluded from the search to format the enclosing
+/// suite instead so that the formatter's docstring detection in
+/// [`FormatSuite`](crate::statement::suite::FormatSuite) correctly detects and formats the
+/// docstrings.
 ///
 /// ### Compound statements with a simple statement body
 /// Don't include simple-statement bodies of compound statements `if True: pass` because the formatter
 /// must run `FormatClauseBody` to determine if the body should be collapsed or not.
 ///
 /// ### Incorrectly indented code
-/// Code that uses indentations that don't match the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search,
-/// because formatting such nodes on their own can lead to indentation mismatch with its sibling nodes.
+/// Code that uses indentations that don't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search, because formatting
+/// such nodes on their own can lead to indentation mismatch with its sibling nodes.
 ///
 /// ## Suppression comments
 /// The search ends when `range` falls into a suppressed range because there's nothing to format. It also avoids that the
@@ -282,10 +286,12 @@ enum EnclosingNode<'a> {
 /// with the body. This ensures that the formatter runs `FormatClauseBody` that determines if the body should be indented.
 ///
 /// ## Non-standard indentation
-/// Node's that use an indentation that doesn't match the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search.
-/// This is because the formatter always uses the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth), resulting in the
-/// formatted nodes using a different indentation than the unformatted sibling nodes. This would be tolerable
-/// in non whitespace sensitive languages like JavaScript but results in lexical errors in Python.
+/// Nodes that use an indentation that doesn't match the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth) are excluded from the search. This is because the
+/// formatter always uses the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth), resulting in the formatted nodes using a different
+/// indentation than the unformatted sibling nodes. This would be tolerable in non whitespace
+/// sensitive languages like JavaScript but results in lexical errors in Python.
 ///
 /// ## Implementation
 /// It would probably be possible to merge this visitor with [`FindEnclosingNode`] but they are separate because
@@ -713,9 +719,11 @@ impl Format<PyFormatContext<'_>> for FormatEnclosingNode<'_> {
     }
 }
 
-/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth).
+/// Computes the level of indentation for `indentation` when using the configured [`IndentStyle`]
+/// and [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
-/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and [`IndentWidth`](ruff_formatter::IndentWidth).
+/// Returns `None` if the indentation doesn't conform to the configured [`IndentStyle`] and
+/// [`IndentWidth`](ruff_formatter::IndentWidth).
 ///
 /// # Panics
 /// If `offset` is outside of `source`.

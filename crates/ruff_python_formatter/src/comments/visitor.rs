@@ -174,7 +174,8 @@ impl<'ast> SourceOrderVisitor<'ast> for CommentsVisitor<'ast, '_> {
 
 /// A comment decorated with additional information about its surrounding context in the source document.
 ///
-/// Used by [`place_comment`] to determine if this should become a [leading](self#leading-comments), [dangling](self#dangling-comments), or [trailing](self#trailing-comments) comment.
+/// Used by [`place_comment`] to determine if this should become a [leading](self#leading-comments),
+/// [dangling](self#dangling-comments), or [trailing](self#trailing-comments) comment.
 #[derive(Debug, Clone)]
 pub(crate) struct DecoratedComment<'a> {
     enclosing: AnyNodeRef<'a>,
