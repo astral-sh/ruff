@@ -62,7 +62,7 @@ use crate::types::diagnostic::{
     INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_PARAM_ORDER,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
@@ -77,7 +77,8 @@ use crate::types::diagnostic::{
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
     report_invalid_or_unsupported_base, report_invalid_return_type,
-    report_invalid_type_checking_constant, report_named_tuple_field_with_leading_underscore,
+    report_invalid_type_checking_constant, report_invalid_type_param_order,
+    report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_comparison,
@@ -926,6 +927,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            if self.context.is_lint_enabled(&INVALID_TYPE_PARAM_ORDER) {
+                if let Some(generic_context) = class.generic_context(self.db()) {
+                    let mut seen_default = false;
+
+                    for bound_typevar in generic_context.variables(self.db()) {
+                        let typevar = bound_typevar.typevar(self.db());
+                        let has_default = typevar.default_type(self.db()).is_some();
+
+                        if seen_default && !has_default {
+                            report_invalid_type_param_order(
+                                &self.context,
+                                class,
+                                typevar.name(self.db()).as_str(),
+                            );
+                        }
+                        if has_default {
+                            seen_default = true;
+                        }
+                    }
+                }
+            }
             let scope = class.body_scope(self.db()).scope(self.db());
             if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
                 && let Some(parent) = scope.parent()
