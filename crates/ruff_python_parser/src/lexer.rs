@@ -1452,14 +1452,20 @@ impl<'src> Lexer<'src> {
             return false;
         }
 
+        if let Some(interpolated) = self.interpolated_strings.current_mut() {
+            interpolated.try_end_format_spec(self.nesting);
+        }
+
         // Reduce the nesting level because the parser recovered from an error inside list parsing
         // i.e., it recovered from an unclosed parenthesis (`(`, `[`, or `{`).
         self.nesting -= 1;
 
-        // The lexer can't be moved back for a triple-quoted f/t-string because the newlines are
-        // part of the f/t-string itself, so there is no newline token to be emitted.
-        if self.current_flags.is_triple_quoted_interpolated_string() {
-            return false;
+        // A nesting level that's lower than the nesting when the interpolated string was created
+        // strongly suggests that we're now outside an interpolated string.
+        if let Some(interpolated) = self.interpolated_strings.current()
+            && interpolated.nesting() < self.nesting
+        {
+            self.interpolated_strings.pop();
         }
 
         let Some(new_position) = non_logical_newline_start else {
@@ -1536,6 +1542,8 @@ impl<'src> Lexer<'src> {
                 return;
             }
         }
+
+        dbg!("Handle unclosed string");
 
         if self.errors.last().is_some_and(|error| {
             error.location() == self.current_range

@@ -145,6 +145,28 @@ Module(
                     simple: false,
                 },
             ),
+            ClassDef(
+                StmtClassDef {
+                    node_index: NodeIndex(None),
+                    range: 94..111,
+                    decorator_list: [],
+                    name: Identifier {
+                        id: Name("A"),
+                        range: 100..101,
+                        node_index: NodeIndex(None),
+                    },
+                    type_params: None,
+                    arguments: None,
+                    body: [
+                        Pass(
+                            StmtPass {
+                                node_index: NodeIndex(None),
+                                range: 107..111,
+                            },
+                        ),
+                    ],
+                },
+            ),
         ],
     },
 )
@@ -190,33 +212,11 @@ Module(
 
 
   |
-1 |   # Regression test for https://github.com/astral-sh/ty/issues/1828
-2 |   (c: int = 1,f"""{d=[
-3 |   def a(
-  |  _______^
-4 | | class A:
-5 | |     pass
-  | |_________^ Syntax Error: f-string: unterminated triple-quoted string
-  |
-
-
-  |
 2 | (c: int = 1,f"""{d=[
 3 | def a(
 4 | class A:
   | ^^^^^ Syntax Error: Expected `)`, found `class`
 5 |     pass
-  |
-
-
-  |
-1 |   # Regression test for https://github.com/astral-sh/ty/issues/1828
-2 |   (c: int = 1,f"""{d=[
-3 |   def a(
-  |  _______^
-4 | | class A:
-5 | |     pass
-  | |_________^ Syntax Error: Expected a statement
   |
 
 

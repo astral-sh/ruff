@@ -841,7 +841,7 @@ impl TokenFlags {
         self.intersects(TokenFlags::T_STRING.union(TokenFlags::F_STRING))
     }
 
-    /// Returns `true` if the token is a triple-quoted t-string.
+    /// Returns `true` if the token is a triple-quoted interpolated-string.
     pub fn is_triple_quoted_interpolated_string(self) -> bool {
         self.intersects(TokenFlags::TRIPLE_QUOTED_STRING) && self.is_interpolated_string()
     }
