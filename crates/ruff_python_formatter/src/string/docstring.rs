@@ -1584,7 +1584,12 @@ fn docstring_format_source(
     let parsed = ruff_python_parser::parse(source, ParseOptions::from(source_type))?;
     let comment_ranges = CommentRanges::from(parsed.tokens());
     let source_code = ruff_formatter::SourceCode::new(source);
-    let comments = crate::Comments::from_ast(parsed.syntax(), source_code, &comment_ranges);
+    let comments = crate::Comments::from_ast(
+        parsed.syntax(),
+        source_code,
+        &comment_ranges,
+        options.preview(),
+    );
 
     let ctx = PyFormatContext::new(options, source, comments, parsed.tokens())
         .in_docstring(docstring_quote_style);

@@ -11,6 +11,7 @@ use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::cmp::Ordering;
 
+use crate::PreviewMode;
 use crate::comments::visitor::{CommentPlacement, DecoratedComment};
 use crate::expression::expr_slice::{ExprSliceCommentSection, assign_comment_in_slice};
 use crate::expression::parentheses::is_expression_parenthesized;
@@ -24,11 +25,12 @@ pub(super) fn place_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
+    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     handle_parenthesized_comment(comment, source)
         .or_else(|comment| handle_end_of_line_comment_around_body(comment, source))
         .or_else(|comment| handle_own_line_comment_around_body(comment, source))
-        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source))
+        .or_else(|comment| handle_enclosed_comment(comment, comment_ranges, source, preview))
 }
 
 /// Handle parenthesized comments. A parenthesized comment is a comment that appears within a
@@ -193,6 +195,7 @@ fn handle_enclosed_comment<'a>(
     comment: DecoratedComment<'a>,
     comment_ranges: &CommentRanges,
     source: &str,
+    preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     match comment.enclosing_node() {
         AnyNodeRef::Parameters(parameters) => {
@@ -231,7 +234,7 @@ fn handle_enclosed_comment<'a>(
         }
         AnyNodeRef::ExprUnaryOp(unary_op) => handle_unary_op_comment(comment, unary_op, source),
         AnyNodeRef::ExprNamed(_) => handle_named_expr_comment(comment, source),
-        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source),
+        AnyNodeRef::ExprLambda(lambda) => handle_lambda_comment(comment, lambda, source, preview),
         AnyNodeRef::ExprDict(_) => handle_dict_unpacking_comment(comment, source)
             .or_else(|comment| handle_bracketed_end_of_line_comment(comment, source))
             .or_else(|comment| handle_key_value_comment(comment, source)),
@@ -1827,6 +1830,7 @@ fn handle_lambda_comment<'a>(
     comment: DecoratedComment<'a>,
     lambda: &'a ast::ExprLambda,
     source: &str,
+    _preview: PreviewMode,
 ) -> CommentPlacement<'a> {
     if let Some(parameters) = lambda.parameters.as_deref() {
         // End-of-line comments between the `lambda` and the parameters are dangling on the lambda:

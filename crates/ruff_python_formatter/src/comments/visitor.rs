@@ -11,6 +11,7 @@ use ruff_python_ast::visitor::source_order::*;
 use ruff_python_trivia::{CommentLinePosition, CommentRanges};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
+use crate::PreviewMode;
 use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::placement::place_comment;
 use crate::comments::{CommentsMap, SourceComment};
@@ -535,11 +536,12 @@ pub(super) struct CommentsMapBuilder<'a> {
     /// We need those for backwards lexing
     comment_ranges: &'a CommentRanges,
     source: &'a str,
+    preview: PreviewMode,
 }
 
 impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
     fn push_comment(&mut self, placement: DecoratedComment<'a>) {
-        let placement = place_comment(placement, self.comment_ranges, self.source);
+        let placement = place_comment(placement, self.comment_ranges, self.source, self.preview);
         match placement {
             CommentPlacement::Leading { node, comment } => {
                 self.push_leading_comment(node, comment);
@@ -601,11 +603,16 @@ impl<'a> PushComment<'a> for CommentsMapBuilder<'a> {
 }
 
 impl<'a> CommentsMapBuilder<'a> {
-    pub(crate) fn new(source: &'a str, comment_ranges: &'a CommentRanges) -> Self {
+    pub(crate) fn new(
+        source: &'a str,
+        comment_ranges: &'a CommentRanges,
+        preview: PreviewMode,
+    ) -> Self {
         Self {
             comments: CommentsMap::default(),
             comment_ranges,
             source,
+            preview,
         }
     }
 
