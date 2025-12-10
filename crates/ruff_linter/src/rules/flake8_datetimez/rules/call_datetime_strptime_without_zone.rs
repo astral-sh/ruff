@@ -21,6 +21,10 @@ use crate::rules::flake8_datetimez::helpers::DatetimeModuleAntipattern;
 /// `datetime.datetime.strptime()` without `%z` returns a naive datetime
 /// object. Follow it with `.replace(tzinfo=<timezone>)` or `.astimezone()`.
 ///
+/// To make a naive date object on Python 3.13 and earlier, follow it with
+/// `datetime.datetime.strptime()` with `.date()`.
+/// On Python 3.14 and later, use `datetime.date.strptime()`.
+///
 /// ## Example
 /// ```python
 /// import datetime
@@ -155,7 +159,7 @@ fn find_antipattern(
         return Some(DatetimeModuleAntipattern::NoTzArgumentPassed);
     };
     // Ex) `datetime.strptime(...).astimezone()`
-    if attr == "astimezone" {
+    if attr == "astimezone" || attr == "date" {
         return None;
     }
     if attr != "replace" {
