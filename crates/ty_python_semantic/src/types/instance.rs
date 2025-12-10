@@ -13,7 +13,7 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
+    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable,
 };
@@ -93,8 +93,41 @@ impl<'db> Type<'db> {
         matches!(self, Type::NominalInstance(_))
     }
 
-    pub(crate) const fn is_generic_nominal_instance(self) -> bool {
-        matches!(self, Type::NominalInstance(instance_type) if matches!(instance_type.0, NominalInstanceInner::NonTuple(class) if class.is_generic()))
+    /// Returns whether the definition of this type is generic
+    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
+    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.is_definition_generic(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.is_definition_generic(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.is_definition_generic(db))
+            }
+            Type::NominalInstance(instance_type) => match instance_type.0 {
+                NominalInstanceInner::NonTuple(class) => class.is_generic(),
+                NominalInstanceInner::ExactTuple(_) => true,
+                NominalInstanceInner::Object => false,
+            },
+            Type::ProtocolInstance(protocol) => {
+                matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
+            }
+            Type::TypedDict(typed_dict) => typed_dict.defining_class().is_generic(),
+            Type::Dynamic(dynamic) => {
+                matches!(dynamic, DynamicType::UnknownGeneric(_))
+            }
+            // Due to inheritance rules, enums cannot be generic.
+            Type::EnumLiteral(_) => false,
+            // Once generic NewType is officially specified, handle it.
+            _ => false,
+        }
     }
 
     pub(crate) const fn as_nominal_instance(self) -> Option<NominalInstanceType<'db>> {

@@ -68,6 +68,8 @@ reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
 And non-generic types cannot be specialized:
 
 ```py
+from typing import TypeVar, Protocol, TypedDict
+
 type B = ...
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias"
@@ -100,6 +102,57 @@ type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
     reveal_type(d)  # revealed: Unknown
+
+type Tuple = tuple[int, str]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+def _(doubly_specialized: Tuple[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class LegacyProto(Protocol[T]):
+    pass
+
+type LegacyProtoInt = LegacyProto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+def _(x: LegacyProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Proto[T](Protocol):
+    pass
+
+type ProtoInt = Proto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+def _(x: ProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+# TODO: TypedDict is just a function object at runtime, we should emit an error
+class LegacyDict(TypedDict[T]):
+    x: T
+
+type LegacyDictInt = LegacyDict[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+def _(x: LegacyDictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Dict[T](TypedDict):
+    x: T
+
+type DictInt = Dict[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Dict` is already specialized"
+def _(x: DictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+type Union = list[str] | list[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+def _(x: Union[int]):
+    reveal_type(x)  # revealed: Unknown
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:

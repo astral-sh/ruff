@@ -659,6 +659,8 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import Protocol, TypeVar, TypedDict
+
 ListOfInts = list[int]
 
 # error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[int]'>` is already specialized"
@@ -676,6 +678,66 @@ def _(doubly_specialized: DoublySpecialized):
 List = list[int][int]
 
 def _(doubly_specialized: List):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+Tuple = tuple[int, str]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'tuple[int, str]'>` is already specialized"
+def _(doubly_specialized: Tuple[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class LegacyProto(Protocol[T]):
+    pass
+
+LegacyProtoInt = LegacyProto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'LegacyProto[int]'>` is already specialized"
+def _(doubly_specialized: LegacyProtoInt[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+class Proto[T](Protocol):
+    pass
+
+ProtoInt = Proto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'Proto[int]'>` is already specialized"
+def _(doubly_specialized: ProtoInt[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+# TODO: TypedDict is just a function object at runtime, we should emit an error
+class LegacyDict(TypedDict[T]):
+    x: T
+
+# TODO: should be a `non-subscriptable` error
+LegacyDictInt = LegacyDict[int]
+
+# TODO: should be a `non-subscriptable` error
+def _(doubly_specialized: LegacyDictInt[int]):
+    # TODO: should be `Unknown`
+    reveal_type(doubly_specialized)  # revealed: @Todo(Inference of subscript on special form)
+
+class Dict[T](TypedDict):
+    x: T
+
+DictInt = Dict[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'Dict[int]'>` is already specialized"
+def _(doubly_specialized: DictInt[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+Union = list[str] | list[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<types.UnionType special form 'list[str] | list[int]'>` is already specialized"
+def _(doubly_specialized: Union[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+type MyListAlias[T] = list[T]
+MyListOfInts = MyListAlias[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+def _(doubly_specialized: MyListOfInts[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 ```
 

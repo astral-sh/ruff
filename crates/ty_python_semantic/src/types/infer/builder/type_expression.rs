@@ -949,10 +949,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                                 self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
                             {
                                 let value_type = type_alias.raw_value_type(self.db());
-                                let mut diagnostic = builder.into_diagnostic(format_args!(
-                                    "Cannot subscript non-generic type alias",
-                                ));
-                                if value_type.is_generic_nominal_instance() {
+                                let mut diagnostic = builder
+                                    .into_diagnostic("Cannot subscript non-generic type alias");
+                                if value_type.is_definition_generic(self.db()) {
                                     diagnostic.set_primary_message(format_args!(
                                         "`{}` is already specialized",
                                         value_type.display(self.db()),
