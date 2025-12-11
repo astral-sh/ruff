@@ -184,6 +184,9 @@ impl<'db> NewType<'db> {
                         Some(mapped_base),
                     ));
                 }
+                // Mapping base class types is used for normalization and applying type mappings,
+                // neither of which have any effect on `float` or `complex` (which are already
+                // fully normalized and non-generic), so we don't need to bother calling `f`.
                 NewTypeBase::Float | NewTypeBase::Complex => {}
             }
         }
