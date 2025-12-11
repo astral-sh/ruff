@@ -525,16 +525,16 @@ impl<'db> OverloadLiteral<'db> {
             let class_scope = index.scope(class_scope_id.file_scope_id(db));
             let class_node = class_scope.node().as_class()?;
             let class_def = index.expect_single_definition(class_node);
-            let (class_literal, class_is_generic) = match infer_definition_types(db, class_def)
+            let Type::ClassLiteral(class_literal) = infer_definition_types(db, class_def)
                 .declaration_type(class_def)
                 .inner_type()
-            {
-                Type::ClassLiteral(class_literal) => {
-                    (class_literal, class_literal.generic_context(db).is_some())
-                }
-                Type::GenericAlias(alias) => (alias.origin(db), true),
-                _ => return None,
+            else {
+                return None;
             };
+            let class_is_generic = class_literal.generic_context(db).is_some();
+            let class_is_fallback = class_literal
+                .known(db)
+                .is_some_and(KnownClass::is_fallback_class);
 
             // Normally we implicitly annotate `self` or `cls` with `Self` or `type[Self]`, and
             // create a `Self` typevar that we then have to solve for whenever this method is
@@ -552,12 +552,7 @@ impl<'db> OverloadLiteral<'db> {
             //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
             //     and so we need specialization inference to determine the "real" class that the
             //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
-            if method_has_explicit_self
-                || class_is_generic
-                || class_literal
-                    .known(db)
-                    .is_some_and(KnownClass::is_fallback_class)
-            {
+            if method_has_explicit_self || class_is_generic || class_is_fallback {
                 let scope_id = definition.scope(db);
                 let typevar_binding_context = Some(definition);
                 let index = semantic_index(db, scope_id.file(db));
