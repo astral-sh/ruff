@@ -1,6 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
-use crate::AlwaysFixableViolation;
+use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
+use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does
 /// Checks for invalid suppression comments
@@ -25,15 +26,34 @@ use crate::AlwaysFixableViolation;
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.9")]
-pub(crate) struct InvalidSuppressionComment;
+pub(crate) struct InvalidSuppressionComment {
+    pub kind: InvalidSuppressionCommentKind,
+}
 
-impl AlwaysFixableViolation for InvalidSuppressionComment {
+impl Violation for InvalidSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Invalid suppression comment".to_string()
+        let msg = match self.kind {
+            InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Indentation) => {
+                "unexpected indentation".to_string()
+            }
+            InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Trailing) => {
+                "trailing comments are not supported".to_string()
+            }
+            InvalidSuppressionCommentKind::Invalid(InvalidSuppressionKind::Unmatched) => {
+                "no matching 'disable' comment".to_string()
+            }
+            InvalidSuppressionCommentKind::Error(error) => format!("{error}"),
+        };
+        format!("Invalid suppression comment: {msg}")
     }
 
-    fn fix_title(&self) -> String {
-        "Remove invalid suppression comment".to_string()
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove invalid suppression comment".to_string())
     }
+}
+
+pub(crate) enum InvalidSuppressionCommentKind {
+    Invalid(InvalidSuppressionKind),
+    Error(ParseErrorKind),
 }
