@@ -3043,9 +3043,10 @@ impl<'db> Type<'db> {
                 first.is_equivalent_to_impl(db, second, inferable, visitor)
             }
 
-            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => {
-                first.is_equivalent_to_impl(db, second, inferable, visitor)
-            }
+            (Type::ProtocolInstance(first), Type::ProtocolInstance(second)) => visitor
+                .visit((self, other), || {
+                    first.is_equivalent_to_impl(db, second, inferable, visitor)
+                }),
             (Type::ProtocolInstance(protocol), nominal @ Type::NominalInstance(n))
             | (nominal @ Type::NominalInstance(n), Type::ProtocolInstance(protocol)) => {
                 ConstraintSet::from(n.is_object() && protocol.normalized(db) == nominal)

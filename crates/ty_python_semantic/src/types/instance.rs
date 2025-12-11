@@ -688,22 +688,24 @@ impl<'db> ProtocolInstanceType<'db> {
     /// Such a protocol is therefore an equivalent type to `object`, which would in fact be
     /// normalised to `object`.
     pub(super) fn is_equivalent_to_object(self, db: &'db dyn Db) -> bool {
+        self.when_equivalent_to_object(db).is_always_satisfied(db)
+    }
+
+    pub(super) fn when_equivalent_to_object(self, db: &'db dyn Db) -> ConstraintSet<'db> {
         #[salsa::tracked(cycle_initial=initial, heap_size=ruff_memory_usage::heap_size)]
-        fn is_equivalent_to_object_inner<'db>(
+        fn when_equivalent_to_object_inner<'db>(
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             _: (),
-        ) -> bool {
-            Type::object()
-                .satisfies_protocol(
-                    db,
-                    protocol,
-                    InferableTypeVars::None,
-                    TypeRelation::Subtyping,
-                    &HasRelationToVisitor::default(),
-                    &IsDisjointVisitor::default(),
-                )
-                .is_always_satisfied(db)
+        ) -> ConstraintSet<'db> {
+            Type::object().satisfies_protocol(
+                db,
+                protocol,
+                InferableTypeVars::None,
+                TypeRelation::Subtyping,
+                &HasRelationToVisitor::default(),
+                &IsDisjointVisitor::default(),
+            )
         }
 
         fn initial<'db>(
@@ -711,11 +713,11 @@ impl<'db> ProtocolInstanceType<'db> {
             _id: salsa::Id,
             _value: ProtocolInstanceType<'db>,
             _: (),
-        ) -> bool {
-            true
+        ) -> ConstraintSet<'db> {
+            ConstraintSet::from(true)
         }
 
-        is_equivalent_to_object_inner(db, self, ())
+        when_equivalent_to_object_inner(db, self, ())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -757,23 +759,30 @@ impl<'db> ProtocolInstanceType<'db> {
     }
 
     /// Return `true` if this protocol type is equivalent to the protocol `other`.
-    ///
-    /// TODO: consider the types of the members as well as their existence
     pub(super) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
-        _visitor: &IsEquivalentVisitor<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        if self == other {
-            return ConstraintSet::from(true);
-        }
-        let self_normalized = self.normalized(db);
-        if self_normalized == Type::ProtocolInstance(other) {
-            return ConstraintSet::from(true);
-        }
-        ConstraintSet::from(self_normalized == other.normalized(db))
+        let self_interface = self.interface(db);
+        let other_interface = other.interface(db);
+
+        let equivalent_interfaces =
+            ConstraintSet::from(self_interface.len(db) == other_interface.len(db)).and(db, || {
+                self_interface
+                    .members(db)
+                    .zip(other_interface.members(db))
+                    .when_all(db, |(our_member, other_member)| {
+                        our_member.is_equivalent_to_impl(db, &other_member, inferable, visitor)
+                    })
+            });
+
+        equivalent_interfaces.or(db, || {
+            self.when_equivalent_to_object(db)
+                .and(db, || other.when_equivalent_to_object(db))
+        })
     }
 
     /// Return `true` if this protocol type is disjoint from the protocol `other`.

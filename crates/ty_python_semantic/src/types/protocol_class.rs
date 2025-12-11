@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::{CallableTypeKind, TypeContext};
+use crate::types::{CallableTypeKind, IsEquivalentVisitor, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -196,6 +196,10 @@ pub(super) fn walk_protocol_interface<'db, V: super::visitor::TypeVisitor<'db> +
 }
 
 impl<'db> ProtocolInterface<'db> {
+    pub(super) fn len(self, db: &'db dyn Db) -> usize {
+        self.inner(db).len()
+    }
+
     /// Synthesize a new protocol interface with the given members.
     ///
     /// All created members will be covariant, read-only property members
@@ -649,6 +653,39 @@ impl<'db> ProtocolMemberKind<'db> {
             }
         }
     }
+
+    fn is_equivalent_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: ProtocolMemberKind<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        match (self, other) {
+            (ProtocolMemberKind::Method(self_method), ProtocolMemberKind::Method(other_method)) => {
+                self_method.is_equivalent_to_impl(db, other_method, inferable, visitor)
+            }
+            (
+                ProtocolMemberKind::Property(self_property),
+                ProtocolMemberKind::Property(other_property),
+            ) => self_property.is_equivalent_to_impl(db, other_property, inferable, visitor),
+            (ProtocolMemberKind::Other(self_type), ProtocolMemberKind::Other(other_type)) => {
+                self_type.is_equivalent_to_impl(db, other_type, inferable, visitor)
+            }
+            (
+                ProtocolMemberKind::Method(_),
+                ProtocolMemberKind::Other(_) | ProtocolMemberKind::Property(_),
+            )
+            | (
+                ProtocolMemberKind::Other(_) | ProtocolMemberKind::Property(_),
+                ProtocolMemberKind::Method(_),
+            ) => ConstraintSet::from(false),
+            (ProtocolMemberKind::Property(_), ProtocolMemberKind::Other(_))
+            | (ProtocolMemberKind::Other(_), ProtocolMemberKind::Property(_)) => {
+                ConstraintSet::from(false)
+            }
+        }
+    }
 }
 
 /// A single member of a protocol interface.
@@ -812,6 +849,32 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                     })
             }
         }
+    }
+
+    pub(super) fn is_equivalent_to_impl(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        visitor: &IsEquivalentVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        let ProtocolMember {
+            name: self_name,
+            kind: self_kind,
+            qualifiers: self_qualifiers,
+        } = self;
+        let ProtocolMember {
+            name: other_name,
+            kind: other_kind,
+            qualifiers: other_qualifiers,
+        } = other;
+        if self_name != other_name {
+            return ConstraintSet::from(false);
+        }
+        if self_qualifiers != other_qualifiers {
+            return ConstraintSet::from(false);
+        }
+        self_kind.is_equivalent_to_impl(db, *other_kind, inferable, visitor)
     }
 }
 
