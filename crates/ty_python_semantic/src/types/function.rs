@@ -515,7 +515,10 @@ impl<'db> OverloadLiteral<'db> {
                 return None;
             }
 
-            let method_may_be_generic = generic_context
+            // We have not yet added an implicit annotation to the `self` parameter, so any
+            // typevars that currently appear in the method's generic context come from explicit
+            // annotations.
+            let method_has_explicit_self = generic_context
                 .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
 
             let class_scope_id = definition.scope(db);
@@ -533,7 +536,23 @@ impl<'db> OverloadLiteral<'db> {
                 _ => return None,
             };
 
-            if method_may_be_generic
+            // Normally we implicitly annotate `self` or `cls` with `Self` or `type[Self]`, and
+            // create a `Self` typevar that we then have to solve for whenever this method is
+            // called. As an optimization, we can skip creating that typevar in certain situations:
+            //
+            //   - The method cannot use explicit `Self` in any other parameter annotations,
+            //     or in its return type. If it does, then we really do need specialization
+            //     inference at each call site to see which specific instance type should be
+            //     used in those other parameters / return type.
+            //
+            //   - The class cannot be generic. If it is, then we might need an actual `Self`
+            //     typevar to help carry through constraints that relate the instance type to
+            //     other typevars in the method signature.
+            //
+            //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
+            //     and so we need specialization inference to determine the "real" class that the
+            //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
+            if method_has_explicit_self
                 || class_is_generic
                 || class_literal
                     .known(db)
@@ -558,10 +577,8 @@ impl<'db> OverloadLiteral<'db> {
                     Some(Type::TypeVar(typing_self))
                 }
             } else {
-                // For methods of non-generic classes that are not otherwise generic (e.g. return `Self` or
-                // have additional type parameters), the implicit `Self` type of the `self`, or the implicit
-                // `type[Self]` type of the `cls` parameter, would be the only type variable, so we can just
-                // use the class directly.
+                // If skip creating the typevar, we use "instance of class" or "subclass of
+                // class" as the implicit annotation instead.
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
                         db,
