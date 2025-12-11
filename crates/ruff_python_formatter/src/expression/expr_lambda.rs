@@ -409,25 +409,15 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             if is_expression_parenthesized((*body).into(), comments.ranges(), f.context().source())
                 && comments.has_leading(*body)
             {
+                trailing_comments(dangling).fmt(f)?;
+
                 if leading_body_comments.is_empty() {
-                    write!(
-                        f,
-                        [
-                            space(),
-                            trailing_comments(dangling),
-                            body.format().with_options(Parentheses::Always),
-                        ]
-                    )
+                    space().fmt(f)?;
                 } else {
-                    write!(
-                        f,
-                        [
-                            trailing_comments(dangling),
-                            hard_line_break(),
-                            body.format().with_options(Parentheses::Always)
-                        ]
-                    )
+                    hard_line_break().fmt(f)?;
                 }
+
+                body.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 write!(
                     f,
