@@ -1,4 +1,4 @@
-use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use ruff_db::files::File;
 use ty_project::Db;
 
@@ -26,7 +26,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
             for file in files.iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
-                    for (_, symbol) in symbols_for_file_global_only(&*db, *file).search(query) {
+                    for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
