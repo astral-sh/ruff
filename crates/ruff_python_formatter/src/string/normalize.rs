@@ -38,8 +38,9 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// it can't because the string contains the preferred quotes OR
     /// it leads to more escaping.
     ///
-    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
-    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`, make sure to also
+    /// add them to
+    /// [`FormatImplicitConcatenatedStringFlat::new`](crate::string::implicit::FormatImplicitConcatenatedStringFlat::new).
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
         let preferred_quote_style = self
             .preferred_quote_style

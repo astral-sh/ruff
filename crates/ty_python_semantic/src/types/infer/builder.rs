@@ -5910,7 +5910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
             builder.into_diagnostic(format_args!(
-                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                "Operator `{op}=` is not supported between objects of type `{}` and `{}`",
                 target_type.display(db),
                 value_type.display(db)
             ));
@@ -8894,7 +8894,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.all_reachable_bindings(place_id)).place
+                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -9679,7 +9679,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Unary operator `{op}` is unsupported for type `{}`",
+                                "Unary operator `{op}` is not supported for type `{}`",
                                 operand_type.display(self.db()),
                             ));
                         }
@@ -9716,7 +9716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
+                        "Operator `{op}` is not supported between objects of type `{}` and `{}`",
                         left_ty.display(db),
                         right_ty.display(db)
                     ));
@@ -10844,19 +10844,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-            ) => {
-                let result = match op {
-                    ast::CmpOp::Eq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db()))
-                    ),
-                    ast::CmpOp::NotEq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).negate(self.db())
-                    ),
-                    _ => None,
-                };
-                result.map(|constraints| Ok(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), constraints)
-                ))))
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                _ => None,
             }
 
             (

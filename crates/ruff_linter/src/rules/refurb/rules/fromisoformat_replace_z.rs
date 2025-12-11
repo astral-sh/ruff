@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{
     Expr, ExprAttribute, ExprBinOp, ExprCall, ExprStringLiteral, ExprSubscript, ExprUnaryOp,
     Number, Operator, PythonVersion, UnaryOp,
@@ -112,8 +112,7 @@ pub(crate) fn fromisoformat_replace_z(checker: &Checker, call: &ExprCall) {
     let value_full_range = parenthesized_range(
         replace_time_zone.date.into(),
         replace_time_zone.parent.into(),
-        checker.comment_ranges(),
-        checker.source(),
+        checker.tokens(),
     )
     .unwrap_or(replace_time_zone.date.range());
 

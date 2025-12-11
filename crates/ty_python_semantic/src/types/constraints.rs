@@ -447,6 +447,11 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
         self.node.simplify_for_display(db).display(db)
     }
+
+    #[expect(dead_code)] // Keep this around for debugging purposes
+    pub(crate) fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
+        self.node.display_graph(db, prefix)
+    }
 }
 
 impl From<bool> for ConstraintSet<'_> {
@@ -510,11 +515,13 @@ impl<'db> ConstrainedTypeVar<'db> {
         debug_assert_eq!(upper, upper.top_materialization(db));
 
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
-        // be a union type. Both of those can be rewritten as simpler BDDs:
+        // be a union type. Because the following equivalences hold, we can break these bounds
+        // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
+        // simpler constraints mean that our sequent maps won't grow pathologically large.)
         //
-        //   T ≤ α & β  ⇒ (T ≤ α) ∧ (T ≤ β)
-        //   T ≤ α & ¬β ⇒ (T ≤ α) ∧ ¬(T ≤ β)
-        //   α | β ≤ T  ⇒ (α ≤ T) ∧ (β ≤ T)
+        //   T ≤ (α & β)   ⇔ (T ≤ α) ∧ (T ≤ β)
+        //   T ≤ (¬α & ¬β) ⇔ (T ≤ ¬α) ∧ (T ≤ ¬β)
+        //   (α | β) ≤ T   ⇔ (α ≤ T) ∧ (β ≤ T)
         if let Type::Union(lower_union) = lower {
             let mut result = Node::AlwaysTrue;
             for lower_element in lower_union.elements(db) {
@@ -525,7 +532,12 @@ impl<'db> ConstrainedTypeVar<'db> {
             }
             return result;
         }
-        if let Type::Intersection(upper_intersection) = upper {
+        // A negated type ¬α is represented as an intersection with no positive elements, and a
+        // single negative element. We _don't_ want to treat that an "intersection" for the
+        // purposes of simplifying upper bounds.
+        if let Type::Intersection(upper_intersection) = upper
+            && !upper_intersection.is_simple_negation(db)
+        {
             let mut result = Node::AlwaysTrue;
             for upper_element in upper_intersection.iter_positive(db) {
                 result = result.and(
@@ -536,7 +548,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             for upper_element in upper_intersection.iter_negative(db) {
                 result = result.and(
                     db,
-                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element).negate(db),
+                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element.negate(db)),
                 );
             }
             return result;
@@ -728,7 +740,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::Disjoint;
         }
 
-        if lower.is_union() || upper.is_intersection() {
+        if lower.is_union() || upper.is_nontrivial_intersection(db) {
             return IntersectionResult::CannotSimplify;
         }
 
@@ -1591,7 +1603,6 @@ impl<'db> Node<'db> {
     ///     │       └─₀ never
     ///     └─₀ never
     /// ```
-    #[cfg_attr(not(test), expect(dead_code))] // Keep this around for debugging purposes
     fn display_graph(self, db: &'db dyn Db, prefix: &dyn Display) -> impl Display {
         struct DisplayNode<'a, 'db> {
             db: &'db dyn Db,

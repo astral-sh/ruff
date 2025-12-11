@@ -25,7 +25,7 @@ use crate::{
             report_overridden_final_method,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
-        list_members::{Member, MemberWithDefinition, all_members_of_scope},
+        list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
     },
 };
 
@@ -54,7 +54,7 @@ pub(super) fn check_class<'db>(context: &InferContext<'db, '_>, class: ClassLite
 
     let class_specialized = class.identity_specialization(db);
     let scope = class.body_scope(db);
-    let own_class_members: FxHashSet<_> = all_members_of_scope(db, scope).collect();
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
 
     for member in own_class_members {
         check_class_declaration(context, configuration, class_specialized, scope, &member);
@@ -129,7 +129,7 @@ fn check_class_declaration<'db>(
         && PROHIBITED_NAMEDTUPLE_ATTRS.contains(&member.name.as_str())
         && let Some(symbol_id) = place_table(db, class_scope).symbol_id(&member.name)
         && let Some(bad_definition) = use_def_map(db, class_scope)
-            .all_reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
+            .reachable_bindings(ScopedPlaceId::Symbol(symbol_id))
             .filter_map(|binding| binding.binding.definition())
             .find(|def| !matches!(def.kind(db), DefinitionKind::AnnotatedAssignment(_)))
         && let Some(builder) = context.report_lint(

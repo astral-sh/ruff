@@ -878,7 +878,7 @@ impl<'db> Type<'db> {
         Self::Dynamic(DynamicType::Any)
     }
 
-    pub(crate) const fn unknown() -> Self {
+    pub const fn unknown() -> Self {
         Self::Dynamic(DynamicType::Unknown)
     }
 
@@ -912,8 +912,19 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, cycle)
+        // Avoid unioning two generic aliases of the same class together; this union will never
+        // simplify and is likely to cause downstream problems. This introduces the theoretical
+        // possibility of cycle oscillation involving such types (because we are not strictly
+        // widening the type on each iteration), but so far we have not seen an example of that.
+        match (previous, self) {
+            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
+                if prev_alias.origin(db) == curr_alias.origin(db) =>
+            {
+                self
+            }
+            _ => UnionType::from_elements_cycle_recovery(db, [self, previous]),
+        }
+        .recursive_type_normalized(db, cycle)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
@@ -1268,8 +1279,14 @@ impl<'db> Type<'db> {
         self.as_union().expect("Expected a Type::Union variant")
     }
 
-    pub(crate) const fn is_intersection(self) -> bool {
-        matches!(self, Type::Intersection(_))
+    /// Returns whether this is a "real" intersection type. (Negated types are represented by an
+    /// intersection containing a single negative branch, which this method does _not_ consider a
+    /// "real" intersection.)
+    pub(crate) fn is_nontrivial_intersection(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Intersection(intersection) => !intersection.is_simple_negation(db),
+            _ => false,
+        }
     }
 
     pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
@@ -1465,6 +1482,7 @@ impl<'db> Type<'db> {
     /// - Strips the types of default values from parameters in `Callable` types: only whether a parameter
     ///   *has* or *does not have* a default value is relevant to whether two `Callable` types  are equivalent.
     /// - Converts class-based protocols into synthesized protocols
+    /// - Converts class-based typeddicts into synthesized typeddicts
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
         self.normalized_impl(db, &NormalizedVisitor::default())
@@ -1523,10 +1541,9 @@ impl<'db> Type<'db> {
                 // Always normalize single-member enums to their class instance (`Literal[Single.VALUE]` => `Single`)
                 enum_literal.enum_class_instance(db)
             }
-            Type::TypedDict(_) => {
-                // TODO: Normalize TypedDicts
-                self
-            }
+            Type::TypedDict(typed_dict) => visitor.visit(self, || {
+                Type::TypedDict(typed_dict.normalized_impl(db, visitor))
+            }),
             Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
             Type::NewTypeInstance(newtype) => {
                 visitor.visit(self, || {
@@ -2755,6 +2772,34 @@ impl<'db> Type<'db> {
                     )
                 })
                 .unwrap_or_else(|| ConstraintSet::from(relation.is_assignability())),
+
+            // Similarly, `<class 'C'>` is assignable to `<class 'C[...]'>` (a generic-alias type)
+            // if the default specialization of `C` is assignable to `C[...]`. This scenario occurs
+            // with final generic types, where `type[C[...]]` is simplified to the generic-alias
+            // type `<class 'C[...]'>`, due to the fact that `C[...]` has no subclasses.
+            (Type::ClassLiteral(class), Type::GenericAlias(target_alias)) => {
+                class.default_specialization(db).has_relation_to_impl(
+                    db,
+                    ClassType::Generic(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
+            // For generic aliases, we delegate to the underlying class type.
+            (Type::GenericAlias(self_alias), Type::GenericAlias(target_alias)) => {
+                ClassType::Generic(self_alias).has_relation_to_impl(
+                    db,
+                    ClassType::Generic(target_alias),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             (Type::GenericAlias(alias), Type::SubclassOf(target_subclass_ty)) => target_subclass_ty
                 .subclass_of()
                 .into_class(db)
@@ -3065,6 +3110,10 @@ impl<'db> Type<'db> {
                 left.is_equivalent_to_impl(db, right, inferable, visitor)
             }
 
+            (Type::TypedDict(left), Type::TypedDict(right)) => visitor.visit((self, other), || {
+                left.is_equivalent_to_impl(db, right, inferable, visitor)
+            }),
+
             _ => ConstraintSet::from(false),
         }
     }
@@ -3365,7 +3414,6 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
                 right @ (Type::BooleanLiteral(..)
@@ -3379,7 +3427,6 @@ impl<'db> Type<'db> {
                 | Type::WrapperDescriptor(..)
                 | Type::ModuleLiteral(..)
                 | Type::ClassLiteral(..)
-                | Type::GenericAlias(..)
                 | Type::SpecialForm(..)
                 | Type::KnownInstance(..)),
             ) => ConstraintSet::from(left != right),
@@ -3562,13 +3609,39 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            (Type::GenericAlias(left_alias), Type::GenericAlias(right_alias)) => {
+                ConstraintSet::from(left_alias.origin(db) != right_alias.origin(db)).or(db, || {
+                    left_alias.specialization(db).is_disjoint_from_impl(
+                        db,
+                        right_alias.specialization(db),
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
+            }
+
+            (Type::ClassLiteral(class_literal), other @ Type::GenericAlias(_))
+            | (other @ Type::GenericAlias(_), Type::ClassLiteral(class_literal)) => class_literal
+                .default_specialization(db)
+                .into_generic_alias()
+                .when_none_or(|alias| {
+                    other.is_disjoint_from_impl(
+                        db,
+                        Type::GenericAlias(alias),
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                }),
+
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => {
-                        class_b.when_subclass_of(db, None, class_a).negate(db)
-                    }
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
+                        !class_a.could_exist_in_mro_of(db, ClassType::NonGeneric(class_b)),
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
@@ -3577,9 +3650,9 @@ impl<'db> Type<'db> {
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
                     SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
-                    SubclassOfInner::Class(class_a) => ClassType::from(alias_b)
-                        .when_subclass_of(db, class_a, inferable)
-                        .negate(db),
+                    SubclassOfInner::Class(class_a) => ConstraintSet::from(
+                        !class_a.could_exist_in_mro_of(db, ClassType::Generic(alias_b)),
+                    ),
                     SubclassOfInner::TypeVar(_) => unreachable!(),
                 }
             }
@@ -3873,6 +3946,8 @@ impl<'db> Type<'db> {
                     relation_visitor,
                 )
             }
+
+            (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => ConstraintSet::from(true),
         }
     }
 
@@ -7568,7 +7643,13 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => protocol.to_meta_type(db),
             // `TypedDict` instances are instances of `dict` at runtime, but its important that we
             // understand a more specific meta type in order to correctly handle `__getitem__`.
-            Type::TypedDict(typed_dict) => SubclassOfType::from(db, typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::Class(class) => SubclassOfType::from(db, class),
+                TypedDictType::Synthesized(_) => SubclassOfType::from(
+                    db,
+                    todo_type!("TypedDict synthesized meta-type").expect_dynamic(),
+                ),
+            },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
             Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
         }
@@ -8277,7 +8358,7 @@ impl<'db> Type<'db> {
             },
 
             Self::TypedDict(typed_dict) => {
-                Some(TypeDefinition::Class(typed_dict.defining_class().definition(db)))
+                typed_dict.definition(db).map(TypeDefinition::Class)
             }
 
             Self::Union(_) | Self::Intersection(_) => None,
@@ -11550,7 +11631,7 @@ impl<'db> BoolError<'db> {
                 not_boolable_type, ..
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`",
+                    "Boolean conversion is not supported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
                 let mut sub = SubDiagnostic::new(
@@ -11575,7 +11656,7 @@ impl<'db> BoolError<'db> {
                 return_type,
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{not_boolable}`",
+                    "Boolean conversion is not supported for type `{not_boolable}`",
                     not_boolable = not_boolable_type.display(context.db()),
                 ));
                 let mut sub = SubDiagnostic::new(
@@ -11601,7 +11682,7 @@ impl<'db> BoolError<'db> {
             }
             Self::NotCallable { not_boolable_type } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`",
+                    "Boolean conversion is not supported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
                 let sub = SubDiagnostic::new(
@@ -11624,7 +11705,7 @@ impl<'db> BoolError<'db> {
                     .unwrap();
 
                 builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for union `{}` \
+                    "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
                     Type::Union(*union).display(context.db()),
                     first_error.not_boolable_type().display(context.db()),
@@ -11633,7 +11714,7 @@ impl<'db> BoolError<'db> {
 
             Self::Other { not_boolable_type } => {
                 builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`; \
+                    "Boolean conversion is not supported for type `{}`; \
                      it incorrectly implements `__bool__`",
                     not_boolable_type.display(context.db())
                 ));
@@ -14176,6 +14257,10 @@ impl<'db> IntersectionType<'db> {
 
     pub(crate) fn has_one_element(self, db: &'db dyn Db) -> bool {
         (self.positive(db).len() + self.negative(db).len()) == 1
+    }
+
+    pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
+        self.positive(db).is_empty() && self.negative(db).len() == 1
     }
 
     fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {

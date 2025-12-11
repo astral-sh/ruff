@@ -1338,6 +1338,40 @@ def g3(obj: Foo[tuple[A]]):
     f3(obj)
 ```
 
+## Generic aliases
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_assignable_to, TypeOf
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
+```
+
 ## `TypeGuard` and `TypeIs`
 
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
