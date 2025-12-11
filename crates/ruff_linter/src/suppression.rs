@@ -19,7 +19,8 @@ use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
 use crate::rules::ruff::rules::{
-    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
+    InvalidSuppressionComment, InvalidSuppressionCommentKind, UnmatchedSuppressionComment,
+    UnusedCodes, UnusedNOQA, UnusedNOQAKind,
 };
 use crate::settings::LinterSettings;
 
@@ -133,7 +134,7 @@ impl Suppressions {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        self.valid.is_empty()
+        self.valid.is_empty() && self.invalid.is_empty() && self.errors.is_empty()
     }
 
     /// Check if a diagnostic is suppressed by any known range suppressions
@@ -162,7 +163,12 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        if !context.any_rule_enabled(&[Rule::UnusedNOQA, Rule::InvalidRuleCode]) {
+        if !context.any_rule_enabled(&[
+            Rule::UnusedNOQA,
+            Rule::InvalidRuleCode,
+            Rule::InvalidSuppressionComment,
+            Rule::UnmatchedSuppressionComment,
+        ]) {
             return;
         }
 
@@ -223,6 +229,40 @@ impl Suppressions {
             }
         }
 
+        for error in &self.errors {
+            // treat comments with no codes as unused suppression
+            let mut diagnostic = if error.kind == ParseErrorKind::MissingCodes {
+                context.report_diagnostic(
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes::default()),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                    error.range,
+                )
+            } else {
+                context.report_diagnostic(
+                    InvalidSuppressionComment {
+                        kind: InvalidSuppressionCommentKind::Error(error.kind),
+                    },
+                    error.range,
+                )
+            };
+            diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+        }
+
+        for invalid in &self.invalid {
+            let mut diagnostic = context.report_diagnostic(
+                InvalidSuppressionComment {
+                    kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
+                },
+                invalid.comment.range,
+            );
+            diagnostic.set_fix(Fix::safe_edit(delete_comment(
+                invalid.comment.range,
+                locator,
+            )));
+        }
+
         let unmatched = self
             .valid
             .iter()
@@ -234,21 +274,6 @@ impl Suppressions {
             .collect::<FxHashSet<TextRange>>();
         for range in unmatched {
             context.report_diagnostic(UnmatchedSuppressionComment {}, range);
-        }
-
-        for error in self
-            .errors
-            .iter()
-            .filter(|error| error.kind == ParseErrorKind::MissingCodes)
-        {
-            let mut diagnostic = context.report_diagnostic(
-                UnusedNOQA {
-                    codes: Some(UnusedCodes::default()),
-                    kind: UnusedNOQAKind::Suppression,
-                },
-                error.range,
-            );
-            diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
         }
     }
 }
@@ -407,7 +432,7 @@ impl<'a> SuppressionsBuilder<'a> {
 }
 
 #[derive(Copy, Clone, Debug, Eq, Error, PartialEq)]
-enum ParseErrorKind {
+pub(crate) enum ParseErrorKind {
     #[error("not a suppression comment")]
     NotASuppression,
 
