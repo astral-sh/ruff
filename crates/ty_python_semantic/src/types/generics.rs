@@ -15,6 +15,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
@@ -1553,6 +1554,10 @@ impl<'db> SpecializationBuilder<'db> {
     /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
     /// the specialization that this builder is building up.
     ///
+    /// `formal` should be the top-level formal parameter type that we are inferring. This is used
+    /// by our literal promotion logic, which needs to know which typevars are affected by each
+    /// argument, and the variance of those typevars in the corresponding parameter.
+    ///
     /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
     /// the main specialization that we are building, and [`build`][Self::build] will build the
     /// specialization directly from that constraint set. This method lets us migrate to that brave
@@ -1560,8 +1565,8 @@ impl<'db> SpecializationBuilder<'db> {
     /// type comparisons.
     fn add_type_mappings_from_constraint_set(
         &mut self,
+        formal: Type<'db>,
         constraints: ConstraintSet<'db>,
-        variance: TypeVarVariance,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
         constraints.for_each_path(self.db, |path| {
@@ -1570,11 +1575,14 @@ impl<'db> SpecializationBuilder<'db> {
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
                 if !upper.is_object() {
+                    let variance = formal.variance_of(self.db, typevar);
                     self.add_type_mapping(typevar, upper, variance, &mut f);
                 } else if !lower.is_never() {
+                    let variance = formal.variance_of(self.db, typevar);
                     self.add_type_mapping(typevar, lower, variance, &mut f);
                 }
                 if let Type::TypeVar(lower_bound_typevar) = lower {
+                    let variance = formal.variance_of(self.db, lower_bound_typevar);
                     self.add_type_mapping(
                         lower_bound_typevar,
                         Type::TypeVar(typevar),
@@ -1583,6 +1591,7 @@ impl<'db> SpecializationBuilder<'db> {
                     );
                 }
                 if let Type::TypeVar(upper_bound_typevar) = upper {
+                    let variance = formal.variance_of(self.db, upper_bound_typevar);
                     self.add_type_mapping(
                         upper_bound_typevar,
                         Type::TypeVar(typevar),
@@ -1899,7 +1908,7 @@ impl<'db> SpecializationBuilder<'db> {
                             formal_callable.signatures(self.db),
                             self.inferable,
                         );
-                    self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
+                    self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                 }
             }
 
