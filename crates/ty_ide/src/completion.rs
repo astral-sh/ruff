@@ -2594,9 +2594,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"foo=",
         );
     }
 
@@ -2610,9 +2608,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"foo=",
         );
     }
 
@@ -3269,7 +3265,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3290,7 +3286,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3308,9 +3304,9 @@ foo(b<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
-        bar
-        barbaz
-        baz
+        bar=
+        barbaz=
+        baz=
         "
         );
     }
@@ -3327,9 +3323,7 @@ foo(bar=1, b<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        baz
-        "
+            @"baz="
         );
     }
 
@@ -3347,9 +3341,7 @@ abc(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        okay
-        "
+            @"okay="
         );
     }
 
@@ -3365,9 +3357,7 @@ abc(okay=1, ba<CURSOR> baz=5
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        bar
-        "
+            @"bar="
         );
     }
 
@@ -3411,9 +3401,9 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
-        okay_abc
-        okay_okay
+        okay=
+        okay_abc=
+        okay_okay=
         "
         );
     }
@@ -3433,7 +3423,7 @@ bar(<CURSOR>
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         foo
-        okay
+        okay=
         ");
     }
 
@@ -6885,7 +6875,7 @@ def f(zqzqzq: str):
             self.filtered
                 .iter()
                 .map(|c| {
-                    let mut snapshot = c.name.as_str().to_string();
+                    let mut snapshot = c.insert.as_deref().unwrap_or(c.name.as_str()).to_string();
                     if self.type_signatures {
                         let ty =
                             c.ty.map(|ty| ty.display(self.db).to_string())
