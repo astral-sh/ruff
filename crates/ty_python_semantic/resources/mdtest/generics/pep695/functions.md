@@ -85,13 +85,11 @@ def takes_in_protocol[T](x: CanIndex[T]) -> T:
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
@@ -124,12 +122,10 @@ class Sub(list[int]): ...
 class GenericSub[T](list[T]): ...
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
-# TODO: revealed: int
-reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
-# TODO: revealed: str
-reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
