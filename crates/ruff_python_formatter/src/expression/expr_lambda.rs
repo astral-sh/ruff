@@ -377,19 +377,46 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         );
 
         let fmt_body = format_with(|f: &mut PyFormatter| {
-            write!(
-                f,
-                [
-                    space(),
-                    token("("),
-                    trailing_comments(after_parameters_end_of_line),
-                    block_indent(&format_args!(
-                        leading_comments(leading_body_comments),
-                        body.format().with_options(Parentheses::Never)
-                    )),
-                    token(")")
-                ]
-            )
+            let body_comments = f.context().comments().leading_dangling_trailing(&**body);
+            if body_comments.has_leading() {
+                if body_comments
+                    .leading
+                    .iter()
+                    .any(|comment| comment.line_position().is_own_line())
+                {
+                    write!(
+                        f,
+                        [
+                            trailing_comments(dangling),
+                            hard_line_break(),
+                            body.format().with_options(Parentheses::Always),
+                        ]
+                    )
+                } else {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            trailing_comments(dangling),
+                            body.format().with_options(Parentheses::Always),
+                        ]
+                    )
+                }
+            } else {
+                write!(
+                    f,
+                    [
+                        space(),
+                        token("("),
+                        trailing_comments(after_parameters_end_of_line),
+                        block_indent(&format_args!(
+                            leading_comments(leading_body_comments),
+                            body.format().with_options(Parentheses::Never)
+                        )),
+                        token(")")
+                    ]
+                )
+            }
         });
 
         match layout {

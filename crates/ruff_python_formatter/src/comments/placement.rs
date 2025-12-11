@@ -1884,14 +1884,19 @@ fn handle_lambda_comment<'a>(
             return CommentPlacement::dangling(comment.enclosing_node(), comment);
         }
     } else {
-        // Comments between the lambda and the body are dangling on the lambda:
+        // End-of-line comments between the lambda and the body are dangling on the lambda:
         // ```python
         // (
         //     lambda:  # comment
         //     y
         // )
         // ```
+        // But own-line comments after `:` are leading on the body.
         if comment.start() < lambda.body.start() {
+            if comment.line_position().is_own_line() {
+                return CommentPlacement::leading(&*lambda.body, comment);
+            }
+
             // If the value is parenthesized, and the comment is within the parentheses, it should
             // be a leading comment on the value, not a dangling comment in the lambda, as in:
             // ```python
