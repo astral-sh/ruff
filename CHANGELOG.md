@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.14.9
+
+Released on 2025-12-11.
+
+### Preview features
+
+- \[`ruff`\] New `RUF100` diagnostics for unused range suppressions ([#21783](https://github.com/astral-sh/ruff/pull/21783))
+- \[`pylint`\] Detect subclasses of builtin exceptions (`PLW0133`) ([#21382](https://github.com/astral-sh/ruff/pull/21382))
+
+### Bug fixes
+
+- Fix comment placement in lambda parameters ([#21868](https://github.com/astral-sh/ruff/pull/21868))
+- Skip over trivia tokens after re-lexing ([#21895](https://github.com/astral-sh/ruff/pull/21895))
+- \[`flake8-bandit`\] Fix false positive when using non-standard `CSafeLoader` path (S506). ([#21830](https://github.com/astral-sh/ruff/pull/21830))
+- \[`flake8-bugbear`\] Accept immutable slice default arguments (`B008`) ([#21823](https://github.com/astral-sh/ruff/pull/21823))
+
+### Rule changes
+
+- \[`pydocstyle`\] Suppress `D417` for parameters with `Unpack` annotations ([#21816](https://github.com/astral-sh/ruff/pull/21816))
+
+### Performance
+
+- Use `memchr` for computing line indexes ([#21838](https://github.com/astral-sh/ruff/pull/21838))
+
+### Documentation
+
+- Document `*.pyw` is included by default in preview ([#21885](https://github.com/astral-sh/ruff/pull/21885))
+- Document range suppressions, reorganize suppression docs ([#21884](https://github.com/astral-sh/ruff/pull/21884))
+- Update mkdocs-material to 9.7.0 (Insiders now free) ([#21797](https://github.com/astral-sh/ruff/pull/21797))
+
+### Contributors
+
+- [@Avasam](https://github.com/Avasam)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@amyreese](https://github.com/amyreese)
+- [@phongddo](https://github.com/phongddo)
+- [@prakhar1144](https://github.com/prakhar1144)
+- [@mahiro72](https://github.com/mahiro72)
+- [@ntBre](https://github.com/ntBre)
+- [@LoicRiegel](https://github.com/LoicRiegel)
+
 ## 0.14.8
 
 Released on 2025-12-04.
