@@ -277,11 +277,12 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
 /// UP026
 pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport {
-            names,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Import(node) => {
+            let ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            } = &**node;
             // Find all `mock` imports.
             if names
                 .iter()
@@ -326,12 +327,16 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module: Some(module),
-            level,
-            names,
-            ..
-        }) => {
+        Stmt::ImportFrom(node) => {
+            let ast::StmtImportFrom {
+                module: Some(module),
+                level,
+                names,
+                range: _,
+                node_index: _,
+            } = &**node else {
+                return;
+            };
             if *level > 0 {
                 return;
             }

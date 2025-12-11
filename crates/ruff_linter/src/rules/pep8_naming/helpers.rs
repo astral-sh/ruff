@@ -25,10 +25,10 @@ pub(super) fn is_acronym(name: &str, asname: &str) -> bool {
 
 /// Returns `true` if the statement is an assignment to a named tuple.
 pub(super) fn is_named_tuple_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+    let Stmt::Assign(node) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = node.value.as_ref() else {
         return false;
     };
     semantic
@@ -45,10 +45,10 @@ pub(super) fn is_typed_dict_assignment(stmt: &Stmt, semantic: &SemanticModel) ->
         return false;
     }
 
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+    let Stmt::Assign(node) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = node.value.as_ref() else {
         return false;
     };
     semantic.match_typing_expr(func, "TypedDict")
@@ -60,10 +60,10 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
         return false;
     }
 
-    let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+    let Stmt::Assign(node) = stmt else {
         return false;
     };
-    let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+    let Expr::Call(ast::ExprCall { func, .. }) = node.value.as_ref() else {
         return false;
     };
     semantic
@@ -77,8 +77,8 @@ pub(super) fn is_type_var_assignment(stmt: &Stmt, semantic: &SemanticModel) -> b
 /// Returns `true` if the statement is an assignment to a `TypeAlias`.
 pub(super) fn is_type_alias_assignment(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     match stmt {
-        Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
-            semantic.match_typing_expr(annotation, "TypeAlias")
+        Stmt::AnnAssign(node) => {
+            semantic.match_typing_expr(&node.annotation, "TypeAlias")
         }
         Stmt::TypeAlias(_) => true,
         _ => false,
@@ -157,11 +157,15 @@ pub(super) fn is_django_model_import(name: &str, stmt: &Stmt, semantic: &Semanti
     }
 
     match stmt {
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        }) => match_model_import(name, value.as_ref(), semantic),
-        Stmt::Assign(ast::StmtAssign { value, .. }) => {
-            match_model_import(name, value.as_ref(), semantic)
+        Stmt::AnnAssign(node) => {
+            if let Some(value) = &node.value {
+                match_model_import(name, value.as_ref(), semantic)
+            } else {
+                false
+            }
+        }
+        Stmt::Assign(node) => {
+            match_model_import(name, node.value.as_ref(), semantic)
         }
         _ => false,
     }

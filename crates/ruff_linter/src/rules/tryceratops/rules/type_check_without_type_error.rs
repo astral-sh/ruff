@@ -105,8 +105,10 @@ fn check_body(checker: &Checker, body: &[Stmt]) {
         if has_control_flow(item) {
             return;
         }
-        if let Stmt::Raise(ast::StmtRaise { exc: Some(exc), .. }) = &item {
-            check_raise(checker, exc, item);
+        if let Stmt::Raise(node) = &item {
+            if let Some(exc) = &node.exc {
+                check_raise(checker, exc, item);
+            }
         }
     }
 }
@@ -155,8 +157,8 @@ pub(crate) fn type_check_without_type_error(
         ..
     } = stmt_if;
 
-    if let Some(Stmt::If(ast::StmtIf { test, .. })) = parent {
-        if !check_type_check_test(checker.semantic(), test) {
+    if let Some(Stmt::If(node)) = parent {
+        if !check_type_check_test(checker.semantic(), &node.test) {
             return;
         }
     }

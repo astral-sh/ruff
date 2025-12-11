@@ -158,10 +158,10 @@ pub(crate) fn unquoted_type_alias(checker: &Checker, binding: &Binding) {
         return;
     }
 
-    let Some(Stmt::AnnAssign(ast::StmtAnnAssign {
-        value: Some(expr), ..
-    })) = binding.statement(checker.semantic())
-    else {
+    let Some(Stmt::AnnAssign(node)) = binding.statement(checker.semantic()) else {
+        return;
+    };
+    let Some(expr) = &node.value else {
         return;
     };
 

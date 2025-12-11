@@ -95,16 +95,11 @@ pub(crate) fn if_stmt_min_max(checker: &Checker, stmt_if: &ast::StmtIf) {
         return;
     }
 
-    let [
-        body @ Stmt::Assign(ast::StmtAssign {
-            targets: body_targets,
-            value: body_value,
-            ..
-        }),
-    ] = body.as_slice()
-    else {
+    let [body @ Stmt::Assign(node)] = body.as_slice() else {
         return;
     };
+    let body_targets = &node.targets;
+    let body_value = &node.value;
     let [body_target] = body_targets.as_slice() else {
         return;
     };

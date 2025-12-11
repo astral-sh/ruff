@@ -5,7 +5,6 @@ use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::{
     self as ast, Expr, ExprCall, ExprName, Operator, ParameterWithDefault, Parameters, Stmt,
-    StmtAssign,
 };
 use ruff_python_stdlib::typing::{
     as_pep_585_generic, is_immutable_generic_type, is_immutable_non_generic_type,
@@ -366,9 +365,13 @@ pub fn is_immutable_newtype_call(
         return false;
     }
 
-    let Some(Stmt::Assign(StmtAssign { value, .. })) = binding.statement(semantic) else {
+    let Some(stmt) = binding.statement(semantic) else {
         return false;
     };
+    let Stmt::Assign(node) = stmt else {
+        return false;
+    };
+    let value = &node.value;
 
     let Expr::Call(ExprCall {
         func, arguments, ..
@@ -632,18 +635,20 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // ```
             //
             // The type checker might know how to infer the type based on `init_expr`.
-            Some(Stmt::Assign(ast::StmtAssign { targets, value, .. })) => targets
-                .iter()
-                .find_map(|target| match_value(binding, target, value))
-                .is_some_and(|value| T::match_initializer(value, semantic)),
+            Some(Stmt::Assign(node)) => {
+                node.targets
+                    .iter()
+                    .find_map(|target| match_value(binding, target, &node.value))
+                    .is_some_and(|value| T::match_initializer(value, semantic))
+            }
 
             // ```python
             // x: annotation = some_expr
             // ```
             //
             // In this situation, we check only the annotation.
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                T::match_annotation(annotation, semantic)
+            Some(Stmt::AnnAssign(node)) => {
+                T::match_annotation(&node.annotation, semantic)
             }
 
             _ => false,
@@ -670,14 +675,16 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // with open("file.txt") as x:
             //     ...
             // ```
-            Some(Stmt::With(ast::StmtWith { items, .. })) => items
-                .iter()
-                .find_map(|item| {
-                    let target = item.optional_vars.as_ref()?;
-                    let value = &item.context_expr;
-                    match_value(binding, target, value)
-                })
-                .is_some_and(|value| T::match_initializer(value, semantic)),
+            Some(Stmt::With(node)) => {
+                node.items
+                    .iter()
+                    .find_map(|item| {
+                        let target = item.optional_vars.as_ref()?;
+                        let value = &item.context_expr;
+                        match_value(binding, target, value)
+                    })
+                    .is_some_and(|value| T::match_initializer(value, semantic))
+            }
 
             _ => false,
         },
@@ -689,8 +696,8 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // ```
             //
             // We trust the annotation and see if the type checker matches the annotation.
-            Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) => {
-                let Some(parameter) = find_parameter(parameters, binding) else {
+            Some(Stmt::FunctionDef(node)) => {
+                let Some(parameter) = find_parameter(&node.parameters, binding) else {
                     return false;
                 };
                 let Some(annotation) = parameter.annotation() else {
@@ -708,8 +715,8 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // ```
             //
             // It's a typed declaration, type annotation is the only source of information.
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. })) => {
-                T::match_annotation(annotation, semantic)
+            Some(Stmt::AnnAssign(node)) => {
+                T::match_annotation(&node.annotation, semantic)
             }
             _ => false,
         },
@@ -719,9 +726,11 @@ pub fn check_type<T: TypeChecker>(binding: &Binding, semantic: &SemanticModel) -
             // def foo() -> int:
             //   ...
             // ```
-            Some(Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. })) => returns
-                .as_ref()
-                .is_some_and(|return_ann| T::match_annotation(return_ann, semantic)),
+            Some(Stmt::FunctionDef(node)) => {
+                node.returns
+                    .as_ref()
+                    .is_some_and(|return_ann| T::match_annotation(return_ann, semantic))
+            }
 
             _ => false,
         },
@@ -1038,12 +1047,12 @@ pub fn is_dict(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
-            binding.statement(semantic)
-        {
-            if let Some(kwarg_parameter) = parameters.kwarg.as_deref() {
-                if kwarg_parameter.name.range() == binding.range() {
-                    return true;
+        if let Some(stmt) = binding.statement(semantic) {
+            if let Stmt::FunctionDef(node) = stmt {
+                if let Some(kwarg_parameter) = node.parameters.kwarg.as_deref() {
+                    if kwarg_parameter.name.range() == binding.range() {
+                        return true;
+                    }
                 }
             }
         }
@@ -1091,12 +1100,12 @@ pub fn is_tuple(binding: &Binding, semantic: &SemanticModel) -> bool {
     //   ...
     // ```
     if matches!(binding.kind, BindingKind::Argument) {
-        if let Some(Stmt::FunctionDef(ast::StmtFunctionDef { parameters, .. })) =
-            binding.statement(semantic)
-        {
-            if let Some(arg_parameter) = parameters.vararg.as_deref() {
-                if arg_parameter.name.range() == binding.range() {
-                    return true;
+        if let Some(stmt) = binding.statement(semantic) {
+            if let Stmt::FunctionDef(node) = stmt {
+                if let Some(arg_parameter) = node.parameters.vararg.as_deref() {
+                    if arg_parameter.name.range() == binding.range() {
+                        return true;
+                    }
                 }
             }
         }
@@ -1183,10 +1192,14 @@ pub fn resolve_assignment<'a>(
     let binding_id = semantic.resolve_name(name)?;
     let statement = semantic.binding(binding_id).statement(semantic)?;
     match statement {
-        Stmt::Assign(ast::StmtAssign { value, .. })
-        | Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        }) => {
+        Stmt::Assign(node) => {
+            let ast::ExprCall { func, .. } = node.value.as_call_expr()?;
+
+            let qualified_name = semantic.resolve_qualified_name(func)?;
+            Some(qualified_name.extend_members(reversed_tail.into_iter().rev()))
+        }
+        Stmt::AnnAssign(node) => {
+            let value = node.value.as_ref()?;
             let ast::ExprCall { func, .. } = value.as_call_expr()?;
 
             let qualified_name = semantic.resolve_qualified_name(func)?;
@@ -1237,24 +1250,23 @@ pub fn find_binding_value<'a>(binding: &Binding, semantic: &'a SemanticModel) ->
         }
         // Ex) `x = 1`
         BindingKind::Assignment => match binding.statement(semantic) {
-            Some(Stmt::Assign(ast::StmtAssign { value, targets, .. })) => {
-                return targets
+            Some(Stmt::Assign(node)) => {
+                return node
+                    .targets
                     .iter()
-                    .find_map(|target| match_value(binding, target, value));
+                    .find_map(|target| match_value(binding, target, &node.value));
             }
-            Some(Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value),
-                target,
-                ..
-            })) => {
-                return match_value(binding, target, value);
+            Some(Stmt::AnnAssign(node)) => {
+                if let Some(value) = &node.value {
+                    return match_value(binding, &node.target, value);
+                }
             }
             _ => {}
         },
         // Ex) `with open("file.txt") as f:`
         BindingKind::WithItemVar => match binding.statement(semantic) {
-            Some(Stmt::With(ast::StmtWith { items, .. })) => {
-                return items.iter().find_map(|item| {
+            Some(Stmt::With(node)) => {
+                return node.items.iter().find_map(|item| {
                     let target = item.optional_vars.as_ref()?;
                     let value = &item.context_expr;
                     match_value(binding, target, value)

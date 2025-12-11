@@ -166,57 +166,54 @@ fn num_branches(stmts: &[Stmt]) -> usize {
     stmts
         .iter()
         .map(|stmt| match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                1 + num_branches(body)
-                    + elif_else_clauses.len()
-                    + elif_else_clauses
+            Stmt::If(node) => {
+                1 + num_branches(&node.body)
+                    + node.elif_else_clauses.len()
+                    + node.elif_else_clauses
                         .iter()
                         .map(|clause| num_branches(&clause.body))
                         .sum::<usize>()
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                cases.len()
-                    + cases
+            Stmt::Match(node) => {
+                node.cases.len()
+                    + node.cases
                         .iter()
                         .map(|case| num_branches(&case.body))
                         .sum::<usize>()
             }
             // The `with` statement is not considered a branch but the statements inside the `with` should be counted.
-            Stmt::With(ast::StmtWith { body, .. }) => num_branches(body),
-            Stmt::For(ast::StmtFor { body, orelse, .. })
-            | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                1 + num_branches(body)
-                    + (if orelse.is_empty() {
+            Stmt::With(node) => num_branches(&node.body),
+            Stmt::For(node) => {
+                1 + num_branches(&node.body)
+                    + (if node.orelse.is_empty() {
                         0
                     } else {
-                        1 + num_branches(orelse)
+                        1 + num_branches(&node.orelse)
                     })
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::While(node) => {
+                1 + num_branches(&node.body)
+                    + (if node.orelse.is_empty() {
+                        0
+                    } else {
+                        1 + num_branches(&node.orelse)
+                    })
+            }
+            Stmt::Try(node) => {
                 // Count each `except` clause as a branch; the `else` and `finally` clauses also
                 // count, but the `try` clause itself does not.
-                num_branches(body)
-                    + (if orelse.is_empty() {
+                num_branches(&node.body)
+                    + (if node.orelse.is_empty() {
                         0
                     } else {
-                        1 + num_branches(orelse)
+                        1 + num_branches(&node.orelse)
                     })
-                    + (if finalbody.is_empty() {
+                    + (if node.finalbody.is_empty() {
                         0
                     } else {
-                        1 + num_branches(finalbody)
+                        1 + num_branches(&node.finalbody)
                     })
-                    + handlers
+                    + node.handlers
                         .iter()
                         .map(|handler| {
                             1 + {

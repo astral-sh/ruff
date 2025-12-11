@@ -2,7 +2,7 @@
 //!
 //! See: <https://bandit.readthedocs.io/en/latest/blacklists/blacklist_imports.html>
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -371,7 +371,8 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
     }
 
     match stmt {
-        Stmt::Import(ast::StmtImport { names, .. }) => {
+        Stmt::Import(node) => {
+            let names = &node.names;
             for name in names {
                 match name.name.as_str() {
                     "telnetlib" => {
@@ -421,8 +422,9 @@ pub(crate) fn suspicious_imports(checker: &Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
-            let Some(identifier) = module else { return };
+        Stmt::ImportFrom(node) => {
+            let Some(identifier) = &node.module else { return };
+            let names = &node.names;
             match identifier.as_str() {
                 "telnetlib" => {
                     checker.report_diagnostic_if_enabled(

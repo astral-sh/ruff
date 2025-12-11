@@ -107,13 +107,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     for statement in body {
         match statement {
             // Ex) `__slots__ = ("name",)`
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+            Stmt::Assign(node) => {
+                let [Expr::Name(ast::ExprName { id, .. })] = node.targets.as_slice() else {
                     continue;
                 };
 
                 if id == "__slots__" {
-                    for attribute in slots_attributes(value) {
+                    for attribute in slots_attributes(&node.value) {
                         if let Some(attribute) = attribute {
                             slots.insert(attribute);
                         } else {
@@ -124,12 +124,12 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
             }
 
             // Ex) `__slots__: Tuple[str, ...] = ("name",)`
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            Stmt::AnnAssign(node) => {
+                let Some(value) = &node.value else {
+                    continue;
+                };
+
+                let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() else {
                     continue;
                 };
 
@@ -145,13 +145,13 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
             }
 
             // Ex) `__slots__ += ("name",)`
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            Stmt::AugAssign(node) => {
+                let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() else {
                     continue;
                 };
 
                 if id == "__slots__" {
-                    for attribute in slots_attributes(value) {
+                    for attribute in slots_attributes(&node.value) {
                         if let Some(attribute) = attribute {
                             slots.insert(attribute);
                         } else {
@@ -170,11 +170,11 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
 
     // And, collect all the property name with setter.
     for statement in body {
-        let Stmt::FunctionDef(ast::StmtFunctionDef { decorator_list, .. }) = statement else {
+        let Stmt::FunctionDef(node) = statement else {
             continue;
         };
 
-        for decorator in decorator_list {
+        for decorator in &node.decorator_list {
             let Some(ast::ExprAttribute { value, attr, .. }) =
                 decorator.expression.as_attribute_expr()
             else {
@@ -193,16 +193,16 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
     // Second, find any assignments that aren't included in `__slots__`.
     let mut assignments = vec![];
     for statement in body {
-        let Stmt::FunctionDef(ast::StmtFunctionDef { name, body, .. }) = statement else {
+        let Stmt::FunctionDef(node) = statement else {
             continue;
         };
 
-        if name == "__init__" {
-            for statement in body {
+        if node.name.as_str() == "__init__" {
+            for statement in &node.body {
                 match statement {
                     // Ex) `self.name = name`
-                    Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                        let [Expr::Attribute(attribute)] = targets.as_slice() else {
+                    Stmt::Assign(assign_node) => {
+                        let [Expr::Attribute(attribute)] = assign_node.targets.as_slice() else {
                             continue;
                         };
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
@@ -217,8 +217,8 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
                     }
 
                     // Ex) `self.name: str = name`
-                    Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                        let Expr::Attribute(attribute) = target.as_ref() else {
+                    Stmt::AnnAssign(ann_node) => {
+                        let Expr::Attribute(attribute) = ann_node.target.as_ref() else {
                             continue;
                         };
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {
@@ -233,8 +233,8 @@ fn is_attributes_not_in_slots(body: &[Stmt]) -> Vec<AttributeAssignment<'_>> {
                     }
 
                     // Ex) `self.name += name`
-                    Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                        let Expr::Attribute(attribute) = target.as_ref() else {
+                    Stmt::AugAssign(aug_node) => {
+                        let Expr::Attribute(attribute) = aug_node.target.as_ref() else {
                             continue;
                         };
                         let Expr::Name(ast::ExprName { id, .. }) = attribute.value.as_ref() else {

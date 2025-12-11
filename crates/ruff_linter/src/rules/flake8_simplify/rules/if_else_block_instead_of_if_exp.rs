@@ -112,27 +112,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: body_targets,
-            value: body_value,
-            ..
-        }),
-    ] = body.as_slice()
-    else {
+    let [Stmt::Assign(body_node)] = body.as_slice() else {
         return;
     };
-    let [
-        Stmt::Assign(ast::StmtAssign {
-            targets: else_targets,
-            value: else_value,
-            ..
-        }),
-    ] = else_body.as_slice()
-    else {
+    let [Stmt::Assign(else_node)] = else_body.as_slice() else {
         return;
     };
-    let ([body_target], [else_target]) = (body_targets.as_slice(), else_targets.as_slice()) else {
+    let ([body_target], [else_target]) = (body_node.targets.as_slice(), else_node.targets.as_slice()) else {
         return;
     };
     let Expr::Name(ast::ExprName { id: body_id, .. }) = body_target else {
@@ -148,13 +134,13 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     // Avoid suggesting ternary for `if (yield ...)`-style checks.
     // TODO(charlie): Fix precedence handling for yields in generator.
     if matches!(
-        body_value.as_ref(),
+        body_node.value.as_ref(),
         Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
     ) {
         return;
     }
     if matches!(
-        else_value.as_ref(),
+        else_node.value.as_ref(),
         Expr::Yield(_) | Expr::YieldFrom(_) | Expr::Await(_)
     ) {
         return;
@@ -190,20 +176,20 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
     //     - If `test == not body_value`, replace with `target_var = body_value and else_value`
     //     - If `not test == body_value`, replace with `target_var = body_value and else_value`
     //     - Otherwise, replace with `target_var = body_value if test else else_value`
-    let (contents, assignment_kind) = match (test, body_value) {
-        (test_node, body_node)
-            if ComparableExpr::from(test_node) == ComparableExpr::from(body_node)
+    let (contents, assignment_kind) = match (test, &body_node.value) {
+        (test_node, body_val_node)
+            if ComparableExpr::from(test_node) == ComparableExpr::from(body_val_node.as_ref())
                 && !contains_effect(test_node, |id| checker.semantic().has_builtin_binding(id)) =>
         {
             let target_var = &body_target;
-            let binary = assignment_binary_or(target_var, body_value, else_value);
+            let binary = assignment_binary_or(target_var, &body_node.value, &else_node.value);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
-        (test_node, body_node)
+        (test_node, body_val_node)
             if (test_node.as_unary_op_expr().is_some_and(|op_expr| {
                 op_expr.op.is_not()
-                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_node)
-            }) || body_node.as_unary_op_expr().is_some_and(|op_expr| {
+                    && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(body_val_node.as_ref())
+            }) || body_val_node.as_ref().as_unary_op_expr().is_some_and(|op_expr| {
                 op_expr.op.is_not()
                     && ComparableExpr::from(&op_expr.operand) == ComparableExpr::from(test_node)
             })) && !contains_effect(test_node, |id| {
@@ -211,12 +197,12 @@ pub(crate) fn if_else_block_instead_of_if_exp(checker: &Checker, stmt_if: &ast::
             }) =>
         {
             let target_var = &body_target;
-            let binary = assignment_binary_and(target_var, body_value, else_value);
+            let binary = assignment_binary_and(target_var, &body_node.value, &else_node.value);
             (checker.generator().stmt(&binary), AssignmentKind::Binary)
         }
         _ => {
             let target_var = &body_target;
-            let ternary = assignment_ternary(target_var, body_value, test, else_value);
+            let ternary = assignment_ternary(target_var, &body_node.value, test, &else_node.value);
             (checker.generator().stmt(&ternary), AssignmentKind::Ternary)
         }
     };

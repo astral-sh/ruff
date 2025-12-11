@@ -392,43 +392,32 @@ pub fn any_over_interpolated_string_element(
 
 pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            type_params,
-            body,
-            decorator_list,
-            returns,
-            ..
-        }) => {
-            parameters.iter().any(|param| {
+        Stmt::FunctionDef(node) => {
+            node.parameters.iter().any(|param| {
                 param
                     .default()
                     .is_some_and(|default| any_over_expr(default, func))
                     || param
                         .annotation()
                         .is_some_and(|annotation| any_over_expr(annotation, func))
-            }) || type_params.as_ref().is_some_and(|type_params| {
+            }) || node.type_params.as_ref().is_some_and(|type_params| {
                 type_params
                     .iter()
                     .any(|type_param| any_over_type_param(type_param, func))
-            }) || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
+            }) || node.body.iter().any(|stmt| any_over_stmt(stmt, func))
+                || node
+                    .decorator_list
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))
-                || returns
+                || node
+                    .returns
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        Stmt::ClassDef(ast::StmtClassDef {
-            arguments,
-            type_params,
-            body,
-            decorator_list,
-            ..
-        }) => {
+        Stmt::ClassDef(node) => {
             // Note that e.g. `class A(*args, a=2, *args2, **kwargs): pass` is a valid class
             // definition
-            arguments
+            node.arguments
                 .as_deref()
                 .is_some_and(|Arguments { args, keywords, .. }| {
                     args.iter().any(|expr| any_over_expr(expr, func))
@@ -436,89 +425,61 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
                             .iter()
                             .any(|keyword| any_over_expr(&keyword.value, func))
                 })
-                || type_params.as_ref().is_some_and(|type_params| {
+                || node.type_params.as_ref().is_some_and(|type_params| {
                     type_params
                         .iter()
                         .any(|type_param| any_over_type_param(type_param, func))
                 })
-                || body.iter().any(|stmt| any_over_stmt(stmt, func))
-                || decorator_list
+                || node.body.iter().any(|stmt| any_over_stmt(stmt, func))
+                || node
+                    .decorator_list
                     .iter()
                     .any(|decorator| any_over_expr(&decorator.expression, func))
         }
-        Stmt::Return(ast::StmtReturn {
-            value,
-            range: _,
-            node_index: _,
-        }) => value
+        Stmt::Return(node) => node
+            .value
             .as_ref()
             .is_some_and(|value| any_over_expr(value, func)),
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _,
-            node_index: _,
-        }) => targets.iter().any(|expr| any_over_expr(expr, func)),
-        Stmt::TypeAlias(ast::StmtTypeAlias {
-            name,
-            type_params,
-            value,
-            ..
-        }) => {
-            any_over_expr(name, func)
-                || type_params.as_ref().is_some_and(|type_params| {
+        Stmt::Delete(node) => node.targets.iter().any(|expr| any_over_expr(expr, func)),
+        Stmt::TypeAlias(node) => {
+            any_over_expr(&node.name, func)
+                || node.type_params.as_ref().is_some_and(|type_params| {
                     type_params
                         .iter()
                         .any(|type_param| any_over_type_param(type_param, func))
                 })
-                || any_over_expr(value, func)
+                || any_over_expr(&node.value, func)
         }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            targets.iter().any(|expr| any_over_expr(expr, func)) || any_over_expr(value, func)
+        Stmt::Assign(node) => {
+            node.targets.iter().any(|expr| any_over_expr(expr, func))
+                || any_over_expr(&node.value, func)
         }
-        Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-            any_over_expr(target, func) || any_over_expr(value, func)
+        Stmt::AugAssign(node) => {
+            any_over_expr(&node.target, func) || any_over_expr(&node.value, func)
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            annotation,
-            value,
-            ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(annotation, func)
-                || value
+        Stmt::AnnAssign(node) => {
+            any_over_expr(&node.target, func)
+                || any_over_expr(&node.annotation, func)
+                || node
+                    .value
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        Stmt::For(ast::StmtFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
-        }) => {
-            any_over_expr(target, func)
-                || any_over_expr(iter, func)
-                || any_over_body(body, func)
-                || any_over_body(orelse, func)
+        Stmt::For(node) => {
+            any_over_expr(&node.target, func)
+                || any_over_expr(&node.iter, func)
+                || any_over_body(&node.body, func)
+                || any_over_body(&node.orelse, func)
         }
-        Stmt::While(ast::StmtWhile {
-            test,
-            body,
-            orelse,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(test, func) || any_over_body(body, func) || any_over_body(orelse, func),
-        Stmt::If(ast::StmtIf {
-            test,
-            body,
-            elif_else_clauses,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(test, func)
-                || any_over_body(body, func)
-                || elif_else_clauses.iter().any(|clause| {
+        Stmt::While(node) => {
+            any_over_expr(&node.test, func)
+                || any_over_body(&node.body, func)
+                || any_over_body(&node.orelse, func)
+        }
+        Stmt::If(node) => {
+            any_over_expr(&node.test, func)
+                || any_over_body(&node.body, func)
+                || node.elif_else_clauses.iter().any(|clause| {
                     clause
                         .test
                         .as_ref()
@@ -526,37 +487,27 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
                         || any_over_body(&clause.body, func)
                 })
         }
-        Stmt::With(ast::StmtWith { items, body, .. }) => {
-            items.iter().any(|with_item| {
+        Stmt::With(node) => {
+            node.items.iter().any(|with_item| {
                 any_over_expr(&with_item.context_expr, func)
                     || with_item
                         .optional_vars
                         .as_ref()
                         .is_some_and(|expr| any_over_expr(expr, func))
-            }) || any_over_body(body, func)
+            }) || any_over_body(&node.body, func)
         }
-        Stmt::Raise(ast::StmtRaise {
-            exc,
-            cause,
-            range: _,
-            node_index: _,
-        }) => {
-            exc.as_ref().is_some_and(|value| any_over_expr(value, func))
-                || cause
+        Stmt::Raise(node) => {
+            node.exc
+                .as_ref()
+                .is_some_and(|value| any_over_expr(value, func))
+                || node
+                    .cause
                     .as_ref()
                     .is_some_and(|value| any_over_expr(value, func))
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_body(body, func)
-                || handlers.iter().any(|handler| {
+        Stmt::Try(node) => {
+            any_over_body(&node.body, func)
+                || node.handlers.iter().any(|handler| {
                     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         type_,
                         body,
@@ -565,26 +516,19 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
                     type_.as_ref().is_some_and(|expr| any_over_expr(expr, func))
                         || any_over_body(body, func)
                 })
-                || any_over_body(orelse, func)
-                || any_over_body(finalbody, func)
+                || any_over_body(&node.orelse, func)
+                || any_over_body(&node.finalbody, func)
         }
-        Stmt::Assert(ast::StmtAssert {
-            test,
-            msg,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(test, func)
-                || msg.as_ref().is_some_and(|value| any_over_expr(value, func))
+        Stmt::Assert(node) => {
+            any_over_expr(&node.test, func)
+                || node
+                    .msg
+                    .as_ref()
+                    .is_some_and(|value| any_over_expr(value, func))
         }
-        Stmt::Match(ast::StmtMatch {
-            subject,
-            cases,
-            range: _,
-            node_index: _,
-        }) => {
-            any_over_expr(subject, func)
-                || cases.iter().any(|case| {
+        Stmt::Match(node) => {
+            any_over_expr(&node.subject, func)
+                || node.cases.iter().any(|case| {
                     let MatchCase {
                         pattern,
                         guard,
@@ -601,11 +545,7 @@ pub fn any_over_stmt(stmt: &Stmt, func: &dyn Fn(&Expr) -> bool) -> bool {
         Stmt::ImportFrom(_) => false,
         Stmt::Global(_) => false,
         Stmt::Nonlocal(_) => false,
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) => any_over_expr(value, func),
+        Stmt::Expr(node) => any_over_expr(&node.value, func),
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) => false,
         Stmt::IpyEscapeCommand(_) => false,
     }
@@ -631,15 +571,15 @@ pub fn is_assignment_to_a_dunder(stmt: &Stmt) -> bool {
     // Check whether it's an assignment to a dunder, with or without a type
     // annotation. This is what pycodestyle (as of 2.9.1) does.
     match stmt {
-        Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-            if let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() {
+        Stmt::Assign(node) => {
+            if let [Expr::Name(ast::ExprName { id, .. })] = node.targets.as_slice() {
                 is_dunder(id)
             } else {
                 false
             }
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-            if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+        Stmt::AnnAssign(node) => {
+            if let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() {
                 is_dunder(id)
             } else {
                 false
@@ -1021,33 +961,31 @@ pub struct RaiseStatementVisitor<'a> {
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _,
-                node_index: _,
-            }) => {
-                self.raises
-                    .push((stmt.range(), exc.as_deref(), cause.as_deref()));
+            Stmt::Raise(node) => {
+                self.raises.push((
+                    stmt.range(),
+                    node.exc.as_deref(),
+                    node.cause.as_deref(),
+                ));
             }
             Stmt::ClassDef(_) | Stmt::FunctionDef(_) | Stmt::Try(_) => {}
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                crate::statement_visitor::walk_body(self, body);
-                for clause in elif_else_clauses {
+            Stmt::If(node) => {
+                crate::statement_visitor::walk_body(self, &node.body);
+                for clause in &node.elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            Stmt::While(ast::StmtWhile { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. })
-            | Stmt::For(ast::StmtFor { body, .. }) => {
-                crate::statement_visitor::walk_body(self, body);
+            Stmt::While(node) => {
+                crate::statement_visitor::walk_body(self, &node.body);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                for case in cases {
+            Stmt::With(node) => {
+                crate::statement_visitor::walk_body(self, &node.body);
+            }
+            Stmt::For(node) => {
+                crate::statement_visitor::walk_body(self, &node.body);
+            }
+            Stmt::Match(node) => {
+                for case in &node.cases {
                     crate::statement_visitor::walk_body(self, &case.body);
                 }
             }
@@ -1066,10 +1004,10 @@ impl Visitor<'_> for AwaitVisitor {
     fn visit_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::FunctionDef(_) | Stmt::ClassDef(_) => (),
-            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+            Stmt::With(node) if node.is_async => {
                 self.seen_await = true;
             }
-            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
+            Stmt::For(node) if node.is_async => {
                 self.seen_await = true;
             }
             _ => crate::visitor::walk_stmt(self, stmt),
@@ -1095,13 +1033,8 @@ impl Visitor<'_> for AwaitVisitor {
 
 /// Return `true` if a `Stmt` is a docstring.
 pub fn is_docstring_stmt(stmt: &Stmt) -> bool {
-    if let Stmt::Expr(ast::StmtExpr {
-        value,
-        range: _,
-        node_index: _,
-    }) = stmt
-    {
-        value.is_string_literal_expr()
+    if let Stmt::Expr(node) = stmt {
+        node.value.is_string_literal_expr()
     } else {
         false
     }
@@ -1113,13 +1046,8 @@ pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -
         if matches!(parent, Stmt::If(_) | Stmt::While(_) | Stmt::Match(_)) {
             return true;
         }
-        if let Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) = parent
-        {
-            if value.is_if_expr() {
+        if let Stmt::Expr(node) = parent {
+            if node.value.is_if_expr() {
                 return true;
             }
         }
@@ -1140,7 +1068,7 @@ pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool 
 /// Check if a node represents an unpacking assignment.
 pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
     match parent {
-        Stmt::With(ast::StmtWith { items, .. }) => items.iter().any(|item| {
+        Stmt::With(node) => node.items.iter().any(|item| {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.is_tuple_expr() {
                     if any_over_expr(optional_vars, &|expr| expr == child) {
@@ -1150,22 +1078,23 @@ pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
             }
             false
         }),
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Assign(node) => {
             // In `(a, b) = (1, 2)`, `(1, 2)` is the target, and it is a tuple.
             let value_is_tuple = matches!(
-                value.as_ref(),
+                node.value.as_ref(),
                 Expr::Set(_) | Expr::List(_) | Expr::Tuple(_)
             );
             // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
             // `(a, b)` is a tuple. (We use "tuple" as a placeholder for any
             // unpackable expression.)
-            let targets_are_tuples = targets
+            let targets_are_tuples = node
+                .targets
                 .iter()
                 .all(|item| matches!(item, Expr::Set(_) | Expr::List(_) | Expr::Tuple(_)));
             // If we're looking at `a` in `(a, b) = coords = (1, 2)`, then we should
             // identify that the current expression is in a tuple.
             let child_in_tuple = targets_are_tuples
-                || targets.iter().any(|item| {
+                || node.targets.iter().any(|item| {
                     matches!(item, Expr::Set(_) | Expr::List(_) | Expr::Tuple(_))
                         && any_over_expr(item, &|expr| expr == child)
                 });
@@ -1748,7 +1677,7 @@ mod tests {
             default: Some(Box::new(constant_two.clone())),
             name: Identifier::new("x", TextRange::default()),
         });
-        let type_alias = Stmt::TypeAlias(StmtTypeAlias {
+        let type_alias = Stmt::TypeAlias(Box::new(StmtTypeAlias {
             name: Box::new(name.clone()),
             type_params: Some(Box::new(TypeParams {
                 type_params: vec![type_var_one, type_var_two],
@@ -1758,7 +1687,7 @@ mod tests {
             value: Box::new(constant_three.clone()),
             range: TextRange::default(),
             node_index: AtomicNodeIndex::NONE,
-        });
+        }));
         assert!(!any_over_stmt(&type_alias, &|expr| {
             seen.borrow_mut().push(expr.clone());
             false

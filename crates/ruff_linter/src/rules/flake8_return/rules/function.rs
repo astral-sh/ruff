@@ -448,12 +448,12 @@ fn is_noreturn_func(func: &Expr, semantic: &SemanticModel) -> bool {
         return false;
     };
 
-    let Stmt::FunctionDef(ast::StmtFunctionDef { returns, .. }) = semantic.statement(node_id)
+    let Stmt::FunctionDef(node) = semantic.statement(node_id)
     else {
         return false;
     };
 
-    let Some(returns) = returns.as_ref() else {
+    let Some(returns) = node.returns.as_ref() else {
         return false;
     };
 
@@ -481,19 +481,16 @@ fn add_return_none(checker: &Checker, stmt: &Stmt, range: TextRange) {
 
 fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
     match stmt {
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            if body
+        Stmt::If(node) => {
+            if node
+                .body
                 .last()
                 .is_some_and(|last| has_implicit_return(checker, last))
             {
                 return true;
             }
 
-            if elif_else_clauses.iter().any(|clause| {
+            if node.elif_else_clauses.iter().any(|clause| {
                 clause
                     .body
                     .last()
@@ -504,25 +501,33 @@ fn has_implicit_return(checker: &Checker, stmt: &Stmt) -> bool {
 
             // Check if we don't have an else clause
             matches!(
-                elif_else_clauses.last(),
+                node.elif_else_clauses.last(),
                 None | Some(ast::ElifElseClause { test: Some(_), .. })
             )
         }
-        Stmt::Assert(ast::StmtAssert { test, .. }) if is_const_false(test) => false,
-        Stmt::While(ast::StmtWhile { test, .. }) if is_const_true(test) => false,
-        Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-            if let Some(last_stmt) = orelse.last() {
+        Stmt::Assert(node) if is_const_false(&node.test) => false,
+        Stmt::While(node) if is_const_true(&node.test) => false,
+        Stmt::For(node) => {
+            if let Some(last_stmt) = node.orelse.last() {
                 has_implicit_return(checker, last_stmt)
             } else {
                 true
             }
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases.iter().any(|case| {
+        Stmt::While(node) => {
+            if let Some(last_stmt) = node.orelse.last() {
+                has_implicit_return(checker, last_stmt)
+            } else {
+                true
+            }
+        }
+        Stmt::Match(node) => node.cases.iter().any(|case| {
             case.body
                 .last()
                 .is_some_and(|last| has_implicit_return(checker, last))
         }),
-        Stmt::With(ast::StmtWith { body, .. }) => body
+        Stmt::With(node) => node
+            .body
             .last()
             .is_some_and(|last_stmt| has_implicit_return(checker, last_stmt)),
         Stmt::Return(_) | Stmt::Raise(_) | Stmt::Try(_) => false,

@@ -139,7 +139,7 @@ pub(crate) fn legacy_raises_warns_deprecated_call(checker: &Checker, call: &ast:
         && !has_trailing_content(stmt.end(), checker.source())
     {
         if let Some(with_stmt) = try_fix_legacy_call(context_type, stmt, semantic) {
-            let generated = checker.generator().stmt(&Stmt::With(with_stmt));
+            let generated = checker.generator().stmt(&Stmt::With(Box::new(with_stmt)));
             let first_line = checker.locator().line_str(stmt.start());
             let indentation = leading_indentation(first_line);
             let mut indented = String::new();
@@ -196,19 +196,19 @@ fn try_fix_legacy_call(
                 None
             }
         }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            let call = value.as_call_expr().filter(|call| {
+        Stmt::Assign(node) => {
+            let call = node.value.as_call_expr().filter(|call| {
                 PytestContextType::from_expr_name(&call.func, semantic) == Some(context_type)
             })?;
             let (optional_vars, assign_targets) = match context_type {
                 PytestContextType::Raises => {
-                    let [target] = targets.as_slice() else {
+                    let [target] = node.targets.as_slice() else {
                         return None;
                     };
                     (Some(target), None)
                 }
                 PytestContextType::Warns | PytestContextType::DeprecatedCall => {
-                    (None, Some(targets.as_slice()))
+                    (None, Some(node.targets.as_slice()))
                 }
             };
 
@@ -280,12 +280,12 @@ fn generate_with_statement(
     };
 
     let body = if let Some(assign_targets) = assign_targets {
-        Stmt::Assign(ast::StmtAssign {
+        Stmt::Assign(Box::new(ast::StmtAssign {
             node_index: AtomicNodeIndex::NONE,
             range: TextRange::default(),
             targets: assign_targets.to_vec(),
             value: Box::new(func_call.into()),
-        })
+        }))
     } else {
         Stmt::Expr(StmtExpr {
             node_index: AtomicNodeIndex::NONE,

@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -71,15 +71,23 @@ fn walk_stmt(checker: &Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
             );
         }
         match stmt {
-            Stmt::While(ast::StmtWhile { body, .. }) | Stmt::For(ast::StmtFor { body, .. }) => {
-                walk_stmt(checker, body, Stmt::is_return_stmt);
+            Stmt::While(node) => {
+                walk_stmt(checker, &node.body, Stmt::is_return_stmt);
             }
-            Stmt::If(ast::StmtIf { body, .. })
-            | Stmt::Try(ast::StmtTry { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
-                walk_stmt(checker, body, f);
+            Stmt::For(node) => {
+                walk_stmt(checker, &node.body, Stmt::is_return_stmt);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::If(node) => {
+                walk_stmt(checker, &node.body, f);
+            }
+            Stmt::Try(node) => {
+                walk_stmt(checker, &node.body, f);
+            }
+            Stmt::With(node) => {
+                walk_stmt(checker, &node.body, f);
+            }
+            Stmt::Match(node) => {
+                let cases = &node.cases;
                 for case in cases {
                     walk_stmt(checker, &case.body, f);
                 }

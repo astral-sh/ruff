@@ -940,23 +940,21 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                 };
                 self.add_assignment(stmt, name);
             }
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target, op, value, ..
-            }) => {
+            ast::Stmt::AugAssign(aug_assign) => {
                 if self.all_origin.is_none() {
                     // We can't update `__all__` if it doesn't already
                     // exist.
                     return;
                 }
-                if !is_dunder_all(target) {
+                if !is_dunder_all(&aug_assign.target) {
                     return;
                 }
                 // Anything other than `+=` is not valid.
-                if !matches!(op, ast::Operator::Add) {
+                if !matches!(aug_assign.op, ast::Operator::Add) {
                     self.all_invalid = true;
                     return;
                 }
-                if !self.extend_all(value) {
+                if !self.extend_all(&aug_assign.value) {
                     self.all_invalid = true;
                 }
             }

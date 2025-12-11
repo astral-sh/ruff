@@ -92,9 +92,11 @@ impl<'a> BannedModuleImportPolicies<'a> {
     pub(crate) fn new(stmt: &'a Stmt, checker: &Checker) -> Self {
         match stmt {
             Stmt::Import(import) => Self::Import(import),
-            Stmt::ImportFrom(import @ StmtImportFrom { module, level, .. }) => {
+            Stmt::ImportFrom(import) => {
+                let module = &import.module;
+                let level = import.level;
                 let module = resolve_imported_module_path(
-                    *level,
+                    level,
                     module.as_deref(),
                     checker.module.qualified_name(),
                 );

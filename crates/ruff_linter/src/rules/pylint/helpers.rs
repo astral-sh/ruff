@@ -119,22 +119,22 @@ impl Visitor<'_> for SequenceIndexVisitor<'_> {
             return;
         }
         match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
-                self.visit_expr(value);
+            Stmt::Assign(node) => {
+                self.modified = node.targets.iter().any(|target| self.is_assignment(target));
+                self.visit_expr(&node.value);
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if let Some(value) = value {
-                    self.modified = self.is_assignment(target);
+            Stmt::AnnAssign(node) => {
+                if let Some(value) = &node.value {
+                    self.modified = self.is_assignment(&node.target);
                     self.visit_expr(value);
                 }
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                self.modified = self.is_assignment(target);
-                self.visit_expr(value);
+            Stmt::AugAssign(node) => {
+                self.modified = self.is_assignment(&node.target);
+                self.visit_expr(&node.value);
             }
-            Stmt::Delete(ast::StmtDelete { targets, .. }) => {
-                self.modified = targets.iter().any(|target| self.is_assignment(target));
+            Stmt::Delete(node) => {
+                self.modified = node.targets.iter().any(|target| self.is_assignment(target));
             }
             _ => visitor::walk_stmt(self, stmt),
         }

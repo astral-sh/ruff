@@ -42,13 +42,14 @@ impl<'a> Collector<'a> {
 impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
     fn visit_stmt(&mut self, stmt: &'ast Stmt) {
         match stmt {
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::ImportFrom(import_from) => {
+                let ast::StmtImportFrom {
+                    names,
+                    module,
+                    level,
+                    range: _,
+                    node_index: _,
+                } = &**import_from;
                 let module = module.as_deref();
                 let level = *level;
                 for alias in names {
@@ -87,24 +88,26 @@ impl<'ast> SourceOrderVisitor<'ast> for Collector<'_> {
                     }
                 }
             }
-            Stmt::Import(ast::StmtImport {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Import(import_stmt) => {
+                let ast::StmtImport {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**import_stmt;
                 for alias in names {
                     if let Some(module_name) = ModuleName::new(alias.name.as_str()) {
                         self.imports.push(CollectedImport::Import(module_name));
                     }
                 }
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::If(if_stmt) => {
+                let ast::StmtIf {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                    node_index: _,
+                } = &**if_stmt;
                 // Skip TYPE_CHECKING blocks if not requested
                 if self.type_checking_imports || !is_type_checking_condition(test) {
                     self.visit_body(body);

@@ -64,11 +64,19 @@ impl<'a> source_order::SourceOrderVisitor<'a> for AsyncExprVisitor {
     }
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
-                self.found_await_or_async = true;
+            Stmt::With(with_stmt) => {
+                if with_stmt.is_async {
+                    self.found_await_or_async = true;
+                } else {
+                    source_order::walk_stmt(self, stmt);
+                }
             }
-            Stmt::For(ast::StmtFor { is_async: true, .. }) => {
-                self.found_await_or_async = true;
+            Stmt::For(for_stmt) => {
+                if for_stmt.is_async {
+                    self.found_await_or_async = true;
+                } else {
+                    source_order::walk_stmt(self, stmt);
+                }
             }
             // avoid counting inner classes' or functions' bodies toward the search
             Stmt::FunctionDef(function_def) => {

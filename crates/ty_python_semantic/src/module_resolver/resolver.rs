@@ -1506,11 +1506,11 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
             return;
         }
 
-        let ast::Stmt::Assign(ast::StmtAssign { value, targets, .. }) = stmt else {
+        let ast::Stmt::Assign(node) = stmt else {
             return;
         };
 
-        let [ast::Expr::Name(maybe_path)] = &**targets else {
+        let [ast::Expr::Name(maybe_path)] = &node.targets[..] else {
             return;
         };
 
@@ -1522,7 +1522,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
             func: extend_func,
             arguments: extend_arguments,
             ..
-        }) = &**value
+        }) = &*node.value
         else {
             return;
         };
@@ -1574,7 +1574,7 @@ impl Visitor<'_> for LegacyNamespacePackageVisitor {
         }
 
         // Test that this is an `extend_path(__path__, __name__)` call
-        if maybe_extend_path != "extend_path" {
+        if &*maybe_extend_path != "extend_path" {
             return;
         }
 

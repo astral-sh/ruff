@@ -1,6 +1,6 @@
 use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
-use ruff_python_ast::{Decorator, Expr, Stmt, StmtExpr, StmtFunctionDef, StmtRaise};
+use ruff_python_ast::{Decorator, Expr, Stmt, StmtExpr, StmtFunctionDef};
 
 use crate::model::SemanticModel;
 use crate::scope::Scope;
@@ -146,12 +146,7 @@ pub fn is_stub(function_def: &StmtFunctionDef, semantic: &SemanticModel) -> bool
                 Expr::StringLiteral(_) | Expr::EllipsisLiteral(_)
             )
         }
-        Stmt::Raise(StmtRaise {
-            range: _,
-            node_index: _,
-            exc: exception,
-            cause: _,
-        }) => exception.as_ref().is_some_and(|exc| {
+        Stmt::Raise(raise_stmt) => raise_stmt.exc.as_ref().is_some_and(|exc| {
             semantic
                 .resolve_builtin_symbol(map_callable(exc))
                 .is_some_and(|name| matches!(name, "NotImplementedError" | "NotImplemented"))

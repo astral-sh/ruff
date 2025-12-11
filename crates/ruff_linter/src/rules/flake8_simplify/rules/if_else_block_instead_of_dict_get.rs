@@ -98,26 +98,16 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     let [else_body_stmt] = else_body.as_slice() else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: body_var,
-        value: body_value,
-        ..
-    }) = &body_stmt
-    else {
+    let Stmt::Assign(body_node) = &body_stmt else {
         return;
     };
-    let [body_var] = body_var.as_slice() else {
+    let [body_var] = body_node.targets.as_slice() else {
         return;
     };
-    let Stmt::Assign(ast::StmtAssign {
-        targets: orelse_var,
-        value: orelse_value,
-        ..
-    }) = &else_body_stmt
-    else {
+    let Stmt::Assign(orelse_node) = &else_body_stmt else {
         return;
     };
-    let [orelse_var] = orelse_var.as_slice() else {
+    let [orelse_var] = orelse_node.targets.as_slice() else {
         return;
     };
 
@@ -143,8 +133,8 @@ pub(crate) fn if_else_block_instead_of_dict_get(checker: &Checker, stmt_if: &ast
     }
 
     let (expected_var, expected_value, default_var, default_value) = match ops[..] {
-        [CmpOp::In] => (body_var, body_value, orelse_var, orelse_value.as_ref()),
-        [CmpOp::NotIn] => (orelse_var, orelse_value, body_var, body_value.as_ref()),
+        [CmpOp::In] => (body_var, &body_node.value, orelse_var, orelse_node.value.as_ref()),
+        [CmpOp::NotIn] => (orelse_var, &orelse_node.value, body_var, body_node.value.as_ref()),
         _ => {
             return;
         }

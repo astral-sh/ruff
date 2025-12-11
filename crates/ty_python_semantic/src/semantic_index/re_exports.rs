@@ -173,70 +173,39 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
 
     fn visit_stmt(&mut self, stmt: &'db ast::Stmt) {
         match stmt {
-            ast::Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                decorator_list,
-                arguments,
-                type_params: _, // We don't want to visit the type params of the class
-                body: _,        // We don't want to visit the body of the class
-                range: _,
-                node_index: _,
-            }) => {
-                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
-                for decorator in decorator_list {
+            ast::Stmt::ClassDef(class_def) => {
+                self.possibly_add_export(&class_def.name.id, PossibleExportKind::Normal);
+                for decorator in &class_def.decorator_list {
                     self.visit_decorator(decorator);
                 }
-                if let Some(arguments) = arguments {
+                if let Some(arguments) = &class_def.arguments {
                     self.visit_arguments(arguments);
                 }
             }
 
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                decorator_list,
-                parameters,
-                returns,
-                type_params: _, // We don't want to visit the type params of the function
-                body: _,        // We don't want to visit the body of the function
-                range: _,
-                node_index: _,
-                is_async: _,
-            }) => {
-                self.possibly_add_export(&name.id, PossibleExportKind::Normal);
-                for decorator in decorator_list {
+            ast::Stmt::FunctionDef(func_def) => {
+                self.possibly_add_export(&func_def.name.id, PossibleExportKind::Normal);
+                for decorator in &func_def.decorator_list {
                     self.visit_decorator(decorator);
                 }
-                self.visit_parameters(parameters);
-                if let Some(returns) = returns {
+                self.visit_parameters(&func_def.parameters);
+                if let Some(returns) = &func_def.returns {
                     self.visit_expr(returns);
                 }
             }
 
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value,
-                annotation,
-                simple: _,
-                range: _,
-                node_index: _,
-            }) => {
-                if value.is_some() || self.visiting_stub_file {
-                    self.visit_expr(target);
+            ast::Stmt::AnnAssign(ann_assign) => {
+                if ann_assign.value.is_some() || self.visiting_stub_file {
+                    self.visit_expr(&ann_assign.target);
                 }
-                self.visit_expr(annotation);
-                if let Some(value) = value {
+                self.visit_expr(&ann_assign.annotation);
+                if let Some(value) = &ann_assign.value {
                     self.visit_expr(value);
                 }
             }
 
-            ast::Stmt::TypeAlias(ast::StmtTypeAlias {
-                name,
-                type_params: _,
-                value: _,
-                range: _,
-                node_index: _,
-            }) => {
-                self.visit_expr(name);
+            ast::Stmt::TypeAlias(type_alias) => {
+                self.visit_expr(&type_alias.name);
                 // Neither walrus expressions nor statements cannot appear in type aliases;
                 // no need to recursively visit the `value` or `type_params`
             }

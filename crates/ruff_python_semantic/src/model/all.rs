@@ -102,9 +102,9 @@ impl SemanticModel<'_> {
         let mut flags = DunderAllFlags::empty();
 
         if let Some(value) = match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => Some(value),
-            Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_ref(),
-            Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(value),
+            Stmt::Assign(node) => Some(&node.value),
+            Stmt::AnnAssign(node) => node.value.as_ref(),
+            Stmt::AugAssign(node) => Some(&node.value),
             _ => None,
         } {
             if let Expr::BinOp(ast::ExprBinOp { left, right, .. }) = value.as_ref() {

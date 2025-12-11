@@ -281,12 +281,10 @@ impl Renamer {
     ) -> Option<Edit> {
         let statement = binding.statement(semantic)?;
 
-        let (ast::Stmt::Assign(ast::StmtAssign { value, .. })
-        | ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value), ..
-        })) = statement
-        else {
-            return None;
+        let value = match statement {
+            ast::Stmt::Assign(node) => &node.value,
+            ast::Stmt::AnnAssign(node) => node.value.as_ref()?,
+            _ => return None,
         };
 
         let ast::ExprCall {

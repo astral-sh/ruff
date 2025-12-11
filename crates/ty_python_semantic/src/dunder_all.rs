@@ -223,8 +223,8 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
         }
 
         match stmt {
-            ast::Stmt::ImportFrom(import_from @ ast::StmtImportFrom { names, .. }) => {
-                for ast::Alias { name, asname, .. } in names {
+            ast::Stmt::ImportFrom(import_from) => {
+                for ast::Alias { name, asname, .. } in &import_from.names {
                     // `from module import *` where `module` is a module with a top-level `__all__`
                     // variable that contains the "__all__" element.
                     if name == "*" {
@@ -275,14 +275,14 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [target] = targets.as_slice() else {
+            ast::Stmt::Assign(assign_stmt) => {
+                let [target] = assign_stmt.targets.as_slice() else {
                     return;
                 };
                 if !is_dunder_all(target) {
                     return;
                 }
-                match &**value {
+                match &*assign_stmt.value {
                     // `__all__ = [...]`
                     // `__all__ = (...)`
                     ast::Expr::List(ast::ExprList { elts, .. })
@@ -298,30 +298,27 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op: ast::Operator::Add,
-                value,
-                ..
-            }) => {
+            ast::Stmt::AugAssign(aug_assign) => {
+                if aug_assign.op != ast::Operator::Add {
+                    return;
+                }
                 if self.origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
                 }
-                if !is_dunder_all(target) {
+                if !is_dunder_all(&aug_assign.target) {
                     return;
                 }
-                if !self.extend(value) {
+                if !self.extend(&aug_assign.value) {
                     self.invalid = true;
                 }
             }
 
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if !is_dunder_all(target) {
+            ast::Stmt::AnnAssign(ann_assign) => {
+                let Some(value) = &ann_assign.value else {
+                    return;
+                };
+                if !is_dunder_all(&ann_assign.target) {
                     return;
                 }
                 match &**value {
@@ -368,15 +365,10 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 }
             }
 
-            ast::Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => match self.evaluate_test_expr(test) {
-                Some(Truthiness::AlwaysTrue) => self.visit_body(body),
+            ast::Stmt::If(if_stmt) => match self.evaluate_test_expr(&if_stmt.test) {
+                Some(Truthiness::AlwaysTrue) => self.visit_body(&if_stmt.body),
                 Some(Truthiness::AlwaysFalse) => {
-                    for ast::ElifElseClause { test, body, .. } in elif_else_clauses {
+                    for ast::ElifElseClause { test, body, .. } in &if_stmt.elif_else_clauses {
                         if let Some(test) = test {
                             match self.evaluate_test_expr(test) {
                                 Some(Truthiness::AlwaysTrue) => {
@@ -409,9 +401,7 @@ impl<'db> StatementVisitor<'db> for DunderAllNamesCollector<'db> {
                 // level.
             }
 
-            ast::Stmt::AugAssign(..)
-            | ast::Stmt::AnnAssign(..)
-            | ast::Stmt::Delete(..)
+            ast::Stmt::Delete(..)
             | ast::Stmt::Return(..)
             | ast::Stmt::Raise(..)
             | ast::Stmt::Assert(..)

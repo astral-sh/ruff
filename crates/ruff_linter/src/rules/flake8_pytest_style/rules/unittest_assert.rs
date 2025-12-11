@@ -162,12 +162,12 @@ impl TryFrom<&str> for UnittestAssert {
 }
 
 fn assert(expr: &Expr, msg: Option<&Expr>) -> Stmt {
-    Stmt::Assert(ast::StmtAssert {
+    Stmt::Assert(Box::new(ast::StmtAssert {
         test: Box::new(expr.clone()),
         msg: msg.map(|msg| Box::new(msg.clone())),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    })
+    }))
 }
 
 fn compare(left: &Expr, cmp_op: CmpOp, right: &Expr) -> Expr {

@@ -69,54 +69,44 @@ fn num_statements(stmts: &[Stmt]) -> usize {
     let mut count = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            Stmt::If(node) => {
                 count += 1;
-                count += num_statements(body);
-                for clause in elif_else_clauses {
+                count += num_statements(&node.body);
+                for clause in &node.elif_else_clauses {
                     count += 1;
                     count += num_statements(&clause.body);
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                count += num_statements(body);
-                count += num_statements(orelse);
+            Stmt::For(node) => {
+                count += num_statements(&node.body);
+                count += num_statements(&node.orelse);
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(node) => {
                 count += 1;
-                count += num_statements(body);
-                count += num_statements(orelse);
+                count += num_statements(&node.body);
+                count += num_statements(&node.orelse);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
+            Stmt::Match(node) => {
                 count += 1;
-                for case in cases {
+                for case in &node.cases {
                     count += 1;
                     count += num_statements(&case.body);
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
+            Stmt::Try(node) => {
                 count += 1;
-                count += num_statements(body);
-                if !orelse.is_empty() {
-                    count += 1 + num_statements(orelse);
+                count += num_statements(&node.body);
+                if !node.orelse.is_empty() {
+                    count += 1 + num_statements(&node.orelse);
                 }
-                if !finalbody.is_empty() {
+                if !node.finalbody.is_empty() {
                     // Unclear why, but follow Pylint's convention.
-                    count += 2 + num_statements(finalbody);
+                    count += 2 + num_statements(&node.finalbody);
                 }
-                if handlers.len() > 1 {
+                if node.handlers.len() > 1 {
                     count += 1;
                 }
-                for handler in handlers {
+                for handler in &node.handlers {
                     count += 1;
                     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
@@ -124,10 +114,13 @@ fn num_statements(stmts: &[Stmt]) -> usize {
                     count += num_statements(body);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-            | Stmt::With(ast::StmtWith { body, .. }) => {
+            Stmt::FunctionDef(node) => {
                 count += 1;
-                count += num_statements(body);
+                count += num_statements(&node.body);
+            }
+            Stmt::With(node) => {
+                count += 1;
+                count += num_statements(&node.body);
             }
             Stmt::Return(_) => {}
             _ => {

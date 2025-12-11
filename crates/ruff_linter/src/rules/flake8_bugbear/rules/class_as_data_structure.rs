@@ -114,14 +114,14 @@ pub(crate) fn class_as_data_structure(checker: &Checker, class_def: &ast::StmtCl
 // assignment of a name to an attribute.
 fn is_simple_assignment_to_attribute(stmt: &ast::Stmt) -> bool {
     match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            let [target] = targets.as_slice() else {
+        ast::Stmt::Assign(node) => {
+            let [target] = node.targets.as_slice() else {
                 return false;
             };
-            target.is_attribute_expr() && value.is_name_expr()
+            target.is_attribute_expr() && node.value.is_name_expr()
         }
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-            target.is_attribute_expr() && value.as_ref().is_some_and(|val| val.is_name_expr())
+        ast::Stmt::AnnAssign(node) => {
+            node.target.is_attribute_expr() && node.value.as_ref().is_some_and(|val| val.is_name_expr())
         }
         _ => false,
     }

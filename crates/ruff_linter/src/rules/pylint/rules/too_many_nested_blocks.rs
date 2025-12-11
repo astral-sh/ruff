@@ -95,39 +95,29 @@ fn is_nested_block(stmt: &Stmt) -> bool {
 /// Returns `true` if the given statement is a leaf node.
 fn has_nested_block(stmt: &Stmt) -> bool {
     match stmt {
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            body.iter().any(is_nested_block)
-                || elif_else_clauses
+        Stmt::If(node) => {
+            node.body.iter().any(is_nested_block)
+                || node.elif_else_clauses
                     .iter()
                     .any(|elif_else| elif_else.body.iter().any(is_nested_block))
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
+        Stmt::While(node) => {
+            node.body.iter().any(is_nested_block) || node.orelse.iter().any(is_nested_block)
         }
-        Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-            body.iter().any(is_nested_block) || orelse.iter().any(is_nested_block)
+        Stmt::For(node) => {
+            node.body.iter().any(is_nested_block) || node.orelse.iter().any(is_nested_block)
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            body.iter().any(is_nested_block)
-                || handlers.iter().any(|handler| match handler {
+        Stmt::Try(node) => {
+            node.body.iter().any(is_nested_block)
+                || node.handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => body.iter().any(is_nested_block),
                 })
-                || orelse.iter().any(is_nested_block)
-                || finalbody.iter().any(is_nested_block)
+                || node.orelse.iter().any(is_nested_block)
+                || node.finalbody.iter().any(is_nested_block)
         }
-        Stmt::With(ast::StmtWith { body, .. }) => body.iter().any(is_nested_block),
+        Stmt::With(node) => node.body.iter().any(is_nested_block),
         _ => false,
     }
 }

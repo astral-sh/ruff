@@ -121,23 +121,23 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
     for stmt in body {
         match stmt {
             // Ex) `__slots__ = ("name",)`
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                let [Expr::Name(ast::ExprName { id, .. })] = targets.as_slice() else {
+            Stmt::Assign(node) => {
+                let [Expr::Name(ast::ExprName { id, .. })] = node.targets.as_slice() else {
                     continue;
                 };
 
                 if id == "__slots__" {
-                    members.extend(slots_attributes(value));
+                    members.extend(slots_attributes(&node.value));
                 }
             }
 
             // Ex) `__slots__: Tuple[str, ...] = ("name",)`
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            Stmt::AnnAssign(node) => {
+                let Some(value) = &node.value else {
+                    continue;
+                };
+
+                let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() else {
                     continue;
                 };
 
@@ -147,13 +147,13 @@ fn slots_members(body: &[Stmt]) -> FxHashSet<Slot<'_>> {
             }
 
             // Ex) `__slots__ += ("name",)`
-            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
-                let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() else {
+            Stmt::AugAssign(node) => {
+                let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() else {
                     continue;
                 };
 
                 if id == "__slots__" {
-                    members.extend(slots_attributes(value));
+                    members.extend(slots_attributes(&node.value));
                 }
             }
             _ => {}

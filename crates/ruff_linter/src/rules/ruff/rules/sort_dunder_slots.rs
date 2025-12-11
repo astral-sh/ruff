@@ -120,15 +120,16 @@ pub(crate) fn sort_dunder_slots(checker: &Checker, binding: &Binding) {
     };
 
     let (target, value) = match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, value, .. }) => match targets.as_slice() {
-            [target] => (target, &**value),
+        ast::Stmt::Assign(node) => match node.targets.as_slice() {
+            [target] => (target, &*node.value),
             _ => return,
         },
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            value: Some(value),
-            ..
-        }) => (&**target, &**value),
+        ast::Stmt::AnnAssign(node) => {
+            let Some(value) = &node.value else {
+                return;
+            };
+            (&*node.target, &**value)
+        }
         _ => return,
     };
 

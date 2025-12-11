@@ -7,10 +7,7 @@ use crate::{BindingId, SemanticModel};
 use ruff_python_ast as ast;
 use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{
-    ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt, StmtFor, StmtIf,
-    StmtMatch, StmtTry, StmtWhile, StmtWith,
-};
+use ruff_python_ast::{ExceptHandler, Expr, ExprName, ExprStarred, ExprSubscript, ExprTuple, Stmt};
 
 /// Return `true` if any base class matches a [`QualifiedName`] predicate.
 pub fn any_qualified_base_class(
@@ -183,18 +180,17 @@ pub fn any_member_declaration(
                 Stmt::FunctionDef(function_def) => Some(ClassMemberKind::FunctionDef(function_def)),
                 Stmt::Assign(assign) => Some(ClassMemberKind::Assign(assign)),
                 Stmt::AnnAssign(assign) => Some(ClassMemberKind::AnnAssign(assign)),
-                Stmt::With(StmtWith { body, .. }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound) {
+                Stmt::With(node) => {
+                    if any_stmt_in_body(&node.body, func, ClassMemberBoundness::PossiblyUnbound) {
                         return true;
                     }
 
                     None
                 }
 
-                Stmt::For(StmtFor { body, orelse, .. })
-                | Stmt::While(StmtWhile { body, orelse, .. }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                Stmt::For(node) => {
+                    if any_stmt_in_body(&node.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(&node.orelse, func, ClassMemberBoundness::PossiblyUnbound)
                     {
                         return true;
                     }
@@ -202,13 +198,19 @@ pub fn any_member_declaration(
                     None
                 }
 
-                Stmt::If(StmtIf {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || elif_else_clauses.iter().any(|it| {
+                Stmt::While(node) => {
+                    if any_stmt_in_body(&node.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(&node.orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                    {
+                        return true;
+                    }
+
+                    None
+                }
+
+                Stmt::If(node) => {
+                    if any_stmt_in_body(&node.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || node.elif_else_clauses.iter().any(|it| {
                             any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
                         })
                     {
@@ -217,8 +219,8 @@ pub fn any_member_declaration(
                     None
                 }
 
-                Stmt::Match(StmtMatch { cases, .. }) => {
-                    if cases.iter().any(|it| {
+                Stmt::Match(node) => {
+                    if node.cases.iter().any(|it| {
                         any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
                     }) {
                         return true;
@@ -227,17 +229,11 @@ pub fn any_member_declaration(
                     None
                 }
 
-                Stmt::Try(StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
-                    if any_stmt_in_body(body, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(orelse, func, ClassMemberBoundness::PossiblyUnbound)
-                        || any_stmt_in_body(finalbody, func, ClassMemberBoundness::PossiblyUnbound)
-                        || handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
+                Stmt::Try(node) => {
+                    if any_stmt_in_body(&node.body, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(&node.orelse, func, ClassMemberBoundness::PossiblyUnbound)
+                        || any_stmt_in_body(&node.finalbody, func, ClassMemberBoundness::PossiblyUnbound)
+                        || node.handlers.iter().any(|ExceptHandler::ExceptHandler(it)| {
                             any_stmt_in_body(&it.body, func, ClassMemberBoundness::PossiblyUnbound)
                         })
                     {
@@ -336,12 +332,10 @@ impl IsMetaclass {
 fn has_metaclass_new_signature(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     // Look for a __new__ method in the class body
     for stmt in &class_def.body {
-        let ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-            name, parameters, ..
-        }) = stmt
-        else {
+        let ast::Stmt::FunctionDef(func_def) = stmt else {
             continue;
         };
+        let (name, parameters) = (&func_def.name, &func_def.parameters);
 
         if name != "__new__" {
             continue;

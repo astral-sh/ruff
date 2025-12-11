@@ -140,7 +140,8 @@ pub(crate) fn unnecessary_future_import(checker: &Checker, scope: &Scope) {
                 };
 
                 let stmt = checker.semantic().statement(node_id);
-                if let Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) = stmt {
+                if let Stmt::ImportFrom(node) = stmt {
+                    let names = &node.names;
                     let Some(alias) = names
                         .iter()
                         .find(|alias| alias.name.as_str() == binding.name(checker.source()))

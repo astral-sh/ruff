@@ -43,12 +43,15 @@ impl Violation for UselessTryExcept {
 pub(crate) fn useless_try_except(checker: &Checker, handlers: &[ExceptHandler]) {
     if handlers.iter().all(|handler| {
         let ExceptHandler::ExceptHandler(ExceptHandlerExceptHandler { name, body, .. }) = handler;
-        let Some(Stmt::Raise(ast::StmtRaise {
-            exc, cause: None, ..
-        })) = &body.first()
-        else {
+        let Some(Stmt::Raise(raise_stmt)) = &body.first() else {
             return false;
         };
+
+        if raise_stmt.cause.is_some() {
+            return false;
+        }
+
+        let exc = &raise_stmt.exc;
         if let Some(expr) = exc {
             // E.g., `except ... as e: raise e`
             if let Expr::Name(ast::ExprName { id, .. }) = expr.as_ref() {

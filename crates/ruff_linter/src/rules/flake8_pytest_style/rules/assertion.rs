@@ -369,10 +369,10 @@ impl Violation for PytestUnittestRaisesAssertion {
 /// PT027
 pub(crate) fn unittest_raises_assertion_call(checker: &Checker, call: &ast::ExprCall) {
     // Bindings in `with` statements are handled by `unittest_raises_assertion_bindings`.
-    if let Stmt::With(ast::StmtWith { items, .. }) = checker.semantic().current_statement() {
+    if let Stmt::With(with_stmt) = checker.semantic().current_statement() {
         let call_ref = AnyNodeRef::from(call);
 
-        if items.iter().any(|item| {
+        if with_stmt.items.iter().any(|item| {
             AnyNodeRef::from(&item.context_expr).ptr_eq(call_ref) && item.optional_vars.is_some()
         }) {
             return;
@@ -390,7 +390,11 @@ pub(crate) fn unittest_raises_assertion_binding(checker: &Checker, binding: &Bin
 
     let semantic = checker.semantic();
 
-    let Some(Stmt::With(with)) = binding.statement(semantic) else {
+    let Some(stmt) = binding.statement(semantic) else {
+        return;
+    };
+
+    let Stmt::With(with) = stmt else {
         return;
     };
 

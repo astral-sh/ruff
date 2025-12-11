@@ -77,6 +77,10 @@ fields = [{ name = "body", type = "Box<Expr>" }]
 add_suffix_to_is_methods = true
 anynode_is_label = "statement"
 doc = "See also [stmt](https://docs.python.org/3/library/ast.html#ast.stmt)"
+# Box all variants except the smallest ones (Pass, Break, Continue, Return, Expr)
+# to reduce enum size from 128 bytes to ~24 bytes
+box_variants = true
+unboxed_variants = ["StmtPass", "StmtBreak", "StmtContinue", "StmtReturn", "StmtExpr"]
 
 [Stmt.nodes.StmtFunctionDef]
 doc = """See also [FunctionDef](https://docs.python.org/3/library/ast.html#ast.FunctionDef)

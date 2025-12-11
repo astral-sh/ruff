@@ -220,11 +220,11 @@ pub(crate) fn complex_raises(checker: &Checker, stmt: &Stmt, items: &[WithItem],
     if raises_called {
         let is_too_complex = if let [stmt] = body {
             match stmt {
-                Stmt::With(ast::StmtWith { body, .. }) => is_non_trivial_with_body(body),
+                Stmt::With(with_stmt) => is_non_trivial_with_body(&with_stmt.body),
                 // Allow function and class definitions to test decorators.
                 Stmt::ClassDef(_) | Stmt::FunctionDef(_) => false,
                 // Allow empty `for` loops to test iterators.
-                Stmt::For(ast::StmtFor { body, .. }) => match &body[..] {
+                Stmt::For(for_stmt) => match &for_stmt.body[..] {
                     [Stmt::Pass(_)] => false,
                     [Stmt::Expr(ast::StmtExpr { value, .. })] => !value.is_ellipsis_literal_expr(),
                     _ => true,

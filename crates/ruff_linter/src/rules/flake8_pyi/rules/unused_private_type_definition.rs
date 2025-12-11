@@ -196,15 +196,14 @@ pub(crate) fn unused_private_type_var(checker: &Checker, scope: &Scope) {
         let Some(source) = binding.source else {
             continue;
         };
-        let stmt @ Stmt::Assign(ast::StmtAssign { targets, value, .. }) =
-            checker.semantic().statement(source)
-        else {
+        let stmt = checker.semantic().statement(source);
+        let Stmt::Assign(assign) = stmt else {
             continue;
         };
-        let [Expr::Name(ast::ExprName { id, .. })] = &targets[..] else {
+        let [Expr::Name(ast::ExprName { id, .. })] = &assign.targets[..] else {
             continue;
         };
-        let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() else {
+        let Expr::Call(ast::ExprCall { func, .. }) = assign.value.as_ref() else {
             continue;
         };
 
@@ -317,18 +316,16 @@ pub(crate) fn unused_private_type_alias(checker: &Checker, scope: &Scope) {
 
 fn extract_type_alias_name<'a>(stmt: &'a ast::Stmt, semantic: &SemanticModel) -> Option<&'a str> {
     match stmt {
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-            target, annotation, ..
-        }) => {
-            let ast::ExprName { id, .. } = target.as_name_expr()?;
-            if semantic.match_typing_expr(annotation, "TypeAlias") {
+        ast::Stmt::AnnAssign(ann_assign) => {
+            let ast::ExprName { id, .. } = ann_assign.target.as_name_expr()?;
+            if semantic.match_typing_expr(&ann_assign.annotation, "TypeAlias") {
                 Some(id)
             } else {
                 None
             }
         }
-        ast::Stmt::TypeAlias(ast::StmtTypeAlias { name, .. }) => {
-            let ast::ExprName { id, .. } = name.as_name_expr()?;
+        ast::Stmt::TypeAlias(type_alias) => {
+            let ast::ExprName { id, .. } = type_alias.name.as_name_expr()?;
             Some(id)
         }
         _ => None,
@@ -388,9 +385,9 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
         // class Bar(typing.TypedDict, typing.Generic[T]):
         //     y: T
         // ```
-        Stmt::ClassDef(class_def @ ast::StmtClassDef { name, .. }) => {
+        Stmt::ClassDef(class_def) => {
             if class_def.bases().iter().any(is_typeddict) {
-                Some(name)
+                Some(&class_def.name)
             } else {
                 None
             }
@@ -402,12 +399,12 @@ fn extract_typeddict_name<'a>(stmt: &'a Stmt, semantic: &SemanticModel) -> Optio
         // import typing
         // Baz = typing.TypedDict("Baz", {"z": bytes})
         // ```
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            let [target] = targets.as_slice() else {
+        Stmt::Assign(assign) => {
+            let [target] = assign.targets.as_slice() else {
                 return None;
             };
             let ast::ExprName { id, .. } = target.as_name_expr()?;
-            let ast::ExprCall { func, .. } = value.as_call_expr()?;
+            let ast::ExprCall { func, .. } = assign.value.as_call_expr()?;
             if is_typeddict(func) { Some(id) } else { None }
         }
         _ => None,

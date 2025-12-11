@@ -942,8 +942,8 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
 
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Raise(ast::StmtRaise { exc, .. }) => {
-                if let Some(exc) = exc.as_ref() {
+            Stmt::Raise(node) => {
+                if let Some(exc) = node.exc.as_ref() {
                     // First try to resolve the exception directly
                     if let Some(qualified_name) =
                         self.semantic.resolve_qualified_name(map_callable(exc))

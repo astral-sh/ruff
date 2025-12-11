@@ -1350,35 +1350,24 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
         match stmt {
             ast::Stmt::FunctionDef(function_def) => {
-                let ast::StmtFunctionDef {
-                    decorator_list,
-                    parameters,
-                    type_params,
-                    name,
-                    returns,
-                    body,
-                    is_async: _,
-                    range: _,
-                    node_index: _,
-                } = function_def;
-                for decorator in decorator_list {
+                for decorator in &function_def.decorator_list {
                     self.visit_decorator(decorator);
                 }
 
                 self.with_type_params(
                     NodeWithScopeRef::FunctionTypeParameters(function_def),
-                    type_params.as_deref(),
+                    function_def.type_params.as_deref(),
                     |builder| {
-                        builder.visit_parameters(parameters);
-                        if let Some(returns) = returns {
+                        builder.visit_parameters(&function_def.parameters);
+                        if let Some(returns) = &function_def.returns {
                             builder.visit_annotation(returns);
                         }
 
                         builder.push_scope(NodeWithScopeRef::Function(function_def));
 
-                        builder.declare_parameters(parameters);
+                        builder.declare_parameters(&function_def.parameters);
 
-                        let mut first_parameter_name = parameters
+                        let mut first_parameter_name = function_def.parameters
                             .iter_non_variadic_params()
                             .next()
                             .map(|first_param| first_param.parameter.name.id().as_str());
@@ -1387,7 +1376,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                             &mut first_parameter_name,
                         );
 
-                        builder.visit_body(body);
+                        builder.visit_body(&function_def.body);
 
                         builder.current_first_parameter_name = first_parameter_name;
                         builder.pop_scope()
@@ -1395,7 +1384,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 );
                 // The default value of the parameters needs to be evaluated in the
                 // enclosing scope.
-                for default in parameters
+                for default in function_def.parameters
                     .iter_non_variadic_params()
                     .filter_map(|param| param.default.as_deref())
                 {
@@ -1404,21 +1393,21 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // The symbol for the function name itself has to be evaluated
                 // at the end to match the runtime evaluation of parameter defaults
                 // and return-type annotations.
-                let symbol = self.add_symbol(name.id.clone());
+                let symbol = self.add_symbol(function_def.name.id.clone());
 
                 // Record a use of the function name in the scope that it is defined in, so that it
                 // can be used to find previously defined functions with the same name. This is
                 // used to collect all the overloaded definitions of a function. This needs to be
                 // done on the `Identifier` node as opposed to `ExprName` because that's what the
                 // AST uses.
-                let use_id = self.current_ast_ids().record_use(name);
+                let use_id = self.current_ast_ids().record_use(&function_def.name);
                 self.current_use_def_map_mut().record_use(
                     symbol.into(),
                     use_id,
-                    NodeKey::from_node(name),
+                    NodeKey::from_node(&function_def.name),
                 );
 
-                self.add_definition(symbol.into(), function_def);
+                self.add_definition(symbol.into(), &**function_def);
                 self.mark_symbol_used(symbol);
             }
             ast::Stmt::ClassDef(class) => {
@@ -1443,7 +1432,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 // In Python runtime semantics, a class is registered after its scope is evaluated.
                 let symbol = self.add_symbol(class.name.id.clone());
-                self.add_definition(symbol.into(), class);
+                self.add_definition(symbol.into(), &**class);
             }
             ast::Stmt::TypeAlias(type_alias) => {
                 let symbol = self.add_symbol(
@@ -1453,7 +1442,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                         .map(|name| name.id.clone())
                         .unwrap_or("<unknown>".into()),
                 );
-                self.add_definition(symbol.into(), type_alias);
+                self.add_definition(symbol.into(), &**type_alias);
                 self.visit_expr(&type_alias.name);
 
                 self.with_type_params(
@@ -1468,7 +1457,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }
             ast::Stmt::Import(node) => {
                 self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
+                    .record_node_reachability(NodeKey::from_node(&**node));
 
                 for (alias_index, alias) in node.names.iter().enumerate() {
                     // Mark the imported module, and all of its parents, as being imported in this
@@ -1498,7 +1487,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
             }
             ast::Stmt::ImportFrom(node) => {
                 self.current_use_def_map_mut()
-                    .record_node_reachability(NodeKey::from_node(node));
+                    .record_node_reachability(NodeKey::from_node(&**node));
 
                 // If we see:
                 //
@@ -1688,12 +1677,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
             }
 
-            ast::Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::Assert(node) => {
                 // We model an `assert test, msg` statement here. Conceptually, we can think of
                 // this as being equivalent to the following:
                 //
@@ -1713,10 +1697,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // flow states and simplification of reachability constraints, since there is no way
                 // of getting out of that `msg` branch. We simply restore to the post-test state.
 
-                self.visit_expr(test);
-                let predicate = self.build_predicate(test);
+                self.visit_expr(&node.test);
+                let predicate = self.build_predicate(&node.test);
 
-                if let Some(msg) = msg {
+                if let Some(msg) = &node.msg {
                     let post_test = self.flow_snapshot();
                     let negated_predicate = predicate.negated();
                     self.record_narrowing_constraint(negated_predicate);
@@ -1793,48 +1777,40 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     *node.target,
                     ast::Expr::Attribute(_) | ast::Expr::Subscript(_) | ast::Expr::Name(_)
                 ) {
-                    self.push_assignment(node.into());
+                    self.push_assignment((&**node).into());
                     self.visit_expr(&node.target);
                     self.pop_assignment();
                 } else {
                     self.visit_expr(&node.target);
                 }
             }
-            ast::Stmt::AugAssign(
-                aug_assign @ ast::StmtAugAssign {
-                    range: _,
-                    node_index: _,
-                    target,
-                    op,
-                    value,
-                },
-            ) => {
+            ast::Stmt::AugAssign(aug_assign) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
-                self.visit_expr(value);
+                self.visit_expr(&aug_assign.value);
 
-                match &**target {
+                match &*aug_assign.target {
                     ast::Expr::Name(ast::ExprName { id, .. })
-                        if id == "__all__" && op.is_add() && self.in_module_scope() =>
+                        if id == "__all__" && aug_assign.op.is_add() && self.in_module_scope() =>
                     {
                         if let ast::Expr::Attribute(ast::ExprAttribute { value, attr, .. }) =
-                            &**value
+                            &*aug_assign.value
                         {
                             if attr == "__all__" {
                                 self.add_standalone_expression(value);
                             }
                         }
 
-                        self.push_assignment(aug_assign.into());
-                        self.visit_expr(target);
+                        self.push_assignment((&**aug_assign).into());
+                        self.visit_expr(&aug_assign.target);
                         self.pop_assignment();
                     }
                     ast::Expr::Name(_) | ast::Expr::Attribute(_) | ast::Expr::Subscript(_) => {
-                        self.push_assignment(aug_assign.into());
-                        self.visit_expr(target);
+                        self.push_assignment((&**aug_assign).into());
+                        self.visit_expr(&aug_assign.target);
                         self.pop_assignment();
                     }
                     _ => {
-                        self.visit_expr(target);
+                        self.visit_expr(&aug_assign.target);
                     }
                 }
             }
@@ -1925,21 +1901,15 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.in_type_checking_block = is_outer_block_in_type_checking;
             }
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
-                self.visit_expr(test);
+            ast::Stmt::While(node) => {
+                self.visit_expr(&node.test);
 
                 let pre_loop = self.flow_snapshot();
-                let predicate = self.record_expression_narrowing_constraint(test);
+                let predicate = self.record_expression_narrowing_constraint(&node.test);
                 self.record_reachability_constraint(predicate);
 
                 let outer_loop = self.push_loop();
-                self.visit_body(body);
+                self.visit_body(&node.body);
                 let this_loop = self.pop_loop(outer_loop);
 
                 // We execute the `else` branch once the condition evaluates to false. This could
@@ -1961,7 +1931,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                 self.record_negated_narrowing_constraint(predicate);
 
-                self.visit_body(orelse);
+                self.visit_body(&node.orelse);
 
                 // Breaking out of a while loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -1969,65 +1939,44 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::With(ast::StmtWith {
-                items,
-                body,
-                is_async,
-                ..
-            }) => {
-                for item @ ast::WithItem {
-                    range: _,
-                    node_index: _,
-                    context_expr,
-                    optional_vars,
-                } in items
-                {
-                    self.visit_expr(context_expr);
-                    if let Some(optional_vars) = optional_vars.as_deref() {
-                        let context_manager = self.add_standalone_expression(context_expr);
+            ast::Stmt::With(node) => {
+                for item in &node.items {
+                    self.visit_expr(&item.context_expr);
+                    if let Some(optional_vars) = item.optional_vars.as_deref() {
+                        let context_manager = self.add_standalone_expression(&item.context_expr);
                         self.add_unpackable_assignment(
                             &Unpackable::WithItem {
                                 item,
-                                is_async: *is_async,
+                                is_async: node.is_async,
                             },
                             optional_vars,
                             context_manager,
                         );
                     }
                 }
-                self.visit_body(body);
+                self.visit_body(&node.body);
             }
 
-            ast::Stmt::For(
-                for_stmt @ ast::StmtFor {
-                    range: _,
-                    node_index: _,
-                    is_async: _,
-                    target,
-                    iter,
-                    body,
-                    orelse,
-                },
-            ) => {
+            ast::Stmt::For(for_stmt) => {
                 debug_assert_eq!(&self.current_assignments, &[]);
 
-                let iter_expr = self.add_standalone_expression(iter);
-                self.visit_expr(iter);
+                let iter_expr = self.add_standalone_expression(&for_stmt.iter);
+                self.visit_expr(&for_stmt.iter);
 
                 self.record_ambiguous_reachability();
 
                 let pre_loop = self.flow_snapshot();
 
-                self.add_unpackable_assignment(&Unpackable::For(for_stmt), target, iter_expr);
+                self.add_unpackable_assignment(&Unpackable::For(for_stmt), &for_stmt.target, iter_expr);
 
                 let outer_loop = self.push_loop();
-                self.visit_body(body);
+                self.visit_body(&for_stmt.body);
                 let this_loop = self.pop_loop(outer_loop);
 
                 // We may execute the `else` clause without ever executing the body, so merge in
                 // the pre-loop state before visiting `else`.
                 self.flow_merge(pre_loop);
-                self.visit_body(orelse);
+                self.visit_body(&for_stmt.orelse);
 
                 // Breaking out of a `for` loop bypasses the `else` clause, so merge in the break
                 // states after visiting `else`.
@@ -2035,30 +1984,25 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(break_state);
                 }
             }
-            ast::Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::Match(node) => {
                 debug_assert_eq!(self.current_match_case, None);
 
-                let subject_expr = self.add_standalone_expression(subject);
-                self.visit_expr(subject);
-                if cases.is_empty() {
+                let subject_expr = self.add_standalone_expression(&node.subject);
+                self.visit_expr(&node.subject);
+                if node.cases.is_empty() {
                     return;
                 }
 
                 let mut no_case_matched = self.flow_snapshot();
 
-                let has_catchall = cases
+                let has_catchall = node.cases
                     .last()
                     .is_some_and(|case| case.guard.is_none() && case.pattern.is_wildcard());
 
                 let mut post_case_snapshots = vec![];
                 let mut previous_pattern: Option<PatternPredicate<'_>> = None;
 
-                for (i, case) in cases.iter().enumerate() {
+                for (i, case) in node.cases.iter().enumerate() {
                     self.current_match_case = Some(CurrentMatchCase::new(&case.pattern));
                     self.visit_pattern(&case.pattern);
                     self.current_match_case = None;
@@ -2100,7 +2044,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
 
                     post_case_snapshots.push(self.flow_snapshot());
 
-                    if i != cases.len() - 1 || !has_catchall {
+                    if i != node.cases.len() - 1 || !has_catchall {
                         // We need to restore the state after each case, but not after the last
                         // one. The last one will just become the state that we merge the other
                         // snapshots into.
@@ -2124,15 +2068,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_merge(post_clause_state);
                 }
             }
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::Try(node) => {
                 self.record_ambiguous_reachability();
 
                 // Save the state prior to visiting any of the `try` block.
@@ -2146,7 +2082,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 self.try_node_context_stack_manager.push_context();
 
                 // Visit the `try` block!
-                self.visit_body(body);
+                self.visit_body(&node.body);
 
                 let mut post_except_states = vec![];
 
@@ -2154,7 +2090,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // while visiting the `try` block
                 let try_block_snapshots = self.try_node_context_stack_manager.pop_context();
 
-                if !handlers.is_empty() {
+                if !node.handlers.is_empty() {
                     // Save the state immediately *after* visiting the `try` block
                     // but *before* we prepare for visiting the `except` block(s).
                     //
@@ -2170,9 +2106,9 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     }
 
                     let pre_except_state = self.flow_snapshot();
-                    let num_handlers = handlers.len();
+                    let num_handlers = node.handlers.len();
 
-                    for (i, except_handler) in handlers.iter().enumerate() {
+                    for (i, except_handler) in node.handlers.iter().enumerate() {
                         let ast::ExceptHandler::ExceptHandler(except_handler) = except_handler;
                         let ast::ExceptHandlerExceptHandler {
                             name: symbol_name,
@@ -2196,7 +2132,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                                 symbol.into(),
                                 DefinitionNodeRef::ExceptHandler(ExceptHandlerDefinitionNodeRef {
                                     handler: except_handler,
-                                    is_star: *is_star,
+                                    is_star: node.is_star,
                                 }),
                             );
                             Some(symbol)
@@ -2225,7 +2161,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                     self.flow_restore(post_try_block_state);
                 }
 
-                self.visit_body(orelse);
+                self.visit_body(&node.orelse);
 
                 for post_except_state in post_except_states {
                     self.flow_merge(post_except_state);
@@ -2241,7 +2177,7 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // For more details, see:
                 // - https://astral-sh.notion.site/Exception-handler-control-flow-11348797e1ca80bb8ce1e9aedbbe439d
                 // - https://github.com/astral-sh/ruff/pull/13633#discussion_r1788626702
-                self.visit_body(finalbody);
+                self.visit_body(&node.finalbody);
             }
 
             ast::Stmt::Raise(_) | ast::Stmt::Return(_) | ast::Stmt::Continue(_) => {
@@ -2258,12 +2194,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 // Everything in the current block after a terminal statement is unreachable.
                 self.mark_unreachable();
             }
-            ast::Stmt::Global(ast::StmtGlobal {
-                range: _,
-                node_index: _,
-                names,
-            }) => {
-                for name in names {
+            ast::Stmt::Global(node) => {
+                for name in &node.names {
                     self.scopes_by_expression
                         .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
@@ -2295,12 +2227,8 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                range: _,
-                node_index: _,
-                names,
-            }) => {
-                for name in names {
+            ast::Stmt::Nonlocal(node) => {
+                for name in &node.names {
                     self.scopes_by_expression
                         .record_expression(name, self.current_scope());
                     let symbol_id = self.add_symbol(name.id.clone());
@@ -2339,14 +2267,10 @@ impl<'ast> Visitor<'ast> for SemanticIndexBuilder<'_, 'ast> {
                 }
                 walk_stmt(self, stmt);
             }
-            ast::Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _,
-                node_index: _,
-            }) => {
+            ast::Stmt::Delete(node) => {
                 // We will check the target expressions and then delete them.
                 walk_stmt(self, stmt);
-                for target in targets {
+                for target in &node.targets {
                     if let Some(mut target) = PlaceExpr::try_from_expr(target) {
                         if let PlaceExpr::Symbol(symbol) = &mut target {
                             // `del x` behaves like an assignment in that it forces all references

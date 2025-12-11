@@ -256,55 +256,47 @@ impl<'a> Generator<'a> {
         }
 
         match ast {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                is_async,
-                name,
-                parameters,
-                body,
-                returns,
-                decorator_list,
-                type_params,
-                ..
-            }) => {
+            Stmt::FunctionDef(node) => {
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
-                for decorator in decorator_list {
+                for decorator in &node.decorator_list {
                     statement!({
                         self.p("@");
                         self.unparse_expr(&decorator.expression, precedence::MAX);
                     });
                 }
                 statement!({
-                    if *is_async {
+                    if node.is_async {
                         self.p("async ");
                     }
                     self.p("def ");
-                    self.p_id(name);
-                    if let Some(type_params) = type_params {
+                    self.p_id(&node.name);
+                    if let Some(type_params) = &node.type_params {
                         self.unparse_type_params(type_params);
                     }
                     self.p("(");
-                    self.unparse_parameters(parameters);
+                    self.unparse_parameters(&node.parameters);
                     self.p(")");
-                    if let Some(returns) = returns {
+                    if let Some(returns) = &node.returns {
                         self.p(" -> ");
                         self.unparse_expr(returns, precedence::MAX);
                     }
                     self.p(":");
                 });
-                self.body(body);
+                self.body(&node.body);
                 if self.indent_depth == 0 {
                     self.newlines(2);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                arguments,
-                body,
-                decorator_list,
-                type_params,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::ClassDef(node) => {
+                let ast::StmtClassDef {
+                    name,
+                    arguments,
+                    body,
+                    decorator_list,
+                    type_params,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 self.newlines(if self.indent_depth == 0 { 2 } else { 1 });
                 for decorator in decorator_list {
                     statement!({
@@ -362,11 +354,12 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Delete(node) => {
+                let ast::StmtDelete {
+                    targets,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("del ");
                     let mut first = true;
@@ -376,22 +369,23 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(node) => {
                 statement!({
-                    for target in targets {
+                    for target in &node.targets {
                         self.unparse_expr(target, precedence::ASSIGN);
                         self.p(" = ");
                     }
-                    self.unparse_expr(value, precedence::ASSIGN);
+                    self.unparse_expr(&node.value, precedence::ASSIGN);
                 });
             }
-            Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op,
-                value,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::AugAssign(node) => {
+                let ast::StmtAugAssign {
+                    target,
+                    op,
+                    value,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.unparse_expr(target, precedence::AUG_ASSIGN);
                     self.p(" ");
@@ -414,14 +408,15 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::AUG_ASSIGN);
                 });
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                simple,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::AnnAssign(node) => {
+                let ast::StmtAnnAssign {
+                    target,
+                    annotation,
+                    value,
+                    simple,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     let need_parens = matches!(target.as_ref(), Expr::Name(_)) && !simple;
                     self.p_if(need_parens, "(");
@@ -435,39 +430,33 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::For(ast::StmtFor {
-                is_async,
-                target,
-                iter,
-                body,
-                orelse,
-                ..
-            }) => {
+            Stmt::For(node) => {
                 statement!({
-                    if *is_async {
+                    if node.is_async {
                         self.p("async ");
                     }
                     self.p("for ");
-                    self.unparse_expr(target, precedence::FOR);
+                    self.unparse_expr(&node.target, precedence::FOR);
                     self.p(" in ");
-                    self.unparse_expr(iter, precedence::MAX);
+                    self.unparse_expr(&node.iter, precedence::MAX);
                     self.p(":");
                 });
-                self.body(body);
-                if !orelse.is_empty() {
+                self.body(&node.body);
+                if !node.orelse.is_empty() {
                     statement!({
                         self.p("else:");
                     });
-                    self.body(orelse);
+                    self.body(&node.orelse);
                 }
             }
-            Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::While(node) => {
+                let ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("while ");
                     self.unparse_expr(test, precedence::WHILE);
@@ -481,13 +470,14 @@ impl<'a> Generator<'a> {
                     self.body(orelse);
                 }
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::If(node) => {
+                let ast::StmtIf {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("if ");
                     self.unparse_expr(test, precedence::IF);
@@ -510,32 +500,28 @@ impl<'a> Generator<'a> {
                     self.body(&clause.body);
                 }
             }
-            Stmt::With(ast::StmtWith {
-                is_async,
-                items,
-                body,
-                ..
-            }) => {
+            Stmt::With(node) => {
                 statement!({
-                    if *is_async {
+                    if node.is_async {
                         self.p("async ");
                     }
                     self.p("with ");
                     let mut first = true;
-                    for item in items {
+                    for item in &node.items {
                         self.p_delim(&mut first, ", ");
                         self.unparse_with_item(item);
                     }
                     self.p(":");
                 });
-                self.body(body);
+                self.body(&node.body);
             }
-            Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Match(node) => {
+                let ast::StmtMatch {
+                    subject,
+                    cases,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("match ");
                     self.unparse_expr(subject, precedence::MAX);
@@ -549,13 +535,14 @@ impl<'a> Generator<'a> {
                     self.indent_depth = self.indent_depth.saturating_sub(1);
                 }
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                name,
-                range: _,
-                node_index: _,
-                type_params,
-                value,
-            }) => {
+            Stmt::TypeAlias(node) => {
+                let ast::StmtTypeAlias {
+                    name,
+                    range: _,
+                    node_index: _,
+                    type_params,
+                    value,
+                } = &**node;
                 statement!({
                     self.p("type ");
                     self.unparse_expr(name, precedence::MAX);
@@ -566,12 +553,13 @@ impl<'a> Generator<'a> {
                     self.unparse_expr(value, precedence::ASSIGN);
                 });
             }
-            Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Raise(node) => {
+                let ast::StmtRaise {
+                    exc,
+                    cause,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("raise");
                     if let Some(exc) = exc {
@@ -584,15 +572,16 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Try(node) => {
+                let ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("try:");
                 });
@@ -617,12 +606,13 @@ impl<'a> Generator<'a> {
                     self.body(finalbody);
                 }
             }
-            Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Assert(node) => {
+                let ast::StmtAssert {
+                    test,
+                    msg,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("assert ");
                     self.unparse_expr(test, precedence::ASSERT);
@@ -632,11 +622,12 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Import(ast::StmtImport {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Import(node) => {
+                let ast::StmtImport {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("import ");
                     let mut first = true;
@@ -646,13 +637,14 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::ImportFrom(node) => {
+                let ast::StmtImportFrom {
+                    module,
+                    names,
+                    level,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("from ");
                     if *level > 0 {
@@ -671,11 +663,12 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Global(node) => {
+                let ast::StmtGlobal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("global ");
                     let mut first = true;
@@ -685,11 +678,12 @@ impl<'a> Generator<'a> {
                     }
                 });
             }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Nonlocal(node) => {
+                let ast::StmtNonlocal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 statement!({
                     self.p("nonlocal ");
                     let mut first = true;
@@ -723,9 +717,9 @@ impl<'a> Generator<'a> {
                     self.p("continue");
                 });
             }
-            Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand { kind, value, .. }) => {
+            Stmt::IpyEscapeCommand(node) => {
                 statement!({
-                    self.p(&format!("{kind}{value}"));
+                    self.p(&format!("{}{}", node.kind, node.value));
                 });
             }
         }

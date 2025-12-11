@@ -64,12 +64,10 @@ impl Violation for CollapsibleElseIf {
 
 /// PLR5501
 pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
-    let Stmt::If(ast::StmtIf {
-        elif_else_clauses, ..
-    }) = stmt
-    else {
+    let Stmt::If(if_stmt) = stmt else {
         return;
     };
+    let elif_else_clauses = &if_stmt.elif_else_clauses;
 
     let Some(
         else_clause @ ElifElseClause {
@@ -79,7 +77,10 @@ pub(crate) fn collapsible_else_if(checker: &Checker, stmt: &Stmt) {
     else {
         return;
     };
-    let [first @ Stmt::If(ast::StmtIf { .. })] = body.as_slice() else {
+    let [first] = body.as_slice() else {
+        return;
+    };
+    let Stmt::If(_) = first else {
         return;
     };
 

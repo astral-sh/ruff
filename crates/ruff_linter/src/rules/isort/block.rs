@@ -183,87 +183,77 @@ impl<'a> StatementVisitor<'a> for BlockBuilder<'a> {
         let prev_nested = self.nested;
         self.nested = true;
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
-                for stmt in body {
+            Stmt::FunctionDef(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
-                for stmt in body {
+            Stmt::ClassDef(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                for stmt in body {
+            Stmt::For(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
+                for stmt in &node.orelse {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                for stmt in body {
+            Stmt::While(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
+                for stmt in &node.orelse {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                for stmt in body {
+            Stmt::If(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for clause in elif_else_clauses {
+                for clause in &node.elif_else_clauses {
                     self.visit_elif_else_clause(clause);
                 }
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
-                for stmt in body {
+            Stmt::With(node) => {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                for match_case in cases {
+            Stmt::Match(node) => {
+                for match_case in &node.cases {
                     self.visit_match_case(match_case);
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                for except_handler in handlers {
+            Stmt::Try(node) => {
+                for except_handler in &node.handlers {
                     self.visit_except_handler(except_handler);
                 }
 
-                for stmt in body {
+                for stmt in &node.body {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in orelse {
+                for stmt in &node.orelse {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);
 
-                for stmt in finalbody {
+                for stmt in &node.finalbody {
                     self.visit_stmt(stmt);
                 }
                 self.finalize(None);

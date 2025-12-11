@@ -71,39 +71,35 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
     let mut complexity = 0;
     for stmt in stmts {
         match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            Stmt::If(if_stmt) => {
                 complexity += 1;
-                complexity += get_complexity_number(body);
-                for clause in elif_else_clauses {
+                complexity += get_complexity_number(&if_stmt.body);
+                for clause in &if_stmt.elif_else_clauses {
                     if clause.test.is_some() {
                         complexity += 1;
                     }
                     complexity += get_complexity_number(&clause.body);
                 }
             }
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
+            Stmt::For(for_stmt) => {
                 complexity += 1;
-                complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                complexity += get_complexity_number(&for_stmt.body);
+                complexity += get_complexity_number(&for_stmt.orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
-                complexity += get_complexity_number(body);
+            Stmt::With(with_stmt) => {
+                complexity += get_complexity_number(&with_stmt.body);
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
+            Stmt::While(while_stmt) => {
                 complexity += 1;
-                complexity += get_complexity_number(body);
-                complexity += get_complexity_number(orelse);
+                complexity += get_complexity_number(&while_stmt.body);
+                complexity += get_complexity_number(&while_stmt.orelse);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                for case in cases {
+            Stmt::Match(match_stmt) => {
+                for case in &match_stmt.cases {
                     complexity += 1;
                     complexity += get_complexity_number(&case.body);
                 }
-                if let Some(last_case) = cases.last() {
+                if let Some(last_case) = match_stmt.cases.last() {
                     // The complexity of an irrefutable pattern is similar to an `else` block of an `if` statement.
                     //
                     // For example:
@@ -121,20 +117,14 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     }
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                complexity += get_complexity_number(body);
-                if !orelse.is_empty() {
+            Stmt::Try(try_stmt) => {
+                complexity += get_complexity_number(&try_stmt.body);
+                if !try_stmt.orelse.is_empty() {
                     complexity += 1;
                 }
-                complexity += get_complexity_number(orelse);
-                complexity += get_complexity_number(finalbody);
-                for handler in handlers {
+                complexity += get_complexity_number(&try_stmt.orelse);
+                complexity += get_complexity_number(&try_stmt.finalbody);
+                for handler in &try_stmt.handlers {
                     complexity += 1;
                     let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
@@ -142,12 +132,12 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                     complexity += get_complexity_number(body);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
+            Stmt::FunctionDef(func_def) => {
                 complexity += 1;
-                complexity += get_complexity_number(body);
+                complexity += get_complexity_number(&func_def.body);
             }
-            Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
-                complexity += get_complexity_number(body);
+            Stmt::ClassDef(class_def) => {
+                complexity += get_complexity_number(&class_def.body);
             }
             _ => {}
         }

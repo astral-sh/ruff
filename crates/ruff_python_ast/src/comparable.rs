@@ -1594,233 +1594,297 @@ pub enum ComparableStmt<'a> {
 impl<'a> From<&'a ast::Stmt> for ComparableStmt<'a> {
     fn from(stmt: &'a ast::Stmt) -> Self {
         match stmt {
-            ast::Stmt::FunctionDef(ast::StmtFunctionDef {
-                is_async,
-                name,
-                parameters,
-                body,
-                decorator_list,
-                returns,
-                type_params,
-                range: _,
-                node_index: _,
-            }) => Self::FunctionDef(StmtFunctionDef {
-                is_async: *is_async,
-                name: name.as_str(),
-                parameters: parameters.into(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                returns: returns.as_ref().map(Into::into),
-                type_params: type_params.as_ref().map(Into::into),
-            }),
-            ast::Stmt::ClassDef(ast::StmtClassDef {
-                name,
-                arguments,
-                body,
-                decorator_list,
-                type_params,
-                range: _,
-                node_index: _,
-            }) => Self::ClassDef(StmtClassDef {
-                name: name.as_str(),
-                arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
-                body: body.iter().map(Into::into).collect(),
-                decorator_list: decorator_list.iter().map(Into::into).collect(),
-                type_params: type_params.as_ref().map(Into::into),
-            }),
+            ast::Stmt::FunctionDef(node) => {
+                let ast::StmtFunctionDef {
+                    is_async,
+                    name,
+                    parameters,
+                    body,
+                    decorator_list,
+                    returns,
+                    type_params,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::FunctionDef(StmtFunctionDef {
+                    is_async: *is_async,
+                    name: name.as_str(),
+                    parameters: parameters.into(),
+                    body: body.iter().map(Into::into).collect(),
+                    decorator_list: decorator_list.iter().map(Into::into).collect(),
+                    returns: returns.as_ref().map(Into::into),
+                    type_params: type_params.as_ref().map(Into::into),
+                })
+            }
+            ast::Stmt::ClassDef(node) => {
+                let ast::StmtClassDef {
+                    name,
+                    arguments,
+                    body,
+                    decorator_list,
+                    type_params,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::ClassDef(StmtClassDef {
+                    name: name.as_str(),
+                    arguments: arguments.as_ref().map(Into::into).unwrap_or_default(),
+                    body: body.iter().map(Into::into).collect(),
+                    decorator_list: decorator_list.iter().map(Into::into).collect(),
+                    type_params: type_params.as_ref().map(Into::into),
+                })
+            }
             ast::Stmt::Return(ast::StmtReturn {
                 value,
                 range: _,
                 node_index: _,
-            }) => Self::Return(StmtReturn {
-                value: value.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Delete(ast::StmtDelete {
-                targets,
-                range: _,
-                node_index: _,
-            }) => Self::Delete(StmtDelete {
-                targets: targets.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::TypeAlias(ast::StmtTypeAlias {
-                range: _,
-                node_index: _,
-                name,
-                type_params,
-                value,
-            }) => Self::TypeAlias(StmtTypeAlias {
-                name: name.into(),
-                type_params: type_params.as_ref().map(Into::into),
-                value: value.into(),
-            }),
-            ast::Stmt::Assign(ast::StmtAssign {
-                targets,
-                value,
-                range: _,
-                node_index: _,
-            }) => Self::Assign(StmtAssign {
-                targets: targets.iter().map(Into::into).collect(),
-                value: value.into(),
-            }),
-            ast::Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op,
-                value,
-                range: _,
-                node_index: _,
-            }) => Self::AugAssign(StmtAugAssign {
-                target: target.into(),
-                op: (*op).into(),
-                value: value.into(),
-            }),
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                simple,
-                range: _,
-                node_index: _,
-            }) => Self::AnnAssign(StmtAnnAssign {
-                target: target.into(),
-                annotation: annotation.into(),
-                value: value.as_ref().map(Into::into),
-                simple: *simple,
-            }),
-            ast::Stmt::For(ast::StmtFor {
-                is_async,
-                target,
-                iter,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => Self::For(StmtFor {
-                is_async: *is_async,
-                target: target.into(),
-                iter: iter.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => Self::While(StmtWhile {
-                test: test.into(),
-                body: body.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node_index: _,
-            }) => Self::If(StmtIf {
-                test: test.into(),
-                body: body.iter().map(Into::into).collect(),
-                elif_else_clauses: elif_else_clauses.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::With(ast::StmtWith {
-                is_async,
-                items,
-                body,
-                range: _,
-                node_index: _,
-            }) => Self::With(StmtWith {
-                is_async: *is_async,
-                items: items.iter().map(Into::into).collect(),
-                body: body.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => Self::Match(StmtMatch {
-                subject: subject.into(),
-                cases: cases.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::Raise(ast::StmtRaise {
-                exc,
-                cause,
-                range: _,
-                node_index: _,
-            }) => Self::Raise(StmtRaise {
-                exc: exc.as_ref().map(Into::into),
-                cause: cause.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                is_star,
-                range: _,
-                node_index: _,
-            }) => Self::Try(StmtTry {
-                body: body.iter().map(Into::into).collect(),
-                handlers: handlers.iter().map(Into::into).collect(),
-                orelse: orelse.iter().map(Into::into).collect(),
-                finalbody: finalbody.iter().map(Into::into).collect(),
-                is_star: *is_star,
-            }),
-            ast::Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => Self::Assert(StmtAssert {
-                test: test.into(),
-                msg: msg.as_ref().map(Into::into),
-            }),
-            ast::Stmt::Import(ast::StmtImport {
-                names,
-                range: _,
-                node_index: _,
-            }) => Self::Import(StmtImport {
-                names: names.iter().map(Into::into).collect(),
-            }),
-            ast::Stmt::ImportFrom(ast::StmtImportFrom {
-                module,
-                names,
-                level,
-                range: _,
-                node_index: _,
-            }) => Self::ImportFrom(StmtImportFrom {
-                module: module.as_deref(),
-                names: names.iter().map(Into::into).collect(),
-                level: *level,
-            }),
-            ast::Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) => Self::Global(StmtGlobal {
-                names: names.iter().map(ast::Identifier::as_str).collect(),
-            }),
-            ast::Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) => Self::Nonlocal(StmtNonlocal {
-                names: names.iter().map(ast::Identifier::as_str).collect(),
-            }),
-            ast::Stmt::IpyEscapeCommand(ast::StmtIpyEscapeCommand {
-                kind,
-                value,
-                range: _,
-                node_index: _,
-            }) => Self::IpyEscapeCommand(StmtIpyEscapeCommand { kind: *kind, value }),
+            }) => {
+                Self::Return(StmtReturn {
+                    value: value.as_ref().map(Into::into),
+                })
+            }
+            ast::Stmt::Delete(node) => {
+                let ast::StmtDelete {
+                    targets,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Delete(StmtDelete {
+                    targets: targets.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::TypeAlias(node) => {
+                let ast::StmtTypeAlias {
+                    range: _,
+                    node_index: _,
+                    name,
+                    type_params,
+                    value,
+                } = &**node;
+                Self::TypeAlias(StmtTypeAlias {
+                    name: name.into(),
+                    type_params: type_params.as_ref().map(Into::into),
+                    value: value.into(),
+                })
+            }
+            ast::Stmt::Assign(node) => {
+                let ast::StmtAssign {
+                    targets,
+                    value,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Assign(StmtAssign {
+                    targets: targets.iter().map(Into::into).collect(),
+                    value: value.into(),
+                })
+            }
+            ast::Stmt::AugAssign(node) => {
+                let ast::StmtAugAssign {
+                    target,
+                    op,
+                    value,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::AugAssign(StmtAugAssign {
+                    target: target.into(),
+                    op: (*op).into(),
+                    value: value.into(),
+                })
+            }
+            ast::Stmt::AnnAssign(node) => {
+                let ast::StmtAnnAssign {
+                    target,
+                    annotation,
+                    value,
+                    simple,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::AnnAssign(StmtAnnAssign {
+                    target: target.into(),
+                    annotation: annotation.into(),
+                    value: value.as_ref().map(Into::into),
+                    simple: *simple,
+                })
+            }
+            ast::Stmt::For(node) => {
+                let ast::StmtFor {
+                    is_async,
+                    target,
+                    iter,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::For(StmtFor {
+                    is_async: *is_async,
+                    target: target.into(),
+                    iter: iter.into(),
+                    body: body.iter().map(Into::into).collect(),
+                    orelse: orelse.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::While(node) => {
+                let ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::While(StmtWhile {
+                    test: test.into(),
+                    body: body.iter().map(Into::into).collect(),
+                    orelse: orelse.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::If(node) => {
+                let ast::StmtIf {
+                    test,
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::If(StmtIf {
+                    test: test.into(),
+                    body: body.iter().map(Into::into).collect(),
+                    elif_else_clauses: elif_else_clauses.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::With(node) => {
+                let ast::StmtWith {
+                    is_async,
+                    items,
+                    body,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::With(StmtWith {
+                    is_async: *is_async,
+                    items: items.iter().map(Into::into).collect(),
+                    body: body.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::Match(node) => {
+                let ast::StmtMatch {
+                    subject,
+                    cases,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Match(StmtMatch {
+                    subject: subject.into(),
+                    cases: cases.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::Raise(node) => {
+                let ast::StmtRaise {
+                    exc,
+                    cause,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Raise(StmtRaise {
+                    exc: exc.as_ref().map(Into::into),
+                    cause: cause.as_ref().map(Into::into),
+                })
+            }
+            ast::Stmt::Try(node) => {
+                let ast::StmtTry {
+                    body,
+                    handlers,
+                    orelse,
+                    finalbody,
+                    is_star,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Try(StmtTry {
+                    body: body.iter().map(Into::into).collect(),
+                    handlers: handlers.iter().map(Into::into).collect(),
+                    orelse: orelse.iter().map(Into::into).collect(),
+                    finalbody: finalbody.iter().map(Into::into).collect(),
+                    is_star: *is_star,
+                })
+            }
+            ast::Stmt::Assert(node) => {
+                let ast::StmtAssert {
+                    test,
+                    msg,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Assert(StmtAssert {
+                    test: test.into(),
+                    msg: msg.as_ref().map(Into::into),
+                })
+            }
+            ast::Stmt::Import(node) => {
+                let ast::StmtImport {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Import(StmtImport {
+                    names: names.iter().map(Into::into).collect(),
+                })
+            }
+            ast::Stmt::ImportFrom(node) => {
+                let ast::StmtImportFrom {
+                    module,
+                    names,
+                    level,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::ImportFrom(StmtImportFrom {
+                    module: module.as_deref(),
+                    names: names.iter().map(Into::into).collect(),
+                    level: *level,
+                })
+            }
+            ast::Stmt::Global(node) => {
+                let ast::StmtGlobal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Global(StmtGlobal {
+                    names: names.iter().map(ast::Identifier::as_str).collect(),
+                })
+            }
+            ast::Stmt::Nonlocal(node) => {
+                let ast::StmtNonlocal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::Nonlocal(StmtNonlocal {
+                    names: names.iter().map(ast::Identifier::as_str).collect(),
+                })
+            }
+            ast::Stmt::IpyEscapeCommand(node) => {
+                let ast::StmtIpyEscapeCommand {
+                    kind,
+                    value,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                Self::IpyEscapeCommand(StmtIpyEscapeCommand { kind: *kind, value })
+            }
             ast::Stmt::Expr(ast::StmtExpr {
                 value,
                 range: _,
                 node_index: _,
-            }) => Self::Expr(StmtExpr {
-                value: value.into(),
-            }),
+            }) => {
+                Self::Expr(StmtExpr {
+                    value: value.into(),
+                })
+            }
             ast::Stmt::Pass(_) => Self::Pass,
             ast::Stmt::Break(_) => Self::Break,
             ast::Stmt::Continue(_) => Self::Continue,

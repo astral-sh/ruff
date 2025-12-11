@@ -269,27 +269,25 @@ struct Terminal<'a> {
 }
 
 fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
-    let Stmt::For(ast::StmtFor {
-        body, target, iter, ..
-    }) = stmt
-    else {
+    let Stmt::For(for_stmt) = stmt else {
         return None;
     };
+    let ast::StmtFor {
+        body, target, iter, ..
+    } = &**for_stmt;
 
     // The loop itself should contain a single `if` statement, with a single `return` statement in
     // the body.
-    let [
-        Stmt::If(ast::StmtIf {
-            body: nested_body,
-            test: nested_test,
-            elif_else_clauses: nested_elif_else_clauses,
-            range: _,
-            node_index: _,
-        }),
-    ] = body.as_slice()
-    else {
+    let [Stmt::If(if_stmt)] = body.as_slice() else {
         return None;
     };
+    let ast::StmtIf {
+        body: nested_body,
+        test: nested_test,
+        elif_else_clauses: nested_elif_else_clauses,
+        range: _,
+        node_index: _,
+    } = &**if_stmt;
     if !nested_elif_else_clauses.is_empty() {
         return None;
     }
@@ -326,9 +324,10 @@ fn match_loop(stmt: &Stmt) -> Option<Loop<'_>> {
 /// return False
 /// ```
 fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+    let Stmt::For(for_stmt) = stmt else {
         return None;
     };
+    let ast::StmtFor { orelse, .. } = &**for_stmt;
 
     // The `else` block has to contain a single `return True` or `return False`.
     let [
@@ -366,9 +365,10 @@ fn match_else_return(stmt: &Stmt) -> Option<Terminal<'_>> {
 ///     return False
 /// ```
 fn match_sibling_return<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<Terminal<'a>> {
-    let Stmt::For(ast::StmtFor { orelse, .. }) = stmt else {
+    let Stmt::For(for_stmt) = stmt else {
         return None;
     };
+    let ast::StmtFor { orelse, .. } = &**for_stmt;
 
     // The loop itself shouldn't have an `else` block.
     if !orelse.is_empty() {

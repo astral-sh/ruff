@@ -300,9 +300,9 @@ fn find_dunder_all_exprs<'a>(semantic: &'a SemanticModel) -> Vec<&'a ast::Expr> 
                 _ => None,
             }?;
             match stmt {
-                Stmt::Assign(ast::StmtAssign { value, .. }) => Some(&**value),
-                Stmt::AnnAssign(ast::StmtAnnAssign { value, .. }) => value.as_deref(),
-                Stmt::AugAssign(ast::StmtAugAssign { value, .. }) => Some(&**value),
+                Stmt::Assign(node) => Some(&*node.value),
+                Stmt::AnnAssign(node) => node.value.as_deref(),
+                Stmt::AugAssign(node) => Some(&*node.value),
                 _ => None,
             }
         })

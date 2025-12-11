@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_semantic::analyze::typing::is_dict;
@@ -109,12 +109,14 @@ fn is_dict_key_tuple_with_two_elements(binding: &Binding, semantic: &SemanticMod
     };
 
     let (value, annotation) = match statement {
-        Stmt::Assign(assign_stmt) => (assign_stmt.value.as_ref(), None),
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            value: Some(value),
-            annotation,
-            ..
-        }) => (value.as_ref(), Some(annotation.as_ref())),
+        Stmt::Assign(node) => (node.value.as_ref(), None),
+        Stmt::AnnAssign(node) => {
+            if let Some(value) = &node.value {
+                (value.as_ref(), Some(node.annotation.as_ref()))
+            } else {
+                return false;
+            }
+        }
         _ => return false,
     };
 

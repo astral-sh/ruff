@@ -204,7 +204,7 @@ impl serde::Serialize for NameImport {
 #[cfg(feature = "serde")]
 impl<'de> serde::de::Deserialize<'de> for NameImports {
     fn deserialize<D: serde::de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        use ruff_python_ast::{self as ast, Stmt};
+        use ruff_python_ast::Stmt;
         use ruff_python_parser::Parsed;
 
         struct AnyNameImportsVisitor;
@@ -225,30 +225,22 @@ impl<'de> serde::de::Deserialize<'de> for NameImports {
                 };
 
                 let imports = match stmt {
-                    Stmt::ImportFrom(ast::StmtImportFrom {
-                        module,
-                        names,
-                        level,
-                        range: _,
-                        node_index: _,
-                    }) => names
+                    Stmt::ImportFrom(import_from) => import_from
+                        .names
                         .iter()
                         .map(|name| {
                             NameImport::ImportFrom(MemberNameImport {
-                                module: module.as_deref().map(ToString::to_string),
+                                module: import_from.module.as_deref().map(ToString::to_string),
                                 name: Alias {
                                     name: name.name.to_string(),
                                     as_name: name.asname.as_deref().map(ToString::to_string),
                                 },
-                                level: *level,
+                                level: import_from.level,
                             })
                         })
                         .collect(),
-                    Stmt::Import(ast::StmtImport {
-                        names,
-                        range: _,
-                        node_index: _,
-                    }) => names
+                    Stmt::Import(import_stmt) => import_stmt
+                        .names
                         .iter()
                         .map(|name| {
                             NameImport::Import(ModuleNameImport {

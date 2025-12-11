@@ -223,7 +223,7 @@ fn function(
                     ..parameter.clone()
                 })
                 .collect::<Vec<_>>();
-            let func = Stmt::FunctionDef(ast::StmtFunctionDef {
+            let func = Stmt::FunctionDef(Box::new(ast::StmtFunctionDef {
                 is_async: false,
                 name: Identifier::new(name.to_string(), TextRange::default()),
                 parameters: Box::new(Parameters {
@@ -237,13 +237,13 @@ fn function(
                 type_params: None,
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-            });
+            }));
             let generated = checker.generator().stmt(&func);
 
             return replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker);
         }
     }
-    let function = Stmt::FunctionDef(ast::StmtFunctionDef {
+    let function = Stmt::FunctionDef(Box::new(ast::StmtFunctionDef {
         is_async: false,
         name: Identifier::new(name.to_string(), TextRange::default()),
         parameters: Box::new(parameters),
@@ -253,7 +253,7 @@ fn function(
         type_params: None,
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
+    }));
     let generated = checker.generator().stmt(&function);
 
     replace_trailing_ellipsis_with_original_expr(generated, lambda, stmt, checker)

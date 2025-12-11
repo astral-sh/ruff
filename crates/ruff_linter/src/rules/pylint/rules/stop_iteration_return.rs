@@ -79,13 +79,15 @@ impl<'a> Visitor<'a> for GeneratorAnalyzer<'a, '_> {
     fn visit_stmt(&mut self, stmt: &'a ast::Stmt) {
         match stmt {
             ast::Stmt::FunctionDef(_) => {}
-            ast::Stmt::Raise(raise @ ast::StmtRaise { exc: Some(exc), .. }) => {
-                if self
-                    .checker
-                    .semantic()
-                    .match_builtin_expr(map_callable(exc), "StopIteration")
-                {
-                    self.stop_iteration_raises.push(raise);
+            ast::Stmt::Raise(raise) => {
+                if let Some(exc) = &raise.exc {
+                    if self
+                        .checker
+                        .semantic()
+                        .match_builtin_expr(map_callable(exc), "StopIteration")
+                    {
+                        self.stop_iteration_raises.push(raise);
+                    }
                 }
                 walk_stmt(self, stmt);
             }

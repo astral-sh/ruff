@@ -74,12 +74,12 @@ pub(crate) fn mutable_dataclass_default(checker: &Checker, class_def: &ast::Stmt
     }
 
     for statement in &class_def.body {
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
-            annotation,
-            value: Some(value),
-            ..
-        }) = statement
-        else {
+        let Stmt::AnnAssign(ann_assign_stmt) = statement else {
+            continue;
+        };
+
+        let annotation = &ann_assign_stmt.annotation;
+        let Some(value) = &ann_assign_stmt.value else {
             continue;
         };
 

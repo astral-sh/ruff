@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::identifier::except;
-use ruff_python_ast::{self as ast, ExceptHandler, Expr, Stmt};
+use ruff_python_ast::{ExceptHandler, Expr, Stmt};
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -65,7 +65,7 @@ pub(crate) fn bare_except(
     if type_.is_none()
         && !body
             .iter()
-            .any(|stmt| matches!(stmt, Stmt::Raise(ast::StmtRaise { exc: None, .. })))
+            .any(|stmt| matches!(stmt, Stmt::Raise(raise_stmt) if raise_stmt.exc.is_none()))
     {
         checker.report_diagnostic(BareExcept, except(handler, checker.locator().contents()));
     }

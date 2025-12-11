@@ -3,7 +3,7 @@ use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::statement_visitor::StatementVisitor;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::{walk_expr, walk_stmt};
-use ruff_python_ast::{Alias, Stmt, StmtImportFrom, statement_visitor};
+use ruff_python_ast::{Alias, Stmt, statement_visitor};
 use ruff_python_semantic::SemanticModel;
 
 /// AST visitor that searches an AST tree for [`ast::StmtImportFrom`] nodes
@@ -28,7 +28,9 @@ impl StatementVisitor<'_> for ImportSearcher<'_> {
         if self.found_import {
             return;
         }
-        if let Stmt::ImportFrom(StmtImportFrom { module, names, .. }) = stmt {
+        if let Stmt::ImportFrom(import_from) = stmt {
+            let module = &import_from.module;
+            let names = &import_from.names;
             if module.as_ref().is_some_and(|module| module == self.module)
                 && names.iter().any(|Alias { name, .. }| name == self.name)
             {

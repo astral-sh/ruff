@@ -5,8 +5,7 @@
 //! be called in a parent `Visitor`'s `visit_stmt` and `visit_expr` methods, respectively.
 
 use ruff_python_ast::{
-    self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt, StmtExpr,
-    StmtFunctionDef, StmtImportFrom,
+    self as ast, Expr, ExprContext, IrrefutablePatternKind, Pattern, PythonVersion, Stmt,
     comparable::ComparableExpr,
     helpers,
     visitor::{Visitor, walk_expr, walk_stmt},
@@ -59,13 +58,14 @@ impl SemanticSyntaxChecker {
 
     fn check_stmt<Ctx: SemanticSyntaxContext>(&mut self, stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::ImportFrom(StmtImportFrom {
-                range,
-                module,
-                level,
-                names,
-                ..
-            }) => {
+            Stmt::ImportFrom(node) => {
+                let ast::StmtImportFrom {
+                    range,
+                    module,
+                    level,
+                    names,
+                    node_index: _,
+                } = &**node;
                 if matches!(module.as_deref(), Some("__future__")) {
                     for name in names {
                         if !is_known_future_feature(&name.name) {
@@ -124,17 +124,19 @@ impl SemanticSyntaxChecker {
                     visitor.visit_pattern(&case.pattern);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
-                parameters,
-                ..
-            }) => {
+            Stmt::FunctionDef(node) => {
+                let ast::StmtFunctionDef {
+                    type_params,
+                    parameters,
+                    ..
+                } = &**node;
                 if let Some(type_params) = type_params {
                     Self::duplicate_type_parameter_name(type_params, ctx);
                 }
                 Self::duplicate_parameter_name(parameters, ctx);
             }
-            Stmt::Global(ast::StmtGlobal { names, .. }) => {
+            Stmt::Global(node) => {
+                let ast::StmtGlobal { names, .. } = &**node;
                 for name in names {
                     if ctx.is_bound_parameter(name) {
                         Self::add_error(
@@ -145,19 +147,18 @@ impl SemanticSyntaxChecker {
                     }
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
-                ..
-            })
-            | Stmt::TypeAlias(ast::StmtTypeAlias {
-                type_params: Some(type_params),
-                ..
-            }) => {
+            Stmt::ClassDef(node) if node.type_params.is_some() => {
+                let type_params = node.type_params.as_ref().unwrap();
                 Self::duplicate_type_parameter_name(type_params, ctx);
                 Self::type_parameter_default_order(type_params, ctx);
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                if let [Expr::Starred(ast::ExprStarred { range, .. })] = targets.as_slice() {
+            Stmt::TypeAlias(node) if node.type_params.is_some() => {
+                let type_params = node.type_params.as_ref().unwrap();
+                Self::duplicate_type_parameter_name(type_params, ctx);
+                Self::type_parameter_default_order(type_params, ctx);
+            }
+            Stmt::Assign(node) => {
+                if let [Expr::Starred(ast::ExprStarred { range, .. })] = node.targets.as_slice() {
                     // test_ok single_starred_assignment_target
                     // (*a,) = (1,)
                     // *a, = (1,)
@@ -183,7 +184,7 @@ impl SemanticSyntaxChecker {
                 // _ = *{42}
                 // _ = *list()
                 // _ = *(p + q)
-                Self::invalid_star_expression(value, ctx);
+                Self::invalid_star_expression(&node.value, ctx);
             }
             Stmt::Return(ast::StmtReturn {
                 value,
@@ -199,12 +200,13 @@ impl SemanticSyntaxChecker {
                     Self::add_error(ctx, SemanticSyntaxErrorKind::ReturnOutsideFunction, *range);
                 }
             }
-            Stmt::For(ast::StmtFor {
-                target,
-                iter,
-                is_async,
-                ..
-            }) => {
+            Stmt::For(node) => {
+                let ast::StmtFor {
+                    target,
+                    iter,
+                    is_async,
+                    ..
+                } = &**node;
                 // test_err single_star_for
                 // for _ in *x: ...
                 // for *x in xs: ...
@@ -218,14 +220,15 @@ impl SemanticSyntaxChecker {
                     );
                 }
             }
-            Stmt::With(ast::StmtWith { is_async: true, .. }) => {
+            Stmt::With(node) if node.is_async => {
                 Self::await_outside_async_function(
                     ctx,
                     stmt,
                     AwaitOutsideAsyncFunctionKind::AsyncWith,
                 );
             }
-            Stmt::Nonlocal(ast::StmtNonlocal { names, range, .. }) => {
+            Stmt::Nonlocal(node) => {
+                let ast::StmtNonlocal { names, range, .. } = &**node;
                 // test_ok nonlocal_declaration_at_module_level
                 // def _():
                 //     nonlocal x
@@ -272,7 +275,7 @@ impl SemanticSyntaxChecker {
 
     fn check_annotation<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Stmt::AnnAssign(node) => {
                 if ctx.python_version() > PythonVersion::PY313 {
                     // test_ok valid_annotation_py313
                     // # parse_options: {"target-version": "3.13"}
@@ -295,15 +298,10 @@ impl SemanticSyntaxChecker {
                         position: InvalidExpressionPosition::TypeAnnotation,
                         ctx,
                     };
-                    visitor.visit_expr(annotation);
+                    visitor.visit_expr(&node.annotation);
                 }
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                type_params,
-                parameters,
-                returns,
-                ..
-            }) => {
+            Stmt::FunctionDef(node) => {
                 // test_ok valid_annotation_function_py313
                 // # parse_options: {"target-version": "3.13"}
                 // def f() -> (y := 3): ...
@@ -355,32 +353,30 @@ impl SemanticSyntaxChecker {
                     position: InvalidExpressionPosition::TypeAnnotation,
                     ctx,
                 };
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &node.type_params {
                     visitor.visit_type_params(type_params);
                 }
                 // the __future__ annotation error takes precedence over the generic error
                 if ctx.future_annotations_or_stub() || ctx.python_version() > PythonVersion::PY313 {
                     visitor.position = InvalidExpressionPosition::TypeAnnotation;
-                } else if type_params.is_some() {
+                } else if node.type_params.is_some() {
                     visitor.position = InvalidExpressionPosition::GenericDefinition;
                 } else {
                     return;
                 }
-                for param in parameters
+                for param in node
+                    .parameters
                     .iter()
                     .filter_map(ast::AnyParameterRef::annotation)
                 {
                     visitor.visit_expr(param);
                 }
-                if let Some(returns) = returns {
+                if let Some(returns) = &node.returns {
                     visitor.visit_expr(returns);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                type_params: Some(type_params),
-                arguments,
-                ..
-            }) => {
+            Stmt::ClassDef(node) if node.type_params.is_some() => {
+                let type_params = node.type_params.as_ref().unwrap();
                 // test_ok valid_annotation_class
                 // class F(y := list): ...
                 // def f():
@@ -402,14 +398,12 @@ impl SemanticSyntaxChecker {
                     ctx,
                 };
                 visitor.visit_type_params(type_params);
-                if let Some(arguments) = arguments {
+                if let Some(arguments) = &node.arguments {
                     visitor.position = InvalidExpressionPosition::GenericDefinition;
                     visitor.visit_arguments(arguments);
                 }
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                type_params, value, ..
-            }) => {
+            Stmt::TypeAlias(node) => {
                 // test_err invalid_annotation_type_alias
                 // type X[T: (yield 1)] = int      # TypeVar bound
                 // type X[T = (yield 1)] = int     # TypeVar default
@@ -423,8 +417,8 @@ impl SemanticSyntaxChecker {
                     position: InvalidExpressionPosition::TypeAlias,
                     ctx,
                 };
-                visitor.visit_expr(value);
-                if let Some(type_params) = type_params {
+                visitor.visit_expr(&node.value);
+                if let Some(type_params) = &node.type_params {
                     visitor.visit_type_params(type_params);
                 }
             }
@@ -485,43 +479,34 @@ impl SemanticSyntaxChecker {
     /// Check for [`SemanticSyntaxErrorKind::WriteToDebug`] in `stmt`.
     fn debug_shadowing<Ctx: SemanticSyntaxContext>(stmt: &ast::Stmt, ctx: &Ctx) {
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                name,
-                type_params,
-                parameters,
-                ..
-            }) => {
+            Stmt::FunctionDef(node) => {
                 // test_err debug_shadow_function
                 // def __debug__(): ...  # function name
                 // def f[__debug__](): ...  # type parameter name
                 // def f(__debug__): ...  # parameter name
-                Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                Self::check_identifier(&node.name, ctx);
+                if let Some(type_params) = &node.type_params {
                     for type_param in type_params.iter() {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
-                for parameter in parameters {
+                for parameter in &node.parameters {
                     Self::check_identifier(parameter.name(), ctx);
                 }
             }
-            Stmt::ClassDef(ast::StmtClassDef {
-                name, type_params, ..
-            }) => {
+            Stmt::ClassDef(node) => {
                 // test_err debug_shadow_class
                 // class __debug__: ...  # class name
                 // class C[__debug__]: ...  # type parameter name
-                Self::check_identifier(name, ctx);
-                if let Some(type_params) = type_params {
+                Self::check_identifier(&node.name, ctx);
+                if let Some(type_params) = &node.type_params {
                     for type_param in type_params.iter() {
                         Self::check_identifier(type_param.name(), ctx);
                     }
                 }
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                type_params: Some(type_params),
-                ..
-            }) => {
+            Stmt::TypeAlias(node) if node.type_params.is_some() => {
+                let type_params = node.type_params.as_ref().unwrap();
                 // test_err debug_shadow_type_alias
                 // type __debug__ = list[int]  # visited as an Expr but still flagged
                 // type Debug[__debug__] = str
@@ -529,8 +514,7 @@ impl SemanticSyntaxChecker {
                     Self::check_identifier(type_param.name(), ctx);
                 }
             }
-            Stmt::Import(ast::StmtImport { names, .. })
-            | Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+            Stmt::Import(node) => {
                 // test_err debug_shadow_import
                 // import __debug__
                 // import debug as __debug__
@@ -541,18 +525,27 @@ impl SemanticSyntaxChecker {
                 // import __debug__ as debug
                 // from __debug__ import Some
                 // from x import __debug__ as debug
-                for name in names {
+                for name in &node.names {
                     match &name.asname {
                         Some(asname) => Self::check_identifier(asname, ctx),
                         None => Self::check_identifier(&name.name, ctx),
                     }
                 }
             }
-            Stmt::Try(ast::StmtTry { handlers, .. }) => {
+            Stmt::ImportFrom(node) => {
+                for name in &node.names {
+                    match &name.asname {
+                        Some(asname) => Self::check_identifier(asname, ctx),
+                        None => Self::check_identifier(&name.name, ctx),
+                    }
+                }
+            }
+            Stmt::Try(node) => {
                 // test_err debug_shadow_try
                 // try: ...
                 // except Exception as __debug__: ...
-                for handler in handlers
+                for handler in node
+                    .handlers
                     .iter()
                     .filter_map(ast::ExceptHandler::as_except_handler)
                 {
@@ -732,18 +725,18 @@ impl SemanticSyntaxChecker {
 
         // update internal state
         match stmt {
-            Stmt::Expr(StmtExpr { value, .. })
-                if !self.seen_module_docstring_boundary && value.is_string_literal_expr() => {}
-            Stmt::ImportFrom(StmtImportFrom { module, .. }) => {
+            Stmt::Expr(node)
+                if !self.seen_module_docstring_boundary && node.value.is_string_literal_expr() => {}
+            Stmt::ImportFrom(node) => {
                 // Allow __future__ imports until we see a non-__future__ import.
-                if !matches!(module.as_deref(), Some("__future__")) {
+                if !matches!(node.module.as_deref(), Some("__future__")) {
                     self.seen_futures_boundary = true;
                 }
             }
-            Stmt::FunctionDef(StmtFunctionDef { is_async, body, .. }) => {
-                if *is_async {
+            Stmt::FunctionDef(node) => {
+                if node.is_async {
                     let mut visitor = ReturnVisitor::default();
-                    visitor.visit_body(body);
+                    visitor.visit_body(&node.body);
 
                     if visitor.has_yield {
                         if let Some(return_range) = visitor.return_range {

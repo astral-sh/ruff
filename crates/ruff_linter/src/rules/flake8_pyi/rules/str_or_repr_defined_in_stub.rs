@@ -1,4 +1,3 @@
-use ruff_python_ast as ast;
 use ruff_python_ast::Stmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -44,16 +43,14 @@ impl AlwaysFixableViolation for StrOrReprDefinedInStub {
 
 /// PYI029
 pub(crate) fn str_or_repr_defined_in_stub(checker: &Checker, stmt: &Stmt) {
-    let Stmt::FunctionDef(ast::StmtFunctionDef {
-        name,
-        decorator_list,
-        returns,
-        parameters,
-        ..
-    }) = stmt
-    else {
+    let Stmt::FunctionDef(func_def) = stmt else {
         return;
     };
+
+    let name = &func_def.name;
+    let decorator_list = &func_def.decorator_list;
+    let returns = &func_def.returns;
+    let parameters = &func_def.parameters;
 
     let Some(returns) = returns else {
         return;

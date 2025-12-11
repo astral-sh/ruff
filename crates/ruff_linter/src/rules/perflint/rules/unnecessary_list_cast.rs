@@ -207,7 +207,7 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
             target_id == id
         }
         // Ex) `foo[0] = bar`
-        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
+        Stmt::Assign(node) => node.targets.iter().any(|target| {
             if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
                     return target_id == id;
@@ -216,16 +216,16 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
             false
         }),
         // Ex) `foo += bar`
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-            if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
+        Stmt::AugAssign(node) => {
+            if let Some(ast::ExprName { id: target_id, .. }) = node.target.as_name_expr() {
                 target_id == id
             } else {
                 false
             }
         }
         // Ex) `foo[0]: int = bar`
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-            if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
+        Stmt::AnnAssign(node) => {
+            if let Some(ast::ExprSubscript { value: target, .. }) = node.target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
                     return target_id == id;
                 }
@@ -233,7 +233,7 @@ fn match_mutation(stmt: &Stmt, id: &str) -> bool {
             false
         }
         // Ex) `del foo[0]`
-        Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
+        Stmt::Delete(node) => node.targets.iter().any(|target| {
             if let Some(ast::ExprSubscript { value: target, .. }) = target.as_subscript_expr() {
                 if let Some(ast::ExprName { id: target_id, .. }) = target.as_name_expr() {
                     return target_id == id;

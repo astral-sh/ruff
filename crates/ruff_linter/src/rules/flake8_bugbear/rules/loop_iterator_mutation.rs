@@ -5,8 +5,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::name::UnqualifiedName;
 use ruff_python_ast::{
-    Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtAssign, StmtAugAssign,
-    StmtDelete, StmtFor, StmtIf,
+    self as ast, Expr, ExprAttribute, ExprCall, ExprSubscript, ExprTuple, Stmt, StmtFor,
     visitor::{self, Visitor},
 };
 use ruff_text_size::TextRange;
@@ -242,43 +241,39 @@ impl<'a> Visitor<'a> for LoopMutationsVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             // Ex) `del items[0]`
-            Stmt::Delete(StmtDelete {
-                range,
-                targets,
-                node_index: _,
-            }) => {
+            Stmt::Delete(node) => {
+                let ast::StmtDelete {
+                    range,
+                    targets,
+                    node_index: _,
+                } = &**node;
                 self.handle_delete(*range, targets);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `items[0] = 1`
-            Stmt::Assign(StmtAssign { range, targets, .. }) => {
-                self.handle_assign(*range, targets);
+            Stmt::Assign(node) => {
+                self.handle_assign(node.range, &node.targets);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `items += [1]`
-            Stmt::AugAssign(StmtAugAssign { range, target, .. }) => {
-                self.handle_aug_assign(*range, target);
+            Stmt::AugAssign(node) => {
+                self.handle_aug_assign(node.range, &node.target);
                 visitor::walk_stmt(self, stmt);
             }
 
             // Ex) `if True: items.append(1)`
-            Stmt::If(StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            Stmt::If(node) => {
                 // Handle the `if` branch.
                 self.branch += 1;
                 self.branches.push(self.branch);
-                self.visit_expr(test);
-                self.visit_body(body);
+                self.visit_expr(&node.test);
+                self.visit_body(&node.body);
                 self.branches.pop();
 
                 // Handle the `elif` and `else` branches.
-                for clause in elif_else_clauses {
+                for clause in &node.elif_else_clauses {
                     self.branch += 1;
                     self.branches.push(self.branch);
                     if let Some(test) = &clause.test {

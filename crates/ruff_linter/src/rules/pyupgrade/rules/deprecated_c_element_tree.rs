@@ -55,11 +55,12 @@ where
 /// UP023
 pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
     match stmt {
-        Stmt::Import(ast::StmtImport {
-            names,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Import(import_stmt) => {
+            let ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            } = &**import_stmt;
             // Ex) `import xml.etree.cElementTree as ET`
             for name in names {
                 if &name.name == "xml.etree.cElementTree" && name.asname.is_some() {
@@ -67,13 +68,15 @@ pub(crate) fn deprecated_c_element_tree(checker: &Checker, stmt: &Stmt) {
                 }
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom {
-            module,
-            names,
-            level,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::ImportFrom(import_from_stmt) => {
+            let ast::StmtImportFrom {
+                module,
+                names,
+                level,
+                range: _,
+                node_index: _,
+            } = &**import_from_stmt;
+
             if *level > 0 {
                 // Ex) `import .xml.etree.cElementTree as ET`
             } else if let Some(module) = module {

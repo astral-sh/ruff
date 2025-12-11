@@ -92,23 +92,16 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if idx % 2 == 0:
         //         result[name] = idx
         // ```
-        [
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                test,
-                ..
-            }),
-        ] => {
+        [Stmt::If(node)] => {
             // TODO(charlie): If there's an `else` clause, verify that the `else` has the
             // same structure.
-            if !elif_else_clauses.is_empty() {
+            if !node.elif_else_clauses.is_empty() {
                 return;
             }
-            let [stmt] = body.as_slice() else {
+            let [stmt] = node.body.as_slice() else {
                 return;
             };
-            (stmt, Some(test))
+            (stmt, Some(&node.test))
         }
         // ```python
         // for idx, name in enumerate(names):
@@ -118,15 +111,12 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         _ => return,
     };
 
-    let Stmt::Assign(ast::StmtAssign {
-        targets,
-        value,
-        range,
-        node_index: _,
-    }) = stmt
-    else {
+    let Stmt::Assign(node) = stmt else {
         return;
     };
+    let targets = &node.targets;
+    let value = &node.value;
+    let range = &node.range;
 
     let [
         Expr::Subscript(ast::ExprSubscript {
@@ -212,8 +202,8 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     if is_fix_manual_dict_comprehension_enabled(checker.settings()) {
         let binding_stmt = binding.statement(checker.semantic());
         let binding_value = binding_stmt.and_then(|binding_stmt| match binding_stmt {
-            ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
-            ast::Stmt::Assign(assign) => Some(&assign.value),
+            ast::Stmt::AnnAssign(node) => node.value.as_deref(),
+            ast::Stmt::Assign(node) => Some(&node.value),
             _ => None,
         });
 
@@ -243,7 +233,7 @@ pub(crate) fn manual_dict_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         // but not necessarily, so this needs to be manually fixed. This does not apply when using an update.
         let binding_has_one_target = binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
             ast::Stmt::AnnAssign(_) => true,
-            ast::Stmt::Assign(assign) => assign.targets.len() == 1,
+            ast::Stmt::Assign(node) => node.targets.len() == 1,
             _ => false,
         });
         // If the binding gets used in between the assignment and the for loop, a comprehension is no longer safe

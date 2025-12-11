@@ -100,7 +100,7 @@ pub(crate) fn reimplemented_operator(checker: &Checker, target: &FunctionLike) {
             || checker
                 .semantic()
                 .current_statements()
-                .any(|stmt| matches!(stmt, Stmt::AnnAssign(_) | Stmt::Assign(_))))
+                .any(|stmt| stmt.is_ann_assign_stmt() || stmt.is_assign_stmt()))
     {
         return;
     }
@@ -179,7 +179,7 @@ impl FunctionLike<'_> {
         match self {
             Self::Lambda(expr) => Some(&expr.body),
             Self::Function(stmt) => match stmt.body.as_slice() {
-                [Stmt::Return(ast::StmtReturn { value, .. })] => value.as_deref(),
+                [Stmt::Return(return_node)] => return_node.value.as_deref(),
                 _ => None,
             },
         }

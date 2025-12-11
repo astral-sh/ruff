@@ -51,7 +51,7 @@ impl AlwaysFixableViolation for AssertFalse {
 }
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
-    Stmt::Raise(ast::StmtRaise {
+    Stmt::Raise(Box::new(ast::StmtRaise {
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         exc: Some(Box::new(Expr::Call(ast::ExprCall {
@@ -75,7 +75,7 @@ fn assertion_error(msg: Option<&Expr>) -> Stmt {
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         }))),
         cause: None,
-    })
+    }))
 }
 
 /// B011

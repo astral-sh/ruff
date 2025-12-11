@@ -12,11 +12,7 @@ use crate::SemanticModel;
 /// ```
 pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     match stmt {
-        Stmt::Expr(ast::StmtExpr {
-            value,
-            range: _,
-            node_index: _,
-        }) => match value.as_ref() {
+        Stmt::Expr(node) => match node.value.as_ref() {
             Expr::Call(ast::ExprCall { func, .. }) => semantic
                 .resolve_qualified_name(func.as_ref())
                 .is_some_and(|qualified_name| {
@@ -38,8 +34,8 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
                 }),
             _ => false,
         },
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
+        Stmt::AugAssign(node) => semantic
+            .resolve_qualified_name(map_subscript(&node.target))
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["sys", "path"])),
         _ => false,
     }
@@ -53,7 +49,7 @@ pub fn is_sys_path_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
 /// ```
 pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool {
     match stmt {
-        Stmt::Expr(ast::StmtExpr { value, .. }) => match value.as_ref() {
+        Stmt::Expr(node) => match node.value.as_ref() {
             Expr::Call(ast::ExprCall { func, .. }) => semantic
                 .resolve_qualified_name(func.as_ref())
                 .is_some_and(|qualified_name| {
@@ -69,25 +65,25 @@ pub fn is_os_environ_modification(stmt: &Stmt, semantic: &SemanticModel) -> bool
                 }),
             _ => false,
         },
-        Stmt::Delete(ast::StmtDelete { targets, .. }) => targets.iter().any(|target| {
+        Stmt::Delete(node) => node.targets.iter().any(|target| {
             semantic
                 .resolve_qualified_name(map_subscript(target))
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["os", "environ"])
                 })
         }),
-        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.iter().any(|target| {
+        Stmt::Assign(node) => node.targets.iter().any(|target| {
             semantic
                 .resolve_qualified_name(map_subscript(target))
                 .is_some_and(|qualified_name| {
                     matches!(qualified_name.segments(), ["os", "environ"])
                 })
         }),
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
+        Stmt::AnnAssign(node) => semantic
+            .resolve_qualified_name(map_subscript(&node.target))
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
-        Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => semantic
-            .resolve_qualified_name(map_subscript(target))
+        Stmt::AugAssign(node) => semantic
+            .resolve_qualified_name(map_subscript(&node.target))
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["os", "environ"])),
         _ => false,
     }

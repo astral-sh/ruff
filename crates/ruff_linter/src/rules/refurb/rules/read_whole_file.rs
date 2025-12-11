@@ -203,8 +203,8 @@ fn generate_fix(
     // The assignment's RHS must also be the same as the `read` call in `expr`, otherwise this fix
     // would remove the rest of the expression.
     let replacement = match with_stmt.body.as_slice() {
-        [Stmt::Assign(ast::StmtAssign { targets, value, .. })] if value.range() == expr.range() => {
-            match targets.as_slice() {
+        [Stmt::Assign(assign_node)] if assign_node.value.range() == expr.range() => {
+            match assign_node.targets.as_slice() {
                 [Expr::Name(name)] => {
                     format!(
                         "{name} = {binding}({filename_code}).{suggestion}",
@@ -214,23 +214,18 @@ fn generate_fix(
                 _ => return None,
             }
         }
-        [
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value: Some(value),
-                ..
-            }),
-        ] if value.range() == expr.range() => match target.as_ref() {
-            Expr::Name(name) => {
-                format!(
-                    "{var}: {ann} = {binding}({filename_code}).{suggestion}",
-                    var = name.id,
-                    ann = locator.slice(annotation.range())
-                )
+        [Stmt::AnnAssign(ann_assign_node)] if ann_assign_node.value.as_ref().is_some_and(|v| v.range() == expr.range()) => {
+            match ann_assign_node.target.as_ref() {
+                Expr::Name(name) => {
+                    format!(
+                        "{var}: {ann} = {binding}({filename_code}).{suggestion}",
+                        var = name.id,
+                        ann = locator.slice(ann_assign_node.annotation.range())
+                    )
+                }
+                _ => return None,
             }
-            _ => return None,
-        },
+        }
         _ => return None,
     };
 

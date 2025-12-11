@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
@@ -62,10 +62,13 @@ pub(crate) fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) {
 
     for statement in body {
         let value = match statement {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => value,
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value), ..
-            }) => value,
+            Stmt::Assign(assign) => &assign.value,
+            Stmt::AnnAssign(ann_assign) => {
+                match &ann_assign.value {
+                    Some(value) => value,
+                    None => continue,
+                }
+            }
             _ => continue,
         };
 

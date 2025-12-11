@@ -782,7 +782,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         for scope in self.semantic.current_scopes() {
             match scope.kind {
                 ScopeKind::Class(_) | ScopeKind::Lambda(_) => return false,
-                ScopeKind::Function(ast::StmtFunctionDef { is_async, .. }) => return *is_async,
+                ScopeKind::Function(function_def) => {
+                    let is_async = &function_def.is_async;
+                    return *is_async;
+                }
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -870,9 +873,13 @@ impl SemanticSyntaxContext for Checker<'_> {
 
         for parent in self.semantic.current_statements().skip(1) {
             match parent {
-                Stmt::For(ast::StmtFor { orelse, .. })
-                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                    if !orelse.contains(child) {
+                Stmt::For(node) => {
+                    if !node.orelse.contains(child) {
+                        return true;
+                    }
+                }
+                Stmt::While(node) => {
+                    if !node.orelse.contains(child) {
                         return true;
                     }
                 }
@@ -888,7 +895,8 @@ impl SemanticSyntaxContext for Checker<'_> {
 
     fn is_bound_parameter(&self, name: &str) -> bool {
         match self.semantic.current_scope().kind {
-            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
+            ScopeKind::Function(function_def) => {
+                let parameters = &function_def.parameters;
                 parameters.includes(name)
             }
             ScopeKind::Class(_)
@@ -932,12 +940,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
             {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
             }
-            Stmt::ImportFrom(ast::StmtImportFrom { module, names, .. }) => {
+            Stmt::ImportFrom(node) => {
                 self.semantic.flags |= SemanticModelFlags::MODULE_DOCSTRING_BOUNDARY;
 
                 // Allow __future__ imports until we see a non-__future__ import.
-                if let Some("__future__") = module.as_deref() {
-                    if names
+                if let Some("__future__") = node.module.as_deref() {
+                    if node
+                        .names
                         .iter()
                         .any(|alias| alias.name.as_str() == "annotations")
                     {
@@ -981,20 +990,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 1: Binding
         match stmt {
-            Stmt::AugAssign(ast::StmtAugAssign {
-                target,
-                op: _,
-                value: _,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::AugAssign(node) => {
+                let ast::StmtAugAssign {
+                    target,
+                    op: _,
+                    value: _,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 self.handle_node_load(target);
             }
-            Stmt::Import(ast::StmtImport {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Import(node) => {
+                let ast::StmtImport {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
@@ -1043,13 +1054,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::ImportFrom(ast::StmtImportFrom {
-                names,
-                module,
-                level,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::ImportFrom(node) => {
+                let ast::StmtImportFrom {
+                    names,
+                    module,
+                    level,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 if self.semantic.at_top_level() {
                     self.importer.visit_import(stmt);
                 }
@@ -1110,11 +1122,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Global(node) => {
+                let ast::StmtGlobal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         let binding_id = self.semantic.global_scope().get(name);
@@ -1136,11 +1149,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     }
                 }
             }
-            Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Nonlocal(node) => {
+                let ast::StmtNonlocal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 if !self.semantic.scope_id.is_global() {
                     for name in names {
                         if let Some((scope_id, binding_id)) = self.semantic.nonlocal(name) {
@@ -1174,17 +1188,13 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         // Step 2: Traversal
         match stmt {
-            Stmt::FunctionDef(
-                function_def @ ast::StmtFunctionDef {
-                    name,
-                    body,
-                    parameters,
-                    decorator_list,
-                    returns,
-                    type_params,
-                    ..
-                },
-            ) => {
+            Stmt::FunctionDef(function_def) => {
+                let name = &function_def.name;
+                let body = &function_def.body;
+                let parameters = &function_def.parameters;
+                let decorator_list = &function_def.decorator_list;
+                let returns = &function_def.returns;
+                let type_params = &function_def.type_params;
                 // Visit the decorators and arguments, but avoid the body, which will be
                 // deferred.
                 for decorator in decorator_list {
@@ -1313,16 +1323,12 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     BindingFlags::empty(),
                 );
             }
-            Stmt::ClassDef(
-                class_def @ ast::StmtClassDef {
-                    name,
-                    body,
-                    arguments,
-                    decorator_list,
-                    type_params,
-                    ..
-                },
-            ) => {
+            Stmt::ClassDef(class_def) => {
+                let name = &class_def.name;
+                let body = &class_def.body;
+                let arguments = &class_def.arguments;
+                let decorator_list = &class_def.decorator_list;
+                let type_params = &class_def.type_params;
                 for decorator in decorator_list {
                     self.visit_decorator(decorator);
                 }
@@ -1369,30 +1375,20 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     BindingFlags::empty(),
                 );
             }
-            Stmt::TypeAlias(ast::StmtTypeAlias {
-                range: _,
-                node_index: _,
-                name,
-                type_params,
-                value,
-            }) => {
+            Stmt::TypeAlias(node) => {
                 self.semantic.push_scope(ScopeKind::Type);
-                if let Some(type_params) = type_params {
+                if let Some(type_params) = &node.type_params {
                     self.visit_type_params(type_params);
                 }
-                self.visit_deferred_type_alias_value(value);
+                self.visit_deferred_type_alias_value(&node.value);
                 self.semantic.pop_scope();
-                self.visit_expr(name);
+                self.visit_expr(&node.name);
             }
-            Stmt::Try(
-                try_node @ ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                },
-            ) => {
+            Stmt::Try(try_node) => {
+                let body = &try_node.body;
+                let handlers = &try_node.handlers;
+                let orelse = &try_node.orelse;
+                let finalbody = &try_node.finalbody;
                 // Iterate over the `body`, then the `handlers`, then the `orelse`, then the
                 // `finalbody`, but treat the body and the `orelse` as a single branch for
                 // flow analysis purposes.
@@ -1418,64 +1414,60 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(finalbody);
                 self.semantic.pop_branch();
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                annotation,
-                value,
-                ..
-            }) => {
+            Stmt::AnnAssign(node) => {
                 match AnnotationContext::from_model(
                     &self.semantic,
                     self.settings(),
                     self.target_version(),
                 ) {
                     AnnotationContext::RuntimeRequired => {
-                        self.visit_runtime_required_annotation(annotation);
+                        self.visit_runtime_required_annotation(&node.annotation);
                     }
                     AnnotationContext::RuntimeEvaluated
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
-                            annotation,
+                            &node.annotation,
                             self.semantic(),
                         ) =>
                     {
-                        self.visit_runtime_required_annotation(annotation);
+                        self.visit_runtime_required_annotation(&node.annotation);
                     }
                     AnnotationContext::RuntimeEvaluated => {
-                        self.visit_runtime_evaluated_annotation(annotation);
+                        self.visit_runtime_evaluated_annotation(&node.annotation);
                     }
                     AnnotationContext::TypingOnly
                         if flake8_type_checking::helpers::is_dataclass_meta_annotation(
-                            annotation,
+                            &node.annotation,
                             self.semantic(),
                         ) =>
                     {
-                        if let Expr::Subscript(subscript) = &**annotation {
+                        if let Expr::Subscript(subscript) = &*node.annotation {
                             // Ex) `InitVar[str]`
                             self.visit_runtime_required_annotation(&subscript.value);
                             self.visit_annotation(&subscript.slice);
                         } else {
                             // Ex) `InitVar`
-                            self.visit_runtime_required_annotation(annotation);
+                            self.visit_runtime_required_annotation(&node.annotation);
                         }
                     }
-                    AnnotationContext::TypingOnly => self.visit_annotation(annotation),
+                    AnnotationContext::TypingOnly => self.visit_annotation(&node.annotation),
                 }
 
-                if let Some(expr) = value {
-                    if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if let Some(expr) = &node.value {
+                    if self.semantic.match_typing_expr(&node.annotation, "TypeAlias") {
                         self.visit_annotated_type_alias_value(expr);
                     } else {
                         self.visit_expr(expr);
                     }
                 }
-                self.visit_expr(target);
+                self.visit_expr(&node.target);
             }
-            Stmt::Assert(ast::StmtAssert {
-                test,
-                msg,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Assert(node) => {
+                let ast::StmtAssert {
+                    test,
+                    msg,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 let snapshot = self.semantic.flags;
                 self.semantic.flags |= SemanticModelFlags::ASSERT_STATEMENT;
                 self.visit_boolean_test(test);
@@ -1484,13 +1476,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 }
                 self.semantic.flags = snapshot;
             }
-            Stmt::With(ast::StmtWith {
-                items,
-                body,
-                is_async: _,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::With(node) => {
+                let ast::StmtWith {
+                    items,
+                    body,
+                    is_async: _,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 for item in items {
                     self.visit_with_item(item);
                 }
@@ -1498,26 +1491,22 @@ impl<'a> Visitor<'a> for Checker<'a> {
                 self.visit_body(body);
                 self.semantic.pop_branch();
             }
-            Stmt::While(ast::StmtWhile {
-                test,
-                body,
-                orelse,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::While(node) => {
+                let ast::StmtWhile {
+                    test,
+                    body,
+                    orelse,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 self.visit_boolean_test(test);
                 self.visit_body(body);
                 self.visit_body(orelse);
             }
-            Stmt::If(
-                stmt_if @ ast::StmtIf {
-                    test,
-                    body,
-                    elif_else_clauses,
-                    range: _,
-                    node_index: _,
-                },
-            ) => {
+            Stmt::If(stmt_if) => {
+                let test = &stmt_if.test;
+                let body = &stmt_if.body;
+                let elif_else_clauses = &stmt_if.elif_else_clauses;
                 self.visit_boolean_test(test);
 
                 self.semantic.push_branch();
@@ -1542,14 +1531,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
 
         if self.semantic().at_top_level() || self.semantic().current_scope().kind.is_class() {
             match stmt {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let [Expr::Name(_)] = targets.as_slice() {
+                Stmt::Assign(node) => {
+                    if let [Expr::Name(_)] = node.targets.as_slice() {
                         self.docstring_state =
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if target.is_name_expr() {
+                Stmt::AnnAssign(node) => {
+                    if node.target.is_name_expr() {
                         self.docstring_state =
                             DocstringState::Expected(ExpectedDocstringKind::Attribute);
                     }
@@ -2690,13 +2679,13 @@ impl<'a> Checker<'a> {
 
         match parent {
             Stmt::TypeAlias(_) => flags.insert(BindingFlags::DEFERRED_TYPE_ALIAS),
-            Stmt::AnnAssign(ast::StmtAnnAssign { annotation, .. }) => {
+            Stmt::AnnAssign(node) => {
                 // TODO: It is a bit unfortunate that we do this check twice
                 //       maybe we should change how we visit this statement
                 //       so the semantic flag for the type alias sticks around
                 //       until after we've handled this store, so we can check
                 //       the flag instead of duplicating this check
-                if self.semantic.match_typing_expr(annotation, "TypeAlias") {
+                if self.semantic.match_typing_expr(&node.annotation, "TypeAlias") {
                     flags.insert(BindingFlags::ANNOTATED_TYPE_ALIAS);
                 }
             }
@@ -2707,22 +2696,22 @@ impl<'a> Checker<'a> {
 
         if scope.kind.is_module()
             && match parent {
-                Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                    if let Some(Expr::Name(ast::ExprName { id, .. })) = targets.first() {
+                Stmt::Assign(node) => {
+                    if let Some(Expr::Name(ast::ExprName { id, .. })) = node.targets.first() {
                         id == "__all__"
                     } else {
                         false
                     }
                 }
-                Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                Stmt::AugAssign(node) => {
+                    if let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() {
                         id == "__all__"
                     } else {
                         false
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                    if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                Stmt::AnnAssign(node) => {
+                    if let Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() {
                         id == "__all__"
                     } else {
                         false
@@ -2765,10 +2754,8 @@ impl<'a> Checker<'a> {
         // Match the left-hand side of an annotated assignment without a value,
         // like `x` in `x: int`. N.B. In stub files, these should be viewed
         // as assignments on par with statements such as `x: int = 5`.
-        if matches!(
-            parent,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) && !self.semantic.in_annotation()
+        if matches!(parent, Stmt::AnnAssign(node) if node.value.is_none())
+            && !self.semantic.in_annotation()
         {
             self.add_binding(id, expr.range(), BindingKind::Annotation, flags);
             return;
@@ -3040,19 +3027,16 @@ impl<'a> Checker<'a> {
 
                 let stmt = self.semantic.current_statement();
 
-                let Stmt::FunctionDef(ast::StmtFunctionDef {
-                    body, parameters, ..
-                }) = stmt
-                else {
+                let Stmt::FunctionDef(node) = stmt else {
                     unreachable!("Expected Stmt::FunctionDef")
                 };
 
                 self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
 
-                self.visit_parameters(parameters);
+                self.visit_parameters(&node.parameters);
                 // Set the docstring state before visiting the function body.
                 self.docstring_state = DocstringState::Expected(ExpectedDocstringKind::Function);
-                self.visit_body(body);
+                self.visit_body(&node.body);
             }
         }
         self.semantic.restore(snapshot);

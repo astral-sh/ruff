@@ -41,23 +41,31 @@ impl Terminal {
 
         for stmt in stmts {
             match stmt {
-                Stmt::For(ast::StmtFor { body, orelse, .. })
-                | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                    if always_breaks(body) {
+                Stmt::For(node) => {
+                    if always_breaks(&node.body) {
                         continue;
                     }
 
-                    terminal = terminal.and_then(Self::from_body(body));
+                    terminal = terminal.and_then(Self::from_body(&node.body));
 
-                    if !sometimes_breaks(body) {
-                        terminal = terminal.and_then(Self::from_body(orelse));
+                    if !sometimes_breaks(&node.body) {
+                        terminal = terminal.and_then(Self::from_body(&node.orelse));
                     }
                 }
-                Stmt::If(ast::StmtIf {
-                    body,
-                    elif_else_clauses,
-                    ..
-                }) => {
+                Stmt::While(node) => {
+                    if always_breaks(&node.body) {
+                        continue;
+                    }
+
+                    terminal = terminal.and_then(Self::from_body(&node.body));
+
+                    if !sometimes_breaks(&node.body) {
+                        terminal = terminal.and_then(Self::from_body(&node.orelse));
+                    }
+                }
+                Stmt::If(node) => {
+                    let body = &node.body;
+                    let elif_else_clauses = &node.elif_else_clauses;
                     let branch_terminal = Terminal::branches(
                         std::iter::once(Self::from_body(body)).chain(
                             elif_else_clauses
@@ -77,14 +85,14 @@ impl Terminal {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
                 }
-                Stmt::Match(ast::StmtMatch { cases, .. }) => {
+                Stmt::Match(node) => {
                     let branch_terminal = terminal.and_then(Terminal::branches(
-                        cases.iter().map(|case| Self::from_body(&case.body)),
+                        node.cases.iter().map(|case| Self::from_body(&case.body)),
                     ));
 
                     // If the `match` is known to be exhaustive (by way of including a wildcard
                     // pattern)...
-                    if cases.iter().any(is_wildcard) {
+                    if node.cases.iter().any(is_wildcard) {
                         // And all branches return, then the `match` statement returns.
                         terminal = terminal.and_then(branch_terminal);
                     } else {
@@ -95,27 +103,21 @@ impl Terminal {
                         }
                     }
                 }
-                Stmt::Try(ast::StmtTry {
-                    body,
-                    handlers,
-                    orelse,
-                    finalbody,
-                    ..
-                }) => {
+                Stmt::Try(node) => {
                     // If the body returns, then this can't be a non-returning function. We assume
                     // that _any_ statement in the body could raise an exception, so we don't
                     // consider the body to be exhaustive. In other words, we assume the exception
                     // handlers exist for a reason.
-                    let body_terminal = Self::from_body(body);
+                    let body_terminal = Self::from_body(&node.body);
                     if body_terminal.has_any_return() {
                         terminal = terminal.and_then(Terminal::ConditionalReturn);
                     }
 
                     // If the `finally` block returns, the `try` block must also return. (Similarly,
                     // if the `finally` block raises, the `try` block must also raise.)
-                    terminal = terminal.and_then(Self::from_body(finalbody));
+                    terminal = terminal.and_then(Self::from_body(&node.finalbody));
 
-                    let branch_terminal = Terminal::branches(handlers.iter().map(|handler| {
+                    let branch_terminal = Terminal::branches(node.handlers.iter().map(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
@@ -123,7 +125,7 @@ impl Terminal {
                         Self::from_body(body)
                     }));
 
-                    if orelse.is_empty() {
+                    if node.orelse.is_empty() {
                         // If there's no `else`, we may fall through, so only mark that this can't
                         // be a non-returning function if any of the branches return.
                         if branch_terminal.has_any_return() {
@@ -133,11 +135,11 @@ impl Terminal {
                         // If there's an `else`, we won't fall through. If all the handlers and
                         // the `else` block return,, the `try` block also returns.
                         terminal =
-                            terminal.and_then(branch_terminal.branch(Terminal::from_body(orelse)));
+                            terminal.and_then(branch_terminal.branch(Terminal::from_body(&node.orelse)));
                     }
                 }
-                Stmt::With(ast::StmtWith { body, .. }) => {
-                    terminal = terminal.and_then(Self::from_body(body));
+                Stmt::With(node) => {
+                    terminal = terminal.and_then(Self::from_body(&node.body));
                 }
                 Stmt::Return(_) => {
                     terminal = terminal.and_then(Terminal::RaiseOrReturn);
@@ -247,62 +249,52 @@ impl Terminal {
 fn sometimes_breaks(stmts: &[Stmt]) -> bool {
     for stmt in stmts {
         match stmt {
-            Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_any_return() {
+            Stmt::For(node) => {
+                if Terminal::from_body(&node.body).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse) {
+                if sometimes_breaks(&node.orelse) {
                     return true;
                 }
             }
-            Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-                if Terminal::from_body(body).has_any_return() {
+            Stmt::While(node) => {
+                if Terminal::from_body(&node.body).has_any_return() {
                     return false;
                 }
-                if sometimes_breaks(orelse) {
+                if sometimes_breaks(&node.orelse) {
                     return true;
                 }
             }
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                if std::iter::once(body)
-                    .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+            Stmt::If(node) => {
+                if std::iter::once(&node.body)
+                    .chain(node.elif_else_clauses.iter().map(|clause| &clause.body))
                     .any(|body| sometimes_breaks(body))
                 {
                     return true;
                 }
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                if cases.iter().any(|case| sometimes_breaks(&case.body)) {
+            Stmt::Match(node) => {
+                if node.cases.iter().any(|case| sometimes_breaks(&case.body)) {
                     return true;
                 }
             }
-            Stmt::Try(ast::StmtTry {
-                body,
-                handlers,
-                orelse,
-                finalbody,
-                ..
-            }) => {
-                if sometimes_breaks(body)
-                    || handlers.iter().any(|handler| {
+            Stmt::Try(node) => {
+                if sometimes_breaks(&node.body)
+                    || node.handlers.iter().any(|handler| {
                         let ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                             body,
                             ..
                         }) = handler;
                         sometimes_breaks(body)
                     })
-                    || sometimes_breaks(orelse)
-                    || sometimes_breaks(finalbody)
+                    || sometimes_breaks(&node.orelse)
+                    || sometimes_breaks(&node.finalbody)
                 {
                     return true;
                 }
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
-                if sometimes_breaks(body) {
+            Stmt::With(node) => {
+                if sometimes_breaks(&node.body) {
                     return true;
                 }
             }

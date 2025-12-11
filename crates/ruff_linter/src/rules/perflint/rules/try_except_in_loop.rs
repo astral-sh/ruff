@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
-use ruff_python_ast::{self as ast, PythonVersion, Stmt};
+use ruff_python_ast::{PythonVersion, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -93,9 +93,11 @@ pub(crate) fn try_except_in_loop(checker: &Checker, body: &[Stmt]) {
         return;
     }
 
-    let [Stmt::Try(ast::StmtTry { handlers, body, .. })] = body else {
+    let [Stmt::Try(try_stmt)] = body else {
         return;
     };
+    let handlers = &try_stmt.handlers;
+    let body = &try_stmt.body;
 
     let Some(handler) = handlers.first() else {
         return;

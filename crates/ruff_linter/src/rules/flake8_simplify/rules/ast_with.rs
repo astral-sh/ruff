@@ -68,18 +68,10 @@ impl Violation for MultipleWithStatements {
 /// Returns a boolean indicating whether it's an async with statement, the items
 /// and body.
 fn next_with(body: &[Stmt]) -> Option<(bool, &[WithItem], &[Stmt])> {
-    let [
-        Stmt::With(ast::StmtWith {
-            is_async,
-            items,
-            body,
-            ..
-        }),
-    ] = body
-    else {
+    let [Stmt::With(node)] = body else {
         return None;
     };
-    Some((*is_async, items, body))
+    Some((node.is_async, &node.items, &node.body))
 }
 
 /// Check if `with_items` contains a single item which should not necessarily be
@@ -139,8 +131,8 @@ pub(crate) fn multiple_with_statements(
     //     with B(), C():
     //         print("hello")
     // ```
-    if let Some(Stmt::With(ast::StmtWith { body, .. })) = with_parent {
-        if body.len() == 1 {
+    if let Some(Stmt::With(node)) = with_parent {
+        if node.body.len() == 1 {
             return;
         }
     }

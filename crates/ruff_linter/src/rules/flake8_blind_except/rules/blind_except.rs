@@ -154,10 +154,12 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
             return;
         }
         match stmt {
-            Stmt::Raise(ast::StmtRaise { exc, cause, .. }) => {
+            Stmt::Raise(node) => {
+                let exc = node.exc.as_deref();
+                let cause = node.cause.as_deref();
                 // except Exception [as <name>]:
                 //     raise [<exc> [from <cause>]]
-                let reraised = match (self.name, exc.as_deref(), cause.as_deref()) {
+                let reraised = match (self.name, exc, cause) {
                     // `raise`
                     (_, None, None) => true,
                     // `raise SomeExc from <name>`

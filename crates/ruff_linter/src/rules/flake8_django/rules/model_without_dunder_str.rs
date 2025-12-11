@@ -72,7 +72,7 @@ pub(crate) fn model_without_dunder_str(checker: &Checker, class_def: &ast::StmtC
 fn has_dunder_method(class_def: &ast::StmtClassDef, semantic: &SemanticModel) -> bool {
     analyze::class::any_super_class(class_def, semantic, &|class_def| {
         class_def.body.iter().any(|val| match val {
-            Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => name == "__str__",
+            Stmt::FunctionDef(node) => node.name.as_str() == "__str__",
             _ => false,
         })
     })
@@ -90,24 +90,25 @@ fn is_non_abstract_model(class_def: &ast::StmtClassDef, semantic: &SemanticModel
 /// Check if class is abstract, in terms of Django model inheritance.
 fn is_model_abstract(class_def: &ast::StmtClassDef) -> bool {
     for element in &class_def.body {
-        let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
+        let Stmt::ClassDef(node) = element else {
             continue;
         };
-        if name != "Meta" {
+        if node.name.as_str() != "Meta" {
             continue;
         }
-        for element in body {
+        for element in &node.body {
             match element {
-                Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                    if targets
+                Stmt::Assign(assign) => {
+                    if assign
+                        .targets
                         .iter()
-                        .any(|target| is_abstract_true_assignment(target, Some(value)))
+                        .any(|target| is_abstract_true_assignment(target, Some(&assign.value)))
                     {
                         return true;
                     }
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                    if is_abstract_true_assignment(target, value.as_deref()) {
+                Stmt::AnnAssign(ann_assign) => {
+                    if is_abstract_true_assignment(&ann_assign.target, ann_assign.value.as_deref()) {
                         return true;
                     }
                 }

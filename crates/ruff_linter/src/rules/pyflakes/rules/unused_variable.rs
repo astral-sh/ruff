@@ -4,7 +4,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::token::{TokenKind, Tokens};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
 use ruff_python_semantic::Binding;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
@@ -161,14 +161,14 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
 
     // First case: simple assignment (`x = 1`)
-    if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = statement {
-        if let Some(target) = targets
+    if let Stmt::Assign(node) = statement {
+        if let Some(target) = node.targets
             .iter()
             .find(|target| binding.range() == target.range())
         {
             if target.is_name_expr() {
-                return if targets.len() > 1
-                    || contains_effect(value, |id| checker.semantic().has_builtin_binding(id))
+                return if node.targets.len() > 1
+                    || contains_effect(&node.value, |id| checker.semantic().has_builtin_binding(id))
                 {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
@@ -200,35 +200,32 @@ fn remove_unused_variable(binding: &Binding, checker: &Checker) -> Option<Fix> {
     }
 
     // Second case: simple annotated assignment (`x: int = 1`)
-    if let Stmt::AnnAssign(ast::StmtAnnAssign {
-        target,
-        value: Some(value),
-        ..
-    }) = statement
-    {
-        if target.is_name_expr() {
-            return if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
-                // If the expression is complex (`x = foo()`), remove the assignment,
-                // but preserve the right-hand side.
-                let start = statement.start();
-                let end =
-                    match_token_after(checker.tokens(), start, |token| token == TokenKind::Equal)?
-                        .start();
-                let edit = Edit::deletion(start, end);
-                Some(Fix::unsafe_edit(edit))
-            } else {
-                // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
-                Some(Fix::unsafe_edit(edit).isolate(isolation))
-            };
+    if let Stmt::AnnAssign(node) = statement {
+        if let Some(value) = &node.value {
+            if node.target.is_name_expr() {
+                return if contains_effect(value, |id| checker.semantic().has_builtin_binding(id)) {
+                    // If the expression is complex (`x = foo()`), remove the assignment,
+                    // but preserve the right-hand side.
+                    let start = statement.start();
+                    let end =
+                        match_token_after(checker.tokens(), start, |token| token == TokenKind::Equal)?
+                            .start();
+                    let edit = Edit::deletion(start, end);
+                    Some(Fix::unsafe_edit(edit))
+                } else {
+                    // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
+                    let edit = delete_stmt(statement, parent, checker.locator(), checker.indexer());
+                    Some(Fix::unsafe_edit(edit).isolate(isolation))
+                };
+            }
         }
     }
 
     // Third case: with_item (`with foo() as x:`)
-    if let Stmt::With(ast::StmtWith { items, .. }) = statement {
+    if let Stmt::With(node) = statement {
         // Find the binding that matches the given `Range`.
         // TODO(charlie): Store the `WithItem` in the `Binding`.
-        for item in items {
+        for item in &node.items {
             if let Some(optional_vars) = &item.optional_vars {
                 if optional_vars.range() == binding.range() {
                     // Find the first token before the `as` keyword.

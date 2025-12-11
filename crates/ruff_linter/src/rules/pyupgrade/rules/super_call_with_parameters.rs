@@ -97,15 +97,13 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     // Find the enclosing function definition (if any).
-    let Some(
-        func_stmt @ Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters: parent_parameters,
-            ..
-        }),
-    ) = parents.find(|stmt| stmt.is_function_def_stmt())
-    else {
+    let Some(func_stmt) = parents.find(|stmt| stmt.is_function_def_stmt()) else {
         return;
     };
+    let Stmt::FunctionDef(func_def) = func_stmt else {
+        return;
+    };
+    let parent_parameters = &func_def.parameters;
 
     if is_builtins_super(checker.semantic(), call)
         && !has_local_dunder_class_var_ref(checker.semantic(), func_stmt)
@@ -119,14 +117,14 @@ pub(crate) fn super_call_with_parameters(checker: &Checker, call: &ast::ExprCall
     };
 
     // Find the enclosing class definition (if any).
-    let Some(Stmt::ClassDef(ast::StmtClassDef {
-        name: parent_name,
-        decorator_list,
-        ..
-    })) = parents.find(|stmt| stmt.is_class_def_stmt())
-    else {
+    let Some(class_stmt) = parents.find(|stmt| stmt.is_class_def_stmt()) else {
         return;
     };
+    let Stmt::ClassDef(class_def) = class_stmt else {
+        return;
+    };
+    let parent_name = &class_def.name;
+    let decorator_list = &class_def.decorator_list;
 
     let (
         Expr::Name(ast::ExprName {
@@ -252,13 +250,11 @@ impl ClassCellReferenceFinder {
 
 impl<'a> Visitor<'a> for ClassCellReferenceFinder {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
-        match stmt {
-            Stmt::ClassDef(_) => {}
-            _ => {
-                if !self.has_class_cell {
-                    walk_stmt(self, stmt);
-                }
-            }
+        if stmt.is_class_def_stmt() {
+            return;
+        }
+        if !self.has_class_cell {
+            walk_stmt(self, stmt);
         }
     }
 

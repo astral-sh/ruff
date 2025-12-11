@@ -1,41 +1,32 @@
 //! Utilities for manually traversing a Python AST.
-use crate::{self as ast, AnyNodeRef, ExceptHandler, Stmt};
+use crate::{AnyNodeRef, ExceptHandler, Stmt};
 
 /// Given a [`Stmt`] and its parent, return the [`ast::Suite`] that contains the [`Stmt`].
 pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<EnclosingSuite<'a>> {
     // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
     match parent {
-        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::ClassDef(ast::StmtClassDef { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::For(ast::StmtFor { body, orelse, .. }) => [body, orelse]
+        Stmt::FunctionDef(node) => EnclosingSuite::new(&node.body, stmt),
+        Stmt::ClassDef(node) => EnclosingSuite::new(&node.body, stmt),
+        Stmt::For(node) => [&node.body, &node.orelse]
             .iter()
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => [body, orelse]
+        Stmt::While(node) => [&node.body, &node.orelse]
             .iter()
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => [body]
+        Stmt::If(node) => [&node.body]
             .into_iter()
-            .chain(elif_else_clauses.iter().map(|clause| &clause.body))
+            .chain(node.elif_else_clauses.iter().map(|clause| &clause.body))
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::With(ast::StmtWith { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
+        Stmt::With(node) => EnclosingSuite::new(&node.body, stmt),
+        Stmt::Match(node) => node
+            .cases
             .iter()
             .map(|case| &case.body)
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => [body, orelse, finalbody]
+        Stmt::Try(node) => [&node.body, &node.orelse, &node.finalbody]
             .into_iter()
             .chain(
-                handlers
+                node.handlers
                     .iter()
                     .filter_map(ExceptHandler::as_except_handler)
                     .map(|handler| &handler.body),

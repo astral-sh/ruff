@@ -62,11 +62,11 @@ impl<'semantic, 'data> ReturnVisitor<'semantic, 'data> {
 impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::ClassDef(ast::StmtClassDef { decorator_list, .. }) => {
+            Stmt::ClassDef(node) => {
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
                 self.parents.push(stmt);
-                for decorator in decorator_list {
+                for decorator in &node.decorator_list {
                     visitor::walk_decorator(self, decorator);
                 }
                 self.parents.pop();
@@ -74,12 +74,15 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 // But don't recurse into the body.
                 return;
             }
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters,
-                decorator_list,
-                returns,
-                ..
-            }) => {
+            Stmt::FunctionDef(node) => {
+                let ast::StmtFunctionDef {
+                    parameters,
+                    decorator_list,
+                    returns,
+                    range: _,
+                    node_index: _,
+                    ..
+                } = &**node;
                 // Visit the decorators, etc.
                 self.sibling = Some(stmt);
                 self.parents.push(stmt);
@@ -95,24 +98,30 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                 // But don't recurse into the body.
                 return;
             }
-            Stmt::Global(ast::StmtGlobal {
-                names,
-                range: _,
-                node_index: _,
-            })
-            | Stmt::Nonlocal(ast::StmtNonlocal {
-                names,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::Global(node) => {
+                let ast::StmtGlobal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
                 self.stack
                     .non_locals
                     .extend(names.iter().map(Identifier::as_str));
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+            Stmt::Nonlocal(node) => {
+                let ast::StmtNonlocal {
+                    names,
+                    range: _,
+                    node_index: _,
+                } = &**node;
+                self.stack
+                    .non_locals
+                    .extend(names.iter().map(Identifier::as_str));
+            }
+            Stmt::AnnAssign(node) => {
                 // Ex) `x: int`
-                if value.is_none() {
-                    if let Expr::Name(name) = target.as_ref() {
+                if node.value.is_none() {
+                    if let Expr::Name(name) = node.target.as_ref() {
                         self.stack.annotations.insert(name.id.as_str());
                     }
                 }
@@ -140,11 +149,11 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
                         //         x = f.read()
                         //     return x
                         // ```
-                        Stmt::With(with) => {
+                        Stmt::With(with_node) => {
                             if let Some(stmt_assign) =
-                                with.body.last().and_then(Stmt::as_assign_stmt)
+                                with_node.body.last().and_then(Stmt::as_assign_stmt)
                             {
-                                if !has_conditional_body(with, self.semantic) {
+                                if !has_conditional_body(with_node, self.semantic) {
                                     self.stack.assignment_return.push((
                                         stmt_assign,
                                         stmt_return,
@@ -159,11 +168,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'_, 'a> {
 
                 self.stack.returns.push(stmt_return);
             }
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
+            Stmt::If(node) => {
+                let ast::StmtIf {
+                    body,
+                    elif_else_clauses,
+                    range: _,
+                    node_index: _,
+                    ..
+                } = &**node;
                 if let Some(first) = elif_else_clauses.first() {
                     self.stack.elifs_elses.push((body, first));
                 }

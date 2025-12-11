@@ -236,9 +236,10 @@ impl<'a> Importer<'a> {
         semantic: &SemanticModel<'a>,
         type_checking_block: &Stmt,
     ) -> Option<&'a Stmt> {
-        let Stmt::If(ast::StmtIf { test, .. }) = type_checking_block else {
+        let Stmt::If(node) = type_checking_block else {
             return None;
         };
+        let test = &node.test;
 
         let mut source = test;
         while let Expr::Attribute(ast::ExprAttribute { value, .. }) = source.as_ref() {
@@ -453,17 +454,10 @@ impl<'a> Importer<'a> {
             if stmt.start() >= at {
                 break;
             }
-            if let Stmt::ImportFrom(ast::StmtImportFrom {
-                module: name,
-                names,
-                level,
-                range: _,
-                node_index: _,
-            }) = stmt
-            {
-                if *level == 0
-                    && name.as_ref().is_some_and(|name| name == module)
-                    && names.iter().all(|alias| alias.name.as_str() != "*")
+            if let Stmt::ImportFrom(node) = stmt {
+                if node.level == 0
+                    && node.module.as_ref().is_some_and(|name| name == module)
+                    && node.names.iter().all(|alias| alias.name.as_str() != "*")
                 {
                     import_from = Some(*stmt);
                 }

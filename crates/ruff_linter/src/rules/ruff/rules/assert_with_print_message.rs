@@ -65,12 +65,12 @@ pub(crate) fn assert_with_print_message(checker: &Checker, stmt: &ast::StmtAsser
             // This is the confirmed rule condition
             let mut diagnostic = checker.report_diagnostic(AssertWithPrintMessage, call.range());
             diagnostic.set_fix(Fix::unsafe_edit(Edit::range_replacement(
-                checker.generator().stmt(&Stmt::Assert(ast::StmtAssert {
+                checker.generator().stmt(&Stmt::Assert(Box::new(ast::StmtAssert {
                     test: stmt.test.clone(),
                     msg: print_arguments::to_expr(&call.arguments, checker).map(Box::new),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                })),
+                }))),
                 // We have to replace the entire statement,
                 // as the `print` could be empty and thus `call.range()`
                 // will cease to exist.

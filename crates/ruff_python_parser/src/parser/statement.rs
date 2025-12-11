@@ -114,13 +114,13 @@ impl<'src> Parser<'src> {
         let start = self.node_start();
 
         match self.current_token_kind() {
-            TokenKind::If => Stmt::If(self.parse_if_statement()),
-            TokenKind::For => Stmt::For(self.parse_for_statement(start)),
-            TokenKind::While => Stmt::While(self.parse_while_statement()),
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(vec![], start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(vec![], start)),
-            TokenKind::Try => Stmt::Try(self.parse_try_statement()),
-            TokenKind::With => Stmt::With(self.parse_with_statement(start)),
+            TokenKind::If => self.parse_if_statement().into(),
+            TokenKind::For => self.parse_for_statement(start).into(),
+            TokenKind::While => self.parse_while_statement().into(),
+            TokenKind::Def => self.parse_function_definition(vec![], start).into(),
+            TokenKind::Class => self.parse_class_definition(vec![], start).into(),
+            TokenKind::Try => self.parse_try_statement().into(),
+            TokenKind::With => self.parse_with_statement(start).into(),
             TokenKind::At => self.parse_decorators(),
             TokenKind::Async => self.parse_async_statement(),
             token => {
@@ -130,11 +130,11 @@ impl<'src> Parser<'src> {
 
                     match self.classify_match_token() {
                         MatchTokenKind::Keyword => {
-                            return Stmt::Match(self.parse_match_statement());
+                            return self.parse_match_statement().into();
                         }
                         MatchTokenKind::KeywordOrIdentifier => {
                             if let Some(match_stmt) = self.try_parse_match_statement() {
-                                return Stmt::Match(match_stmt);
+                                return match_stmt.into();
                             }
                         }
                         MatchTokenKind::Identifier => {}
@@ -262,19 +262,19 @@ impl<'src> Parser<'src> {
     /// See: <https://docs.python.org/3/reference/simple_stmts.html>
     fn parse_simple_statement(&mut self) -> Stmt {
         match self.current_token_kind() {
-            TokenKind::Return => Stmt::Return(self.parse_return_statement()),
-            TokenKind::Import => Stmt::Import(self.parse_import_statement()),
-            TokenKind::From => Stmt::ImportFrom(self.parse_from_import_statement()),
-            TokenKind::Pass => Stmt::Pass(self.parse_pass_statement()),
-            TokenKind::Continue => Stmt::Continue(self.parse_continue_statement()),
-            TokenKind::Break => Stmt::Break(self.parse_break_statement()),
-            TokenKind::Raise => Stmt::Raise(self.parse_raise_statement()),
-            TokenKind::Del => Stmt::Delete(self.parse_delete_statement()),
-            TokenKind::Assert => Stmt::Assert(self.parse_assert_statement()),
-            TokenKind::Global => Stmt::Global(self.parse_global_statement()),
-            TokenKind::Nonlocal => Stmt::Nonlocal(self.parse_nonlocal_statement()),
+            TokenKind::Return => self.parse_return_statement().into(),
+            TokenKind::Import => self.parse_import_statement().into(),
+            TokenKind::From => self.parse_from_import_statement().into(),
+            TokenKind::Pass => self.parse_pass_statement().into(),
+            TokenKind::Continue => self.parse_continue_statement().into(),
+            TokenKind::Break => self.parse_break_statement().into(),
+            TokenKind::Raise => self.parse_raise_statement().into(),
+            TokenKind::Del => self.parse_delete_statement().into(),
+            TokenKind::Assert => self.parse_assert_statement().into(),
+            TokenKind::Global => self.parse_global_statement().into(),
+            TokenKind::Nonlocal => self.parse_nonlocal_statement().into(),
             TokenKind::IpyEscapeCommand => {
-                Stmt::IpyEscapeCommand(self.parse_ipython_escape_command_statement())
+                self.parse_ipython_escape_command_statement().into()
             }
             token => {
                 if token == TokenKind::Type {
@@ -285,7 +285,7 @@ impl<'src> Parser<'src> {
                     if (first == TokenKind::Name || first.is_soft_keyword())
                         && matches!(second, TokenKind::Lsqb | TokenKind::Equal)
                     {
-                        return Stmt::TypeAlias(self.parse_type_alias_statement());
+                        return self.parse_type_alias_statement().into();
                     }
                 }
 
@@ -296,19 +296,17 @@ impl<'src> Parser<'src> {
                     self.parse_expression_list(ExpressionContext::yield_or_starred_bitwise_or());
 
                 if self.at(TokenKind::Equal) {
-                    Stmt::Assign(self.parse_assign_statement(parsed_expr, start))
+                    self.parse_assign_statement(parsed_expr, start).into()
                 } else if self.at(TokenKind::Colon) {
-                    Stmt::AnnAssign(self.parse_annotated_assignment_statement(parsed_expr, start))
+                    self.parse_annotated_assignment_statement(parsed_expr, start).into()
                 } else if let Some(op) = self.current_token_kind().as_augmented_assign_operator() {
-                    Stmt::AugAssign(self.parse_augmented_assignment_statement(
+                    self.parse_augmented_assignment_statement(
                         parsed_expr,
                         op,
                         start,
-                    ))
+                    ).into()
                 } else if self.options.mode == Mode::Ipython && self.at(TokenKind::Question) {
-                    Stmt::IpyEscapeCommand(
-                        self.parse_ipython_help_end_escape_command_statement(&parsed_expr),
-                    )
+                    self.parse_ipython_help_end_escape_command_statement(&parsed_expr).into()
                 } else {
                     Stmt::Expr(ast::StmtExpr {
                         range: self.node_range(start),
@@ -2728,24 +2726,24 @@ impl<'src> Parser<'src> {
         match self.current_token_kind() {
             // test_ok async_function_definition
             // async def foo(): ...
-            TokenKind::Def => Stmt::FunctionDef(ast::StmtFunctionDef {
+            TokenKind::Def => ast::StmtFunctionDef {
                 is_async: true,
                 ..self.parse_function_definition(vec![], async_start)
-            }),
+            }.into(),
 
             // test_ok async_with_statement
             // async with item: ...
-            TokenKind::With => Stmt::With(ast::StmtWith {
+            TokenKind::With => ast::StmtWith {
                 is_async: true,
                 ..self.parse_with_statement(async_start)
-            }),
+            }.into(),
 
             // test_ok async_for_statement
             // async for target in iter: ...
-            TokenKind::For => Stmt::For(ast::StmtFor {
+            TokenKind::For => ast::StmtFor {
                 is_async: true,
                 ..self.parse_for_statement(async_start)
-            }),
+            }.into(),
 
             kind => {
                 // test_err async_unexpected_token
@@ -2888,18 +2886,18 @@ impl<'src> Parser<'src> {
         }
 
         match self.current_token_kind() {
-            TokenKind::Def => Stmt::FunctionDef(self.parse_function_definition(decorators, start)),
-            TokenKind::Class => Stmt::ClassDef(self.parse_class_definition(decorators, start)),
+            TokenKind::Def => self.parse_function_definition(decorators, start).into(),
+            TokenKind::Class => self.parse_class_definition(decorators, start).into(),
             TokenKind::Async if self.peek() == TokenKind::Def => {
                 self.bump(TokenKind::Async);
 
                 // test_ok decorator_async_function
                 // @decorator
                 // async def foo(): ...
-                Stmt::FunctionDef(ast::StmtFunctionDef {
+                ast::StmtFunctionDef {
                     is_async: true,
                     ..self.parse_function_definition(decorators, start)
-                })
+                }.into()
             }
             _ => {
                 // test_err decorator_unexpected_token

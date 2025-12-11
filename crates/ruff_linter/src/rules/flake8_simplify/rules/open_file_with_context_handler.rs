@@ -68,8 +68,8 @@ fn match_async_exit_stack(semantic: &SemanticModel) -> bool {
         return false;
     }
     for parent in semantic.current_statements() {
-        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
-            for item in items {
+        if let Stmt::With(node) = parent {
+            for item in &node.items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic
                         .resolve_qualified_name(func)
@@ -102,8 +102,8 @@ fn match_exit_stack(semantic: &SemanticModel) -> bool {
         return false;
     }
     for parent in semantic.current_statements() {
-        if let Stmt::With(ast::StmtWith { items, .. }) = parent {
-            for item in items {
+        if let Stmt::With(node) = parent {
+            for item in &node.items {
                 if let Expr::Call(ast::ExprCall { func, .. }) = &item.context_expr {
                     if semantic
                         .resolve_qualified_name(func)

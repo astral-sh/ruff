@@ -109,21 +109,14 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
         //     if z:
         //         filtered.append(x)
         // ```
-        [
-            ast::Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                test,
-                ..
-            }),
-        ] => {
-            if !elif_else_clauses.is_empty() {
+        [ast::Stmt::If(node)] => {
+            if !node.elif_else_clauses.is_empty() {
                 return;
             }
-            let [stmt] = body.as_slice() else {
+            let [stmt] = node.body.as_slice() else {
                 return;
             };
-            (stmt, Some(test))
+            (stmt, Some(&node.test))
         }
         // ```python
         // for x in y:
@@ -267,8 +260,8 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
 
     let list_binding_stmt = list_binding.statement(checker.semantic());
     let list_binding_value = list_binding_stmt.and_then(|binding_stmt| match binding_stmt {
-        ast::Stmt::AnnAssign(assign) => assign.value.as_deref(),
-        ast::Stmt::Assign(assign) => Some(&assign.value),
+        ast::Stmt::AnnAssign(node) => node.value.as_deref(),
+        ast::Stmt::Assign(node) => Some(&node.value),
         _ => None,
     });
 
@@ -304,7 +297,7 @@ pub(crate) fn manual_list_comprehension(checker: &Checker, for_stmt: &ast::StmtF
     // but not necessarily, so this needs to be manually fixed. This does not apply when using an extend.
     let binding_has_one_target = list_binding_stmt.is_some_and(|binding_stmt| match binding_stmt {
         ast::Stmt::AnnAssign(_) => true,
-        ast::Stmt::Assign(assign) => assign.targets.len() == 1,
+        ast::Stmt::Assign(node) => node.targets.len() == 1,
         _ => false,
     });
 
@@ -464,8 +457,8 @@ fn convert_to_list_extend(
             let binding_stmt = binding.statement(semantic);
             let binding_stmt_range = binding_stmt
                 .and_then(|stmt| match stmt {
-                    ast::Stmt::AnnAssign(assign) => Some(assign.range),
-                    ast::Stmt::Assign(assign) => Some(assign.range),
+                    ast::Stmt::AnnAssign(node) => Some(node.range),
+                    ast::Stmt::Assign(node) => Some(node.range),
                     _ => None,
                 })
                 .ok_or(anyhow!(

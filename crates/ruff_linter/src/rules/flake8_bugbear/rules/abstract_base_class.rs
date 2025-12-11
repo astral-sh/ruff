@@ -173,23 +173,20 @@ pub(crate) fn abstract_base_class(
         // If an ABC declares an attribute by providing a type annotation
         // but does not actually assign a value for that attribute,
         // assume it is intended to be an "abstract attribute"
-        if matches!(
-            stmt,
-            Stmt::AnnAssign(ast::StmtAnnAssign { value: None, .. })
-        ) {
-            has_abstract_method = true;
-            continue;
+        if let Stmt::AnnAssign(node) = stmt {
+            if node.value.is_none() {
+                has_abstract_method = true;
+                continue;
+            }
         }
 
-        let Stmt::FunctionDef(ast::StmtFunctionDef {
-            decorator_list,
-            body,
-            name: method_name,
-            ..
-        }) = stmt
-        else {
+        let Stmt::FunctionDef(node) = stmt else {
             continue;
         };
+
+        let decorator_list = &node.decorator_list;
+        let body = &node.body;
+        let method_name = &node.name;
 
         let has_abstract_decorator = is_abstract(decorator_list, checker.semantic());
         has_abstract_method |= has_abstract_decorator;

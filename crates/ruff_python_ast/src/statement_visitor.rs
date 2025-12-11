@@ -29,51 +29,41 @@ pub fn walk_body<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, body: &'
 
 pub fn walk_stmt<'a, V: StatementVisitor<'a> + ?Sized>(visitor: &mut V, stmt: &'a Stmt) {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => {
-            visitor.visit_body(body);
+        Stmt::FunctionDef(node) => {
+            visitor.visit_body(&node.body);
         }
-        Stmt::For(ast::StmtFor { body, orelse, .. }) => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
+        Stmt::For(node) => {
+            visitor.visit_body(&node.body);
+            visitor.visit_body(&node.orelse);
         }
-        Stmt::ClassDef(ast::StmtClassDef { body, .. }) => {
-            visitor.visit_body(body);
+        Stmt::ClassDef(node) => {
+            visitor.visit_body(&node.body);
         }
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            visitor.visit_body(body);
-            visitor.visit_body(orelse);
+        Stmt::While(node) => {
+            visitor.visit_body(&node.body);
+            visitor.visit_body(&node.orelse);
         }
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            visitor.visit_body(body);
-            for clause in elif_else_clauses {
+        Stmt::If(node) => {
+            visitor.visit_body(&node.body);
+            for clause in &node.elif_else_clauses {
                 visitor.visit_elif_else_clause(clause);
             }
         }
-        Stmt::With(ast::StmtWith { body, .. }) => {
-            visitor.visit_body(body);
+        Stmt::With(node) => {
+            visitor.visit_body(&node.body);
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            for match_case in cases {
+        Stmt::Match(node) => {
+            for match_case in &node.cases {
                 visitor.visit_match_case(match_case);
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            visitor.visit_body(body);
-            for except_handler in handlers {
+        Stmt::Try(node) => {
+            visitor.visit_body(&node.body);
+            for except_handler in &node.handlers {
                 visitor.visit_except_handler(except_handler);
             }
-            visitor.visit_body(orelse);
-            visitor.visit_body(finalbody);
+            visitor.visit_body(&node.orelse);
+            visitor.visit_body(&node.finalbody);
         }
         _ => {}
     }

@@ -1,4 +1,4 @@
-use ruff_python_ast::{Stmt, StmtTry};
+use ruff_python_ast::Stmt;
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::{Ranged, TextSize};
 
@@ -8,9 +8,10 @@ pub(super) fn outside_handlers(offset: TextSize, semantic: &SemanticModel) -> bo
             break;
         }
 
-        let Stmt::Try(StmtTry { handlers, .. }) = stmt else {
+        let Stmt::Try(try_stmt) = stmt else {
             continue;
         };
+        let handlers = &try_stmt.handlers;
 
         if handlers
             .iter()

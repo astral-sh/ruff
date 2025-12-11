@@ -3626,7 +3626,9 @@ mod tests {
     #[test]
     #[cfg(target_pointer_width = "64")]
     fn size() {
-        assert_eq!(std::mem::size_of::<Stmt>(), 128);
+        // Stmt variants are boxed to reduce the enum size from 128 to 32 bytes.
+        // Only Return, Expr, Pass, Break, Continue remain unboxed.
+        assert_eq!(std::mem::size_of::<Stmt>(), 32);
         assert_eq!(std::mem::size_of::<StmtFunctionDef>(), 128);
         assert_eq!(std::mem::size_of::<StmtClassDef>(), 120);
         assert_eq!(std::mem::size_of::<StmtTry>(), 112);

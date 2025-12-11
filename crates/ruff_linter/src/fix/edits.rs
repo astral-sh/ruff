@@ -127,8 +127,8 @@ pub(crate) fn make_redundant_alias<'a>(
     stmt: &Stmt,
 ) -> Vec<Edit> {
     let aliases = match stmt {
-        Stmt::Import(ast::StmtImport { names, .. }) => names,
-        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => names,
+        Stmt::Import(node) => &node.names,
+        Stmt::ImportFrom(node) => &node.names,
         _ => {
             return Vec::new();
         }
@@ -404,43 +404,46 @@ fn is_only<T: PartialEq>(vec: &[T], value: &T) -> bool {
 /// Determine if a child is the only statement in its body.
 fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
     match parent {
-        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. })
-        | Stmt::ClassDef(ast::StmtClassDef { body, .. })
-        | Stmt::With(ast::StmtWith { body, .. }) => {
-            if is_only(body, child) {
+        Stmt::FunctionDef(node) => {
+            if is_only(&node.body, child) {
                 return true;
             }
         }
-        Stmt::For(ast::StmtFor { body, orelse, .. })
-        | Stmt::While(ast::StmtWhile { body, orelse, .. }) => {
-            if is_only(body, child) || is_only(orelse, child) {
+        Stmt::ClassDef(node) => {
+            if is_only(&node.body, child) {
                 return true;
             }
         }
-        Stmt::If(ast::StmtIf {
-            body,
-            elif_else_clauses,
-            ..
-        }) => {
-            if is_only(body, child)
-                || elif_else_clauses
+        Stmt::With(node) => {
+            if is_only(&node.body, child) {
+                return true;
+            }
+        }
+        Stmt::For(node) => {
+            if is_only(&node.body, child) || is_only(&node.orelse, child) {
+                return true;
+            }
+        }
+        Stmt::While(node) => {
+            if is_only(&node.body, child) || is_only(&node.orelse, child) {
+                return true;
+            }
+        }
+        Stmt::If(node) => {
+            if is_only(&node.body, child)
+                || node
+                    .elif_else_clauses
                     .iter()
                     .any(|ast::ElifElseClause { body, .. }| is_only(body, child))
             {
                 return true;
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            ..
-        }) => {
-            if is_only(body, child)
-                || is_only(orelse, child)
-                || is_only(finalbody, child)
-                || handlers.iter().any(|handler| match handler {
+        Stmt::Try(node) => {
+            if is_only(&node.body, child)
+                || is_only(&node.orelse, child)
+                || is_only(&node.finalbody, child)
+                || node.handlers.iter().any(|handler| match handler {
                     ExceptHandler::ExceptHandler(ast::ExceptHandlerExceptHandler {
                         body, ..
                     }) => is_only(body, child),
@@ -449,8 +452,8 @@ fn is_lone_child(child: &Stmt, parent: &Stmt) -> bool {
                 return true;
             }
         }
-        Stmt::Match(ast::StmtMatch { cases, .. }) => {
-            if cases.iter().any(|case| is_only(&case.body, child)) {
+        Stmt::Match(node) => {
+            if node.cases.iter().any(|case| is_only(&case.body, child)) {
                 return true;
             }
         }

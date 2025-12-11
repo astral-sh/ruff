@@ -58,11 +58,11 @@ impl Violation for NonUniqueEnums {
 pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) {
     let semantic = checker.semantic();
 
-    let Stmt::ClassDef(parent) = parent else {
+    let Stmt::ClassDef(class_def) = parent else {
         return;
     };
 
-    if !parent.bases().iter().any(|expr| {
+    if !class_def.bases().iter().any(|expr| {
         semantic
             .resolve_qualified_name(expr)
             .is_some_and(|qualified_name| matches!(qualified_name.segments(), ["enum", "Enum"]))
@@ -72,9 +72,10 @@ pub(crate) fn non_unique_enums(checker: &Checker, parent: &Stmt, body: &[Stmt]) 
 
     let mut seen_targets: FxHashSet<ComparableExpr> = FxHashSet::default();
     for stmt in body {
-        let Stmt::Assign(ast::StmtAssign { value, .. }) = stmt else {
+        let Stmt::Assign(assign_stmt) = stmt else {
             continue;
         };
+        let value = &assign_stmt.value;
 
         if is_call_to_enum_auto(semantic, value) {
             continue;

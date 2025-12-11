@@ -62,26 +62,24 @@ impl Violation for SingleStringSlots {
 pub(crate) fn single_string_slots(checker: &Checker, class: &StmtClassDef) {
     for stmt in &class.body {
         match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                for target in targets {
+            Stmt::Assign(assign) => {
+                for target in &assign.targets {
                     if let Expr::Name(ast::ExprName { id, .. }) = target {
                         if id.as_str() == "__slots__" {
-                            if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
+                            if matches!(assign.value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
                                 checker.report_diagnostic(SingleStringSlots, stmt.identifier());
                             }
                         }
                     }
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if id.as_str() == "__slots__" {
-                        if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
-                            checker.report_diagnostic(SingleStringSlots, stmt.identifier());
+            Stmt::AnnAssign(ann_assign) => {
+                if let Some(value) = &ann_assign.value {
+                    if let Expr::Name(ast::ExprName { id, .. }) = ann_assign.target.as_ref() {
+                        if id.as_str() == "__slots__" {
+                            if matches!(value.as_ref(), Expr::StringLiteral(_) | Expr::FString(_)) {
+                                checker.report_diagnostic(SingleStringSlots, stmt.identifier());
+                            }
                         }
                     }
                 }

@@ -102,50 +102,47 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
 
     for statement in &class_def.body {
         match statement {
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                annotation,
-                target,
-                value: Some(value),
-                ..
-            }) => {
-                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if is_class_var_annotation(annotation, checker.semantic()) {
+            Stmt::AnnAssign(node) => {
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = node.target.as_ref() {
+                    if is_class_var_annotation(&node.annotation, checker.semantic()) {
                         class_var_targets.insert(id);
                     }
                 }
 
-                if !is_special_attribute(target)
-                    && is_mutable_expr(value, checker.semantic())
-                    && !is_class_var_annotation(annotation, checker.semantic())
-                    && !is_final_annotation(annotation, checker.semantic())
-                    && !is_immutable_annotation(annotation, checker.semantic(), &[])
-                {
-                    if dataclass_kind(class_def, checker.semantic()).is_some() {
-                        continue;
-                    }
+                if let Some(value) = &node.value {
+                    if !is_special_attribute(&node.target)
+                        && is_mutable_expr(value, checker.semantic())
+                        && !is_class_var_annotation(&node.annotation, checker.semantic())
+                        && !is_final_annotation(&node.annotation, checker.semantic())
+                        && !is_immutable_annotation(&node.annotation, checker.semantic(), &[])
+                    {
+                        if dataclass_kind(class_def, checker.semantic()).is_some() {
+                            continue;
+                        }
 
-                    // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
-                    if has_default_copy_semantics(class_def, checker.semantic()) {
-                        return;
-                    }
+                        // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
+                        if has_default_copy_semantics(class_def, checker.semantic()) {
+                            return;
+                        }
 
-                    checker.report_diagnostic(MutableClassDefault, value.range());
+                        checker.report_diagnostic(MutableClassDefault, value.range());
+                    }
                 }
             }
-            Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                if !targets.iter().all(|target| {
+            Stmt::Assign(node) => {
+                if !node.targets.iter().all(|target| {
                     is_special_attribute(target)
                         || target
                             .as_name_expr()
                             .is_some_and(|name| class_var_targets.contains(&name.id))
-                }) && is_mutable_expr(value, checker.semantic())
+                }) && is_mutable_expr(&node.value, checker.semantic())
                 {
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
                     if has_default_copy_semantics(class_def, checker.semantic()) {
                         return;
                     }
 
-                    checker.report_diagnostic(MutableClassDefault, value.range());
+                    checker.report_diagnostic(MutableClassDefault, node.value.range());
                 }
             }
             _ => (),

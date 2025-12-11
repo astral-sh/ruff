@@ -119,13 +119,11 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
             return;
         }
         match stmt {
-            Stmt::For(ast::StmtFor {
-                target, iter, body, ..
-            }) => {
-                if self.name_matches(target) {
+            Stmt::For(node) => {
+                if self.name_matches(&node.target) {
                     self.overridden = true;
                 } else {
-                    if self.name_matches(iter) {
+                    if self.name_matches(&node.iter) {
                         self.increment_usage_count(1);
                         // This could happen when the group is being looped
                         // over multiple times:
@@ -136,36 +134,30 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                         //      for item in group:
                         //          ...
                         if self.usage_count > 1 {
-                            self.exprs.push(iter);
+                            self.exprs.push(&node.iter);
                         }
                     }
                     self.nested = true;
-                    visitor::walk_body(self, body);
+                    visitor::walk_body(self, &node.body);
                     self.nested = false;
                 }
             }
-            Stmt::While(ast::StmtWhile { body, .. }) => {
+            Stmt::While(node) => {
                 self.nested = true;
-                visitor::walk_body(self, body);
+                visitor::walk_body(self, &node.body);
                 self.nested = false;
             }
-            Stmt::If(ast::StmtIf {
-                test,
-                body,
-                elif_else_clauses,
-                range: _,
-                node_index: _,
-            }) => {
+            Stmt::If(node) => {
                 // base if plus branches
-                let mut if_stack = Vec::with_capacity(1 + elif_else_clauses.len());
+                let mut if_stack = Vec::with_capacity(1 + node.elif_else_clauses.len());
                 // Initialize the vector with the count for the if branch.
                 if_stack.push(0);
                 self.counter_stack.push(if_stack);
 
-                self.visit_expr(test);
-                self.visit_body(body);
+                self.visit_expr(&node.test);
+                self.visit_body(&node.body);
 
-                for clause in elif_else_clauses {
+                for clause in &node.elif_else_clauses {
                     self.counter_stack.last_mut().unwrap().push(0);
                     self.visit_elif_else_clause(clause);
                 }
@@ -177,15 +169,10 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.increment_usage_count(max_count);
                 }
             }
-            Stmt::Match(ast::StmtMatch {
-                subject,
-                cases,
-                range: _,
-                node_index: _,
-            }) => {
-                self.counter_stack.push(Vec::with_capacity(cases.len()));
-                self.visit_expr(subject);
-                for match_case in cases {
+            Stmt::Match(node) => {
+                self.counter_stack.push(Vec::with_capacity(node.cases.len()));
+                self.visit_expr(&node.subject);
+                for match_case in &node.cases {
                     self.counter_stack.last_mut().unwrap().push(0);
                     self.visit_match_case(match_case);
                 }
@@ -196,17 +183,17 @@ impl<'a> Visitor<'a> for GroupNameFinder<'a> {
                     self.increment_usage_count(max_count);
                 }
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-                if targets.iter().any(|target| self.name_matches(target)) {
+            Stmt::Assign(node) => {
+                if node.targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
                 } else {
-                    self.visit_expr(value);
+                    self.visit_expr(&node.value);
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if self.name_matches(target) {
+            Stmt::AnnAssign(node) => {
+                if self.name_matches(&node.target) {
                     self.overridden = true;
-                } else if let Some(expr) = value {
+                } else if let Some(expr) = &node.value {
                     self.visit_expr(expr);
                 }
             }

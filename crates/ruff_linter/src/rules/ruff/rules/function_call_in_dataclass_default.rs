@@ -121,17 +121,16 @@ pub(crate) fn function_call_in_dataclass_default(
         .collect();
 
     for statement in &class_def.body {
-        let Stmt::AnnAssign(ast::StmtAnnAssign {
-            annotation,
-            value: Some(expr),
-            ..
-        }) = statement
-        else {
+        let Stmt::AnnAssign(node) = statement else {
+            continue;
+        };
+        let Some(expr) = &node.value else {
             continue;
         };
         let Expr::Call(ast::ExprCall { func, .. }) = expr.as_ref() else {
             continue;
         };
+        let annotation = &node.annotation;
 
         let is_field = is_dataclass_field(func, checker.semantic(), dataclass_kind);
 
@@ -179,7 +178,10 @@ fn is_frozen_dataclass_instantiation(
         .lookup_attribute_in_scope(func, scope_id)
         .is_some_and(|id| {
             let binding = &semantic.binding(id);
-            let Some(Stmt::ClassDef(class_def)) = binding.statement(semantic) else {
+            let Some(stmt) = binding.statement(semantic) else {
+                return false;
+            };
+            let Stmt::ClassDef(class_def) = stmt else {
                 return false;
             };
 

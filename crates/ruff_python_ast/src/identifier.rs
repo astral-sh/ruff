@@ -112,10 +112,10 @@ pub fn except(handler: &ExceptHandler, source: &str) -> TextRange {
 
 /// Return the [`TextRange`] of the `else` token in a `For` or `While` statement.
 pub fn else_(stmt: &Stmt, source: &str) -> Option<TextRange> {
-    let (Stmt::For(ast::StmtFor { body, orelse, .. })
-    | Stmt::While(ast::StmtWhile { body, orelse, .. })) = stmt
-    else {
-        return None;
+    let (body, orelse) = match stmt {
+        Stmt::For(node) => (&node.body, &node.orelse),
+        Stmt::While(node) => (&node.body, &node.orelse),
+        _ => return None,
     };
 
     if orelse.is_empty() {

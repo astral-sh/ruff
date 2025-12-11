@@ -66,7 +66,7 @@ impl AlwaysFixableViolation for SetAttrWithConstant {
 }
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> String {
-    let stmt = Stmt::Assign(ast::StmtAssign {
+    let stmt = Stmt::Assign(Box::new(ast::StmtAssign {
         targets: vec![Expr::Attribute(ast::ExprAttribute {
             value: Box::new(obj.clone()),
             attr: Identifier::new(name.to_string(), TextRange::default()),
@@ -77,7 +77,7 @@ fn assignment(obj: &Expr, name: &str, value: &Expr, generator: Generator) -> Str
         value: Box::new(value.clone()),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    });
+    }));
     generator.stmt(&stmt)
 }
 

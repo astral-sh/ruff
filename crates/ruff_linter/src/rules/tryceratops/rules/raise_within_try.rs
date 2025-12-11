@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, ExceptHandler, Stmt};
+use ruff_python_ast::{ExceptHandler, Stmt};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
@@ -98,11 +98,12 @@ pub(crate) fn raise_within_try(checker: &Checker, body: &[Stmt], handlers: &[Exc
         .collect();
 
     for stmt in raises {
-        let Stmt::Raise(ast::StmtRaise {
-            exc: Some(exception),
-            ..
-        }) = stmt
+        let Stmt::Raise(node) = stmt
         else {
+            continue;
+        };
+
+        let Some(exception) = &node.exc else {
             continue;
         };
 

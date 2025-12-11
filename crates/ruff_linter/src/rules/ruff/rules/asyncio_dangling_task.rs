@@ -153,12 +153,14 @@ pub(crate) fn asyncio_dangling_binding(scope: &Scope, checker: &Checker) {
             };
 
             match semantic.statement(source) {
-                Stmt::Assign(ast::StmtAssign { value, targets, .. }) if targets.len() == 1 => {
-                    asyncio_dangling_task(checker, value, semantic);
+                Stmt::Assign(node) if node.targets.len() == 1 => {
+                    asyncio_dangling_task(checker, &node.value, semantic);
                 }
-                Stmt::AnnAssign(ast::StmtAnnAssign {
-                    value: Some(value), ..
-                }) => asyncio_dangling_task(checker, value, semantic),
+                Stmt::AnnAssign(node) => {
+                    if let Some(value) = &node.value {
+                        asyncio_dangling_task(checker, value, semantic);
+                    }
+                }
                 _ => {}
             }
         }

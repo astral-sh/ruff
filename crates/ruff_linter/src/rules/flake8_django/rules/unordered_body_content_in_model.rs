@@ -153,13 +153,13 @@ impl fmt::Display for ContentType {
 
 fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentType> {
     match element {
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
-            if let Expr::Call(ast::ExprCall { func, .. }) = value.as_ref() {
+        Stmt::Assign(node) => {
+            if let Expr::Call(ast::ExprCall { func, .. }) = node.value.as_ref() {
                 if helpers::is_model_field(func, semantic) {
                     return Some(ContentType::FieldDeclaration);
                 }
             }
-            let expr = targets.first()?;
+            let expr = node.targets.first()?;
             let Expr::Name(ast::ExprName { id, .. }) = expr else {
                 return None;
             };
@@ -169,14 +169,14 @@ fn get_element_type(element: &Stmt, semantic: &SemanticModel) -> Option<ContentT
                 None
             }
         }
-        Stmt::ClassDef(ast::StmtClassDef { name, .. }) => {
-            if name == "Meta" {
+        Stmt::ClassDef(node) => {
+            if node.name.as_str() == "Meta" {
                 Some(ContentType::MetaClass)
             } else {
                 None
             }
         }
-        Stmt::FunctionDef(ast::StmtFunctionDef { name, .. }) => match name.as_str() {
+        Stmt::FunctionDef(node) => match node.name.as_str() {
             name if is_dunder(name) => Some(ContentType::MagicMethod),
             "save" => Some(ContentType::SaveMethod),
             "get_absolute_url" => Some(ContentType::GetAbsoluteUrlMethod),

@@ -59,30 +59,30 @@ impl AlwaysFixableViolation for MissingRequiredImport {
 fn includes_import(stmt: &Stmt, target: &NameImport) -> bool {
     match target {
         NameImport::Import(target) => {
-            let Stmt::Import(ast::StmtImport {
+            let Stmt::Import(import_stmt) = &stmt else {
+                return false;
+            };
+            let ast::StmtImport {
                 names,
                 range: _,
                 node_index: _,
-            }) = &stmt
-            else {
-                return false;
-            };
+            } = &**import_stmt;
             names.iter().any(|alias| {
                 alias.name == target.name.name
                     && alias.asname.as_deref() == target.name.as_name.as_deref()
             })
         }
         NameImport::ImportFrom(target) => {
-            let Stmt::ImportFrom(ast::StmtImportFrom {
+            let Stmt::ImportFrom(import_from_stmt) = &stmt else {
+                return false;
+            };
+            let ast::StmtImportFrom {
                 module,
                 names,
                 level,
                 range: _,
                 node_index: _,
-            }) = &stmt
-            else {
-                return false;
-            };
+            } = &**import_from_stmt;
             module.as_deref() == target.module.as_deref()
                 && *level == target.level
                 && names.iter().any(|alias| {

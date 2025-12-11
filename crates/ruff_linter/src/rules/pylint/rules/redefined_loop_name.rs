@@ -149,9 +149,9 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Collect target expressions.
         match stmt {
-            Stmt::For(ast::StmtFor { target, .. }) => {
+            Stmt::For(node) => {
                 self.assignment_targets.extend(
-                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                    assignment_targets_from_expr(&node.target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
                             binding_kind: InnerBindingKind::For,
@@ -159,9 +159,9 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     }),
                 );
             }
-            Stmt::With(ast::StmtWith { items, .. }) => {
+            Stmt::With(node) => {
                 self.assignment_targets.extend(
-                    assignment_targets_from_with_items(items, self.dummy_variable_rgx).map(
+                    assignment_targets_from_with_items(&node.items, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
                             expr,
                             binding_kind: InnerBindingKind::With,
@@ -169,17 +169,18 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     ),
                 );
             }
-            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+            Stmt::Assign(node) => {
                 // Check for single-target assignments which are of the
                 // form `x = cast(..., x)`.
-                if targets
+                if node
+                    .targets
                     .first()
-                    .is_some_and(|target| assignment_is_cast_expr(value, target, self.context))
+                    .is_some_and(|target| assignment_is_cast_expr(&node.value, target, self.context))
                 {
                     return;
                 }
                 self.assignment_targets.extend(
-                    assignment_targets_from_assign_targets(targets, self.dummy_variable_rgx).map(
+                    assignment_targets_from_assign_targets(&node.targets, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
                             expr,
                             binding_kind: InnerBindingKind::Assignment,
@@ -187,9 +188,9 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     ),
                 );
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            Stmt::AugAssign(node) => {
                 self.assignment_targets.extend(
-                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                    assignment_targets_from_expr(&node.target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
                             binding_kind: InnerBindingKind::Assignment,
@@ -197,12 +198,12 @@ impl<'b> StatementVisitor<'b> for InnerForWithAssignTargetsVisitor<'_, 'b> {
                     }),
                 );
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
-                if value.is_none() {
+            Stmt::AnnAssign(node) => {
+                if node.value.is_none() {
                     return;
                 }
                 self.assignment_targets.extend(
-                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                    assignment_targets_from_expr(&node.target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {
                             expr,
                             binding_kind: InnerBindingKind::Assignment,
@@ -345,9 +346,9 @@ fn assignment_targets_from_assign_targets<'a>(
 /// PLW2901
 pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
     let (outer_assignment_targets, inner_assignment_targets) = match stmt {
-        Stmt::With(ast::StmtWith { items, body, .. }) => {
+        Stmt::With(node) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_with_items(items, &checker.settings().dummy_variable_rgx)
+                assignment_targets_from_with_items(&node.items, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::With,
@@ -358,14 +359,14 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                 dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
-            for stmt in body {
+            for stmt in &node.body {
                 visitor.visit_stmt(stmt);
             }
             (outer_assignment_targets, visitor.assignment_targets)
         }
-        Stmt::For(ast::StmtFor { target, body, .. }) => {
+        Stmt::For(node) => {
             let outer_assignment_targets: Vec<ExprWithOuterBindingKind> =
-                assignment_targets_from_expr(target, &checker.settings().dummy_variable_rgx)
+                assignment_targets_from_expr(&node.target, &checker.settings().dummy_variable_rgx)
                     .map(|expr| ExprWithOuterBindingKind {
                         expr,
                         binding_kind: OuterBindingKind::For,
@@ -376,7 +377,7 @@ pub(crate) fn redefined_loop_name(checker: &Checker, stmt: &Stmt) {
                 dummy_variable_rgx: &checker.settings().dummy_variable_rgx,
                 assignment_targets: vec![],
             };
-            for stmt in body {
+            for stmt in &node.body {
                 visitor.visit_stmt(stmt);
             }
             (outer_assignment_targets, visitor.assignment_targets)

@@ -140,10 +140,10 @@ fn is_dunder_method(name: &str) -> bool {
 }
 
 fn is_exception_check(stmt: &Stmt) -> bool {
-    let Stmt::If(ast::StmtIf { body, .. }) = stmt else {
+    let Stmt::If(node) = stmt else {
         return false;
     };
-    matches!(body.as_slice(), [Stmt::Raise(_)])
+    matches!(node.body.as_slice(), [Stmt::Raise(_)])
 }
 
 /// SIM201

@@ -59,16 +59,20 @@ pub(crate) fn all_with_model_form(checker: &Checker, class_def: &ast::StmtClassD
     }
 
     for element in &class_def.body {
-        let Stmt::ClassDef(ast::StmtClassDef { name, body, .. }) = element else {
+        let Stmt::ClassDef(class_def_inner) = element else {
             continue;
         };
+        let name = &class_def_inner.name;
+        let body = &class_def_inner.body;
         if name != "Meta" {
             continue;
         }
         for element in body {
-            let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = element else {
+            let Stmt::Assign(assign) = element else {
                 continue;
             };
+            let targets = &assign.targets;
+            let value = &assign.value;
             for target in targets {
                 let Expr::Name(ast::ExprName { id, .. }) = target else {
                     continue;

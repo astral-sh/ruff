@@ -113,7 +113,9 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
 
     // gather all explicit *method calls
     for stmt in &class_def.body {
-        if let Stmt::Assign(ast::StmtAssign { targets, value, .. }) = stmt {
+        if let Stmt::Assign(node) = stmt {
+            let targets = &node.targets;
+            let value = &node.value;
             if let Expr::Call(ast::ExprCall {
                 func, arguments, ..
             }) = value.as_ref()
@@ -149,12 +151,10 @@ fn get_undecorated_methods(checker: &Checker, class_stmt: &Stmt, method_type: &M
     }
 
     for stmt in &class_def.body {
-        if let Stmt::FunctionDef(ast::StmtFunctionDef {
-            name,
-            decorator_list,
-            ..
-        }) = stmt
-        {
+        if let Stmt::FunctionDef(node) = stmt {
+            let name = &node.name;
+            let decorator_list = &node.decorator_list;
+
             let Some(decorator_call_statement) = explicit_decorator_calls.get(name.id()) else {
                 continue;
             };

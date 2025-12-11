@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_dunder;
-use ruff_python_ast::{Expr, ExprName, Stmt, StmtAssign, StmtClassDef};
+use ruff_python_ast::{Expr, ExprName, Stmt, StmtClassDef};
 use ruff_text_size::Ranged;
 
 use crate::Violation;
@@ -75,10 +75,11 @@ pub(crate) fn implicit_class_var_in_dataclass(checker: &mut Checker, class_def: 
     }
 
     for statement in &class_def.body {
-        let Stmt::Assign(StmtAssign { targets, .. }) = statement else {
+        let Stmt::Assign(assign_stmt) = statement else {
             continue;
         };
 
+        let targets = &assign_stmt.targets;
         if targets.len() > 1 {
             continue;
         }

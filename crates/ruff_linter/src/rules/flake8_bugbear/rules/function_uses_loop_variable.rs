@@ -86,12 +86,10 @@ struct SuspiciousVariablesVisitor<'a> {
 impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::FunctionDef(ast::StmtFunctionDef {
-                parameters, body, ..
-            }) => {
+            Stmt::FunctionDef(node) => {
                 // Collect all loaded variable names.
                 let mut visitor = LoadedNamesVisitor::default();
-                visitor.visit_body(body);
+                visitor.visit_body(&node.body);
 
                 // Treat any non-arguments as "suspicious".
                 self.names
@@ -100,7 +98,7 @@ impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
                             return false;
                         }
 
-                        if parameters.includes(&loaded.id) {
+                        if node.parameters.includes(&loaded.id) {
                             return false;
                         }
 
@@ -242,18 +240,26 @@ impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
         }
 
         match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
+            Stmt::Assign(node) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
-                for expr in targets {
+                for expr in &node.targets {
                     visitor.visit_expr(expr);
                 }
                 self.names.extend(visitor.names);
             }
-            Stmt::AugAssign(ast::StmtAugAssign { target, .. })
-            | Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | Stmt::For(ast::StmtFor { target, .. }) => {
+            Stmt::AugAssign(node) => {
                 let mut visitor = NamesFromAssignmentsVisitor::default();
-                visitor.visit_expr(target);
+                visitor.visit_expr(&node.target);
+                self.names.extend(visitor.names);
+            }
+            Stmt::AnnAssign(node) => {
+                let mut visitor = NamesFromAssignmentsVisitor::default();
+                visitor.visit_expr(&node.target);
+                self.names.extend(visitor.names);
+            }
+            Stmt::For(node) => {
+                let mut visitor = NamesFromAssignmentsVisitor::default();
+                visitor.visit_expr(&node.target);
                 self.names.extend(visitor.names);
             }
             _ => {}

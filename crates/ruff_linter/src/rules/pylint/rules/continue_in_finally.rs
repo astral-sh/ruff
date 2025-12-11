@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::Stmt;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_text_size::Ranged;
@@ -54,28 +54,27 @@ fn traverse_body(checker: &Checker, body: &[Stmt]) {
         }
 
         match stmt {
-            Stmt::If(ast::StmtIf {
-                body,
-                elif_else_clauses,
-                ..
-            }) => {
-                traverse_body(checker, body);
-                for clause in elif_else_clauses {
+            Stmt::If(if_stmt) => {
+                traverse_body(checker, &if_stmt.body);
+                for clause in &if_stmt.elif_else_clauses {
                     traverse_body(checker, &clause.body);
                 }
             }
-            Stmt::Try(ast::StmtTry { body, orelse, .. }) => {
-                traverse_body(checker, body);
-                traverse_body(checker, orelse);
+            Stmt::Try(try_stmt) => {
+                traverse_body(checker, &try_stmt.body);
+                traverse_body(checker, &try_stmt.orelse);
             }
-            Stmt::For(ast::StmtFor { orelse, .. }) | Stmt::While(ast::StmtWhile { orelse, .. }) => {
-                traverse_body(checker, orelse);
+            Stmt::For(for_stmt) => {
+                traverse_body(checker, &for_stmt.orelse);
             }
-            Stmt::With(ast::StmtWith { body, .. }) => {
-                traverse_body(checker, body);
+            Stmt::While(while_stmt) => {
+                traverse_body(checker, &while_stmt.orelse);
             }
-            Stmt::Match(ast::StmtMatch { cases, .. }) => {
-                for case in cases {
+            Stmt::With(with_stmt) => {
+                traverse_body(checker, &with_stmt.body);
+            }
+            Stmt::Match(match_stmt) => {
+                for case in &match_stmt.cases {
                     traverse_body(checker, &case.body);
                 }
             }

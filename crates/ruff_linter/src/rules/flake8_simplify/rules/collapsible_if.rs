@@ -230,21 +230,13 @@ fn nested_if_body(stmt_if: &ast::StmtIf) -> Option<NestedIf<'_>> {
 ///         ...
 /// ```
 fn find_last_nested_if(body: &[Stmt]) -> Option<&Expr> {
-    let [
-        Stmt::If(ast::StmtIf {
-            test,
-            body: inner_body,
-            elif_else_clauses,
-            ..
-        }),
-    ] = body
-    else {
+    let [Stmt::If(node)] = body else {
         return None;
     };
-    if !elif_else_clauses.is_empty() {
+    if !node.elif_else_clauses.is_empty() {
         return None;
     }
-    find_last_nested_if(inner_body).or(Some(test))
+    find_last_nested_if(&node.body).or(Some(&node.test))
 }
 
 /// Returns `true` if an expression is an `if __name__ == "__main__":` check.

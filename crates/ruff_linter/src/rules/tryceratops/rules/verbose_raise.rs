@@ -95,13 +95,11 @@ struct RaiseStatementVisitor<'a> {
 impl<'a> StatementVisitor<'a> for RaiseStatementVisitor<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
-            Stmt::Raise(raise @ ast::StmtRaise { .. }) => {
+            Stmt::Raise(raise) => {
                 self.raises.push(raise);
             }
-            Stmt::Try(ast::StmtTry {
-                body, finalbody, ..
-            }) => {
-                for stmt in body.iter().chain(finalbody) {
+            Stmt::Try(try_stmt) => {
+                for stmt in try_stmt.body.iter().chain(&try_stmt.finalbody) {
                     walk_stmt(self, stmt);
                 }
             }

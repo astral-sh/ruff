@@ -23,11 +23,13 @@ pub(crate) fn annotate_imports<'a>(
         .iter()
         .map(|import| {
             match import {
-                Stmt::Import(ast::StmtImport {
-                    names,
-                    range,
-                    node_index: _,
-                }) => {
+                Stmt::Import(import_stmt) => {
+                    let ast::StmtImport {
+                        names,
+                        range,
+                        node_index: _,
+                    } = &**import_stmt;
+
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =
@@ -58,13 +60,15 @@ pub(crate) fn annotate_imports<'a>(
                         inline,
                     }
                 }
-                Stmt::ImportFrom(ast::StmtImportFrom {
-                    module,
-                    names,
-                    level,
-                    range: _,
-                    node_index: _,
-                }) => {
+                Stmt::ImportFrom(import_from_stmt) => {
+                    let ast::StmtImportFrom {
+                        module,
+                        names,
+                        level,
+                        range: _,
+                        node_index: _,
+                    } = &**import_from_stmt;
+
                     // Find comments above.
                     let mut atop = vec![];
                     while let Some(comment) =

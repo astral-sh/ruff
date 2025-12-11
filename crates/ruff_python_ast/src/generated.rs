@@ -123,42 +123,42 @@ impl Mod {
 #[derive(Clone, Debug, PartialEq)]
 #[cfg_attr(feature = "get-size", derive(get_size2::GetSize))]
 pub enum Stmt {
-    FunctionDef(crate::StmtFunctionDef),
-    ClassDef(crate::StmtClassDef),
+    FunctionDef(Box<crate::StmtFunctionDef>),
+    ClassDef(Box<crate::StmtClassDef>),
     Return(crate::StmtReturn),
-    Delete(crate::StmtDelete),
-    TypeAlias(crate::StmtTypeAlias),
-    Assign(crate::StmtAssign),
-    AugAssign(crate::StmtAugAssign),
-    AnnAssign(crate::StmtAnnAssign),
-    For(crate::StmtFor),
-    While(crate::StmtWhile),
-    If(crate::StmtIf),
-    With(crate::StmtWith),
-    Match(crate::StmtMatch),
-    Raise(crate::StmtRaise),
-    Try(crate::StmtTry),
-    Assert(crate::StmtAssert),
-    Import(crate::StmtImport),
-    ImportFrom(crate::StmtImportFrom),
-    Global(crate::StmtGlobal),
-    Nonlocal(crate::StmtNonlocal),
+    Delete(Box<crate::StmtDelete>),
+    TypeAlias(Box<crate::StmtTypeAlias>),
+    Assign(Box<crate::StmtAssign>),
+    AugAssign(Box<crate::StmtAugAssign>),
+    AnnAssign(Box<crate::StmtAnnAssign>),
+    For(Box<crate::StmtFor>),
+    While(Box<crate::StmtWhile>),
+    If(Box<crate::StmtIf>),
+    With(Box<crate::StmtWith>),
+    Match(Box<crate::StmtMatch>),
+    Raise(Box<crate::StmtRaise>),
+    Try(Box<crate::StmtTry>),
+    Assert(Box<crate::StmtAssert>),
+    Import(Box<crate::StmtImport>),
+    ImportFrom(Box<crate::StmtImportFrom>),
+    Global(Box<crate::StmtGlobal>),
+    Nonlocal(Box<crate::StmtNonlocal>),
     Expr(crate::StmtExpr),
     Pass(crate::StmtPass),
     Break(crate::StmtBreak),
     Continue(crate::StmtContinue),
-    IpyEscapeCommand(crate::StmtIpyEscapeCommand),
+    IpyEscapeCommand(Box<crate::StmtIpyEscapeCommand>),
 }
 
 impl From<crate::StmtFunctionDef> for Stmt {
     fn from(node: crate::StmtFunctionDef) -> Self {
-        Self::FunctionDef(node)
+        Self::FunctionDef(Box::new(node))
     }
 }
 
 impl From<crate::StmtClassDef> for Stmt {
     fn from(node: crate::StmtClassDef) -> Self {
-        Self::ClassDef(node)
+        Self::ClassDef(Box::new(node))
     }
 }
 
@@ -170,103 +170,103 @@ impl From<crate::StmtReturn> for Stmt {
 
 impl From<crate::StmtDelete> for Stmt {
     fn from(node: crate::StmtDelete) -> Self {
-        Self::Delete(node)
+        Self::Delete(Box::new(node))
     }
 }
 
 impl From<crate::StmtTypeAlias> for Stmt {
     fn from(node: crate::StmtTypeAlias) -> Self {
-        Self::TypeAlias(node)
+        Self::TypeAlias(Box::new(node))
     }
 }
 
 impl From<crate::StmtAssign> for Stmt {
     fn from(node: crate::StmtAssign) -> Self {
-        Self::Assign(node)
+        Self::Assign(Box::new(node))
     }
 }
 
 impl From<crate::StmtAugAssign> for Stmt {
     fn from(node: crate::StmtAugAssign) -> Self {
-        Self::AugAssign(node)
+        Self::AugAssign(Box::new(node))
     }
 }
 
 impl From<crate::StmtAnnAssign> for Stmt {
     fn from(node: crate::StmtAnnAssign) -> Self {
-        Self::AnnAssign(node)
+        Self::AnnAssign(Box::new(node))
     }
 }
 
 impl From<crate::StmtFor> for Stmt {
     fn from(node: crate::StmtFor) -> Self {
-        Self::For(node)
+        Self::For(Box::new(node))
     }
 }
 
 impl From<crate::StmtWhile> for Stmt {
     fn from(node: crate::StmtWhile) -> Self {
-        Self::While(node)
+        Self::While(Box::new(node))
     }
 }
 
 impl From<crate::StmtIf> for Stmt {
     fn from(node: crate::StmtIf) -> Self {
-        Self::If(node)
+        Self::If(Box::new(node))
     }
 }
 
 impl From<crate::StmtWith> for Stmt {
     fn from(node: crate::StmtWith) -> Self {
-        Self::With(node)
+        Self::With(Box::new(node))
     }
 }
 
 impl From<crate::StmtMatch> for Stmt {
     fn from(node: crate::StmtMatch) -> Self {
-        Self::Match(node)
+        Self::Match(Box::new(node))
     }
 }
 
 impl From<crate::StmtRaise> for Stmt {
     fn from(node: crate::StmtRaise) -> Self {
-        Self::Raise(node)
+        Self::Raise(Box::new(node))
     }
 }
 
 impl From<crate::StmtTry> for Stmt {
     fn from(node: crate::StmtTry) -> Self {
-        Self::Try(node)
+        Self::Try(Box::new(node))
     }
 }
 
 impl From<crate::StmtAssert> for Stmt {
     fn from(node: crate::StmtAssert) -> Self {
-        Self::Assert(node)
+        Self::Assert(Box::new(node))
     }
 }
 
 impl From<crate::StmtImport> for Stmt {
     fn from(node: crate::StmtImport) -> Self {
-        Self::Import(node)
+        Self::Import(Box::new(node))
     }
 }
 
 impl From<crate::StmtImportFrom> for Stmt {
     fn from(node: crate::StmtImportFrom) -> Self {
-        Self::ImportFrom(node)
+        Self::ImportFrom(Box::new(node))
     }
 }
 
 impl From<crate::StmtGlobal> for Stmt {
     fn from(node: crate::StmtGlobal) -> Self {
-        Self::Global(node)
+        Self::Global(Box::new(node))
     }
 }
 
 impl From<crate::StmtNonlocal> for Stmt {
     fn from(node: crate::StmtNonlocal) -> Self {
-        Self::Nonlocal(node)
+        Self::Nonlocal(Box::new(node))
     }
 }
 
@@ -296,7 +296,7 @@ impl From<crate::StmtContinue> for Stmt {
 
 impl From<crate::StmtIpyEscapeCommand> for Stmt {
     fn from(node: crate::StmtIpyEscapeCommand) -> Self {
-        Self::IpyEscapeCommand(node)
+        Self::IpyEscapeCommand(Box::new(node))
     }
 }
 
@@ -374,7 +374,7 @@ impl Stmt {
     #[inline]
     pub fn function_def_stmt(self) -> Option<crate::StmtFunctionDef> {
         match self {
-            Self::FunctionDef(val) => Some(val),
+            Self::FunctionDef(val) => Some(*val),
             _ => None,
         }
     }
@@ -382,7 +382,7 @@ impl Stmt {
     #[inline]
     pub fn expect_function_def_stmt(self) -> crate::StmtFunctionDef {
         match self {
-            Self::FunctionDef(val) => val,
+            Self::FunctionDef(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -411,7 +411,7 @@ impl Stmt {
     #[inline]
     pub fn class_def_stmt(self) -> Option<crate::StmtClassDef> {
         match self {
-            Self::ClassDef(val) => Some(val),
+            Self::ClassDef(val) => Some(*val),
             _ => None,
         }
     }
@@ -419,7 +419,7 @@ impl Stmt {
     #[inline]
     pub fn expect_class_def_stmt(self) -> crate::StmtClassDef {
         match self {
-            Self::ClassDef(val) => val,
+            Self::ClassDef(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -485,7 +485,7 @@ impl Stmt {
     #[inline]
     pub fn delete_stmt(self) -> Option<crate::StmtDelete> {
         match self {
-            Self::Delete(val) => Some(val),
+            Self::Delete(val) => Some(*val),
             _ => None,
         }
     }
@@ -493,7 +493,7 @@ impl Stmt {
     #[inline]
     pub fn expect_delete_stmt(self) -> crate::StmtDelete {
         match self {
-            Self::Delete(val) => val,
+            Self::Delete(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -522,7 +522,7 @@ impl Stmt {
     #[inline]
     pub fn type_alias_stmt(self) -> Option<crate::StmtTypeAlias> {
         match self {
-            Self::TypeAlias(val) => Some(val),
+            Self::TypeAlias(val) => Some(*val),
             _ => None,
         }
     }
@@ -530,7 +530,7 @@ impl Stmt {
     #[inline]
     pub fn expect_type_alias_stmt(self) -> crate::StmtTypeAlias {
         match self {
-            Self::TypeAlias(val) => val,
+            Self::TypeAlias(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -559,7 +559,7 @@ impl Stmt {
     #[inline]
     pub fn assign_stmt(self) -> Option<crate::StmtAssign> {
         match self {
-            Self::Assign(val) => Some(val),
+            Self::Assign(val) => Some(*val),
             _ => None,
         }
     }
@@ -567,7 +567,7 @@ impl Stmt {
     #[inline]
     pub fn expect_assign_stmt(self) -> crate::StmtAssign {
         match self {
-            Self::Assign(val) => val,
+            Self::Assign(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -596,7 +596,7 @@ impl Stmt {
     #[inline]
     pub fn aug_assign_stmt(self) -> Option<crate::StmtAugAssign> {
         match self {
-            Self::AugAssign(val) => Some(val),
+            Self::AugAssign(val) => Some(*val),
             _ => None,
         }
     }
@@ -604,7 +604,7 @@ impl Stmt {
     #[inline]
     pub fn expect_aug_assign_stmt(self) -> crate::StmtAugAssign {
         match self {
-            Self::AugAssign(val) => val,
+            Self::AugAssign(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -633,7 +633,7 @@ impl Stmt {
     #[inline]
     pub fn ann_assign_stmt(self) -> Option<crate::StmtAnnAssign> {
         match self {
-            Self::AnnAssign(val) => Some(val),
+            Self::AnnAssign(val) => Some(*val),
             _ => None,
         }
     }
@@ -641,7 +641,7 @@ impl Stmt {
     #[inline]
     pub fn expect_ann_assign_stmt(self) -> crate::StmtAnnAssign {
         match self {
-            Self::AnnAssign(val) => val,
+            Self::AnnAssign(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -670,7 +670,7 @@ impl Stmt {
     #[inline]
     pub fn for_stmt(self) -> Option<crate::StmtFor> {
         match self {
-            Self::For(val) => Some(val),
+            Self::For(val) => Some(*val),
             _ => None,
         }
     }
@@ -678,7 +678,7 @@ impl Stmt {
     #[inline]
     pub fn expect_for_stmt(self) -> crate::StmtFor {
         match self {
-            Self::For(val) => val,
+            Self::For(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -707,7 +707,7 @@ impl Stmt {
     #[inline]
     pub fn while_stmt(self) -> Option<crate::StmtWhile> {
         match self {
-            Self::While(val) => Some(val),
+            Self::While(val) => Some(*val),
             _ => None,
         }
     }
@@ -715,7 +715,7 @@ impl Stmt {
     #[inline]
     pub fn expect_while_stmt(self) -> crate::StmtWhile {
         match self {
-            Self::While(val) => val,
+            Self::While(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -744,7 +744,7 @@ impl Stmt {
     #[inline]
     pub fn if_stmt(self) -> Option<crate::StmtIf> {
         match self {
-            Self::If(val) => Some(val),
+            Self::If(val) => Some(*val),
             _ => None,
         }
     }
@@ -752,7 +752,7 @@ impl Stmt {
     #[inline]
     pub fn expect_if_stmt(self) -> crate::StmtIf {
         match self {
-            Self::If(val) => val,
+            Self::If(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -781,7 +781,7 @@ impl Stmt {
     #[inline]
     pub fn with_stmt(self) -> Option<crate::StmtWith> {
         match self {
-            Self::With(val) => Some(val),
+            Self::With(val) => Some(*val),
             _ => None,
         }
     }
@@ -789,7 +789,7 @@ impl Stmt {
     #[inline]
     pub fn expect_with_stmt(self) -> crate::StmtWith {
         match self {
-            Self::With(val) => val,
+            Self::With(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -818,7 +818,7 @@ impl Stmt {
     #[inline]
     pub fn match_stmt(self) -> Option<crate::StmtMatch> {
         match self {
-            Self::Match(val) => Some(val),
+            Self::Match(val) => Some(*val),
             _ => None,
         }
     }
@@ -826,7 +826,7 @@ impl Stmt {
     #[inline]
     pub fn expect_match_stmt(self) -> crate::StmtMatch {
         match self {
-            Self::Match(val) => val,
+            Self::Match(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -855,7 +855,7 @@ impl Stmt {
     #[inline]
     pub fn raise_stmt(self) -> Option<crate::StmtRaise> {
         match self {
-            Self::Raise(val) => Some(val),
+            Self::Raise(val) => Some(*val),
             _ => None,
         }
     }
@@ -863,7 +863,7 @@ impl Stmt {
     #[inline]
     pub fn expect_raise_stmt(self) -> crate::StmtRaise {
         match self {
-            Self::Raise(val) => val,
+            Self::Raise(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -892,7 +892,7 @@ impl Stmt {
     #[inline]
     pub fn try_stmt(self) -> Option<crate::StmtTry> {
         match self {
-            Self::Try(val) => Some(val),
+            Self::Try(val) => Some(*val),
             _ => None,
         }
     }
@@ -900,7 +900,7 @@ impl Stmt {
     #[inline]
     pub fn expect_try_stmt(self) -> crate::StmtTry {
         match self {
-            Self::Try(val) => val,
+            Self::Try(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -929,7 +929,7 @@ impl Stmt {
     #[inline]
     pub fn assert_stmt(self) -> Option<crate::StmtAssert> {
         match self {
-            Self::Assert(val) => Some(val),
+            Self::Assert(val) => Some(*val),
             _ => None,
         }
     }
@@ -937,7 +937,7 @@ impl Stmt {
     #[inline]
     pub fn expect_assert_stmt(self) -> crate::StmtAssert {
         match self {
-            Self::Assert(val) => val,
+            Self::Assert(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -966,7 +966,7 @@ impl Stmt {
     #[inline]
     pub fn import_stmt(self) -> Option<crate::StmtImport> {
         match self {
-            Self::Import(val) => Some(val),
+            Self::Import(val) => Some(*val),
             _ => None,
         }
     }
@@ -974,7 +974,7 @@ impl Stmt {
     #[inline]
     pub fn expect_import_stmt(self) -> crate::StmtImport {
         match self {
-            Self::Import(val) => val,
+            Self::Import(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -1003,7 +1003,7 @@ impl Stmt {
     #[inline]
     pub fn import_from_stmt(self) -> Option<crate::StmtImportFrom> {
         match self {
-            Self::ImportFrom(val) => Some(val),
+            Self::ImportFrom(val) => Some(*val),
             _ => None,
         }
     }
@@ -1011,7 +1011,7 @@ impl Stmt {
     #[inline]
     pub fn expect_import_from_stmt(self) -> crate::StmtImportFrom {
         match self {
-            Self::ImportFrom(val) => val,
+            Self::ImportFrom(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -1040,7 +1040,7 @@ impl Stmt {
     #[inline]
     pub fn global_stmt(self) -> Option<crate::StmtGlobal> {
         match self {
-            Self::Global(val) => Some(val),
+            Self::Global(val) => Some(*val),
             _ => None,
         }
     }
@@ -1048,7 +1048,7 @@ impl Stmt {
     #[inline]
     pub fn expect_global_stmt(self) -> crate::StmtGlobal {
         match self {
-            Self::Global(val) => val,
+            Self::Global(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -1077,7 +1077,7 @@ impl Stmt {
     #[inline]
     pub fn nonlocal_stmt(self) -> Option<crate::StmtNonlocal> {
         match self {
-            Self::Nonlocal(val) => Some(val),
+            Self::Nonlocal(val) => Some(*val),
             _ => None,
         }
     }
@@ -1085,7 +1085,7 @@ impl Stmt {
     #[inline]
     pub fn expect_nonlocal_stmt(self) -> crate::StmtNonlocal {
         match self {
-            Self::Nonlocal(val) => val,
+            Self::Nonlocal(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }
@@ -1262,7 +1262,7 @@ impl Stmt {
     #[inline]
     pub fn ipy_escape_command_stmt(self) -> Option<crate::StmtIpyEscapeCommand> {
         match self {
-            Self::IpyEscapeCommand(val) => Some(val),
+            Self::IpyEscapeCommand(val) => Some(*val),
             _ => None,
         }
     }
@@ -1270,7 +1270,7 @@ impl Stmt {
     #[inline]
     pub fn expect_ipy_escape_command_stmt(self) -> crate::StmtIpyEscapeCommand {
         match self {
-            Self::IpyEscapeCommand(val) => val,
+            Self::IpyEscapeCommand(val) => *val,
             _ => panic!("called expect on {self:?}"),
         }
     }

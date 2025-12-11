@@ -121,43 +121,30 @@ pub fn walk_elif_else_clause<V: Transformer + ?Sized>(
 
 pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
     match stmt {
-        Stmt::FunctionDef(ast::StmtFunctionDef {
-            parameters,
-            body,
-            decorator_list,
-            returns,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
+        Stmt::FunctionDef(node) => {
+            for decorator in &mut node.decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            if let Some(type_params) = type_params {
+            if let Some(type_params) = &mut node.type_params {
                 visitor.visit_type_params(type_params);
             }
-            visitor.visit_parameters(parameters);
-            if let Some(expr) = returns {
+            visitor.visit_parameters(&mut node.parameters);
+            if let Some(expr) = &mut node.returns {
                 visitor.visit_annotation(expr);
             }
-            visitor.visit_body(body);
+            visitor.visit_body(&mut node.body);
         }
-        Stmt::ClassDef(ast::StmtClassDef {
-            arguments,
-            body,
-            decorator_list,
-            type_params,
-            ..
-        }) => {
-            for decorator in decorator_list {
+        Stmt::ClassDef(node) => {
+            for decorator in &mut node.decorator_list {
                 visitor.visit_decorator(decorator);
             }
-            if let Some(type_params) = type_params {
+            if let Some(type_params) = &mut node.type_params {
                 visitor.visit_type_params(type_params);
             }
-            if let Some(arguments) = arguments {
+            if let Some(arguments) = &mut node.arguments {
                 visitor.visit_arguments(arguments);
             }
-            visitor.visit_body(body);
+            visitor.visit_body(&mut node.body);
         }
         Stmt::Return(ast::StmtReturn {
             value,
@@ -168,116 +155,131 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Delete(ast::StmtDelete {
-            targets,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Delete(node) => {
+            let ast::StmtDelete {
+                targets,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             for expr in targets {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::TypeAlias(ast::StmtTypeAlias {
-            range: _,
-            node_index: _,
-            name,
-            type_params,
-            value,
-        }) => {
+        Stmt::TypeAlias(node) => {
+            let ast::StmtTypeAlias {
+                range: _,
+                node_index: _,
+                name,
+                type_params,
+                value,
+            } = &mut **node;
             visitor.visit_expr(value);
             if let Some(type_params) = type_params {
                 visitor.visit_type_params(type_params);
             }
             visitor.visit_expr(name);
         }
-        Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+        Stmt::Assign(node) => {
+            let ast::StmtAssign { targets, value, range: _, node_index: _ } = &mut **node;
             visitor.visit_expr(value);
             for expr in targets {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::AugAssign(ast::StmtAugAssign {
-            target,
-            op,
-            value,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::AugAssign(node) => {
+            let ast::StmtAugAssign {
+                target,
+                op,
+                value,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(value);
             visitor.visit_operator(op);
             visitor.visit_expr(target);
         }
-        Stmt::AnnAssign(ast::StmtAnnAssign {
-            target,
-            annotation,
-            value,
-            ..
-        }) => {
+        Stmt::AnnAssign(node) => {
+            let ast::StmtAnnAssign {
+                target,
+                annotation,
+                value,
+                simple: _,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             if let Some(expr) = value {
                 visitor.visit_expr(expr);
             }
             visitor.visit_annotation(annotation);
             visitor.visit_expr(target);
         }
-        Stmt::For(ast::StmtFor {
-            target,
-            iter,
-            body,
-            orelse,
-            ..
-        }) => {
+        Stmt::For(node) => {
+            let ast::StmtFor {
+                target,
+                iter,
+                body,
+                orelse,
+                is_async: _,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(iter);
             visitor.visit_expr(target);
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        Stmt::While(ast::StmtWhile {
-            test,
-            body,
-            orelse,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::While(node) => {
+            let ast::StmtWhile {
+                test,
+                body,
+                orelse,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(test);
             visitor.visit_body(body);
             visitor.visit_body(orelse);
         }
-        Stmt::If(ast::StmtIf {
-            test,
-            body,
-            elif_else_clauses,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::If(node) => {
+            let ast::StmtIf {
+                test,
+                body,
+                elif_else_clauses,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(test);
             visitor.visit_body(body);
             for clause in elif_else_clauses {
                 walk_elif_else_clause(visitor, clause);
             }
         }
-        Stmt::With(ast::StmtWith { items, body, .. }) => {
+        Stmt::With(node) => {
+            let ast::StmtWith { items, body, is_async: _, range: _, node_index: _ } = &mut **node;
             for with_item in items {
                 visitor.visit_with_item(with_item);
             }
             visitor.visit_body(body);
         }
-        Stmt::Match(ast::StmtMatch {
-            subject,
-            cases,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Match(node) => {
+            let ast::StmtMatch {
+                subject,
+                cases,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(subject);
             for match_case in cases {
                 visitor.visit_match_case(match_case);
             }
         }
-        Stmt::Raise(ast::StmtRaise {
-            exc,
-            cause,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Raise(node) => {
+            let ast::StmtRaise {
+                exc,
+                cause,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             if let Some(expr) = exc {
                 visitor.visit_expr(expr);
             }
@@ -285,15 +287,16 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Try(ast::StmtTry {
-            body,
-            handlers,
-            orelse,
-            finalbody,
-            is_star: _,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Try(node) => {
+            let ast::StmtTry {
+                body,
+                handlers,
+                orelse,
+                finalbody,
+                is_star: _,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_body(body);
             for except_handler in handlers {
                 visitor.visit_except_handler(except_handler);
@@ -301,27 +304,30 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             visitor.visit_body(orelse);
             visitor.visit_body(finalbody);
         }
-        Stmt::Assert(ast::StmtAssert {
-            test,
-            msg,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Assert(node) => {
+            let ast::StmtAssert {
+                test,
+                msg,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             visitor.visit_expr(test);
             if let Some(expr) = msg {
                 visitor.visit_expr(expr);
             }
         }
-        Stmt::Import(ast::StmtImport {
-            names,
-            range: _,
-            node_index: _,
-        }) => {
+        Stmt::Import(node) => {
+            let ast::StmtImport {
+                names,
+                range: _,
+                node_index: _,
+            } = &mut **node;
             for alias in names {
                 visitor.visit_alias(alias);
             }
         }
-        Stmt::ImportFrom(ast::StmtImportFrom { names, .. }) => {
+        Stmt::ImportFrom(node) => {
+            let ast::StmtImportFrom { names, module: _, level: _, range: _, node_index: _ } = &mut **node;
             for alias in names {
                 visitor.visit_alias(alias);
             }
@@ -332,7 +338,9 @@ pub fn walk_stmt<V: Transformer + ?Sized>(visitor: &V, stmt: &mut Stmt) {
             value,
             range: _,
             node_index: _,
-        }) => visitor.visit_expr(value),
+        }) => {
+            visitor.visit_expr(value);
+        }
         Stmt::Pass(_) | Stmt::Break(_) | Stmt::Continue(_) | Stmt::IpyEscapeCommand(_) => {}
     }
 }

@@ -2,7 +2,7 @@ use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::{self as ast, Expr, Stmt};
+use ruff_python_ast::{Expr, Stmt};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -59,15 +59,15 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
     for stmt in body {
         // Extract the property name from the assignment statement.
         let target = match stmt {
-            Stmt::Assign(ast::StmtAssign { targets, .. }) => {
-                if let [Expr::Name(id)] = targets.as_slice() {
+            Stmt::Assign(assign_stmt) => {
+                if let [Expr::Name(id)] = assign_stmt.targets.as_slice() {
                     id
                 } else {
                     continue;
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign { target, .. }) => {
-                if let Expr::Name(id) = target.as_ref() {
+            Stmt::AnnAssign(ann_assign_stmt) => {
+                if let Expr::Name(id) = ann_assign_stmt.target.as_ref() {
                     id
                 } else {
                     continue;
@@ -78,20 +78,20 @@ pub(crate) fn duplicate_class_field_definition(checker: &Checker, body: &[Stmt])
 
         // If this is an unrolled augmented assignment (e.g., `x = x + 1`), skip it.
         match stmt {
-            Stmt::Assign(ast::StmtAssign { value, .. }) => {
-                if any_over_expr(value.as_ref(), &|expr| {
+            Stmt::Assign(assign_stmt) => {
+                if any_over_expr(assign_stmt.value.as_ref(), &|expr| {
                     expr.as_name_expr().is_some_and(|name| name.id == target.id)
                 }) {
                     continue;
                 }
             }
-            Stmt::AnnAssign(ast::StmtAnnAssign {
-                value: Some(value), ..
-            }) => {
-                if any_over_expr(value.as_ref(), &|expr| {
-                    expr.as_name_expr().is_some_and(|name| name.id == target.id)
-                }) {
-                    continue;
+            Stmt::AnnAssign(ann_assign_stmt) => {
+                if let Some(value) = &ann_assign_stmt.value {
+                    if any_over_expr(value.as_ref(), &|expr| {
+                        expr.as_name_expr().is_some_and(|name| name.id == target.id)
+                    }) {
+                        continue;
+                    }
                 }
             }
             _ => continue,

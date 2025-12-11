@@ -92,15 +92,9 @@ impl Violation for NeedlessBool {
 /// SIM103
 pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     let Stmt::If(stmt_if) = stmt else { return };
-    let ast::StmtIf {
-        test: if_test,
-        body: if_body,
-        elif_else_clauses,
-        ..
-    } = stmt_if;
 
     // Extract an `if` or `elif` (that returns) followed by an else (that returns the same value)
-    let (if_test, if_body, else_body, range) = match elif_else_clauses.as_slice() {
+    let (if_test, if_body, else_body, range) = match stmt_if.elif_else_clauses.as_slice() {
         // if-else case:
         // ```python
         // if x > 0:
@@ -115,8 +109,8 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 ..
             },
         ] => (
-            if_test.as_ref(),
-            if_body,
+            stmt_if.test.as_ref(),
+            stmt_if.body.as_slice(),
             else_body.as_slice(),
             stmt_if.range(),
         ),
@@ -143,7 +137,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             },
         ] => (
             elif_test,
-            elif_body,
+            elif_body.as_slice(),
             else_body.as_slice(),
             TextRange::new(elif_range.start(), else_range.end()),
         ),
@@ -155,7 +149,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
         // ```
         [] => {
             // Fetching the next sibling is expensive, so do some validation early.
-            if is_one_line_return_bool(if_body).is_none() {
+            if is_one_line_return_bool(&stmt_if.body).is_none() {
                 return;
             }
 
@@ -175,8 +169,8 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
             }
 
             (
-                if_test.as_ref(),
-                if_body,
+                stmt_if.test.as_ref(),
+                stmt_if.body.as_slice(),
                 std::slice::from_ref(next_stmt),
                 TextRange::new(stmt_if.start(), next_stmt.end()),
             )
@@ -231,7 +225,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                     op: ast::UnaryOp::Not,
                     operand,
                     ..
-                }) => Some((**operand).clone()),
+                }) => Some(operand.clone()),
 
                 Expr::Compare(ast::ExprCompare {
                     ops,
@@ -252,26 +246,26 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                         unreachable!("Single comparison with multiple comparators");
                     };
 
-                    Some(Expr::Compare(ast::ExprCompare {
+                    Some(Box::new(Expr::Compare(ast::ExprCompare {
                         ops: Box::new([op.negate()]),
                         left: left.clone(),
                         comparators: Box::new([right.clone()]),
                         range: TextRange::default(),
                         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                    }))
+                    })))
                 }
 
-                _ => Some(Expr::UnaryOp(ast::ExprUnaryOp {
+                _ => Some(Box::new(Expr::UnaryOp(ast::ExprUnaryOp {
                     op: ast::UnaryOp::Not,
                     operand: Box::new(if_test.clone()),
                     range: TextRange::default(),
                     node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-                })),
+                }))),
             }
         } else if if_test.is_compare_expr() {
             // If the condition is a comparison, we can replace it with the condition, since we
             // know it's a boolean.
-            Some(if_test.clone())
+            Some(Box::new(if_test.clone()))
         } else if checker.semantic().has_builtin_binding("bool") {
             // Otherwise, we need to wrap the condition in a call to `bool`.
             let func_node = ast::ExprName {
@@ -291,7 +285,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
                 range: TextRange::default(),
                 node_index: ruff_python_ast::AtomicNodeIndex::NONE,
             };
-            Some(Expr::Call(call_node))
+            Some(Box::new(Expr::Call(call_node)))
         } else {
             None
         }
@@ -300,7 +294,7 @@ pub(crate) fn needless_bool(checker: &Checker, stmt: &Stmt) {
     // Generate the replacement `return` statement.
     let replacement = condition.as_ref().map(|expr| {
         Stmt::Return(ast::StmtReturn {
-            value: Some(Box::new(expr.clone())),
+            value: Some(expr.clone()),
             range: TextRange::default(),
             node_index: ruff_python_ast::AtomicNodeIndex::NONE,
         })
