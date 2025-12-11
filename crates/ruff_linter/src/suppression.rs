@@ -163,6 +163,7 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
+        // TODO: wrap these around relevant bits below
         if !context.any_rule_enabled(&[
             Rule::UnusedNOQA,
             Rule::InvalidRuleCode,
@@ -250,6 +251,7 @@ impl Suppressions {
             diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
         }
 
+        // TODO: sometimes these don't get fixes attached?
         for invalid in &self.invalid {
             let mut diagnostic = context.report_diagnostic(
                 InvalidSuppressionComment {
