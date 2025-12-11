@@ -405,11 +405,9 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             //      )
             // )
             // ```
-            if is_expression_parenthesized(
-                (*body).into(),
-                f.context().comments().ranges(),
-                f.context().source(),
-            ) && f.context().comments().has_leading(*body)
+            let comments = f.context().comments();
+            if is_expression_parenthesized((*body).into(), comments.ranges(), f.context().source())
+                && comments.has_leading(*body)
             {
                 if leading_body_comments.is_empty() {
                     write!(
