@@ -13,6 +13,7 @@ Released on 2025-12-11.
 
 - Fix comment placement in lambda parameters ([#21868](https://github.com/astral-sh/ruff/pull/21868))
 - Skip over trivia tokens after re-lexing ([#21895](https://github.com/astral-sh/ruff/pull/21895))
+- \[`flake8-bandit`\] Fix false positive when using non-standard `CSafeLoader` path (S506). ([#21830](https://github.com/astral-sh/ruff/pull/21830))
 - \[`flake8-bugbear`\] Accept immutable slice default arguments (`B008`) ([#21823](https://github.com/astral-sh/ruff/pull/21823))
 
 ### Rule changes
@@ -27,12 +28,7 @@ Released on 2025-12-11.
 
 - Document `*.pyw` is included by default in preview ([#21885](https://github.com/astral-sh/ruff/pull/21885))
 - Document range suppressions, reorganize suppression docs ([#21884](https://github.com/astral-sh/ruff/pull/21884))
-- Update README to remove production warning ([#21899](https://github.com/astral-sh/ruff/pull/21899))
 - Update mkdocs-material to 9.7.0 (Insiders now free) ([#21797](https://github.com/astral-sh/ruff/pull/21797))
-
-### Other changes
-
-- [flake8-bandit] Fix false positive when using non-standard `CSafeLoader` path (S506). ([#21830](https://github.com/astral-sh/ruff/pull/21830))
 
 ### Contributors
 
