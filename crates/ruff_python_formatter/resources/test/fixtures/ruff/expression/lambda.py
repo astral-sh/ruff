@@ -789,3 +789,18 @@ transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).betwe
     x:
     x
 )
+
+(
+    lambda: # dangling-end-of-line
+    # dangling-own-line
+    (  # leading-body-end-of-line
+        x
+    )
+)
+
+(
+    lambda: # dangling-end-of-line
+    (  # leading-body-end-of-line
+        x
+    )
+)

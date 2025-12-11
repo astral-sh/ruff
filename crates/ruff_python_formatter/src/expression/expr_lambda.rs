@@ -4,7 +4,9 @@ use ruff_text_size::Ranged;
 
 use crate::builders::parenthesize_if_expands;
 use crate::comments::{SourceComment, dangling_comments, leading_comments, trailing_comments};
-use crate::expression::parentheses::{NeedsParentheses, OptionalParentheses, Parentheses};
+use crate::expression::parentheses::{
+    NeedsParentheses, OptionalParentheses, Parentheses, is_expression_parenthesized,
+};
 use crate::expression::{CallChainLayout, has_own_parentheses};
 use crate::other::parameters::ParametersParentheses;
 use crate::prelude::*;
@@ -377,19 +379,72 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         );
 
         let fmt_body = format_with(|f: &mut PyFormatter| {
-            write!(
-                f,
-                [
-                    space(),
-                    token("("),
-                    trailing_comments(after_parameters_end_of_line),
-                    block_indent(&format_args!(
-                        leading_comments(leading_body_comments),
-                        body.format().with_options(Parentheses::Never)
-                    )),
-                    token(")")
-                ]
-            )
+            // If the body is parenthesized and has its own leading comments, preserve the
+            // separation between the dangling lambda comments and the body comments. For example,
+            // preserve this comment positioning:
+            //
+            // ```python
+            // (
+            //      lambda:  # 1
+            //      # 2
+            //      (  # 3
+            //          x
+            //      )
+            // )
+            // ```
+            //
+            // 1 and 2 are dangling on the lambda and emitted first, followed by a hard line break
+            // and the parenthesized body with its leading comments.
+            //
+            // However, when removing 2, 1 and 3 can instead be formatted on the same line:
+            //
+            // ```python
+            // (
+            //      lambda: (  # 1  # 3
+            //          x
+            //      )
+            // )
+            // ```
+            if is_expression_parenthesized(
+                (*body).into(),
+                f.context().comments().ranges(),
+                f.context().source(),
+            ) && f.context().comments().has_leading(*body)
+            {
+                if leading_body_comments.is_empty() {
+                    write!(
+                        f,
+                        [
+                            space(),
+                            trailing_comments(dangling),
+                            body.format().with_options(Parentheses::Always),
+                        ]
+                    )
+                } else {
+                    write!(
+                        f,
+                        [
+                            trailing_comments(dangling),
+                            hard_line_break(),
+                            body.format().with_options(Parentheses::Always)
+                        ]
+                    )
+                }
+            } else {
+                write!(
+                    f,
+                    [
+                        space(),
+                        token("("),
+                        trailing_comments(after_parameters_end_of_line),
+                        block_indent(&format_args!(
+                            leading_comments(leading_body_comments),
+                            body.format().with_options(Parentheses::Never)
+                        )),
+                        token(")")
+                    ]
+                )
+            }
         });
 
         match layout {
