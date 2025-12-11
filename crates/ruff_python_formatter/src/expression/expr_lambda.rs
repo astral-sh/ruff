@@ -360,63 +360,59 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
                 .unwrap_or(dangling.len()),
         );
 
-        let fmt_body = format_with(|f: &mut PyFormatter| {
-            // If the body is parenthesized and has its own leading comments, preserve the
-            // separation between the dangling lambda comments and the body comments. For example,
-            // preserve this comment positioning:
-            //
-            // ```python
-            // (
-            //      lambda:  # 1
-            //      # 2
-            //      (  # 3
-            //          x
-            //      )
-            // )
-            // ```
-            //
-            // 1 and 2 are dangling on the lambda and emitted first, followed by a hard line break
-            // and the parenthesized body with its leading comments.
-            //
-            // However, when removing 2, 1 and 3 can instead be formatted on the same line:
-            //
-            // ```python
-            // (
-            //      lambda: (  # 1  # 3
-            //          x
-            //      )
-            // )
-            // ```
-            let comments = f.context().comments();
-            if is_expression_parenthesized((*body).into(), comments.ranges(), f.context().source())
-                && comments.has_leading(*body)
-            {
-                trailing_comments(dangling).fmt(f)?;
+        // If the body is parenthesized and has its own leading comments, preserve the
+        // separation between the dangling lambda comments and the body comments. For example,
+        // preserve this comment positioning:
+        //
+        // ```python
+        // (
+        //      lambda:  # 1
+        //      # 2
+        //      (  # 3
+        //          x
+        //      )
+        // )
+        // ```
+        //
+        // 1 and 2 are dangling on the lambda and emitted first, followed by a hard line break
+        // and the parenthesized body with its leading comments.
+        //
+        // However, when removing 2, 1 and 3 can instead be formatted on the same line:
+        //
+        // ```python
+        // (
+        //      lambda: (  # 1  # 3
+        //          x
+        //      )
+        // )
+        // ```
+        let comments = f.context().comments();
+        if is_expression_parenthesized((*body).into(), comments.ranges(), f.context().source())
+            && comments.has_leading(*body)
+        {
+            trailing_comments(dangling).fmt(f)?;
 
-                if leading_body_comments.is_empty() {
-                    space().fmt(f)?;
-                } else {
-                    hard_line_break().fmt(f)?;
-                }
-
-                body.format().with_options(Parentheses::Always).fmt(f)
+            if leading_body_comments.is_empty() {
+                space().fmt(f)?;
             } else {
-                write!(
-                    f,
-                    [
-                        space(),
-                        token("("),
-                        trailing_comments(after_parameters_end_of_line),
-                        block_indent(&format_args!(
-                            leading_comments(leading_body_comments),
-                            body.format().with_options(Parentheses::Never)
-                        )),
-                        token(")")
-                    ]
-                )
+                hard_line_break().fmt(f)?;
             }
-        });
 
-        fmt_body.fmt(f)
+            body.format().with_options(Parentheses::Always).fmt(f)
+        } else {
+            write!(
+                f,
+                [
+                    space(),
+                    token("("),
+                    trailing_comments(after_parameters_end_of_line),
+                    block_indent(&format_args!(
+                        leading_comments(leading_body_comments),
+                        body.format().with_options(Parentheses::Never)
+                    )),
+                    token(")")
+                ]
+            )
+        }
     }
 }
