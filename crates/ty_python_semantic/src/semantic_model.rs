@@ -241,6 +241,27 @@ impl<'db> SemanticModel<'db> {
         let index = semantic_index(self.db, self.file);
         match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+            ast::AnyNodeRef::StmtFunctionDef(def) => {
+                Some(def.definition(self).scope(self.db).file_scope_id(self.db))
+            }
+            ast::AnyNodeRef::StmtClassDef(class) => {
+                Some(class.definition(self).scope(self.db).file_scope_id(self.db))
+            }
+            ast::AnyNodeRef::Parameter(param) => {
+                Some(param.definition(self).scope(self.db).file_scope_id(self.db))
+            }
+            ast::AnyNodeRef::ParameterWithDefault(param) => {
+                Some(param.definition(self).scope(self.db).file_scope_id(self.db))
+            }
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
+                handler
+                    .definition(self)
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
+            ast::AnyNodeRef::TypeParamTypeVar(var) => {
+                Some(var.definition(self).scope(self.db).file_scope_id(self.db))
+            }
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
@@ -395,12 +416,12 @@ impl<'db> Completion<'db> {
     }
 }
 
-pub trait HasType {
+pub trait HasType<'db> {
     /// Returns the inferred type of `self`.
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+    fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db>;
 }
 
 pub trait HasDefinition {
@@ -411,8 +432,8 @@ pub trait HasDefinition {
     fn definition<'db>(&self, model: &SemanticModel<'db>) -> Definition<'db>;
 }
 
-impl HasType for ast::ExprRef<'_> {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+impl<'db> HasType<'db> for ast::ExprRef<'_> {
+    fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
         let index = semantic_index(model.db, model.file);
         // TODO(#1637): semantic tokens is making this crash even with
         // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
@@ -429,9 +450,9 @@ impl HasType for ast::ExprRef<'_> {
 
 macro_rules! impl_expression_has_type {
     ($ty: ty) => {
-        impl HasType for $ty {
+        impl<'db> HasType<'db> for $ty {
             #[inline]
-            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let expression_ref = ExprRef::from(self);
                 expression_ref.inferred_type(model)
             }
@@ -473,8 +494,8 @@ impl_expression_has_type!(ast::ExprTuple);
 impl_expression_has_type!(ast::ExprSlice);
 impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 
-impl HasType for ast::Expr {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+impl<'db> HasType<'db> for ast::Expr {
+    fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
         match self {
             Expr::BoolOp(inner) => inner.inferred_type(model),
             Expr::Named(inner) => inner.inferred_type(model),
@@ -523,11 +544,11 @@ macro_rules! impl_binding_has_ty_def {
             }
         }
 
-        impl HasType for $ty {
+        impl<'db> HasType<'db> for $ty {
             #[inline]
-            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
                 let binding = HasDefinition::definition(self, model);
-                binding_type(model.db, binding)
+                binding.inferred_type(model)
             }
         }
     };
@@ -540,13 +561,19 @@ impl_binding_has_ty_def!(ast::ParameterWithDefault);
 impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
-impl HasType for ast::Alias {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+impl<'db> HasType<'db> for ast::Alias {
+    fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
         if &self.name == "*" {
             return Type::Never;
         }
         let index = semantic_index(model.db, model.file);
         binding_type(model.db, index.expect_single_definition(self))
+    }
+}
+
+impl<'db> HasType<'db> for Definition<'db> {
+    fn inferred_type(&self, model: &SemanticModel<'db>) -> Type<'db> {
+        binding_type(model.db, *self)
     }
 }
 

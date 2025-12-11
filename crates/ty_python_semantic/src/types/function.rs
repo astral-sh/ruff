@@ -52,6 +52,7 @@
 use std::str::FromStr;
 
 use bitflags::bitflags;
+use itertools::Itertools;
 use ruff_db::diagnostic::{Annotation, DiagnosticId, Severity, Span};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -63,7 +64,7 @@ use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{FileScopeId, SemanticIndex, semantic_index};
+use crate::semantic_index::{FileScopeId, SemanticIndex, place_table, semantic_index, use_def_map};
 use crate::types::call::{Binding, CallArguments};
 use crate::types::constraints::ConstraintSet;
 use crate::types::context::InferContext;
@@ -260,7 +261,7 @@ impl<'db> OverloadLiteral<'db> {
         self.decorators(db).contains(decorator)
     }
 
-    pub(crate) fn is_overload(self, db: &dyn Db) -> bool {
+    pub fn is_overload(self, db: &dyn Db) -> bool {
         self.has_known_decorator(db, FunctionDecorators::OVERLOAD)
     }
 
@@ -350,7 +351,7 @@ impl<'db> OverloadLiteral<'db> {
     /// calling query is not in the same file as this function is defined in, then this will create
     /// a cross-module dependency directly on the full AST which will lead to cache
     /// over-invalidation.
-    fn definition(self, db: &'db dyn Db) -> Definition<'db> {
+    pub fn definition(self, db: &'db dyn Db) -> Definition<'db> {
         let body_scope = self.body_scope(db);
         let index = semantic_index(db, body_scope.file(db));
         index.expect_single_definition(body_scope.node(db).expect_function())
@@ -363,7 +364,7 @@ impl<'db> OverloadLiteral<'db> {
         // here to get the previous function definition with the same name.
         let scope = self.definition(db).scope(db);
         let module = parsed_module(db, self.file(db)).load(db);
-        let use_def = semantic_index(db, scope.file(db)).use_def_map(scope.file_scope_id(db));
+        let use_def = use_def_map(db, scope);
         let use_id = self
             .body_scope(db)
             .node(db)
@@ -563,7 +564,7 @@ impl<'db> OverloadLiteral<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionLiteral<'db> {
-    pub(crate) last_definition: OverloadLiteral<'db>,
+    pub last_definition: OverloadLiteral<'db>,
 }
 
 // The Salsa heap is tracked separately.
@@ -721,7 +722,7 @@ impl<'db> FunctionLiteral<'db> {
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
 pub struct FunctionType<'db> {
-    pub(crate) literal: FunctionLiteral<'db>,
+    pub literal: FunctionLiteral<'db>,
 
     /// Contains a potentially modified signature for this function literal, in case certain operations
     /// (like type mappings) have been applied to it.
@@ -945,11 +946,42 @@ impl<'db> FunctionType<'db> {
 
     /// Returns an iterator of all of the definitions of this function, including both overload
     /// signatures and any implementation, all in source order.
-    pub(crate) fn iter_overloads_and_implementation(
+    pub fn iter_overloads_and_implementation(
         self,
         db: &'db dyn Db,
     ) -> impl Iterator<Item = OverloadLiteral<'db>> + 'db {
         self.literal(db).iter_overloads_and_implementation(db)
+    }
+
+    pub fn resolve_overload(self, db: &'db dyn Db) -> FunctionType<'db> {
+        let scope = self.definition(db).scope(db);
+        let module = parsed_module(db, self.file(db)).load(db);
+        let use_def = use_def_map(db, scope);
+        let place_table = place_table(db, scope);
+
+        let function = self.node(db, scope.file(db), &module);
+        let symbol_id = place_table.symbol_id(&function.name.id).unwrap();
+
+        let overload_literal = self.literal(db).last_definition(db);
+
+        // Not overloaded
+        if !overload_literal.is_overload(db) {
+            return self;
+        }
+
+        // Find the last binding in the outer scope that contains self as one possible overload.
+        use_def
+            .end_of_scope_symbol_bindings(symbol_id.into())
+            .filter_map(|binding| {
+                let ty = binding_type(db, binding.binding.definition()?).as_function_literal()?;
+
+                ty.literal(db)
+                    .iter_overloads_and_implementation(db)
+                    .contains(&overload_literal)
+                    .then_some(ty)
+            })
+            .last()
+            .unwrap_or(self)
     }
 
     pub(crate) fn first_overload_or_implementation(self, db: &'db dyn Db) -> OverloadLiteral<'db> {
@@ -971,7 +1003,7 @@ impl<'db> FunctionType<'db> {
     /// Were this not a salsa query, then the calling query
     /// would depend on the function's AST and rerun for every change in that file.
     #[salsa::tracked(returns(ref), cycle_initial=signature_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
-    pub(crate) fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
+    pub fn signature(self, db: &'db dyn Db) -> CallableSignature<'db> {
         self.updated_signature(db)
             .cloned()
             .unwrap_or_else(|| self.literal(db).signature(db))
@@ -990,7 +1022,7 @@ impl<'db> FunctionType<'db> {
         returns(ref), cycle_initial=last_definition_signature_cycle_initial,
         heap_size=ruff_memory_usage::heap_size,
     )]
-    pub(crate) fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
+    pub fn last_definition_signature(self, db: &'db dyn Db) -> Signature<'db> {
         self.updated_last_definition_signature(db)
             .cloned()
             .unwrap_or_else(|| self.literal(db).last_definition_signature(db))

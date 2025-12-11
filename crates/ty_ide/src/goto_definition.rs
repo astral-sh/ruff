@@ -1070,6 +1070,54 @@ def ab(a: int, *, c: int): ...
     }
 
     #[test]
+    fn goto_definition_on_overloaded_function_literal() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                "
+from typing import overload, Any
+
+@overload
+def ab(a: int): ...
+
+@overload
+def ab<CURSOR>(a: int, b: int): ...
+
+def ab(a: int, c: Any):
+    return 1
+",
+            )
+            .build();
+
+        assert_snapshot!(test.goto_definition(), @r"
+        info[goto-definition]: Go to definition
+          --> main.py:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     ^^ Clicking here
+         9 |
+        10 | def ab(a: int, c: Any):
+           |
+        info: Found 3 definitions
+          --> main.py:5:5
+           |
+         4 | @overload
+         5 | def ab(a: int): ...
+           |     --
+         6 |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     --
+         9 |
+        10 | def ab(a: int, c: Any):
+           |     --
+        11 |     return 1
+           |
+        ");
+    }
+
+    #[test]
     fn goto_definition_binary_operator() {
         let test = CursorTest::builder()
             .source(
@@ -1697,8 +1745,9 @@ Traceb<CURSOR>ackType
 
     impl CursorTest {
         fn goto_definition(&self) -> String {
-            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(targets) = salsa::attach(&self.db, || {
+                goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "No goto target found".to_string();
             };
 

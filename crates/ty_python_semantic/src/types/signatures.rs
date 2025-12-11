@@ -147,7 +147,7 @@ impl<'db> CallableSignature<'db> {
         }
     }
 
-    pub(crate) fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
+    pub fn iter(&self) -> std::slice::Iter<'_, Signature<'db>> {
         self.overloads.iter()
     }
 
@@ -772,7 +772,7 @@ impl<'db> Signature<'db> {
     }
 
     /// Return the definition associated with this signature, if any.
-    pub(crate) fn definition(&self) -> Option<Definition<'db>> {
+    pub fn definition(&self) -> Option<Definition<'db>> {
         self.definition
     }
 

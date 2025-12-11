@@ -1289,7 +1289,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_function_literal(self) -> Option<FunctionType<'db>> {
+    pub const fn as_function_literal(self) -> Option<FunctionType<'db>> {
         match self {
             Type::FunctionLiteral(function_type) => Some(function_type),
             _ => None,
