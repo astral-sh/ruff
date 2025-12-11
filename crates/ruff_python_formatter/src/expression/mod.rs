@@ -941,6 +941,24 @@ impl CallChainLayout {
         matches!(self, Self::Fluent(AttributeState::FirstCallOrSubscript))
     }
 
+    /// Returns either `Fluent` or `NonFluent` depending on a
+    /// heuristic computed for the whole chain.
+    ///
+    /// Explicitly, the criterion to return `Fluent` is
+    /// as follows:
+    ///
+    /// 1. Beginning from the right (i.e. the `expr` itself),
+    /// traverse inwards past calls, subscripts, and attribute
+    /// expressions until we meet the first expression that is
+    /// either none of these or else is parenthesized. This will
+    /// be the _root_ of the call chain.
+    /// 2. Count the number of _attribute values_ that are _called
+    /// or subscripted_ in the chain (note that this includes the
+    /// root but excludes the rightmost attribute in the chain since
+    /// it is not the _value_ of some attribute).
+    /// 3. If the root is parenthesized, add 1 to that value.
+    /// 4. If the total is at least 2, return `Fluent`. Otherwise
+    /// return `NonFluent`
     pub(crate) fn from_expression(
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
@@ -949,14 +967,28 @@ impl CallChainLayout {
         // is stabilized
         context: &PyFormatContext,
     ) -> Self {
+        // Count of attribute values which are called or
+        // subscripted, after the leftmost parenthesized
+        // value.
+        //
+        // Examples:
+        // ```
+        // # Count of 3 - notice that .d()
+        // # does not contribute
+        // a().b().c[0]()().d()
+        // # Count of 2 - notice that a()
+        // # does not contribute
+        // (a()).b().c[0].d
+        // ```
+        let mut computed_attribute_values_after_parentheses = 0;
+
         let mut call_like_count = 0;
-        let mut was_in_call_like = false;
-        let mut first_attr_value_parenthesized = false;
 
-        // We can delete this and its uses below once
-        // the preview style [] is stabilized.
-        let mut attributes_after_parentheses = 0;
-
+        // Going from right to left, we traverse calls, subscripts,
+        // and attributes until we get to an expression of a different
+        // kind _or_ to a parenthesized expression. This records
+        // the case where we end the traversal at a parenthesized expression.
+        let mut root_value_parenthesized = false;
         loop {
             match expr {
                 ExprRef::Attribute(ast::ExprAttribute { value, .. }) => {
@@ -966,15 +998,14 @@ impl CallChainLayout {
                     // data[:100].T
                     // ^^^^^^^^^^ value
                     // ```
-                    call_like_count += u32::from(was_in_call_like);
                     if is_expression_parenthesized(value.into(), comment_ranges, source) {
                         // `(a).b`. We preserve these parentheses so don't recurse
-                        first_attr_value_parenthesized = true;
+                        root_value_parenthesized = true;
                         break;
                     } else if matches!(value.as_ref(), Expr::Call(_) | Expr::Subscript(_)) {
-                        attributes_after_parentheses += 1;
+                        computed_attribute_values_after_parentheses += 1;
                     }
-                    was_in_call_like = false;
+
                     expr = ExprRef::from(value.as_ref());
                 }
                 // ```
@@ -994,50 +1025,30 @@ impl CallChainLayout {
                         break;
                     }
 
-                    was_in_call_like = true;
+                    // Accumulate the `call_like_count`, but we only
+                    // want to count things like `a()[0]()()` once.
+                    if !inner.is_call_expr() && !inner.is_subscript_expr() {
+                        call_like_count += 1
+                    }
+
                     expr = ExprRef::from(inner.as_ref());
                 }
                 _ => {
-                    // We count the first call in the chain even
-                    // if it is not part of an attribute, e.g.
-                    //
-                    // f().g()
-                    // ^^^ count this
-                    call_like_count += u32::from(was_in_call_like);
                     break;
                 }
             }
         }
 
-        // Observe that `call_like_count >= attributes_after_parentheses`
-        //
-        // Indeed, the latter accumulates only at an attribute expression
-        // with non-parenthesized, call-like value. After that, we
-        // immediately set `was_in_call_like` to `true`. Any execution path
-        // from that code point to the exit or to the next accumulation of
-        // `attribute_after_parentheses` passes through
-        //
-        // ```
-        // call_like_count += u32::from(was_in_call_like);
-        // ```
-        //
-        // and it does so before it could pass through
-        // `was_in_call_like = false`.
-        //
-        // This justifies the name `fluent_layout_more_often_enabled`
-        // used below.
-        if is_fluent_layout_more_often_enabled(context) {
-            if call_like_count + u32::from(first_attr_value_parenthesized) < 2 {
-                CallChainLayout::NonFluent
-            } else {
-                CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
-            }
+        let threshold = if is_fluent_layout_more_often_enabled(context) {
+            call_like_count + u32::from(root_value_parenthesized)
         } else {
-            if attributes_after_parentheses + u32::from(first_attr_value_parenthesized) < 2 {
-                CallChainLayout::NonFluent
-            } else {
-                CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
-            }
+            computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized)
+        };
+
+        if threshold < 2 {
+            CallChainLayout::NonFluent
+        } else {
+            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
         }
     }
 
