@@ -3,7 +3,9 @@ use std::collections::BTreeSet;
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
-use crate::types::{ClassType, KnownClass, Type, UnionType, definition_expression_type, visitor};
+use crate::types::{
+    ClassType, KnownClass, KnownUnion, Type, UnionType, definition_expression_type, visitor,
+};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 
@@ -84,8 +86,11 @@ impl<'db> NewType<'db> {
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
             // or explicit, so the explicit version is also allowed.
-            Type::Union(union_type) if union_type.is_int_float(db) => NewTypeBase::Float,
-            Type::Union(union_type) if union_type.is_int_float_complex(db) => NewTypeBase::Complex,
+            Type::Union(union_type) => match union_type.known(db) {
+                Some(KnownUnion::Float) => NewTypeBase::Float,
+                Some(KnownUnion::Complex) => NewTypeBase::Complex,
+                _ => object_fallback,
+            },
             _ => object_fallback,
         }
     }

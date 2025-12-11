@@ -104,13 +104,13 @@ use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
     ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, LintDiagnosticGuard, MemberLookupPolicy,
-    MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm,
-    Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
-    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
-    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType,
-    UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
+    ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet,
+    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
+    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
+    UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5629,35 +5629,34 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     // Infer the deferred base type of a NewType.
     fn infer_newtype_assignment_deferred(&mut self, arguments: &ast::Arguments) {
-        match self.infer_type_expression(&arguments.args[1]) {
-            Type::NominalInstance(_) | Type::NewTypeInstance(_) => {}
+        let inferred = self.infer_type_expression(&arguments.args[1]);
+        match inferred {
+            Type::NominalInstance(_) | Type::NewTypeInstance(_) => return,
             // There are exactly two union types allowed as bases for NewType: `int | float` and
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
             // or explicit, so the explicit version is also allowed.
-            Type::Union(union_ty)
-                if union_ty.is_int_float(self.db()) || union_ty.is_int_float_complex(self.db()) => {
-            }
+            Type::Union(union_ty) => match union_ty.known(self.db()) {
+                Some(KnownUnion::Float) | Some(KnownUnion::Complex) => return,
+                _ => {}
+            },
             // `Unknown` is likely to be the result of an unresolved import or a typo, which will
             // already get a diagnostic, so don't pile on an extra diagnostic here.
-            Type::Dynamic(DynamicType::Unknown) => {}
-            other_type => {
-                if let Some(builder) = self
-                    .context
-                    .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
-                {
-                    let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
-                    diag.set_primary_message(format!("type `{}`", other_type.display(self.db())));
-                    if matches!(other_type, Type::ProtocolInstance(_)) {
-                        diag.info("The base of a `NewType` is not allowed to be a protocol class.");
-                    } else if matches!(other_type, Type::TypedDict(_)) {
-                        diag.info("The base of a `NewType` is not allowed to be a `TypedDict`.");
-                    } else {
-                        diag.info(
-                            "The base of a `NewType` must be a class type or another `NewType`.",
-                        );
-                    }
-                }
+            Type::Dynamic(DynamicType::Unknown) => return,
+            _ => {}
+        }
+        if let Some(builder) = self
+            .context
+            .report_lint(&INVALID_NEWTYPE, &arguments.args[1])
+        {
+            let mut diag = builder.into_diagnostic("invalid base for `typing.NewType`");
+            diag.set_primary_message(format!("type `{}`", inferred.display(self.db())));
+            if matches!(inferred, Type::ProtocolInstance(_)) {
+                diag.info("The base of a `NewType` is not allowed to be a protocol class.");
+            } else if matches!(inferred, Type::TypedDict(_)) {
+                diag.info("The base of a `NewType` is not allowed to be a `TypedDict`.");
+            } else {
+                diag.info("The base of a `NewType` must be a class type or another `NewType`.");
             }
         }
     }

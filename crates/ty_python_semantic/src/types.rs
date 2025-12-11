@@ -13916,40 +13916,13 @@ impl<'db> UnionType<'db> {
         ConstraintSet::from(sorted_self == other.normalized(db))
     }
 
-    /// Returns true if this union is equivalent to `int | float`, which is what `float` expands
-    /// into in type position.
-    pub(crate) fn is_int_float(self, db: &'db dyn Db) -> bool {
-        let elements = self.elements(db);
-        if elements.len() != 2 {
-            return false;
-        }
-        let mut has_int = false;
-        let mut has_float = false;
-        for element in elements {
-            if let Type::NominalInstance(nominal) = element
-                && let Some(known) = nominal.known_class(db)
-            {
-                match known {
-                    KnownClass::Int => has_int = true,
-                    KnownClass::Float => has_float = true,
-                    _ => {}
-                }
-            }
-        }
-        has_int && has_float
-    }
-
     /// Returns true if this union is equivalent to `int | float | complex`, which is what
     /// `complex` expands into in type position.
-    pub(crate) fn is_int_float_complex(self, db: &'db dyn Db) -> bool {
-        let elements = self.elements(db);
-        if elements.len() != 3 {
-            return false;
-        }
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownUnion> {
         let mut has_int = false;
         let mut has_float = false;
         let mut has_complex = false;
-        for element in elements {
+        for element in self.elements(db) {
             if let Type::NominalInstance(nominal) = element
                 && let Some(known) = nominal.known_class(db)
             {
@@ -13957,12 +13930,24 @@ impl<'db> UnionType<'db> {
                     KnownClass::Int => has_int = true,
                     KnownClass::Float => has_float = true,
                     KnownClass::Complex => has_complex = true,
-                    _ => {}
+                    _ => return None,
                 }
+            } else {
+                return None;
             }
         }
-        has_int && has_float && has_complex
+        match (has_int, has_float, has_complex) {
+            (true, true, false) => Some(KnownUnion::Float),
+            (true, true, true) => Some(KnownUnion::Complex),
+            _ => None,
+        }
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KnownUnion {
+    Float,   // `int | float`
+    Complex, // `int | float | complex`
 }
 
 #[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
