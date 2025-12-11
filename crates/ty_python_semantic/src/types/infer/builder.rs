@@ -5910,7 +5910,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
             builder.into_diagnostic(format_args!(
-                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                "Operator `{op}=` is not supported between objects of type `{}` and `{}`",
                 target_type.display(db),
                 value_type.display(db)
             ));
@@ -9679,7 +9679,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Unary operator `{op}` is unsupported for type `{}`",
+                                "Unary operator `{op}` is not supported for type `{}`",
                                 operand_type.display(self.db()),
                             ));
                         }
@@ -9716,7 +9716,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
+                        "Operator `{op}` is not supported between objects of type `{}` and `{}`",
                         left_ty.display(db),
                         right_ty.display(db)
                     ));
