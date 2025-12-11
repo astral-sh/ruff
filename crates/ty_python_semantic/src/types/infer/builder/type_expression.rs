@@ -155,7 +155,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
-                        self.infer_binary_expression(binary, TypeContext::default());
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
