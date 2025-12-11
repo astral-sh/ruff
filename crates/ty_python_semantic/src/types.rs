@@ -1903,6 +1903,20 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
     }
 
+    fn when_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+        )
+    }
+
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.

@@ -322,6 +322,18 @@ impl<'db> ConstraintSet<'db> {
         false
     }
 
+    pub(crate) fn mentions_typevar(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        let mut found = false;
+        self.node.for_each_constraint(db, &mut |constraint| {
+            found |= constraint.typevar(db).identity(db) == bound_typevar;
+        });
+        found
+    }
+
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
     /// constraints in this constraint set hold. Panics if neither of the types being compared are
     /// a typevar. (That case is handled by `Type::has_relation_to`.)

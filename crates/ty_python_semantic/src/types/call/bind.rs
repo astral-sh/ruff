@@ -3017,7 +3017,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             FxHashMap::default();
 
         let parameters = self.signature.parameters();
-        for (argument_index, adjusted_argument_index, argument, argument_type) in
+        for (argument_index, adjusted_argument_index, _, argument_type) in
             self.enumerate_argument_types()
         {
             for (parameter_index, variadic_argument_type) in
@@ -3029,28 +3029,25 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 };
 
                 // Below, we will possibly perform literal promotion on the types that we infer for
-                // each typevar. Whether we do so will depend on the variance of the typevar in the
-                // parameter type that each argument is mapped to.
-                //
-                // Note that we do not track the variance for synthetic `self` arguments. Those
-                // only exist for generic methods of a (possibly generic) class. The class instance
-                // is fixed for any generic method call, and shouldn't affect literal promotion.
-                // (This is true even for the constructors of a generic class: a `self` annotation
-                // on `__init__` limits which specializations the constructor overload applies to,
-                // but we rely on occurrences of a typevar in other parameters to determine whether
-                // to promote literals in the specialized generic class type.)
-                if !matches!(argument, Argument::Synthetic)
-                    && parameter.form == ParameterForm::Value
-                    && expected_type.has_typevar(self.db)
-                {
-                    for bound_typevar in generic_context_variables.clone() {
-                        let variance = expected_type.variance_of(self.db, bound_typevar);
-                        if variance != TypeVarVariance::Bivariant {
-                            variance_in_arguments
-                                .entry(bound_typevar.identity(self.db))
-                                .and_modify(|current| *current = current.join(variance))
-                                .or_insert(variance);
-                        }
+                // each typevar. Whether we do so will depend on which arguments affect the
+                // specialization of the typevar, and what variance the typevar has in the
+                // corresponding parameter type.
+                let when_assignable = argument_type.when_constraint_set_assignable_to(
+                    self.db,
+                    expected_type,
+                    self.inferable_typevars,
+                );
+                for bound_typevar in generic_context_variables.clone() {
+                    let identity = bound_typevar.identity(self.db);
+                    if !when_assignable.mentions_typevar(self.db, identity) {
+                        continue;
+                    }
+                    let variance = expected_type.variance_of(self.db, bound_typevar);
+                    if variance != TypeVarVariance::Bivariant {
+                        variance_in_arguments
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
                     }
                 }
 
