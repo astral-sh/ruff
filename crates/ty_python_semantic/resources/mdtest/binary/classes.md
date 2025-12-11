@@ -27,7 +27,7 @@ python-version = "3.9"
 class A: ...
 class B: ...
 
-# error: "Operator `|` is unsupported between objects of type `<class 'A'>` and `<class 'B'>`"
+# error: "Operator `|` is not supported between objects of type `<class 'A'>` and `<class 'B'>`"
 reveal_type(A | B)  # revealed: Unknown
 ```
 

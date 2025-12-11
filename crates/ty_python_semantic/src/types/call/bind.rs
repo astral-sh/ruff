@@ -1603,10 +1603,16 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
 
-        tracing::debug!(
+        let _span = tracing::trace_span!(
+            "CallableBinding::check_types",
+            arguments = %argument_types.display(db),
+            signature = %self.signature_type.display(db),
+        )
+        .entered();
+
+        tracing::trace!(
             target: "ty_python_semantic::types::call::bind",
             matching_overload_index = ?self.matching_overload_index(),
-            signature = %self.signature_type.display(db),
             "after step 1",
         );
 
@@ -1640,10 +1646,9 @@ impl<'db> CallableBinding<'db> {
             overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
         }
 
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::call::bind",
             matching_overload_index = ?self.matching_overload_index(),
-            signature = %self.signature_type.display(db),
             "after step 2",
         );
 
@@ -1659,10 +1664,9 @@ impl<'db> CallableBinding<'db> {
                 // If two or more candidate overloads remain, proceed to step 4.
                 self.filter_overloads_containing_variadic(&indexes);
 
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
-                    signature = %self.signature_type.display(db),
                     "after step 4",
                 );
 
@@ -1685,10 +1689,9 @@ impl<'db> CallableBinding<'db> {
                             &indexes,
                         );
 
-                        tracing::debug!(
+                        tracing::trace!(
                             target: "ty_python_semantic::types::call::bind",
                             matching_overload_index = ?self.matching_overload_index(),
-                            signature = %self.signature_type.display(db),
                             "after step 5",
                         );
                     }
@@ -1793,10 +1796,9 @@ impl<'db> CallableBinding<'db> {
                     overload.match_parameters(db, expanded_arguments, &mut argument_forms);
                 }
 
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
-                    signature = %self.signature_type.display(db),
                     "after step 1",
                 );
 
@@ -1806,10 +1808,9 @@ impl<'db> CallableBinding<'db> {
                     overload.check_types(db, expanded_arguments, call_expression_tcx);
                 }
 
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::call::bind",
                     matching_overload_index = ?self.matching_overload_index(),
-                    signature = %self.signature_type.display(db),
                     "after step 2",
                 );
 
@@ -1821,10 +1822,9 @@ impl<'db> CallableBinding<'db> {
                     MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
                         self.filter_overloads_containing_variadic(&matching_overload_indexes);
 
-                        tracing::debug!(
+                        tracing::trace!(
                             target: "ty_python_semantic::types::call::bind",
                             matching_overload_index = ?self.matching_overload_index(),
-                            signature = %self.signature_type.display(db),
                             "after step 4",
                         );
 
@@ -1843,10 +1843,9 @@ impl<'db> CallableBinding<'db> {
                                     &indexes,
                                 );
 
-                                tracing::debug!(
+                                tracing::trace!(
                                     target: "ty_python_semantic::types::call::bind",
                                     matching_overload_index = ?self.matching_overload_index(),
-                                    signature = %self.signature_type.display(db),
                                     "after step 5",
                                 );
 

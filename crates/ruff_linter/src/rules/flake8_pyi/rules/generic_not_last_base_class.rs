@@ -160,20 +160,16 @@ fn generate_fix(
 ) -> anyhow::Result<Fix> {
     let locator = checker.locator();
     let source = locator.contents();
+    let tokens = checker.tokens();
 
     let deletion = remove_argument(
         generic_base,
         arguments,
         Parentheses::Preserve,
         source,
-        checker.comment_ranges(),
+        tokens,
     )?;
-    let insertion = add_argument(
-        locator.slice(generic_base),
-        arguments,
-        checker.comment_ranges(),
-        source,
-    );
+    let insertion = add_argument(locator.slice(generic_base), arguments, tokens);
 
     Ok(Fix::unsafe_edits(deletion, [insertion]))
 }

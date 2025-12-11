@@ -2241,7 +2241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name,
             type_params,
             parameters,
-            returns,
+            returns: _,
             body: _,
             decorator_list,
         } = function;
@@ -2288,21 +2288,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(default, TypeContext::default());
         }
 
-        // If there are type params, parameters and returns are evaluated in that scope, that is, in
-        // `infer_function_type_params`, rather than here.
+        // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
+        // we always defer the inference of the parameters and returns. That ensures that we do not
+        // add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // requires getting the signature of this function definition, which in turn requires
+        // (lazily) inferring the parameter and return types.)
         if type_params.is_none() {
-            if self.defer_annotations() {
-                self.deferred.insert(definition, self.multi_inference_state);
-            } else {
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
-                self.infer_return_type_annotation(
-                    returns.as_deref(),
-                    DeferredExpressionState::None,
-                );
-                self.infer_parameters(parameters);
-                self.typevar_binding_context = previous_typevar_binding_context;
-            }
+            self.deferred.insert(definition, self.multi_inference_state);
         }
 
         let known_function =
@@ -2702,21 +2694,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let function_node = function_definition.node(self.module());
         let function_name = &function_node.name;
 
-        // TODO: handle implicit type of `cls` for classmethods
-        if is_implicit_classmethod(function_name) || is_implicit_staticmethod(function_name) {
+        if is_implicit_staticmethod(function_name) {
             return None;
         }
 
+        let mut is_classmethod = is_implicit_classmethod(function_name);
         let inference = infer_definition_types(db, method_definition);
         for decorator in &function_node.decorator_list {
             let decorator_ty = inference.expression_type(&decorator.expression);
-            if decorator_ty.as_class_literal().is_some_and(|class| {
-                matches!(
-                    class.known(db),
-                    Some(KnownClass::Classmethod | KnownClass::Staticmethod)
-                )
-            }) {
-                return None;
+            if let Some(known_class) = decorator_ty
+                .as_class_literal()
+                .and_then(|class| class.known(db))
+            {
+                if known_class == KnownClass::Staticmethod {
+                    return None;
+                }
+
+                is_classmethod |= known_class == KnownClass::Classmethod;
             }
         }
 
@@ -2726,7 +2720,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .inner_type()
             .as_class_literal()?;
 
-        typing_self(db, self.scope(), Some(method_definition), class_literal)
+        let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
+        if is_classmethod {
+            typing_self
+                .map(|typing_self| SubclassOfType::from(db, SubclassOfInner::TypeVar(typing_self)))
+        } else {
+            typing_self.map(Type::TypeVar)
+        }
     }
 
     /// Set initial declared/inferred types for a `**kwargs` keyword-variadic parameter.
@@ -2938,10 +2938,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
+        let mut prev_in_no_type_check = self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+        for decorator in &function.decorator_list {
+            let decorator_type = self.infer_decorator(decorator);
+            if let Type::FunctionLiteral(function) = decorator_type
+                && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
+            {
+                // If the function is decorated with the `no_type_check` decorator,
+                // we need to suppress any errors that come after the decorators.
+                prev_in_no_type_check = InNoTypeCheck::Yes;
+                break;
+            }
+        }
+        self.context.set_in_no_type_check(prev_in_no_type_check);
+
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
-            DeferredExpressionState::Deferred,
+            self.defer_annotations().into(),
         );
         self.infer_parameters(function.parameters.as_ref());
         self.typevar_binding_context = previous_typevar_binding_context;
@@ -5902,7 +5916,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
             builder.into_diagnostic(format_args!(
-                "Operator `{op}=` is unsupported between objects of type `{}` and `{}`",
+                "Operator `{op}=` is not supported between objects of type `{}` and `{}`",
                 target_type.display(db),
                 value_type.display(db)
             ));
@@ -8886,7 +8900,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If we're inferring types of deferred expressions, look them up from end-of-scope.
         if self.is_deferred() {
             let place = if let Some(place_id) = place_table.place_id(expr) {
-                place_from_bindings(db, use_def.all_reachable_bindings(place_id)).place
+                place_from_bindings(db, use_def.reachable_bindings(place_id)).place
             } else {
                 assert!(
                     self.deferred_state.in_string_annotation(),
@@ -9671,7 +9685,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Unary operator `{op}` is unsupported for type `{}`",
+                                "Unary operator `{op}` is not supported for type `{}`",
                                 operand_type.display(self.db()),
                             ));
                         }
@@ -9708,7 +9722,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "Operator `{op}` is unsupported between objects of type `{}` and `{}`",
+                        "Operator `{op}` is not supported between objects of type `{}` and `{}`",
                         left_ty.display(db),
                         right_ty.display(db)
                     ));
@@ -10836,19 +10850,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             (
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(left)),
                 Type::KnownInstance(KnownInstanceType::ConstraintSet(right)),
-            ) => {
-                let result = match op {
-                    ast::CmpOp::Eq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db()))
-                    ),
-                    ast::CmpOp::NotEq => Some(
-                        left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).negate(self.db())
-                    ),
-                    _ => None,
-                };
-                result.map(|constraints| Ok(Type::KnownInstance(KnownInstanceType::ConstraintSet(
-                    TrackedConstraintSet::new(self.db(), constraints)
-                ))))
+            ) => match op {
+                ast::CmpOp::Eq => Some(Ok(Type::BooleanLiteral(
+                    left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                ast::CmpOp::NotEq => Some(Ok(Type::BooleanLiteral(
+                    !left.constraints(self.db()).iff(self.db(), right.constraints(self.db())).is_always_satisfied(self.db()),
+                ))),
+                _ => None,
             }
 
             (

@@ -6433,6 +6433,155 @@ collabc<CURSOR>
         assert_snapshot!(snapshot, @"collections.abc");
     }
 
+    #[test]
+    fn local_function_variable_with_return() {
+        let builder = completion_test_builder(
+            "\
+variable_global = 1
+def foo():
+    variable_local = 1
+    variable_<CURSOR>
+    return
+",
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().build().snapshot(),
+            @r"
+        variable_global
+        variable_local
+        ",
+        );
+    }
+
+    #[test]
+    fn nested_scopes_with_return() {
+        let builder = completion_test_builder(
+            "\
+variable_1 = 1
+def fun1():
+    variable_2 = 1
+    def fun2():
+        variable_3 = 1
+        def fun3():
+            variable_4 = 1
+            variable_<CURSOR>
+            return
+        return
+    return
+",
+        );
+        assert_snapshot!(
+            builder.skip_auto_import().build().snapshot(),
+            @r"
+        variable_1
+        variable_2
+        variable_3
+        variable_4
+        ",
+        );
+    }
+
+    #[test]
+    fn multiple_declarations_global_scope1() {
+        let builder = completion_test_builder(
+            "\
+zqzqzq: int = 1
+zqzqzq: str = 'foo'
+zqzq<CURSOR>
+",
+        );
+        // The type for `zqzqzq` *should* be `str`, but we consider all
+        // reachable declarations and bindings, which means we get a
+        // union of `int` and `str` here even though the `int` binding
+        // isn't live at the cursor position.
+        assert_snapshot!(
+            builder.skip_auto_import().type_signatures().build().snapshot(),
+            @"zqzqzq :: int | str",
+        );
+    }
+
+    #[test]
+    fn multiple_declarations_global_scope2() {
+        let builder = completion_test_builder(
+            "\
+zqzqzq: int = 1
+zqzq<CURSOR>
+zqzqzq: str = 'foo'
+",
+        );
+        // The type for `zqzqzq` *should* be `int`, but we consider all
+        // reachable declarations and bindings, which means we get a
+        // union of `int` and `str` here even though the `str` binding
+        // doesn't exist at the cursor position.
+        assert_snapshot!(
+            builder.skip_auto_import().type_signatures().build().snapshot(),
+            @"zqzqzq :: int | str",
+        );
+    }
+
+    #[test]
+    fn multiple_declarations_function_scope1() {
+        let builder = completion_test_builder(
+            "\
+def foo():
+    zqzqzq: int = 1
+    zqzqzq: str = 'foo'
+    zqzq<CURSOR>
+    return
+",
+        );
+        // The type for `zqzqzq` *should* be `str`, but we consider all
+        // reachable declarations and bindings, which means we get a
+        // union of `int` and `str` here even though the `int` binding
+        // isn't live at the cursor position.
+        assert_snapshot!(
+            builder.skip_auto_import().type_signatures().build().snapshot(),
+            @"zqzqzq :: int | str",
+        );
+    }
+
+    #[test]
+    fn multiple_declarations_function_scope2() {
+        let builder = completion_test_builder(
+            "\
+def foo():
+    zqzqzq: int = 1
+    zqzq<CURSOR>
+    zqzqzq: str = 'foo'
+    return
+",
+        );
+        // The type for `zqzqzq` *should* be `int`, but we consider all
+        // reachable declarations and bindings, which means we get a
+        // union of `int` and `str` here even though the `str` binding
+        // doesn't exist at the cursor position.
+        assert_snapshot!(
+            builder.skip_auto_import().type_signatures().build().snapshot(),
+            @"zqzqzq :: int | str",
+        );
+    }
+
+    #[test]
+    fn multiple_declarations_function_parameter() {
+        let builder = completion_test_builder(
+            "\
+from pathlib import Path
+def f(zqzqzq: str):
+    zqzqzq: Path = Path(zqzqzq)
+    zqzq<CURSOR>
+    return
+",
+        );
+        // The type for `zqzqzq` *should* be `Path`, but we consider all
+        // reachable declarations and bindings, which means we get a
+        // union of `str` and `Path` here even though the `str` binding
+        // isn't live at the cursor position.
+        assert_snapshot!(
+            builder.skip_auto_import().type_signatures().build().snapshot(),
+            @"zqzqzq :: str | Path",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///

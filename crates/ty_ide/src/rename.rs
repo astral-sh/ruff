@@ -98,7 +98,9 @@ mod tests {
 
     impl CursorTest {
         fn prepare_rename(&self) -> String {
-            let Some(range) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
+            let Some(range) = salsa::attach(&self.db, || {
+                can_rename(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "Cannot rename".to_string();
             };
 
@@ -106,13 +108,13 @@ mod tests {
         }
 
         fn rename(&self, new_name: &str) -> String {
-            let Some(_) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
-                return "Cannot rename".to_string();
-            };
+            let rename_results = salsa::attach(&self.db, || {
+                can_rename(&self.db, self.cursor.file, self.cursor.offset)?;
 
-            let Some(rename_results) =
                 rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
-            else {
+            });
+
+            let Some(rename_results) = rename_results else {
                 return "Cannot rename".to_string();
             };
 

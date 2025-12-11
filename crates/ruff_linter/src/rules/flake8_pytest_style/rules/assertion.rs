@@ -10,7 +10,7 @@ use libcst_native::{
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
@@ -303,8 +303,7 @@ pub(crate) fn unittest_assertion(
                 parenthesized_range(
                     expr.into(),
                     checker.semantic().current_statement().into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
+                    checker.tokens(),
                 )
                 .unwrap_or(expr.range()),
             )));

@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -262,6 +263,52 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
+    }
+
+    pub(super) fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayCallArguments<'a, 'db> {
+            call_arguments: &'a CallArguments<'a, 'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for DisplayCallArguments<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("(")?;
+                for (index, (argument, ty)) in self.call_arguments.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match argument {
+                        Argument::Synthetic => write!(
+                            f,
+                            "self: {}",
+                            ty.unwrap_or_else(Type::unknown).display(self.db)
+                        )?,
+                        Argument::Positional => {
+                            write!(f, "{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                        Argument::Variadic => {
+                            write!(f, "*{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                        Argument::Keyword(name) => write!(
+                            f,
+                            "{}={}",
+                            name,
+                            ty.unwrap_or_else(Type::unknown).display(self.db)
+                        )?,
+                        Argument::Keywords => {
+                            write!(f, "**{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                    }
+                }
+                f.write_str(")")
+            }
+        }
+
+        DisplayCallArguments {
+            call_arguments: self,
+            db,
+        }
     }
 }
 

@@ -277,7 +277,7 @@ T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
     return t1 + t2
 ```
 
@@ -287,7 +287,7 @@ and an `int` and a `str` cannot be added together:
 
 ```py
 def unions_are_different(t1: int | str, t2: int | str) -> int | str:
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `int | str` and `int | str`"
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `int | str` and `int | str`"
     return t1 + t2
 ```
 
@@ -336,6 +336,44 @@ reveal_type(union_and_nonunion_params(1, 1))  # revealed: Literal[1]
 reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
 reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
+
+This also works if the typevar has a bound:
+
+```py
+T_str = TypeVar("T_str", bound=str)
+
+def accepts_t_or_int(x: T_str | int) -> T_str:
+    raise NotImplementedError
+
+reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
+reveal_type(accepts_t_or_int(1))  # revealed: Unknown
+
+class Unrelated: ...
+
+# error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
+reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
+```
+
+```py
+T_str = TypeVar("T_str", bound=str)
+
+def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
+    raise NotImplementedError
+
+reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
+# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
+reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+
+def _(list_ofstr: list[str], list_of_int: list[int]):
+    reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
+
+    # TODO: the error message here could be improved by referring to the second union element
+    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
+would also be a valid solution:
 
 ```py
 S = TypeVar("S")

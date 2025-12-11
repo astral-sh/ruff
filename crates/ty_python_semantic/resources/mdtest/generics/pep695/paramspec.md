@@ -417,8 +417,7 @@ The `converter` function act as a decorator here:
 def f3(x: int, y: str) -> int:
     return 1
 
-# TODO: This should reveal `(x: int, y: str) -> bool` but there's a cycle: https://github.com/astral-sh/ty/issues/1729
-reveal_type(f3)  # revealed: ((x: int, y: str) -> bool) | ((...) -> bool)
+reveal_type(f3)  # revealed: (x: int, y: str) -> bool
 
 reveal_type(f3(1, "a"))  # revealed: bool
 reveal_type(f3(x=1, y="a"))  # revealed: bool
