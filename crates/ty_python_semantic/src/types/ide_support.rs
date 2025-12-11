@@ -86,9 +86,9 @@ pub fn definitions_for_name<'db>(
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
                 let global_bindings =
-                    global_use_def_map.all_reachable_symbol_bindings(global_symbol_id);
+                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.all_reachable_symbol_declarations(global_symbol_id);
+                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
@@ -114,8 +114,8 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -155,7 +155,8 @@ pub fn definitions_for_name<'db>(
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
         if matches!(name_str, "float" | "complex")
             && let Some(expr) = node.expr_name()
-            && let Some(union) = expr.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && let Some(ty) = expr.inferred_type(model)
+            && let Some(union) = ty.as_union()
             && is_float_or_complex_annotation(db, union, name_str)
         {
             return union
@@ -234,7 +235,10 @@ pub fn definitions_for_attribute<'db>(
     let mut resolved = Vec::new();
 
     // Determine the type of the LHS
-    let lhs_ty = attribute.value.inferred_type(model);
+    let Some(lhs_ty) = attribute.value.inferred_type(model) else {
+        return resolved;
+    };
+
     let tys = match lhs_ty {
         Type::Union(union) => union.elements(model.db()).to_vec(),
         _ => vec![lhs_ty],
@@ -294,7 +298,7 @@ pub fn definitions_for_attribute<'db>(
                 let use_def = use_def_map(db, class_scope);
 
                 // Check declarations first
-                for decl in use_def.all_reachable_symbol_declarations(place_id) {
+                for decl in use_def.reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -307,7 +311,7 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.all_reachable_symbol_bindings(place_id) {
+                for binding in use_def.reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -332,7 +336,7 @@ pub fn definitions_for_attribute<'db>(
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
-                    for decl in use_def.all_reachable_member_declarations(place_id) {
+                    for decl in use_def.reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
                             resolved.extend(resolve_definition(
                                 db,
@@ -345,7 +349,7 @@ pub fn definitions_for_attribute<'db>(
                     }
 
                     // If no declarations found, check bindings
-                    for binding in use_def.all_reachable_member_bindings(place_id) {
+                    for binding in use_def.reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
                             resolved.extend(resolve_definition(
                                 db,
@@ -374,7 +378,9 @@ pub fn definitions_for_keyword_argument<'db>(
     call_expr: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     let Some(keyword_name) = keyword.arg.as_ref() else {
         return Vec::new();
@@ -498,7 +504,9 @@ pub fn call_signature_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
@@ -507,7 +515,9 @@ pub fn call_signature_details<'db>(
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(model)
+                splatted_value
+                    .inferred_type(model)
+                    .unwrap_or(Type::unknown())
             });
         let bindings = callable_type
             .bindings(model.db())
@@ -564,7 +574,7 @@ pub fn call_type_simplified_by_overloads(
     call_expr: &ast::ExprCall,
 ) -> Option<String> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let func_type = call_expr.func.inferred_type(model)?;
 
     // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
@@ -579,7 +589,9 @@ pub fn call_type_simplified_by_overloads(
 
     // Hand the overload resolution system as much type info as we have
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
-        splatted_value.inferred_type(model)
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
     });
 
     // Try to resolve overloads with the arguments/types we have
@@ -612,8 +624,8 @@ pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,
     binary_op: &ast::ExprBinOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let left_ty = binary_op.left.inferred_type(model);
-    let right_ty = binary_op.right.inferred_type(model);
+    let left_ty = binary_op.left.inferred_type(model)?;
+    let right_ty = binary_op.right.inferred_type(model)?;
 
     let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
         return None;
@@ -639,7 +651,7 @@ pub fn definitions_for_unary_op<'db>(
     model: &SemanticModel<'db>,
     unary_op: &ast::ExprUnaryOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let operand_ty = unary_op.operand.inferred_type(model);
+    let operand_ty = unary_op.operand.inferred_type(model)?;
 
     let unary_dunder_method = match unary_op.op {
         ast::UnaryOp::Invert => "__invert__",
@@ -843,6 +855,7 @@ mod resolve_definition {
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
+    use ruff_python_stdlib::sys::is_builtin_module;
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
@@ -1096,8 +1109,8 @@ mod resolve_definition {
         let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -1160,6 +1173,14 @@ mod resolve_definition {
         // here because there isn't really an importing file. However this `resolve_real_module`
         // can be understood as essentially `import .`, which is also what `file_to_module` is,
         // so this is in fact exactly the file we want to consider the importer.
+        //
+        // ... unless we have a builtin module. i.e., A module embedded
+        // into the interpreter. In which case, all we have are stubs.
+        // `resolve_real_module` will always return `None` for this case, but
+        // it will emit false positive logs. And this saves us some work.
+        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
+            return None;
+        }
         let real_module =
             resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));

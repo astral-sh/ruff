@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 
 use ruff_python_ast::PythonVersion;
-use ruff_python_ast::{self as ast, Expr, name::Name, parenthesize::parenthesized_range};
+use ruff_python_ast::{self as ast, Expr, name::Name, token::parenthesized_range};
 use ruff_python_codegen::Generator;
 use ruff_python_semantic::{BindingId, ResolvedReference, SemanticModel};
 use ruff_text_size::{Ranged, TextRange};
@@ -330,12 +330,8 @@ pub(super) fn parenthesize_loop_iter_if_necessary<'a>(
     let locator = checker.locator();
     let iter = for_stmt.iter.as_ref();
 
-    let original_parenthesized_range = parenthesized_range(
-        iter.into(),
-        for_stmt.into(),
-        checker.comment_ranges(),
-        checker.source(),
-    );
+    let original_parenthesized_range =
+        parenthesized_range(iter.into(), for_stmt.into(), checker.tokens());
 
     if let Some(range) = original_parenthesized_range {
         return Cow::Borrowed(locator.slice(range));

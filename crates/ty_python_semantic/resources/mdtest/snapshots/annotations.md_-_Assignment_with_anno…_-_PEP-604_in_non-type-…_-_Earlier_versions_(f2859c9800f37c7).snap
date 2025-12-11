@@ -19,7 +19,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.m
 # Diagnostics
 
 ```
-error[unsupported-operator]: Operator `|` is unsupported between objects of type `<class 'int'>` and `<class 'str'>`
+error[unsupported-operator]: Operator `|` is not supported between objects of type `<class 'int'>` and `<class 'str'>`
  --> src/mdtest_snippet.py:2:12
   |
 1 | # error: [unsupported-operator]

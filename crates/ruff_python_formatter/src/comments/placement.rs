@@ -1974,8 +1974,8 @@ fn handle_unary_op_comment<'a>(
 /// )
 /// ```
 ///
-/// The comment will be attached to the [`Arguments`] node as a dangling comment, to ensure
-/// that it remains on the same line as open parenthesis.
+/// The comment will be attached to the [`Arguments`](ast::Arguments) node as a dangling comment, to
+/// ensure that it remains on the same line as open parenthesis.
 ///
 /// Similarly, given:
 /// ```python
@@ -1984,8 +1984,8 @@ fn handle_unary_op_comment<'a>(
 /// ] = ...
 /// ```
 ///
-/// The comment will be attached to the [`TypeParams`] node as a dangling comment, to ensure
-/// that it remains on the same line as open bracket.
+/// The comment will be attached to the [`TypeParams`](ast::TypeParams) node as a dangling comment,
+/// to ensure that it remains on the same line as open bracket.
 fn handle_bracketed_end_of_line_comment<'a>(
     comment: DecoratedComment<'a>,
     source: &str,

@@ -296,7 +296,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 456..472,
+                            range: 456..471,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -306,7 +306,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 460..472,
+                                range: 460..471,
                                 node_index: NodeIndex(None),
                                 args: [
                                     Name(
@@ -581,7 +581,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 890..906,
+                            range: 890..905,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -591,7 +591,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 894..906,
+                                range: 894..905,
                                 node_index: NodeIndex(None),
                                 args: [
                                     FString(
@@ -832,7 +832,16 @@ Module(
    |
 28 | # The lexer is nested with multiple levels of parentheses
 29 | if call(foo, [a, b
-   |                   ^ Syntax Error: Expected `]`, found NonLogicalNewline
+30 |     def bar():
+   |     ^^^ Syntax Error: Expected `]`, found `def`
+31 |         pass
+   |
+
+
+   |
+28 | # The lexer is nested with multiple levels of parentheses
+29 | if call(foo, [a, b
+   |                   ^ Syntax Error: Expected `)`, found newline
 30 |     def bar():
 31 |         pass
    |
@@ -857,11 +866,10 @@ Module(
 
 
    |
-41 | # test is to make sure it emits a `NonLogicalNewline` token after `b`.
 42 | if call(foo, [a,
 43 |     b
-   |      ^ Syntax Error: Expected `]`, found NonLogicalNewline
 44 | )
+   | ^ Syntax Error: Expected `]`, found `)`
 45 |     def bar():
 46 |         pass
    |
@@ -898,7 +906,7 @@ Module(
    |
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
-   |                   ^ Syntax Error: Expected FStringEnd, found NonLogicalNewline
+   |                   ^ Syntax Error: Expected `)`, found newline
 51 |     def bar():
 52 |         pass
    |

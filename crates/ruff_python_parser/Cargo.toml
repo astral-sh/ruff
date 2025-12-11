@@ -35,6 +35,7 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 insta = { workspace = true, features = ["glob"] }
+itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }

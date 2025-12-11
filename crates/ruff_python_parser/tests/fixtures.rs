@@ -4,15 +4,16 @@ use std::fmt::{Formatter, Write};
 use std::fs;
 use std::path::Path;
 
+use itertools::Itertools;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
-use ruff_python_ast::token::Token;
+use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
-use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, parse_unchecked};
+use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Parsed, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -81,7 +82,7 @@ fn test_valid_syntax(input_path: &Path) {
     }
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
-    validate_ast(parsed.syntax(), source.text_len(), input_path);
+    validate_ast(&parsed, source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
@@ -139,7 +140,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let parsed = parse_unchecked(&source, options.clone());
 
     validate_tokens(parsed.tokens(), source.text_len(), input_path);
-    validate_ast(parsed.syntax(), source.text_len(), input_path);
+    validate_ast(&parsed, source.text_len(), input_path);
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
@@ -402,12 +403,16 @@ Tokens: {tokens:#?}
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
-fn validate_ast(root: &Mod, source_len: TextSize, test_path: &Path) {
-    walk_module(&mut ValidateAstVisitor::new(source_len, test_path), root);
+fn validate_ast(parsed: &Parsed<Mod>, source_len: TextSize, test_path: &Path) {
+    walk_module(
+        &mut ValidateAstVisitor::new(parsed.tokens(), source_len, test_path),
+        parsed.syntax(),
+    );
 }
 
 #[derive(Debug)]
 struct ValidateAstVisitor<'a> {
+    tokens: std::iter::Peekable<std::slice::Iter<'a, Token>>,
     parents: Vec<AnyNodeRef<'a>>,
     previous: Option<AnyNodeRef<'a>>,
     source_length: TextSize,
@@ -415,12 +420,54 @@ struct ValidateAstVisitor<'a> {
 }
 
 impl<'a> ValidateAstVisitor<'a> {
-    fn new(source_length: TextSize, test_path: &'a Path) -> Self {
+    fn new(tokens: &'a Tokens, source_length: TextSize, test_path: &'a Path) -> Self {
         Self {
+            tokens: tokens.iter().peekable(),
             parents: Vec::new(),
             previous: None,
             source_length,
             test_path,
+        }
+    }
+}
+
+impl ValidateAstVisitor<'_> {
+    /// Check that the node's start doesn't fall within a token.
+    /// Called in `enter_node` before visiting children.
+    fn assert_start_boundary(&mut self, node: AnyNodeRef<'_>) {
+        // Skip tokens that end at or before the node starts.
+        self.tokens
+            .peeking_take_while(|t| t.end() <= node.start())
+            .last();
+
+        if let Some(next) = self.tokens.peek() {
+            // At this point, next_token.end() > node.start()
+            assert!(
+                next.start() >= node.start(),
+                "{path}: The start of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                path = self.test_path.display(),
+                root = self.parents.first()
+            );
+        }
+    }
+
+    /// Check that the node's end doesn't fall within a token.
+    /// Called in `leave_node` after visiting children, so all tokens
+    /// within the node have been consumed.
+    fn assert_end_boundary(&mut self, node: AnyNodeRef<'_>) {
+        // Skip tokens that end at or before the node ends.
+        self.tokens
+            .peeking_take_while(|t| t.end() <= node.end())
+            .last();
+
+        if let Some(next) = self.tokens.peek() {
+            // At this point, `next_token.end() > node.end()`
+            assert!(
+                next.start() >= node.end(),
+                "{path}: The end of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                path = self.test_path.display(),
+                root = self.parents.first()
+            );
         }
     }
 }
@@ -452,12 +499,16 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
             );
         }
 
+        self.assert_start_boundary(node);
+
         self.parents.push(node);
 
         TraversalSignal::Traverse
     }
 
     fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+        self.assert_end_boundary(node);
+
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);

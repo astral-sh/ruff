@@ -76,7 +76,7 @@ pub(crate) fn enum_metadata<'db>(
     let mut auto_counter = 0;
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.all_reachable_symbol_bindings(ignore);
+        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
         let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
