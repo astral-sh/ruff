@@ -236,11 +236,41 @@ impl<'db> SemanticModel<'db> {
         completions
     }
 
-    /// Get the scope of the given node (handles string annotations)
+    /// Returns the scope in which `node` is defined (handles string annotations).
     pub fn scope(&self, node: ast::AnyNodeRef<'_>) -> Option<FileScopeId> {
         let index = semantic_index(self.db, self.file);
         match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+            ast::AnyNodeRef::StmtFunctionDef(function) => Some(
+                function
+                    .definition(self)
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
+            ast::AnyNodeRef::StmtClassDef(class) => {
+                Some(class.definition(self).scope(self.db).file_scope_id(self.db))
+            }
+            ast::AnyNodeRef::Parameter(parameter) => Some(
+                parameter
+                    .definition(self)
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
+            ast::AnyNodeRef::ParameterWithDefault(parameter) => Some(
+                parameter
+                    .definition(self)
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => Some(
+                handler
+                    .definition(self)
+                    .scope(self.db)
+                    .file_scope_id(self.db),
+            ),
+            ast::AnyNodeRef::TypeParamTypeVar(var) => {
+                Some(var.definition(self).scope(self.db).file_scope_id(self.db))
+            }
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
