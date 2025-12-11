@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -193,16 +193,14 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),
@@ -224,16 +222,14 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),
