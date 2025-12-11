@@ -922,7 +922,30 @@ impl<'db> Type<'db> {
             {
                 self
             }
-            _ => UnionType::from_elements_cycle_recovery(db, [self, previous]),
+            _ => {
+                // Also avoid unioning in a previous type which contains a Divergent from the
+                // current cycle, if the most-recent type does not. This cannot cause an
+                // oscillation, since Divergent is only introduced at the start of fixpoint
+                // iteration.
+                let has_divergent_type_in_cycle = |ty| {
+                    any_over_type(
+                        db,
+                        ty,
+                        &|nested_ty| {
+                            matches!(
+                    nested_ty,
+                    Type::Dynamic(DynamicType::Divergent(DivergentType { id }))
+                    if cycle.head_ids().contains(&id))
+                        },
+                        false,
+                    )
+                };
+                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
+                    self
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                }
+            }
         }
         .recursive_type_normalized(db, cycle)
     }
