@@ -22,6 +22,7 @@ itertools = { workspace = true }
 unic-ucd-category = { workspace = true }
 
 [dev-dependencies]
+insta = { workspace = true }
 
 [lints]
 workspace = true

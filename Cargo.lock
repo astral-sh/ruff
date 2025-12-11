@@ -3333,6 +3333,7 @@ name = "ruff_python_literal"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.10.0",
+ "insta",
  "itertools 0.14.0",
  "ruff_python_ast",
  "unic-ucd-category",
