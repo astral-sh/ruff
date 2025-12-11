@@ -1003,7 +1003,7 @@ impl<'db> Type<'db> {
     pub(crate) fn class_specialization(
         self,
         db: &'db dyn Db,
-    ) -> Option<(ClassType<'db>, Specialization<'db>)> {
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         self.specialization_of_optional(db, None)
     }
 
@@ -1021,7 +1021,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<(ClassType<'db>, Specialization<'db>)> {
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
             Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
@@ -1035,7 +1035,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        Some((class_type, specialization?))
+        Some((class_literal, specialization?))
     }
 
     /// Given a type variable `T` from the generic context of a class `C`:
@@ -3905,17 +3905,20 @@ impl<'db> Type<'db> {
             .zip(specialization.types(db))
         {
             let variance = type_var.variance_with_polarity(db, polarity);
-            let tcx = tcx.and_then(|tcx| {
-                tcx.filter_union(db, |ty| {
-                    ty.find_type_var_from(db, type_var, class_literal).is_some()
-                })
-                .find_type_var_from(db, type_var, class_literal)
+            let narrowed_tcx = tcx.and_then(|annotation| match annotation {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .filter_map(|ty| ty.find_type_var_from(db, type_var, class_literal))
+                    .exactly_one()
+                    .ok(),
+                _ => annotation.find_type_var_from(db, type_var, class_literal),
             });
 
-            f(type_var, *ty, variance, tcx);
+            f(type_var, *ty, variance, narrowed_tcx);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, tcx, variance, f, visitor);
+                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, visitor);
             });
         }
     }

@@ -2818,35 +2818,38 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Prefer the declared type of generic classes.
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
-            let tcx = tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some());
-            tcx.class_specialization(self.db)?;
-
-            let return_specialization = return_ty
+            let (tcx_class, tcx_specialization) = tcx
                 .filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
-                .class_specialization(self.db);
+                .class_specialization(self.db)?;
+
+            let Some((return_class, return_specialization)) = return_ty
+                .filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+                .class_specialization(self.db)
+            else {
+                builder.infer(return_ty, tcx).ok()?;
+                return Some(builder.type_mappings().clone());
+            };
 
             // TODO: We should use the constraint solver here to determine the type mappings for more
             // complex subtyping relationships, e.g., callables, protocols, or unions containing multiple
             // generic elements.
-            if let Some((class_literal, _)) = return_specialization
-                && let Some(generic_alias) = class_literal.into_generic_alias()
-            {
-                let specialization = generic_alias.specialization(self.db);
-                for (class_type_var, return_ty) in specialization
-                    .generic_context(self.db)
-                    .variables(self.db)
-                    .zip(specialization.types(self.db))
-                {
-                    if let Some(ty) = tcx.find_type_var_from(
-                        self.db,
-                        class_type_var,
-                        generic_alias.origin(self.db),
+            for base in return_class.iter_mro(self.db, Some(return_specialization)) {
+                let Some((base_class, Some(base_specialization))) =
+                    base.into_class().map(|class| class.class_literal(self.db))
+                else {
+                    continue;
+                };
+
+                if base_class == tcx_class {
+                    for (base_ty, tcx_ty) in std::iter::zip(
+                        base_specialization.types(self.db),
+                        tcx_specialization.types(self.db),
                     ) {
-                        builder.infer(*return_ty, ty).ok()?;
+                        builder.infer(*base_ty, *tcx_ty).ok()?;
                     }
+
+                    break;
                 }
-            } else {
-                builder.infer(return_ty, tcx).ok()?;
             }
 
             Some(builder.type_mappings().clone())
