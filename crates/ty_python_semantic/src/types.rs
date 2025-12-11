@@ -13916,8 +13916,8 @@ impl<'db> UnionType<'db> {
         ConstraintSet::from(sorted_self == other.normalized(db))
     }
 
-    /// Returns true if this union is equivalent to `int | float | complex`, which is what
-    /// `complex` expands into in type position.
+    /// Identify some specific unions of known classes, currently the ones that `float` and
+    /// `complex` expand into in type position.
     pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownUnion> {
         let mut has_int = false;
         let mut has_float = false;
