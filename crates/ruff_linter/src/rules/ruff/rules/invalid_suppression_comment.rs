@@ -30,7 +30,7 @@ pub(crate) struct InvalidSuppressionComment {
     pub kind: InvalidSuppressionCommentKind,
 }
 
-impl Violation for InvalidSuppressionComment {
+impl AlwaysFixableViolation for InvalidSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
         let msg = match self.kind {
@@ -48,8 +48,8 @@ impl Violation for InvalidSuppressionComment {
         format!("Invalid suppression comment: {msg}")
     }
 
-    fn fix_title(&self) -> Option<String> {
-        Some("Remove invalid suppression comment".to_string())
+    fn fix_title(&self) -> String {
+        "Remove invalid suppression comment".to_string()
     }
 }
 
