@@ -277,7 +277,7 @@ T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
+    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `T@same_constrained_types`"
     return t1 + t2
 ```
 
@@ -287,7 +287,7 @@ and an `int` and a `str` cannot be added together:
 
 ```py
 def unions_are_different(t1: int | str, t2: int | str) -> int | str:
-    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `int | str` and `int | str`"
+    # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `int | str`"
     return t1 + t2
 ```
 
