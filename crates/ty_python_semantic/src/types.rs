@@ -912,8 +912,19 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        UnionType::from_elements_cycle_recovery(db, [self, previous])
-            .recursive_type_normalized(db, cycle)
+        // Avoid unioning two generic aliases of the same class together; this union will never
+        // simplify and is likely to cause downstream problems. This introduces the theoretical
+        // possibility of cycle oscillation involving such types (because we are not strictly
+        // widening the type on each iteration), but so far we have not seen an example of that.
+        match (previous, self) {
+            (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
+                if prev_alias.origin(db) == curr_alias.origin(db) =>
+            {
+                self
+            }
+            _ => UnionType::from_elements_cycle_recovery(db, [self, previous]),
+        }
+        .recursive_type_normalized(db, cycle)
     }
 
     fn is_none(&self, db: &'db dyn Db) -> bool {
