@@ -366,10 +366,9 @@ def foo():
     # ruff: enable[E741, F841]
 ```
 
-If no matching "enable" comment is found, a RUF10x violation will be raised for unmatched
-range suppression, though Ruff will also treat this as an "implicit" range. The implicit
-range is defined from the starting "disable" comment, until reaching a logical scope
-indented less than the starting comment:
+If no matching "enable" comment is found, Ruff will also treat this as an "implicit" range.
+The implicit range is defined from the starting "disable" comment, until reaching
+a logical scope indented less than the starting comment:
 
 ```python
 def foo():
@@ -384,9 +383,7 @@ foo()
 ```
 
 It is strongly suggested to use explicit range suppressions, in order to prevent
-accidental suppressions of violations, especially at global module scope. If implicit
-range suppressions are desired, the RUF10x lint can be disabled, or an inline `noqa`
-suppression can be added to the end of the "disable" comment.
+accidental suppressions of violations, especially at global module scope.
 
 Range suppressions cannot be used to enable or select rules that aren't already
 selected by the project configuration or runtime flags. An "enable" comment can only
