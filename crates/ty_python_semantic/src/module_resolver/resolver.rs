@@ -334,7 +334,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
             db,
             file,
             path,
-            desperate_search_paths(db, file).iter().flatten(),
+            simple_desperate_search_paths(db, file).iter(),
         )
     })
 }
@@ -449,9 +449,63 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
     if search_paths.is_empty() {
         None
     } else {
-        search_paths.reverse();
         Some(search_paths)
     }
+}
+
+/// Get the search-paths that should be used for desperate resolution of imports in this file
+///
+/// Currently this is "the closest ancestor dir that contains a pyproject.toml", which is
+/// a completely arbitrary decision. We could potentially change this to return an iterator
+/// of every ancestor with a pyproject.toml or every ancestor.
+///
+/// For now this works well in common cases where we have some larger workspace that contains
+/// one or more python projects in sub-directories, and those python projects assume that
+/// absolute imports resolve relative to the pyproject.toml they live under.
+///
+/// Being so strict minimizes concerns about this going off a lot and doing random
+/// chaotic things. In particular, all files under a given pyproject.toml will currently
+/// agree on this being their desperate search-path, which is really nice.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn simple_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+    let system = db.system();
+    let importing_path = importing_file.path(db).as_system_path()?;
+
+    // Only allow this if the importing_file is under the first-party search path
+    let (base_path, rel_path) =
+        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
+            if !search_path.is_first_party() {
+                return None;
+            }
+            Some((
+                search_path.as_system_path()?,
+                search_path.relativize_system_path_only(importing_path)?,
+            ))
+        })?;
+
+    // Read the revision on the corresponding file root to
+    // register an explicit dependency on this directory. When
+    // the revision gets bumped, the cache that Salsa creates
+    // for this routine will be invalidated.
+    //
+    // (This is conditional because ruff uses this code too and doesn't set roots)
+    if let Some(root) = db.files().root(db, base_path) {
+        let _ = root.revision(db);
+    }
+
+    // Only allow searching up to the first-party path's root
+    for rel_dir in rel_path.ancestors() {
+        let candidate_path = base_path.join(rel_dir);
+        // Any dir with a pyproject.toml or ty.toml might be a project root
+        if system.is_file(&candidate_path.join("pyproject.toml"))
+            || system.is_file(&candidate_path.join("ty.toml"))
+        {
+            let search_path = SearchPath::first_party(system, candidate_path).ok()?;
+            return Some(search_path);
+        }
+    }
+
+    None
 }
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
 pub struct SearchPaths {
