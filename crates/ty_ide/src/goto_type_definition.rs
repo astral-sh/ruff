@@ -1900,9 +1900,9 @@ def function():
 
     impl CursorTest {
         fn goto_type_definition(&self) -> String {
-            let Some(targets) =
+            let Some(targets) = salsa::attach(&self.db, || {
                 goto_type_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            }) else {
                 return "No goto target found".to_string();
             };
 

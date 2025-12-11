@@ -2785,8 +2785,9 @@ def ab(a: int, *, c: int): ...
 
     impl CursorTest {
         fn goto_declaration(&self) -> String {
-            let Some(targets) = goto_declaration(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(targets) = salsa::attach(&self.db, || {
+                goto_declaration(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "No goto target found".to_string();
             };
 
