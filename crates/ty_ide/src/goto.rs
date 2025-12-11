@@ -392,11 +392,30 @@ impl GotoTarget<'_> {
             GotoTarget::Expression(expression) => {
                 definitions_for_expression(model, *expression, alias_resolution)
             }
-            // For already-defined symbols, they are their own definitions
-            GotoTarget::FunctionDef(function) => Some(vec![ResolvedDefinition::Definition(
-                function.definition(model),
-            )]),
 
+            GotoTarget::FunctionDef(function) => {
+                let self_definition = function.definition(model);
+
+                let mut definitions = Vec::new();
+
+                // TODO: Skip the implementation in go to definition
+                // TODO: Only take the implementation in go to declaration
+                if let Some(ty) = function.inferred_type(model).as_function_literal() {
+                    let overload = ty.resolve_overload(model.db());
+
+                    definitions.extend(overload.iter_overloads_and_implementation(model.db()).map(
+                        |literal| ResolvedDefinition::Definition(literal.definition(model.db())),
+                    ))
+                }
+
+                if definitions.is_empty() {
+                    definitions.push(ResolvedDefinition::Definition(self_definition));
+                }
+
+                Some(definitions)
+            }
+
+            // For already-defined symbols, they are their own definitions
             GotoTarget::ClassDef(class) => Some(vec![ResolvedDefinition::Definition(
                 class.definition(model),
             )]),

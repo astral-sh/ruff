@@ -106,14 +106,23 @@ mod tests {
         }
 
         fn rename(&self, new_name: &str) -> String {
-            let Some(_) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
-                return "Cannot rename".to_string();
-            };
+            let rename_results = salsa::attach(&self.db, || {
+                let Some(_) = can_rename(&self.db, self.cursor.file, self.cursor.offset) else {
+                    return Err("Cannot rename".to_string());
+                };
 
-            let Some(rename_results) =
-                rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
-            else {
-                return "Cannot rename".to_string();
+                let Some(rename_results) =
+                    rename(&self.db, self.cursor.file, self.cursor.offset, new_name)
+                else {
+                    return Err("Cannot rename".to_string());
+                };
+
+                Ok(rename_results)
+            });
+
+            let rename_results = match rename_results {
+                Ok(rename_results) => rename_results,
+                Err(err) => return err,
             };
 
             if rename_results.is_empty() {
@@ -1533,24 +1542,283 @@ result = func(10, y=20)
             )
             .build();
 
+        assert_snapshot!(test.rename("better_name"), @r###"
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
+        "###);
+    }
+
+    #[test]
+    fn rename_non_first_overloaded_function_declaration() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+                @overload
+                def test<CURSOR>(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r###"
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
+        "###);
+    }
+
+    #[test]
+    fn rename_overloaded_function_definition() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+                @overload
+                def test(a: str) -> str: ...
+                @overload
+                def test(a: int) -> int: ...
+
+                def test<CURSOR>(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r###"
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
+        "###);
+    }
+
+    #[test]
+    fn rename_overloaded_function_with_conditional_definitions() {
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+                def foo() -> bool: ...
+
+                @overload
+                def test() -> None: ...
+
+                if foo():
+                    @overload
+                    def test<CURSOR>(a: str) -> str: ...
+                else:
+                    @overload
+                    def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
         assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
-         --> lib.py:5:5
-          |
-        4 | @overload
-        5 | def test() -> None: ...
-          |     ^^^^
-        6 | @overload
-        7 | def test(a: str) -> str: ...
-          |
-         ::: main.py:2:17
-          |
-        2 | from lib import test
-          |                 ----
-        3 |
-        4 | test("test")
-          | ----
-          |
+        info[rename]: Rename symbol (found 6 locations)
+          --> lib.py:6:5
+           |
+         5 | @overload
+         6 | def test() -> None: ...
+           |     ^^^^
+         7 |
+         8 | if foo():
+         9 |     @overload
+        10 |     def test(a: str) -> str: ...
+           |         ----
+        11 | else:
+        12 |     @overload
+        13 |     def test(a: int) -> int: ...
+           |         ----
+        14 |
+        15 | def test(a: Any) -> Any:
+           |     ----
+        16 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
+        "#);
+    }
+
+    #[test]
+    fn rename_overloaded_function_with_always_true_conditional_definitions() {
+        // Ideally, the overload in the `else` branch would be renamed too
+        // but it gets inferred as `Never`.
+        // The alternative would be to use `definitions_for_name` and simply rename all
+        // symbols (or functions) with the same name, ignoring whether they are indeed overloads
+        // of the same function. However, renaming all symbols comes at the risk that we
+        // rename more symbols than we should, that's why we're erroring on the side of caution
+        // here and only rename the "reachable" sybmols.
+        let test = CursorTest::builder()
+            .source(
+                "lib.py",
+                r#"
+                from typing import overload, Any
+
+                @overload
+                def test() -> None: ...
+
+                if True:
+                    @overload
+                    def test<CURSOR>(a: str) -> str: ...
+                else:
+                    @overload
+                    def test(a: int) -> int: ...
+
+                def test(a: Any) -> Any:
+                    return a
+                "#,
+            )
+            .source(
+                "main.py",
+                r#"
+                from lib import test
+
+                test("test")
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.rename("better_name"), @r#"
+        info[rename]: Rename symbol (found 5 locations)
+          --> lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ^^^^
+         6 |
+         7 | if True:
+         8 |     @overload
+         9 |     def test(a: str) -> str: ...
+           |         ----
+        10 | else:
+        11 |     @overload
+        12 |     def test(a: int) -> int: ...
+        13 |
+        14 | def test(a: Any) -> Any:
+           |     ----
+        15 |     return a
+           |
+          ::: main.py:2:17
+           |
+         2 | from lib import test
+           |                 ----
+         3 |
+         4 | test("test")
+           | ----
+           |
         "#);
     }
 
@@ -1585,25 +1853,33 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 2 locations)
-         --> lib.py:6:9
-          |
-        4 | class Test:
-        5 |     @overload
-        6 |     def test() -> None: ...
-          |         ^^^^
-        7 |     @overload
-        8 |     def test(a: str) -> str: ...
-          |
-         ::: main.py:4:8
-          |
-        2 | from lib import Test
-        3 |
-        4 | Test().test("test")
-          |        ----
-          |
-        "#);
+        assert_snapshot!(test.rename("better_name"), @r###"
+        info[rename]: Rename symbol (found 5 locations)
+          --> lib.py:6:9
+           |
+         4 | class Test:
+         5 |     @overload
+         6 |     def test() -> None: ...
+           |         ^^^^
+         7 |     @overload
+         8 |     def test(a: str) -> str: ...
+           |         ----
+         9 |     @overload
+        10 |     def test(a: int) -> int: ...
+           |         ----
+        11 |
+        12 |     def test(a: Any) -> Any:
+           |         ----
+        13 |         return a
+           |
+          ::: main.py:4:8
+           |
+         2 | from lib import Test
+         3 |
+         4 | Test().test("test")
+           |        ----
+           |
+        "###);
     }
 
     #[test]
@@ -1635,25 +1911,33 @@ result = func(10, y=20)
             )
             .build();
 
-        assert_snapshot!(test.rename("better_name"), @r#"
-        info[rename]: Rename symbol (found 3 locations)
-         --> main.py:2:17
-          |
-        2 | from lib import test
-          |                 ^^^^
-        3 |
-        4 | test("test")
-          | ----
-          |
-         ::: lib.py:5:5
-          |
-        4 | @overload
-        5 | def test() -> None: ...
-          |     ----
-        6 | @overload
-        7 | def test(a: str) -> str: ...
-          |
-        "#);
+        assert_snapshot!(test.rename("better_name"), @r###"
+        info[rename]: Rename symbol (found 6 locations)
+          --> main.py:2:17
+           |
+         2 | from lib import test
+           |                 ^^^^
+         3 |
+         4 | test("test")
+           | ----
+           |
+          ::: lib.py:5:5
+           |
+         4 | @overload
+         5 | def test() -> None: ...
+           |     ----
+         6 | @overload
+         7 | def test(a: str) -> str: ...
+           |     ----
+         8 | @overload
+         9 | def test(a: int) -> int: ...
+           |     ----
+        10 |
+        11 | def test(a: Any) -> Any:
+           |     ----
+        12 |     return a
+           |
+        "###);
     }
 
     #[test]
