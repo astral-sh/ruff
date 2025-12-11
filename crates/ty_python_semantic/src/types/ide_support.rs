@@ -843,6 +843,7 @@ mod resolve_definition {
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
+    use ruff_python_stdlib::sys::is_builtin_module;
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
@@ -1160,6 +1161,14 @@ mod resolve_definition {
         // here because there isn't really an importing file. However this `resolve_real_module`
         // can be understood as essentially `import .`, which is also what `file_to_module` is,
         // so this is in fact exactly the file we want to consider the importer.
+        //
+        // ... unless we have a builtin module. i.e., A module embedded
+        // into the interpreter. In which case, all we have are stubs.
+        // `resolve_real_module` will always return `None` for this case, but
+        // it will emit false positive logs. And this saves us some work.
+        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
+            return None;
+        }
         let real_module =
             resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
