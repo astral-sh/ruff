@@ -184,7 +184,7 @@ impl Format<PyFormatContext<'_>> for FormatTargetWithEqualOperator<'_> {
 /// No parentheses are added for `short` because it fits into the configured line length, regardless of whether
 /// the comment exceeds the line width or not.
 ///
-/// This logic isn't implemented in [`place_comment`] by associating trailing statement comments to the expression because
+/// This logic isn't implemented in `place_comment` by associating trailing statement comments to the expression because
 /// doing so breaks the suite empty lines formatting that relies on trailing comments to be stored on the statement.
 #[derive(Debug)]
 pub(super) enum FormatStatementsLastExpression<'a> {
@@ -202,8 +202,8 @@ pub(super) enum FormatStatementsLastExpression<'a> {
     /// ] = some_long_value
     /// ```
     ///
-    /// This layout is preferred over [`RightToLeft`] if the left is unsplittable (single keyword like `return` or a Name)
-    /// because it has better performance characteristics.
+    /// This layout is preferred over [`Self::RightToLeft`] if the left is unsplittable (single
+    /// keyword like `return` or a Name) because it has better performance characteristics.
     LeftToRight {
         /// The right side of an assignment or the value returned in a return statement.
         value: &'a Expr,
@@ -1083,11 +1083,10 @@ impl Format<PyFormatContext<'_>> for InterpolatedString<'_> {
 /// For legibility, we discuss only the case of f-strings below, but the
 /// same comments apply to t-strings.
 ///
-/// This is just a wrapper around [`FormatFString`] while considering a special
-/// case when the f-string is at an assignment statement's value position.
-/// This is necessary  to prevent an instability where an f-string contains a
-/// multiline expression and the f-string fits on the line, but only when it's
-/// surrounded by parentheses.
+/// This is just a wrapper around [`FormatFString`](crate::other::f_string::FormatFString) while
+/// considering a special case when the f-string is at an assignment statement's value position.
+/// This is necessary to prevent an instability where an f-string contains a multiline expression
+/// and the f-string fits on the line, but only when it's surrounded by parentheses.
 ///
 /// ```python
 /// aaaaaaaaaaaaaaaaaa = f"testeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee{
