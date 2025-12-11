@@ -67,7 +67,7 @@ impl<'src> TokenSource<'src> {
     ///
     /// [`re_lex_logical_token`]: Lexer::re_lex_logical_token
     pub(crate) fn re_lex_logical_token(&mut self) {
-        let mut non_logical_line = None;
+        let mut non_logical_newline = None;
 
         #[cfg(debug_assertions)]
         let last_non_trivia_end_before = {
@@ -81,7 +81,7 @@ impl<'src> TokenSource<'src> {
         for (index, token) in self.tokens.iter().enumerate().rev() {
             match token.kind() {
                 TokenKind::NonLogicalNewline => {
-                    non_logical_line = Some((index, token.start()));
+                    non_logical_newline = Some((index, token.start()));
                 }
                 TokenKind::Comment => continue,
                 _ => break,
@@ -90,12 +90,12 @@ impl<'src> TokenSource<'src> {
 
         if !self
             .lexer
-            .re_lex_logical_token(non_logical_line.map(|(_, start)| start))
+            .re_lex_logical_token(non_logical_newline.map(|(_, start)| start))
         {
             return;
         }
 
-        let non_logical_line_index = non_logical_line
+        let non_logical_line_index = non_logical_newline
             .expect(
                 "`re_lex_logical_token` should only return `true` if `non_logical_line` is `Some`",
             )
