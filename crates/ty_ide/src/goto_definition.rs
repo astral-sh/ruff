@@ -1697,8 +1697,9 @@ Traceb<CURSOR>ackType
 
     impl CursorTest {
         fn goto_definition(&self) -> String {
-            let Some(targets) = goto_definition(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(targets) = salsa::attach(&self.db, || {
+                goto_definition(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "No goto target found".to_string();
             };
 
