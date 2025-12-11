@@ -2241,7 +2241,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             name,
             type_params,
             parameters,
-            returns,
+            returns: _,
             body: _,
             decorator_list,
         } = function;
@@ -2288,21 +2288,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             self.infer_expression(default, TypeContext::default());
         }
 
-        // If there are type params, parameters and returns are evaluated in that scope, that is, in
-        // `infer_function_type_params`, rather than here.
+        // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
+        // we always defer the inference of the parameters and returns. That ensures that we do not
+        // add any spurious salsa cycles when applying decorators below. (Applying a decorator
+        // requires getting the signature of this function definition, which in turn requires
+        // (lazily) inferring the parameter and return types.)
         if type_params.is_none() {
-            if self.defer_annotations() {
-                self.deferred.insert(definition, self.multi_inference_state);
-            } else {
-                let previous_typevar_binding_context =
-                    self.typevar_binding_context.replace(definition);
-                self.infer_return_type_annotation(
-                    returns.as_deref(),
-                    DeferredExpressionState::None,
-                );
-                self.infer_parameters(parameters);
-                self.typevar_binding_context = previous_typevar_binding_context;
-            }
+            self.deferred.insert(definition, self.multi_inference_state);
         }
 
         let known_function =
@@ -2946,10 +2938,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         definition: Definition<'db>,
         function: &ast::StmtFunctionDef,
     ) {
+        let mut prev_in_no_type_check = self.context.set_in_no_type_check(InNoTypeCheck::Yes);
+        for decorator in &function.decorator_list {
+            let decorator_type = self.infer_decorator(decorator);
+            if let Type::FunctionLiteral(function) = decorator_type
+                && let Some(KnownFunction::NoTypeCheck) = function.known(self.db())
+            {
+                // If the function is decorated with the `no_type_check` decorator,
+                // we need to suppress any errors that come after the decorators.
+                prev_in_no_type_check = InNoTypeCheck::Yes;
+                break;
+            }
+        }
+        self.context.set_in_no_type_check(prev_in_no_type_check);
+
         let previous_typevar_binding_context = self.typevar_binding_context.replace(definition);
         self.infer_return_type_annotation(
             function.returns.as_deref(),
-            DeferredExpressionState::Deferred,
+            self.defer_annotations().into(),
         );
         self.infer_parameters(function.parameters.as_ref());
         self.typevar_binding_context = previous_typevar_binding_context;
