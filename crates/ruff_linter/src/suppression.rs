@@ -490,8 +490,10 @@ impl<'src> SuppressionParser<'src> {
         } else if self.cursor.as_str().starts_with("enable") {
             self.cursor.skip_bytes("enable".len());
             Ok(SuppressionAction::Enable)
-        } else if self.cursor.as_str().starts_with("noqa") {
-            // file-level "noqa" variant, ignore for now
+        } else if self.cursor.as_str().starts_with("noqa")
+            || self.cursor.as_str().starts_with("isort")
+        {
+            // alternate suppression variants, ignore for now
             self.error(ParseErrorKind::NotASuppression)
         } else {
             self.error(ParseErrorKind::UnknownAction)
