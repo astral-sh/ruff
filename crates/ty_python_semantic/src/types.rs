@@ -1916,11 +1916,7 @@ impl<'db> Type<'db> {
     /// This uses `TypeRelation::ConstraintSetAssignability`, which encodes typevar relations into
     /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
     /// reasoning depending on inferable typevars.
-    pub fn is_constraint_set_assignable_to(
-        self,
-        db: &'db dyn Db,
-        target: Type<'db>,
-    ) -> bool {
+    pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
         self.when_constraint_set_assignable_to(db, target, InferableTypeVars::None)
             .is_always_satisfied(db)
     }
