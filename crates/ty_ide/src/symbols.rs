@@ -431,7 +431,11 @@ struct SymbolVisitor<'db> {
     /// This is true even when we're inside a function definition
     /// that is inside a class.
     in_class: bool,
-    global_only: bool,
+    /// When enabled, the visitor should only try to extract
+    /// symbols from a module that we believed form the "exported"
+    /// interface for that module. i.e., `__all__` is only respected
+    /// when this is enabled. It's otherwise ignored.
+    exports_only: bool,
     /// The origin of an `__all__` variable, if found.
     all_origin: Option<DunderAllOrigin>,
     /// A set of names extracted from `__all__`.
@@ -451,7 +455,7 @@ impl<'db> SymbolVisitor<'db> {
             symbol_stack: vec![],
             in_function: false,
             in_class: false,
-            global_only: false,
+            exports_only: false,
             all_origin: None,
             all_names: FxHashSet::default(),
             all_invalid: false,
@@ -460,7 +464,7 @@ impl<'db> SymbolVisitor<'db> {
 
     fn globals(db: &'db dyn Db, file: File) -> Self {
         Self {
-            global_only: true,
+            exports_only: true,
             ..Self::tree(db, file)
         }
     }
@@ -585,6 +589,11 @@ impl<'db> SymbolVisitor<'db> {
     ///
     /// If the assignment isn't for `__all__`, then this is a no-op.
     fn add_all_assignment(&mut self, targets: &[ast::Expr], value: Option<&ast::Expr>) {
+        // We don't care about `__all__` unless we're
+        // specifically looking for exported symbols.
+        if !self.exports_only {
+            return;
+        }
         if self.in_function || self.in_class {
             return;
         }
@@ -865,7 +874,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     import_kind: None,
                 };
 
-                if self.global_only {
+                if self.exports_only {
                     self.add_symbol(symbol);
                     // If global_only, don't walk function bodies
                     return;
@@ -894,7 +903,7 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                     import_kind: None,
                 };
 
-                if self.global_only {
+                if self.exports_only {
                     self.add_symbol(symbol);
                     // If global_only, don't walk class bodies
                     return;
@@ -943,6 +952,12 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
             ast::Stmt::AugAssign(ast::StmtAugAssign {
                 target, op, value, ..
             }) => {
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
+                }
+
                 if self.all_origin.is_none() {
                     // We can't update `__all__` if it doesn't already
                     // exist.
@@ -961,6 +976,12 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                 }
             }
             ast::Stmt::Expr(expr) => {
+                // We don't care about `__all__` unless we're
+                // specifically looking for exported symbols.
+                if !self.exports_only {
+                    return;
+                }
+
                 if self.all_origin.is_none() {
                     // We can't update `__all__` if it doesn't already exist.
                     return;
@@ -990,6 +1011,12 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                 source_order::walk_stmt(self, stmt);
             }
             ast::Stmt::Import(import) => {
+                // We ignore any names introduced by imports
+                // unless we're specifically looking for the
+                // set of exported symbols.
+                if !self.exports_only {
+                    return;
+                }
                 // We only consider imports in global scope.
                 if self.in_function {
                     return;
@@ -999,6 +1026,12 @@ impl SourceOrderVisitor<'_> for SymbolVisitor<'_> {
                 }
             }
             ast::Stmt::ImportFrom(import_from) => {
+                // We ignore any names introduced by imports
+                // unless we're specifically looking for the
+                // set of exported symbols.
+                if !self.exports_only {
+                    return;
+                }
                 // We only consider imports in global scope.
                 if self.in_function {
                     return;
