@@ -732,7 +732,13 @@ impl<'db> Signature<'db> {
             // signature's generic context, too. (The generic context should include any synthetic
             // typevars created for `typing.Self`, even if the `typing.Self` annotation was added
             // implicitly.)
-            if let Type::TypeVar(self_typevar) = self_type {
+            let self_typevar = match self_type {
+                Type::TypeVar(self_typevar) => Some(self_typevar),
+                Type::SubclassOf(subclass_of) => subclass_of.into_type_var(),
+                _ => None,
+            };
+
+            if let Some(self_typevar) = self_typevar {
                 match self.generic_context.as_mut() {
                     Some(generic_context)
                         if generic_context
