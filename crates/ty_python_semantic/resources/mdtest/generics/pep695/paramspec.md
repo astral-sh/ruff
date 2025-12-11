@@ -656,24 +656,18 @@ def with_parameters[**P](f: Callable[P, int], *args: P.args, **kwargs: P.kwargs)
         return str(f(*args, **kwargs))
     return nested
 
-# revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(change_return_type(int_int))
+reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
 # TODO: This shouldn't error and should pick the first overload because of the return type
 # error: [invalid-argument-type]
-# revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(change_return_type(int_str))
+reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
-# TODO: revealed: Overload[(x: int) -> str, (x: str) -> str]
 # error: [invalid-argument-type]
-# revealed: (...) -> str
-reveal_type(change_return_type(str_str))
+reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
 # TODO: Both of these shouldn't raise an error
 # error: [invalid-argument-type]
-# revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(with_parameters(int_int, 1))
+reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 # error: [invalid-argument-type]
-# revealed: Overload[(x: int) -> str, (x: str) -> str]
-reveal_type(with_parameters(int_int, "a"))
+reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 ```
