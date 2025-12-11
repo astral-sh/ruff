@@ -35,7 +35,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         write!(f, [token("lambda")])?;
 
-        if let Some(parameters) = parameters {
+        let dangling = if let Some(parameters) = parameters {
             let parameters_have_comments = comments.contains_comments(parameters.into());
 
             // In this context, a dangling comment can either be a comment between the `lambda` and the
@@ -129,41 +129,34 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
-            } else if preview {
-                return FormatBody {
-                    body,
-                    dangling: dangling_after_parameters,
-                    layout: self.layout,
-                }
-                .fmt(f);
-            } else {
+            } else if !preview {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
+
+            dangling_after_parameters
         } else {
             write!(f, [token(":")])?;
 
             // In this context, a dangling comment is a comment between the `lambda` and the body.
             if dangling.is_empty() {
                 write!(f, [space()])?;
-            } else if preview {
-                return FormatBody {
-                    body,
-                    dangling,
-                    layout: self.layout,
-                }
-                .fmt(f);
-            } else {
+            } else if !preview {
                 write!(f, [dangling_comments(dangling)])?;
             }
-        }
+
+            dangling
+        };
 
         if preview {
             let body_comments = comments.leading_dangling_trailing(body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
+                if !dangling.is_empty() {
+                    FormatBody { body, dangling }.fmt(f)
+                }
                 // If the body has comments, we always want to preserve the parentheses. This also
                 // ensures that we correctly handle parenthesized comments, and don't need to worry
                 // about them in the implementation below.
-                if body_comments.has_leading() || body_comments.has_trailing_own_line() {
+                else if body_comments.has_leading() || body_comments.has_trailing_own_line() {
                     body.format().with_options(Parentheses::Always).fmt(f)
                 }
                 // Calls and subscripts require special formatting because they have their own
@@ -340,16 +333,11 @@ impl NeedsParentheses for ExprLambda {
 struct FormatBody<'a> {
     body: &'a Expr,
     dangling: &'a [SourceComment],
-    layout: ExprLambdaLayout,
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let FormatBody {
-            dangling,
-            body,
-            layout,
-        } = self;
+        let FormatBody { dangling, body } = self;
 
         // Can't use partition_point because there can be additional end of line comments after the
         // initial set. All of these comments are dangling, for example:
@@ -429,9 +417,6 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             }
         });
 
-        match layout {
-            ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
-            ExprLambdaLayout::Default => fmt_body.fmt(f),
-        }
+        fmt_body.fmt(f)
     }
 }
