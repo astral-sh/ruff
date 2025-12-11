@@ -155,12 +155,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
-                        // Avoid inferring the types of invalid binary expressions that have been
-                        // parsed from a string annotation, as they are not present in the semantic
-                        // index.
-                        if !self.deferred_state.in_string_annotation() {
-                            self.infer_binary_expression(binary, TypeContext::default());
-                        }
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
