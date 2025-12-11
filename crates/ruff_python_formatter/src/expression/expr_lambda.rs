@@ -129,9 +129,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
             if dangling_after_parameters.is_empty() {
                 write!(f, [space()])?;
-            }
-            // In preview, always parenthesize the body if there are dangling comments.
-            else if preview {
+            } else if preview {
                 return FormatBody {
                     body,
                     dangling: dangling_after_parameters,
@@ -147,9 +145,7 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             // In this context, a dangling comment is a comment between the `lambda` and the body.
             if dangling.is_empty() {
                 write!(f, [space()])?;
-            }
-            // In preview, always parenthesize the body if there are dangling comments.
-            else if preview {
+            } else if preview {
                 return FormatBody {
                     body,
                     dangling,
