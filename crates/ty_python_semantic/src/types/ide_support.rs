@@ -155,7 +155,8 @@ pub fn definitions_for_name<'db>(
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
         if matches!(name_str, "float" | "complex")
             && let Some(expr) = node.expr_name()
-            && let Some(union) = expr.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && let Some(ty) = expr.inferred_type(model)
+            && let Some(union) = ty.as_union()
             && is_float_or_complex_annotation(db, union, name_str)
         {
             return union
@@ -234,7 +235,10 @@ pub fn definitions_for_attribute<'db>(
     let mut resolved = Vec::new();
 
     // Determine the type of the LHS
-    let lhs_ty = attribute.value.inferred_type(model);
+    let Some(lhs_ty) = attribute.value.inferred_type(model) else {
+        return resolved;
+    };
+
     let tys = match lhs_ty {
         Type::Union(union) => union.elements(model.db()).to_vec(),
         _ => vec![lhs_ty],
@@ -374,7 +378,9 @@ pub fn definitions_for_keyword_argument<'db>(
     call_expr: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     let Some(keyword_name) = keyword.arg.as_ref() else {
         return Vec::new();
@@ -498,7 +504,9 @@ pub fn call_signature_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
@@ -507,7 +515,9 @@ pub fn call_signature_details<'db>(
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(model)
+                splatted_value
+                    .inferred_type(model)
+                    .unwrap_or(Type::unknown())
             });
         let bindings = callable_type
             .bindings(model.db())
@@ -564,7 +574,7 @@ pub fn call_type_simplified_by_overloads(
     call_expr: &ast::ExprCall,
 ) -> Option<String> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let func_type = call_expr.func.inferred_type(model)?;
 
     // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
@@ -579,7 +589,9 @@ pub fn call_type_simplified_by_overloads(
 
     // Hand the overload resolution system as much type info as we have
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
-        splatted_value.inferred_type(model)
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
     });
 
     // Try to resolve overloads with the arguments/types we have
@@ -612,8 +624,8 @@ pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,
     binary_op: &ast::ExprBinOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let left_ty = binary_op.left.inferred_type(model);
-    let right_ty = binary_op.right.inferred_type(model);
+    let left_ty = binary_op.left.inferred_type(model)?;
+    let right_ty = binary_op.right.inferred_type(model)?;
 
     let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
         return None;
@@ -639,7 +651,7 @@ pub fn definitions_for_unary_op<'db>(
     model: &SemanticModel<'db>,
     unary_op: &ast::ExprUnaryOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let operand_ty = unary_op.operand.inferred_type(model);
+    let operand_ty = unary_op.operand.inferred_type(model)?;
 
     let unary_dunder_method = match unary_op.op {
         ast::UnaryOp::Invert => "__invert__",

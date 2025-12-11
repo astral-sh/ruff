@@ -362,8 +362,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
             Expr::Name(name) => {
                 if let Some(rhs) = self.assignment_rhs {
                     if name.ctx.is_store() {
-                        let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        if let Some(ty) = expr.inferred_type(&self.model) {
+                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        }
                     }
                 }
                 source_order::walk_expr(self, expr);
@@ -371,8 +372,9 @@ impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
             Expr::Attribute(attribute) => {
                 if let Some(rhs) = self.assignment_rhs {
                     if attribute.ctx.is_store() {
-                        let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        if let Some(ty) = expr.inferred_type(&self.model) {
+                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        }
                     }
                 }
                 source_order::walk_expr(self, expr);

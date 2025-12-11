@@ -196,7 +196,10 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `object.<CURSOR>` context.
     pub fn attribute_completions(&self, node: &ast::ExprAttribute) -> Vec<Completion<'db>> {
-        let ty = node.value.inferred_type(self);
+        let Some(ty) = node.value.inferred_type(self) else {
+            return Vec::new();
+        };
+
         all_members(self.db, ty)
             .into_iter()
             .map(|member| Completion {
@@ -400,7 +403,7 @@ pub trait HasType {
     ///
     /// ## Panics
     /// May panic if `self` is from another file than `model`.
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db>;
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>>;
 }
 
 pub trait HasDefinition {
@@ -412,18 +415,16 @@ pub trait HasDefinition {
 }
 
 impl HasType for ast::ExprRef<'_> {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         let index = semantic_index(model.db, model.file);
         // TODO(#1637): semantic tokens is making this crash even with
         // `try_expr_ref_in_ast` guarding this, for now just use `try_expression_scope_id`.
         // The problematic input is `x: "float` (with a dangling quote). I imagine the issue
         // is we're too eagerly setting `is_string_annotation` in inference.
-        let Some(file_scope) = index.try_expression_scope_id(&model.expr_ref_in_ast(*self)) else {
-            return Type::unknown();
-        };
+        let file_scope = index.try_expression_scope_id(&model.expr_ref_in_ast(*self))?;
         let scope = file_scope.to_scope_id(model.db, model.file);
 
-        infer_scope_types(model.db, scope).expression_type(*self)
+        infer_scope_types(model.db, scope).try_expression_type(*self)
     }
 }
 
@@ -431,7 +432,7 @@ macro_rules! impl_expression_has_type {
     ($ty: ty) => {
         impl HasType for $ty {
             #[inline]
-            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let expression_ref = ExprRef::from(self);
                 expression_ref.inferred_type(model)
             }
@@ -474,7 +475,7 @@ impl_expression_has_type!(ast::ExprSlice);
 impl_expression_has_type!(ast::ExprIpyEscapeCommand);
 
 impl HasType for ast::Expr {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         match self {
             Expr::BoolOp(inner) => inner.inferred_type(model),
             Expr::Named(inner) => inner.inferred_type(model),
@@ -525,9 +526,9 @@ macro_rules! impl_binding_has_ty_def {
 
         impl HasType for $ty {
             #[inline]
-            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+            fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
                 let binding = HasDefinition::definition(self, model);
-                binding_type(model.db, binding)
+                Some(binding_type(model.db, binding))
             }
         }
     };
@@ -541,12 +542,12 @@ impl_binding_has_ty_def!(ast::ExceptHandlerExceptHandler);
 impl_binding_has_ty_def!(ast::TypeParamTypeVar);
 
 impl HasType for ast::Alias {
-    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Type<'db> {
+    fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
         if &self.name == "*" {
-            return Type::Never;
+            return Some(Type::Never);
         }
         let index = semantic_index(model.db, model.file);
-        binding_type(model.db, index.expect_single_definition(self))
+        Some(binding_type(model.db, index.expect_single_definition(self)))
     }
 }
 
@@ -584,7 +585,7 @@ mod tests {
 
         let function = ast.suite()[0].as_function_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
-        let ty = function.inferred_type(&model);
+        let ty = function.inferred_type(&model).unwrap();
 
         assert!(ty.is_function_literal());
 
@@ -603,7 +604,7 @@ mod tests {
 
         let class = ast.suite()[0].as_class_def_stmt().unwrap();
         let model = SemanticModel::new(&db, foo);
-        let ty = class.inferred_type(&model);
+        let ty = class.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
 
@@ -624,7 +625,7 @@ mod tests {
         let import = ast.suite()[0].as_import_from_stmt().unwrap();
         let alias = &import.names[0];
         let model = SemanticModel::new(&db, bar);
-        let ty = alias.inferred_type(&model);
+        let ty = alias.inferred_type(&model).unwrap();
 
         assert!(ty.is_class_literal());
 

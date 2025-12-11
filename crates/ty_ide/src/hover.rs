@@ -3610,6 +3610,20 @@ def function():
         ");
     }
 
+    #[test]
+    fn hover_tuple_assignment_target() {
+        let test = CursorTest::builder()
+            .source(
+                "test.py",
+                r#"
+                (x, y)<CURSOR> = "test", 10
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @"Hover provided no content");
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;
