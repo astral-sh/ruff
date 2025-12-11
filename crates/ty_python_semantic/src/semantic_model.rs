@@ -241,6 +241,8 @@ impl<'db> SemanticModel<'db> {
         let index = semantic_index(self.db, self.file);
         match self.node_in_ast(node) {
             ast::AnyNodeRef::Identifier(identifier) => index.try_expression_scope_id(identifier),
+
+            // Nodes implementing `HasDefinition`
             ast::AnyNodeRef::StmtFunctionDef(function) => Some(
                 function
                     .definition(self)
@@ -271,6 +273,8 @@ impl<'db> SemanticModel<'db> {
             ast::AnyNodeRef::TypeParamTypeVar(var) => {
                 Some(var.definition(self).scope(self.db).file_scope_id(self.db))
             }
+
+            // Fallback
             node => match node.as_expr_ref() {
                 // If we couldn't identify a specific
                 // expression that we're in, then just
