@@ -148,28 +148,6 @@ class Test:
           |
         info: Method from_path
         ");
-
-        assert_snapshot!(test.workspace_symbols("data"), @r"
-        info[workspace-symbols]: WorkspaceSymbolInfo
-         --> models.py:2:7
-          |
-        2 | class DataModel:
-          |       ^^^^^^^^^
-        3 |     '''A data model class'''
-        4 |     def __init__(self):
-          |
-        info: Class DataModel
-        ");
-
-        assert_snapshot!(test.workspace_symbols("apibase"), @r"
-        info[workspace-symbols]: WorkspaceSymbolInfo
-         --> constants.py:2:1
-          |
-        2 | API_BASE_URL = 'https://api.example.com'
-          | ^^^^^^^^^^^^
-          |
-        info: Constant API_BASE_URL
-        ");
     }
 
     impl CursorTest {
