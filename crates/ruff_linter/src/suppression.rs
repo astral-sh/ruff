@@ -251,7 +251,6 @@ impl Suppressions {
             diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
         }
 
-        // TODO: sometimes these don't get fixes attached?
         for invalid in &self.invalid {
             let mut diagnostic = context.report_diagnostic(
                 InvalidSuppressionComment {

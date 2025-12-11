@@ -313,11 +313,17 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
             ]),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
             ])
             .with_preview_mode(),
         );

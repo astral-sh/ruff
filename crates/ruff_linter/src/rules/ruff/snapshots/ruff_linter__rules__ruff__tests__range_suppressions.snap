@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 14
-Added: 18
+Added: 19
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -249,6 +249,24 @@ RUF104 Unmatched suppression comment
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^
 12 |     I = 1
    |
+
+
+RUF103 [*] Invalid suppression comment: no matching 'disable' comment
+  --> suppressions.py:19:5
+   |
+17 |     # should be generated.
+18 |     I = 1
+19 |     # ruff: enable[E741, F841]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove invalid suppression comment
+16 |     # Neither warning is ignored, and an "unmatched suppression"
+17 |     # should be generated.
+18 |     I = 1
+   -     # ruff: enable[E741, F841]
+19 | 
+20 | 
+21 | def f():
 
 
 RUF100 [*] Unused suppression (non-enabled: `E501`)
