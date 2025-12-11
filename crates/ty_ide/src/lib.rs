@@ -230,6 +230,11 @@ impl NavigationTargets {
     fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.len()
+    }
 }
 
 impl IntoIterator for NavigationTargets {
