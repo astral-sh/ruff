@@ -1048,7 +1048,7 @@ mod tests {
 
     #[test]
     fn test_format_unicode_escape_with_field() {
-        assert_debug_snapshot!(FormatString::from_str("I am a \\N{snowman}{snowman}"))
+        assert_debug_snapshot!(FormatString::from_str("I am a \\N{snowman}{snowman}"));
     }
 
     #[test]
