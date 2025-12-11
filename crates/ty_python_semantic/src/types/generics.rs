@@ -1569,6 +1569,7 @@ impl<'db> SpecializationBuilder<'db> {
         constraints: ConstraintSet<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
+        let constraints = constraints.limit_to_valid_specializations(self.db);
         constraints.for_each_path(self.db, |path| {
             for constraint in path.positive_constraints() {
                 let typevar = constraint.typevar(self.db);

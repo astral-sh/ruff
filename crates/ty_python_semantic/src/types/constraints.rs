@@ -360,6 +360,18 @@ impl<'db> ConstraintSet<'db> {
         self.node.satisfied_by_all_typevars(db, inferable)
     }
 
+    pub(crate) fn limit_to_valid_specializations(self, db: &'db dyn Db) -> Self {
+        let mut result = self.node;
+        let mut seen = FxHashSet::default();
+        self.node.for_each_constraint(db, &mut |constraint| {
+            let bound_typevar = constraint.typevar(db);
+            if seen.insert(bound_typevar) {
+                result = result.and(db, bound_typevar.valid_specializations(db));
+            }
+        });
+        Self { node: result }
+    }
+
     /// Updates this constraint set to hold the union of itself and another constraint set.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
