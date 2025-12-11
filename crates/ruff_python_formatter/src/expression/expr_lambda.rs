@@ -151,7 +151,85 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             let body_comments = comments.leading_dangling_trailing(body);
             let fmt_body = format_with(|f: &mut PyFormatter| {
                 if !dangling.is_empty() {
-                    FormatBody { body, dangling }.fmt(f)
+                    // Can't use partition_point because there can be additional end of line
+                    // comments after the initial set. All of these comments are dangling, for
+                    // example:
+                    //
+                    // ```python
+                    // (
+                    //     lambda  # 1
+                    //     # 2
+                    //     :  # 3
+                    //     # 4
+                    //     y
+                    // )
+                    // ```
+                    //
+                    // and alternate between own line and end of line.
+                    let (after_parameters_end_of_line, leading_body_comments) = dangling.split_at(
+                        dangling
+                            .iter()
+                            .position(|comment| comment.line_position().is_own_line())
+                            .unwrap_or(dangling.len()),
+                    );
+
+                    // If the body is parenthesized and has its own leading comments, preserve the
+                    // separation between the dangling lambda comments and the body comments. For
+                    // example, preserve this comment positioning:
+                    //
+                    // ```python
+                    // (
+                    //      lambda:  # 1
+                    //      # 2
+                    //      (  # 3
+                    //          x
+                    //      )
+                    // )
+                    // ```
+                    //
+                    // 1 and 2 are dangling on the lambda and emitted first, followed by a hard line
+                    // break and the parenthesized body with its leading comments.
+                    //
+                    // However, when removing 2, 1 and 3 can instead be formatted on the same line:
+                    //
+                    // ```python
+                    // (
+                    //      lambda: (  # 1  # 3
+                    //          x
+                    //      )
+                    // )
+                    // ```
+                    let comments = f.context().comments();
+                    if is_expression_parenthesized(
+                        body.into(),
+                        comments.ranges(),
+                        f.context().source(),
+                    ) && comments.has_leading(body)
+                    {
+                        trailing_comments(dangling).fmt(f)?;
+
+                        if leading_body_comments.is_empty() {
+                            space().fmt(f)?;
+                        } else {
+                            hard_line_break().fmt(f)?;
+                        }
+
+                        body.format().with_options(Parentheses::Always).fmt(f)
+                    } else {
+                        write!(
+                            f,
+                            [
+                                space(),
+                                token("("),
+                                trailing_comments(after_parameters_end_of_line),
+                                block_indent(&format_args!(
+                                    leading_comments(leading_body_comments),
+                                    body.format().with_options(Parentheses::Never)
+                                )),
+                                token(")")
+                            ]
+                        )
+                    }
                 }
                 // If the body has comments, we always want to preserve the parentheses. This also
                 // ensures that we correctly handle parenthesized comments, and don't need to worry
@@ -338,81 +416,6 @@ struct FormatBody<'a> {
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
         let FormatBody { dangling, body } = self;
-
-        // Can't use partition_point because there can be additional end of line comments after the
-        // initial set. All of these comments are dangling, for example:
-        //
-        // ```python
-        // (
-        //     lambda  # 1
-        //     # 2
-        //     :  # 3
-        //     # 4
-        //     y
-        // )
-        // ```
-        //
-        // and alternate between own line and end of line.
-        let (after_parameters_end_of_line, leading_body_comments) = dangling.split_at(
-            dangling
-                .iter()
-                .position(|comment| comment.line_position().is_own_line())
-                .unwrap_or(dangling.len()),
-        );
-
-        // If the body is parenthesized and has its own leading comments, preserve the
-        // separation between the dangling lambda comments and the body comments. For example,
-        // preserve this comment positioning:
-        //
-        // ```python
-        // (
-        //      lambda:  # 1
-        //      # 2
-        //      (  # 3
-        //          x
-        //      )
-        // )
-        // ```
-        //
-        // 1 and 2 are dangling on the lambda and emitted first, followed by a hard line break
-        // and the parenthesized body with its leading comments.
-        //
-        // However, when removing 2, 1 and 3 can instead be formatted on the same line:
-        //
-        // ```python
-        // (
-        //      lambda: (  # 1  # 3
-        //          x
-        //      )
-        // )
-        // ```
-        let comments = f.context().comments();
-        if is_expression_parenthesized((*body).into(), comments.ranges(), f.context().source())
-            && comments.has_leading(*body)
-        {
-            trailing_comments(dangling).fmt(f)?;
-
-            if leading_body_comments.is_empty() {
-                space().fmt(f)?;
-            } else {
-                hard_line_break().fmt(f)?;
-            }
-
-            body.format().with_options(Parentheses::Always).fmt(f)
-        } else {
-            write!(
-                f,
-                [
-                    space(),
-                    token("("),
-                    trailing_comments(after_parameters_end_of_line),
-                    block_indent(&format_args!(
-                        leading_comments(leading_body_comments),
-                        body.format().with_options(Parentheses::Never)
-                    )),
-                    token(")")
-                ]
-            )
-        }
+        todo!()
     }
 }
