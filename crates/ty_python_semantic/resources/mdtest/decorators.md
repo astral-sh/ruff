@@ -144,11 +144,9 @@ from functools import cache
 def f(x: int) -> int:
     return x**2
 
-# TODO: revealed: _lru_cache_wrapper[int]
-# revealed: _lru_cache_wrapper[int] | _lru_cache_wrapper[Unknown]
+# revealed: _lru_cache_wrapper[int]
 reveal_type(f)
-# TODO: revealed: int
-# revealed: int | Unknown
+# revealed: int
 reveal_type(f(1))
 ```
 
