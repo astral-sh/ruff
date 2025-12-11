@@ -132,7 +132,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
             // In preview, always parenthesize the body if there are dangling comments.
             else if preview {
-                return format_body(body, dangling_after_parameters, self.layout).fmt(f);
+                return FormatBody {
+                    body,
+                    dangling: dangling_after_parameters,
+                    layout: self.layout,
+                }
+                .fmt(f);
             } else {
                 write!(f, [dangling_comments(dangling_after_parameters)])?;
             }
@@ -145,7 +150,12 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
             }
             // In preview, always parenthesize the body if there are dangling comments.
             else if preview {
-                return format_body(body, dangling, self.layout).fmt(f);
+                return FormatBody {
+                    body,
+                    dangling,
+                    layout: self.layout,
+                }
+                .fmt(f);
             } else {
                 write!(f, [dangling_comments(dangling)])?;
             }
@@ -328,18 +338,6 @@ impl NeedsParentheses for ExprLambda {
         } else {
             OptionalParentheses::Multiline
         }
-    }
-}
-
-fn format_body<'a>(
-    body: &'a Expr,
-    dangling: &'a [SourceComment],
-    layout: ExprLambdaLayout,
-) -> FormatBody<'a> {
-    FormatBody {
-        body,
-        dangling,
-        layout,
     }
 }
 
