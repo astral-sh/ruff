@@ -58,7 +58,7 @@ info: rule `invalid-method-override` is enabled by default
 ```
 
 ```
-error[unsupported-bool-conversion]: Boolean conversion is unsupported for type `NotBoolable`
+error[unsupported-bool-conversion]: Boolean conversion is not supported for type `NotBoolable`
   --> src/mdtest_snippet.py:10:1
    |
  9 | # error: [unsupported-bool-conversion]

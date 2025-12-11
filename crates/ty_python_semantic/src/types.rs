@@ -11574,7 +11574,7 @@ impl<'db> BoolError<'db> {
                 not_boolable_type, ..
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`",
+                    "Boolean conversion is not supported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
                 let mut sub = SubDiagnostic::new(
@@ -11599,7 +11599,7 @@ impl<'db> BoolError<'db> {
                 return_type,
             } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{not_boolable}`",
+                    "Boolean conversion is not supported for type `{not_boolable}`",
                     not_boolable = not_boolable_type.display(context.db()),
                 ));
                 let mut sub = SubDiagnostic::new(
@@ -11625,7 +11625,7 @@ impl<'db> BoolError<'db> {
             }
             Self::NotCallable { not_boolable_type } => {
                 let mut diag = builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`",
+                    "Boolean conversion is not supported for type `{}`",
                     not_boolable_type.display(context.db())
                 ));
                 let sub = SubDiagnostic::new(
@@ -11648,7 +11648,7 @@ impl<'db> BoolError<'db> {
                     .unwrap();
 
                 builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for union `{}` \
+                    "Boolean conversion is not supported for union `{}` \
                      because `{}` doesn't implement `__bool__` correctly",
                     Type::Union(*union).display(context.db()),
                     first_error.not_boolable_type().display(context.db()),
@@ -11657,7 +11657,7 @@ impl<'db> BoolError<'db> {
 
             Self::Other { not_boolable_type } => {
                 builder.into_diagnostic(format_args!(
-                    "Boolean conversion is unsupported for type `{}`; \
+                    "Boolean conversion is not supported for type `{}`; \
                      it incorrectly implements `__bool__`",
                     not_boolable_type.display(context.db())
                 ));
