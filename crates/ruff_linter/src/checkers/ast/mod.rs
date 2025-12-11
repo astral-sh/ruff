@@ -438,10 +438,10 @@ impl<'a> Checker<'a> {
     }
 
     /// Returns the [`Tokens`] for the parsed source file.
-    /// 
-    /// 
+    ///
+    ///
     /// Unlike [`Self::tokens`], this method always returns
-    /// the tokens for the current file, even when within a parsed type annotation. 
+    /// the tokens for the current file, even when within a parsed type annotation.
     pub(crate) fn source_tokens(&self) -> &'a Tokens {
         self.parsed.tokens()
     }
