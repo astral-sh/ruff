@@ -516,7 +516,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -658,7 +658,7 @@ pub struct SrcOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
