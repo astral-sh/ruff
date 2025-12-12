@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use core::fmt;
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{self, Diagnostic};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
@@ -19,8 +19,8 @@ use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
 use crate::rules::ruff::rules::{
-    InvalidSuppressionComment, InvalidSuppressionCommentKind, UnmatchedSuppressionComment,
-    UnusedCodes, UnusedNOQA, UnusedNOQAKind,
+    InvalidRuleCode, InvalidSuppressionComment, InvalidSuppressionCommentKind,
+    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
 };
 use crate::settings::LinterSettings;
 
@@ -217,6 +217,26 @@ impl Suppressions {
             }
         }
 
+        if context.is_rule_enabled(Rule::InvalidRuleCode) {
+            for suppression in self
+                .valid
+                .iter()
+                .filter(|suppression| Rule::from_code(&suppression.code).is_err())
+            {
+                for comment in &suppression.comments {
+                    let (range, edit) =
+                        Suppressions::delete_code_or_comment(locator, suppression, comment);
+                    let mut diagnostic = context.report_diagnostic(
+                        InvalidRuleCode {
+                            rule_code: suppression.code.to_string(),
+                        },
+                        range,
+                    );
+                    diagnostic.set_fix(Fix::safe_edit(edit));
+                }
+            }
+        }
+
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
             // missing codes already handled above, report the rest as invalid comments
             for error in self
@@ -262,6 +282,7 @@ impl Suppressions {
             }
         }
     }
+
     fn delete_code_or_comment(
         locator: &Locator<'_>,
         suppression: &Suppression,
