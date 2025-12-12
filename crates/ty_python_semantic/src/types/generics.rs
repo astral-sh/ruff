@@ -1582,6 +1582,14 @@ impl<'db> SpecializationBuilder<'db> {
                         &mut f,
                     );
                 }
+                if let Type::TypeVar(upper_bound_typevar) = upper {
+                    self.add_type_mapping(
+                        upper_bound_typevar,
+                        Type::TypeVar(typevar),
+                        variance,
+                        &mut f,
+                    );
+                }
             }
         });
     }
