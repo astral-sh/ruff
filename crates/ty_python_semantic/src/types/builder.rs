@@ -38,7 +38,6 @@
 //! unnecessary `is_subtype_of` checks.
 
 use crate::types::enums::{enum_member_literals, enum_metadata};
-use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType, structural_type_ordering,
@@ -652,13 +651,7 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         if self.order_elements {
-            types.sort_unstable_by(|l, r| {
-                if self.recursively_defined.is_yes() {
-                    structural_type_ordering(self.db, l, r)
-                } else {
-                    union_or_intersection_elements_ordering(self.db, l, r)
-                }
-            });
+            types.sort_unstable_by(|l, r| structural_type_ordering(self.db, l, r));
         }
         match types.len() {
             0 => None,
