@@ -249,9 +249,9 @@ IntOrStr = TypeAliasType(get_name(), int | str)
 type OptNestedInt = int | tuple[OptNestedInt, ...] | None
 
 def f(x: OptNestedInt) -> None:
-    reveal_type(x)  # revealed: tuple[OptNestedInt, ...] | None | int
+    reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...] | None
     if x is not None:
-        reveal_type(x)  # revealed: tuple[OptNestedInt, ...] | int
+        reveal_type(x)  # revealed: int | tuple[OptNestedInt, ...]
 ```
 
 ### Invalid self-referential
@@ -328,7 +328,7 @@ class B(A[Alias]):
 
 def f(b: B):
     reveal_type(b)  # revealed: B
-    reveal_type(b.attr)  # revealed: int | list[Alias]
+    reveal_type(b.attr)  # revealed: list[Alias] | int
 ```
 
 ### Mutually recursive
@@ -451,5 +451,5 @@ type Y = X | str | dict[str, Y]
 
 def _(y: Y):
     if isinstance(y, dict):
-        reveal_type(y)  # revealed: dict[str, Y] | dict[str, X]
+        reveal_type(y)  # revealed: dict[str, X] | dict[str, Y]
 ```
