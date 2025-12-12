@@ -35,6 +35,7 @@ mod inlay_hints;
 mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
+mod rename;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
@@ -52,8 +53,8 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request,
-    Shutdown, WorkspaceConfiguration, WorkspaceDiagnosticRequest,
+    Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest,
+    PrepareRenameRequest, Request, Shutdown, WorkspaceConfiguration, WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
@@ -67,12 +68,11 @@ use lsp_types::{
     TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
     TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
     WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceFolder,
+    WorkspaceEdit, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
 use tempfile::TempDir;
-
 use ty_server::{ClientOptions, LogLevel, Server, init_logging};
 
 /// Number of times to retry receiving a message before giving up
@@ -417,6 +417,16 @@ impl TestServer {
         R: Request,
     {
         self.try_await_response::<R>(id, None)
+            .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
+    }
+
+    #[track_caller]
+    pub(crate) fn send_request_await<R>(&mut self, params: R::Params) -> R::Result
+    where
+        R: Request,
+    {
+        let id = self.send_request::<R>(params);
+        self.try_await_response::<R>(&id, None)
             .unwrap_or_else(|err| panic!("Failed to receive response for request {id}: {err}"))
     }
 
@@ -802,6 +812,38 @@ impl TestServer {
         self.send_notification::<DidChangeWatchedFiles>(params);
     }
 
+    pub(crate) fn rename(
+        &mut self,
+        document: &Url,
+        position: lsp_types::Position,
+        new_name: &str,
+    ) -> Result<Option<WorkspaceEdit>, ()> {
+        if self
+            .send_request_await::<PrepareRenameRequest>(lsp_types::TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier {
+                    uri: document.clone(),
+                },
+                position,
+            })
+            .is_none()
+        {
+            return Err(());
+        }
+
+        Ok(
+            self.send_request_await::<lsp_types::request::Rename>(lsp_types::RenameParams {
+                text_document_position: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: document.clone(),
+                    },
+                    position,
+                },
+                new_name: new_name.to_string(),
+                work_done_progress_params: WorkDoneProgressParams::default(),
+            }),
+        )
+    }
+
     /// Send a `textDocument/diagnostic` request for the document at the given path.
     pub(crate) fn document_diagnostic_request(
         &mut self,
@@ -1077,17 +1119,6 @@ impl TestServerBuilder {
             .text_document
             .get_or_insert_default()
             .diagnostic
-            .get_or_insert_default()
-            .dynamic_registration = Some(enabled);
-        self
-    }
-
-    /// Enable or disable dynamic registration of rename capability
-    pub(crate) fn enable_rename_dynamic_registration(mut self, enabled: bool) -> Self {
-        self.client_capabilities
-            .text_document
-            .get_or_insert_default()
-            .rename
             .get_or_insert_default()
             .dynamic_registration = Some(enabled);
         self

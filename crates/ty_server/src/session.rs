@@ -9,7 +9,7 @@ use anyhow::{Context, anyhow};
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
+    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
@@ -32,9 +32,7 @@ use options::GlobalOptions;
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
-use crate::capabilities::{
-    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
-};
+use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
@@ -583,7 +581,6 @@ impl Session {
     /// `ty.experimental.rename` global setting.
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
-        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
         let mut registrations = vec![];
@@ -623,31 +620,6 @@ impl Session {
                     .unwrap(),
                 ),
             });
-        }
-
-        if self
-            .resolved_client_capabilities
-            .supports_rename_dynamic_registration()
-        {
-            let is_rename_enabled = self.global_settings.is_rename_enabled();
-
-            if !is_rename_enabled {
-                tracing::debug!("Rename capability is disabled in the resolved global settings");
-                if self.registrations.contains(Rename::METHOD) {
-                    unregistrations.push(Unregistration {
-                        id: RENAME_REGISTRATION_ID.into(),
-                        method: Rename::METHOD.into(),
-                    });
-                }
-            }
-
-            if is_rename_enabled {
-                registrations.push(Registration {
-                    id: RENAME_REGISTRATION_ID.into(),
-                    method: Rename::METHOD.into(),
-                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
-                });
-            }
         }
 
         if let Some(register_options) = self.file_watcher_registration_options() {
@@ -1020,6 +992,7 @@ impl DocumentSnapshot {
     }
 
     /// Returns the client settings for all workspaces.
+    #[expect(unused)]
     pub(crate) fn global_settings(&self) -> &GlobalSettings {
         &self.global_settings
     }
@@ -1451,7 +1424,7 @@ impl DocumentHandle {
     }
 
     pub(crate) fn update_text_document(
-        &self,
+        &mut self,
         session: &mut Session,
         content_changes: Vec<TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
@@ -1471,6 +1444,8 @@ impl DocumentHandle {
             } else {
                 document.apply_changes(content_changes, new_version, position_encoding);
             }
+
+            self.set_version(document.version());
         }
 
         self.update_in_db(session);
@@ -1479,7 +1454,7 @@ impl DocumentHandle {
     }
 
     pub(crate) fn update_notebook_document(
-        &self,
+        &mut self,
         session: &mut Session,
         cells: Option<lsp_types::NotebookDocumentCellChange>,
         metadata: Option<lsp_types::LSPObject>,
@@ -1496,6 +1471,8 @@ impl DocumentHandle {
                 new_version,
                 position_encoding,
             )?;
+
+            self.set_version(new_version);
         }
 
         self.update_in_db(session);
@@ -1514,6 +1491,16 @@ impl DocumentHandle {
         };
 
         session.apply_changes(path, changes);
+    }
+
+    fn set_version(&mut self, version: DocumentVersion) {
+        let self_version = match self {
+            DocumentHandle::Text { version, .. }
+            | DocumentHandle::Notebook { version, .. }
+            | DocumentHandle::Cell { version, .. } => version,
+        };
+
+        *self_version = version;
     }
 
     /// De-registers a document, specified by its key.
