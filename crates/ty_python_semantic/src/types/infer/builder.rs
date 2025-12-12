@@ -3541,10 +3541,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         return Ok(param_type);
                     }
 
-                    Type::KnownInstance(known_instance)
+                    Type::KnownInstance(known_instance @ KnownInstanceType::TypeVar(typevar))
                         if known_instance.class(self.db()) == KnownClass::ParamSpec =>
                     {
-                        // TODO: Emit diagnostic: "ParamSpec "P" is unbound"
+                        if let Some(diagnostic_builder) =
+                            self.context.report_lint(&INVALID_TYPE_ARGUMENTS, expr)
+                        {
+                            diagnostic_builder.into_diagnostic(format_args!(
+                                "ParamSpec `{}` is unbound",
+                                typevar.name(self.db())
+                            ));
+                        }
                         return Err(());
                     }
 
@@ -11636,6 +11643,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         generic_context: GenericContext<'db>,
         specialize: impl FnOnce(&[Option<Type<'db>>]) -> Type<'db>,
     ) -> Type<'db> {
+        enum ExplicitSpecializationError {
+            InvalidParamSpec,
+            UnsatisfiedBound,
+            UnsatisfiedConstraints,
+            /// These two errors override the errors above, causing all specializations to be `Unknown`.
+            MissingTypeVars,
+            TooManyArguments,
+            /// This error overrides the errors above, causing the type itself to be `Unknown`.
+            NonGeneric,
+        }
+
         fn add_typevar_definition<'db>(
             db: &'db dyn Db,
             diagnostic: &mut Diagnostic,
@@ -11688,7 +11706,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        let mut has_error = false;
+        let mut error: Option<ExplicitSpecializationError> = None;
 
         for (index, item) in typevars.zip_longest(type_arguments.iter()).enumerate() {
             match item {
@@ -11704,8 +11722,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ) {
                             Ok(paramspec_value) => paramspec_value,
                             Err(()) => {
-                                has_error = true;
-                                Type::unknown()
+                                error = Some(ExplicitSpecializationError::InvalidParamSpec);
+                                Type::paramspec_value_callable(db, Parameters::unknown())
                             }
                         }
                     } else {
@@ -11737,8 +11755,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
-                                has_error = true;
-                                continue;
+                                error = Some(ExplicitSpecializationError::UnsatisfiedBound);
+                                specialization_types.push(Some(Type::unknown()));
+                            } else {
+                                specialization_types.push(Some(provided_type));
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -11771,14 +11791,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     ));
                                     add_typevar_definition(db, &mut diagnostic, typevar);
                                 }
-                                has_error = true;
-                                continue;
+                                error = Some(ExplicitSpecializationError::UnsatisfiedConstraints);
+                                specialization_types.push(Some(Type::unknown()));
+                            } else {
+                                specialization_types.push(Some(provided_type));
                             }
                         }
-                        None => {}
+                        None => {
+                            specialization_types.push(Some(provided_type));
+                        }
                     }
-
-                    specialization_types.push(Some(provided_type));
                 }
                 EitherOrBoth::Left(typevar) => {
                     if typevar.default_type(db).is_none() {
@@ -11813,33 +11835,57 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 ));
             }
-            has_error = true;
+            error = Some(ExplicitSpecializationError::MissingTypeVars);
         }
 
         if let Some(first_excess_type_argument_index) = first_excess_type_argument_index {
-            let node = get_node(first_excess_type_argument_index);
-            if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
-                let description = CallableDescription::new(db, value_ty);
-                builder.into_diagnostic(format_args!(
-                    "Too many type arguments{}: expected {}, got {}",
-                    if let Some(CallableDescription { kind, name }) = description {
-                        format!(" to {kind} `{name}`")
-                    } else {
-                        String::new()
-                    },
-                    if typevar_with_defaults == 0 {
-                        format!("{typevars_len}")
-                    } else {
-                        format!(
-                            "between {} and {}",
-                            typevars_len - typevar_with_defaults,
-                            typevars_len
-                        )
-                    },
-                    type_arguments.len(),
-                ));
+            if typevars_len == 0 {
+                // Type parameter list cannot be empty, so if we reach here, `value_ty` is not a generic type.
+                if let Some(builder) = self
+                    .context
+                    .report_lint(&NON_SUBSCRIPTABLE, &*subscript.value)
+                {
+                    let mut diagnostic =
+                        builder.into_diagnostic("Cannot subscript non-generic type");
+                    if match value_ty {
+                        Type::GenericAlias(_) => true,
+                        Type::KnownInstance(KnownInstanceType::UnionType(union)) => union
+                            .value_expression_types(db)
+                            .is_ok_and(|mut tys| tys.any(|ty| ty.is_generic_alias())),
+                        _ => false,
+                    } {
+                        diagnostic.set_primary_message(format_args!(
+                            "`{}` is already specialized",
+                            value_ty.display(db)
+                        ));
+                    }
+                }
+                error = Some(ExplicitSpecializationError::NonGeneric);
+            } else {
+                let node = get_node(first_excess_type_argument_index);
+                if let Some(builder) = self.context.report_lint(&INVALID_TYPE_ARGUMENTS, node) {
+                    let description = CallableDescription::new(db, value_ty);
+                    builder.into_diagnostic(format_args!(
+                        "Too many type arguments{}: expected {}, got {}",
+                        if let Some(CallableDescription { kind, name }) = description {
+                            format!(" to {kind} `{name}`")
+                        } else {
+                            String::new()
+                        },
+                        if typevar_with_defaults == 0 {
+                            format!("{typevars_len}")
+                        } else {
+                            format!(
+                                "between {} and {}",
+                                typevars_len - typevar_with_defaults,
+                                typevars_len
+                            )
+                        },
+                        type_arguments.len(),
+                    ));
+                }
+                error = Some(ExplicitSpecializationError::TooManyArguments);
             }
-            has_error = true;
         }
 
         if store_inferred_type_arguments {
@@ -11849,21 +11895,31 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
         }
 
-        if has_error {
-            let unknowns = generic_context
-                .variables(self.db())
-                .map(|typevar| {
-                    Some(if typevar.is_paramspec(db) {
-                        Type::paramspec_value_callable(db, Parameters::unknown())
-                    } else {
-                        Type::unknown()
+        match error {
+            Some(ExplicitSpecializationError::NonGeneric) => Type::unknown(),
+            Some(
+                ExplicitSpecializationError::MissingTypeVars
+                | ExplicitSpecializationError::TooManyArguments,
+            ) => {
+                let unknowns = generic_context
+                    .variables(self.db())
+                    .map(|typevar| {
+                        Some(if typevar.is_paramspec(db) {
+                            Type::paramspec_value_callable(db, Parameters::unknown())
+                        } else {
+                            Type::unknown()
+                        })
                     })
-                })
-                .collect::<Vec<_>>();
-            return specialize(&unknowns);
+                    .collect::<Vec<_>>();
+                specialize(&unknowns)
+            }
+            Some(
+                ExplicitSpecializationError::UnsatisfiedBound
+                | ExplicitSpecializationError::UnsatisfiedConstraints
+                | ExplicitSpecializationError::InvalidParamSpec,
+            )
+            | None => specialize(&specialization_types),
         }
-
-        specialize(&specialization_types)
     }
 
     fn infer_subscript_expression_types(
@@ -12044,9 +12100,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::PEP695(alias))),
                 _,
             ) if alias.generic_context(db).is_none() => {
+                debug_assert!(alias.specialization(db).is_none());
                 if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
-                    builder
-                        .into_diagnostic(format_args!("Cannot subscript non-generic type alias"));
+                    let value_type = alias.raw_value_type(db);
+                    let mut diagnostic =
+                        builder.into_diagnostic("Cannot subscript non-generic type alias");
+                    if value_type.is_definition_generic(db) {
+                        diagnostic.set_primary_message(format_args!(
+                            "`{}` is already specialized",
+                            value_type.display(db)
+                        ));
+                    }
                 }
 
                 Some(Type::unknown())
