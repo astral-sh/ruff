@@ -1011,7 +1011,9 @@ impl<'db> Type<'db> {
             Type::ProtocolInstance(protocol) => {
                 matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
             }
-            Type::TypedDict(typed_dict) => typed_dict.defining_class().is_generic(),
+            Type::TypedDict(typed_dict) => typed_dict
+                .defining_class()
+                .is_some_and(ClassType::is_generic),
             Type::Dynamic(dynamic) => {
                 matches!(dynamic, DynamicType::UnknownGeneric(_))
             }
