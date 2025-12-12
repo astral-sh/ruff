@@ -1,6 +1,6 @@
 use compact_str::CompactString;
 use core::fmt;
-use ruff_db::diagnostic::{self, Diagnostic};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
