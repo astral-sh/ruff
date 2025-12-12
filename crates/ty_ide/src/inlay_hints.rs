@@ -6017,9 +6017,9 @@ mod tests {
     fn test_function_signature_inlay_hint() {
         let mut test = inlay_hint_test(
             "
-                  def foo(x: int, *y: bool, z: str | int | list[str]): ...
+        def foo(x: int, *y: bool, z: str | int | list[str]): ...
 
-                  a = foo",
+        a = foo",
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
@@ -6158,18 +6158,35 @@ mod tests {
     fn test_module_inlay_hint() {
         let mut test = inlay_hint_test(
             "
-                      import foo
+        import foo
 
-                      a = foo",
+        a = foo",
         );
 
         test.with_extra_file("foo.py", "'''Foo module'''");
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
         import foo
 
         a[: <module 'foo'>] = foo
         ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:423:7
+            |
+        422 | @disjoint_base
+        423 | class ModuleType:
+            |       ^^^^^^^^^^
+        424 |     """Create a module object.
+            |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | import foo
+        3 |
+        4 | a[: <module 'foo'>] = foo
+          |      ^^^^^^
+          |
+
         info[inlay-hint-location]: Inlay Hint Target
          --> foo.py:1:1
           |
@@ -6177,30 +6194,529 @@ mod tests {
           | ^^^^^^^^^^^^^^^^
           |
         info: Source
-         --> main2.py:4:5
+         --> main2.py:4:14
           |
         2 | import foo
         3 |
         4 | a[: <module 'foo'>] = foo
-          |     ^^^^^^^^^^^^^^
+          |              ^^^
           |
-        ");
+        "#);
     }
 
     #[test]
     fn test_literal_type_alias_inlay_hint() {
         let mut test = inlay_hint_test(
             "
-                        from typing import Literal
+        from typing import Literal
 
-                        a = Literal['a', 'b', 'c']",
+        a = Literal['a', 'b', 'c']",
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Literal
 
         a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main2.py:4:20
+          |
+        2 | from typing import Literal
+        3 |
+        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+          |                    ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:28
+          |
+        2 | from typing import Literal
+        3 |
+        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+          |                            ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:33
+          |
+        2 | from typing import Literal
+        3 |
+        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+          |                                 ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:38
+          |
+        2 | from typing import Literal
+        3 |
+        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+          |                                      ^^^
+          |
         "#);
+    }
+
+    #[test]
+    fn test_wrapper_descriptor_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from types import FunctionType
+
+        a = FunctionType.__get__",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from types import FunctionType
+
+        a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:670:7
+            |
+        669 | @final
+        670 | class WrapperDescriptorType:
+            |       ^^^^^^^^^^^^^^^^^^^^^
+        671 |     @property
+        672 |     def __name__(self) -> str: ...
+            |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | from types import FunctionType
+        3 |
+        4 | a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
+          |      ^^^^^^^^^^^^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/types.pyi:77:7
+           |
+        75 | # Make sure this class definition stays roughly in line with `builtins.function`
+        76 | @final
+        77 | class FunctionType:
+           |       ^^^^^^^^^^^^
+        78 |     """Create a function object.
+           |
+        info: Source
+         --> main2.py:4:39
+          |
+        2 | from types import FunctionType
+        3 |
+        4 | a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
+          |                                       ^^^^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_method_wrapper_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        def f(): ...
+
+        a = f.__call__",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def f(): ...
+
+        a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:684:7
+            |
+        683 | @final
+        684 | class MethodWrapperType:
+            |       ^^^^^^^^^^^^^^^^^
+        685 |     @property
+        686 |     def __self__(self) -> object: ...
+            |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def f(): ...
+        3 |
+        4 | a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
+          |      ^^^^^^^^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:134:9
+            |
+        132 |         ) -> Self: ...
+        133 |
+        134 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+            |         ^^^^^^^^
+        135 |         """Call self as a function."""
+            |
+        info: Source
+         --> main2.py:4:22
+          |
+        2 | def f(): ...
+        3 |
+        4 | a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
+          |                      ^^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/types.pyi:77:7
+           |
+        75 | # Make sure this class definition stays roughly in line with `builtins.function`
+        76 | @final
+        77 | class FunctionType:
+           |       ^^^^^^^^^^^^
+        78 |     """Create a function object.
+           |
+        info: Source
+         --> main2.py:4:35
+          |
+        2 | def f(): ...
+        3 |
+        4 | a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
+          |                                   ^^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:5
+          |
+        2 | def f(): ...
+          |     ^
+        3 |
+        4 | a = f.__call__
+          |
+        info: Source
+         --> main2.py:4:45
+          |
+        2 | def f(): ...
+        3 |
+        4 | a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
+          |                                             ^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_newtype_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from typing import NewType
+
+        N = NewType('N', str)
+
+        Y = N",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from typing import NewType
+
+        N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+
+        Y[: <NewType pseudo-class 'N'>] = N
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:615:11
+            |
+        613 |     TypeGuard: _SpecialForm
+        614 |
+        615 |     class NewType:
+            |           ^^^^^^^
+        616 |         """NewType creates simple unique types with almost zero runtime overhead.
+            |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+          |      ^^^^^^^
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:1
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N = NewType('N', str)
+          | ^
+        5 |
+        6 | Y = N
+          |
+        info: Source
+         --> main2.py:4:28
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+          |                            ^
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:637:28
+            |
+        635 |         """
+        636 |
+        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+            |                            ^^^^
+        638 |         if sys.version_info >= (3, 11):
+        639 |             @staticmethod
+            |
+        info: Source
+         --> main2.py:4:44
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+          |                                            ^^^^
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:637:39
+            |
+        635 |         """
+        636 |
+        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+            |                                       ^^
+        638 |         if sys.version_info >= (3, 11):
+        639 |             @staticmethod
+            |
+        info: Source
+         --> main2.py:4:56
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+          |                                                        ^^
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:615:11
+            |
+        613 |     TypeGuard: _SpecialForm
+        614 |
+        615 |     class NewType:
+            |           ^^^^^^^
+        616 |         """NewType creates simple unique types with almost zero runtime overhead.
+            |
+        info: Source
+         --> main2.py:6:6
+          |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |      ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:1
+          |
+        2 | from typing import NewType
+        3 |
+        4 | N = NewType('N', str)
+          | ^
+        5 |
+        6 | Y = N
+          |
+        info: Source
+         --> main2.py:6:28
+          |
+        4 | N[: <NewType pseudo-class 'N'>] = NewType([name=]'N', [tp=]str)
+        5 |
+        6 | Y[: <NewType pseudo-class 'N'>] = N
+          |                            ^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_meta_typevar_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        def f[T](x: type[T]):
+            y = x",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def f[T](x: type[T]):
+            y[: type[T@f]] = x
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:247:7
+            |
+        246 | @disjoint_base
+        247 | class type:
+            |       ^^^^
+        248 |     """type(object) -> the object's type
+        249 |     type(name, bases, dict, **kwds) -> a new type
+            |
+        info: Source
+         --> main2.py:3:9
+          |
+        2 | def f[T](x: type[T]):
+        3 |     y[: type[T@f]] = x
+          |         ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:7
+          |
+        2 | def f[T](x: type[T]):
+          |       ^
+        3 |     y = x
+          |
+        info: Source
+         --> main2.py:3:14
+          |
+        2 | def f[T](x: type[T]):
+        3 |     y[: type[T@f]] = x
+          |              ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def f[T](x: type[T]):
+            y: type[T@f] = x
+        "#);
+    }
+
+    #[test]
+    fn test_subscripted_protocol_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from typing import Protocol, TypeVar
+        T = TypeVar('T')
+        Strange = Protocol[T]",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import Protocol, TypeVar
+        T[: typing.TypeVar] = TypeVar([name=]'T')
+        Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:1
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T = TypeVar('T')
+          | ^
+        4 | Strange = Protocol[T]
+          |
+        info: Source
+         --> main2.py:3:5
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+          |     ^^^^^^^^^^^^^^
+        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:276:13
+            |
+        274 |         def __new__(
+        275 |             cls,
+        276 |             name: str,
+            |             ^^^^
+        277 |             *constraints: Any,  # AnnotationForm
+        278 |             bound: Any | None = None,  # AnnotationForm
+            |
+        info: Source
+         --> main2.py:3:32
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+          |                                ^^^^
+        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:341:1
+            |
+        340 | Union: _SpecialForm
+        341 | Protocol: _SpecialForm
+            | ^^^^^^^^
+        342 | Callable: _SpecialForm
+        343 | Type: _SpecialForm
+            |
+        info: Source
+         --> main2.py:4:26
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+          |                          ^^^^^^^^^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:3:1
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T = TypeVar('T')
+          | ^
+        4 | Strange = Protocol[T]
+          |
+        info: Source
+         --> main2.py:4:42
+          |
+        2 | from typing import Protocol, TypeVar
+        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+          |                                          ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import Protocol, TypeVar
+        T: typing.TypeVar = TypeVar('T')
+        Strange = Protocol[T]
+        ");
     }
 
     struct InlayHintLocationDiagnostic {

@@ -34,7 +34,8 @@ from inspect import getattr_static
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(self, x: int) -> str
 
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f(self, x: int) -> str
 reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method C.f(x: int) -> str
@@ -258,7 +259,7 @@ class C:
 
 method_wrapper = getattr_static(C, "f").__get__
 
-reveal_type(method_wrapper)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(method_wrapper)  # revealed: <method-wrapper '__get__' of function 'f'>
 
 # All of these are fine:
 method_wrapper(C(), C)
@@ -414,7 +415,8 @@ class C:
     def f(cls): ...
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 ```
 
 But we correctly model how the `classmethod` descriptor works:
@@ -632,7 +634,7 @@ class MyClass:
 
 static_assert(is_assignable_to(types.FunctionType, Callable))
 
-# revealed: <wrapper-descriptor `__get__` of `function` objects>
+# revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(types.FunctionType.__get__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
 
@@ -640,7 +642,7 @@ static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
 reveal_type(f)
 static_assert(is_assignable_to(TypeOf[f], Callable))
 
-# revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(f.__get__)
 static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
 
@@ -648,11 +650,11 @@ static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
 reveal_type(types.FunctionType.__call__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
 
-# revealed: <method-wrapper `__call__` of `f`>
+# revealed: <method-wrapper '__call__' of function 'f'>
 reveal_type(f.__call__)
 static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
 
-# revealed: <wrapper-descriptor `__get__` of `property` objects>
+# revealed: <wrapper-descriptor '__get__' of 'property' objects>
 reveal_type(property.__get__)
 static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
 
@@ -661,15 +663,15 @@ reveal_type(MyClass.my_property)
 static_assert(is_assignable_to(TypeOf[property], Callable))
 static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
 
-# revealed: <method-wrapper `__get__` of `property` object>
+# revealed: <method-wrapper '__get__' of property 'my_property'>
 reveal_type(MyClass.my_property.__get__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
 
-# revealed: <wrapper-descriptor `__set__` of `property` objects>
+# revealed: <wrapper-descriptor '__set__' of 'property' objects>
 reveal_type(property.__set__)
 static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 
-# revealed: <method-wrapper `__set__` of `property` object>
+# revealed: <method-wrapper '__set__' of property 'my_property'>
 reveal_type(MyClass.my_property.__set__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 
@@ -677,7 +679,7 @@ static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 reveal_type(str.startswith)
 static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 
-# revealed: <method-wrapper `startswith` of `str` object>
+# revealed: <method-wrapper 'startswith' of string 'foo'>
 reveal_type("foo".startswith)
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
 
