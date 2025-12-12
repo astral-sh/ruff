@@ -931,10 +931,17 @@ pub enum AttributeState {
 }
 
 impl CallChainLayout {
-    pub(crate) fn call_like_attribute(self) -> Self {
+    /// Returns new state decreasing count of remaining calls/subscripts
+    /// to traverse, or the state `FirstCallOrSubscript`, as appropriate.
+    #[must_use]
+    pub(crate) fn increment_call_like_attribute(self) -> Self {
         match self {
             Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x)) => {
                 if x > 1 {
+                    // Recall that we traverse call chains from right to
+                    // left. So after moving past a call-like attribute
+                    // we _decrease_ the count of _remaining_ calls and
+                    // subscripts to the left of our current position.
                     Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x - 1))
                 } else {
                     Self::Fluent(AttributeState::FirstCallOrSubscript)
@@ -944,7 +951,11 @@ impl CallChainLayout {
         }
     }
 
-    pub(crate) fn after_attribute(self) -> Self {
+    /// Returns with state change
+    /// `FirstCallOrSubscript` -> `BeforeFirstCallOrSubscript`
+    /// and otherwise returns unchanged.
+    #[must_use]
+    pub(crate) fn increment_after_attribute(self) -> Self {
         match self {
             Self::Fluent(AttributeState::FirstCallOrSubscript) => {
                 Self::Fluent(AttributeState::BeforeFirstCallOrSubscript)

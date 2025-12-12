@@ -56,17 +56,17 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     match value.as_ref() {
                         Expr::Attribute(expr) => {
                             expr.format()
-                                .with_options(call_chain_layout.after_attribute())
+                                .with_options(call_chain_layout.increment_after_attribute())
                                 .fmt(f)?;
                         }
                         Expr::Call(expr) => {
                             expr.format()
-                                .with_options(call_chain_layout.after_attribute())
+                                .with_options(call_chain_layout.increment_after_attribute())
                                 .fmt(f)?;
                         }
                         Expr::Subscript(expr) => {
                             expr.format()
-                                .with_options(call_chain_layout.after_attribute())
+                                .with_options(call_chain_layout.increment_after_attribute())
                                 .fmt(f)?;
                         }
                         _ => {

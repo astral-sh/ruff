@@ -53,7 +53,7 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 match value.as_ref() {
                     Expr::Attribute(expr) => expr
                         .format()
-                        .with_options(call_chain_layout.call_like_attribute())
+                        .with_options(call_chain_layout.increment_call_like_attribute())
                         .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
