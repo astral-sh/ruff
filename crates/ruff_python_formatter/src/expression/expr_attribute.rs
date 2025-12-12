@@ -199,7 +199,6 @@ impl NeedsParentheses for ExprAttribute {
                 self.into(),
                 context.comments().ranges(),
                 context.source(),
-                context
             ),
             CallChainLayout::Fluent(_)
         ) {

@@ -96,7 +96,6 @@ impl NeedsParentheses for ExprSubscript {
                     self.into(),
                     context.comments().ranges(),
                     context.source(),
-                    context
                 ),
                 CallChainLayout::Fluent(_)
             ) {

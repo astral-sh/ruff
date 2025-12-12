@@ -429,20 +429,3 @@ variable = (
     .first_method("some string")
 )
 ```
-
-
-## Preview changes
-```diff
---- Stable
-+++ Preview
-@@ -171,7 +171,8 @@
- if (
-     (
-         something  # a comment
--    ).first_method("some string")  # second comment
-+    )
-+    .first_method("some string")  # second comment
- ):
-     pass
- 
-```

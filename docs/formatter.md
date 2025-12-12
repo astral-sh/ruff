@@ -538,33 +538,10 @@ x = (
 Both the stable and preview formatting are variants of something
 called a **fluent layout**.
 
-In general, this preview style differs from the stable style in the
-following two ways:
-
-1. In the case where a fluent layout is applied, the preview formatting
-differs from the stable formatting only at the first attribute that precedes
+In general, this preview style differs from the stable style
+only at the first attribute that precedes
 a call or subscript. The preview formatting breaks _before_ this attribute,
 while the stable formatting breaks _after_ the call or subscript.
-2. When `preview` is enabled, the fluent layout will be used slightly more often, as we explain below.
-
-To explain point (2), we need to explain the heuristic used for deciding
-whether to apply a fluent layout. In stable, the heuristic is essentially
-to apply fluent formatting in the following situations:
-
-- A parenthesized, call, or subscript expression is followed by at least one attribute that is called or subscripted, excluding the last attribute in the chain, or
-- A non-attribute expression is followed by at least two attributes that
-are called or subscripted, excluding the last attribute in the chain
-
-In `preview` the heuristic is identical except that we do not exclude the
-last attribute in the chain from consideration.
-
-For example, with `line-length = 8`, we have:
-
-```python
-x = a[0].b().c   # formatted to fluent with and without preview
-x = a.b().c().d # formatted to fluent with and without preview
-x = a.d.b().c() # formatted to fluent only in preview
-```
 
 ## Sorting imports
 

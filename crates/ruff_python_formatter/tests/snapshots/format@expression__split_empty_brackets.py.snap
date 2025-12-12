@@ -198,24 +198,7 @@ response = await sync_to_async(
 ```diff
 --- Stable
 +++ Preview
-@@ -18,10 +18,14 @@
- ).casefold(1)
- 
- ct_match = (
--    unicodedata.normalize("NFKC", s1).casefold(
-+    unicodedata
-+    .normalize("NFKC", s1)
-+    .casefold(
-         # foo
-     )
--    == unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold(
-+    == unicodedata
-+    .normalize("NFKCNFKCNFKCNFKCNFKC", s2)
-+    .casefold(
-         # foo
-     )
- )
-@@ -62,9 +66,9 @@
+@@ -62,9 +62,9 @@
      1
  }.unicodedata.normalize("NFKCNFKCNFKCNFKCNFKC", s2).casefold()
  
