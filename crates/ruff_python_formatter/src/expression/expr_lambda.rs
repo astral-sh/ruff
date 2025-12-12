@@ -35,7 +35,9 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         write!(f, [token("lambda")])?;
 
-        let dangling = if let Some(parameters) = parameters {
+        // Format any dangling comments before the parameters, but save any dangling comments after
+        // the parameters/after the header to be formatted with the body below.
+        let dangling_header_comments = if let Some(parameters) = parameters {
             // In this context, a dangling comment can either be a comment between the `lambda` and the
             // parameters, or a comment between the parameters and the body.
             let (dangling_before_parameters, dangling_after_parameters) = dangling
@@ -130,18 +132,20 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
 
         write!(f, [token(":")])?;
 
-        // In this context, a dangling comment is a comment between the `lambda` and the body.
-        if dangling.is_empty() {
+        if dangling_header_comments.is_empty() {
             write!(f, [space()])?;
         } else if !preview {
-            write!(f, [dangling_comments(dangling)])?;
+            write!(f, [dangling_comments(dangling_header_comments)])?;
         }
 
         if !preview {
             return body.format().fmt(f);
         }
 
-        let fmt_body = FormatBody { body, dangling };
+        let fmt_body = FormatBody {
+            body,
+            dangling_header_comments,
+        };
 
         match self.layout {
             ExprLambdaLayout::Assignment => fits_expanded(&fmt_body).fmt(f),
@@ -206,18 +210,72 @@ impl NeedsParentheses for ExprLambda {
 
 struct FormatBody<'a> {
     body: &'a Expr,
-    dangling: &'a [SourceComment],
+
+    /// Dangling comments attached to the lambda header that should be formatted with the body.
+    ///
+    /// These can include both own-line and end-of-line comments. For lambdas with parameters, this
+    /// means comments after the parameters:
+    ///
+    /// ```py
+    /// (
+    ///     lambda x, y  # 1
+    ///         # 2
+    ///         :  # 3
+    ///         # 4
+    ///         x + y
+    /// )
+    /// ```
+    ///
+    /// Or all dangling comments for lambdas without parameters:
+    ///
+    /// ```py
+    /// (
+    ///     lambda  # 1
+    ///         # 2
+    ///         :  # 3
+    ///         # 4
+    ///         1
+    /// )
+    /// ```
+    ///
+    /// In most cases these should formatted within the parenthesized body, as in:
+    ///
+    /// ```py
+    /// (
+    ///     lambda: (  # 1
+    ///         # 2
+    ///         # 3
+    ///         # 4
+    ///         1
+    ///     )
+    /// )
+    /// ```
+    ///
+    /// or without `# 2`:
+    ///
+    /// ```py
+    /// (
+    ///     lambda: (  # 1  # 3
+    ///         # 4
+    ///         1
+    ///     )
+    /// )
+    /// ```
+    dangling_header_comments: &'a [SourceComment],
 }
 
 impl Format<PyFormatContext<'_>> for FormatBody<'_> {
     fn fmt(&self, f: &mut PyFormatter) -> FormatResult<()> {
-        let FormatBody { dangling, body } = self;
+        let FormatBody {
+            dangling_header_comments,
+            body,
+        } = self;
 
         let body = *body;
         let comments = f.context().comments().clone();
         let body_comments = comments.leading_dangling_trailing(body);
 
-        if !dangling.is_empty() {
+        if !dangling_header_comments.is_empty() {
             // Can't use partition_point because there can be additional end of line comments
             // after the initial set. All of these comments are dangling, for example:
             //
@@ -232,12 +290,13 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // ```
             //
             // and alternate between own line and end of line.
-            let (after_parameters_end_of_line, leading_body_comments) = dangling.split_at(
-                dangling
-                    .iter()
-                    .position(|comment| comment.line_position().is_own_line())
-                    .unwrap_or(dangling.len()),
-            );
+            let (after_parameters_end_of_line, leading_body_comments) = dangling_header_comments
+                .split_at(
+                    dangling_header_comments
+                        .iter()
+                        .position(|comment| comment.line_position().is_own_line())
+                        .unwrap_or(dangling_header_comments.len()),
+                );
 
             // If the body is parenthesized and has its own leading comments, preserve the
             // separation between the dangling lambda comments and the body comments. For
@@ -269,7 +328,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             if is_expression_parenthesized(body.into(), comments.ranges(), f.context().source())
                 && comments.has_leading(body)
             {
-                trailing_comments(dangling).fmt(f)?;
+                trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of
                 // `dangling` above, but their presence still determines the spacing here.
