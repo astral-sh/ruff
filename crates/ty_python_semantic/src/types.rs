@@ -3307,11 +3307,6 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement disjointness for TypedDict
-                ConstraintSet::from(false)
-            }
-
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
             (Type::SubclassOf(subclass_of), Type::Callable(_) | Type::ProtocolInstance(_))
             | (Type::Callable(_) | Type::ProtocolInstance(_), Type::SubclassOf(subclass_of))
@@ -4038,6 +4033,23 @@ impl<'db> Type<'db> {
             }
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => ConstraintSet::from(true),
+
+            (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => {
+                disjointness_visitor.visit((self, other), || {
+                    self_typeddict.is_disjoint_from_impl(
+                        db,
+                        other_typeddict,
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
+            }
+
+            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
+                // TODO: Implement disjointness for TypedDict with other types.
+                ConstraintSet::from(false)
+            }
         }
     }
 

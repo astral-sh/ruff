@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
@@ -340,6 +341,150 @@ impl<'db> TypedDictType<'db> {
                 )
             },
         )
+    }
+
+    /// Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
+    /// `TypedDict` `C` that's fully-static and assignable to both of them.
+    ///
+    /// `TypedDict` assignability is determined field-by-field, so we determine disjointness
+    /// similarly. For any field that's only in `A`, it's always possible for our hypothetical `C`
+    /// to copy/paste that field without losing assignability to `B` (and vice versa), so we only
+    /// need to consider fields that are present in both `A` and `B`.
+    ///
+    /// There are three properties of each field to consider: the declared type, whether it's
+    /// mutable ("mut" vs "imm" below), and whether it's required ("req" vs "opt" below). Here's a
+    /// table summary of the restrictions on the declared type of a source field (for us that means
+    /// in `C`, which we want to be assignable to both `A` and `B`) given a destination field (for
+    /// us that means in either `A` or `B`). For completeness we'll also include the possibility
+    /// that the source field is missing entirely, though we'll soon see that we can ignore that
+    /// case. This table is essentially what `has_relation_to_impl` implements above. Here
+    /// "equivalent" means the source and destination types must be equivalent/compatible,
+    /// "assignable" means the source must be assignable to the destination, and "-" means the
+    /// assignment is never allowed:
+    ///
+    ///    source→ | mut + req  | mut + opt  | imm + req  | imm + opt  |   [missing]   |
+    /// ↓dest      |            |            |            |            |               |
+    /// -----------|------------|------------|------------|------------|---------------|
+    /// mut + req  | equivalent |     -      |     -      |     -      |       -       |
+    /// mut + opt  |     -      | equivalent |     -      |     -      |       -       |
+    /// imm + req  | assignable |     -      | assignable |     -      |       -       |
+    /// imm + opt  | assignable | assignable | assignable | assignable | [dest is obj] |
+    ///
+    /// We can cut that table down substantially by noticing two things:
+    ///
+    /// - We don't need to consider the cases where the source field (in `C`) is `ReadOnly`/"imm",
+    ///   because the mutable version of the same field is always "strictly more assignable". In
+    ///   other words, nothing in the `TypedDict` assignability rules ever requires a source field
+    ///   to be immutable.
+    /// - We don't need to consider the special case where the source field is missing, because
+    ///   that's only allowed when the destination is `ReadOnly[NotRequired[object]]`, which is
+    ///   compatible with *any* choice of source field.
+    ///
+    /// The cases we actually need to reason about are this smaller table:
+    ///
+    ///    source→ | mut + req  | mut + opt  |
+    /// ↓dest      |            |            |
+    /// -----------|------------|------------|
+    /// mut + req  | equivalent |     -      |
+    /// mut + opt  |     -      | equivalent |
+    /// imm + req  | assignable |     -      |
+    /// imm + opt  | assignable | assignable |
+    ///
+    /// So, given a field name that's in both `A` and `B`, here are the conditions where it's
+    /// *impossible* to choose a source field for `C` that's compatible with both destinations,
+    /// which tells us that `A` and `B` are disjoint:
+    ///
+    ///      1. If one side is "mut+opt" (which forces the field in `C` to be "opt") and the other
+    ///         side is "req" (which forces the field in `C` to be "req").
+    ///     2a. If both sides are mutable, and their types are not equivalent/compatible. (Because
+    ///         the type in `C` must be compatible with both of them.)
+    ///     2b. If one sides is mutable, and its type is not assignable to the immutable side's type.
+    ///         (Because the type in `C` must be compatible with the mutable side.)
+    ///     2c. If both sides are immutable, and their types are disjoint. (Because the type in `C`
+    ///         must be assignable to both.)
+    ///
+    /// TODO: Adding support for `closed` and `extra_items` will complicate this.
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: TypedDictType<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        let fields_in_common = btreemap_overlapping_items(self.items(db), other.items(db));
+        fields_in_common.when_any(db, |(_name, (self_field, other_field))| {
+            // Condition 1 above.
+            if self_field.is_required() || other_field.is_required() {
+                if (!self_field.is_required() && !self_field.is_read_only())
+                    || (!other_field.is_required() && !other_field.is_read_only())
+                {
+                    // One side demands a `Required` source field, while the other side demands a
+                    // `NotRequired` one. They must be disjoint.
+                    return ConstraintSet::from(true);
+                }
+            }
+            if !self_field.is_read_only() && !other_field.is_read_only() {
+                // Condition 2a above. This field is mutable on both sides, so the so the types
+                // must be compatible, i.e. mutually assignable.
+                self_field
+                    .declared_ty
+                    .has_relation_to_impl(
+                        db,
+                        other_field.declared_ty,
+                        inferable,
+                        TypeRelation::Assignability,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                    .and(db, || {
+                        other_field.declared_ty.has_relation_to_impl(
+                            db,
+                            self_field.declared_ty,
+                            inferable,
+                            TypeRelation::Assignability,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                    .negate(db)
+            } else if !self_field.is_read_only() {
+                // Half of condition 2b above.
+                self_field
+                    .declared_ty
+                    .has_relation_to_impl(
+                        db,
+                        other_field.declared_ty,
+                        inferable,
+                        TypeRelation::Assignability,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                    .negate(db)
+            } else if !other_field.is_read_only() {
+                // The other half of condition 2b above.
+                other_field
+                    .declared_ty
+                    .has_relation_to_impl(
+                        db,
+                        self_field.declared_ty,
+                        inferable,
+                        TypeRelation::Assignability,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                    .negate(db)
+            } else {
+                // Condition 2c above.
+                self_field.declared_ty.is_disjoint_from_impl(
+                    db,
+                    other_field.declared_ty,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                )
+            }
+        })
     }
 }
 
@@ -905,3 +1050,63 @@ bitflags! {
 }
 
 impl get_size2::GetSize for TypedDictFieldFlags {}
+
+/// Yield all the key/val pairs where the same key is present in both `BTreeMap`s. Take advantage
+/// of the fact that keys are sorted to walk through each map once without doing any lookups. It
+/// would be nice if `BTreeMap` had something like `BTreeSet::intersection` that did this for us,
+/// but as far as I know we have to do it ourselves. Life is hard.
+fn btreemap_overlapping_items<'a, K, V1, V2>(
+    left: &'a BTreeMap<K, V1>,
+    right: &'a BTreeMap<K, V2>,
+) -> impl Iterator<Item = (&'a K, (&'a V1, &'a V2))>
+where
+    K: Ord,
+{
+    let mut left_items = left.iter().peekable();
+    let mut right_items = right.iter().peekable();
+    std::iter::from_fn(move || {
+        while let (Some((left_key, left_val)), Some((right_key, right_val))) =
+            (left_items.peek().copied(), right_items.peek().copied())
+        {
+            match left_key.cmp(right_key) {
+                Ordering::Equal => {
+                    // Matching keys. Yield this pair of values and advance both iterators.
+                    left_items.next();
+                    right_items.next();
+                    return Some((left_key, (left_val, right_val)));
+                }
+                Ordering::Less => {
+                    // `left_items` is behind `right_items` in key order. Advance `left_items`.
+                    left_items.next();
+                }
+                Ordering::Greater => {
+                    // The opposite.
+                    right_items.next();
+                }
+            }
+        }
+        // We've exhausted one or both of the maps, so there can be no more matching keys.
+        None
+    })
+}
+
+#[test]
+fn test_btreemap_overlapping_items() {
+    // A case with partial overlap and gaps.
+    let left = BTreeMap::from_iter([("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5)]);
+    let right = BTreeMap::from_iter([("b", 2.0), ("d", 4.0), ("f", 6.0)]);
+    assert_eq!(
+        btreemap_overlapping_items(&left, &right).collect::<Vec<_>>(),
+        vec![(&"b", (&2, &2.0)), (&"d", (&4, &4.0))],
+    );
+    assert_eq!(
+        btreemap_overlapping_items(&right, &left).collect::<Vec<_>>(),
+        vec![(&"b", (&2.0, &2)), (&"d", (&4.0, &4))],
+    );
+
+    // A case where one side is empty.
+    let left = BTreeMap::<i32, i32>::new();
+    let right = BTreeMap::<i32, i32>::from_iter([(1, 1), (2, 2)]);
+    assert!(btreemap_overlapping_items(&left, &right).next().is_none());
+    assert!(btreemap_overlapping_items(&right, &left).next().is_none());
+}
