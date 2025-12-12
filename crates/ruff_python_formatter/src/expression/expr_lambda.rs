@@ -123,27 +123,19 @@ impl FormatNodeRule<ExprLambda> for FormatExprLambda {
                 )?;
             }
 
-            write!(f, [token(":")])?;
-
-            if dangling_after_parameters.is_empty() {
-                write!(f, [space()])?;
-            } else if !preview {
-                write!(f, [dangling_comments(dangling_after_parameters)])?;
-            }
-
             dangling_after_parameters
         } else {
-            write!(f, [token(":")])?;
-
-            // In this context, a dangling comment is a comment between the `lambda` and the body.
-            if dangling.is_empty() {
-                write!(f, [space()])?;
-            } else if !preview {
-                write!(f, [dangling_comments(dangling)])?;
-            }
-
             dangling
         };
+
+        write!(f, [token(":")])?;
+
+        // In this context, a dangling comment is a comment between the `lambda` and the body.
+        if dangling.is_empty() {
+            write!(f, [space()])?;
+        } else if !preview {
+            write!(f, [dangling_comments(dangling)])?;
+        }
 
         FormatBody {
             body,
