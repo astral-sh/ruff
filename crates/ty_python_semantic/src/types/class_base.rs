@@ -152,11 +152,9 @@ impl<'db> ClassBase<'db> {
 
             Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
 
-            Type::NewTypeInstance(newtype) => ClassBase::try_from_type(
-                db,
-                Type::instance(db, newtype.base_class_type(db)),
-                subclass,
-            ),
+            Type::NewTypeInstance(newtype) => {
+                ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)
+            }
 
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)

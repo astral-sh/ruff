@@ -3,7 +3,9 @@ use std::collections::BTreeSet;
 use crate::Db;
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::types::constraints::ConstraintSet;
-use crate::types::{ClassType, Type, definition_expression_type, visitor};
+use crate::types::{
+    ClassType, KnownClass, KnownUnion, Type, UnionType, definition_expression_type, visitor,
+};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 
@@ -80,8 +82,15 @@ impl<'db> NewType<'db> {
                 NewTypeBase::ClassType(nominal_instance_type.class(db))
             }
             Type::NewTypeInstance(newtype) => NewTypeBase::NewType(newtype),
-            // This branch includes bases that are other typing constructs besides classes and
-            // other newtypes, for example unions. `NewType("Foo", int | str)` is not allowed.
+            // There are exactly two union types allowed as bases for NewType: `int | float` and
+            // `int | float | complex`. These are allowed because that's what `float` and `complex`
+            // expand into in type position. We don't currently ask whether the union was implicit
+            // or explicit, so the explicit version is also allowed.
+            Type::Union(union_type) => match union_type.known(db) {
+                Some(KnownUnion::Float) => NewTypeBase::Float,
+                Some(KnownUnion::Complex) => NewTypeBase::Complex,
+                _ => object_fallback,
+            },
             _ => object_fallback,
         }
     }
@@ -94,15 +103,16 @@ impl<'db> NewType<'db> {
         }
     }
 
-    // Walk the `NewTypeBase` chain to find the underlying `ClassType`. There might not be a
-    // `ClassType` if this `NewType` is cyclical, and we fall back to `object` in that case.
-    pub fn base_class_type(self, db: &'db dyn Db) -> ClassType<'db> {
+    // Walk the `NewTypeBase` chain to find the underlying non-newtype `Type`. There might not be
+    // one if this `NewType` is cyclical, and we fall back to `object` in that case.
+    pub fn concrete_base_type(self, db: &'db dyn Db) -> Type<'db> {
         for base in self.iter_bases(db) {
-            if let NewTypeBase::ClassType(class_type) = base {
-                return class_type;
+            match base {
+                NewTypeBase::NewType(_) => continue,
+                concrete => return concrete.instance_type(db),
             }
         }
-        ClassType::object(db)
+        Type::object()
     }
 
     pub(crate) fn is_equivalent_to_impl(self, db: &'db dyn Db, other: Self) -> bool {
@@ -179,10 +189,14 @@ impl<'db> NewType<'db> {
                         Some(mapped_base),
                     ));
                 }
+                // Mapping base class types is used for normalization and applying type mappings,
+                // neither of which have any effect on `float` or `complex` (which are already
+                // fully normalized and non-generic), so we don't need to bother calling `f`.
+                NewTypeBase::Float | NewTypeBase::Complex => {}
             }
         }
-        // If we get here, there is no `ClassType` (because this newtype is cyclic), and we don't
-        // call `f` at all.
+        // If we get here, there is no `ClassType` (because this newtype is either float/complex or
+        // cyclic), and we don't call `f` at all.
         Some(self)
     }
 
@@ -209,6 +223,12 @@ pub(crate) fn walk_newtype_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Si
 pub enum NewTypeBase<'db> {
     ClassType(ClassType<'db>),
     NewType(NewType<'db>),
+    // `float` and `complex` are special-cased in type position, where they refer to `int | float`
+    // and `int | float | complex` respectively. As an extension of that special case, we allow
+    // them in `NewType` bases, even though unions and other typing constructs normally aren't
+    // allowed.
+    Float,
+    Complex,
 }
 
 impl<'db> NewTypeBase<'db> {
@@ -216,6 +236,21 @@ impl<'db> NewTypeBase<'db> {
         match self {
             NewTypeBase::ClassType(class_type) => Type::instance(db, class_type),
             NewTypeBase::NewType(newtype) => Type::NewTypeInstance(newtype),
+            NewTypeBase::Float => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                ],
+            ),
+            NewTypeBase::Complex => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                    KnownClass::Complex.to_instance(db),
+                ],
+            ),
         }
     }
 }
@@ -246,10 +281,6 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         let current = self.current?;
         match current.base(self.db) {
-            NewTypeBase::ClassType(base_class_type) => {
-                self.current = None;
-                Some(NewTypeBase::ClassType(base_class_type))
-            }
             NewTypeBase::NewType(base_newtype) => {
                 // Doing the insertion only in this branch avoids allocating in the common case.
                 self.seen_before.insert(current);
@@ -261,6 +292,10 @@ impl<'db> Iterator for NewTypeBaseIter<'db> {
                     self.current = Some(base_newtype);
                     Some(NewTypeBase::NewType(base_newtype))
                 }
+            }
+            concrete_base => {
+                self.current = None;
+                Some(concrete_base)
             }
         }
     }
