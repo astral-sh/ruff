@@ -384,6 +384,9 @@ foo()
 
 It is strongly suggested to use explicit range suppressions, in order to prevent
 accidental suppressions of violations, especially at global module scope.
+For this reason, a `RUF104` diagnostic will also be produced for any implicit range.
+If implicit range suppressions are desired, the `RUF104` rule can be disabled,
+or an inline `noqa` suppression can be added to the end of the "disable" comment.
 
 Range suppressions cannot be used to enable or select rules that aren't already
 selected by the project configuration or runtime flags. An "enable" comment can only
