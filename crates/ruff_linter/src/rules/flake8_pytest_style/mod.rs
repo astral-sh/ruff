@@ -4,6 +4,8 @@ pub(crate) mod rules;
 pub mod settings;
 pub mod types;
 
+pub(crate) use helpers::is_pytest_hookimpl_wrapper;
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
