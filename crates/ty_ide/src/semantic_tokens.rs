@@ -312,7 +312,8 @@ impl<'db> SemanticTokenVisitor<'db> {
                         TypeVarKind::Legacy
                         | TypeVarKind::ParamSpec
                         | TypeVarKind::Pep695ParamSpec
-                        | TypeVarKind::Pep695 => {}
+                        | TypeVarKind::Pep695
+                        | TypeVarKind::Pep613 => {}
                     }
                 }
 

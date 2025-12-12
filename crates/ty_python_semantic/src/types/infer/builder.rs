@@ -5865,6 +5865,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if is_pep_613_type_alias {
+                let inferred_ty =
+                    if let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = inferred_ty {
+                        let identity = TypeVarIdentity::new(
+                            self.db(),
+                            typevar.identity(self.db()).name(self.db()),
+                            typevar.identity(self.db()).definition(self.db()),
+                            TypeVarKind::Pep613,
+                        );
+                        Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
+                            self.db(),
+                            identity,
+                            typevar._bound_or_constraints(self.db()),
+                            typevar.explicit_variance(self.db()),
+                            typevar._default(self.db()),
+                        )))
+                    } else {
+                        inferred_ty
+                    };
                 self.add_declaration_with_binding(
                     target.into(),
                     definition,

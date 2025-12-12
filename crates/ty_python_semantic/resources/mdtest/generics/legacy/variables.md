@@ -124,15 +124,12 @@ def _(
     b: T[T],
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
     c: BareAnnotated[int],
-    # TODO: no error
-    # error: [invalid-type-form]
     d: Annotated[int],
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
     reveal_type(c)  # revealed: Unknown
-    # TODO: should be `int`
-    reveal_type(d)  # revealed: Unknown
+    reveal_type(d)  # revealed: int
 ```
 
 ### Type variables with a default
