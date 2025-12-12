@@ -117,12 +117,6 @@ impl ClientOptions {
     }
 
     #[must_use]
-    pub fn with_experimental_rename(mut self, enabled: bool) -> Self {
-        self.global.experimental.get_or_insert_default().rename = Some(enabled);
-        self
-    }
-
-    #[must_use]
     pub fn with_auto_import(mut self, enabled: bool) -> Self {
         self.workspace
             .completions
@@ -156,9 +150,7 @@ impl GlobalOptions {
     pub(crate) fn into_settings(self) -> GlobalSettings {
         let experimental = self
             .experimental
-            .map(|experimental| ExperimentalSettings {
-                rename: experimental.rename.unwrap_or(false),
-            })
+            .map(Experimental::into_settings)
             .unwrap_or_default();
 
         GlobalSettings {
@@ -326,9 +318,13 @@ impl Combine for DiagnosticMode {
 
 #[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Experimental {
-    /// Whether to enable the experimental symbol rename feature.
-    pub(crate) rename: Option<bool>,
+pub(crate) struct Experimental;
+
+impl Experimental {
+    #[expect(clippy::unused_self)]
+    fn into_settings(self) -> ExperimentalSettings {
+        ExperimentalSettings {}
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]
