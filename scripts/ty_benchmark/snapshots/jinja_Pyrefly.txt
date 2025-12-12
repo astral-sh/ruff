@@ -44,7 +44,6 @@ ERROR src/jinja2/filters.py:169:48-61: `dict_items[tuple[str, Any], Unknown]` is
 ERROR src/jinja2/filters.py:308:22-56: Argument `str` is not assignable to parameter `object` with type `LiteralString` in function `list.append` [bad-argument-type]
 ERROR src/jinja2/filters.py:730:34-38: `unit` may be uninitialized [unbound-name]
 ERROR src/jinja2/filters.py:1352:9-25: `+=` is not supported between `V` and `V` [unsupported-operation]
-ERROR src/jinja2/filters.py:1354:12-14: Returned type `V | Unknown` is not assignable to declared return type `V` [bad-return]
 ERROR src/jinja2/idtracking.py:90:9-16: Object of class `object` has no attribute `refs` [missing-attribute]
 ERROR src/jinja2/idtracking.py:91:9-17: Object of class `object` has no attribute `loads` [missing-attribute]
 ERROR src/jinja2/idtracking.py:92:9-18: Object of class `object` has no attribute `stores` [missing-attribute]
@@ -53,7 +52,6 @@ ERROR src/jinja2/lexer.py:816:31-51: Type of yielded value `tuple[Literal[1], st
 ERROR src/jinja2/loaders.py:143:32-38: `bucket` may be uninitialized [unbound-name]
 ERROR src/jinja2/loaders.py:144:13-19: `bucket` may be uninitialized [unbound-name]
 ERROR src/jinja2/loaders.py:145:28-34: `bucket` may be uninitialized [unbound-name]
-ERROR src/jinja2/loaders.py:331:29-43: `str` is not assignable to attribute `_archive` with type `None` [bad-assignment]
 ERROR src/jinja2/meta.py:79:30-40: Argument `tuple[type[Extends], type[FromImport], type[Import], type[Include]]` is not assignable to parameter `node_type` with type `tuple[type[Extends], ...] | type[Extends]` in function `jinja2.nodes.Node.find_all` [bad-argument-type]
 ERROR src/jinja2/parser.py:160:29-31: Argument `object` is not assignable to parameter `self` with type `Node` in function `jinja2.nodes.Node.__init__` [bad-argument-type]
 ERROR src/jinja2/parser.py:161:16-18: Returned type `object` is not assignable to declared return type `InternalName` [bad-return]
@@ -68,4 +66,4 @@ ERROR src/jinja2/sandbox.py:244:33-43: Cannot set item in `dict[str, ((n: int = 
 ERROR src/jinja2/utils.py:271:16-39: `>` is not supported between `int` and `None` [unsupported-operation]
 ERROR src/jinja2/utils.py:431:2-29: Class `MutableMapping` has no class attribute `register` [missing-attribute]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 69 errors (77 suppressed)
+ INFO 67 errors (78 suppressed)
