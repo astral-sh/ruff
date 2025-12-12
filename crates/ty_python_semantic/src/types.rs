@@ -7281,29 +7281,12 @@ impl<'db> Type<'db> {
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
-                    Some(KnownClass::Complex) => UnionType::from_elements(
-                        db,
-                        [
-                            KnownClass::Int.to_instance(db),
-                            KnownClass::Float.to_instance(db),
-                            KnownClass::Complex.to_instance(db),
-                        ],
-                    ),
-                    Some(KnownClass::Float) => UnionType::from_elements(
-                        db,
-                        [
-                            KnownClass::Int.to_instance(db),
-                            KnownClass::Float.to_instance(db),
-                        ],
-                    ),
-                    _ if class.is_typed_dict(db) => {
-                        Type::typed_dict(class.default_specialization(db))
-                    }
+                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
+                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::typed_dict(*alias)),
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -14006,6 +13989,28 @@ impl<'db> UnionType<'db> {
 pub(crate) enum KnownUnion {
     Float,   // `int | float`
     Complex, // `int | float | complex`
+}
+
+impl KnownUnion {
+    pub(crate) fn to_type(self, db: &dyn Db) -> Type<'_> {
+        match self {
+            KnownUnion::Float => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                ],
+            ),
+            KnownUnion::Complex => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                    KnownClass::Complex.to_instance(db),
+                ],
+            ),
+        }
+    }
 }
 
 #[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
