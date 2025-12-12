@@ -273,5 +273,60 @@ G004 Logging statement uses f-string
 65 | x = 1
 66 | logging.error(f"{x} -> %s", x)
    |               ^^^^^^^^^^^^
+67 |
+68 | # Test cases for control characters in f-strings
    |
 help: Convert to lazy `%` formatting
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:70:27
+   |
+68 | # Test cases for control characters in f-strings
+69 | bar = "bar"
+70 | logging.getLogger().error(f"Lorem ipsum \n {bar}")
+   |                           ^^^^^^^^^^^^^^^^^^^^^^^
+71 |
+72 | value = "test"
+   |
+help: Convert to lazy `%` formatting
+67 | 
+68 | # Test cases for control characters in f-strings
+69 | bar = "bar"
+   - logging.getLogger().error(f"Lorem ipsum \n {bar}")
+70 + logging.getLogger().error("Lorem ipsum \n %s", bar)
+71 | 
+72 | value = "test"
+73 | logging.info(f"Tab\t{value}")
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:73:14
+   |
+72 | value = "test"
+73 | logging.info(f"Tab\t{value}")
+   |              ^^^^^^^^^^^^^^^
+74 |
+75 | logging.info(f"CR\r{value}")
+   |
+help: Convert to lazy `%` formatting
+70 | logging.getLogger().error(f"Lorem ipsum \n {bar}")
+71 | 
+72 | value = "test"
+   - logging.info(f"Tab\t{value}")
+73 + logging.info("Tab\t%s", value)
+74 | 
+75 | logging.info(f"CR\r{value}")
+
+G004 [*] Logging statement uses f-string
+  --> G004.py:75:14
+   |
+73 | logging.info(f"Tab\t{value}")
+74 |
+75 | logging.info(f"CR\r{value}")
+   |              ^^^^^^^^^^^^^^
+   |
+help: Convert to lazy `%` formatting
+72 | value = "test"
+73 | logging.info(f"Tab\t{value}")
+74 | 
+   - logging.info(f"CR\r{value}")
+75 + logging.info("CR\r%s", value)
