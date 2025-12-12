@@ -2,7 +2,7 @@
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text("test")`
-  --> FURB103.py:12:6
+  --> FURB103_0.py:12:6
    |
 11 | # FURB103
 12 | with open("file.txt", "w") as f:
@@ -26,7 +26,7 @@ help: Replace with `Path("file.txt").write_text("test")`
 16 | with open("file.txt", "wb") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(foobar)`
-  --> FURB103.py:16:6
+  --> FURB103_0.py:16:6
    |
 15 | # FURB103
 16 | with open("file.txt", "wb") as f:
@@ -50,7 +50,7 @@ help: Replace with `Path("file.txt").write_bytes(foobar)`
 20 | with open("file.txt", mode="wb") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_bytes(b"abc")`
-  --> FURB103.py:20:6
+  --> FURB103_0.py:20:6
    |
 19 | # FURB103
 20 | with open("file.txt", mode="wb") as f:
@@ -74,7 +74,7 @@ help: Replace with `Path("file.txt").write_bytes(b"abc")`
 24 | with open("file.txt", "w", encoding="utf8") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, encoding="utf8")`
-  --> FURB103.py:24:6
+  --> FURB103_0.py:24:6
    |
 23 | # FURB103
 24 | with open("file.txt", "w", encoding="utf8") as f:
@@ -98,7 +98,7 @@ help: Replace with `Path("file.txt").write_text(foobar, encoding="utf8")`
 28 | with open("file.txt", "w", errors="ignore") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar, errors="ignore")`
-  --> FURB103.py:28:6
+  --> FURB103_0.py:28:6
    |
 27 | # FURB103
 28 | with open("file.txt", "w", errors="ignore") as f:
@@ -122,7 +122,7 @@ help: Replace with `Path("file.txt").write_text(foobar, errors="ignore")`
 32 | with open("file.txt", mode="w") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("file.txt").write_text(foobar)`
-  --> FURB103.py:32:6
+  --> FURB103_0.py:32:6
    |
 31 | # FURB103
 32 | with open("file.txt", mode="w") as f:
@@ -146,7 +146,7 @@ help: Replace with `Path("file.txt").write_text(foobar)`
 36 | with open(foo(), "wb") as f:
 
 FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())`
-  --> FURB103.py:36:6
+  --> FURB103_0.py:36:6
    |
 35 | # FURB103
 36 | with open(foo(), "wb") as f:
@@ -157,7 +157,7 @@ FURB103 `open` and `write` should be replaced by `Path(foo()).write_bytes(bar())
 help: Replace with `Path(foo()).write_bytes(bar())`
 
 FURB103 `open` and `write` should be replaced by `Path("a.txt").write_text(x)`
-  --> FURB103.py:44:6
+  --> FURB103_0.py:44:6
    |
 43 | # FURB103
 44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
@@ -168,7 +168,7 @@ FURB103 `open` and `write` should be replaced by `Path("a.txt").write_text(x)`
 help: Replace with `Path("a.txt").write_text(x)`
 
 FURB103 `open` and `write` should be replaced by `Path("b.txt").write_bytes(y)`
-  --> FURB103.py:44:31
+  --> FURB103_0.py:44:31
    |
 43 | # FURB103
 44 | with open("a.txt", "w") as a, open("b.txt", "wb") as b:
@@ -179,7 +179,7 @@ FURB103 `open` and `write` should be replaced by `Path("b.txt").write_bytes(y)`
 help: Replace with `Path("b.txt").write_bytes(y)`
 
 FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(bar(bar(a + x)))`
-  --> FURB103.py:49:18
+  --> FURB103_0.py:49:18
    |
 48 | # FURB103
 49 | with foo() as a, open("file.txt", "w") as b, foo() as c:
@@ -190,7 +190,7 @@ FURB103 `open` and `write` should be replaced by `Path("file.txt").write_text(ba
 help: Replace with `Path("file.txt").write_text(bar(bar(a + x)))`
 
 FURB103 [*] `open` and `write` should be replaced by `Path("test.json")....`
-   --> FURB103.py:154:6
+   --> FURB103_0.py:154:6
     |
 152 | data = {"price": 100}
 153 |
@@ -214,7 +214,7 @@ help: Replace with `Path("test.json")....`
 158 | with open("tmp_path/pyproject.toml", "w") as f:
 
 FURB103 [*] `open` and `write` should be replaced by `Path("tmp_path/pyproject.toml")....`
-   --> FURB103.py:158:6
+   --> FURB103_0.py:158:6
     |
 157 | # See: https://github.com/astral-sh/ruff/issues/21381
 158 | with open("tmp_path/pyproject.toml", "w") as f:

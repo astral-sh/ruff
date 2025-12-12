@@ -10,7 +10,7 @@ use ruff_text_size::{Ranged, TextRange};
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -114,12 +114,11 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                 .position(|open| open.is_ref(read_from))
             {
                 let open = self.candidates.remove(open);
+                let filename_display = open.argument.display(self.checker.source());
                 let suggestion = make_suggestion(&open, self.checker.generator());
                 let mut diagnostic = self.checker.report_diagnostic(
                     ReadWholeFile {
-                        filename: SourceCodeSnippet::from_str(
-                            &self.checker.generator().expr(open.filename),
-                        ),
+                        filename: SourceCodeSnippet::from_str(filename_display),
                         suggestion: SourceCodeSnippet::from_str(&suggestion),
                     },
                     open.item.range(),
@@ -185,10 +184,11 @@ fn generate_fix(
     if with_stmt.items.len() != 1 {
         return None;
     }
-
+    let OpenArgument::Builtin { filename } = open.argument else {
+        return None;
+    };
     let locator = checker.locator();
-
-    let filename_code = locator.slice(open.filename.range());
+    let filename_code = locator.slice(filename.range());
 
     let (import_edit, binding) = checker
         .importer()
