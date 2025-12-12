@@ -33,11 +33,11 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true, features = ["indexmap"]}
+get-size2 = { workspace = true, features = ["indexmap", "ordermap"]}
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
-salsa = { workspace = true, features = ["compact_str"] }
+salsa = { workspace = true, features = ["compact_str", "ordermap"] }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 rustc-hash = { workspace = true }

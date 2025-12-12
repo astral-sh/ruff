@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 use std::sync::Arc;
 
-use crate::document::DocumentKey;
+use crate::document::{DocumentKey, LanguageId};
 use crate::session::DocumentHandle;
 use crate::{
     PositionEncoding, TextDocument,
@@ -187,12 +187,12 @@ impl Index {
         handle
     }
 
-    pub(super) fn close_document(&mut self, key: &DocumentKey) -> Result<(), DocumentError> {
-        let Some(_) = self.documents.remove(key) else {
+    pub(super) fn close_document(&mut self, key: &DocumentKey) -> Result<Document, DocumentError> {
+        let Some(document) = self.documents.remove(key) else {
             return Err(DocumentError::NotFound(key.clone()));
         };
 
-        Ok(())
+        Ok(document)
     }
 
     pub(super) fn document_mut(
@@ -226,6 +226,13 @@ impl Document {
         match self {
             Self::Text(document) => document.version(),
             Self::Notebook(notebook) => notebook.version(),
+        }
+    }
+
+    pub(crate) fn language_id(&self) -> Option<LanguageId> {
+        match self {
+            Self::Text(document) => document.language_id(),
+            Self::Notebook(_) => None,
         }
     }
 

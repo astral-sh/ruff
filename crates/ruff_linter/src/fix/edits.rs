@@ -3,14 +3,13 @@
 use anyhow::{Context, Result};
 
 use ruff_python_ast::AnyNodeRef;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{self, Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Arguments, ExceptHandler, Expr, ExprList, Parameters, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_index::Indexer;
 use ruff_python_trivia::textwrap::dedent_to;
 use ruff_python_trivia::{
-    CommentRanges, PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content,
-    is_python_whitespace,
+    PythonWhitespace, SimpleTokenKind, SimpleTokenizer, has_leading_content, is_python_whitespace,
 };
 use ruff_source_file::{LineRanges, NewlineWithTrailingNewline, UniversalNewlines};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
@@ -209,7 +208,7 @@ pub(crate) fn remove_argument<T: Ranged>(
     arguments: &Arguments,
     parentheses: Parentheses,
     source: &str,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
 ) -> Result<Edit> {
     // Partition into arguments before and after the argument to remove.
     let (before, after): (Vec<_>, Vec<_>) = arguments
@@ -224,7 +223,7 @@ pub(crate) fn remove_argument<T: Ranged>(
         .context("Unable to find argument")?;
 
     let parenthesized_range =
-        parenthesized_range(arg.value().into(), arguments.into(), comment_ranges, source)
+        token::parenthesized_range(arg.value().into(), arguments.into(), tokens)
             .unwrap_or(arg.range());
 
     if !after.is_empty() {
@@ -270,25 +269,14 @@ pub(crate) fn remove_argument<T: Ranged>(
 ///
 /// The new argument will be inserted before the first existing keyword argument in `arguments`, if
 /// there are any present. Otherwise, the new argument is added to the end of the argument list.
-pub(crate) fn add_argument(
-    argument: &str,
-    arguments: &Arguments,
-    comment_ranges: &CommentRanges,
-    source: &str,
-) -> Edit {
+pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Tokens) -> Edit {
     if let Some(ast::Keyword { range, value, .. }) = arguments.keywords.first() {
-        let keyword = parenthesized_range(value.into(), arguments.into(), comment_ranges, source)
-            .unwrap_or(*range);
+        let keyword = parenthesized_range(value.into(), arguments.into(), tokens).unwrap_or(*range);
         Edit::insertion(format!("{argument}, "), keyword.start())
     } else if let Some(last) = arguments.arguments_source_order().last() {
         // Case 1: existing arguments, so append after the last argument.
-        let last = parenthesized_range(
-            last.value().into(),
-            arguments.into(),
-            comment_ranges,
-            source,
-        )
-        .unwrap_or(last.range());
+        let last = parenthesized_range(last.value().into(), arguments.into(), tokens)
+            .unwrap_or(last.range());
         Edit::insertion(format!(", {argument}"), last.end())
     } else {
         // Case 2: no arguments. Add argument, without any trailing comma.

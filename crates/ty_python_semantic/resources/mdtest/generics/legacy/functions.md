@@ -277,7 +277,7 @@ T = TypeVar("T", int, str)
 
 def same_constrained_types(t1: T, t2: T) -> T:
     # TODO: no error
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `T@same_constrained_types` and `T@same_constrained_types`"
     return t1 + t2
 ```
 
@@ -287,7 +287,7 @@ and an `int` and a `str` cannot be added together:
 
 ```py
 def unions_are_different(t1: int | str, t2: int | str) -> int | str:
-    # error: [unsupported-operator] "Operator `+` is unsupported between objects of type `int | str` and `int | str`"
+    # error: [unsupported-operator] "Operator `+` is not supported between objects of type `int | str` and `int | str`"
     return t1 + t2
 ```
 
@@ -337,6 +337,44 @@ reveal_type(union_and_nonunion_params(3, 1))  # revealed: Literal[1]
 reveal_type(union_and_nonunion_params("a", 1))  # revealed: Literal["a", 1]
 ```
 
+This also works if the typevar has a bound:
+
+```py
+T_str = TypeVar("T_str", bound=str)
+
+def accepts_t_or_int(x: T_str | int) -> T_str:
+    raise NotImplementedError
+
+reveal_type(accepts_t_or_int("a"))  # revealed: Literal["a"]
+reveal_type(accepts_t_or_int(1))  # revealed: Unknown
+
+class Unrelated: ...
+
+# error: [invalid-argument-type] "Argument type `Unrelated` does not satisfy upper bound `str` of type variable `T_str`"
+reveal_type(accepts_t_or_int(Unrelated()))  # revealed: Unknown
+```
+
+```py
+T_str = TypeVar("T_str", bound=str)
+
+def accepts_t_or_list_of_t(x: T_str | list[T_str]) -> T_str:
+    raise NotImplementedError
+
+reveal_type(accepts_t_or_list_of_t("a"))  # revealed: Literal["a"]
+# error: [invalid-argument-type] "Argument type `Literal[1]` does not satisfy upper bound `str` of type variable `T_str`"
+reveal_type(accepts_t_or_list_of_t(1))  # revealed: Unknown
+
+def _(list_ofstr: list[str], list_of_int: list[int]):
+    reveal_type(accepts_t_or_list_of_t(list_ofstr))  # revealed: str
+
+    # TODO: the error message here could be improved by referring to the second union element
+    # error: [invalid-argument-type] "Argument type `list[int]` does not satisfy upper bound `str` of type variable `T_str`"
+    reveal_type(accepts_t_or_list_of_t(list_of_int))  # revealed: Unknown
+```
+
+Here, we make sure that `S` is solved as `Literal[1]` instead of a union of the two literals, which
+would also be a valid solution:
+
 ```py
 S = TypeVar("S")
 
@@ -345,6 +383,138 @@ def tuple_param(x: T | S, y: tuple[T, S]) -> tuple[T, S]:
 
 reveal_type(tuple_param("a", ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
 reveal_type(tuple_param(1, ("a", 1)))  # revealed: tuple[Literal["a"], Literal[1]]
+```
+
+When a union parameter contains generic classes like `P[T] | Q[T]`, we can infer the typevar from
+the actual argument even for non-final classes.
+
+```py
+from typing import TypeVar, Generic
+
+T = TypeVar("T")
+
+class P(Generic[T]):
+    x: T
+
+class Q(Generic[T]):
+    x: T
+
+def extract_t(x: P[T] | Q[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_t(P[int]()))  # revealed: int
+reveal_type(extract_t(Q[str]()))  # revealed: str
+```
+
+Passing anything else results in an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(extract_t([1, 2]))  # revealed: Unknown
+```
+
+This also works when different union elements have different typevars:
+
+```py
+S = TypeVar("S")
+
+def extract_both(x: P[T] | Q[S]) -> tuple[T, S]:
+    raise NotImplementedError
+
+reveal_type(extract_both(P[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(extract_both(Q[str]()))  # revealed: tuple[Unknown, str]
+```
+
+Inference also works when passing subclasses of the generic classes in the union.
+
+```py
+class SubP(P[T]):
+    pass
+
+class SubQ(Q[T]):
+    pass
+
+reveal_type(extract_t(SubP[int]()))  # revealed: int
+reveal_type(extract_t(SubQ[str]()))  # revealed: str
+
+reveal_type(extract_both(SubP[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(extract_both(SubQ[str]()))  # revealed: tuple[Unknown, str]
+```
+
+When a type is a subclass of both `P` and `Q` with different specializations, we cannot infer a
+single type for `T` in `extract_t`, because `P` and `Q` are invariant. However, we can still infer
+both types in a call to `extract_both`:
+
+```py
+class PandQ(P[int], Q[str]):
+    pass
+
+# TODO: Ideally, we would return `Unknown` here.
+# error: [invalid-argument-type]
+reveal_type(extract_t(PandQ()))  # revealed: int | str
+
+reveal_type(extract_both(PandQ()))  # revealed: tuple[int, str]
+```
+
+When non-generic types are part of the union, we can still infer typevars for the remaining generic
+types:
+
+```py
+def extract_optional_t(x: None | P[T]) -> T:
+    raise NotImplementedError
+
+reveal_type(extract_optional_t(None))  # revealed: Unknown
+reveal_type(extract_optional_t(P[int]()))  # revealed: int
+```
+
+Passing anything else results in an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
+```
+
+If the union contains contains parent and child of a generic class, we ideally pick the union
+element that is more precise:
+
+```py
+class Base(Generic[T]):
+    x: T
+
+class Sub(Base[T]): ...
+
+def f(t: Base[T] | Sub[T | None]) -> T:
+    raise NotImplementedError
+
+reveal_type(f(Base[int]()))  # revealed: int
+# TODO: Should ideally be `str`
+reveal_type(f(Sub[str | None]()))  # revealed: str | None
+```
+
+If we have a case like the following, where only one of the union elements matches due to the
+typevar bound, we do not emit a specialization error:
+
+```py
+from typing import TypeVar
+
+I_int = TypeVar("I_int", bound=int)
+S_str = TypeVar("S_str", bound=str)
+
+class P(Generic[T]):
+    value: T
+
+def f(t: P[I_int] | P[S_str]) -> tuple[I_int, S_str]:
+    raise NotImplementedError
+
+reveal_type(f(P[int]()))  # revealed: tuple[int, Unknown]
+reveal_type(f(P[str]()))  # revealed: tuple[Unknown, str]
+```
+
+However, if we pass something that does not match _any_ union element, we do emit an error:
+
+```py
+# error: [invalid-argument-type]
+reveal_type(f(P[bytes]()))  # revealed: tuple[Unknown, Unknown]
 ```
 
 ## Inferring nested generic function calls

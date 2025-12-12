@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr, Operator};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_source_file::LineRanges;
@@ -88,13 +88,7 @@ pub(crate) fn explicit(checker: &Checker, expr: &Expr) {
                     checker.report_diagnostic(ExplicitStringConcatenation, expr.range());
 
                 let is_parenthesized = |expr: &Expr| {
-                    parenthesized_range(
-                        expr.into(),
-                        bin_op.into(),
-                        checker.comment_ranges(),
-                        checker.source(),
-                    )
-                    .is_some()
+                    parenthesized_range(expr.into(), bin_op.into(), checker.tokens()).is_some()
                 };
                 // If either `left` or `right` is parenthesized, generating
                 // a fix would be too involved. Just report the diagnostic.

@@ -20,6 +20,7 @@ use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::ide_support::{
     CallSignatureDetails, call_signature_details, find_active_signature_from_details,
 };
+use ty_python_semantic::types::{ParameterKind, Type};
 
 // TODO: We may want to add special-case handling for calls to constructors
 // so the class docstring is used in place of (or inaddition to) any docstring
@@ -27,25 +28,29 @@ use ty_python_semantic::types::ide_support::{
 
 /// Information about a function parameter
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ParameterDetails {
+pub struct ParameterDetails<'db> {
     /// The parameter name (e.g., "param1")
     pub name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
+    /// The annotated type of the parameter, if any
+    pub ty: Option<Type<'db>>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
+    /// True if the parameter is positional-only.
+    pub is_positional_only: bool,
 }
 
 /// Information about a function signature
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureDetails {
+pub struct SignatureDetails<'db> {
     /// Text representation of the full signature (including input parameters and return type).
     pub label: String,
     /// Documentation for the signature, typically from the function's docstring.
     pub documentation: Option<Docstring>,
     /// Information about each of the parameters in left-to-right order.
-    pub parameters: Vec<ParameterDetails>,
+    pub parameters: Vec<ParameterDetails<'db>>,
     /// Index of the parameter that corresponds to the argument where the
     /// user's cursor is currently positioned.
     pub active_parameter: Option<usize>,
@@ -53,18 +58,18 @@ pub struct SignatureDetails {
 
 /// Signature help information for function calls
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SignatureHelpInfo {
+pub struct SignatureHelpInfo<'db> {
     /// Information about each of the signatures for the function call. We
     /// need to handle multiple because of unions, overloads, and composite
     /// calls like constructors (which invoke both __new__ and __init__).
-    pub signatures: Vec<SignatureDetails>,
+    pub signatures: Vec<SignatureDetails<'db>>,
     /// Index of the "active signature" which is the first signature where
     /// all arguments that are currently present in the code map to parameters.
     pub active_signature: Option<usize>,
 }
 
 /// Signature help information for function calls at the given position
-pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo> {
+pub fn signature_help(db: &dyn Db, file: File, offset: TextSize) -> Option<SignatureHelpInfo<'_>> {
     let parsed = parsed_module(db, file).load(db);
 
     // Get the call expression at the given position.
@@ -166,11 +171,11 @@ fn get_argument_index(call_expr: &ast::ExprCall, offset: TextSize) -> usize {
 }
 
 /// Create signature details from `CallSignatureDetails`.
-fn create_signature_details_from_call_signature_details(
+fn create_signature_details_from_call_signature_details<'db>(
     db: &dyn crate::Db,
-    details: &CallSignatureDetails,
+    details: &CallSignatureDetails<'db>,
     current_arg_index: usize,
-) -> SignatureDetails {
+) -> SignatureDetails<'db> {
     let signature_label = details.label.clone();
 
     let documentation = get_callable_documentation(db, details.definition);
@@ -200,6 +205,8 @@ fn create_signature_details_from_call_signature_details(
         &signature_label,
         documentation.as_ref(),
         &details.parameter_names,
+        &details.parameter_kinds,
+        &details.parameter_types,
     );
     SignatureDetails {
         label: signature_label,
@@ -218,12 +225,14 @@ fn get_callable_documentation(
 }
 
 /// Create `ParameterDetails` objects from parameter label offsets.
-fn create_parameters_from_offsets(
+fn create_parameters_from_offsets<'db>(
     parameter_offsets: &[TextRange],
     signature_label: &str,
     docstring: Option<&Docstring>,
     parameter_names: &[String],
-) -> Vec<ParameterDetails> {
+    parameter_kinds: &[ParameterKind],
+    parameter_types: &[Option<Type<'db>>],
+) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
         docstring.parameter_documentation()
@@ -245,11 +254,18 @@ fn create_parameters_from_offsets(
 
             // Get the parameter name for documentation lookup.
             let param_name = parameter_names.get(i).map(String::as_str).unwrap_or("");
+            let is_positional_only = matches!(
+                parameter_kinds.get(i),
+                Some(ParameterKind::PositionalOnly { .. })
+            );
+            let ty = parameter_types.get(i).copied().flatten();
 
             ParameterDetails {
                 name: param_name.to_string(),
                 label,
+                ty,
                 documentation: param_docs.get(param_name).cloned(),
+                is_positional_only,
             }
         })
         .collect()
@@ -1173,7 +1189,7 @@ def ab(a: int, *, c: int):
     }
 
     impl CursorTest {
-        fn signature_help(&self) -> Option<SignatureHelpInfo> {
+        fn signature_help(&self) -> Option<SignatureHelpInfo<'_>> {
             crate::signature_help::signature_help(&self.db, self.cursor.file, self.cursor.offset)
         }
 

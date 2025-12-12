@@ -265,7 +265,14 @@ fn desperately_resolve_module<'db>(
     let _span = tracing::trace_span!("desperately_resolve_module", %name).entered();
 
     let Some(resolved) = desperately_resolve_name(db, importing_file, name, mode) else {
-        tracing::debug!("Module `{name}` not found while looking in parent dirs");
+        let extra = match module_name.mode(db) {
+            ModuleResolveMode::StubsAllowed => "neither stub nor real module file",
+            ModuleResolveMode::StubsNotAllowed => "stubs not allowed",
+            ModuleResolveMode::StubsNotAllowedSomeShadowingAllowed => {
+                "stubs not allowed but some shadowing allowed"
+            }
+        };
+        tracing::debug!("Module `{name}` not found while looking in parent dirs ({extra})");
         return None;
     };
 

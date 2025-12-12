@@ -437,6 +437,15 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Returns the [`Tokens`] for the parsed source file.
+    ///
+    ///
+    /// Unlike [`Self::tokens`], this method always returns
+    /// the tokens for the current file, even when within a parsed type annotation.
+    pub(crate) fn source_tokens(&self) -> &'a Tokens {
+        self.parsed.tokens()
+    }
+
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {

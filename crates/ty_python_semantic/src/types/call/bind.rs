@@ -2,6 +2,13 @@
 //! arguments against the parameters of the callable. Like with
 //! [signatures][crate::types::signatures], we have to handle the fact that the callable might be a
 //! union of types, each of which might contain multiple overloads.
+//!
+//! ### Tracing
+//!
+//! This module is instrumented with debug-level `tracing` messages. You can set the `TY_LOG`
+//! environment variable to see this output when testing locally. `tracing` log messages typically
+//! have a `target` field, which is the name of the module the message appears in — in this case,
+//! `ty_python_semantic::types::call::bind`.
 
 use std::borrow::Cow;
 use std::collections::HashSet;
@@ -17,7 +24,8 @@ use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Sig
 use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::place::{Definedness, Place};
+use crate::module_resolver::KnownModule;
+use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -36,13 +44,14 @@ use crate::types::generics::{
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
-    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature,
+    BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
     NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
     TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
     enums, list_members, todo_type,
 };
+use crate::unpack::EvaluationMode;
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -934,6 +943,18 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        // TODO: Remove this special handling once we have full support for
+                        // generic protocols in the solver.
+                        Some(KnownFunction::AsyncContextManager) => {
+                            if let [Some(callable)] = overload.parameter_types() {
+                                if let Some(return_ty) =
+                                    asynccontextmanager_return_type(db, *callable)
+                                {
+                                    overload.set_return_type(return_ty);
+                                }
+                            }
+                        }
+
                         Some(KnownFunction::IsProtocol) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
@@ -1582,6 +1603,19 @@ impl<'db> CallableBinding<'db> {
         // before checking.
         let argument_types = argument_types.with_self(self.bound_type);
 
+        let _span = tracing::trace_span!(
+            "CallableBinding::check_types",
+            arguments = %argument_types.display(db),
+            signature = %self.signature_type.display(db),
+        )
+        .entered();
+
+        tracing::trace!(
+            target: "ty_python_semantic::types::call::bind",
+            matching_overload_index = ?self.matching_overload_index(),
+            "after step 1",
+        );
+
         // Step 1: Check the result of the arity check which is done by `match_parameters`
         let matching_overload_indexes = match self.matching_overload_index() {
             MatchingOverloadIndex::None => {
@@ -1612,6 +1646,12 @@ impl<'db> CallableBinding<'db> {
             overload.check_types(db, argument_types.as_ref(), call_expression_tcx);
         }
 
+        tracing::trace!(
+            target: "ty_python_semantic::types::call::bind",
+            matching_overload_index = ?self.matching_overload_index(),
+            "after step 2",
+        );
+
         match self.matching_overload_index() {
             MatchingOverloadIndex::None => {
                 // If all overloads result in errors, proceed to step 3.
@@ -1623,6 +1663,12 @@ impl<'db> CallableBinding<'db> {
             MatchingOverloadIndex::Multiple(indexes) => {
                 // If two or more candidate overloads remain, proceed to step 4.
                 self.filter_overloads_containing_variadic(&indexes);
+
+                tracing::trace!(
+                    target: "ty_python_semantic::types::call::bind",
+                    matching_overload_index = ?self.matching_overload_index(),
+                    "after step 4",
+                );
 
                 match self.matching_overload_index() {
                     MatchingOverloadIndex::None => {
@@ -1641,6 +1687,12 @@ impl<'db> CallableBinding<'db> {
                             db,
                             argument_types.as_ref(),
                             &indexes,
+                        );
+
+                        tracing::trace!(
+                            target: "ty_python_semantic::types::call::bind",
+                            matching_overload_index = ?self.matching_overload_index(),
+                            "after step 5",
                         );
                     }
                 }
@@ -1744,11 +1796,23 @@ impl<'db> CallableBinding<'db> {
                     overload.match_parameters(db, expanded_arguments, &mut argument_forms);
                 }
 
+                tracing::trace!(
+                    target: "ty_python_semantic::types::call::bind",
+                    matching_overload_index = ?self.matching_overload_index(),
+                    "after step 1",
+                );
+
                 merged_argument_forms.merge(&argument_forms);
 
                 for (_, overload) in self.matching_overloads_mut() {
                     overload.check_types(db, expanded_arguments, call_expression_tcx);
                 }
+
+                tracing::trace!(
+                    target: "ty_python_semantic::types::call::bind",
+                    matching_overload_index = ?self.matching_overload_index(),
+                    "after step 2",
+                );
 
                 let return_type = match self.matching_overload_index() {
                     MatchingOverloadIndex::None => None,
@@ -1757,6 +1821,12 @@ impl<'db> CallableBinding<'db> {
                     }
                     MatchingOverloadIndex::Multiple(matching_overload_indexes) => {
                         self.filter_overloads_containing_variadic(&matching_overload_indexes);
+
+                        tracing::trace!(
+                            target: "ty_python_semantic::types::call::bind",
+                            matching_overload_index = ?self.matching_overload_index(),
+                            "after step 4",
+                        );
 
                         match self.matching_overload_index() {
                             MatchingOverloadIndex::None => {
@@ -1772,6 +1842,13 @@ impl<'db> CallableBinding<'db> {
                                     expanded_arguments,
                                     &indexes,
                                 );
+
+                                tracing::trace!(
+                                    target: "ty_python_semantic::types::call::bind",
+                                    matching_overload_index = ?self.matching_overload_index(),
+                                    "after step 5",
+                                );
+
                                 Some(self.return_type())
                             }
                         }
@@ -1926,12 +2003,37 @@ impl<'db> CallableBinding<'db> {
             .take(max_parameter_count)
             .collect::<Vec<_>>();
 
+        // The following loop is trying to construct a tuple of argument types that correspond to
+        // the participating parameter indexes. Considering the following example:
+        //
+        // ```python
+        // @overload
+        // def f(x: Literal[1], y: Literal[2]) -> tuple[int, int]: ...
+        // @overload
+        // def f(*args: Any) -> tuple[Any, ...]: ...
+        //
+        // f(1, 2)
+        // ```
+        //
+        // Here, only the first parameter participates in the filtering process because only one
+        // overload has the second parameter. So, while going through the argument types, the
+        // second argument needs to be skipped but for the second overload both arguments map to
+        // the first parameter and that parameter is considered for the filtering process. This
+        // flag is to handle that special case of many-to-one mapping from arguments to parameters.
+        let mut variadic_parameter_handled = false;
+
         for (argument_index, argument_type) in arguments.iter_types().enumerate() {
+            if variadic_parameter_handled {
+                continue;
+            }
             for overload_index in matching_overload_indexes {
                 let overload = &self.overloads[*overload_index];
                 for (parameter_index, variadic_argument_type) in
                     overload.argument_matches[argument_index].iter()
                 {
+                    if overload.signature.parameters()[parameter_index].is_variadic() {
+                        variadic_parameter_handled = true;
+                    }
                     if !participating_parameter_indexes.contains(&parameter_index) {
                         continue;
                     }
@@ -4533,3 +4635,55 @@ impl fmt::Display for FunctionKind {
 // An example of a routine with many many overloads:
 // https://github.com/henribru/google-api-python-client-stubs/blob/master/googleapiclient-stubs/discovery.pyi
 const MAXIMUM_OVERLOADS: usize = 50;
+
+/// Infer the return type for a call to `asynccontextmanager`.
+///
+/// The `@asynccontextmanager` decorator transforms a function that returns (a subtype of) `AsyncIterator[T]`
+/// into a function that returns `_AsyncGeneratorContextManager[T]`.
+///
+/// TODO: This function only handles the most basic case. It should be removed once we have
+/// full support for generic protocols in the solver.
+fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> Option<Type<'db>> {
+    let bindings = func_ty.bindings(db);
+    let binding = bindings
+        .single_element()?
+        .overloads
+        .iter()
+        .exactly_one()
+        .ok()?;
+    let signature = &binding.signature;
+    let return_ty = signature.return_ty?;
+
+    let yield_ty = return_ty
+        .try_iterate_with_mode(db, EvaluationMode::Async)
+        .ok()?
+        .homogeneous_element_type(db);
+
+    if yield_ty.is_divergent()
+        || signature
+            .parameters()
+            .iter()
+            .any(|param| param.annotated_type().is_some_and(|ty| ty.is_divergent()))
+    {
+        return Some(yield_ty);
+    }
+
+    let context_manager =
+        known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
+            .place
+            .ignore_possibly_undefined()?
+            .as_class_literal()?;
+
+    let context_manager = context_manager.apply_specialization(db, |generic_context| {
+        generic_context.specialize_partial(db, [Some(yield_ty), None])
+    });
+
+    let new_return_ty = Type::from(context_manager).to_instance(db)?;
+    let new_signature = Signature::new(signature.parameters().clone(), Some(new_return_ty));
+
+    Some(Type::Callable(CallableType::new(
+        db,
+        CallableSignature::single(new_signature),
+        CallableTypeKind::FunctionLike,
+    )))
+}

@@ -155,7 +155,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
-                        self.infer_binary_expression(binary, TypeContext::default());
+                        // Avoid inferring the types of invalid binary expressions that have been
+                        // parsed from a string annotation, as they are not present in the semantic
+                        // index.
+                        if !self.deferred_state.in_string_annotation() {
+                            self.infer_binary_expression(binary, TypeContext::default());
+                        }
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
@@ -1188,7 +1193,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                     .in_type_expression(db, self.scope(), None)
                     .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
-                self.store_expression_type(arguments_slice, ty);
+                // Only store on the tuple slice; non-tuple cases are handled by
+                // `infer_subscript_load_impl` via `infer_expression`.
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, ty);
+                }
                 ty
             }
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {

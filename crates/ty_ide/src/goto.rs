@@ -295,7 +295,7 @@ impl<'db> Definitions<'db> {
 
 impl GotoTarget<'_> {
     pub(crate) fn inferred_type<'db>(&self, model: &SemanticModel<'db>) -> Option<Type<'db>> {
-        let ty = match self {
+        match self {
             GotoTarget::Expression(expression) => expression.inferred_type(model),
             GotoTarget::FunctionDef(function) => function.inferred_type(model),
             GotoTarget::ClassDef(class) => class.inferred_type(model),
@@ -317,7 +317,7 @@ impl GotoTarget<'_> {
             } => {
                 // We don't currently support hovering the bare `.` so there is always a name
                 let module = import_name(module_name, *component_index);
-                model.resolve_module_type(Some(module), *level)?
+                model.resolve_module_type(Some(module), *level)
             }
             GotoTarget::StringAnnotationSubexpr {
                 string_expr,
@@ -334,16 +334,16 @@ impl GotoTarget<'_> {
                 } else {
                     // TODO: force the typechecker to tell us its secrets
                     // (it computes but then immediately discards these types)
-                    return None;
+                    None
                 }
             }
             GotoTarget::BinOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
-                ty
+                Some(ty)
             }
             GotoTarget::UnaryOp { expression, .. } => {
                 let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
-                ty
+                Some(ty)
             }
             // TODO: Support identifier targets
             GotoTarget::PatternMatchRest(_)
@@ -353,10 +353,8 @@ impl GotoTarget<'_> {
             | GotoTarget::TypeParamParamSpecName(_)
             | GotoTarget::TypeParamTypeVarTupleName(_)
             | GotoTarget::NonLocal { .. }
-            | GotoTarget::Globals { .. } => return None,
-        };
-
-        Some(ty)
+            | GotoTarget::Globals { .. } => None,
+        }
     }
 
     /// Try to get a simplified display of this callable type by resolving overloads

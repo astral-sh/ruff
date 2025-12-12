@@ -453,17 +453,17 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn all_reachable_bindings(
+    pub(crate) fn reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_bindings(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_bindings(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_bindings(member),
         }
     }
 
-    pub(crate) fn all_reachable_symbol_bindings(
+    pub(crate) fn reachable_symbol_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -471,7 +471,7 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_bindings(
+    pub(crate) fn reachable_member_bindings(
         &self,
         symbol: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -547,7 +547,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn all_reachable_symbol_declarations(
+    pub(crate) fn reachable_symbol_declarations(
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -555,7 +555,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_declarations(
+    pub(crate) fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -563,13 +563,13 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_declarations(
+    pub(crate) fn reachable_declarations(
         &self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_declarations(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_declarations(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_declarations(member),
         }
     }
 
@@ -588,6 +588,30 @@ impl<'db> UseDefMap<'db> {
         self.end_of_scope_symbols
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
+    }
+
+    pub(crate) fn all_reachable_symbols<'map>(
+        &'map self,
+    ) -> impl Iterator<
+        Item = (
+            ScopedSymbolId,
+            DeclarationsIterator<'map, 'db>,
+            BindingWithConstraintsIterator<'map, 'db>,
+        ),
+    > + 'map {
+        self.reachable_definitions_by_symbol.iter_enumerated().map(
+            |(symbol_id, reachable_definitions)| {
+                let declarations = self.declarations_iterator(
+                    &reachable_definitions.declarations,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                let bindings = self.bindings_iterator(
+                    &reachable_definitions.bindings,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                (symbol_id, declarations, bindings)
+            },
+        )
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.

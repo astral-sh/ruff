@@ -19,10 +19,21 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    fn variable_type(expr: &Expr, ty: Type, db: &dyn Db, allow_edits: bool) -> Self {
+    fn variable_type(
+        expr: &Expr,
+        rhs: &Expr,
+        ty: Type,
+        db: &dyn Db,
+        allow_edits: bool,
+    ) -> Option<Self> {
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
+
+        // Filter out a reptitive hints like `x: T = T()`
+        if call_matches_name(rhs, &details.label) {
+            return None;
+        }
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -73,12 +84,12 @@ impl InlayHint {
             vec![]
         };
 
-        Self {
+        Some(Self {
             position,
             kind: InlayHintKind::Type,
             label: InlayHintLabel { parts: label_parts },
             text_edits,
-        }
+        })
     }
 
     fn call_argument_name(
@@ -250,7 +261,7 @@ struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
     hints: Vec<InlayHint>,
-    in_assignment: bool,
+    assignment_rhs: Option<&'a Expr>,
     range: TextRange,
     settings: &'a InlayHintSettings,
     in_no_edits_allowed: bool,
@@ -262,21 +273,21 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             db,
             model: SemanticModel::new(db, file),
             hints: Vec::new(),
-            in_assignment: false,
+            assignment_rhs: None,
             range,
             settings,
             in_no_edits_allowed: false,
         }
     }
 
-    fn add_type_hint(&mut self, expr: &Expr, ty: Type<'db>, allow_edits: bool) {
+    fn add_type_hint(&mut self, expr: &Expr, rhs: &Expr, ty: Type<'db>, allow_edits: bool) {
         if !self.settings.variable_types {
             return;
         }
 
-        let inlay_hint = InlayHint::variable_type(expr, ty, self.db, allow_edits);
-
-        self.hints.push(inlay_hint);
+        if let Some(inlay_hint) = InlayHint::variable_type(expr, rhs, ty, self.db, allow_edits) {
+            self.hints.push(inlay_hint);
+        }
     }
 
     fn add_call_argument_name(
@@ -299,8 +310,8 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     }
 }
 
-impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
-    fn enter_node(&mut self, node: AnyNodeRef<'_>) -> TraversalSignal {
+impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
+    fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
         } else {
@@ -308,7 +319,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
         }
     }
 
-    fn visit_stmt(&mut self, stmt: &Stmt) {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         let node = AnyNodeRef::from(stmt);
 
         if !self.enter_node(node).is_traverse() {
@@ -317,7 +328,9 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
 
         match stmt {
             Stmt::Assign(assign) => {
-                self.in_assignment = !type_hint_is_excessive_for_expr(&assign.value);
+                if !type_hint_is_excessive_for_expr(&assign.value) {
+                    self.assignment_rhs = Some(&*assign.value);
+                }
                 if !annotations_are_valid_syntax(assign) {
                     self.in_no_edits_allowed = true;
                 }
@@ -325,7 +338,7 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
                     self.visit_expr(target);
                 }
                 self.in_no_edits_allowed = false;
-                self.in_assignment = false;
+                self.assignment_rhs = None;
 
                 self.visit_expr(&assign.value);
 
@@ -344,22 +357,24 @@ impl SourceOrderVisitor<'_> for InlayHintVisitor<'_, '_> {
         source_order::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'_ Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match expr {
             Expr::Name(name) => {
-                if self.in_assignment {
+                if let Some(rhs) = self.assignment_rhs {
                     if name.ctx.is_store() {
-                        let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, ty, !self.in_no_edits_allowed);
+                        if let Some(ty) = expr.inferred_type(&self.model) {
+                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        }
                     }
                 }
                 source_order::walk_expr(self, expr);
             }
             Expr::Attribute(attribute) => {
-                if self.in_assignment {
+                if let Some(rhs) = self.assignment_rhs {
                     if attribute.ctx.is_store() {
-                        let ty = expr.inferred_type(&self.model);
-                        self.add_type_hint(expr, ty, !self.in_no_edits_allowed);
+                        if let Some(ty) = expr.inferred_type(&self.model) {
+                            self.add_type_hint(expr, rhs, ty, !self.in_no_edits_allowed);
+                        }
                     }
                 }
                 source_order::walk_expr(self, expr);
@@ -413,6 +428,26 @@ fn arg_matches_name(arg_or_keyword: &ArgOrKeyword, name: &str) -> bool {
             Expr::Attribute(expr_attribute) => return expr_attribute.attr.as_str() == name,
             _ => return false,
         }
+    }
+}
+
+/// Given a function call, check if the expression is the "same name"
+/// as the function being called.
+///
+/// This allows us to filter out reptitive inlay hints like `x: T = T(...)`.
+/// While still allowing non-trivial ones like `x: T[U] = T()`.
+fn call_matches_name(expr: &Expr, name: &str) -> bool {
+    // Only care about function calls
+    let Expr::Call(call) = expr else {
+        return false;
+    };
+
+    match &*call.func {
+        // `x: T = T()` is a match
+        Expr::Name(expr_name) => expr_name.id.as_str() == name,
+        // `x: T = a.T()` is a match
+        Expr::Attribute(expr_attribute) => expr_attribute.attr.as_str() == name,
+        _ => false,
     }
 }
 
@@ -1829,35 +1864,16 @@ mod tests {
             ",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r"
         class A:
             def __init__(self, y):
-                self.x[: int] = int(1)
+                self.x = int(1)
                 self.y[: Unknown] = y
 
-        a[: A] = A([y=]2)
-        a.y[: int] = int(3)
+        a = A([y=]2)
+        a.y = int(3)
 
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
-            |
-        347 | @disjoint_base
-        348 | class int:
-            |       ^^^
-        349 |     """int([x]) -> integer
-        350 |     int(x, base=10) -> integer
-            |
-        info: Source
-         --> main2.py:4:18
-          |
-        2 | class A:
-        3 |     def __init__(self, y):
-        4 |         self.x[: int] = int(1)
-          |                  ^^^
-        5 |         self.y[: Unknown] = y
-          |
-
         info[inlay-hint-location]: Inlay Hint Target
           --> stdlib/ty_extensions.pyi:20:1
            |
@@ -1871,29 +1887,11 @@ mod tests {
          --> main2.py:5:18
           |
         3 |     def __init__(self, y):
-        4 |         self.x[: int] = int(1)
+        4 |         self.x = int(1)
         5 |         self.y[: Unknown] = y
           |                  ^^^^^^^
         6 |
-        7 | a[: A] = A([y=]2)
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:2:7
-          |
-        2 | class A:
-          |       ^
-        3 |     def __init__(self, y):
-        4 |         self.x = int(1)
-          |
-        info: Source
-         --> main2.py:7:5
-          |
-        5 |         self.y[: Unknown] = y
-        6 |
-        7 | a[: A] = A([y=]2)
-          |     ^
-        8 | a.y[: int] = int(3)
+        7 | a = A([y=]2)
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -1906,30 +1904,13 @@ mod tests {
         5 |         self.y = y
           |
         info: Source
-         --> main2.py:7:13
+         --> main2.py:7:8
           |
         5 |         self.y[: Unknown] = y
         6 |
-        7 | a[: A] = A([y=]2)
-          |             ^
-        8 | a.y[: int] = int(3)
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/builtins.pyi:348:7
-            |
-        347 | @disjoint_base
-        348 | class int:
-            |       ^^^
-        349 |     """int([x]) -> integer
-        350 |     int(x, base=10) -> integer
-            |
-        info: Source
-         --> main2.py:8:7
-          |
-        7 | a[: A] = A([y=]2)
-        8 | a.y[: int] = int(3)
-          |       ^^^
+        7 | a = A([y=]2)
+          |        ^
+        8 | a.y = int(3)
           |
 
         ---------------------------------------------
@@ -1938,12 +1919,12 @@ mod tests {
 
         class A:
             def __init__(self, y):
-                self.x: int = int(1)
+                self.x = int(1)
                 self.y: Unknown = y
 
-        a: A = A(2)
-        a.y: int = int(3)
-        "#);
+        a = A(2)
+        a.y = int(3)
+        ");
     }
 
     #[test]
@@ -2937,31 +2918,12 @@ mod tests {
             def __init__(self):
                 self.x: int = 1
 
-        x[: MyClass] = MyClass()
+        x = MyClass()
         y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
         a[: MyClass], b[: MyClass] = MyClass(), MyClass()
         c[: MyClass], d[: MyClass] = (MyClass(), MyClass())
 
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:2:7
-          |
-        2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self):
-        4 |         self.x: int = 1
-          |
-        info: Source
-         --> main2.py:6:5
-          |
-        4 |         self.x: int = 1
-        5 |
-        6 | x[: MyClass] = MyClass()
-          |     ^^^^^^^
-        7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
-        8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
-          |
-
         info[inlay-hint-location]: Inlay Hint Target
             --> stdlib/builtins.pyi:2695:7
              |
@@ -2973,7 +2935,7 @@ mod tests {
         info: Source
          --> main2.py:7:5
           |
-        6 | x[: MyClass] = MyClass()
+        6 | x = MyClass()
         7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
           |     ^^^^^
         8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
@@ -2991,7 +2953,7 @@ mod tests {
         info: Source
          --> main2.py:7:11
           |
-        6 | x[: MyClass] = MyClass()
+        6 | x = MyClass()
         7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
           |           ^^^^^^^
         8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
@@ -3009,7 +2971,7 @@ mod tests {
         info: Source
          --> main2.py:7:20
           |
-        6 | x[: MyClass] = MyClass()
+        6 | x = MyClass()
         7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
           |                    ^^^^^^^
         8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
@@ -3027,7 +2989,7 @@ mod tests {
         info: Source
          --> main2.py:8:5
           |
-        6 | x[: MyClass] = MyClass()
+        6 | x = MyClass()
         7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
         8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
           |     ^^^^^^^
@@ -3045,7 +3007,7 @@ mod tests {
         info: Source
          --> main2.py:8:19
           |
-        6 | x[: MyClass] = MyClass()
+        6 | x = MyClass()
         7 | y[: tuple[MyClass, MyClass]] = (MyClass(), MyClass())
         8 | a[: MyClass], b[: MyClass] = MyClass(), MyClass()
           |                   ^^^^^^^
@@ -3094,7 +3056,7 @@ mod tests {
             def __init__(self):
                 self.x: int = 1
 
-        x: MyClass = MyClass()
+        x = MyClass()
         y: tuple[MyClass, MyClass] = (MyClass(), MyClass())
         a, b = MyClass(), MyClass()
         c, d = (MyClass(), MyClass())
@@ -4097,31 +4059,11 @@ mod tests {
             def __init__(self):
                 self.x: int = 1
                 self.y: int = 2
-        val[: MyClass] = MyClass()
+        val = MyClass()
 
         foo(val.x)
         foo([x=]val.y)
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:7
-          |
-        2 | def foo(x: int): pass
-        3 | class MyClass:
-          |       ^^^^^^^
-        4 |     def __init__(self):
-        5 |         self.x: int = 1
-          |
-        info: Source
-         --> main2.py:7:7
-          |
-        5 |         self.x: int = 1
-        6 |         self.y: int = 2
-        7 | val[: MyClass] = MyClass()
-          |       ^^^^^^^
-        8 |
-        9 | foo(val.x)
-          |
-
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -4137,20 +4079,6 @@ mod tests {
         10 | foo([x=]val.y)
            |      ^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def foo(x: int): pass
-        class MyClass:
-            def __init__(self):
-                self.x: int = 1
-                self.y: int = 2
-        val: MyClass = MyClass()
-
-        foo(val.x)
-        foo(val.y)
         ");
     }
 
@@ -4176,31 +4104,11 @@ mod tests {
             def __init__(self):
                 self.x: int = 1
                 self.y: int = 2
-        x[: MyClass] = MyClass()
+        x = MyClass()
 
         foo(x.x)
         foo([x=]x.y)
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:7
-          |
-        2 | def foo(x: int): pass
-        3 | class MyClass:
-          |       ^^^^^^^
-        4 |     def __init__(self):
-        5 |         self.x: int = 1
-          |
-        info: Source
-         --> main2.py:7:5
-          |
-        5 |         self.x: int = 1
-        6 |         self.y: int = 2
-        7 | x[: MyClass] = MyClass()
-          |     ^^^^^^^
-        8 |
-        9 | foo(x.x)
-          |
-
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -4216,20 +4124,6 @@ mod tests {
         10 | foo([x=]x.y)
            |      ^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def foo(x: int): pass
-        class MyClass:
-            def __init__(self):
-                self.x: int = 1
-                self.y: int = 2
-        x: MyClass = MyClass()
-
-        foo(x.x)
-        foo(x.y)
         ");
     }
 
@@ -4258,31 +4152,11 @@ mod tests {
                 return 1
             def y() -> int:
                 return 2
-        val[: MyClass] = MyClass()
+        val = MyClass()
 
         foo(val.x())
         foo([x=]val.y())
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:7
-          |
-        2 | def foo(x: int): pass
-        3 | class MyClass:
-          |       ^^^^^^^
-        4 |     def __init__(self):
-        5 |     def x() -> int:
-          |
-        info: Source
-          --> main2.py:9:7
-           |
-         7 |     def y() -> int:
-         8 |         return 2
-         9 | val[: MyClass] = MyClass()
-           |       ^^^^^^^
-        10 |
-        11 | foo(val.x())
-           |
-
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:2:9
           |
@@ -4298,22 +4172,6 @@ mod tests {
         12 | foo([x=]val.y())
            |      ^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def foo(x: int): pass
-        class MyClass:
-            def __init__(self):
-            def x() -> int:
-                return 1
-            def y() -> int:
-                return 2
-        val: MyClass = MyClass()
-
-        foo(val.x())
-        foo(val.y())
         ");
     }
 
@@ -4346,31 +4204,11 @@ mod tests {
                 return 1
             def y() -> List[int]:
                 return 2
-        val[: MyClass] = MyClass()
+        val = MyClass()
 
         foo(val.x()[0])
         foo([x=]val.y()[1])
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:5:7
-          |
-        4 | def foo(x: int): pass
-        5 | class MyClass:
-          |       ^^^^^^^
-        6 |     def __init__(self):
-        7 |     def x() -> List[int]:
-          |
-        info: Source
-          --> main2.py:11:7
-           |
-         9 |     def y() -> List[int]:
-        10 |         return 2
-        11 | val[: MyClass] = MyClass()
-           |       ^^^^^^^
-        12 |
-        13 | foo(val.x()[0])
-           |
-
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:4:9
           |
@@ -4388,24 +4226,6 @@ mod tests {
         14 | foo([x=]val.y()[1])
            |      ^
            |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        from typing import List
-
-        def foo(x: int): pass
-        class MyClass:
-            def __init__(self):
-            def x() -> List[int]:
-                return 1
-            def y() -> List[int]:
-                return 2
-        val: MyClass = MyClass()
-
-        foo(val.x()[0])
-        foo(val.y()[1])
         ");
     }
 
@@ -4697,7 +4517,7 @@ mod tests {
         class Foo:
             def __init__(self, x: int): pass
         Foo([x=]1)
-        f[: Foo] = Foo([x=]1)
+        f = Foo([x=]1)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:24
@@ -4715,24 +4535,7 @@ mod tests {
         3 |     def __init__(self, x: int): pass
         4 | Foo([x=]1)
           |      ^
-        5 | f[: Foo] = Foo([x=]1)
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:2:7
-          |
-        2 | class Foo:
-          |       ^^^
-        3 |     def __init__(self, x: int): pass
-        4 | Foo(1)
-          |
-        info: Source
-         --> main2.py:5:5
-          |
-        3 |     def __init__(self, x: int): pass
-        4 | Foo([x=]1)
-        5 | f[: Foo] = Foo([x=]1)
-          |     ^^^
+        5 | f = Foo([x=]1)
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4745,22 +4548,13 @@ mod tests {
         5 | f = Foo(1)
           |
         info: Source
-         --> main2.py:5:17
+         --> main2.py:5:10
           |
         3 |     def __init__(self, x: int): pass
         4 | Foo([x=]1)
-        5 | f[: Foo] = Foo([x=]1)
-          |                 ^
+        5 | f = Foo([x=]1)
+          |          ^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        class Foo:
-            def __init__(self, x: int): pass
-        Foo(1)
-        f: Foo = Foo(1)
         ");
     }
 
@@ -4778,7 +4572,7 @@ mod tests {
         class Foo:
             def __new__(cls, x: int): pass
         Foo([x=]1)
-        f[: Foo] = Foo([x=]1)
+        f = Foo([x=]1)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
          --> main.py:3:22
@@ -4796,24 +4590,7 @@ mod tests {
         3 |     def __new__(cls, x: int): pass
         4 | Foo([x=]1)
           |      ^
-        5 | f[: Foo] = Foo([x=]1)
-          |
-
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:2:7
-          |
-        2 | class Foo:
-          |       ^^^
-        3 |     def __new__(cls, x: int): pass
-        4 | Foo(1)
-          |
-        info: Source
-         --> main2.py:5:5
-          |
-        3 |     def __new__(cls, x: int): pass
-        4 | Foo([x=]1)
-        5 | f[: Foo] = Foo([x=]1)
-          |     ^^^
+        5 | f = Foo([x=]1)
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -4826,22 +4603,13 @@ mod tests {
         5 | f = Foo(1)
           |
         info: Source
-         --> main2.py:5:17
+         --> main2.py:5:10
           |
         3 |     def __new__(cls, x: int): pass
         4 | Foo([x=]1)
-        5 | f[: Foo] = Foo([x=]1)
-          |                 ^
+        5 | f = Foo([x=]1)
+          |          ^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        class Foo:
-            def __new__(cls, x: int): pass
-        Foo(1)
-        f: Foo = Foo(1)
         ");
     }
 

@@ -11,7 +11,7 @@ use crate::semantic_index::scope::{FileScopeId, NodeWithScopeKind, ScopeId};
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
-use crate::types::constraints::ConstraintSet;
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
 use crate::types::signatures::{Parameters, ParametersKind};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
@@ -86,7 +86,7 @@ pub(crate) fn typing_self<'db>(
     function_scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
     class: ClassLiteral<'db>,
-) -> Option<Type<'db>> {
+) -> Option<BoundTypeVarInstance<'db>> {
     let index = semantic_index(db, function_scope_id.file(db));
 
     let identity = TypeVarIdentity::new(
@@ -117,7 +117,6 @@ pub(crate) fn typing_self<'db>(
         typevar_binding_context,
         typevar,
     )
-    .map(Type::TypeVar)
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -1227,18 +1226,20 @@ impl<'db> Specialization<'db> {
         let self_materialization_kind = self.materialization_kind(db);
         let other_materialization_kind = other.materialization_kind(db);
 
-        let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
-            .zip(self.types(db))
-            .zip(other.types(db))
-        {
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        );
+
+        types.when_all(db, |(bound_typevar, self_type, other_type)| {
             // Subtyping/assignability of each type in the specialization depends on the variance
             // of the corresponding typevar:
             //   - covariant: verify that self_type <: other_type
             //   - contravariant: verify that other_type <: self_type
             //   - invariant: verify that self_type <: other_type AND other_type <: self_type
             //   - bivariant: skip, can't make subtyping/assignability false
-            let compatible = match bound_typevar.variance(db) {
+            match bound_typevar.variance(db) {
                 TypeVarVariance::Invariant => has_relation_in_invariant_position(
                     db,
                     self_type,
@@ -1267,13 +1268,82 @@ impl<'db> Specialization<'db> {
                     disjointness_visitor,
                 ),
                 TypeVarVariance::Bivariant => ConstraintSet::from(true),
-            };
-            if result.intersect(db, compatible).is_never_satisfied(db) {
-                return result;
             }
+        })
+    }
+
+    pub(crate) fn is_disjoint_from(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.is_disjoint_from_impl(
+            db,
+            other,
+            inferable,
+            &IsDisjointVisitor::default(),
+            &HasRelationToVisitor::default(),
+        )
+    }
+
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        let generic_context = self.generic_context(db);
+        if generic_context != other.generic_context(db) {
+            return ConstraintSet::from(true);
         }
 
-        result
+        if let (Some(self_tuple), Some(other_tuple)) = (self.tuple_inner(db), other.tuple_inner(db))
+        {
+            return self_tuple.is_disjoint_from_impl(
+                db,
+                other_tuple,
+                inferable,
+                disjointness_visitor,
+                relation_visitor,
+            );
+        }
+
+        let types = itertools::izip!(
+            generic_context.variables(db),
+            self.types(db),
+            other.types(db)
+        );
+
+        types.when_all(
+            db,
+            |(bound_typevar, self_type, other_type)| match bound_typevar.variance(db) {
+                // TODO: This check can lead to false negatives.
+                //
+                // For example, `Foo[int]` and `Foo[bool]` are disjoint, even though `bool` is a subtype
+                // of `int`. However, given two non-inferable type variables `T` and `U`, `Foo[T]` and
+                // `Foo[U]` should not be considered disjoint, as `T` and `U` could be specialized to the
+                // same type. We don't currently have a good typing relationship to represent this.
+                TypeVarVariance::Invariant => self_type.is_disjoint_from_impl(
+                    db,
+                    *other_type,
+                    inferable,
+                    disjointness_visitor,
+                    relation_visitor,
+                ),
+
+                // If `Foo[T]` is covariant in `T`, `Foo[Never]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Covariant => ConstraintSet::from(false),
+
+                // If `Foo[T]` is contravariant in `T`, `Foo[A | B]` is a subtype of `Foo[A]` and `Foo[B]`
+                TypeVarVariance::Contravariant => ConstraintSet::from(false),
+
+                // If `Foo[T]` is bivariant in `T`, `Foo[A]` and `Foo[B]` are mutual subtypes.
+                TypeVarVariance::Bivariant => ConstraintSet::from(false),
+            },
+        )
     }
 
     pub(crate) fn is_equivalent_to_impl(
@@ -1545,35 +1615,66 @@ impl<'db> SpecializationBuilder<'db> {
                 }
                 self.add_type_mapping(*formal_bound_typevar, remaining_actual, polarity, f);
             }
-            (Type::Union(formal), _) => {
-                // Second, if the formal is a union, and precisely one union element is assignable
-                // from the actual type, then we don't add any type mapping. This handles a case like
+            (Type::Union(union_formal), _) => {
+                // Second, if the formal is a union, and the actual type is assignable to precisely
+                // one union element, then we don't add any type mapping. This handles a case like
                 //
                 // ```py
-                // def f[T](t: T | None): ...
+                // def f[T](t: T | None) -> T: ...
                 //
-                // f(None)
+                // reveal_type(f(None))  # revealed: Unknown
                 // ```
                 //
                 // without specializing `T` to `None`.
-                //
-                // Otherwise, if precisely one union element _is_ a typevar (not _contains_ a
-                // typevar), then we add a mapping between that typevar and the actual type.
                 if !actual.is_never() {
-                    let assignable_elements = (formal.elements(self.db).iter()).filter(|ty| {
-                        actual
-                            .when_subtype_of(self.db, **ty, self.inferable)
-                            .is_always_satisfied(self.db)
-                    });
+                    let assignable_elements =
+                        (union_formal.elements(self.db).iter()).filter(|ty| {
+                            actual
+                                .when_subtype_of(self.db, **ty, self.inferable)
+                                .is_always_satisfied(self.db)
+                        });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
                     }
                 }
 
-                let bound_typevars =
-                    (formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
-                if let Ok(bound_typevar) = bound_typevars.exactly_one() {
-                    self.add_type_mapping(bound_typevar, actual, polarity, f);
+                let mut bound_typevars =
+                    (union_formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
+
+                // TODO:
+                // Handling more than one bare typevar is something that we can't handle yet.
+                if bound_typevars.nth(1).is_some() {
+                    return Ok(());
+                }
+
+                // Finally, if there are no bare typevars, we try to infer type mappings by
+                // checking against each union element. This handles cases like
+                // ```py
+                // def f[T](t: P[T] | Q[T]) -> T: ...
+                //
+                // reveal_type(f(P[str]()))  # revealed: str
+                // reveal_type(f(Q[int]()))  # revealed: int
+                // ```
+                let mut first_error = None;
+                let mut found_matching_element = false;
+                for formal_element in union_formal.elements(self.db) {
+                    let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                    if let Err(err) = result {
+                        first_error.get_or_insert(err);
+                    } else {
+                        // The recursive call to `infer_map_impl` may succeed even if the actual type is
+                        // not assignable to the formal element.
+                        if !actual
+                            .when_assignable_to(self.db, *formal_element, self.inferable)
+                            .is_never_satisfied(self.db)
+                        {
+                            found_matching_element = true;
+                        }
+                    }
+                }
+
+                if !found_matching_element && let Some(error) = first_error {
+                    return Err(error);
                 }
             }
 

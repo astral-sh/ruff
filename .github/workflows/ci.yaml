@@ -24,6 +24,8 @@ env:
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
+  # Enable mdtests that require external dependencies
+  MDTEST_EXTERNAL: "1"
 
 jobs:
   determine_changes:
@@ -296,7 +298,7 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"

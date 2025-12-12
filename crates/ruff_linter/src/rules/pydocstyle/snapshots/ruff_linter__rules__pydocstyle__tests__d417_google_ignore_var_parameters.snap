@@ -83,3 +83,13 @@ D417 Missing argument description in the docstring for `should_fail`: `Args`
 200 |     """
 201 |     Send a message.
     |
+
+D417 Missing argument description in the docstring for `function_with_unpack_and_missing_arg_doc_should_fail`: `query`
+   --> D417.py:238:5
+    |
+236 |     """
+237 |
+238 | def function_with_unpack_and_missing_arg_doc_should_fail(query: str, **kwargs: Unpack[User]):
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+239 |     """Function with Unpack kwargs but missing query arg documentation.
+    |

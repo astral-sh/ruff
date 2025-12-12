@@ -679,8 +679,9 @@ impl Indentation {
 
 /// Returns `true` for a space or tab character.
 ///
-/// This is different than [`is_python_whitespace`] in that it returns `false` for a form feed character.
-/// Form feed characters are excluded because they should be preserved in the suppressed output.
+/// This is different than [`is_python_whitespace`](ruff_python_trivia::is_python_whitespace) in
+/// that it returns `false` for a form feed character. Form feed characters are excluded because
+/// they should be preserved in the suppressed output.
 const fn is_indent_whitespace(c: char) -> bool {
     matches!(c, ' ' | '\t')
 }

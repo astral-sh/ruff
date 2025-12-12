@@ -607,7 +607,7 @@ class X:
     def __init__(self, val: int): ...
     def make_another(self) -> Self:
         reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
-        return self.__new__(X)
+        return self.__new__(type(self))
 ```
 
 ## Builtin functions and methods

@@ -214,7 +214,7 @@ def _(int_or_int: IntOrInt, list_of_int_or_list_of_int: ListOfIntOrListOfInt):
 `NoneType` has no special or-operator behavior, so this is an error:
 
 ```py
-None | None  # error: [unsupported-operator] "Operator `|` is unsupported between objects of type `None` and `None`"
+None | None  # error: [unsupported-operator] "Operator `|` is not supported between objects of type `None` and `None`"
 ```
 
 When constructing something nonsensical like `int | 1`, we emit a diagnostic for the expression

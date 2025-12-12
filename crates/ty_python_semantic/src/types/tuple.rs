@@ -288,6 +288,23 @@ impl<'db> TupleType<'db> {
         )
     }
 
+    pub(crate) fn is_disjoint_from_impl(
+        self,
+        db: &'db dyn Db,
+        other: Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        self.tuple(db).is_disjoint_from_impl(
+            db,
+            other.tuple(db),
+            inferable,
+            disjointness_visitor,
+            relation_visitor,
+        )
+    }
+
     pub(crate) fn is_equivalent_to_impl(
         self,
         db: &'db dyn Db,

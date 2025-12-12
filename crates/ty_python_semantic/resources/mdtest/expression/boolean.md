@@ -232,7 +232,7 @@ if NotBoolable():
 class NotBoolable:
     __bool__: None = None
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+# error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
     ...
 ```
@@ -244,7 +244,7 @@ def test(cond: bool):
     class NotBoolable:
         __bool__: int | None = None if cond else 3
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
     if NotBoolable():
         ...
 ```
@@ -258,7 +258,7 @@ def test(cond: bool):
 
     a = 10 if cond else NotBoolable()
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `Literal[10] | NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `Literal[10] | NotBoolable`"
     if a:
         ...
 ```

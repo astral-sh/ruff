@@ -36,7 +36,7 @@ impl Debug for DebugComment<'_> {
     }
 }
 
-/// Pretty-printed debug representation of [`Comments`].
+/// Pretty-printed debug representation of [`Comments`](super::Comments).
 pub(crate) struct DebugComments<'a> {
     comments: &'a CommentsMap<'a>,
     source_code: SourceCode<'a>,

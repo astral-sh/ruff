@@ -581,6 +581,53 @@ fn check_non_existing_path() -> anyhow::Result<()> {
 }
 
 #[test]
+fn check_file_without_extension() -> anyhow::Result<()> {
+    let case = CliTest::with_file("main", "a = b")?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("main"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `b` used when not defined
+     --> main:1:5
+      |
+    1 | a = b
+      |     ^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_file_without_extension_in_subfolder() -> anyhow::Result<()> {
+    let case = CliTest::with_file("src/main", "a = b")?;
+
+    assert_cmd_snapshot!(
+        case.command().arg("src"),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    "
+    );
+
+    Ok(())
+}
+
+#[test]
 fn concise_diagnostics() -> anyhow::Result<()> {
     let case = CliTest::with_file(
         "test.py",
