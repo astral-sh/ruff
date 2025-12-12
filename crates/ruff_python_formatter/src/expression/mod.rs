@@ -19,9 +19,7 @@ use crate::expression::parentheses::{
     optional_parentheses, parenthesized,
 };
 use crate::prelude::*;
-use crate::preview::{
-    is_fluent_layout_more_often_enabled, is_hug_parens_with_braces_and_square_brackets_enabled,
-};
+use crate::preview::is_hug_parens_with_braces_and_square_brackets_enabled;
 
 mod binary_like;
 pub(crate) mod expr_attribute;
@@ -963,9 +961,6 @@ impl CallChainLayout {
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
         source: &str,
-        // This can be deleted once the preview style
-        // is stabilized
-        context: &PyFormatContext,
     ) -> Self {
         // Count of attribute values which are called or
         // subscripted, after the leftmost parenthesized
@@ -1039,13 +1034,7 @@ impl CallChainLayout {
             }
         }
 
-        let threshold = if is_fluent_layout_more_often_enabled(context) {
-            call_like_count + u32::from(root_value_parenthesized)
-        } else {
-            computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized)
-        };
-
-        if threshold < 2 {
+        if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
             CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
@@ -1066,7 +1055,6 @@ impl CallChainLayout {
                         item.into(),
                         f.context().comments().ranges(),
                         f.context().source(),
-                        f.context(),
                     )
                 } else {
                     CallChainLayout::NonFluent

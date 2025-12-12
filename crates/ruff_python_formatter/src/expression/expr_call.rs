@@ -91,7 +91,6 @@ impl NeedsParentheses for ExprCall {
                 self.into(),
                 context.comments().ranges(),
                 context.source(),
-                context
             ),
             CallChainLayout::Fluent(_)
         ) {

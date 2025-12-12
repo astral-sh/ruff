@@ -2914,19 +2914,6 @@ def length_rst_in_section():
 ```diff
 --- Stable
 +++ Preview
-@@ -683,9 +683,9 @@
- 	...                         self._df.filter(pl.col(col).str.starts_with(c))
- 	...                         for c in sorted(
- 	...                                 set(
--	...                                         df.select(
--	...                                                 pl.col(col).str.slice(0, 1)
--	...                                         ).to_series()
-+	...                                         df
-+	...                                         .select(pl.col(col).str.slice(0, 1))
-+	...                                         .to_series()
- 	...                                 )
- 	...                         )
- 	...                 ]
 @@ -700,9 +700,11 @@
  
  		Examples

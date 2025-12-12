@@ -66,10 +66,3 @@ pub(crate) const fn is_parenthesize_lambda_bodies_enabled(context: &PyFormatCont
 pub(crate) const fn is_fluent_layout_split_first_call_enabled(context: &PyFormatContext) -> bool {
     context.is_preview()
 }
-
-/// Returns `true` if the
-/// [`fluent_layout_more_often`](https://github.com/astral-sh/ruff/pull/21369) preview
-/// style is enabled.
-pub(crate) const fn is_fluent_layout_more_often_enabled(context: &PyFormatContext) -> bool {
-    context.is_preview()
-}

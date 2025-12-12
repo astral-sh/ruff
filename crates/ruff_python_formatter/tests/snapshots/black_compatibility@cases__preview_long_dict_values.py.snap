@@ -228,7 +228,7 @@ class Random:
  }
  
  {
-@@ -139,17 +133,16 @@
+@@ -139,17 +133,17 @@
  
  class Random:
      def func():
@@ -244,8 +244,9 @@ class Random:
 -                        "actionTimestamp": (
 -                            Timestamp(seconds=1530584000, nanos=0).ToJsonString()
 -                        ),
-+                        "actionTimestamp": Timestamp(seconds=1530584000, nanos=0)
-+                        .ToJsonString(),
++                        "actionTimestamp": Timestamp(
++                            seconds=1530584000, nanos=0
++                        ).ToJsonString(),
                      }
                  },
 -            }
@@ -398,8 +399,9 @@ class Random:
                         "timestamp": 1234,
                         "latitude": 1,
                         "longitude": 2,
-                        "actionTimestamp": Timestamp(seconds=1530584000, nanos=0)
-                        .ToJsonString(),
+                        "actionTimestamp": Timestamp(
+                            seconds=1530584000, nanos=0
+                        ).ToJsonString(),
                     }
                 },
             })
