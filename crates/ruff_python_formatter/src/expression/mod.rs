@@ -880,16 +880,18 @@ impl<'a> First<'a> {
 /// In `preview`, we also track the position of the leftmost call or
 /// subscript on an attribute in the chain and break just before the dot.
 ///
-/// So, for example, we would get:
+/// So, for example, the right-hand summand in the above expression
+/// would get formatted as:
 /// ```python
 ///     Blog.objects
 ///     .filter(
-///         entry__headline__contains="Lennon",
-///     ).filter(
-///         entry__pub_date__year=2008,
+///         entry__headline__contains="McCartney",
+///     )
+///     .limit_results[:10]
+///     .filter(
+///         entry__pub_date__year=2010,
 ///     )
 /// ```
-/// in the first summand above, and similarly in the second.
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub enum CallChainLayout {
     /// The root of a call chain
