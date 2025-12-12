@@ -432,12 +432,17 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
     let mut search_paths = Vec::new();
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
-        // Any dir named `tests` might be a pytest root, but not if it's a package
-        let is_pytest_dir = rel_dir.file_name() == Some("tests")
-            && !system.is_file(&candidate_path.join("__init__.py"))
+        if !system.is_directory(&candidate_path) {
+            continue;
+        }
+        // Any dir that isn't a proper package is plausibly some test/script dir that could be
+        // added as a search-path at runtime. Notably this reflects pytest's default mode where
+        // it adds every dir with a .py to the search-paths (making all test files root modules),
+        // unless they see an `__init__.py`, in which case they assume you don't want that.
+        let isnt_regular_package = !system.is_file(&candidate_path.join("__init__.py"))
             && !system.is_file(&candidate_path.join("__init__.pyi"));
         // Any dir with a pyproject.toml or ty.toml might be a project root
-        if is_pytest_dir
+        if isnt_regular_package
             || system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"))
         {
