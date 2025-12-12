@@ -4659,15 +4659,6 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         .ok()?
         .homogeneous_element_type(db);
 
-    if yield_ty.is_divergent()
-        || signature
-            .parameters()
-            .iter()
-            .any(|param| param.annotated_type().is_some_and(|ty| ty.is_divergent()))
-    {
-        return Some(yield_ty);
-    }
-
     let context_manager =
         known_module_symbol(db, KnownModule::Contextlib, "_AsyncGeneratorContextManager")
             .place
