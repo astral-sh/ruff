@@ -6625,8 +6625,8 @@ TypedDi<CURSOR>
         assert_snapshot!(
             builder.imports().build().snapshot(),
             @r"
-        typing.TypedDict :: <no import edit>
-        typing.is_typeddict :: <no import edit>
+        TypedDict :: , TypedDict
+        is_typeddict :: , is_typeddict
         _FilterConfigurationTypedDict :: from logging.config import _FilterConfigurationTypedDict
 
         _FormatterConfigurationTypedDict :: from logging.config import _FormatterConfigurationTypedDict
