@@ -14194,7 +14194,7 @@ impl<'db> UnionType<'db> {
         nested: bool,
     ) -> Option<Type<'db>> {
         let mut builder = UnionBuilder::new(db)
-            .order_elements(true)
+            .order_elements(false)
             .unpack_aliases(false)
             .cycle_recovery(true)
             .recursively_defined(self.recursively_defined(db));
