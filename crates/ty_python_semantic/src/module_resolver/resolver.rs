@@ -334,7 +334,7 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
             db,
             file,
             path,
-            simple_desperate_search_paths(db, file).iter(),
+            relative_desperate_search_paths(db, file).iter(),
         )
     })
 }
@@ -388,21 +388,17 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
     Program::get(db).search_paths(db).iter(db, resolve_mode)
 }
 
-/// Get the search-paths that should be used for desperate resolution of imports in this file
+/// Get the search-paths for desperate resolution of absolute imports in this file.
 ///
-/// Currently this is "the closest ancestor dir that contains a pyproject.toml", which is
-/// a completely arbitrary decision. We could potentially change this to return an iterator
-/// of every ancestor with a pyproject.toml or every ancestor.
+/// Currently this is "all ancestor directories that don't contain an `__init__.py(i)`"
+/// (from closest-to-importing-file to farthest).
 ///
-/// For now this works well in common cases where we have some larger workspace that contains
-/// one or more python projects in sub-directories, and those python projects assume that
-/// absolute imports resolve relative to the pyproject.toml they live under.
+/// (For paranoia purposes, all relative desperate search-paths are also absolute
+/// valid desperate search-paths, but don't worry about that.)
 ///
-/// Being so strict minimizes concerns about this going off a lot and doing random
-/// chaotic things. In particular, all files under a given pyproject.toml will currently
-/// agree on this being their desperate search-path, which is really nice.
+/// We exclude `__init__.py(i)` dirs to avoid truncating packages.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -441,7 +437,10 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
         // unless they see an `__init__.py`, in which case they assume you don't want that.
         let isnt_regular_package = !system.is_file(&candidate_path.join("__init__.py"))
             && !system.is_file(&candidate_path.join("__init__.pyi"));
-        // Any dir with a pyproject.toml or ty.toml might be a project root
+        // Any dir with a pyproject.toml or ty.toml is a valid relative desperate search-path and
+        // we want all of those to also be valid absolute desperate search-paths. It doesn't
+        // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
+        // not let something cursed and spooky happen, ok? d
         if isnt_regular_package
             || system.is_file(&candidate_path.join("pyproject.toml"))
             || system.is_file(&candidate_path.join("ty.toml"))
@@ -458,11 +457,12 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
     }
 }
 
-/// Get the search-paths that should be used for desperate resolution of imports in this file
+/// Get the search-paths for desperate resolution of relative imports in this file.
 ///
-/// Currently this is "the closest ancestor dir that contains a pyproject.toml", which is
-/// a completely arbitrary decision. We could potentially change this to return an iterator
-/// of every ancestor with a pyproject.toml or every ancestor.
+/// Currently this is "the closest ancestor dir that contains a pyproject.toml (or ty.toml)",
+/// which is a completely arbitrary decision. However it's farily important that relative
+/// desperate search-paths pick a single "best" answer because every one is *valid* but one
+/// that's too long or too short may cause problems.
 ///
 /// For now this works well in common cases where we have some larger workspace that contains
 /// one or more python projects in sub-directories, and those python projects assume that
@@ -472,7 +472,7 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<Searc
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn simple_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -1032,7 +1032,7 @@ fn desperately_resolve_name(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedName> {
-    let search_paths = desperate_search_paths(db, importing_file);
+    let search_paths = absolute_desperate_search_paths(db, importing_file);
     resolve_name_impl(db, name, mode, search_paths.iter().flatten())
 }
 
