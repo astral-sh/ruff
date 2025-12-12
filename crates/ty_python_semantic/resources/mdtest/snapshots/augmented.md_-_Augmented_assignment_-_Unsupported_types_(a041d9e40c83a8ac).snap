@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: augmented.md - Augmented assignment - Unsupported types
+mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/augmented.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class C:
+2 |     def __isub__(self, other: str) -> int:
+3 |         return 42
+4 | 
+5 | x = C()
+6 | # error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
+7 | x -= 1
+8 | 
+9 | reveal_type(x)  # revealed: int
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `-=` operation
+ --> src/mdtest_snippet.py:7:1
+  |
+5 | x = C()
+6 | # error: [unsupported-operator] "Operator `-=` is not supported between objects of type `C` and `Literal[1]`"
+7 | x -= 1
+  | -^^^^-
+  | |    |
+  | |    Has type `Literal[1]`
+  | Has type `C`
+8 |
+9 | reveal_type(x)  # revealed: int
+  |
+info: rule `unsupported-operator` is enabled by default
+
+```

@@ -80,7 +80,8 @@ use crate::types::diagnostic::{
     report_invalid_type_checking_constant, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
-    report_rebound_typevar, report_slice_step_size_zero, report_unsupported_comparison,
+    report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
+    report_unsupported_binary_operation, report_unsupported_comparison,
 };
 use crate::types::function::{
     FunctionDecorators, FunctionLiteral, FunctionType, KnownFunction, OverloadLiteral,
@@ -5925,22 +5926,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let op = assignment.op;
         let db = self.db();
 
-        let report_unsupported_augmented_op = |ctx: &mut InferContext| {
-            let Some(builder) = ctx.report_lint(&UNSUPPORTED_OPERATOR, assignment) else {
-                return;
-            };
-            builder.into_diagnostic(format_args!(
-                "Operator `{op}=` is not supported between objects of type `{}` and `{}`",
-                target_type.display(db),
-                value_type.display(db)
-            ));
-        };
-
         // Fall back to non-augmented binary operator inference.
         let mut binary_return_ty = || {
             self.infer_binary_expression_type(assignment.into(), false, target_type, value_type, op)
                 .unwrap_or_else(|| {
-                    report_unsupported_augmented_op(&mut self.context);
+                    report_unsupported_augmented_assignment(
+                        &self.context,
+                        assignment,
+                        target_type,
+                        value_type,
+                    );
                     Type::unknown()
                 })
         };
@@ -5964,7 +5959,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         UnionType::from_elements(db, [outcome.return_type(db), binary_return_ty()])
                     }
                     Err(CallDunderError::CallError(_, bindings)) => {
-                        report_unsupported_augmented_op(&mut self.context);
+                        report_unsupported_augmented_assignment(
+                            &self.context,
+                            assignment,
+                            target_type,
+                            value_type,
+                        );
                         bindings.return_type(db)
                     }
                 }
@@ -9699,7 +9699,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.context.report_lint(&UNSUPPORTED_OPERATOR, unary)
                         {
                             builder.into_diagnostic(format_args!(
-                                "Unary operator `{op}` is not supported for type `{}`",
+                                "Unary operator `{op}` is not supported for object of type `{}`",
                                 operand_type.display(self.db()),
                             ));
                         }
@@ -9732,26 +9732,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_binary_expression_type(binary.into(), false, left_ty, right_ty, *op)
             .unwrap_or_else(|| {
-                let db = self.db();
-
-                if let Some(builder) = self.context.report_lint(&UNSUPPORTED_OPERATOR, binary) {
-                    let mut diag = builder.into_diagnostic(format_args!(
-                        "Operator `{op}` is not supported between objects of type `{}` and `{}`",
-                        left_ty.display(db),
-                        right_ty.display(db)
-                    ));
-
-                    if op == &ast::Operator::BitOr
-                        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
-                            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
-                        && Program::get(db).python_version(db) < PythonVersion::PY310
-                    {
-                        diag.info(
-                            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
-                        );
-                        add_inferred_python_version_hint_to_diagnostic(db, &mut diag, "resolving types");
-                    }
-                }
+                report_unsupported_binary_operation(&self.context, binary, left_ty, right_ty, *op);
                 Type::unknown()
             })
     }

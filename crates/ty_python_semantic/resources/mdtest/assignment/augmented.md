@@ -38,6 +38,8 @@ reveal_type(x)  # revealed: int
 
 ## Unsupported types
 
+<!-- snapshot-diagnostics -->
+
 ```py
 class C:
     def __isub__(self, other: str) -> int:
