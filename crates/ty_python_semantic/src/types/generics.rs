@@ -1458,7 +1458,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
         if self.skip.is_some_and(|skip| skip == index) {
-            return Some(Type::unknown());
+            return Some(Type::Never);
         }
         self.types.get(index).copied()
     }
