@@ -291,12 +291,12 @@ help: Remove invalid suppression comment
 
 
 RUF100 [*] Unused suppression (non-enabled: `E501`)
-  --> suppressions.py:46:5
+  --> suppressions.py:46:21
    |
 44 |     # Neither of these are ignored and warnings are
 45 |     # logged to user
 46 |     # ruff: disable[E501]
-   |     ^^^^^^^^^^^^^^^^^^^^^
+   |                     ^^^^
 47 |     I = 1
 48 |     # ruff: enable[E501]
    |
@@ -311,12 +311,12 @@ help: Remove unused suppression
 
 
 RUF100 [*] Unused suppression (non-enabled: `E501`)
-  --> suppressions.py:48:5
+  --> suppressions.py:48:20
    |
 46 |     # ruff: disable[E501]
 47 |     I = 1
 48 |     # ruff: enable[E501]
-   |     ^^^^^^^^^^^^^^^^^^^^
+   |                    ^^^^
    |
 help: Remove unused suppression
 45 |     # logged to user
@@ -403,12 +403,12 @@ RUF104 Unmatched suppression comment
 
 
 RUF100 [*] Unused suppression (unused: `F841`)
-  --> suppressions.py:69:5
+  --> suppressions.py:69:21
    |
 67 |     # and the other should trigger an unused suppression diagnostic
 68 |     # ruff: disable[F841]
 69 |     # ruff: disable[F841]
-   |     ^^^^^^^^^^^^^^^^^^^^^
+   |                     ^^^^
 70 |     foo = 0
    |
 help: Remove unused suppression
@@ -575,12 +575,12 @@ help: Remove unused suppression
 
 
 RUF102 [*] Invalid rule code in `# noqa`: YF829
-  --> suppressions.py:93:5
+  --> suppressions.py:93:21
    |
 91 | def f():
 92 |     # Unknown rule codes
 93 |     # ruff: disable[YF829]
-   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |                     ^^^^^
 94 |     # ruff: disable[F841, RQW320]
 95 |     value = 0
    |
@@ -634,12 +634,12 @@ help: Remove the rule code
 
 
 RUF102 [*] Invalid rule code in `# noqa`: YF829
-  --> suppressions.py:97:5
+  --> suppressions.py:97:20
    |
 95 |     value = 0
 96 |     # ruff: enable[F841, RQW320]
 97 |     # ruff: enable[YF829]
-   |     ^^^^^^^^^^^^^^^^^^^^^
+   |                    ^^^^^
    |
 help: Remove the rule code
 94 |     # ruff: disable[F841, RQW320]
