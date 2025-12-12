@@ -156,6 +156,9 @@ a: "1 or 2"
 b: "(x := 1)"
 # error: [invalid-type-form]
 c: "1 + 2"
+# Regression test for https://github.com/astral-sh/ty/issues/1847
+# error: [invalid-type-form]
+c2: "a*(i for i in [])"
 d: "lambda x: x"
 e: "x if True else y"
 f: "{'a': 1, 'b': 2}"

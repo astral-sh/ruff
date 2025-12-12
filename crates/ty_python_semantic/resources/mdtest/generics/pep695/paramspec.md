@@ -228,6 +228,7 @@ Explicit specialization of a generic class involving `ParamSpec` is done by prov
 of types, `...`, or another in-scope `ParamSpec`.
 
 ```py
+reveal_type(OnlyParamSpec[[]]().attr)  # revealed: () -> None
 reveal_type(OnlyParamSpec[[int, str]]().attr)  # revealed: (int, str, /) -> None
 reveal_type(OnlyParamSpec[...]().attr)  # revealed: (...) -> None
 
@@ -236,9 +237,29 @@ def func[**P2](c: Callable[P2, None]):
 
 P2 = ParamSpec("P2")
 
-# TODO: error: paramspec is unbound
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
 reveal_type(OnlyParamSpec[P2]().attr)  # revealed: (...) -> None
+
+# error: [invalid-type-arguments] "No type argument provided for required type variable `P1` of class `OnlyParamSpec`"
+reveal_type(OnlyParamSpec[()]().attr)  # revealed: (...) -> None
 ```
+
+An explicit tuple expression (unlike an implicit one that omits the parentheses) is also accepted
+when the `ParamSpec` is the only type variable. But, this isn't recommended is mainly a fallout of
+it having the same AST as the one without the parentheses. Both mypy and Pyright also allow this.
+
+```py
+reveal_type(OnlyParamSpec[(int, str)]().attr)  # revealed: (int, str, /) -> None
+```
+
+<!-- blacken-docs:off -->
+
+```py
+# error: [invalid-syntax]
+reveal_type(OnlyParamSpec[]().attr)  # revealed: (...) -> None
+```
+
+<!-- blacken-docs:on -->
 
 The square brackets can be omitted when `ParamSpec` is the only type variable
 
@@ -255,14 +276,19 @@ reveal_type(OnlyParamSpec[int]().attr)  # revealed: (int, /) -> None
 But, they cannot be omitted when there are multiple type variables.
 
 ```py
+reveal_type(TypeVarAndParamSpec[int, []]().attr)  # revealed: () -> int
 reveal_type(TypeVarAndParamSpec[int, [int, str]]().attr)  # revealed: (int, str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, [str]]().attr)  # revealed: (str, /) -> int
 reveal_type(TypeVarAndParamSpec[int, ...]().attr)  # revealed: (...) -> int
 
-# TODO: error: paramspec is unbound
-reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> Unknown
-# error: [invalid-type-arguments]
-reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> Unknown
+# error: [invalid-type-arguments] "ParamSpec `P2` is unbound"
+reveal_type(TypeVarAndParamSpec[int, P2]().attr)  # revealed: (...) -> int
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, int]().attr)  # revealed: (...) -> int
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, ()]().attr)  # revealed: (...) -> int
+# error: [invalid-type-arguments] "Type argument for `ParamSpec` must be"
+reveal_type(TypeVarAndParamSpec[int, (int, str)]().attr)  # revealed: (...) -> int
 ```
 
 Nor can they be omitted when there are more than one `ParamSpec`.
@@ -391,16 +417,13 @@ The `converter` function act as a decorator here:
 def f3(x: int, y: str) -> int:
     return 1
 
-# TODO: This should reveal `(x: int, y: str) -> bool` but there's a cycle: https://github.com/astral-sh/ty/issues/1729
-reveal_type(f3)  # revealed: ((x: int, y: str) -> bool) | ((x: Divergent, y: Divergent) -> bool)
+reveal_type(f3)  # revealed: (x: int, y: str) -> bool
 
 reveal_type(f3(1, "a"))  # revealed: bool
 reveal_type(f3(x=1, y="a"))  # revealed: bool
 reveal_type(f3(1, y="a"))  # revealed: bool
 reveal_type(f3(y="a", x=1))  # revealed: bool
 
-# TODO: There should only be one error but the type of `f3` is a union: https://github.com/astral-sh/ty/issues/1729
-# error: [missing-argument] "No argument provided for required parameter `y`"
 # error: [missing-argument] "No argument provided for required parameter `y`"
 f3(1)
 # error: [invalid-argument-type] "Argument is incorrect: Expected `int`, found `Literal["a"]`"

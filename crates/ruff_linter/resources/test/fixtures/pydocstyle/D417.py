@@ -218,3 +218,26 @@ def should_not_fail(payload, Args):
         Args:
             The other arguments.
     """
+
+
+# Test cases for Unpack[TypedDict] kwargs
+from typing import TypedDict
+from typing_extensions import Unpack
+
+class User(TypedDict):
+    id: int
+    name: str
+
+def function_with_unpack_args_should_not_fail(query: str, **kwargs: Unpack[User]):
+    """Function with Unpack kwargs.
+
+    Args:
+        query: some arg
+    """
+
+def function_with_unpack_and_missing_arg_doc_should_fail(query: str, **kwargs: Unpack[User]):
+    """Function with Unpack kwargs but missing query arg documentation.
+
+    Args:
+        **kwargs: keyword arguments
+    """

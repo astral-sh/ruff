@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{Arguments, Expr, ExprCall};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType};
@@ -86,6 +86,7 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
         applicability,
         checker.semantic(),
         checker.locator(),
+        checker.tokens(),
         checker.comment_ranges(),
         checker.source(),
     );
@@ -95,27 +96,26 @@ pub(crate) fn unnecessary_cast_to_int(checker: &Checker, call: &ExprCall) {
 }
 
 /// Creates a fix that replaces `int(expression)` with `expression`.
+#[allow(clippy::too_many_arguments)]
 fn unwrap_int_expression(
     call: &ExprCall,
     argument: &Expr,
     applicability: Applicability,
     semantic: &SemanticModel,
     locator: &Locator,
+    tokens: &Tokens,
     comment_ranges: &CommentRanges,
     source: &str,
 ) -> Fix {
-    let content = if let Some(range) = parenthesized_range(
-        argument.into(),
-        (&call.arguments).into(),
-        comment_ranges,
-        source,
-    ) {
+    let content = if let Some(range) =
+        parenthesized_range(argument.into(), (&call.arguments).into(), tokens)
+    {
         locator.slice(range).to_string()
     } else {
         let parenthesize = semantic.current_expression_parent().is_some()
             || argument.is_named_expr()
             || locator.count_lines(argument.range()) > 0;
-        if parenthesize && !has_own_parentheses(argument, comment_ranges, source) {
+        if parenthesize && !has_own_parentheses(argument, tokens, source) {
             format!("({})", locator.slice(argument.range()))
         } else {
             locator.slice(argument.range()).to_string()
@@ -255,7 +255,7 @@ fn round_applicability(arguments: &Arguments, semantic: &SemanticModel) -> Optio
 }
 
 /// Returns `true` if the given [`Expr`] has its own parentheses (e.g., `()`, `[]`, `{}`).
-fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str) -> bool {
+fn has_own_parentheses(expr: &Expr, tokens: &Tokens, source: &str) -> bool {
     match expr {
         Expr::ListComp(_)
         | Expr::SetComp(_)
@@ -276,14 +276,10 @@ fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str
             // f
             // (10)
             // ```
-            let func_end = parenthesized_range(
-                call_expr.func.as_ref().into(),
-                call_expr.into(),
-                comment_ranges,
-                source,
-            )
-            .unwrap_or(call_expr.func.range())
-            .end();
+            let func_end =
+                parenthesized_range(call_expr.func.as_ref().into(), call_expr.into(), tokens)
+                    .unwrap_or(call_expr.func.range())
+                    .end();
             lines_after_ignoring_trivia(func_end, source) == 0
         }
         Expr::Subscript(subscript_expr) => {
@@ -291,8 +287,7 @@ fn has_own_parentheses(expr: &Expr, comment_ranges: &CommentRanges, source: &str
             let subscript_end = parenthesized_range(
                 subscript_expr.value.as_ref().into(),
                 subscript_expr.into(),
-                comment_ranges,
-                source,
+                tokens,
             )
             .unwrap_or(subscript_expr.value.range())
             .end();

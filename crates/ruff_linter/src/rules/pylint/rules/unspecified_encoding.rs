@@ -1,8 +1,7 @@
 use std::fmt::{Display, Formatter};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{self as ast, Expr, name::QualifiedName};
 use ruff_python_semantic::SemanticModel;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::{Ranged, TextRange};
@@ -193,8 +192,7 @@ fn generate_keyword_fix(checker: &Checker, call: &ast::ExprCall) -> Fix {
             }))
         ),
         &call.arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
+        checker.tokens(),
     ))
 }
 

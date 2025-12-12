@@ -63,6 +63,12 @@ python-version = "3.12"
 from typing import Self
 
 class A:
+    def __init__(self):
+        reveal_type(self)  # revealed: Self@__init__
+
+    def __init_subclass__(cls, default_name, **kwargs):
+        reveal_type(cls)  # revealed: type[Self@__init_subclass__]
+
     def implicit_self(self) -> Self:
         reveal_type(self)  # revealed: Self@implicit_self
 
@@ -91,8 +97,7 @@ class A:
 
     @classmethod
     def a_classmethod(cls) -> Self:
-        # TODO: This should be type[Self@bar]
-        reveal_type(cls)  # revealed: Unknown
+        reveal_type(cls)  # revealed: type[Self@a_classmethod]
         return cls()
 
     @staticmethod
@@ -277,8 +282,10 @@ reveal_type(C().method())  # revealed: C
 
 ## Class Methods
 
+### Explicit
+
 ```py
-from typing import Self, TypeVar
+from typing import Self
 
 class Shape:
     def foo(self: Self) -> Self:
@@ -293,6 +300,64 @@ class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
 reveal_type(Shape.bar())  # revealed: Shape
+
+reveal_type(Circle().foo())  # revealed: Circle
+reveal_type(Circle.bar())  # revealed: Circle
+```
+
+### Implicit
+
+```py
+from typing import Self
+
+class Shape:
+    def foo(self) -> Self:
+        return self
+
+    @classmethod
+    def bar(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@bar]
+        return cls()
+
+class Circle(Shape): ...
+
+reveal_type(Shape().foo())  # revealed: Shape
+reveal_type(Shape.bar())  # revealed: Shape
+
+reveal_type(Circle().foo())  # revealed: Circle
+reveal_type(Circle.bar())  # revealed: Circle
+```
+
+### Implicit in generic class
+
+```py
+from typing import Self
+
+class GenericShape[T]:
+    def foo(self) -> Self:
+        return self
+
+    @classmethod
+    def bar(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@bar]
+        return cls()
+
+    @classmethod
+    def baz[U](cls, u: U) -> "GenericShape[U]":
+        reveal_type(cls)  # revealed: type[Self@baz]
+        return cls()
+
+class GenericCircle[T](GenericShape[T]): ...
+
+reveal_type(GenericShape().foo())  # revealed: GenericShape[Unknown]
+reveal_type(GenericShape.bar())  # revealed: GenericShape[Unknown]
+reveal_type(GenericShape[int].bar())  # revealed: GenericShape[int]
+reveal_type(GenericShape.baz(1))  # revealed: GenericShape[Literal[1]]
+
+reveal_type(GenericCircle().foo())  # revealed: GenericCircle[Unknown]
+reveal_type(GenericCircle.bar())  # revealed: GenericCircle[Unknown]
+reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
+reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
 ## Attributes

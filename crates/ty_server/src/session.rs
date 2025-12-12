@@ -1,6 +1,6 @@
 //! Data model, state management, and configuration resolution.
 
-use std::collections::{BTreeMap, HashSet, VecDeque};
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::ops::{Deref, DerefMut};
 use std::panic::RefUnwindSafe;
 use std::sync::Arc;
@@ -20,6 +20,7 @@ use lsp_types::{
 use ruff_db::Db;
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
+use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
 use ty_project::watch::{ChangeEvent, CreatedKind};
@@ -467,28 +468,7 @@ impl Session {
 
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {
-                // HACK: This is to ensure that users with an older version of the ty VS Code
-                // extension don't get warnings about unknown options when they are using a newer
-                // version of the language server. This should be removed after a few releases.
-                if !unknown_options.contains_key("importStrategy")
-                    && !unknown_options.contains_key("interpreter")
-                {
-                    tracing::warn!(
-                        "Received unknown options for workspace `{url}`: {}",
-                        serde_json::to_string_pretty(unknown_options)
-                            .unwrap_or_else(|_| format!("{unknown_options:?}"))
-                    );
-
-                    client.show_warning_message(format!(
-                        "Received unknown options for workspace `{url}`: '{}'. \
-                        Refer to the logs for more details.",
-                        unknown_options
-                            .keys()
-                            .map(String::as_str)
-                            .collect::<Vec<_>>()
-                            .join("', '")
-                    ));
-                }
+                warn_about_unknown_options(client, Some(&url), unknown_options);
             }
 
             combined_global_options.combine_with(Some(global));
@@ -1543,7 +1523,8 @@ impl DocumentHandle {
     pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
         let is_cell = self.is_cell();
         let path = self.notebook_or_file_path();
-        session.index_mut().close_document(&self.key())?;
+
+        let removed_document = session.index_mut().close_document(&self.key())?;
 
         // Close the text or notebook file in the database but skip this
         // step for cells because closing a cell doesn't close its notebook.
@@ -1556,6 +1537,19 @@ impl DocumentHandle {
                 AnySystemPath::System(system_path) => {
                     if let Some(file) = db.files().try_system(db, system_path) {
                         db.project().close_file(db, file);
+
+                        // In case we preferred the language given by the Client
+                        // over the one detected by the file extension, remove the file
+                        // from the project to handle cases where a user changes the language
+                        // of a file (which results in a didClose and didOpen for the same path but with different languages).
+                        if removed_document.language_id().is_some()
+                            && system_path
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_none()
+                        {
+                            db.project().remove_file(db, file);
+                        }
                     } else {
                         // This can only fail when the path is a directory or it doesn't exists but the
                         // file should exists for this handler in this branch. This is because every
@@ -1594,4 +1588,30 @@ impl DocumentHandle {
 
         Ok(requires_clear_diagnostics)
     }
+}
+
+/// Warns about unknown options received by the server.
+///
+/// If `workspace_url` is `Some`, it indicates that the unknown options were received during a
+/// workspace initialization, otherwise they were received during the server initialization.
+pub(super) fn warn_about_unknown_options(
+    client: &Client,
+    workspace_url: Option<&Url>,
+    unknown_options: &HashMap<String, serde_json::Value>,
+) {
+    let message = if let Some(workspace_url) = workspace_url {
+        format!(
+            "Received unknown options for workspace `{workspace_url}`: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    } else {
+        format!(
+            "Received unknown options during initialization: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    };
+    tracing::warn!("{message}");
+    client.show_warning_message(message);
 }

@@ -43,7 +43,7 @@ fn config_override_python_version() -> anyhow::Result<()> {
       |
     2 | [tool.ty.environment]
     3 | python-version = "3.11"
-      |                  ^^^^^^ Python 3.11 assumed due to this configuration setting
+      |                  ^^^^^^ Python version configuration
       |
     info: rule `unresolved-attribute` is enabled by default
 
@@ -143,7 +143,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -159,14 +159,14 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
       |
     2 | [tool.ty.environment]
     3 | python-version = "3.8"
-      |                  ^^^^^ Python 3.8 assumed due to this configuration setting
+      |                  ^^^^^ Python version configuration
       |
     info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
     success: false
@@ -772,7 +772,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -787,7 +787,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
      --> venv/pyvenv.cfg:2:11
       |
     2 | version = 3.8
-      |           ^^^ Python version inferred from virtual environment metadata file
+      |           ^^^ Virtual environment metadata
     3 | home = foo/bar/bin
       |
     info: No Python version was specified on the command line or in a configuration file
@@ -796,7 +796,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -831,7 +831,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -846,7 +846,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
      --> venv/pyvenv.cfg:4:23
       |
     4 |             version = 3.8
-      |                       ^^^ Python version inferred from virtual environment metadata file
+      |                       ^^^ Virtual environment metadata
       |
     info: No Python version was specified on the command line or in a configuration file
     info: rule `unresolved-reference` is enabled by default
@@ -854,7 +854,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -898,7 +898,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | [project]
     3 | requires-python = ">=3.8"
-      |                   ^^^^^^^ Python 3.8 assumed due to this configuration setting
+      |                   ^^^^^^^ Python version configuration
       |
 
     Found 1 diagnostic
@@ -1206,7 +1206,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |
     2 | [environment]
     3 | python-version = "3.10"
-      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+      |                  ^^^^^^ Python version configuration
     4 | python-platform = "linux"
       |
     info: rule `unresolved-attribute` is enabled by default
@@ -1225,7 +1225,7 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
       |
     2 | [environment]
     3 | python-version = "3.10"
-      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+      |                  ^^^^^^ Python version configuration
     4 | python-platform = "linux"
       |
     info: rule `unresolved-import` is enabled by default

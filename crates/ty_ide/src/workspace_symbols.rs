@@ -1,4 +1,4 @@
-use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file_global_only};
+use crate::symbols::{QueryPattern, SymbolInfo, symbols_for_file};
 use ruff_db::files::File;
 use ty_project::Db;
 
@@ -26,7 +26,7 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
             for file in files.iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
-                    for (_, symbol) in symbols_for_file_global_only(&*db, *file).search(query) {
+                    for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,
                         // but this works pretty well as it is.
@@ -64,7 +64,7 @@ mod tests {
     };
 
     #[test]
-    fn test_workspace_symbols_multi_file() {
+    fn workspace_symbols_multi_file() {
         let test = CursorTest::builder()
             .source(
                 "utils.py",
@@ -123,6 +123,30 @@ API_BASE_URL = 'https://api.example.com'
           | ^^^^^^^^^^^^
           |
         info: Constant API_BASE_URL
+        ");
+    }
+
+    #[test]
+    fn members() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+class Test:
+    def from_path(): ...
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("from"), @r"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:3:9
+          |
+        2 | class Test:
+        3 |     def from_path(): ...
+          |         ^^^^^^^^^
+          |
+        info: Method from_path
         ");
     }
 

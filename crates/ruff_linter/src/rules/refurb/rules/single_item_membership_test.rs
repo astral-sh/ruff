@@ -95,7 +95,7 @@ pub(crate) fn single_item_membership_test(
                 &[membership_test.replacement_op()],
                 std::slice::from_ref(item),
                 expr.into(),
-                checker.comment_ranges(),
+                checker.tokens(),
                 checker.source(),
             ),
             expr.range(),

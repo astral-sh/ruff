@@ -29,6 +29,7 @@
 
 mod code_actions;
 mod commands;
+mod completions;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -51,11 +52,12 @@ use lsp_types::notification::{
     Initialized, Notification,
 };
 use lsp_types::request::{
-    DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request, Shutdown,
-    WorkspaceConfiguration, WorkspaceDiagnosticRequest,
+    Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest, Request,
+    Shutdown, WorkspaceConfiguration, WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
-    ClientCapabilities, ConfigurationParams, DiagnosticClientCapabilities,
+    ClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
+    CompletionTriggerKind, ConfigurationParams, DiagnosticClientCapabilities,
     DidChangeTextDocumentParams, DidChangeWatchedFilesClientCapabilities,
     DidChangeWatchedFilesParams, DidCloseTextDocumentParams, DidOpenTextDocumentParams,
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
@@ -785,7 +787,6 @@ impl TestServer {
     }
 
     /// Send a `textDocument/didClose` notification
-    #[expect(dead_code)]
     pub(crate) fn close_text_document(&mut self, path: impl AsRef<SystemPath>) {
         let params = DidCloseTextDocumentParams {
             text_document: TextDocumentIdentifier {
@@ -871,6 +872,31 @@ impl TestServer {
         };
         let id = self.send_request::<InlayHintRequest>(params);
         self.await_response::<InlayHintRequest>(&id)
+    }
+
+    /// Sends a `textDocument/completion` request for the document at the given URL and position.
+    pub(crate) fn completion_request(
+        &mut self,
+        uri: &Url,
+        position: Position,
+    ) -> Vec<CompletionItem> {
+        let completions_id = self.send_request::<Completion>(CompletionParams {
+            text_document_position: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            partial_result_params: lsp_types::PartialResultParams::default(),
+            context: Some(lsp_types::CompletionContext {
+                trigger_kind: CompletionTriggerKind::TRIGGER_FOR_INCOMPLETE_COMPLETIONS,
+                trigger_character: None,
+            }),
+        });
+        match self.await_response::<lsp_types::request::Completion>(&completions_id) {
+            Some(CompletionResponse::Array(array)) => array,
+            Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
+            None => vec![],
+        }
     }
 }
 
@@ -1100,6 +1126,16 @@ impl TestServerBuilder {
         } else {
             None
         };
+        self
+    }
+
+    pub(crate) fn enable_diagnostic_related_information(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .publish_diagnostics
+            .get_or_insert_default()
+            .related_information = Some(enabled);
         self
     }
 

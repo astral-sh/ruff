@@ -47,7 +47,7 @@ class Repository(NamedTuple):
     show_fixes: bool = False
 
     @asynccontextmanager
-    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
+    async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[str]:
         """Shallow clone this repository to a temporary directory."""
         if checkout_dir.exists():
             logger.debug(f"Reusing {self.org}:{self.repo}")

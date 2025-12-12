@@ -25,8 +25,9 @@ use crate::{
     },
 };
 
-/// Iterate over all declarations and bindings in the given scope.
-pub(crate) fn all_members_of_scope<'db>(
+/// Iterate over all declarations and bindings that exist at the end
+/// of the given scope.
+pub(crate) fn all_end_of_scope_members<'db>(
     db: &'db dyn Db,
     scope_id: ScopeId<'db>,
 ) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
@@ -73,6 +74,60 @@ pub(crate) fn all_members_of_scope<'db>(
                 })
             },
         ))
+}
+
+/// Iterate over all declarations and bindings that are reachable anywhere
+/// in the given scope.
+pub(crate) fn all_reachable_members<'db>(
+    db: &'db dyn Db,
+    scope_id: ScopeId<'db>,
+) -> impl Iterator<Item = MemberWithDefinition<'db>> + 'db {
+    let use_def_map = use_def_map(db, scope_id);
+    let table = place_table(db, scope_id);
+
+    use_def_map
+        .all_reachable_symbols()
+        .flat_map(move |(symbol_id, declarations, bindings)| {
+            let symbol = table.symbol(symbol_id);
+
+            let declaration_place_result = place_from_declarations(db, declarations);
+            let declaration =
+                declaration_place_result
+                    .first_declaration
+                    .and_then(|first_reachable_definition| {
+                        let ty = declaration_place_result
+                            .ignore_conflicting_declarations()
+                            .place
+                            .ignore_possibly_undefined()?;
+                        let member = Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        };
+                        Some(MemberWithDefinition {
+                            member,
+                            first_reachable_definition,
+                        })
+                    });
+
+            let place_with_definition = place_from_bindings(db, bindings);
+            let binding =
+                place_with_definition
+                    .first_definition
+                    .and_then(|first_reachable_definition| {
+                        let ty = place_with_definition.place.ignore_possibly_undefined()?;
+                        let member = Member {
+                            name: symbol.name().clone(),
+                            ty,
+                        };
+                        Some(MemberWithDefinition {
+                            member,
+                            first_reachable_definition,
+                        })
+                    });
+
+            [declaration, binding]
+        })
+        .flatten()
 }
 
 // `__init__`, `__repr__`, `__eq__`, `__ne__` and `__hash__` are always included via `object`,
@@ -132,7 +187,7 @@ impl<'db> AllMembers<'db> {
             }
 
             Type::NewTypeInstance(newtype) => {
-                self.extend_with_type(db, Type::instance(db, newtype.base_class_type(db)));
+                self.extend_with_type(db, newtype.concrete_base_type(db));
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -359,7 +414,7 @@ impl<'db> AllMembers<'db> {
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
-            for memberdef in all_members_of_scope(db, parent_scope) {
+            for memberdef in all_end_of_scope_members(db, parent_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;
@@ -407,7 +462,7 @@ impl<'db> AllMembers<'db> {
             // class member. This gets us the right type for each
             // member, e.g., `SomeClass.__delattr__` is not a bound
             // method, but `instance_of_SomeClass.__delattr__` is.
-            for memberdef in all_members_of_scope(db, class_body_scope) {
+            for memberdef in all_end_of_scope_members(db, class_body_scope) {
                 let result = ty.member(db, memberdef.member.name.as_str());
                 let Some(ty) = result.place.ignore_possibly_undefined() else {
                     continue;

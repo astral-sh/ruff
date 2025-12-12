@@ -68,13 +68,91 @@ reveal_type(C[int, int])  # revealed: <type alias 'C[Unknown]'>
 And non-generic types cannot be specialized:
 
 ```py
+from typing import TypeVar, Protocol, TypedDict
+
 type B = ...
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias"
 reveal_type(B[int])  # revealed: Unknown
 
 # error: [non-subscriptable] "Cannot subscript non-generic type alias"
-def _(b: B[int]): ...
+def _(b: B[int]):
+    reveal_type(b)  # revealed: Unknown
+
+type IntOrStr = int | str
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+def _(c: IntOrStr[int]):
+    reveal_type(c)  # revealed: Unknown
+
+type ListOfInts = list[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+def _(l: ListOfInts[int]):
+    reveal_type(l)  # revealed: Unknown
+
+type List[T] = list[T]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+def _(l: List[int][int]):
+    reveal_type(l)  # revealed: Unknown
+
+# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+type DoubleSpecialization[T] = list[T][T]
+
+def _(d: DoubleSpecialization[int]):
+    reveal_type(d)  # revealed: Unknown
+
+type Tuple = tuple[int, str]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+def _(doubly_specialized: Tuple[int]):
+    reveal_type(doubly_specialized)  # revealed: Unknown
+
+T = TypeVar("T")
+
+class LegacyProto(Protocol[T]):
+    pass
+
+type LegacyProtoInt = LegacyProto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+def _(x: LegacyProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Proto[T](Protocol):
+    pass
+
+type ProtoInt = Proto[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+def _(x: ProtoInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+# TODO: TypedDict is just a function object at runtime, we should emit an error
+class LegacyDict(TypedDict[T]):
+    x: T
+
+type LegacyDictInt = LegacyDict[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+def _(x: LegacyDictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+class Dict[T](TypedDict):
+    x: T
+
+type DictInt = Dict[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Dict` is already specialized"
+def _(x: DictInt[int]):
+    reveal_type(x)  # revealed: Unknown
+
+type Union = list[str] | list[int]
+
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+def _(x: Union[int]):
+    reveal_type(x)  # revealed: Unknown
 ```
 
 If the type variable has an upper bound, the specialized type must satisfy that bound:
@@ -98,6 +176,15 @@ reveal_type(BoundedByUnion[int])  # revealed: <type alias 'BoundedByUnion[int]'>
 reveal_type(BoundedByUnion[IntSubclass])  # revealed: <type alias 'BoundedByUnion[IntSubclass]'>
 reveal_type(BoundedByUnion[str])  # revealed: <type alias 'BoundedByUnion[str]'>
 reveal_type(BoundedByUnion[int | str])  # revealed: <type alias 'BoundedByUnion[int | str]'>
+
+type TupleOfIntAndStr[T: int, U: str] = tuple[T, U]
+
+def _(x: TupleOfIntAndStr[int, str]):
+    reveal_type(x)  # revealed: tuple[int, str]
+
+# error: [invalid-type-arguments] "Type `int` is not assignable to upper bound `str` of type variable `U@TupleOfIntAndStr`"
+def _(x: TupleOfIntAndStr[int, int]):
+    reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
 If the type variable is constrained, the specialized type must satisfy those constraints:
@@ -119,6 +206,15 @@ reveal_type(Constrained[int | str])  # revealed: <type alias 'Constrained[int | 
 
 # error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `T@Constrained`"
 reveal_type(Constrained[object])  # revealed: <type alias 'Constrained[Unknown]'>
+
+type TupleOfIntOrStr[T: (int, str), U: (int, str)] = tuple[T, U]
+
+def _(x: TupleOfIntOrStr[int, str]):
+    reveal_type(x)  # revealed: tuple[int, str]
+
+# error: [invalid-type-arguments] "Type `object` does not satisfy constraints `int`, `str` of type variable `U@TupleOfIntOrStr`"
+def _(x: TupleOfIntOrStr[int, object]):
+    reveal_type(x)  # revealed: tuple[int, Unknown]
 ```
 
 If the type variable has a default, it can be omitted:

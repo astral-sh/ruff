@@ -141,3 +141,18 @@ class C:
         # revealed: (*, kw_only=Unknown | ((*, kw_only=Unknown) -> Unknown)) -> Unknown
         reveal_type(self.d)
 ```
+
+## Self-referential implicit attributes
+
+```py
+class Cyclic:
+    def __init__(self, data: str | dict):
+        self.data = data
+
+    def update(self):
+        if isinstance(self.data, str):
+            self.data = {"url": self.data}
+
+# revealed: Unknown | str | dict[Unknown, Unknown] | dict[Unknown | str, Unknown | str]
+reveal_type(Cyclic("").data)
+```

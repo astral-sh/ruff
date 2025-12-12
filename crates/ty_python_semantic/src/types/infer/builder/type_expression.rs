@@ -155,7 +155,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     // anything else is an invalid annotation:
                     op => {
-                        self.infer_binary_expression(binary, TypeContext::default());
+                        // Avoid inferring the types of invalid binary expressions that have been
+                        // parsed from a string annotation, as they are not present in the semantic
+                        // index.
+                        if !self.deferred_state.in_string_annotation() {
+                            self.infer_binary_expression(binary, TypeContext::default());
+                        }
                         self.report_invalid_type_expression(
                             expression,
                             format_args!(
@@ -914,6 +919,16 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
+                    if type_alias.specialization(self.db()).is_some() {
+                        if let Some(builder) =
+                            self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                        {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Cannot subscript non-generic type alias");
+                            diagnostic.set_primary_message("Double specialization is not allowed");
+                        }
+                        return Type::unknown();
+                    }
                     match type_alias.generic_context(self.db()) {
                         Some(generic_context) => {
                             let specialized_type_alias = self
@@ -938,9 +953,15 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             if let Some(builder) =
                                 self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
                             {
-                                builder.into_diagnostic(format_args!(
-                                    "Cannot subscript non-generic type alias"
-                                ));
+                                let value_type = type_alias.raw_value_type(self.db());
+                                let mut diagnostic = builder
+                                    .into_diagnostic("Cannot subscript non-generic type alias");
+                                if value_type.is_definition_generic(self.db()) {
+                                    diagnostic.set_primary_message(format_args!(
+                                        "`{}` is already specialized",
+                                        value_type.display(self.db()),
+                                    ));
+                                }
                             }
 
                             Type::unknown()
@@ -1172,7 +1193,11 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     )
                     .in_type_expression(db, self.scope(), None)
                     .unwrap_or_else(|err| err.into_fallback_type(&self.context, subscript, true));
-                self.store_expression_type(arguments_slice, ty);
+                // Only store on the tuple slice; non-tuple cases are handled by
+                // `infer_subscript_load_impl` via `infer_expression`.
+                if arguments_slice.is_tuple_expr() {
+                    self.store_expression_type(arguments_slice, ty);
+                }
                 ty
             }
             SpecialFormType::Literal => match self.infer_literal_parameter_type(arguments_slice) {

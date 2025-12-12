@@ -73,7 +73,8 @@ use crate::types::diagnostic::{
     report_runtime_check_against_non_runtime_checkable_protocol,
 };
 use crate::types::display::DisplaySettings;
-use crate::types::generics::{GenericContext, InferableTypeVars};
+use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
+use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
 use crate::types::signatures::{CallableSignature, Signature};
@@ -82,8 +83,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, Truthiness, Type, TypeContext, TypeMapping, TypeRelation,
-    UnionBuilder, binding_type, definition_expression_type, walk_signature,
+    NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, definition_expression_type,
+    infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -499,13 +501,91 @@ impl<'db> OverloadLiteral<'db> {
             index,
         );
 
-        Signature::from_function(
+        let mut raw_signature = Signature::from_function(
             db,
             pep695_ctx,
             definition,
             function_stmt_node,
             has_implicitly_positional_first_parameter,
-        )
+        );
+
+        let generic_context = raw_signature.generic_context;
+        raw_signature.add_implicit_self_annotation(db, || {
+            if self.is_staticmethod(db) {
+                return None;
+            }
+
+            // We have not yet added an implicit annotation to the `self` parameter, so any
+            // typevars that currently appear in the method's generic context come from explicit
+            // annotations.
+            let method_has_explicit_self = generic_context
+                .is_some_and(|context| context.variables(db).any(|v| v.typevar(db).is_self(db)));
+
+            let class_scope_id = definition.scope(db);
+            let class_scope = index.scope(class_scope_id.file_scope_id(db));
+            let class_node = class_scope.node().as_class()?;
+            let class_def = index.expect_single_definition(class_node);
+            let Type::ClassLiteral(class_literal) = infer_definition_types(db, class_def)
+                .declaration_type(class_def)
+                .inner_type()
+            else {
+                return None;
+            };
+            let class_is_generic = class_literal.generic_context(db).is_some();
+            let class_is_fallback = class_literal
+                .known(db)
+                .is_some_and(KnownClass::is_fallback_class);
+
+            // Normally we implicitly annotate `self` or `cls` with `Self` or `type[Self]`, and
+            // create a `Self` typevar that we then have to solve for whenever this method is
+            // called. As an optimization, we can skip creating that typevar in certain situations:
+            //
+            //   - The method cannot use explicit `Self` in any other parameter annotations,
+            //     or in its return type. If it does, then we really do need specialization
+            //     inference at each call site to see which specific instance type should be
+            //     used in those other parameters / return type.
+            //
+            //   - The class cannot be generic. If it is, then we might need an actual `Self`
+            //     typevar to help carry through constraints that relate the instance type to
+            //     other typevars in the method signature.
+            //
+            //   - The class cannot be a "fallback class". A fallback class is used like a mixin,
+            //     and so we need specialization inference to determine the "real" class that the
+            //     fallback is augmenting. (See KnownClass::is_fallback_class for more details.)
+            if method_has_explicit_self || class_is_generic || class_is_fallback {
+                let scope_id = definition.scope(db);
+                let typevar_binding_context = Some(definition);
+                let index = semantic_index(db, scope_id.file(db));
+                let class = nearest_enclosing_class(db, index, scope_id).unwrap();
+
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
+                    "We should always find the surrounding class \
+                     for an implicit self: Self annotation",
+                );
+
+                if self.is_classmethod(db) {
+                    Some(SubclassOfType::from(
+                        db,
+                        SubclassOfInner::TypeVar(typing_self),
+                    ))
+                } else {
+                    Some(Type::TypeVar(typing_self))
+                }
+            } else {
+                // If skip creating the typevar, we use "instance of class" or "subclass of
+                // class" as the implicit annotation instead.
+                if self.is_classmethod(db) {
+                    Some(SubclassOfType::from(
+                        db,
+                        SubclassOfInner::Class(ClassType::NonGeneric(class_literal)),
+                    ))
+                } else {
+                    Some(class_literal.to_non_generic_instance(db))
+                }
+            }
+        });
+
+        raw_signature
     }
 
     pub(crate) fn parameter_span(
@@ -1028,18 +1108,6 @@ impl<'db> FunctionType<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        // A function type is the subtype of itself, and not of any other function type. However,
-        // our representation of a function type includes any specialization that should be applied
-        // to the signature. Different specializations of the same function type are only subtypes
-        // of each other if they result in subtype signatures.
-        if matches!(
-            relation,
-            TypeRelation::Subtyping | TypeRelation::Redundancy | TypeRelation::SubtypingAssuming(_)
-        ) && self.normalized(db) == other.normalized(db)
-        {
-            return ConstraintSet::from(true);
-        }
-
         if self.literal(db) != other.literal(db) {
             return ConstraintSet::from(false);
         }
@@ -1194,10 +1262,9 @@ fn is_instance_truthiness<'db>(
 
         Type::NominalInstance(..) => always_true_if(is_instance(&ty)),
 
-        Type::NewTypeInstance(newtype) => always_true_if(is_instance(&Type::instance(
-            db,
-            newtype.base_class_type(db),
-        ))),
+        Type::NewTypeInstance(newtype) => {
+            always_true_if(is_instance(&newtype.concrete_base_type(db)))
+        }
 
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
@@ -1330,6 +1397,10 @@ pub enum KnownFunction {
     #[strum(serialize = "abstractmethod")]
     AbstractMethod,
 
+    /// `contextlib.asynccontextmanager`
+    #[strum(serialize = "asynccontextmanager")]
+    AsyncContextManager,
+
     /// `dataclasses.dataclass`
     Dataclass,
     /// `dataclasses.field`
@@ -1416,6 +1487,9 @@ impl KnownFunction {
             }
             Self::AbstractMethod => {
                 matches!(module, KnownModule::Abc)
+            }
+            Self::AsyncContextManager => {
+                matches!(module, KnownModule::Contextlib)
             }
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
@@ -1629,10 +1703,16 @@ impl KnownFunction {
                     && !any_over_type(db, *casted_type, &contains_unknown_or_todo, true)
                 {
                     if let Some(builder) = context.report_lint(&REDUNDANT_CAST, call_expression) {
-                        builder.into_diagnostic(format_args!(
-                            "Value is already of type `{}`",
-                            casted_type.display(db),
+                        let source_display = source_type.display(db).to_string();
+                        let casted_display = casted_type.display(db).to_string();
+                        let mut diagnostic = builder.into_diagnostic(format_args!(
+                            "Value is already of type `{casted_display}`",
                         ));
+                        if source_display != casted_display {
+                            diagnostic.info(format_args!(
+                                "`{casted_display}` is equivalent to `{source_display}`",
+                            ));
+                        }
                     }
                 }
             }
@@ -1940,6 +2020,8 @@ pub(crate) mod tests {
                 | KnownFunction::DunderImport => KnownModule::Builtins,
 
                 KnownFunction::AbstractMethod => KnownModule::Abc,
+
+                KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
                 KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
 

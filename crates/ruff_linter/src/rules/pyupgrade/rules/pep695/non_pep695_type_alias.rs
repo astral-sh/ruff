@@ -2,7 +2,7 @@ use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{Expr, ExprCall, ExprName, Keyword, StmtAnnAssign, StmtAssign, StmtRef};
 use ruff_text_size::{Ranged, TextRange};
@@ -261,11 +261,11 @@ fn create_diagnostic(
     type_alias_kind: TypeAliasKind,
 ) {
     let source = checker.source();
+    let tokens = checker.tokens();
     let comment_ranges = checker.comment_ranges();
 
     let range_with_parentheses =
-        parenthesized_range(value.into(), stmt.into(), comment_ranges, source)
-            .unwrap_or(value.range());
+        parenthesized_range(value.into(), stmt.into(), tokens).unwrap_or(value.range());
 
     let content = format!(
         "type {name}{type_params} = {value}",

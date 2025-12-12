@@ -10,7 +10,6 @@ Global settings: GlobalSettings {
     diagnostic_mode: OpenFilesOnly,
     experimental: ExperimentalSettings {
         rename: false,
-        auto_import: false,
     },
 }
 Open text documents: 0
@@ -21,6 +20,9 @@ Settings: WorkspaceSettings {
     inlay_hints: InlayHintSettings {
         variable_types: true,
         call_argument_names: true,
+    },
+    completions: CompletionSettings {
+        auto_import: true,
     },
     overrides: None,
 }
