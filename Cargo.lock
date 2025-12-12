@@ -1663,7 +1663,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46fdb647ebde000f43b5b53f773c30cf9b0cb4300453208713fa38b2c70935a0"
 dependencies = [
  "console 0.15.11",
- "globset",
  "once_cell",
  "pest",
  "pest_derive",
@@ -1671,7 +1670,6 @@ dependencies = [
  "ron",
  "serde",
  "similar",
- "walkdir",
 ]
 
 [[package]]

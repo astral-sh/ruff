@@ -39,7 +39,7 @@ ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
 datatest-stable = { workspace = true }
-insta = { workspace = true, features = ["glob"] }
+insta = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
