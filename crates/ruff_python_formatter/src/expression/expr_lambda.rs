@@ -271,6 +271,8 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             {
                 trailing_comments(dangling).fmt(f)?;
 
+                // Note that `leading_body_comments` have already been formatted as part of
+                // `dangling` above, but their presence still determines the spacing here.
                 if leading_body_comments.is_empty() {
                     space().fmt(f)?;
                 } else {
