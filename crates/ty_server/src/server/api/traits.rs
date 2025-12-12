@@ -112,9 +112,7 @@ pub(super) trait BackgroundDocumentRequestHandler: RetriableRequestHandler {
         client: &Client,
         params: <<Self as RequestHandler>::RequestType as Request>::Params,
     ) {
-        let result = salsa::attach(db, || {
-            Self::run_with_snapshot(db, &snapshot, client, params)
-        });
+        let result = Self::run_with_snapshot(db, &snapshot, client, params);
 
         if let Err(err) = &result {
             tracing::error!("An error occurred with request ID {id}: {err}");
