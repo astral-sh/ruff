@@ -267,3 +267,6 @@ def indentation_matching_walrus_in_preview():
                     (address,),
                 ).fetchall().some_attr)) == 0 or len(set(names)) > 1:
                     return
+
+# behavior with parenthesized roots
+x = (aaaaaaaaaaaaaaaaaaaaaa).bbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccc().dddddddddddddddddddddddd().eeeeeeeeeeee
