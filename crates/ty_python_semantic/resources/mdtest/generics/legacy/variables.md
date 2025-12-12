@@ -107,15 +107,15 @@ reveal_type(S)  # revealed: TypeVar
 ### No explicit specialization
 
 A type variable itself cannot be explicitly specialized; the result of the specialization is
-`Unknown`. However, anything designated as a generic type alias by `typing.TypeAlias` can be
-explicitly specialized.
+`Unknown`. However, generic PEP 613 type aliases that point to type variables can be explicitly
+specialized.
 
 ```py
 from typing import TypeVar, TypeAlias
 
 T = TypeVar("T")
-BareAnnotated = T
-Annotated: TypeAlias = T
+ImplicitPositive = T
+Positive: TypeAlias = T
 
 def _(
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
@@ -123,8 +123,8 @@ def _(
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
     b: T[T],
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
-    c: BareAnnotated[int],
-    d: Annotated[int],
+    c: ImplicitPositive[int],
+    d: Positive[int],
 ):
     reveal_type(a)  # revealed: Unknown
     reveal_type(b)  # revealed: Unknown
