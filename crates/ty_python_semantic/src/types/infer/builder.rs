@@ -8164,10 +8164,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             value,
         } = named;
 
-        self.infer_expression(target, TypeContext::default());
-
         self.add_binding(named.target.as_ref().into(), definition, |builder, tcx| {
-            builder.infer_expression(value, tcx)
+            let ty = builder.infer_expression(value, tcx);
+            builder.store_expression_type(target, ty);
+            ty
         })
     }
 
