@@ -101,17 +101,22 @@ def f[T: (int,)]():
 ### No explicit specialization
 
 A type variable itself cannot be explicitly specialized; the result of the specialization is
-`Unknown`.
+`Unknown`. However, anything designated as a generic type alias by a type statement can be
+explicitly specialized.
 
 ```py
+type Annotated[T] = T
+
 def _[T](
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
-    x: T[int],
+    a: T[int],
     # error: [invalid-type-form] "A type variable itself cannot be specialized"
-    y: T[T],
+    b: T[T],
+    c: Annotated[int],
 ):
-    reveal_type(x)  # revealed: Unknown
-    reveal_type(y)  # revealed: Unknown
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: int
 ```
 
 ## Invalid uses
