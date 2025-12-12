@@ -3332,8 +3332,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     /// are passed.
     ///
     /// This method returns `false` if the specialization does not contain a mapping for the given
-    /// `paramspec`, contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`)
-    /// or if the value is an overloaded callable.
+    /// `paramspec` or contains an invalid mapping (i.e., not a `Callable` of kind `ParamSpecValue`).
     ///
     /// For more details, refer to [`Self::try_paramspec_evaluation_at`].
     fn evaluate_paramspec_sub_call(
@@ -3352,10 +3351,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         }
 
-        // TODO: Support overloads?
-        let [signature] = callable.signatures(self.db).overloads.as_slice() else {
+        let signatures = &callable.signatures(self.db).overloads;
+        if signatures.is_empty() {
             return false;
-        };
+        }
 
         let sub_arguments = if let Some(argument_index) = argument_index {
             self.arguments.start_from(argument_index)
@@ -3363,21 +3362,61 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             CallArguments::none()
         };
 
-        // TODO: What should be the `signature_type` here?
-        let bindings = match Bindings::from(Binding::single(self.signature_type, signature.clone()))
+        // Create Bindings with all overloads and perform full overload resolution
+        let callable_binding =
+            CallableBinding::from_overloads(self.signature_type, signatures.iter().cloned());
+        let bindings = match Bindings::from(callable_binding)
             .match_parameters(self.db, &sub_arguments)
             .check_types(self.db, &sub_arguments, self.call_expression_tcx, &[])
         {
-            Ok(bindings) => Box::new(bindings),
-            Err(CallError(_, bindings)) => bindings,
+            Ok(bindings) => bindings,
+            Err(CallError(_, bindings)) => *bindings,
         };
 
-        // SAFETY: `bindings` was created from a single binding above.
-        let [binding] = bindings.single_element().unwrap().overloads.as_slice() else {
-            unreachable!("ParamSpec sub-call should only contain a single binding");
+        // SAFETY: `bindings` was created from a single `CallableBinding` above.
+        let Some(callable_binding) = bindings.single_element() else {
+            unreachable!("ParamSpec sub-call should only contain a single CallableBinding");
         };
 
-        self.errors.extend(binding.errors.iter().cloned());
+        match callable_binding.matching_overload_index() {
+            MatchingOverloadIndex::None => {
+                if let [binding] = callable_binding.overloads() {
+                    // This is not an overloaded function, so we can propagate its errors
+                    // to the outer bindings.
+                    self.errors.extend(binding.errors.iter().cloned());
+                } else {
+                    let index = callable_binding
+                        .matching_overload_before_type_checking
+                        .unwrap_or(0);
+                    // TODO: We should also update the specialization for the `ParamSpec` to reflect
+                    // the matching overload here.
+                    self.errors
+                        .extend(callable_binding.overloads()[index].errors.iter().cloned());
+                }
+            }
+            MatchingOverloadIndex::Single(index) => {
+                // TODO: We should also update the specialization for the `ParamSpec` to reflect the
+                // matching overload here.
+                self.errors
+                    .extend(callable_binding.overloads()[index].errors.iter().cloned());
+            }
+            MatchingOverloadIndex::Multiple(_) => {
+                if !matches!(
+                    callable_binding.overload_call_return_type,
+                    Some(OverloadCallReturnType::ArgumentTypeExpansion(_))
+                ) {
+                    self.errors.extend(
+                        callable_binding
+                            .overloads()
+                            .first()
+                            .unwrap()
+                            .errors
+                            .iter()
+                            .cloned(),
+                    );
+                }
+            }
+        }
 
         true
     }
