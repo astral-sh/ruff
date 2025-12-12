@@ -22,7 +22,7 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
+    TypeRelation, structural_type_ordering,
 };
 
 use ordermap::OrderSet;
@@ -340,6 +340,56 @@ impl<'db> TypedDictType<'db> {
                 )
             },
         )
+    }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: TypedDictType<'db>,
+    ) -> std::cmp::Ordering {
+        match (self, other) {
+            (TypedDictType::Class(self_class), TypedDictType::Class(other_class)) => {
+                self_class.structural_ordering(db, other_class)
+            }
+            (TypedDictType::Synthesized(self_dict), TypedDictType::Synthesized(other_dict)) => {
+                let self_items = self_dict.items(db);
+                let other_items = other_dict.items(db);
+
+                // Compare number of items first
+                let items_count = self_items.len().cmp(&other_items.len());
+                if items_count != std::cmp::Ordering::Equal {
+                    return items_count;
+                }
+
+                // Compare each item in order
+                for ((self_name, self_field), (other_name, other_field)) in
+                    self_items.iter().zip(other_items.iter())
+                {
+                    let ord = self_name.cmp(other_name);
+                    if ord != std::cmp::Ordering::Equal {
+                        return ord;
+                    }
+
+                    let ord = structural_type_ordering(
+                        db,
+                        &self_field.declared_ty,
+                        &other_field.declared_ty,
+                    );
+                    if ord != std::cmp::Ordering::Equal {
+                        return ord;
+                    }
+
+                    let ord = self_field.flags.bits().cmp(&other_field.flags.bits());
+                    if ord != std::cmp::Ordering::Equal {
+                        return ord;
+                    }
+                }
+
+                std::cmp::Ordering::Equal
+            }
+            (TypedDictType::Class(_), TypedDictType::Synthesized(_)) => std::cmp::Ordering::Less,
+            (TypedDictType::Synthesized(_), TypedDictType::Class(_)) => std::cmp::Ordering::Greater,
+        }
     }
 }
 

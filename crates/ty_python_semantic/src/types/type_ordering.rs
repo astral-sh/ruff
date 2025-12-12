@@ -207,9 +207,7 @@ pub(super) fn structural_type_ordering<'db>(
         (Type::TypeAlias(_), _) => Ordering::Less,
         (_, Type::TypeAlias(_)) => Ordering::Greater,
 
-        (Type::TypedDict(left), Type::TypedDict(right)) => left
-            .defining_class()
-            .structural_ordering(db, right.defining_class()),
+        (Type::TypedDict(left), Type::TypedDict(right)) => left.structural_ordering(db, *right),
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
 
