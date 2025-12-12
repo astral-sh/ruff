@@ -75,7 +75,7 @@ Basic heuristics like checking for `<working-dir>/src/` and resolving editables 
 work well in most cases, but desperate resolution is needed in a couple key scenarios:
 
 - Test or script directories have a tendency to assume extra search-paths that aren't structurally
-    obvious
+    obvious ([notably pytest](https://docs.pytest.org/en/stable/explanation/pythonpath.html))
 - If you open the root of a monorepo in an IDE, you will often have many separate projects but no
     configuration explaining this. Absolute imports within each project should resolve things in
     that project.
