@@ -467,6 +467,17 @@ pub fn completion<'db>(
             !ty.is_notimplemented(db)
         });
     }
+    if is_specifying_for_statement_iterable(&parsed, offset, typed.as_deref()) {
+        // Remove all keywords that doesn't make sense given the context,
+        // even if they are syntatically valid, e.g. `None`.
+        completions.retain(|item| {
+            let Some(kind) = item.kind else { return true };
+            if kind != CompletionKind::Keyword {
+                return true;
+            }
+            matches!(item.name.as_str(), "await" | "lambda" | "yield")
+        });
+    }
     completions.into_completions()
 }
 
@@ -1565,12 +1576,7 @@ fn is_in_definition_place(
 /// Returns true when the cursor sits on a binding statement.
 /// E.g. naming a parameter, type parameter, or `for` <name>).
 fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
-    let range = if let Some(typed) = typed {
-        let start = offset.saturating_sub(typed.text_len());
-        TextRange::new(start, offset)
-    } else {
-        TextRange::empty(offset)
-    };
+    let range = typed_text_range(typed, offset);
 
     let covering = covering_node(parsed.syntax().into(), range);
     covering.ancestors().any(|node| match node {
@@ -1623,6 +1629,36 @@ fn is_raising_exception(tokens: &[Token]) -> bool {
         }
     }
     false
+}
+
+/// Returns true when the cursor is after the `in` keyword in a
+/// `for x in <CURSOR>` statement.
+fn is_specifying_for_statement_iterable(
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+    typed: Option<&str>,
+) -> bool {
+    let range = typed_text_range(typed, offset);
+
+    let covering = covering_node(parsed.syntax().into(), range);
+    covering.parent().is_some_and(|node| {
+        matches!(
+           node, ast::AnyNodeRef::StmtFor(stmt_for) if stmt_for.iter.range().contains_range(range)
+        )
+    })
+}
+
+/// Returns the `TextRange` of the `typed` text.
+///
+/// `typed` should be the text immediately before the
+/// provided cursor `offset`.
+fn typed_text_range(typed: Option<&str>, offset: TextSize) -> TextRange {
+    if let Some(typed) = typed {
+        let start = offset.saturating_sub(typed.text_len());
+        TextRange::new(start, offset)
+    } else {
+        TextRange::empty(offset)
+    }
 }
 
 /// Order completions according to the following rules:
@@ -5822,6 +5858,62 @@ def foo(param: s<CURSOR>)
         )
         .build()
         .contains("str");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_simple1() {
+        completion_test_builder(
+            "\
+for x in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_simple2() {
+        completion_test_builder(
+            "\
+for x, y, _ in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_simple3() {
+        completion_test_builder(
+            "\
+for i, (x, y, z) in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_complex() {
+        completion_test_builder(
+            "\
+for i, (obj.x, (a[0], b['k']), _), *rest in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
     }
 
     #[test]
