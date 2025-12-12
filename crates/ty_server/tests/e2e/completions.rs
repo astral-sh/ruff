@@ -110,13 +110,13 @@ TypedDi<CURSOR>
     insta::assert_json_snapshot!(completions, @r#"
     [
       {
-        "label": "TypedDict (import typing)",
+        "label": "typing.TypedDict",
         "kind": 6,
         "sortText": "0",
         "insertText": "typing.TypedDict"
       },
       {
-        "label": "is_typeddict (import typing)",
+        "label": "typing.is_typeddict",
         "kind": 3,
         "sortText": "1",
         "insertText": "typing.is_typeddict"

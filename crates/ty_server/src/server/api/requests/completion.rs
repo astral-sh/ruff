@@ -81,8 +81,10 @@ impl BackgroundDocumentRequestHandler for CompletionRequestHandler {
                     })
                 });
 
-                let name = comp.name.to_string();
-                let import_suffix = comp.module_name.map(|name| format!(" (import {name})"));
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let import_suffix = comp
+                    .module_name
+                    .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
                 let (label, label_details) = if snapshot
                     .resolved_client_capabilities()
                     .supports_completion_item_label_details()
