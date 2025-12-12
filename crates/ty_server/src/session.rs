@@ -1451,7 +1451,7 @@ impl DocumentHandle {
     }
 
     pub(crate) fn update_text_document(
-        &self,
+        &mut self,
         session: &mut Session,
         content_changes: Vec<TextDocumentContentChangeEvent>,
         new_version: DocumentVersion,
@@ -1471,6 +1471,8 @@ impl DocumentHandle {
             } else {
                 document.apply_changes(content_changes, new_version, position_encoding);
             }
+
+            self.set_version(document.version());
         }
 
         self.update_in_db(session);
@@ -1479,7 +1481,7 @@ impl DocumentHandle {
     }
 
     pub(crate) fn update_notebook_document(
-        &self,
+        &mut self,
         session: &mut Session,
         cells: Option<lsp_types::NotebookDocumentCellChange>,
         metadata: Option<lsp_types::LSPObject>,
@@ -1496,6 +1498,8 @@ impl DocumentHandle {
                 new_version,
                 position_encoding,
             )?;
+
+            self.set_version(new_version);
         }
 
         self.update_in_db(session);
@@ -1514,6 +1518,16 @@ impl DocumentHandle {
         };
 
         session.apply_changes(path, changes);
+    }
+
+    fn set_version(&mut self, version: DocumentVersion) {
+        let self_version = match self {
+            DocumentHandle::Text { version, .. }
+            | DocumentHandle::Notebook { version, .. }
+            | DocumentHandle::Cell { version, .. } => version,
+        };
+
+        *self_version = version;
     }
 
     /// De-registers a document, specified by its key.
