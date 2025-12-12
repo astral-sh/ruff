@@ -909,8 +909,24 @@ pub enum CallChainLayout {
 /// element relative to the first call or subscript.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeState {
+    /// Stores the number of calls or subscripts on attributes
+    /// to the left of the current position in a chain.
+    ///
+    /// Consecutive calls/subscripts on a single
+    /// object only count once. For example, if we are at
+    /// `c` in `a.b()[0]()().c()` then this number would be 1.
     CallsOrSubscriptsPreceding(u32),
+    /// Indicates that we are at the first called or
+    /// subscripted attribute in the chain (and should
+    /// therefore break).
+    ///
+    /// For example, if we are at `b` in `a.b()[0]()().c()`
     FirstCallOrSubscript,
+    /// Indicates that we are to the left of the first
+    /// called or subscripted attribute, and therefore
+    /// need not break.
+    ///
+    /// For example, if we are at `a` in `a.b()[0]()().c()`
     BeforeFirstCallOrSubscript,
 }
 
@@ -964,7 +980,7 @@ impl CallChainLayout {
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
-        // Count of attribute values which are called or
+        // Count of attribute _values_ which are called or
         // subscripted, after the leftmost parenthesized
         // value.
         //
