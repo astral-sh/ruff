@@ -6,8 +6,8 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.preview = enabled
 
 --- Summary ---
-Removed: 14
-Added: 19
+Removed: 15
+Added: 23
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -238,6 +238,27 @@ help: Remove assignment to unused variable `I`
 note: This is an unsafe fix and may change runtime behavior
 
 
+F841 [*] Local variable `value` is assigned to but never used
+  --> suppressions.py:95:5
+   |
+93 |     # ruff: disable[YF829]
+94 |     # ruff: disable[F841, RQW320]
+95 |     value = 0
+   |     ^^^^^
+96 |     # ruff: enable[F841, RQW320]
+97 |     # ruff: enable[YF829]
+   |
+help: Remove assignment to unused variable `value`
+92 |     # Unknown rule codes
+93 |     # ruff: disable[YF829]
+94 |     # ruff: disable[F841, RQW320]
+   -     value = 0
+95 +     pass
+96 |     # ruff: enable[F841, RQW320]
+97 |     # ruff: enable[YF829]
+note: This is an unsafe fix and may change runtime behavior
+
+
 
 --- Added ---
 RUF104 Unmatched suppression comment
@@ -370,6 +391,17 @@ RUF104 Unmatched suppression comment
    |
 
 
+RUF104 Unmatched suppression comment
+  --> suppressions.py:69:5
+   |
+67 |     # and the other should trigger an unused suppression diagnostic
+68 |     # ruff: disable[F841]
+69 |     # ruff: disable[F841]
+   |     ^^^^^^^^^^^^^^^^^^^^^
+70 |     foo = 0
+   |
+
+
 RUF100 [*] Unused suppression (unused: `F841`)
   --> suppressions.py:69:5
    |
@@ -387,17 +419,6 @@ help: Remove unused suppression
 69 |     foo = 0
 70 | 
 71 | 
-
-
-RUF104 Unmatched suppression comment
-  --> suppressions.py:69:5
-   |
-67 |     # and the other should trigger an unused suppression diagnostic
-68 |     # ruff: disable[F841]
-69 |     # ruff: disable[F841]
-   |     ^^^^^^^^^^^^^^^^^^^^^
-70 |     foo = 0
-   |
 
 
 RUF104 Unmatched suppression comment
@@ -509,6 +530,8 @@ help: Remove unused suppression
    -     # ruff: disable[E741, F401, F841]
 87 +     # ruff: disable[F401, F841]
 88 |     print("hello")
+89 | 
+90 | 
 
 
 RUF100 [*] Unused suppression (non-enabled: `F401`)
@@ -527,6 +550,8 @@ help: Remove unused suppression
    -     # ruff: disable[E741, F401, F841]
 87 +     # ruff: disable[E741, F841]
 88 |     print("hello")
+89 | 
+90 | 
 
 
 RUF100 [*] Unused suppression (unused: `F841`)
@@ -545,3 +570,79 @@ help: Remove unused suppression
    -     # ruff: disable[E741, F401, F841]
 87 +     # ruff: disable[E741, F401]
 88 |     print("hello")
+89 | 
+90 | 
+
+
+RUF102 [*] Invalid rule code in `# noqa`: YF829
+  --> suppressions.py:93:5
+   |
+91 | def f():
+92 |     # Unknown rule codes
+93 |     # ruff: disable[YF829]
+   |     ^^^^^^^^^^^^^^^^^^^^^^
+94 |     # ruff: disable[F841, RQW320]
+95 |     value = 0
+   |
+help: Remove the rule code
+90 | 
+91 | def f():
+92 |     # Unknown rule codes
+   -     # ruff: disable[YF829]
+93 |     # ruff: disable[F841, RQW320]
+94 |     value = 0
+95 |     # ruff: enable[F841, RQW320]
+
+
+RUF102 [*] Invalid rule code in `# noqa`: RQW320
+  --> suppressions.py:94:27
+   |
+92 |     # Unknown rule codes
+93 |     # ruff: disable[YF829]
+94 |     # ruff: disable[F841, RQW320]
+   |                           ^^^^^^
+95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+   |
+help: Remove the rule code
+91 | def f():
+92 |     # Unknown rule codes
+93 |     # ruff: disable[YF829]
+   -     # ruff: disable[F841, RQW320]
+94 +     # ruff: disable[F841]
+95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+97 |     # ruff: enable[YF829]
+
+
+RUF102 [*] Invalid rule code in `# noqa`: RQW320
+  --> suppressions.py:96:26
+   |
+94 |     # ruff: disable[F841, RQW320]
+95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+   |                          ^^^^^^
+97 |     # ruff: enable[YF829]
+   |
+help: Remove the rule code
+93 |     # ruff: disable[YF829]
+94 |     # ruff: disable[F841, RQW320]
+95 |     value = 0
+   -     # ruff: enable[F841, RQW320]
+96 +     # ruff: enable[F841]
+97 |     # ruff: enable[YF829]
+
+
+RUF102 [*] Invalid rule code in `# noqa`: YF829
+  --> suppressions.py:97:5
+   |
+95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+97 |     # ruff: enable[YF829]
+   |     ^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the rule code
+94 |     # ruff: disable[F841, RQW320]
+95 |     value = 0
+96 |     # ruff: enable[F841, RQW320]
+   -     # ruff: enable[YF829]
