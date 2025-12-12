@@ -3398,6 +3398,7 @@ dependencies = [
  "bitflags 2.10.0",
  "bstr",
  "compact_str",
+ "datatest-stable",
  "get-size2",
  "insta",
  "itertools 0.14.0",
