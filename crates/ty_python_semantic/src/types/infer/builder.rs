@@ -5636,10 +5636,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // `int | float | complex`. These are allowed because that's what `float` and `complex`
             // expand into in type position. We don't currently ask whether the union was implicit
             // or explicit, so the explicit version is also allowed.
-            Type::Union(union_ty) => match union_ty.known(self.db()) {
-                Some(KnownUnion::Float) | Some(KnownUnion::Complex) => return,
-                _ => {}
-            },
+            Type::Union(union_ty) => {
+                if let Some(KnownUnion::Float | KnownUnion::Complex) = union_ty.known(self.db()) {
+                    return;
+                }
+            }
             // `Unknown` is likely to be the result of an unresolved import or a typo, which will
             // already get a diagnostic, so don't pile on an extra diagnostic here.
             Type::Dynamic(DynamicType::Unknown) => return,
