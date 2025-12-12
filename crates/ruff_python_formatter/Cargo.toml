@@ -44,7 +44,7 @@ tracing = { workspace = true }
 ruff_formatter = { workspace = true }
 
 datatest-stable = { workspace = true }
-insta = { workspace = true, features = ["glob"] }
+insta = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
