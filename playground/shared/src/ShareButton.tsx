@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 import AstralButton from "./AstralButton";
 
-export default function ShareButton({ onShare }: { onShare: () => Promise<void> }) {
+export default function ShareButton({
+  onShare,
+}: {
+  onShare: () => Promise<void>;
+}) {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
