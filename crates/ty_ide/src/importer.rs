@@ -745,8 +745,17 @@ impl ImportResponseKind<'_> {
     fn priority(&self) -> usize {
         match *self {
             ImportResponseKind::Unqualified { .. } => 0,
-            ImportResponseKind::Qualified { .. } => 1,
-            ImportResponseKind::Partial(_) => 2,
+            ImportResponseKind::Partial(_) => 1,
+            // N.B. When given the choice between adding a
+            // name to an existing `from ... import ...`
+            // statement and using an existing `import ...`
+            // in a qualified manner, we currently choose
+            // the former. Originally we preferred qualification,
+            // but there is some evidence that this violates
+            // expectations.
+            //
+            // Ref: https://github.com/astral-sh/ty/issues/1274#issuecomment-3352233790
+            ImportResponseKind::Qualified { .. } => 2,
         }
     }
 }
@@ -1332,9 +1341,9 @@ import collections
         );
         assert_snapshot!(
             test.import("collections", "defaultdict"), @r"
-        from collections import OrderedDict
+        from collections import OrderedDict, defaultdict
         import collections
-        collections.defaultdict
+        defaultdict
         ");
     }
 
