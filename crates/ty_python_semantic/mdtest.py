@@ -236,11 +236,10 @@ class MDTestRunner:
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
                     self._run_mdtest(self.filters)
-            elif vendored_typeshed_has_changed:
-                if self._recompile_tests(
-                    "Vendored typeshed has changed, recompiling tests..."
-                ):
-                    self._run_mdtest(self.filters)
+            elif vendored_typeshed_has_changed and self._recompile_tests(
+                "Vendored typeshed has changed, recompiling tests..."
+            ):
+                self._run_mdtest(self.filters)
 
             for path in new_md_files | changed_md_files:
                 self._run_mdtests_for_file(path)
