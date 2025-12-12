@@ -1017,7 +1017,7 @@ impl CallChainLayout {
         // ```
         let mut computed_attribute_values_after_parentheses = 0;
 
-        // Similar to the above, but instead looks at all
+        // Similar to the above, but instead looks at all calls
         // and subscripts rather than looking only at those on
         // _attribute values_. So this count can differ from the
         // above.
