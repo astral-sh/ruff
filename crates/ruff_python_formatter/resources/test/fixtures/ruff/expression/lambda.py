@@ -127,6 +127,13 @@ lambda a, /, c: a
 
 (
     lambda
+    # comment
+    *x,
+    **y: x
+)
+
+(
+    lambda
     # comment 1
     *
     # comment 2
@@ -197,12 +204,88 @@ lambda: ( # comment
 )
 
 (
+    lambda  # 1
+    # 2
+    x,  # 3
+    # 4
+    y
+    :  # 5
+    # 6
+    x
+)
+
+(
     lambda
     x,
     # comment
     y:
     z
 )
+
+
+# Leading
+lambda x: (
+    lambda y: lambda z: x
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + y
+                        + z  # Trailing
+)  # Trailing
+
+
+# Leading
+lambda x: lambda y: lambda z: [
+    x,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    y,
+    z
+] # Trailing
+# Trailing
 
 lambda self, araa, kkkwargs=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs), e=1, f=2, g=2: d
 
@@ -227,6 +310,441 @@ def a():
                  e=1, f=2, g=2: d,
         g = 10
     )
+
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ) + 1,
+    )
+
+# Additional ecosystem cases from https://github.com/astral-sh/ruff/pull/21385
+class C:
+    def foo():
+        mock_service.return_value.bucket.side_effect = lambda name: (
+            source_bucket
+            if name == source_bucket_name
+            else storage.Bucket(mock_service, destination_bucket_name)
+        )
+
+class C:
+	function_dict: Dict[Text, Callable[[CRFToken], Any]] = {
+        CRFEntityExtractorOptions.POS2: lambda crf_token: crf_token.pos_tag[:2]
+        if crf_token.pos_tag is not None
+        else None,
+	}
+
+name = re.sub(r"[^\x21\x23-\x5b\x5d-\x7e]...............", lambda m: f"\\{m.group(0)}", p["name"])
+
+def foo():
+    if True:
+        if True:
+            return (
+                lambda x: np.exp(cs(np.log(x.to(u.MeV).value))) * u.MeV * u.cm**2 / u.g
+            )
+
+class C:
+    _is_recognized_dtype: Callable[[DtypeObj], bool] = lambda x: lib.is_np_dtype(
+        x, "M"
+    ) or isinstance(x, DatetimeTZDtype)
+
+class C:
+    def foo():
+        if True:
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
+                    chain_id=_chain_id,
+                    from_ts=from_ts,
+                    to_ts=to_ts,
+                ),
+            )
+
+            transaction_count = self._query_txs_for_range(
+                get_count_fn=lambda from_ts, to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range[_chain_id, from_ts, to_ts],
+            )
+
+def ddb():
+    sql = (
+        lambda var, table, n=N: f"""
+        CREATE TABLE {table} AS
+        SELECT ROW_NUMBER() OVER () AS id, {var}
+        FROM (
+            SELECT {var}
+            FROM RANGE({n}) _ ({var})
+            ORDER BY RANDOM()
+        )
+        """
+    )
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = ( # 1
+    # 2
+    lambda x, y, z: # 3
+    # 4
+    x + y + z # 5
+    # 6
+)
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = (
+    lambda x, y, z: x + y + z
+)
+
+long_assignment_target.with_attribute.and_a_slice[with_an_index] = lambda x, y, z: x + y + z
+
+very_long_variable_name_x, very_long_variable_name_y = lambda a: a + some_very_long_expression, lambda b: b * another_very_long_expression_here
+
+very_long_variable_name_for_result += lambda x: very_long_function_call_that_should_definitely_be_parenthesized_now(x, more_args, additional_parameters)
+
+
+if 1:
+    if 2:
+        if 3:
+            if self.location in EVM_EVMLIKE_LOCATIONS and database is not None:
+                exported_dict["notes"] = EVM_ADDRESS_REGEX.sub(
+                    repl=lambda matched_address: self._maybe_add_label_with_address(
+                        database=database,
+                        matched_address=matched_address,
+                    ),
+                    string=exported_dict["notes"],
+                )
+
+class C:
+    def f():
+        return dict(
+            filter(
+                lambda intent_response: self.is_retrieval_intent_response(
+                    intent_response
+                ),
+                self.responses.items(),
+            )
+        )
+
+@pytest.mark.parametrize(
+    "op",
+    [
+        # Not fluent
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01")
+            ),
+        ),
+        # These four are fluent and fit on one line inside the parenthesized
+        # lambda body
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date)
+            ),
+        ),
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+            ),
+        ),
+        param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
+        param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)),
+        # This is too long on one line in the lambda body and gets wrapped
+        # inside the body.
+        param(
+            lambda left, right: (
+                ibis.timestamp("2017-04-01").cast(dt.date).between(left, right).between(left, right)
+            ),
+        ),
+    ],
+)
+def test_string_temporal_compare_between(con, op, left, right): ...
+
+[
+    (
+        lambda eval_df, _: MetricValue(
+            scores=eval_df["prediction"].tolist(),
+            aggregate_results={"prediction_sum": sum(eval_df["prediction"])},
+        )
+    ),
+]
+
+# reuses the list parentheses
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+
+# adds parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz: xxxxxxxxxxxxxxxxxxxx + yyyyyyyyyyyyyyyyyyyy + zzzzzzzzzzzzzzzzzzzz
+
+# removes parentheses around the body
+lambda xxxxxxxxxxxxxxxxxxxx: (xxxxxxxxxxxxxxxxxxxx + 1)
+
+mapper = lambda x: dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]
+
+lambda x, y, z: (
+    x + y + z
+)
+
+lambda x, y, z: (
+    x + y + z
+    # trailing body
+)
+
+lambda x, y, z: (
+    x + y + z  # trailing eol body
+)
+
+lambda x, y, z: (
+    x + y + z
+) # trailing lambda
+
+lambda x, y, z: (
+    # leading body
+    x + y + z
+)
+
+lambda x, y, z: (  # leading eol body
+    x + y + z
+)
+
+(
+    lambda name:
+    source_bucket  # trailing eol comment
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
+(
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
+x = (
+    lambda name:
+    # dangling header comment
+    source_bucket
+    if name == source_bucket_name
+    else storage.Bucket(mock_service, destination_bucket_name)
+)
+
+(
+    lambda name: # dangling header comment
+    (
+        source_bucket
+        if name == source_bucket_name
+        else storage.Bucket(mock_service, destination_bucket_name)
+    )
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:  # dangling eol header comment
+    db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:
+    # dangling header comment before call
+    db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+(
+    lambda left, right:
+    # comment
+    ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+)
+
+(
+    lambda left, right:
+    ibis.timestamp("2017-04-01")  # comment
+    .cast(dt.date)
+    .between(left, right)
+)
+
+(
+    lambda xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy:
+    # comment
+    [xxxxxxxxxxxxxxxxxxxx, yyyyyyyyyyyyyyyyyyyy, zzzzzzzzzzzzzzzzzzzz]
+)
+
+(
+    lambda x, y:
+    # comment
+    {
+        "key": x,
+        "another": y,
+    }
+)
+
+(
+    lambda x, y:
+    # comment
+    (
+        x,
+        y,
+        z
+    )
+)
+
+(
+    lambda x:
+    # comment
+    dict_with_default[np.nan if isinstance(x, float) and np.isnan(x) else x]
+)
+
+(
+    lambda from_ts, to_ts, _chain_id=chain_id:
+    db_evmtx.count_transactions_in_range[
+        # comment
+        _chain_id, from_ts, to_ts
+    ]
+)
+
+(
+    lambda
+    # comment
+    *args, **kwargs:
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment
+    *args, **kwargs:
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment 1
+    # comment 2
+    *args, **kwargs: # comment 3
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda  # comment 1
+    *args, **kwargs: # comment 3
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+)
+
+(
+    lambda *args, **kwargs:
+    # comment 1
+    ( # comment 2
+        # comment 3
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1 # comment 4
+        # comment 5
+    ) # comment 6
+)
+
+(
+    lambda *brgs, **kwargs:
+    # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa( # comment 2
+        # comment 3
+        *brgs, **kwargs) + 1 # comment 4
+    # comment 5
+)
+
+(
+    lambda *crgs, **kwargs: # comment 1
+    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*crgs, **kwargs) + 1
+)
+
+(
+    lambda *drgs, **kwargs: # comment 1
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*drgs, **kwargs) + 1
+    )
+)
+
+(
+    lambda * # comment 1
+    ergs, **
+    # comment 2
+    kwargs # comment 3
+    : # comment 4
+    (
+        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*ergs, **kwargs) + 1
+    )
+)
+
+(
+    lambda  # 1
+    # 2
+    left,  # 3
+    # 4
+    right:  # 5
+    # 6
+    ibis.timestamp("2017-04-01").cast(dt.date).between(left, right)
+)
+
+(
+    lambda x:  # outer comment 1
+    (
+        lambda y:  # inner comment 1
+        # inner comment 2
+        lambda z: (
+            # innermost comment
+            x + y + z
+        )
+    )
+)
+
+foo(
+    lambda from_ts,  # comment prevents collapsing the parameters to one line
+    to_ts, _chain_id=chain_id: db_evmtx.count_transactions_in_range(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+foo(
+    lambda from_ts,  # but still wrap the body if it gets too long
+    to_ts,
+    _chain_id=chain_id: db_evmtx.count_transactions_in_rangeeeeeeeeeeeeeeeeeeeeeeeeeeeee(
+        chain_id=_chain_id,
+        from_ts=from_ts,
+        to_ts=to_ts,
+    )
+)
+
+transform = lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date).between(left, right).between(left, right)  # trailing comment
+
+(
+    lambda:  # comment
+    1
+)
+
+(
+    lambda  # comment
+    :
+    1
+)
+
+(
+    lambda:
+    # comment
+    1
+)
+
+(
+    lambda:  # comment 1
+    # comment 2
+    1
+)
+
+(
+    lambda  # comment 1
+    # comment 2
+    :  # comment 3
+    # comment 4
+    1
+)
 
 (
     lambda
@@ -270,4 +788,19 @@ def a():
     ** # comment 1
     x:
     x
+)
+
+(
+    lambda: # dangling-end-of-line
+    # dangling-own-line
+    (  # leading-body-end-of-line
+        x
+    )
+)
+
+(
+    lambda: # dangling-end-of-line
+    (  # leading-body-end-of-line
+        x
+    )
 )
