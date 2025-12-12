@@ -1,3 +1,7 @@
+use std::cell::RefCell;
+use std::cmp::Ordering;
+use std::fmt::{Formatter, Write};
+
 use datatest_stable::Utf8Path;
 use itertools::Itertools;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
@@ -11,9 +15,6 @@ use ruff_python_parser::semantic_errors::{
 use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Parsed, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use std::cell::RefCell;
-use std::cmp::Ordering;
-use std::fmt::{Formatter, Write};
 
 #[expect(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
 fn valid_syntax(path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
