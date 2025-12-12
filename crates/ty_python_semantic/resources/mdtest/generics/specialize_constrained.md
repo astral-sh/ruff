@@ -16,7 +16,7 @@ An unbounded typevar can specialize to any type. We will specialize the typevar 
 bound of all of the types that satisfy the constraint set.
 
 ```py
-from typing import Never
+from typing import Any, Never
 from ty_extensions import ConstraintSet, generic_context
 
 # fmt: off
@@ -26,6 +26,8 @@ def unbounded[T]():
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.always()))
     # revealed: ty_extensions.Specialization[T@unbounded = object]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, object)))
+    # revealed: ty_extensions.Specialization[T@unbounded = Any]
+    reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, Any)))
     # revealed: None
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.never()))
 

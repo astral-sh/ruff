@@ -78,8 +78,8 @@ use salsa::plumbing::AsId;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
+    UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -198,21 +198,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        relation: TypeRelation<'db>,
     ) -> Self {
-        let (lower, upper) = match relation {
-            TypeRelation::Subtyping
-            | TypeRelation::Redundancy
-            | TypeRelation::SubtypingAssuming(_) => (
-                lower.top_materialization(db),
-                upper.bottom_materialization(db),
-            ),
-            TypeRelation::Assignability => (
-                lower.bottom_materialization(db),
-                upper.top_materialization(db),
-            ),
-        };
-
         Self {
             node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
         }
@@ -428,7 +414,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
+        Self::constrain_typevar(db, typevar, lower, upper)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -499,9 +485,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         mut lower: Type<'db>,
         mut upper: Type<'db>,
     ) -> Node<'db> {
-        debug_assert_eq!(lower, lower.bottom_materialization(db));
-        debug_assert_eq!(upper, upper.top_materialization(db));
-
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -594,7 +577,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_assignable_to(db, upper) {
             return Node::AlwaysFalse;
         }
 
@@ -712,8 +695,8 @@ impl<'db> ConstrainedTypeVar<'db> {
         if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
-        other.lower(db).is_subtype_of(db, self.lower(db))
-            && self.upper(db).is_subtype_of(db, other.upper(db))
+        other.lower(db).is_assignable_to(db, self.lower(db))
+            && self.upper(db).is_assignable_to(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -724,7 +707,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_assignable_to(db, upper) {
             return IntersectionResult::Disjoint;
         }
 
@@ -1268,7 +1251,7 @@ impl<'db> Node<'db> {
                 // process.
                 debug_assert!(current_bounds.is_none_or(
                     |(greatest_lower_bound, least_upper_bound)| {
-                        greatest_lower_bound.is_subtype_of(db, least_upper_bound)
+                        greatest_lower_bound.is_assignable_to(db, least_upper_bound)
                     }
                 ));
 
@@ -3454,7 +3437,7 @@ impl<'db> GenericContext<'db> {
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
-            if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
+            if !greatest_lower_bound.is_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
                     bound_typevar = %identity.display(db),
