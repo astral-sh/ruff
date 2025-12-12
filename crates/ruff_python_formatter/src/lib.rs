@@ -14,7 +14,8 @@ use ruff_python_trivia::CommentRanges;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    Comments, SourceComment, has_skip_comment, leading_comments, trailing_comments,
+    Comments, SourceComment, SuppressedNodeRanges, has_skip_comment, leading_comments,
+    trailing_comments,
 };
 pub use crate::context::PyFormatContext;
 pub use crate::db::Db;
@@ -61,7 +62,7 @@ where
         let node_ref = AnyNodeRef::from(node);
         let node_comments = comments.leading_dangling_trailing(node_ref);
 
-        if self.is_suppressed(node_comments.trailing, f.context()) {
+        if self.is_suppressed(node, f.context()) {
             suppressed_node(node_ref).fmt(f)
         } else {
             leading_comments(node_comments.leading).fmt(f)?;
@@ -99,11 +100,7 @@ where
     /// Formats the node's fields.
     fn fmt_fields(&self, item: &N, f: &mut PyFormatter) -> FormatResult<()>;
 
-    fn is_suppressed(
-        &self,
-        _trailing_comments: &[SourceComment],
-        _context: &PyFormatContext,
-    ) -> bool {
+    fn is_suppressed(&self, _node: &N, _context: &PyFormatContext) -> bool {
         false
     }
 }
@@ -178,9 +175,10 @@ where
 {
     let source_code = SourceCode::new(source);
     let comments = Comments::from_ast(parsed.syntax(), source_code, comment_ranges);
+    let suppressed_nodes = SuppressedNodeRanges::from_comments(&comments, source);
 
     let formatted = format!(
-        PyFormatContext::new(options, source, comments, parsed.tokens()),
+        PyFormatContext::new(options, source, comments, suppressed_nodes, parsed.tokens()),
         [parsed.syntax().format()]
     )?;
     formatted
