@@ -745,7 +745,7 @@ items = {(123)}
 
 ### Long lambda expressions
 
-In [preview](preview.md), Ruff will keep lambda parameters on a single line,
+In [preview](../preview.md), Ruff will keep lambda parameters on a single line,
 just like Black:
 
 ```python
