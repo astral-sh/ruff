@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 
+use crate::AlwaysFixableViolation;
 use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
-use crate::{AlwaysFixableViolation, Violation};
 
 /// ## What it does
 /// Checks for invalid suppression comments
