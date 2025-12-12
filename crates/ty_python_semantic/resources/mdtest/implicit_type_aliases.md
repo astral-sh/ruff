@@ -414,6 +414,7 @@ def _(
     list_or_tuple_legacy: ListOrTupleLegacy[int],
     my_callable: MyCallable[[str, bytes], int],
     annotated_int: AnnotatedType[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
     transparent_alias: TransparentAlias[int],
     optional_int: MyOptional[int],
 ):
@@ -427,7 +428,7 @@ def _(
     reveal_type(list_or_tuple_legacy)  # revealed: list[int] | tuple[int, ...]
     reveal_type(my_callable)  # revealed: (str, bytes, /) -> int
     reveal_type(annotated_int)  # revealed: int
-    reveal_type(transparent_alias)  # revealed: int
+    reveal_type(transparent_alias)  # revealed: Unknown
     reveal_type(optional_int)  # revealed: int | None
 ```
 

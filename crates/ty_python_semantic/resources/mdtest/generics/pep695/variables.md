@@ -98,6 +98,26 @@ def f[T: (int,)]():
     pass
 ```
 
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic type aliases that point to type variables can be explicitly specialized.
+
+```py
+type Positive[T] = T
+
+def _[T](
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    c: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: int
+```
+
 ## Invalid uses
 
 Note that many of the invalid uses of legacy typevars do not apply to PEP 695 typevars, since the
