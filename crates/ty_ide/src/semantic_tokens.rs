@@ -302,17 +302,25 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
-                if let Some(ty) = ty
-                    && let Type::TypeVar(type_var) = ty
-                {
-                    match type_var.typevar(db).kind(db) {
-                        TypeVarKind::TypingSelf => {
-                            return Some((SemanticTokenType::SelfParameter, modifiers));
+                if let Some(ty) = ty {
+                    let type_var = match ty {
+                        Type::TypeVar(type_var) => Some((type_var, false)),
+                        Type::SubclassOf(subclass_of) => {
+                            subclass_of.into_type_var().map(|var| (var, true))
                         }
-                        TypeVarKind::Legacy
-                        | TypeVarKind::ParamSpec
-                        | TypeVarKind::Pep695ParamSpec
-                        | TypeVarKind::Pep695 => {}
+                        _ => None,
+                    };
+
+                    if let Some((type_var, is_cls)) = type_var
+                        && matches!(type_var.typevar(db).kind(db), TypeVarKind::TypingSelf)
+                    {
+                        let kind = if is_cls {
+                            SemanticTokenType::ClsParameter
+                        } else {
+                            SemanticTokenType::SelfParameter
+                        };
+
+                        return Some((kind, modifiers));
                     }
                 }
 
@@ -1203,7 +1211,7 @@ class MyClass:
             "
 class MyClass:
     @classmethod
-    def method(cls, x): pass
+    def method(cls, x): print(cls)
 ",
         );
 
@@ -1215,6 +1223,8 @@ class MyClass:
         "method" @ 41..47: Method [definition]
         "cls" @ 48..51: ClsParameter [definition]
         "x" @ 53..54: Parameter [definition]
+        "print" @ 57..62: Function
+        "cls" @ 63..66: ClsParameter
         "#);
     }
 
@@ -1246,7 +1256,7 @@ class MyClass:
 class MyClass:
     def method(instance, x): pass
     @classmethod
-    def other(klass, y): pass
+    def other(klass, y): print(klass)
     def complex_method(instance, posonly, /, regular, *args, kwonly, **kwargs): pass
 ",
         );
@@ -1262,13 +1272,15 @@ class MyClass:
         "other" @ 75..80: Method [definition]
         "klass" @ 81..86: ClsParameter [definition]
         "y" @ 88..89: Parameter [definition]
-        "complex_method" @ 105..119: Method [definition]
-        "instance" @ 120..128: SelfParameter [definition]
-        "posonly" @ 130..137: Parameter [definition]
-        "regular" @ 142..149: Parameter [definition]
-        "args" @ 152..156: Parameter [definition]
-        "kwonly" @ 158..164: Parameter [definition]
-        "kwargs" @ 168..174: Parameter [definition]
+        "print" @ 92..97: Function
+        "klass" @ 98..103: ClsParameter
+        "complex_method" @ 113..127: Method [definition]
+        "instance" @ 128..136: SelfParameter [definition]
+        "posonly" @ 138..145: Parameter [definition]
+        "regular" @ 150..157: Parameter [definition]
+        "args" @ 160..164: Parameter [definition]
+        "kwonly" @ 166..172: Parameter [definition]
+        "kwargs" @ 176..182: Parameter [definition]
         "#);
     }
 
