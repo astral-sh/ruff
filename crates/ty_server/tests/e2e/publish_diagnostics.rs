@@ -34,6 +34,42 @@ def foo() -> str:
 }
 
 #[test]
+fn on_did_change() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
+        range: None,
+        range_length: None,
+        text: "def foo() -> int: return 42".to_string(),
+    }];
+
+    server.change_text_document(foo, changes, 2);
+
+    let diagnostics = server.await_notification::<PublishDiagnostics>();
+
+    assert_eq!(diagnostics.version, Some(2));
+
+    insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn message_without_related_information_support() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
