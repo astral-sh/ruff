@@ -336,7 +336,14 @@ pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
         path,
         search_paths(db, ModuleResolveMode::StubsAllowed),
     )
-    .or_else(|| file_to_module_impl(db, file, path, desperate_search_paths(db, file).iter()))
+    .or_else(|| {
+        file_to_module_impl(
+            db,
+            file,
+            path,
+            relative_desperate_search_paths(db, file).iter(),
+        )
+    })
 }
 
 fn file_to_module_impl<'db, 'a>(
@@ -388,11 +395,81 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
     Program::get(db).search_paths(db).iter(db, resolve_mode)
 }
 
-/// Get the search-paths that should be used for desperate resolution of imports in this file
+/// Get the search-paths for desperate resolution of absolute imports in this file.
 ///
-/// Currently this is "the closest ancestor dir that contains a pyproject.toml", which is
-/// a completely arbitrary decision. We could potentially change this to return an iterator
-/// of every ancestor with a pyproject.toml or every ancestor.
+/// Currently this is "all ancestor directories that don't contain an `__init__.py(i)`"
+/// (from closest-to-importing-file to farthest).
+///
+/// (For paranoia purposes, all relative desperate search-paths are also absolute
+/// valid desperate search-paths, but don't worry about that.)
+///
+/// We exclude `__init__.py(i)` dirs to avoid truncating packages.
+#[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<Vec<SearchPath>> {
+    let system = db.system();
+    let importing_path = importing_file.path(db).as_system_path()?;
+
+    // Only allow this if the importing_file is under the first-party search path
+    let (base_path, rel_path) =
+        search_paths(db, ModuleResolveMode::StubsAllowed).find_map(|search_path| {
+            if !search_path.is_first_party() {
+                return None;
+            }
+            Some((
+                search_path.as_system_path()?,
+                search_path.relativize_system_path_only(importing_path)?,
+            ))
+        })?;
+
+    // Read the revision on the corresponding file root to
+    // register an explicit dependency on this directory. When
+    // the revision gets bumped, the cache that Salsa creates
+    // for this routine will be invalidated.
+    //
+    // (This is conditional because ruff uses this code too and doesn't set roots)
+    if let Some(root) = db.files().root(db, base_path) {
+        let _ = root.revision(db);
+    }
+
+    // Only allow searching up to the first-party path's root
+    let mut search_paths = Vec::new();
+    for rel_dir in rel_path.ancestors() {
+        let candidate_path = base_path.join(rel_dir);
+        if !system.is_directory(&candidate_path) {
+            continue;
+        }
+        // Any dir that isn't a proper package is plausibly some test/script dir that could be
+        // added as a search-path at runtime. Notably this reflects pytest's default mode where
+        // it adds every dir with a .py to the search-paths (making all test files root modules),
+        // unless they see an `__init__.py`, in which case they assume you don't want that.
+        let isnt_regular_package = !system.is_file(&candidate_path.join("__init__.py"))
+            && !system.is_file(&candidate_path.join("__init__.pyi"));
+        // Any dir with a pyproject.toml or ty.toml is a valid relative desperate search-path and
+        // we want all of those to also be valid absolute desperate search-paths. It doesn't
+        // make any sense for a folder to have `pyproject.toml` and `__init__.py` but let's
+        // not let something cursed and spooky happen, ok? d
+        if isnt_regular_package
+            || system.is_file(&candidate_path.join("pyproject.toml"))
+            || system.is_file(&candidate_path.join("ty.toml"))
+        {
+            let search_path = SearchPath::first_party(system, candidate_path).ok()?;
+            search_paths.push(search_path);
+        }
+    }
+
+    if search_paths.is_empty() {
+        None
+    } else {
+        Some(search_paths)
+    }
+}
+
+/// Get the search-paths for desperate resolution of relative imports in this file.
+///
+/// Currently this is "the closest ancestor dir that contains a pyproject.toml (or ty.toml)",
+/// which is a completely arbitrary decision. However it's farily important that relative
+/// desperate search-paths pick a single "best" answer because every one is *valid* but one
+/// that's too long or too short may cause problems.
 ///
 /// For now this works well in common cases where we have some larger workspace that contains
 /// one or more python projects in sub-directories, and those python projects assume that
@@ -402,7 +479,7 @@ pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> Sear
 /// chaotic things. In particular, all files under a given pyproject.toml will currently
 /// agree on this being their desperate search-path, which is really nice.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
+fn relative_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPath> {
     let system = db.system();
     let importing_path = importing_file.path(db).as_system_path()?;
 
@@ -431,13 +508,15 @@ fn desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<SearchPat
     // Only allow searching up to the first-party path's root
     for rel_dir in rel_path.ancestors() {
         let candidate_path = base_path.join(rel_dir);
-        if system.path_exists(&candidate_path.join("pyproject.toml"))
-            || system.path_exists(&candidate_path.join("ty.toml"))
+        // Any dir with a pyproject.toml or ty.toml might be a project root
+        if system.is_file(&candidate_path.join("pyproject.toml"))
+            || system.is_file(&candidate_path.join("ty.toml"))
         {
             let search_path = SearchPath::first_party(system, candidate_path).ok()?;
             return Some(search_path);
         }
     }
+
     None
 }
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
@@ -960,8 +1039,8 @@ fn desperately_resolve_name(
     name: &ModuleName,
     mode: ModuleResolveMode,
 ) -> Option<ResolvedName> {
-    let search_paths = desperate_search_paths(db, importing_file);
-    resolve_name_impl(db, name, mode, search_paths.iter())
+    let search_paths = absolute_desperate_search_paths(db, importing_file);
+    resolve_name_impl(db, name, mode, search_paths.iter().flatten())
 }
 
 fn resolve_name_impl<'a>(
