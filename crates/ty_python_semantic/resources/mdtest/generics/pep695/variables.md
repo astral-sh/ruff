@@ -98,6 +98,22 @@ def f[T: (int,)]():
     pass
 ```
 
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`.
+
+```py
+def _[T](
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    x: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    y: T[T],
+):
+    reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: Unknown
+```
+
 ## Invalid uses
 
 Note that many of the invalid uses of legacy typevars do not apply to PEP 695 typevars, since the

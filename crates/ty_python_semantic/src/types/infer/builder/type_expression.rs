@@ -996,7 +996,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     Type::unknown()
                 }
                 KnownInstanceType::TypeVar(_) => {
-                    self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        builder.into_diagnostic(format_args!(
+                            "A type variable itself cannot be specialized",
+                        ));
+                    }
+                    Type::unknown()
                 }
 
                 KnownInstanceType::UnionType(_)

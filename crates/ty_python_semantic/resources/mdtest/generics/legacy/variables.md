@@ -104,6 +104,26 @@ S = TypeVar("S", **{"bound": int})
 reveal_type(S)  # revealed: TypeVar
 ```
 
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def _(
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    x: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    y: T[T],
+):
+    reveal_type(x)  # revealed: Unknown
+    reveal_type(y)  # revealed: Unknown
+```
+
 ### Type variables with a default
 
 Note that the `__default__` property is only available in Python ≥3.13.
