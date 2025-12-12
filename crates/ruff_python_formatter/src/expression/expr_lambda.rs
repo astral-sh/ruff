@@ -276,8 +276,8 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         let body_comments = comments.leading_dangling_trailing(body);
 
         if !dangling_header_comments.is_empty() {
-            // Can't use partition_point because there can be additional end of line comments
-            // after the initial set. All of these comments are dangling, for example:
+            // Split the dangling header comments into trailing comments formatted with the lambda
+            // header (1) and leading comments formatted with the body (2, 3, 4).
             //
             // ```python
             // (
@@ -289,8 +289,9 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
             // )
             // ```
             //
-            // and alternate between own line and end of line.
-            let (after_parameters_end_of_line, leading_body_comments) = dangling_header_comments
+            // Note that these are split based on their line position rather than using
+            // `partition_point` based on a range, for example.
+            let (trailing_header_comments, leading_body_comments) = dangling_header_comments
                 .split_at(
                     dangling_header_comments
                         .iter()
@@ -331,7 +332,8 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
                 trailing_comments(dangling_header_comments).fmt(f)?;
 
                 // Note that `leading_body_comments` have already been formatted as part of
-                // `dangling` above, but their presence still determines the spacing here.
+                // `dangling_header_comments` above, but their presence still determines the spacing
+                // here.
                 if leading_body_comments.is_empty() {
                     space().fmt(f)?;
                 } else {
@@ -345,7 +347,7 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
                     [
                         space(),
                         token("("),
-                        trailing_comments(after_parameters_end_of_line),
+                        trailing_comments(trailing_header_comments),
                         block_indent(&format_args!(
                             leading_comments(leading_body_comments),
                             body.format().with_options(Parentheses::Never)
