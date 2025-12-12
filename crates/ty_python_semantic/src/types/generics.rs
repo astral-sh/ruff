@@ -1892,11 +1892,11 @@ impl<'db> SpecializationBuilder<'db> {
                 };
 
                 for actual_callable in actual_callables.as_slice() {
-                    let when = formal_callable
+                    let when = actual_callable
                         .signatures(self.db)
                         .when_constraint_set_assignable_to(
                             self.db,
-                            actual_callable.signatures(self.db),
+                            formal_callable.signatures(self.db),
                             self.inferable,
                         );
                     self.add_type_mappings_from_constraint_set(when, polarity, &mut f);
