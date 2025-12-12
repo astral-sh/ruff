@@ -12,7 +12,7 @@ valid type for use in a type expression:
 MyInt = int
 
 def f(x: MyInt):
-    reveal_type(x)  # revealed: int
+    reveal_type(x)  # revealed: str
 
 f(1)
 ```

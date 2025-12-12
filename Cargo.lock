@@ -1005,27 +1005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dir-test"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62c013fe825864f3e4593f36426c1fa7a74f5603f13ca8d1af7a990c1cd94a79"
-dependencies = [
- "dir-test-macros",
-]
-
-[[package]]
-name = "dir-test-macros"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d42f54d7b4a6bc2400fe5b338e35d1a335787585375322f49c5d5fe7b243da7e"
-dependencies = [
- "glob",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4513,7 +4492,7 @@ dependencies = [
  "camino",
  "colored 3.0.0",
  "compact_str",
- "dir-test",
+ "datatest-stable",
  "drop_bomb",
  "get-size2",
  "glob",

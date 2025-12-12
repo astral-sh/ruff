@@ -129,17 +129,8 @@ class MDTestRunner:
             check=False,
         )
 
-    def _mangle_path(self, markdown_file: Path) -> str:
-        return (
-            markdown_file.as_posix()
-            .replace("/", "_")
-            .replace("-", "_")
-            .removesuffix(".md")
-        )
-
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        path_mangled = self._mangle_path(markdown_file)
-        test_name = f"mdtest__{path_mangled}"
+        test_name = f"mdtest::{markdown_file}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
 
@@ -250,11 +241,6 @@ class MDTestRunner:
                     "Vendored typeshed has changed, recompiling tests..."
                 ):
                     self._run_mdtest(self.filters)
-            elif new_md_files:
-                files = " ".join(file.as_posix() for file in new_md_files)
-                self._recompile_tests(
-                    f"New Markdown test [yellow]{files}[/yellow] detected, recompiling tests..."
-                )
 
             for path in new_md_files | changed_md_files:
                 self._run_mdtests_for_file(path)
