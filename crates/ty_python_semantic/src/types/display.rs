@@ -746,12 +746,22 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         }
                         let separator = if self.settings.multiline { "\n" } else { ", " };
                         let mut join = f.join(separator);
-                        for signature in signatures {
+                        let display_limit = OVERLOAD_POLICY
+                            .display_limit(signatures.len(), self.settings.multiline);
+                        for signature in signatures.iter().take(display_limit) {
                             join.entry(
                                 &signature
                                     .bind_self(self.db, Some(typing_self_ty))
                                     .display_with(self.db, self.settings.clone()),
                             );
+                        }
+                        if !self.settings.multiline {
+                            let omitted = signatures.len().saturating_sub(display_limit);
+                            join.entry(&DisplayOmitted {
+                                count: omitted,
+                                singular: "overload",
+                                plural: "overloads",
+                            });
                         }
                         join.finish()?;
                         if !self.settings.multiline {
@@ -1152,8 +1162,18 @@ impl<'db> FmtDetailed<'db> for DisplayFunctionType<'db> {
                 }
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
-                for signature in signatures {
+                let display_limit =
+                    OVERLOAD_POLICY.display_limit(signatures.len(), self.settings.multiline);
+                for signature in signatures.iter().take(display_limit) {
                     join.entry(&signature.display_with(self.db, self.settings.clone()));
+                }
+                if !self.settings.multiline {
+                    let omitted = signatures.len().saturating_sub(display_limit);
+                    join.entry(&DisplayOmitted {
+                        count: omitted,
+                        singular: "overload",
+                        plural: "overloads",
+                    });
                 }
                 join.finish()?;
                 if !self.settings.multiline {
@@ -1470,6 +1490,11 @@ impl TupleSpecialization {
     }
 }
 
+const OVERLOAD_POLICY: TruncationPolicy = TruncationPolicy {
+    max: 3,
+    max_when_elided: 2,
+};
+
 impl<'db> CallableType<'db> {
     pub(crate) fn display<'a>(&'a self, db: &'db dyn Db) -> DisplayCallableType<'a, 'db> {
         Self::display_with(self, db, DisplaySettings::default())
@@ -1521,8 +1546,18 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 }
                 let separator = if self.settings.multiline { "\n" } else { ", " };
                 let mut join = f.join(separator);
-                for signature in signatures {
+                let display_limit =
+                    OVERLOAD_POLICY.display_limit(signatures.len(), self.settings.multiline);
+                for signature in signatures.iter().take(display_limit) {
                     join.entry(&signature.display_with(self.db, self.settings.clone()));
+                }
+                if !self.settings.multiline {
+                    let omitted = signatures.len().saturating_sub(display_limit);
+                    join.entry(&DisplayOmitted {
+                        count: omitted,
+                        singular: "overload",
+                        plural: "overloads",
+                    });
                 }
                 join.finish()?;
                 if !self.settings.multiline {
