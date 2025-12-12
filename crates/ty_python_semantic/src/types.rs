@@ -2174,6 +2174,23 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            // Two ParamSpec attributes (P.args/P.kwargs and Q.args/Q.kwargs) are assignable to
+            // each other if they have the same attribute kind and both underlying ParamSpecs are
+            // inferable.
+            (Type::TypeVar(lhs_bound_typevar), Type::TypeVar(rhs_bound_typevar))
+                if lhs_bound_typevar.paramspec_attr(db).is_some()
+                    && lhs_bound_typevar.paramspec_attr(db)
+                        == rhs_bound_typevar.paramspec_attr(db)
+                    && lhs_bound_typevar
+                        .without_paramspec_attr(db)
+                        .is_inferable(db, inferable)
+                    && rhs_bound_typevar
+                        .without_paramspec_attr(db)
+                        .is_inferable(db, inferable) =>
+            {
+                ConstraintSet::from(true)
+            }
+
             // `type[T]` is a subtype of the class object `A` if every instance of `T` is a subtype of an instance
             // of `A`, and vice versa.
             (Type::SubclassOf(subclass_of), _)
