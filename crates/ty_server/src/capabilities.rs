@@ -34,9 +34,8 @@ bitflags::bitflags! {
         const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
-        const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
-        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
-        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 18;
+        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
+        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
     }
 }
 
@@ -167,11 +166,6 @@ impl ResolvedClientCapabilities {
     /// Returns `true` if the client has related information support for diagnostics.
     pub(crate) const fn supports_diagnostic_related_information(self) -> bool {
         self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
-    }
-
-    /// Returns `true` if the client supports dynamic registration for rename capabilities.
-    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
-        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
     }
 
     /// Returns `true` if the client supports "label details" in completion items.
@@ -326,13 +320,6 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
-        if text_document
-            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
-        {
-            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
-        }
-
         if client_capabilities
             .window
             .as_ref()
@@ -373,16 +360,6 @@ pub(crate) fn server_capabilities(
             ))
         };
 
-    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
-        // If the client supports dynamic registration, we will register the rename capabilities
-        // dynamically based on the `ty.experimental.rename` setting.
-        None
-    } else {
-        // Otherwise, we always register the rename provider and bail out in `prepareRename` if
-        // the feature is disabled.
-        Some(OneOf::Right(server_rename_options()))
-    };
-
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
         code_action_provider: Some(types::CodeActionProviderCapability::Options(
@@ -413,7 +390,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
-        rename_provider,
+        rename_provider: Some(OneOf::Right(server_rename_options())),
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
