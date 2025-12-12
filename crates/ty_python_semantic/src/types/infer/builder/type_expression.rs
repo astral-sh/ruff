@@ -1003,7 +1003,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     // Annotated: TypeAlias = T
                     // _: Annotated[int] = 1  # valid
                     // ```
-                    if typevar.identity(self.db()).kind(self.db()) == TypeVarKind::Pep613 {
+                    if typevar.identity(self.db()).kind(self.db()) == TypeVarKind::Pep613Alias {
                         self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
                     } else {
                         if let Some(builder) =

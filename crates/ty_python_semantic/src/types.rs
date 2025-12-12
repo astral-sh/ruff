@@ -8011,7 +8011,7 @@ impl<'db> Type<'db> {
     ) {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
             match bound_typevar.typevar(db).kind(db) {
-                TypeVarKind::Legacy | TypeVarKind::Pep613 | TypeVarKind::TypingSelf
+                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
                             == BindingContext::Definition(binding_context)
@@ -9480,8 +9480,6 @@ impl<'db> FieldInstance<'db> {
 pub enum TypeVarKind {
     /// `T = TypeVar("T")`
     Legacy,
-    /// `Alias: typing.TypeAlias = T`
-    Pep613,
     /// `def foo[T](x: T) -> T: ...`
     Pep695,
     /// `typing.Self`
@@ -9490,6 +9488,8 @@ pub enum TypeVarKind {
     ParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
+    /// `Alias: typing.TypeAlias = T`
+    Pep613Alias,
 }
 
 impl TypeVarKind {

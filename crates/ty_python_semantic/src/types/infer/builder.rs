@@ -5871,7 +5871,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.db(),
                             typevar.identity(self.db()).name(self.db()),
                             typevar.identity(self.db()).definition(self.db()),
-                            TypeVarKind::Pep613,
+                            TypeVarKind::Pep613Alias,
                         );
                         Type::KnownInstance(KnownInstanceType::TypeVar(TypeVarInstance::new(
                             self.db(),
