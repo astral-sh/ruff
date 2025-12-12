@@ -964,17 +964,17 @@ impl CallChainLayout {
     /// as follows:
     ///
     /// 1. Beginning from the right (i.e. the `expr` itself),
-    /// traverse inwards past calls, subscripts, and attribute
-    /// expressions until we meet the first expression that is
-    /// either none of these or else is parenthesized. This will
-    /// be the _root_ of the call chain.
+    ///    traverse inwards past calls, subscripts, and attribute
+    ///    expressions until we meet the first expression that is
+    ///    either none of these or else is parenthesized. This will
+    ///    be the _root_ of the call chain.
     /// 2. Count the number of _attribute values_ that are _called
-    /// or subscripted_ in the chain (note that this includes the
-    /// root but excludes the rightmost attribute in the chain since
-    /// it is not the _value_ of some attribute).
+    ///    or subscripted_ in the chain (note that this includes the
+    ///    root but excludes the rightmost attribute in the chain since
+    ///    it is not the _value_ of some attribute).
     /// 3. If the root is parenthesized, add 1 to that value.
     /// 4. If the total is at least 2, return `Fluent`. Otherwise
-    /// return `NonFluent`
+    ///    return `NonFluent`
     pub(crate) fn from_expression(
         mut expr: ExprRef,
         comment_ranges: &CommentRanges,
@@ -1041,7 +1041,7 @@ impl CallChainLayout {
                     // Accumulate the `call_like_count`, but we only
                     // want to count things like `a()[0]()()` once.
                     if !inner.is_call_expr() && !inner.is_subscript_expr() {
-                        call_like_count += 1
+                        call_like_count += 1;
                     }
 
                     expr = ExprRef::from(inner.as_ref());
