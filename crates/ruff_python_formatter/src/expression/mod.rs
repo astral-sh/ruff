@@ -905,25 +905,30 @@ pub enum CallChainLayout {
     NonFluent,
 }
 
-/// Records information about the position of a call chain
-/// element relative to the first call or subscript.
+/// Records information about the current position within
+/// a call chain.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AttributeState {
-    /// Stores the number of calls or subscripts on attributes
+    /// Stores the number of calls or subscripts
     /// to the left of the current position in a chain.
     ///
     /// Consecutive calls/subscripts on a single
     /// object only count once. For example, if we are at
     /// `c` in `a.b()[0]()().c()` then this number would be 1.
+    ///
+    /// Caveat: If the root of the chain is parenthesized,
+    /// it contributes +1 to this count, even if it is not
+    /// a call or subscript. But the name
+    /// `CallsOrSubscriptsOrParenthesizedRootPreceding`
+    /// is a tad unwieldy, and this also rarely occurs.
     CallsOrSubscriptsPreceding(u32),
     /// Indicates that we are at the first called or
-    /// subscripted attribute in the chain (and should
-    /// therefore break).
+    /// subscripted object in the chain
     ///
     /// For example, if we are at `b` in `a.b()[0]()().c()`
     FirstCallOrSubscript,
     /// Indicates that we are to the left of the first
-    /// called or subscripted attribute, and therefore
+    /// called or subscripted object in the chain, and therefore
     /// need not break.
     ///
     /// For example, if we are at `a` in `a.b()[0]()().c()`
@@ -934,14 +939,15 @@ impl CallChainLayout {
     /// Returns new state decreasing count of remaining calls/subscripts
     /// to traverse, or the state `FirstCallOrSubscript`, as appropriate.
     #[must_use]
-    pub(crate) fn increment_call_like_attribute(self) -> Self {
+    pub(crate) fn decrement_call_like_count(self) -> Self {
         match self {
             Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x)) => {
                 if x > 1 {
                     // Recall that we traverse call chains from right to
-                    // left. So after moving past a call-like attribute
-                    // we _decrease_ the count of _remaining_ calls and
-                    // subscripts to the left of our current position.
+                    // left. So after moving from a call/subscript into
+                    // an attribute, we _decrease_ the count of
+                    // _remaining_ calls or subscripts to the left of our
+                    // current position.
                     Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x - 1))
                 } else {
                     Self::Fluent(AttributeState::FirstCallOrSubscript)
@@ -955,7 +961,7 @@ impl CallChainLayout {
     /// `FirstCallOrSubscript` -> `BeforeFirstCallOrSubscript`
     /// and otherwise returns unchanged.
     #[must_use]
-    pub(crate) fn increment_after_attribute(self) -> Self {
+    pub(crate) fn transition_after_attribute(self) -> Self {
         match self {
             Self::Fluent(AttributeState::FirstCallOrSubscript) => {
                 Self::Fluent(AttributeState::BeforeFirstCallOrSubscript)
@@ -991,6 +997,11 @@ impl CallChainLayout {
         comment_ranges: &CommentRanges,
         source: &str,
     ) -> Self {
+        // TODO(dylan): Once the fluent layout preview style is
+        // stabilized, see if it is possible to simplify some of
+        // the logic around parenthesized roots. (While supporting
+        // both styles it is more difficult to do this.)
+
         // Count of attribute _values_ which are called or
         // subscripted, after the leftmost parenthesized
         // value.
@@ -1006,12 +1017,30 @@ impl CallChainLayout {
         // ```
         let mut computed_attribute_values_after_parentheses = 0;
 
+        // Similar to the above, but instead looks at all
+        // and subscripts rather than looking only at those on
+        // _attribute values_. So this count can differ from the
+        // above.
+        //
+        // Examples of `computed_attribute_values_after_parentheses` vs
+        // `call_like_count`:
+        //
+        // a().b --->  1 vs 1
+        // a.b().c --> 1 vs 1
+        // a.b() --->  0 vs 1
         let mut call_like_count = 0;
 
         // Going from right to left, we traverse calls, subscripts,
         // and attributes until we get to an expression of a different
         // kind _or_ to a parenthesized expression. This records
         // the case where we end the traversal at a parenthesized expression.
+        //
+        // In these cases, the inferred semantics of the chain are different.
+        // We interpret this as the user indicating:
+        // "this parenthesized value is the object of interest and we are
+        // doing transformations on it". This increases our confidence that
+        // this should be fluently formatted, and also means we should make
+        // our first break after this value.
         let mut root_value_parenthesized = false;
         loop {
             match expr {
@@ -1066,7 +1095,44 @@ impl CallChainLayout {
         if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(call_like_count))
+            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(
+                // We count a parenthesized root value as an extra
+                // call for the purposes of tracking state.
+                //
+                // The reason is that, in this case, we want the first
+                // "special" break to happen right after the root, as
+                // opposed to right after the first called/subscripted
+                // attribute.
+                //
+                // For example:
+                //
+                // ```
+                // (object_of_interest)
+                // .data.filter()
+                // .agg()
+                // .etc()
+                // ```
+                //
+                // instead of (in preview):
+                //
+                // ```
+                // (object_of_interest)
+                // .data
+                // .filter()
+                // .etc()
+                // ```
+                //
+                // For comparison, if we didn't have parentheses around
+                // the root, we want (and get, in preview):
+                //
+                // ```
+                // object_of_interest.data
+                // .filter()
+                // .agg()
+                // .etc()
+                // ```
+                call_like_count + u32::from(root_value_parenthesized),
+            ))
         }
     }
 
