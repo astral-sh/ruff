@@ -7,7 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::Violation;
 
 /// ## What it does
-/// Checks for implicitly concatenated strings inside list and tuple literals.
+/// Checks for implicitly concatenated strings inside list, tuple, and set literals.
 ///
 /// ## Why is this bad?
 /// In collection literals, implicit string concatenation is often the result of

@@ -12,6 +12,20 @@ facts = [
     "In 1971, astronaut Alan Shepard played golf on the moon.",
 ]
 
+facts = {
+    "Lobsters have blue blood.",
+    "The liver is the only human organ that can fully regenerate itself.",
+    "Clarinets are made almost entirely out of wood from the mpingo tree."
+    "In 1971, astronaut Alan Shepard played golf on the moon.",
+}
+
+facts = {
+    (
+        "Clarinets are made almost entirely out of wood from the mpingo tree."
+        "In 1971, astronaut Alan Shepard played golf on the moon."
+    ),
+}
+
 facts = (
     (
         "Clarinets are made almost entirely out of wood from the mpingo tree."

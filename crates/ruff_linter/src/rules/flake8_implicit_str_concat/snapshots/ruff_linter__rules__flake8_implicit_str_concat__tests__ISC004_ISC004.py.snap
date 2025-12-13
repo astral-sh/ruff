@@ -22,3 +22,14 @@ ISC004 Implicit string concatenation in collection literal; did you forget a com
    | |______________________________________________________________^
 13 |   ]
    |
+
+ISC004 Implicit string concatenation in collection literal; did you forget a comma?
+  --> ISC004.py:18:5
+   |
+16 |       "Lobsters have blue blood.",
+17 |       "The liver is the only human organ that can fully regenerate itself.",
+18 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+19 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+   | |______________________________________________________________^
+20 |   }
+   |
