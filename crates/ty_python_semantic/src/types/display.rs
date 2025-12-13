@@ -2358,7 +2358,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                         .fmt_detailed(f)?;
                     f.write_str("'>")
                 } else {
-                    f.with_type(ty).write_str("typing.TypeAliasType")
+                    f.with_type(ty).write_str("TypeAliasType")
                 }
             }
             // This is a legacy `TypeVar` _outside_ of any generic class or function, so we render
@@ -2366,9 +2366,9 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             // have a `Type::TypeVar(_)`, which is rendered as the typevar's name.
             KnownInstanceType::TypeVar(typevar_instance) => {
                 if typevar_instance.kind(self.db).is_paramspec() {
-                    f.with_type(ty).write_str("typing.ParamSpec")
+                    f.with_type(ty).write_str("ParamSpec")
                 } else {
-                    f.with_type(ty).write_str("typing.TypeVar")
+                    f.with_type(ty).write_str("TypeVar")
                 }
             }
             KnownInstanceType::Deprecated(_) => f.write_str("warnings.deprecated"),

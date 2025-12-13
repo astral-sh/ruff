@@ -201,7 +201,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any, /) -> _SpecialForm
+reveal_type(IntOrStr.__or__)  # revealed: bound method TypeAliasType.__or__(right: Any, /) -> _SpecialForm
 ```
 
 ## Method calls on types not disjoint from `None`

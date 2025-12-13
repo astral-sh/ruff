@@ -567,7 +567,7 @@ def f(x: int):
     super(x, x)
 
     type IntAlias = int
-    # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
+    # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
 # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
