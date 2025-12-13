@@ -337,6 +337,31 @@ for x in Test():
     reveal_type(x)  # revealed: int
 ```
 
+## Intersection type via isinstance narrowing
+
+When we have an intersection type via `isinstance` narrowing, we should be able to infer the
+iterable element type precisely:
+
+```py
+from typing import Sequence
+
+def _(x: Sequence[int], y: object):
+    reveal_type(x)  # revealed: Sequence[int]
+    for item in x:
+        reveal_type(item)  # revealed: int
+
+    if isinstance(y, list):
+        reveal_type(y)  # revealed: Top[list[Unknown]]
+        for item in y:
+            reveal_type(item)  # revealed: object
+
+    if isinstance(x, list):
+        reveal_type(x)  # revealed: Sequence[int] & Top[list[Unknown]]
+        for item in x:
+            # int & object simplifies to int
+            reveal_type(item)  # revealed: int
+```
+
 ## Possibly-not-callable `__iter__` method
 
 ```py

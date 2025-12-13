@@ -29,8 +29,8 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    IntersectionType, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping,
+    TypeRelation, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -1781,6 +1781,42 @@ impl<'db> TupleSpecBuilder<'db> {
                 TupleSpecBuilder::Variable {
                     prefix: vec![],
                     variable: unioned,
+                    suffix: vec![],
+                }
+            }
+        }
+    }
+
+    /// Return a new tuple-spec builder that reflects the intersection of this tuple and another tuple.
+    ///
+    /// For example, if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a
+    /// tuple-spec for `tuple[object, object]`, the result will be a tuple-spec builder for
+    /// `tuple[int, str]` (since `int & object` simplifies to `int`, and `str & object` to `str`).
+    ///
+    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
+    /// a tuple spec if both `self` and `other` have the exact same length. For example,
+    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
+    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
+    /// `tuple[int & str & bytes, ...]`.
+    pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
+        match (&mut self, other) {
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
+                if our_elements.len() == new_elements.len() =>
+            {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                    *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                }
+                self
+            }
+
+            _ => {
+                let intersected = IntersectionType::from_elements(
+                    db,
+                    self.all_elements().chain(other.all_elements()),
+                );
+                TupleSpecBuilder::Variable {
+                    prefix: vec![],
+                    variable: intersected,
                     suffix: vec![],
                 }
             }
