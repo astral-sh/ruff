@@ -788,7 +788,7 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
 
-# revealed: Never
+# revealed: Unknown
 reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
 class Proxy: ...
