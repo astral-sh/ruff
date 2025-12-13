@@ -43,6 +43,7 @@ use crate::types::generics::{
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::variance::VarianceInferable;
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
@@ -2997,6 +2998,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
+        let generic_context_variables = generic_context.variables(self.db);
         let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
 
         // Prefer the declared type of generic classes.
@@ -3025,10 +3027,33 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
+                // Below, we will possibly perform literal promotion on the types that we infer for
+                // each typevar. Whether we do so will depend on which arguments affect the
+                // specialization of the typevar, and what variance the typevar has in the
+                // corresponding parameter type.
+                let when_assignable = argument_type.when_constraint_set_assignable_to(
+                    self.db,
+                    expected_type,
+                    self.inferable_typevars,
+                );
+                for bound_typevar in generic_context_variables.clone() {
+                    let identity = bound_typevar.identity(self.db);
+                    if !when_assignable.mentions_typevar(self.db, identity) {
+                        continue;
+                    }
+                    let variance = expected_type.variance_of(self.db, bound_typevar);
+                    if variance != TypeVarVariance::Bivariant {
+                        variance_in_arguments
+                            .entry(identity)
+                            .and_modify(|current| *current = current.join(variance))
+                            .or_insert(variance);
+                    }
+                }
+
                 let specialization_result = builder.infer_map(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(identity, inferred_ty)| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if preferred_type_mappings
@@ -3040,11 +3065,6 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         {
                             return None;
                         }
-
-                        variance_in_arguments
-                            .entry(identity)
-                            .and_modify(|current| *current = current.join(variance))
-                            .or_insert(variance);
 
                         Some(inferred_ty)
                     },

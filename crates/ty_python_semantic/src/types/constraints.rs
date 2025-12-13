@@ -76,7 +76,9 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
-use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
+use crate::types::visitor::{
+    TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
+};
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
     TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
@@ -207,7 +209,7 @@ impl<'db> ConstraintSet<'db> {
                 lower.top_materialization(db),
                 upper.bottom_materialization(db),
             ),
-            TypeRelation::Assignability => (
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => (
                 lower.bottom_materialization(db),
                 upper.top_materialization(db),
             ),
@@ -320,6 +322,18 @@ impl<'db> ConstraintSet<'db> {
         }
 
         false
+    }
+
+    pub(crate) fn mentions_typevar(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> bool {
+        let mut found = false;
+        self.node.for_each_constraint(db, &mut |constraint| {
+            found |= constraint.typevar(db).identity(db) == bound_typevar;
+        });
+        found
     }
 
     /// Returns the constraints under which `lhs` is a subtype of `rhs`, assuming that the
@@ -594,7 +608,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the constraint cannot be satisfied, since there is no type that
         // is both greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return Node::AlwaysFalse;
         }
 
@@ -700,7 +714,11 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db).identity(db), self.as_id())
+        (
+            self.typevar(db).binding_context(db),
+            self.typevar(db).identity(db),
+            self.as_id(),
+        )
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -712,8 +730,12 @@ impl<'db> ConstrainedTypeVar<'db> {
         if !self.typevar(db).is_same_typevar_as(db, other.typevar(db)) {
             return false;
         }
-        other.lower(db).is_subtype_of(db, self.lower(db))
-            && self.upper(db).is_subtype_of(db, other.upper(db))
+        other
+            .lower(db)
+            .is_constraint_set_assignable_to(db, self.lower(db))
+            && self
+                .upper(db)
+                .is_constraint_set_assignable_to(db, other.upper(db))
     }
 
     /// Returns the intersection of two range constraints, or `None` if the intersection is empty.
@@ -724,7 +746,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
         // If `lower ≰ upper`, then the intersection is empty, since there is no type that is both
         // greater than `lower`, and less than `upper`.
-        if !lower.is_subtype_of(db, upper) {
+        if !lower.is_constraint_set_assignable_to(db, upper) {
             return IntersectionResult::Disjoint;
         }
 
@@ -1268,7 +1290,7 @@ impl<'db> Node<'db> {
                 // process.
                 debug_assert!(current_bounds.is_none_or(
                     |(greatest_lower_bound, least_upper_bound)| {
-                        greatest_lower_bound.is_subtype_of(db, least_upper_bound)
+                        greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound)
                     }
                 ));
 
@@ -1748,22 +1770,27 @@ impl<'db> InteriorNode<'db> {
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
+        let mentions_typevar = |ty: Type<'db>| match ty {
+            Type::TypeVar(haystack) => haystack.identity(db) == bound_typevar,
+            _ => false,
+        };
         self.abstract_one_inner(
             db,
-            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound of
-            // `bound_typevar`.
+            // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound
+            // that mentions `bound_typevar`.
+            // TODO: This will currently remove constraints that mention a typevar, but the sequent
+            // map is not yet propagating all derived facts about those constraints. For instance,
+            // removing `T` from `T ≤ int ∧ U ≤ Sequence[T]` should produce `U ≤ Sequence[int]`.
+            // But that requires `T ≤ int ∧ U ≤ Sequence[T] → U ≤ Sequence[int]` to exist in the
+            // sequent map. It doesn't, and so we currently produce `U ≤ Unknown` in this case.
             &mut |constraint| {
                 if constraint.typevar(db).identity(db) == bound_typevar {
                     return true;
                 }
-                if let Type::TypeVar(lower_bound_typevar) = constraint.lower(db)
-                    && lower_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.lower(db), &mentions_typevar, false) {
                     return true;
                 }
-                if let Type::TypeVar(upper_bound_typevar) = constraint.upper(db)
-                    && upper_bound_typevar.identity(db) == bound_typevar
-                {
+                if any_over_type(db, constraint.upper(db), &mentions_typevar, false) {
                     return true;
                 }
                 false
@@ -1787,9 +1814,7 @@ impl<'db> InteriorNode<'db> {
                 if constraint.typevar(db).identity(db) != bound_typevar {
                     return true;
                 }
-                if matches!(constraint.lower(db), Type::TypeVar(_))
-                    || matches!(constraint.upper(db), Type::TypeVar(_))
-                {
+                if constraint.lower(db).has_typevar(db) || constraint.upper(db).has_typevar(db) {
                     return true;
                 }
                 false
@@ -2681,6 +2706,24 @@ impl<'db> SequentMap<'db> {
                 (bound_constraint.lower(db), constrained_upper)
             }
 
+            // (CL ≤ C ≤ pivot) ∧ (pivot ≤ B ≤ BU) → (CL ≤ C ≤ B)
+            (constrained_lower, constrained_upper)
+                if constrained_upper == bound_constraint.lower(db)
+                    && !constrained_upper.is_never()
+                    && !constrained_upper.is_object() =>
+            {
+                (constrained_lower, Type::TypeVar(bound_typevar))
+            }
+
+            // (pivot ≤ C ≤ CU) ∧ (BL ≤ B ≤ pivot) → (B ≤ C ≤ CU)
+            (constrained_lower, constrained_upper)
+                if constrained_lower == bound_constraint.upper(db)
+                    && !constrained_lower.is_never()
+                    && !constrained_lower.is_object() =>
+            {
+                (Type::TypeVar(bound_typevar), constrained_upper)
+            }
+
             _ => return,
         };
 
@@ -2703,17 +2746,36 @@ impl<'db> SequentMap<'db> {
                 let left_upper = left_constraint.upper(db);
                 let right_lower = right_constraint.lower(db);
                 let right_upper = right_constraint.upper(db);
+                let new_constraint = |bound_typevar: BoundTypeVarInstance<'db>,
+                                      right_lower: Type<'db>,
+                                      right_upper: Type<'db>| {
+                    let right_lower = if let Type::TypeVar(other_bound_typevar) = right_lower
+                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                    {
+                        Type::Never
+                    } else {
+                        right_lower
+                    };
+                    let right_upper = if let Type::TypeVar(other_bound_typevar) = right_upper
+                        && bound_typevar.is_same_typevar_as(db, other_bound_typevar)
+                    {
+                        Type::object()
+                    } else {
+                        right_upper
+                    };
+                    ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                };
                 let post_constraint = match (left_lower, left_upper) {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
                         if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
                     {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                        new_constraint(bound_typevar, right_lower, right_upper)
                     }
                     (Type::TypeVar(bound_typevar), _) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, Type::Never, right_upper)
+                        new_constraint(bound_typevar, Type::Never, right_upper)
                     }
                     (_, Type::TypeVar(bound_typevar)) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, Type::object())
+                        new_constraint(bound_typevar, right_lower, Type::object())
                     }
                     _ => return,
                 };
@@ -3454,7 +3516,7 @@ impl<'db> GenericContext<'db> {
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
-            if !greatest_lower_bound.is_subtype_of(db, least_upper_bound) {
+            if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
                     bound_typevar = %identity.display(db),

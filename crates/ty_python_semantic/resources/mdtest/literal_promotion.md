@@ -341,3 +341,25 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 x22: X[Literal[1]] | None = x(1)
 reveal_type(x22)  # revealed: X[Literal[1]]
 ```
+
+## Arguments that don't affect a typevar aren't considered
+
+```py
+from typing import Any, Iterable, TypeVar
+
+K = TypeVar("K")
+V = TypeVar("V")
+
+# K is invariant in parameter 1 and covariant in parameter 2.
+def find_dict(lst: Iterable[dict[K, V]], k: K, v: V) -> dict[K, V]:
+    for dct in lst:
+        if dct[k] == v:
+            return dct
+    raise AssertionError(f"Cannot find element in list where key {k} == {v}")
+
+def _(d: Any, t: str):
+    # Because `d` does not affect the specialization of `K`, we consider `K` covariant instead of
+    # invariant for the purposes of this call. That means we _do_ perform literal promotion on `K`.
+    # revealed: dict[str, str]
+    reveal_type(find_dict(d, "email", t))
+```
