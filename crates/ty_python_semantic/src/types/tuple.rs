@@ -1796,8 +1796,7 @@ impl<'db> TupleSpecBuilder<'db> {
     /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
     /// a tuple spec if both `self` and `other` have the exact same length. For example,
     /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
-    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
-    /// `tuple[int & str & bytes, ...]`.
+    /// `tuple[bytes]`, the result will be a tuple-spec builder for `tuple[(int | str) & bytes, ...]`.
     pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
@@ -1810,10 +1809,13 @@ impl<'db> TupleSpecBuilder<'db> {
             }
 
             _ => {
-                let intersected = IntersectionType::from_elements(
-                    db,
-                    self.all_elements().chain(other.all_elements()),
-                );
+                // Each tuple yields the union of its elements when iterated.
+                // The intersection of two iterables yields elements that are
+                // in both, so we intersect their homogeneous element types.
+                let self_elements = UnionType::from_elements(db, self.all_elements());
+                let other_elements = UnionType::from_elements(db, other.all_elements());
+                let intersected =
+                    IntersectionType::from_elements(db, [self_elements, other_elements]);
                 TupleSpecBuilder::Variable {
                     prefix: vec![],
                     variable: intersected,
