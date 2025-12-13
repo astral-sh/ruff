@@ -531,7 +531,7 @@ class FrozenBase:
     x: int
 
 @dataclass 
-class Child(FrozenBase): # error: [non-frozen-subclass-of-frozen-dataclass] "A non-frozen class `Child` cannot inherit from a class `FrozenBase` that is frozen"
+class Child(FrozenBase): # error: [invalid-frozen-dataclass-subclass] "A non-frozen class `Child` cannot inherit from a class `FrozenBase` that is frozen"
 
     y: int
 ```
@@ -546,7 +546,7 @@ class Base:
     x: int
 
 @dataclass(frozen=True)
-class FrozenChild(Base): # error: [frozen-subclass-of-non-frozen-dataclass] "A frozen class `FrozenChild` cannot inherit from a class `Base` that is not frozen"
+class FrozenChild(Base): # error: [invalid-frozen-dataclass-subclass] "A frozen class `FrozenChild` cannot inherit from a class `Base` that is not frozen"
 
     y: int
 ```
