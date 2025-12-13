@@ -490,16 +490,12 @@ fn detect_function_arg_completions<'db>(
         .flat_map(|sig| &sig.parameters)
         .filter(|p| !p.is_positional_only && !set_function_args.contains(&p.name.as_str()))
         .map(|p| {
-            let name = Name::new(&p.name);
-            let documentation = p
-                .documentation
-                .as_ref()
-                .map(|d| Docstring::new(d.to_owned()));
-            let insert = Some(format!("{name}=").into_boxed_str());
+            let documentation = p.documentation.clone().map(Docstring::new);
+            let name = format!("{}=", &p.name);
             Completion {
-                name,
+                name: Name::from(&name),
                 qualified: None,
-                insert,
+                insert: Some(name.into_boxed_str()),
                 ty: p.ty,
                 kind: Some(CompletionKind::Variable),
                 module_name: None,
@@ -2424,7 +2420,10 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"foo",
+            @r"
+        foo
+        foo=
+        ",
         );
     }
 
@@ -2438,7 +2437,10 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"foo",
+            @r"
+        foo
+        foo=
+        ",
         );
     }
 
@@ -2452,7 +2454,10 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"foo",
+            @r"
+        foo
+        foo=
+        ",
         );
     }
 
@@ -2466,7 +2471,10 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @"foo",
+            @r"
+        foo
+        foo=
+        ",
         );
     }
 
@@ -2516,9 +2524,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"foo=",
         );
     }
 
@@ -2532,9 +2538,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"foo=",
         );
     }
 
@@ -3191,7 +3195,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3212,7 +3216,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3230,9 +3234,9 @@ foo(b<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
-        bar
-        barbaz
-        baz
+        bar=
+        barbaz=
+        baz=
         "
         );
     }
@@ -3249,9 +3253,7 @@ foo(bar=1, b<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        baz
-        "
+            @"baz="
         );
     }
 
@@ -3269,9 +3271,7 @@ abc(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        okay
-        "
+            @"okay="
         );
     }
 
@@ -3287,9 +3287,7 @@ abc(okay=1, ba<CURSOR> baz=5
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        bar
-        "
+            @"bar="
         );
     }
 
@@ -3333,9 +3331,9 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
-        okay_abc
-        okay_okay
+        okay=
+        okay_abc=
+        okay_okay=
         "
         );
     }
@@ -3355,7 +3353,7 @@ bar(<CURSOR>
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         foo
-        okay
+        okay=
         ");
     }
 
