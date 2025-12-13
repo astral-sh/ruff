@@ -27,6 +27,24 @@ facts = {
 }
 
 facts = (
+    "Octopuses have three hearts."
+    # Missing comma here.
+    "Honey never spoils.",
+)
+
+facts = [
+    "Octopuses have three hearts."
+    # Missing comma here.
+    "Honey never spoils.",
+]
+
+facts = {
+    "Octopuses have three hearts."
+    # Missing comma here.
+    "Honey never spoils.",
+}
+
+facts = (
     (
         "Clarinets are made almost entirely out of wood from the mpingo tree."
         "In 1971, astronaut Alan Shepard played golf on the moon."
