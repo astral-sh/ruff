@@ -12,7 +12,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 
 x: IntOrStr = 1
@@ -205,7 +205,7 @@ from typing_extensions import TypeAliasType, Union
 
 IntOrStr = TypeAliasType("IntOrStr", Union[int, str])
 
-reveal_type(IntOrStr)  # revealed: typing.TypeAliasType
+reveal_type(IntOrStr)  # revealed: TypeAliasType
 
 reveal_type(IntOrStr.__name__)  # revealed: Literal["IntOrStr"]
 

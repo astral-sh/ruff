@@ -3057,10 +3057,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @r"
-        typing.TypeVar
+        TypeVar
         ---------------------------------------------
         ```python
-        typing.TypeVar
+        TypeVar
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
@@ -3120,10 +3120,10 @@ def function():
         );
 
         assert_snapshot!(test.hover(), @r"
-        typing.TypeVar
+        TypeVar
         ---------------------------------------------
         ```python
-        typing.TypeVar
+        TypeVar
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

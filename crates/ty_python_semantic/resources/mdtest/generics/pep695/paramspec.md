@@ -12,7 +12,7 @@ python-version = "3.13"
 
 ```py
 def foo1[**P]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 ```
 
 ## Bounds and constraints
@@ -45,14 +45,14 @@ The default value for a `ParamSpec` can be either a list of types, `...`, or ano
 
 ```py
 def foo2[**P = ...]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 
 def foo3[**P = [int, str]]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 
 def foo4[**P, **Q = P]():
-    reveal_type(P)  # revealed: typing.ParamSpec
-    reveal_type(Q)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
+    reveal_type(Q)  # revealed: ParamSpec
 ```
 
 Other values are invalid.

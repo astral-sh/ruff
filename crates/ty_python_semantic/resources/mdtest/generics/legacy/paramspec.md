@@ -9,7 +9,7 @@ from typing import ParamSpec
 
 P = ParamSpec("P")
 reveal_type(type(P))  # revealed: <class 'ParamSpec'>
-reveal_type(P)  # revealed: typing.ParamSpec
+reveal_type(P)  # revealed: ParamSpec
 reveal_type(P.__name__)  # revealed: Literal["P"]
 ```
 
