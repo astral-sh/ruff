@@ -2155,7 +2155,7 @@ transform = (
          ),
          param(
              lambda left, right: (
-@@ -471,9 +463,9 @@
+@@ -471,15 +463,16 @@
          ),
          param(lambda left, right: ibis.timestamp("2017-04-01").cast(dt.date)),
          param(
@@ -2168,7 +2168,15 @@ transform = (
          ),
          # This is too long on one line in the lambda body and gets wrapped
          # inside the body.
-@@ -507,16 +499,18 @@
+         param(
+             lambda left, right: (
+-                ibis.timestamp("2017-04-01")
++                ibis
++                .timestamp("2017-04-01")
+                 .cast(dt.date)
+                 .between(left, right)
+                 .between(left, right)
+@@ -507,16 +500,18 @@
  ]
  
  # adds parentheses around the body
@@ -2190,7 +2198,7 @@ transform = (
  
  lambda x, y, z: (
      x + y + z
-@@ -527,7 +521,7 @@
+@@ -527,7 +522,7 @@
      x + y + z  # trailing eol body
  )
  
@@ -2199,7 +2207,7 @@ transform = (
  
  lambda x, y, z: (
      # leading body
-@@ -539,21 +533,23 @@
+@@ -539,21 +534,23 @@
  )
  
  (
@@ -2233,7 +2241,7 @@ transform = (
      # dangling header comment
      source_bucket
      if name == source_bucket_name
-@@ -561,8 +557,7 @@
+@@ -561,8 +558,7 @@
  )
  
  (
@@ -2243,7 +2251,7 @@ transform = (
          source_bucket
          if name == source_bucket_name
          else storage.Bucket(mock_service, destination_bucket_name)
-@@ -570,61 +565,70 @@
+@@ -570,61 +566,71 @@
  )
  
  (
@@ -2293,7 +2301,8 @@ transform = (
 -    .cast(dt.date)
 -    .between(left, right)
 +    lambda left, right: (
-+        ibis.timestamp("2017-04-01")  # comment
++        ibis
++        .timestamp("2017-04-01")  # comment
 +        .cast(dt.date)
 +        .between(left, right)
 +    )
@@ -2346,7 +2355,7 @@ transform = (
  )
  
  (
-@@ -637,27 +641,31 @@
+@@ -637,27 +643,31 @@
  (
      lambda
      # comment
@@ -2386,7 +2395,7 @@ transform = (
  )
  
  (
-@@ -672,25 +680,28 @@
+@@ -672,25 +682,28 @@
  )
  
  (
@@ -2427,7 +2436,7 @@ transform = (
  )
  
  (
-@@ -698,9 +709,9 @@
+@@ -698,9 +711,9 @@
      # comment 1
      *ergs,
      # comment 2
@@ -2440,7 +2449,7 @@ transform = (
  )
  
  (
-@@ -708,19 +719,20 @@
+@@ -708,19 +721,20 @@
      # 2
      left,  # 3
      # 4
@@ -2471,7 +2480,7 @@ transform = (
          )
      )
  )
-@@ -738,48 +750,52 @@
+@@ -738,48 +752,52 @@
  foo(
      lambda from_ts,  # but still wrap the body if it gets too long
      to_ts,
@@ -2548,7 +2557,7 @@ transform = (
  )
  
  (
-@@ -828,8 +844,7 @@
+@@ -828,8 +846,7 @@
  )
  
  (

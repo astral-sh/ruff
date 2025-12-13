@@ -393,12 +393,14 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
         // ```
         else if matches!(body, Expr::Call(_) | Expr::Subscript(_)) {
             let unparenthesized = body.format().with_options(Parentheses::Never);
-            if CallChainLayout::from_expression(
-                body.into(),
-                comments.ranges(),
-                f.context().source(),
-            ) == CallChainLayout::Fluent
-            {
+            if matches!(
+                CallChainLayout::from_expression(
+                    body.into(),
+                    comments.ranges(),
+                    f.context().source(),
+                ),
+                CallChainLayout::Fluent(_)
+            ) {
                 parenthesize_if_expands(&unparenthesized).fmt(f)
             } else {
                 let unparenthesized = unparenthesized.memoized();
