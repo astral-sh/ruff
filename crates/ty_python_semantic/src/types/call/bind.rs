@@ -3001,10 +3001,40 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Prefer the declared type of generic classes.
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
-            tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+            let (tcx_class, tcx_specialization) = tcx
+                .filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                 .class_specialization(self.db)?;
 
-            builder.infer(return_ty, tcx).ok()?;
+            let Some((return_class, return_specialization)) = return_ty
+                .filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
+                .class_specialization(self.db)
+            else {
+                builder.infer(return_ty, tcx).ok()?;
+                return Some(builder.type_mappings().clone());
+            };
+
+            // TODO: We should use the constraint solver here to determine the type mappings for more
+            // complex subtyping relationships, e.g., callables, protocols, or unions containing multiple
+            // generic elements.
+            for base in return_class.iter_mro(self.db, Some(return_specialization)) {
+                let Some((base_class, Some(base_specialization))) =
+                    base.into_class().map(|class| class.class_literal(self.db))
+                else {
+                    continue;
+                };
+
+                if base_class == tcx_class {
+                    for (base_ty, tcx_ty) in std::iter::zip(
+                        base_specialization.types(self.db),
+                        tcx_specialization.types(self.db),
+                    ) {
+                        builder.infer(*base_ty, *tcx_ty).ok()?;
+                    }
+
+                    break;
+                }
+            }
+
             Some(builder.type_mappings().clone())
         });
 

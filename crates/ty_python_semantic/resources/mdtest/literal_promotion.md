@@ -341,3 +341,58 @@ reveal_type(x21)  # revealed: X[Literal[1]]
 x22: X[Literal[1]] | None = x(1)
 reveal_type(x22)  # revealed: X[Literal[1]]
 ```
+
+## Literal annotations see through subtyping
+
+```py
+from typing import Any, Iterable, Literal, MutableSequence, Sequence
+
+x1: Sequence[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x1)  # revealed: list[Literal[1, 2, 3]]
+
+x2: MutableSequence[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x2)  # revealed: list[Literal[1, 2, 3]]
+
+x3: Iterable[Literal[1, 2, 3]] = [1, 2, 3]
+reveal_type(x3)  # revealed: list[Literal[1, 2, 3]]
+
+class Sup1[T]:
+    value: T
+
+class Sub1[T](Sup1[T]): ...
+
+def sub1[T](value: T) -> Sub1[T]:
+    return Sub1()
+
+x4: Sub1[Literal[1]] = sub1(1)
+reveal_type(x4)  # revealed: Sub1[Literal[1]]
+
+x5: Sup1[Literal[1]] = sub1(1)
+reveal_type(x5)  # revealed: Sub1[Literal[1]]
+
+x6: Sup1[Literal[1]] | None = sub1(1)
+reveal_type(x6)  # revealed: Sub1[Literal[1]]
+
+x7: Sup1[Literal[1]] | None = sub1(1)
+reveal_type(x7)  # revealed: Sub1[Literal[1]]
+
+class Sup2A[T, U]:
+    value: tuple[T, U]
+
+class Sup2B[T, U]:
+    value: tuple[T, U]
+
+class Sub2[T, U](Sup2A[T, Any], Sup2B[Any, U]): ...
+
+def sub2[T, U](x: T, y: U) -> Sub2[T, U]:
+    return Sub2()
+
+x8 = sub2(1, 2)
+reveal_type(x8)  # revealed: Sub2[int, int]
+
+x9: Sup2A[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x9)  # revealed: Sub2[Literal[1], int]
+
+x10: Sup2B[Literal[1], Literal[2]] = sub2(1, 2)
+reveal_type(x10)  # revealed: Sub2[int, Literal[2]]
+```

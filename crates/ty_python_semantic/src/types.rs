@@ -1077,7 +1077,10 @@ impl<'db> Type<'db> {
     }
 
     /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         self.specialization_of_optional(db, None)
     }
 
@@ -1088,15 +1091,17 @@ impl<'db> Type<'db> {
         expected_class: ClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
         self.specialization_of_optional(db, Some(expected_class))
+            .map(|(_, specialization)| specialization)
     }
 
     fn specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
             Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
@@ -1107,7 +1112,49 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        specialization
+        Some((class_literal, specialization?))
+    }
+
+    /// Given a type variable `T` from the generic context of a class `C`:
+    /// - If `self` is a specialized instance of `C`, returns the type assigned to `T` on `self`.
+    /// - If `self` is a specialized instance of some class `A[T]`, and `C[T]` is a subclass of
+    ///   `A[T]`, returns the type assigned to `T` on `self`.
+    pub(crate) fn find_type_var_from(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        class: ClassLiteral<'db>,
+    ) -> Option<Type<'db>> {
+        if let Some(specialization) = self.specialization_of(db, class) {
+            return specialization.get(db, bound_typevar);
+        }
+
+        // TODO: We should use the constraint solver here to determine the type mappings for more
+        // complex subtyping relationships, e.g., callables, protocols, or unions containing multiple
+        // generic elements.
+        for base in class.iter_mro(db, None).skip(1) {
+            let Some((base, Some(base_specialization))) =
+                base.into_class().map(|class| class.class_literal(db))
+            else {
+                continue;
+            };
+
+            if let Some(specialization) = self.specialization_of(db, base) {
+                for (base_typevar, base_ty) in base_specialization
+                    .generic_context(db)
+                    .variables(db)
+                    .zip(base_specialization.types(db))
+                {
+                    if *base_ty == Type::TypeVar(bound_typevar) {
+                        return specialization.get(db, base_typevar);
+                    }
+                }
+
+                return None;
+            }
+        }
+
+        None
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -4016,23 +4063,26 @@ impl<'db> Type<'db> {
             return;
         };
 
-        let tcx_specialization = tcx.annotation.and_then(|tcx| {
-            tcx.filter_union(db, |ty| ty.specialization_of(db, class_literal).is_some())
-                .specialization_of(db, class_literal)
-        });
-
-        for (typevar, ty) in specialization
+        for (type_var, ty) in specialization
             .generic_context(db)
             .variables(db)
             .zip(specialization.types(db))
         {
-            let variance = typevar.variance_with_polarity(db, polarity);
-            let tcx = TypeContext::new(tcx_specialization.and_then(|spec| spec.get(db, typevar)));
+            let variance = type_var.variance_with_polarity(db, polarity);
+            let narrowed_tcx = tcx.and_then(|annotation| match annotation {
+                Type::Union(union) => union
+                    .elements(db)
+                    .iter()
+                    .filter_map(|ty| ty.find_type_var_from(db, type_var, class_literal))
+                    .exactly_one()
+                    .ok(),
+                _ => annotation.find_type_var_from(db, type_var, class_literal),
+            });
 
-            f(typevar, *ty, variance, tcx);
+            f(type_var, *ty, variance, narrowed_tcx);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, tcx, variance, f, visitor);
+                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, visitor);
             });
         }
     }
@@ -6230,30 +6280,35 @@ impl<'db> Type<'db> {
                 }
 
                 Some(KnownClass::Tuple) => {
-                    let object = Type::object();
+                    let element_ty =
+                        BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
 
                     // ```py
-                    // class tuple:
+                    // class tuple(Sequence[_T_co]):
                     //     @overload
                     //     def __new__(cls) -> tuple[()]: ...
                     //     @overload
-                    //     def __new__(cls, iterable: Iterable[object]) -> tuple[object, ...]: ...
+                    //     def __new__(cls, iterable: Iterable[_T_co]) -> tuple[_T_co, ...]: ...
                     // ```
                     CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(Parameters::empty(), Some(Type::empty_tuple(db))),
-                            Signature::new(
+                            Signature::new_generic(
+                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
                                 Parameters::new(
                                     db,
                                     [Parameter::positional_only(Some(Name::new_static(
                                         "iterable",
                                     )))
                                     .with_annotated_type(
-                                        KnownClass::Iterable.to_specialized_instance(db, [object]),
+                                        KnownClass::Iterable.to_specialized_instance(
+                                            db,
+                                            [Type::TypeVar(element_ty)],
+                                        ),
                                     )],
                                 ),
-                                Some(Type::homogeneous_tuple(db, object)),
+                                Some(Type::homogeneous_tuple(db, Type::TypeVar(element_ty))),
                             ),
                         ],
                     )
