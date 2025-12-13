@@ -7,8 +7,9 @@ use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
-use crate::types::{CallDunderError, UnionType};
-use crate::types::{CallableTypes, ClassBase, KnownClass, Type, TypeContext};
+use crate::types::{
+    CallDunderError, CallableTypes, ClassBase, KnownUnion, Type, TypeContext, UnionType,
+};
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -193,21 +194,8 @@ pub fn definitions_for_name<'db>(
 
 fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
     let float_or_complex_ty = match name {
-        "float" => UnionType::from_elements(
-            db,
-            [
-                KnownClass::Int.to_instance(db),
-                KnownClass::Float.to_instance(db),
-            ],
-        ),
-        "complex" => UnionType::from_elements(
-            db,
-            [
-                KnownClass::Int.to_instance(db),
-                KnownClass::Float.to_instance(db),
-                KnownClass::Complex.to_instance(db),
-            ],
-        ),
+        "float" => KnownUnion::Float.to_type(db),
+        "complex" => KnownUnion::Complex.to_type(db),
         _ => return false,
     }
     .expect_union();

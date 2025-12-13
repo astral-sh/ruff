@@ -8,9 +8,7 @@ Client capabilities: ResolvedClientCapabilities(
 Position encoding: UTF16
 Global settings: GlobalSettings {
     diagnostic_mode: OpenFilesOnly,
-    experimental: ExperimentalSettings {
-        rename: false,
-    },
+    experimental: ExperimentalSettings,
 }
 Open text documents: 0
 

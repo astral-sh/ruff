@@ -2390,14 +2390,14 @@ fn default_root_flat_layout() -> anyhow::Result<()> {
 fn default_root_tests_folder() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("src/foo.py", "foo = 10"),
-        ("tests/bar.py", "bar = 20"),
+        ("tests/bar.py", "baz = 20"),
         (
             "tests/test_bar.py",
             r#"
             from foo import foo
-            from bar import bar
+            from bar import baz
 
-            print(f"{foo} {bar}")
+            print(f"{foo} {baz}")
             "#,
         ),
     ])?;

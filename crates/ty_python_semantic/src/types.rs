@@ -935,7 +935,30 @@ impl<'db> Type<'db> {
             // type for each overload of each function definition.
             (Type::FunctionLiteral(_), Type::FunctionLiteral(_)) => self,
 
-            _ => UnionType::from_elements_cycle_recovery(db, [self, previous]),
+            _ => {
+                // Also avoid unioning in a previous type which contains a Divergent from the
+                // current cycle, if the most-recent type does not. This cannot cause an
+                // oscillation, since Divergent is only introduced at the start of fixpoint
+                // iteration.
+                let has_divergent_type_in_cycle = |ty| {
+                    any_over_type(
+                        db,
+                        ty,
+                        &|nested_ty| {
+                            matches!(
+                    nested_ty,
+                    Type::Dynamic(DynamicType::Divergent(DivergentType { id }))
+                    if cycle.head_ids().contains(&id))
+                        },
+                        false,
+                    )
+                };
+                if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
+                    self
+                } else {
+                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                }
+            }
         }
         .recursive_type_normalized(db, cycle)
     }
@@ -1000,6 +1023,41 @@ impl<'db> Type<'db> {
 
     pub const fn is_generic_alias(&self) -> bool {
         matches!(self, Type::GenericAlias(_))
+    }
+
+    /// Returns whether the definition of this type is generic
+    /// (this is different from whether this type *is* a generic type; a type that is already fully specialized is not a generic type).
+    pub(crate) fn is_definition_generic(self, db: &'db dyn Db) -> bool {
+        match self {
+            Type::Union(union) => union
+                .elements(db)
+                .iter()
+                .any(|ty| ty.is_definition_generic(db)),
+            Type::Intersection(intersection) => {
+                intersection
+                    .positive(db)
+                    .iter()
+                    .any(|ty| ty.is_definition_generic(db))
+                    || intersection
+                        .negative(db)
+                        .iter()
+                        .any(|ty| ty.is_definition_generic(db))
+            }
+            Type::NominalInstance(instance_type) => instance_type.is_definition_generic(),
+            Type::ProtocolInstance(protocol) => {
+                matches!(protocol.inner, Protocol::FromClass(class) if class.is_generic())
+            }
+            Type::TypedDict(typed_dict) => typed_dict
+                .defining_class()
+                .is_some_and(ClassType::is_generic),
+            Type::Dynamic(dynamic) => {
+                matches!(dynamic, DynamicType::UnknownGeneric(_))
+            }
+            // Due to inheritance rules, enums cannot be generic.
+            Type::EnumLiteral(_) => false,
+            // Once generic NewType is officially specified, handle it.
+            _ => false,
+        }
     }
 
     const fn is_dynamic(&self) -> bool {
@@ -1798,7 +1856,7 @@ impl<'db> Type<'db> {
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
 
             Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).try_upcast_to_callable(db)
+                newtype.concrete_base_type(db).try_upcast_to_callable(db)
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
@@ -2018,21 +2076,9 @@ impl<'db> Type<'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = self {
-                return ConstraintSet::constrain_typevar(
-                    db,
-                    bound_typevar,
-                    Type::Never,
-                    target,
-                    relation,
-                );
+                return ConstraintSet::constrain_typevar(db, bound_typevar, Type::Never, target);
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(
-                    db,
-                    bound_typevar,
-                    self,
-                    Type::object(),
-                    relation,
-                );
+                return ConstraintSet::constrain_typevar(db, bound_typevar, self, Type::object());
             }
         }
 
@@ -2975,17 +3021,16 @@ impl<'db> Type<'db> {
                 self_newtype.has_relation_to_impl(db, target_newtype)
             }
 
-            (
-                Type::NewTypeInstance(self_newtype),
-                Type::NominalInstance(target_nominal_instance),
-            ) => self_newtype.base_class_type(db).has_relation_to_impl(
-                db,
-                target_nominal_instance.class(db),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            ),
+            (Type::NewTypeInstance(self_newtype), _) => {
+                self_newtype.concrete_base_type(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
 
             (Type::PropertyInstance(_), _) => {
                 KnownClass::Property.to_instance(db).has_relation_to_impl(
@@ -3006,10 +3051,9 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            // Other than the special cases enumerated above, nominal-instance types, and
-            // newtype-instance types are never subtypes of any other variants
+            // Other than the special cases enumerated above, nominal-instance types are never
+            // subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
-            (Type::NewTypeInstance(_), _) => ConstraintSet::from(false),
         }
     }
 
@@ -3938,7 +3982,7 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from_impl(db, right)
             }
             (Type::NewTypeInstance(newtype), other) | (other, Type::NewTypeInstance(newtype)) => {
-                Type::instance(db, newtype.base_class_type(db)).is_disjoint_from_impl(
+                newtype.concrete_base_type(db).is_disjoint_from_impl(
                     db,
                     other,
                     inferable,
@@ -4169,9 +4213,7 @@ impl<'db> Type<'db> {
             Type::TypeIs(type_is) => type_is.is_bound(db),
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
-            Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).is_singleton(db)
-            }
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
         }
     }
 
@@ -4222,9 +4264,7 @@ impl<'db> Type<'db> {
             }
 
             Type::NominalInstance(instance) => instance.is_single_valued(db),
-            Type::NewTypeInstance(newtype) => {
-                Type::instance(db, newtype.base_class_type(db)).is_single_valued(db)
-            }
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_single_valued(db),
 
             Type::BoundSuper(_) => {
                 // At runtime two super instances never compare equal, even if their arguments are identical.
@@ -4476,7 +4516,9 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) | Type::Never => Place::bound(self).into(),
 
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
-            Type::NewTypeInstance(newtype) => newtype.base_class_type(db).instance_member(db, name),
+            Type::NewTypeInstance(newtype) => {
+                newtype.concrete_base_type(db).instance_member(db, name)
+            }
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
 
@@ -5592,8 +5634,11 @@ impl<'db> Type<'db> {
                     .value_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)
             })?,
-            Type::NewTypeInstance(newtype) => Type::instance(db, newtype.base_class_type(db))
-                .try_bool_impl(db, allow_short_circuit, visitor)?,
+            Type::NewTypeInstance(newtype) => {
+                newtype
+                    .concrete_base_type(db)
+                    .try_bool_impl(db, allow_short_circuit, visitor)?
+            }
         };
 
         Ok(truthiness)
@@ -6561,7 +6606,7 @@ impl<'db> Type<'db> {
 
             match ty {
                 Type::NominalInstance(nominal) => nominal.tuple_spec(db),
-                Type::NewTypeInstance(newtype) => non_async_special_case(db, Type::instance(db, newtype.base_class_type(db))),
+                Type::NewTypeInstance(newtype) => non_async_special_case(db, newtype.concrete_base_type(db)),
                 Type::GenericAlias(alias) if alias.origin(db).is_tuple(db) => {
                     Some(Cow::Owned(TupleSpec::homogeneous(todo_type!(
                         "*tuple[] annotations"
@@ -7293,29 +7338,12 @@ impl<'db> Type<'db> {
             // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
             Type::ClassLiteral(class) => {
                 let ty = match class.known(db) {
-                    Some(KnownClass::Complex) => UnionType::from_elements(
-                        db,
-                        [
-                            KnownClass::Int.to_instance(db),
-                            KnownClass::Float.to_instance(db),
-                            KnownClass::Complex.to_instance(db),
-                        ],
-                    ),
-                    Some(KnownClass::Float) => UnionType::from_elements(
-                        db,
-                        [
-                            KnownClass::Int.to_instance(db),
-                            KnownClass::Float.to_instance(db),
-                        ],
-                    ),
-                    _ if class.is_typed_dict(db) => {
-                        Type::typed_dict(class.default_specialization(db))
-                    }
+                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
+                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
                     _ => Type::instance(db, class.default_specialization(db)),
                 };
                 Ok(ty)
             }
-            Type::GenericAlias(alias) if alias.is_typed_dict(db) => Ok(Type::typed_dict(*alias)),
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
             Type::SubclassOf(_)
@@ -7674,7 +7702,7 @@ impl<'db> Type<'db> {
                 ),
             },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
-            Type::NewTypeInstance(newtype) => Type::from(newtype.base_class_type(db)),
+            Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
         }
     }
 
@@ -8023,7 +8051,7 @@ impl<'db> Type<'db> {
     ) {
         let matching_typevar = |bound_typevar: &BoundTypeVarInstance<'db>| {
             match bound_typevar.typevar(db).kind(db) {
-                TypeVarKind::Legacy | TypeVarKind::TypingSelf
+                TypeVarKind::Legacy | TypeVarKind::Pep613Alias | TypeVarKind::TypingSelf
                     if binding_context.is_none_or(|binding_context| {
                         bound_typevar.binding_context(db)
                             == BindingContext::Definition(binding_context)
@@ -8343,6 +8371,7 @@ impl<'db> Type<'db> {
                 KnownInstanceType::TypeAliasType(type_alias) => {
                     type_alias.definition(db).map(TypeDefinition::TypeAlias)
                 }
+                KnownInstanceType::NewType(newtype) => Some(TypeDefinition::NewType(newtype.definition(db))),
                 _ => None,
             },
 
@@ -8880,9 +8909,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
             visitor.visit_callable_type(db, callable);
         }
         KnownInstanceType::NewType(newtype) => {
-            if let ClassType::Generic(generic_alias) = newtype.base_class_type(db) {
-                visitor.visit_generic_alias_type(db, generic_alias);
-            }
+            visitor.visit_type(db, newtype.concrete_base_type(db));
         }
     }
 }
@@ -9502,6 +9529,8 @@ pub enum TypeVarKind {
     ParamSpec,
     /// `def foo[**P]() -> None: ...`
     Pep695ParamSpec,
+    /// `Alias: typing.TypeAlias = T`
+    Pep613Alias,
 }
 
 impl TypeVarKind {
@@ -14031,6 +14060,61 @@ impl<'db> UnionType<'db> {
         }
 
         ConstraintSet::from(sorted_self == other.normalized(db))
+    }
+
+    /// Identify some specific unions of known classes, currently the ones that `float` and
+    /// `complex` expand into in type position.
+    pub(crate) fn known(self, db: &'db dyn Db) -> Option<KnownUnion> {
+        let mut has_int = false;
+        let mut has_float = false;
+        let mut has_complex = false;
+        for element in self.elements(db) {
+            if let Type::NominalInstance(nominal) = element
+                && let Some(known) = nominal.known_class(db)
+            {
+                match known {
+                    KnownClass::Int => has_int = true,
+                    KnownClass::Float => has_float = true,
+                    KnownClass::Complex => has_complex = true,
+                    _ => return None,
+                }
+            } else {
+                return None;
+            }
+        }
+        match (has_int, has_float, has_complex) {
+            (true, true, false) => Some(KnownUnion::Float),
+            (true, true, true) => Some(KnownUnion::Complex),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KnownUnion {
+    Float,   // `int | float`
+    Complex, // `int | float | complex`
+}
+
+impl KnownUnion {
+    pub(crate) fn to_type(self, db: &dyn Db) -> Type<'_> {
+        match self {
+            KnownUnion::Float => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                ],
+            ),
+            KnownUnion::Complex => UnionType::from_elements(
+                db,
+                [
+                    KnownClass::Int.to_instance(db),
+                    KnownClass::Float.to_instance(db),
+                    KnownClass::Complex.to_instance(db),
+                ],
+            ),
+        }
     }
 }
 

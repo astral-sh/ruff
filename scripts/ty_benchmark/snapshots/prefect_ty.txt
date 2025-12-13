@@ -29,6 +29,7 @@ src/prefect/events/utilities.py:96:27: error[invalid-argument-type] Argument is 
 src/prefect/events/worker.py:74:9: error[invalid-method-override] Invalid override of method `_prepare_item`: Definition is incompatible with `QueueService._prepare_item`
 src/prefect/events/worker.py:78:15: error[invalid-method-override] Invalid override of method `_handle`: Definition is incompatible with `QueueService._handle`
 src/prefect/events/worker.py:100:9: error[invalid-method-override] Invalid override of method `instance`: Definition is incompatible with `_QueueServiceBase.instance`
+src/prefect/events/worker.py:130:16: error[invalid-return-type] Return type does not match returned value: expected `Self@instance`, found `EventsWorker`
 src/prefect/input/actions.py:46:49: warning[deprecated] The function `json` is deprecated: The `json` method is deprecated; use `model_dump_json` instead.
 src/prefect/server/models/artifacts.py:449:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/artifacts.py:449:39: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
@@ -77,6 +78,8 @@ src/prefect/server/models/flow_runs.py:251:26: error[invalid-type-form] Variable
 src/prefect/server/models/flow_runs.py:252:26: error[invalid-type-form] Variable of type `type[TaskRun]` is not allowed in a type expression
 src/prefect/server/models/flow_runs.py:322:41: error[invalid-argument-type] Argument to function `load_only` is incorrect: Expected `Literal["*"] | QueryableAttribute[Any]`, found `str`
 src/prefect/server/models/flow_runs.py:504:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/flow_runs.py:582:15: error[missing-argument] No argument provided for required parameter `db`
+src/prefect/server/models/flow_runs.py:582:15: error[missing-argument] No argument provided for required parameter `db`
 src/prefect/server/models/flow_runs.py:685:19: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/flows.py:83:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/flows.py:290:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
@@ -85,6 +88,8 @@ src/prefect/server/models/saved_searches.py:146:12: error[unresolved-attribute] 
 src/prefect/server/models/task_run_states.py:74:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
 src/prefect/server/models/task_runs.py:176:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/task_runs.py:462:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
+src/prefect/server/models/task_runs.py:535:15: error[missing-argument] No argument provided for required parameter `db`
+src/prefect/server/models/task_runs.py:535:15: error[missing-argument] No argument provided for required parameter `db`
 src/prefect/server/models/task_workers.py:71:13: error[invalid-argument-type] Argument is incorrect: Expected `DateTime`, found `datetime`
 src/prefect/server/models/variables.py:123:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/variables.py:140:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
@@ -133,4 +138,4 @@ src/prefect/server/models/workers.py:672:12: warning[possibly-missing-attribute]
 src/prefect/server/models/workers.py:755:9: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["heartbeat_interval_seconds"]` and value of type `int` on object of type `dict[str, datetime | WorkerStatus]`
 src/prefect/server/models/workers.py:770:12: error[unresolved-attribute] Object of type `Result[Unknown]` has no attribute `rowcount`
 src/prefect/server/models/workers.py:799:12: error[unresolved-attribute] Object of type `Result[Any]` has no attribute `rowcount`
-Found 135 diagnostics
+Found 140 diagnostics

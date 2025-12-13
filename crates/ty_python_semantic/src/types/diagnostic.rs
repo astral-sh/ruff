@@ -40,7 +40,7 @@ use ruff_db::{
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
+use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
@@ -4153,6 +4153,120 @@ pub(super) fn report_unsupported_comparison<'db>(
             }
         }
     }
+}
+
+pub(super) fn report_unsupported_augmented_assignment<'db>(
+    context: &InferContext<'db, '_>,
+    stmt: &ast::StmtAugAssign,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) {
+    report_unsupported_binary_operation_impl(
+        context,
+        stmt.range(),
+        &stmt.target,
+        &stmt.value,
+        left_ty,
+        right_ty,
+        OperatorDisplay {
+            operator: stmt.op,
+            is_augmented_assignment: true,
+        },
+    );
+}
+
+pub(super) fn report_unsupported_binary_operation<'db>(
+    context: &InferContext<'db, '_>,
+    binary_expression: &ast::ExprBinOp,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+    operator: ast::Operator,
+) {
+    let Some(mut diagnostic) = report_unsupported_binary_operation_impl(
+        context,
+        binary_expression.range(),
+        &binary_expression.left,
+        &binary_expression.right,
+        left_ty,
+        right_ty,
+        OperatorDisplay {
+            operator,
+            is_augmented_assignment: false,
+        },
+    ) else {
+        return;
+    };
+    let db = context.db();
+    if operator == ast::Operator::BitOr
+        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
+        && Program::get(db).python_version(db) < PythonVersion::PY310
+    {
+        diagnostic.info(
+            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
+        );
+        add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving types");
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct OperatorDisplay {
+    operator: ast::Operator,
+    is_augmented_assignment: bool,
+}
+
+impl std::fmt::Display for OperatorDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_augmented_assignment {
+            write!(f, "{}=", self.operator)
+        } else {
+            write!(f, "{}", self.operator)
+        }
+    }
+}
+
+fn report_unsupported_binary_operation_impl<'a>(
+    context: &'a InferContext<'a, 'a>,
+    range: TextRange,
+    left: &ast::Expr,
+    right: &ast::Expr,
+    left_ty: Type<'a>,
+    right_ty: Type<'a>,
+    operator: OperatorDisplay,
+) -> Option<LintDiagnosticGuard<'a, 'a>> {
+    let db = context.db();
+    let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(db, [left_ty, right_ty]);
+
+    let mut diagnostic =
+        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
+
+    if left_ty == right_ty {
+        diagnostic.set_primary_message(format_args!(
+            "Both operands have type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+        diagnostic.annotate(context.secondary(left));
+        diagnostic.annotate(context.secondary(right));
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{operator}` is not supported between two objects of type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+    } else {
+        for (ty, expr) in [(left_ty, left), (right_ty, right)] {
+            diagnostic.annotate(context.secondary(expr).message(format_args!(
+                "Has type `{}`",
+                ty.display_with(db, display_settings.clone())
+            )));
+        }
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{operator}` is not supported between objects of type `{}` and `{}`",
+            left_ty.display_with(db, display_settings.clone()),
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+
+    Some(diagnostic)
 }
 
 /// This function receives an unresolved `from foo import bar` import,

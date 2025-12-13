@@ -2162,8 +2162,8 @@ Some attributes are special-cased, however:
 import types
 from ty_extensions import static_assert, TypeOf, is_subtype_of
 
-reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
+reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(f.__call__)  # revealed: <method-wrapper '__call__' of function 'f'>
 static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ```

@@ -668,6 +668,7 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
+    order_elements: bool,
     db: &'db dyn Db,
 }
 
@@ -675,6 +676,7 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
         Self {
             db,
+            order_elements: false,
             intersections: vec![InnerIntersectionBuilder::default()],
         }
     }
@@ -682,12 +684,23 @@ impl<'db> IntersectionBuilder<'db> {
     fn empty(db: &'db dyn Db) -> Self {
         Self {
             db,
+            order_elements: false,
             intersections: vec![],
         }
     }
 
+    pub(crate) fn order_elements(mut self, val: bool) -> Self {
+        self.order_elements = val;
+        self
+    }
+
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
+    }
+
+    pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
+        let updated = std::mem::replace(self, Self::empty(self.db)).add_positive(ty);
+        *self = updated;
     }
 
     pub(crate) fn add_positive_impl(
@@ -898,13 +911,16 @@ impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
-            self.intersections.pop().unwrap().build(self.db)
+            self.intersections
+                .pop()
+                .unwrap()
+                .build(self.db, self.order_elements)
         } else {
             UnionType::from_elements(
                 self.db,
                 self.intersections
                     .into_iter()
-                    .map(|inner| inner.build(self.db)),
+                    .map(|inner| inner.build(self.db, self.order_elements)),
             )
         }
     }
@@ -1238,7 +1254,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
         }
     }
 
-    fn build(mut self, db: &'db dyn Db) -> Type<'db> {
+    fn build(mut self, db: &'db dyn Db, order_elements: bool) -> Type<'db> {
         self.simplify_constrained_typevars(db);
 
         // If any typevars are in `self.positive`, speculatively solve all bounded type variables
@@ -1279,6 +1295,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
             _ => {
                 self.positive.shrink_to_fit();
                 self.negative.shrink_to_fit();
+                if order_elements {
+                    self.positive
+                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+                    self.negative
+                        .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+                }
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }

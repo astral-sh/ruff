@@ -3624,6 +3624,37 @@ def function():
         assert_snapshot!(test.hover(), @"Hover provided no content");
     }
 
+    #[test]
+    fn hover_named_expression_target() {
+        let test = CursorTest::builder()
+            .source(
+                "mymod.py",
+                r#"
+                if a<CURSOR> := 10:
+                    pass
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.hover(), @r###"
+        Literal[10]
+        ---------------------------------------------
+        ```python
+        Literal[10]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> mymod.py:2:4
+          |
+        2 | if a := 10:
+          |    ^- Cursor offset
+          |    |
+          |    source
+        3 |     pass
+          |
+        "###);
+    }
+
     impl CursorTest {
         fn hover(&self) -> String {
             use std::fmt::Write;

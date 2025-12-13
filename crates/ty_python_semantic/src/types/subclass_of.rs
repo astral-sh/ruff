@@ -119,7 +119,7 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_type_var()
     }
 
-    pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
+    pub const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         self.subclass_of.into_type_var()
     }
 

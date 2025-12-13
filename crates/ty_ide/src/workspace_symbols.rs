@@ -150,6 +150,62 @@ class Test:
         ");
     }
 
+    #[test]
+    fn ignore_all() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+__all__ = []
+class Test:
+    def from_path(): ...
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("from"), @r"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:4:9
+          |
+        2 | __all__ = []
+        3 | class Test:
+        4 |     def from_path(): ...
+          |         ^^^^^^^^^
+          |
+        info: Method from_path
+        ");
+    }
+
+    #[test]
+    fn ignore_imports() {
+        let test = CursorTest::builder()
+            .source(
+                "utils.py",
+                "
+import re
+import json as json
+from collections import defaultdict
+foo = 1
+<CURSOR>",
+            )
+            .build();
+
+        assert_snapshot!(test.workspace_symbols("foo"), @r"
+        info[workspace-symbols]: WorkspaceSymbolInfo
+         --> utils.py:5:1
+          |
+        3 | import json as json
+        4 | from collections import defaultdict
+        5 | foo = 1
+          | ^^^
+          |
+        info: Variable foo
+        ");
+        assert_snapshot!(test.workspace_symbols("re"), @"No symbols found");
+        assert_snapshot!(test.workspace_symbols("json"), @"No symbols found");
+        assert_snapshot!(test.workspace_symbols("default"), @"No symbols found");
+    }
+
     impl CursorTest {
         fn workspace_symbols(&self, query: &str) -> String {
             let symbols = workspace_symbols(&self.db, query);

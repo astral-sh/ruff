@@ -146,9 +146,10 @@ Foo = NewType(name, int)
 reveal_type(Foo)  # revealed: <NewType pseudo-class 'Foo'>
 ```
 
-## The second argument must be a class type or another newtype
+## The base must be a class type or another newtype
 
-Other typing constructs like `Union` are not allowed.
+Other typing constructs like `Union` are not _generally_ allowed. (However, see the next section for
+a couple special cases.)
 
 ```py
 from typing_extensions import NewType
@@ -167,6 +168,61 @@ on top of that:
 Foo = NewType("Foo", 42)
 ```
 
+## `float` and `complex` special cases
+
+`float` and `complex` are subject to a special case in the typing spec, which we currently interpret
+to mean that `float` in type position is `int | float`, and `complex` in type position is
+`int | float | complex`. This is awkward for `NewType`, because as we just tested above, unions
+aren't generally valid `NewType` bases. However, `float` and `complex` _are_ valid `NewType` bases,
+and we accept the unions they expand into.
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", float)
+Foo(3.14)
+Foo(42)
+Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected `int | float`, found `Literal["hello"]`"
+
+reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
+reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
+
+Bar = NewType("Bar", complex)
+Bar(1 + 2j)
+Bar(3.14)
+Bar(42)
+Bar("goodbye")  # error: [invalid-argument-type]
+
+reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[complex]
+reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
+reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
+```
+
+We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
+explicit union (e.g. `int | float`), so these two explicit unions are also allowed. But again, most
+unions are not allowed:
+
+```py
+Baz = NewType("Baz", int | float)
+Baz = NewType("Baz", int | float | complex)
+Baz = NewType("Baz", int | str)  # error: [invalid-newtype] "invalid base for `typing.NewType`"
+```
+
+Similarly, a `NewType` of `float` or `complex` is valid as a `Callable` of the corresponding union
+type:
+
+```py
+from collections.abc import Callable
+
+def f(_: Callable[[int | float], Foo]): ...
+
+f(Foo)
+
+def g(_: Callable[[int | float | complex], Bar]): ...
+
+g(Bar)
+```
+
 ## A `NewType` definition must be a simple variable assignment
 
 ```py
@@ -179,7 +235,7 @@ N: NewType = NewType("N", int)  # error: [invalid-newtype] "A `NewType` definiti
 
 Cyclic newtypes are kind of silly, but it's possible for the user to express them, and it's
 important that we don't go into infinite recursive loops and crash with a stack overflow. In fact,
-this is *why* base type evaluation is deferred; otherwise Salsa itself would crash.
+this is _why_ base type evaluation is deferred; otherwise Salsa itself would crash.
 
 ```py
 from typing_extensions import NewType, reveal_type, cast

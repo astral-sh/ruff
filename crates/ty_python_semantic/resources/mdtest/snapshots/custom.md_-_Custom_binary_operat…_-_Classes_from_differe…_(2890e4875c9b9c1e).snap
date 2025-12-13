@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: custom.md - Custom binary operations - Classes from different modules with the same name
+mdtest path: crates/ty_python_semantic/resources/mdtest/binary/custom.md
+---
+
+# Python source files
+
+## mod1.py
+
+```
+1 | class A: ...
+```
+
+## mod2.py
+
+```
+1 | import mod1
+2 | 
+3 | class A: ...
+4 | 
+5 | # error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
+6 | A() + mod1.A()
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `+` operation
+ --> src/mod2.py:6:1
+  |
+5 | # error: [unsupported-operator] "Operator `+` is not supported between objects of type `mod2.A` and `mod1.A`"
+6 | A() + mod1.A()
+  | ---^^^--------
+  | |     |
+  | |     Has type `mod1.A`
+  | Has type `mod2.A`
+  |
+info: rule `unsupported-operator` is enabled by default
+
+```

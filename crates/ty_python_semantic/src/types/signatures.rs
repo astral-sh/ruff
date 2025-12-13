@@ -396,7 +396,6 @@ impl<'db> CallableSignature<'db> {
                         self_bound_typevar,
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
-                        relation,
                     );
                     let return_types_match = self_return_type.zip(other_return_type).when_some_and(
                         |(self_return_type, other_return_type)| {
@@ -427,7 +426,6 @@ impl<'db> CallableSignature<'db> {
                         self_bound_typevar,
                         Type::Never,
                         upper,
-                        relation,
                     );
                     let return_types_match = self_return_type.when_some_and(|self_return_type| {
                         other_signatures
@@ -461,7 +459,6 @@ impl<'db> CallableSignature<'db> {
                         other_bound_typevar,
                         lower,
                         Type::object(),
-                        relation,
                     );
                     let return_types_match = other_return_type.when_some_and(|other_return_type| {
                         self_signatures

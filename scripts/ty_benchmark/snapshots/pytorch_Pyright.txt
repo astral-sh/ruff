@@ -7664,7 +7664,6 @@
   <CWD>/torch/_inductor/config.py:643:36 - error: "config" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:653:47 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:964:21 - error: "_utils_internal" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/_inductor/config.py:993:20 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:1040:14 - error: Import "libfb.py" could not be resolved (reportMissingImports)
   <CWD>/torch/_inductor/config.py:1565:48 - error: "hip" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/config.py:2240:10 - warning: Import "torch.utils._config_typing" could not be resolved from source (reportMissingModuleSource)
@@ -11703,7 +11702,6 @@
     Type "Sequence[Symbol] | None" is not assignable to type "Iterable[Expr | int]"
       "None" is incompatible with protocol "Iterable[Expr | int]"
         "__iter__" is not present (reportArgumentType)
-  <CWD>/torch/_inductor/select_algorithm.py:2534:16 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:2745:29 - error: "autotune_process" is not a known attribute of module "torch._inductor" (reportAttributeAccessIssue)
   <CWD>/torch/_inductor/select_algorithm.py:2761:26 - error: Cannot access attribute "hint_override" for class "ChoiceCaller"
     Attribute "hint_override" is unknown (reportAttributeAccessIssue)
@@ -25931,13 +25929,7 @@
 <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:14:22 - warning: Import "torch._C._onnx" could not be resolved from source (reportMissingModuleSource)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:100:50 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:104:15 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
-      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:106:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:108:15 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
-      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:110:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:189:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset11.py:193:23 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26038,9 +26030,6 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:90:48 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:91:21 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:91:37 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:97:9 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "float"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "float"
-      "tuple[Unknown, ...]" is not assignable to "float" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:97:40 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:98:40 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset12.py:98:66 - error: "bool" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26241,8 +26230,6 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:241:68 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:27 - error: "sqrt" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:38 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset17.py:246:65 - error: Cannot access attribute "type" for class "tuple[Unknown, ...]"
-    Attribute "type" is unknown (reportAttributeAccessIssue)
 <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py:68:15 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset18.py:69:21 - error: "Value" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -26495,8 +26482,8 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4247:25 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4248:25 - error: Object of type "None" is not subscriptable (reportOptionalSubscript)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4463:48 - error: "LongTensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:5 - error: Expression with type "tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]] | tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]] | None" cannot be assigned to target tuple
-    Type "tuple[Unknown | tuple[Unknown, ...], Unknown | tuple[Unknown, ...]]" is incompatible with target tuple
+  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:5 - error: Expression with type "tuple[Unknown, Unknown] | tuple[Unknown, Unknown, Unknown] | None" cannot be assigned to target tuple
+    Type "tuple[Unknown, Unknown]" is incompatible with target tuple
       Tuple size mismatch; expected 3 but received 2 (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:4564:25 - error: "None" is not iterable
     "__iter__" method not defined (reportGeneralTypeIssues)
@@ -26602,21 +26589,6 @@
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5921:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5926:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5929:64 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5932:23 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-        "tuple[Unknown, ...]" is not assignable to "Tensor"
-        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5934:23 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-        "tuple[Unknown, ...]" is not assignable to "Tensor"
-        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
-  <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5937:19 - error: Type "Unknown | tuple[Unknown, ...]" is not assignable to declared type "Tensor | None"
-    Type "Unknown | tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-      Type "tuple[Unknown, ...]" is not assignable to type "Tensor | None"
-        "tuple[Unknown, ...]" is not assignable to "Tensor"
-        "tuple[Unknown, ...]" is not assignable to "None" (reportAssignmentType)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5937:59 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5967:48 - error: "tensor" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/onnx/_internal/torchscript_exporter/symbolic_opset9.py:5967:70 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -28493,7 +28465,6 @@
 <CWD>/torch/utils/data/dataloader.py
   <CWD>/torch/utils/data/dataloader.py:268:18 - error: "_log_api_usage_once" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:455:69 - error: "context" is not a known attribute of module "multiprocessing" (reportAttributeAccessIssue)
-  <CWD>/torch/utils/data/dataloader.py:612:49 - error: "sched_getaffinity" is not a known attribute of module "os" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:650:32 - error: "Generator" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:706:19 - error: "empty" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/utils/data/dataloader.py:706:41 - error: "int64" is not a known attribute of module "torch" (reportAttributeAccessIssue)
@@ -28816,4 +28787,4 @@
 <CWD>/torch/xpu/streams.py
   <CWD>/torch/xpu/streams.py:14:23 - error: "_XpuStreamBase" is not a known attribute of module "torch" (reportAttributeAccessIssue)
   <CWD>/torch/xpu/streams.py:103:22 - error: "_XpuEventBase" is not a known attribute of module "torch" (reportAttributeAccessIssue)
-19691 errors, 402 warnings, 0 informations
+19681 errors, 402 warnings, 0 informations

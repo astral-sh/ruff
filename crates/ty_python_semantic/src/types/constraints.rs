@@ -80,8 +80,8 @@ use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeRelation,
-    TypeVarBoundOrConstraints, UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionBuilder, IntersectionType, Type,
+    TypeVarBoundOrConstraints, UnionBuilder, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -200,21 +200,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
         upper: Type<'db>,
-        relation: TypeRelation<'db>,
     ) -> Self {
-        let (lower, upper) = match relation {
-            TypeRelation::Subtyping
-            | TypeRelation::Redundancy
-            | TypeRelation::SubtypingAssuming(_) => (
-                lower.top_materialization(db),
-                upper.bottom_materialization(db),
-            ),
-            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => (
-                lower.bottom_materialization(db),
-                upper.top_materialization(db),
-            ),
-        };
-
         Self {
             node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
         }
@@ -446,7 +432,7 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self::constrain_typevar(db, typevar, lower, upper, TypeRelation::Assignability)
+        Self::constrain_typevar(db, typevar, lower, upper)
     }
 
     #[expect(dead_code)] // Keep this around for debugging purposes
@@ -517,9 +503,6 @@ impl<'db> ConstrainedTypeVar<'db> {
         mut lower: Type<'db>,
         mut upper: Type<'db>,
     ) -> Node<'db> {
-        debug_assert_eq!(lower, lower.bottom_materialization(db));
-        debug_assert_eq!(upper, upper.top_materialization(db));
-
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
         // apart and create an equivalent BDD with more nodes but simpler constraints. (Fewer,
@@ -3508,8 +3491,8 @@ impl<'db> GenericContext<'db> {
             // do with that, so instead we just report the ambiguity as a specialization failure.
             let mut satisfied = false;
             let mut unconstrained = false;
-            let mut greatest_lower_bound = Type::Never;
-            let mut least_upper_bound = Type::object();
+            let mut greatest_lower_bound = UnionBuilder::new(db).order_elements(true);
+            let mut least_upper_bound = IntersectionBuilder::new(db).order_elements(true);
             let identity = bound_typevar.identity(db);
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::specialize_constrained",
@@ -3528,10 +3511,8 @@ impl<'db> GenericContext<'db> {
                             upper_bound = %upper_bound.display(db),
                             "found representative type",
                         );
-                        greatest_lower_bound =
-                            UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
-                        least_upper_bound =
-                            IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+                         greatest_lower_bound.add_in_place(lower_bound);
+                         least_upper_bound.add_positive_in_place(upper_bound);
                     }
                     None => {
                         unconstrained = true;
@@ -3565,6 +3546,8 @@ impl<'db> GenericContext<'db> {
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
+            let greatest_lower_bound = greatest_lower_bound.build();
+            let least_upper_bound = least_upper_bound.build();
             if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",

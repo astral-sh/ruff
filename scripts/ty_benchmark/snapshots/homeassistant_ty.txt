@@ -92,9 +92,6 @@ homeassistant/components/alert/__init__.py:107:17: error[invalid-argument-type] 
 homeassistant/components/alexa/auth.py:171:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 homeassistant/components/alexa/auth.py:173:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 homeassistant/components/alexa/auth.py:175:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
-homeassistant/components/alexa/state_report.py:341:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/alexa/state_report.py:342:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _async_entity_state_listener(event_: Event[EventStateChangedData]) -> CoroutineType[Any, Any, None]`
-homeassistant/components/alexa/state_report.py:343:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _async_entity_state_filter(data: EventStateChangedData) -> bool`
 homeassistant/components/alpha_vantage/sensor.py:8:6: error[unresolved-import] Cannot resolve imported module `alpha_vantage.foreignexchange`
 homeassistant/components/alpha_vantage/sensor.py:9:6: error[unresolved-import] Cannot resolve imported module `alpha_vantage.timeseries`
 homeassistant/components/altruist/sensor.py:274:16: error[unresolved-attribute] Object of type `SensorEntityDescription` has no attribute `native_value_fn`
@@ -111,11 +108,7 @@ homeassistant/components/amcrest/camera.py:266:17: error[invalid-argument-type] 
 homeassistant/components/amcrest/sensor.py:9:6: error[unresolved-import] Cannot resolve imported module `amcrest`
 homeassistant/components/ampio/air_quality.py:8:6: error[unresolved-import] Cannot resolve imported module `asmog`
 homeassistant/components/analytics/analytics.py:182:16: error[invalid-return-type] Return type does not match returned value: expected `AnalyticsPlatformProtocol | None`, found `ModuleType`
-homeassistant/components/androidtv/entity.py:46:43: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/androidtv/entity.py:46:82: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/androidtv/entity.py:54:42: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/androidtv/entity.py:55:43: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/androidtv/entity.py:75:21: error[unresolved-attribute] Object of type `(...) -> Awaitable[Unknown]` has no attribute `__name__`
+homeassistant/components/androidtv/entity.py:75:21: error[unresolved-attribute] Object of type `(...) -> Awaitable[_R@adb_decorator]` has no attribute `__name__`
 homeassistant/components/anel_pwrctrl/switch.py:9:6: error[unresolved-import] Cannot resolve imported module `anel_pwrctrl`
 homeassistant/components/anglian_water/config_flow.py:82:44: warning[possibly-missing-attribute] Attribute `refresh_token` may be missing on object of type `(str & BaseAuth) | MSOB2CAuth`
 homeassistant/components/anthemav/config_flow.py:74:47: error[unresolved-attribute] Object of type `Protocol` has no attribute `macaddress`
@@ -133,13 +126,10 @@ homeassistant/components/anthropic/entity.py:428:20: error[unresolved-reference]
 homeassistant/components/anthropic/entity.py:504:21: error[unresolved-reference] Name `current_tool_args` used when not defined
 homeassistant/components/anthropic/entity.py:655:44: warning[possibly-missing-attribute] Attribute `attachments` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
 homeassistant/components/anthropic/entity.py:667:64: warning[possibly-missing-attribute] Attribute `attachments` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
-homeassistant/components/apache_kafka/__init__.py:133:37: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/apache_kafka/__init__.py:133:58: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@start.write(event: Event[EventStateChangedData]) -> CoroutineType[Any, Any, None]`
 homeassistant/components/api/__init__.py:286:28: error[invalid-argument-type] Argument to bound method `async_set` is incorrect: Expected `str`, found `dict[str, dict[str, Any] | list[Any] | str | ... omitted 3 union elements] | list[dict[str, Any] | list[Any] | str | ... omitted 3 union elements] | str | int | float`
 homeassistant/components/api/__init__.py:286:39: error[invalid-argument-type] Argument to bound method `async_set` is incorrect: Expected `Mapping[str, Any] | None`, found `dict[str, dict[str, Any] | list[Any] | str | ... omitted 3 union elements] | list[dict[str, Any] | list[Any] | str | ... omitted 3 union elements] | str | ... omitted 3 union elements`
 homeassistant/components/api/__init__.py:286:51: error[invalid-argument-type] Argument to bound method `async_set` is incorrect: Expected `bool`, found `dict[str, Any] | list[Any] | str | ... omitted 3 union elements`
-homeassistant/components/api/__init__.py:431:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/api/__init__.py:432:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _async_save_changed_entities(event: Event[EventStateChangedData]) -> None`
+homeassistant/components/api/__init__.py:356:21: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["new_state", "old_state"]` and value of type `State & ~AlwaysFalsy` on object of type `dict[str, JsonValueType]`
 homeassistant/components/apple_tv/__init__.py:151:10: error[invalid-type-form] Variable of type `Never` is not allowed in a type expression
 homeassistant/components/apple_tv/__init__.py:284:30: error[invalid-type-form] Variable of type `Never` is not allowed in a type expression
 homeassistant/components/apple_tv/__init__.py:308:25: error[invalid-type-form] Variable of type `Never` is not allowed in a type expression
@@ -236,12 +226,12 @@ homeassistant/components/atag/water_heater.py:68:16: warning[possibly-missing-at
 homeassistant/components/aten_pe/switch.py:8:6: error[unresolved-import] Cannot resolve imported module `atenpdu`
 homeassistant/components/atome/sensor.py:8:6: error[unresolved-import] Cannot resolve imported module `pyatome.client`
 homeassistant/components/august/__init__.py:73:38: error[invalid-argument-type] Argument to bound method `async_setup` is incorrect: Expected `Config`, found `dict[Unknown | str, Unknown | Brand]`
-homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'username' in TypedDict `Config` constructor
-homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'password' in TypedDict `Config` constructor
-homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'login_method' in TypedDict `Config` constructor
 homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'access_token_cache_file' in TypedDict `Config` constructor
 homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'install_id' in TypedDict `Config` constructor
+homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'login_method' in TypedDict `Config` constructor
+homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'password' in TypedDict `Config` constructor
 homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'timeout' in TypedDict `Config` constructor
+homeassistant/components/august/__init__.py:73:38: error[missing-typed-dict-key] Missing required key 'username' in TypedDict `Config` constructor
 homeassistant/components/august/binary_sensor.py:75:9: error[invalid-argument-type] Argument is incorrect: Expected `(AugustData, DoorbellDetail | LockDetail, /) -> Activity | None`, found `def retrieve_online_state(data: AugustData, detail: DoorbellDetail | LockDetail) -> bool`
 homeassistant/components/august/binary_sensor.py:103:12: warning[possibly-missing-attribute] Attribute `doorsense` may be missing on object of type `DoorbellDetail | LockDetail`
 homeassistant/components/august/binary_sensor.py:106:12: warning[possibly-missing-attribute] Attribute `doorbell` may be missing on object of type `DoorbellDetail | LockDetail`
@@ -310,6 +300,7 @@ homeassistant/components/azure_storage/backup.py:80:53: error[unresolved-attribu
 homeassistant/components/azure_storage/backup.py:85:55: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@handle_backup_errors]` has no attribute `__name__`
 homeassistant/components/azure_storage/backup.py:90:17: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@handle_backup_errors]` has no attribute `__name__`
 homeassistant/components/azure_storage/backup.py:95:53: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@handle_backup_errors]` has no attribute `__name__`
+homeassistant/components/azure_storage/backup.py:145:13: error[invalid-argument-type] Argument is incorrect: Expected `bytes | str | Iterable[AnyStr@upload_blob] | AsyncIterable[AnyStr@upload_blob]`, found `AsyncIterator[bytes]`
 homeassistant/components/backblaze_b2/__init__.py:51:16: error[invalid-return-type] Return type does not match returned value: expected `b2sdk.v2.bucket.Bucket`, found `b2sdk._internal.bucket.Bucket`
 homeassistant/components/backblaze_b2/backup.py:95:42: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, T@handle_b2_errors]` has no attribute `__name__`
 homeassistant/components/backup/manager.py:1610:16: error[invalid-return-type] Return type does not match returned value: expected `StoredKnownBackup`, found `dict[Unknown | str, Unknown | str | list[dict[Unknown | str, Unknown | str | None] | Unknown] | list[str]]`
@@ -434,7 +425,6 @@ homeassistant/components/caldav/todo.py:71:39: error[invalid-argument-type] Argu
 homeassistant/components/caldav/todo.py:75:36: error[invalid-argument-type] Argument to function `get_attr_value` is incorrect: Expected `CalendarObjectResource`, found `~AlwaysFalsy`
 homeassistant/components/caldav/todo.py:84:28: error[invalid-argument-type] Argument to function `get_attr_value` is incorrect: Expected `CalendarObjectResource`, found `~AlwaysFalsy`
 homeassistant/components/caldav/todo.py:88:36: error[invalid-argument-type] Argument to function `get_attr_value` is incorrect: Expected `CalendarObjectResource`, found `~AlwaysFalsy`
-homeassistant/components/calendar/trigger.py:172:27: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/components/cambridge_audio/entity.py:32:38: error[unresolved-attribute] Object of type `(...) -> Awaitable[None]` has no attribute `__name__`
 homeassistant/components/canary/camera.py:173:17: error[invalid-argument-type] Argument to function `async_aiohttp_proxy_stream` is incorrect: Expected `StreamReader`, found `StreamReader`
 homeassistant/components/cast/const.py:27:36: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
@@ -444,9 +434,7 @@ homeassistant/components/cast/discovery.py:64:13: error[invalid-method-override]
 homeassistant/components/cast/discovery.py:68:13: error[invalid-method-override] Invalid override of method `update_cast`: Definition is incompatible with `AbstractCastListener.update_cast`
 homeassistant/components/cast/helpers.py:132:13: error[unknown-argument] Argument `is_dynamic_group` does not match any known parameter
 homeassistant/components/cast/helpers.py:268:12: error[unresolved-attribute] Object of type `object` has no attribute `ClientError`
-homeassistant/components/cast/media_player.py:94:39: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/cast/media_player.py:95:34: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/cast/media_player.py:105:46: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__name__`
+homeassistant/components/cast/media_player.py:105:46: error[unresolved-attribute] Object of type `(...) -> _R@api_error` has no attribute `__name__`
 homeassistant/components/cast/media_player.py:353:28: warning[possibly-missing-attribute] Attribute `status` may be missing on object of type `Chromecast | None`
 homeassistant/components/cast/media_player.py:354:29: warning[possibly-missing-attribute] Attribute `media_controller` may be missing on object of type `Chromecast | None`
 homeassistant/components/cast/media_player.py:460:35: warning[possibly-missing-attribute] Attribute `get_multizone_memberships` may be missing on object of type `Unknown | None`
@@ -475,8 +463,6 @@ homeassistant/components/cloud/__init__.py:314:51: error[invalid-argument-type] 
 homeassistant/components/cloud/__init__.py:314:51: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Literal["development", "production"]`, found `Unknown | str`
 homeassistant/components/cloud/__init__.py:314:51: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `dict[Literal["acme_directory", "llm_connection_details", "relayer_connect", "remote_access_resolve_dns_cname", "subscription_info", "subscription_migrate_paypal", "voice_connection_details"], str] | None`, found `Unknown | str`
 homeassistant/components/cloud/ai_task.py:132:16: warning[possibly-missing-attribute] Attribute `content` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
-homeassistant/components/cloud/alexa_config.py:272:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/cloud/alexa_config.py:273:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@async_initialize._handle_entity_registry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> CoroutineType[Any, Any, None]`
 homeassistant/components/cloud/alexa_config.py:543:28: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/cloud/alexa_config.py:547:45: error[invalid-key] Unknown key "old_entity_id" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "old_entity_id"
 homeassistant/components/cloud/client.py:97:33: error[unresolved-attribute] Object of type `object` has no attribute `AppRunner`
@@ -488,10 +474,6 @@ homeassistant/components/cloud/entity.py:127:21: error[invalid-argument-type] Ar
 homeassistant/components/cloud/entity.py:461:44: warning[possibly-missing-attribute] Attribute `attachments` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
 homeassistant/components/cloud/entity.py:462:64: warning[possibly-missing-attribute] Attribute `attachments` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
 homeassistant/components/cloud/entity.py:463:31: warning[possibly-missing-attribute] Attribute `content` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
-homeassistant/components/cloud/google_config.py:269:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/cloud/google_config.py:270:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@async_initialize._handle_entity_registry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
-homeassistant/components/cloud/google_config.py:275:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/components/cloud/google_config.py:276:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@async_initialize._handle_device_registry_updated(event: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> None`
 homeassistant/components/cloud/google_config.py:471:28: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/cloud/google_config.py:495:76: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Create`: Unknown key "changes"
 homeassistant/components/cloud/google_config.py:495:76: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Remove`: Unknown key "changes"
@@ -512,12 +494,6 @@ homeassistant/components/conversation/chat_log.py:587:40: error[invalid-key] Unk
 homeassistant/components/conversation/chat_log.py:588:37: error[invalid-key] Unknown key "tool_name" for TypedDict `AssistantContentDeltaDict`: Unknown key "tool_name"
 homeassistant/components/conversation/chat_log.py:589:39: error[invalid-key] Unknown key "tool_result" for TypedDict `AssistantContentDeltaDict`: Unknown key "tool_result"
 homeassistant/components/conversation/default_agent.py:275:33: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
-homeassistant/components/conversation/default_agent.py:290:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventAreaRegistryUpdatedData]`
-homeassistant/components/conversation/default_agent.py:294:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
-homeassistant/components/conversation/default_agent.py:298:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/conversation/default_agent.py:300:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `bound method Self@_listen_clear_slot_list._filter_entity_registry_changes(event_data: _EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update) -> bool`
-homeassistant/components/conversation/default_agent.py:303:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/conversation/default_agent.py:305:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `bound method Self@_listen_clear_slot_list._filter_state_changes(event_data: EventStateChangedData) -> bool`
 homeassistant/components/counter/__init__.py:219:53: error[invalid-argument-type] Argument to function `max` is incorrect: Argument type `int | None` does not satisfy upper bound `SupportsDunderLT[Any] | SupportsDunderGT[Any]` of type variable `SupportsRichComparisonT`
 homeassistant/components/counter/__init__.py:221:53: error[invalid-argument-type] Argument to function `min` is incorrect: Argument type `int | None | Unknown` does not satisfy upper bound `SupportsDunderLT[Any] | SupportsDunderGT[Any]` of type variable `SupportsRichComparisonT`
 homeassistant/components/cppm_tracker/device_tracker.py:8:6: error[unresolved-import] Cannot resolve imported module `clearpasspy`
@@ -547,7 +523,6 @@ homeassistant/components/danfoss_air/__init__.py:7:6: error[unresolved-import] C
 homeassistant/components/danfoss_air/binary_sensor.py:5:6: error[unresolved-import] Cannot resolve imported module `pydanfossair.commands`
 homeassistant/components/danfoss_air/sensor.py:7:6: error[unresolved-import] Cannot resolve imported module `pydanfossair.commands`
 homeassistant/components/danfoss_air/switch.py:8:6: error[unresolved-import] Cannot resolve imported module `pydanfossair.commands`
-homeassistant/components/datadog/__init__.py:124:31: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
 homeassistant/components/deconz/button.py:104:13: error[unresolved-attribute] Object of type `ButtonEntityDescription` has no attribute `button_fn`
 homeassistant/components/deconz/light.py:255:12: error[unsupported-operator] Operator `not in` is not supported between objects of type `Unknown | ColorMode` and `set[ColorMode] | set[str] | None`
 homeassistant/components/deconz/light.py:303:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal[ColorMode.XY]` and `set[ColorMode] | set[str] | None`
@@ -576,8 +551,6 @@ homeassistant/components/denonavr/receiver.py:102:27: error[unresolved-attribute
 homeassistant/components/devialet/config_flow.py:51:13: error[invalid-argument-type] Argument to bound method `async_create_entry` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/devialet/diagnostics.py:16:12: error[invalid-return-type] Return type does not match returned value: expected `dict[str, Any]`, found `Unknown | None`
 homeassistant/components/devialet/media_player.py:112:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `Unknown | bool | None`
-homeassistant/components/device_tracker/config_entry.py:166:27: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/components/device_tracker/config_entry.py:166:61: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def handle_device_event(ev: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> None`
 homeassistant/components/device_tracker/const.py:52:42: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/components/device_tracker/legacy.py:409:12: error[missing-argument] No argument provided for required parameter `config`
 homeassistant/components/device_tracker/legacy.py:409:34: error[invalid-argument-type] Argument is incorrect: Expected `tuple[str, ...]`, found `str`
@@ -716,15 +689,8 @@ homeassistant/components/econet/climate.py:68:30: error[invalid-argument-type] A
 homeassistant/components/econet/sensor.py:125:16: warning[possibly-missing-attribute] Attribute `energy_type` may be missing on object of type `Unknown | Equipment`
 homeassistant/components/econet/switch.py:29:33: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Thermostat`, found `Equipment`
 homeassistant/components/econet/water_heater.py:57:31: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `WaterHeater`, found `Equipment`
-homeassistant/components/ecovacs/number.py:111:52: error[invalid-type-arguments] Too many type arguments to class `CapabilitySet`: expected 1, got 2
-homeassistant/components/ecovacs/number.py:111:52: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[int]`?
-homeassistant/components/ecovacs/number.py:121:43: error[invalid-type-arguments] Too many type arguments to class `CapabilitySet`: expected 1, got 2
-homeassistant/components/ecovacs/number.py:121:43: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[int]`?
 homeassistant/components/ecovacs/select.py:87:46: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `CapabilityMap`, found `CapabilityMap | None`
-homeassistant/components/ecovacs/select.py:97:57: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[str]`?
-homeassistant/components/ecovacs/select.py:97:64: error[invalid-type-arguments] Too many type arguments to class `CapabilitySetTypes`: expected 2, got 3
-homeassistant/components/ecovacs/select.py:108:48: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[str]`?
-homeassistant/components/ecovacs/select.py:108:55: error[invalid-type-arguments] Too many type arguments to class `CapabilitySetTypes`: expected 2, got 3
+homeassistant/components/ecovacs/select.py:203:40: error[too-many-positional-arguments] Too many positional arguments: expected 0, got 1
 homeassistant/components/ecowitt/binary_sensor.py:51:13: error[invalid-argument-type] Argument to function `replace` is incorrect: Argument type `Unknown | BinarySensorEntityDescription` does not satisfy upper bound `DataclassInstance` of type variable `_DataclassT`
 homeassistant/components/ecowitt/sensor.py:283:13: error[invalid-argument-type] Argument to function `replace` is incorrect: Argument type `Unknown | SensorEntityDescription` does not satisfy upper bound `DataclassInstance` of type variable `_DataclassT`
 homeassistant/components/edimax/switch.py:7:6: error[unresolved-import] Cannot resolve imported module `pyedimax.smartplug`
@@ -732,6 +698,22 @@ homeassistant/components/efergy/sensor.py:129:17: error[invalid-argument-type] A
 homeassistant/components/egardia/__init__.py:5:6: error[unresolved-import] Cannot resolve imported module `pythonegardia`
 homeassistant/components/egardia/alarm_control_panel.py:104:44: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
 homeassistant/components/ekeybionyx/config_flow.py:110:47: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str] | Unknown]` is not assignable to `list[SelectOptionDict]`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `bool | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `int | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `VoiceSettings | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `Sequence[PronunciationDictionaryVersionLocator] | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `int | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `str | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `Sequence[str] | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `Sequence[str] | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `bool | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `bool | None`, found `Unknown | str | VoiceSettings`
+homeassistant/components/elevenlabs/tts.py:289:25: error[invalid-argument-type] Argument is incorrect: Expected `RequestOptions | None`, found `Unknown | str | VoiceSettings`
 homeassistant/components/eliqonline/sensor.py:8:8: error[unresolved-import] Cannot resolve imported module `eliqonline`
 homeassistant/components/elkm1/config_flow.py:203:9: error[invalid-method-override] Invalid override of method `is_matching`: Definition is incompatible with `ConfigFlow.is_matching`
 homeassistant/components/elmax/__init__.py:50:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `SSLContext`, found `None | SSLContext`
@@ -796,6 +778,7 @@ homeassistant/components/eufy/light.py:102:16: error[unsupported-operator] Opera
 homeassistant/components/eufy/light.py:149:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/eufy/light.py:149:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/eufy/switch.py:7:8: error[unresolved-import] Cannot resolve imported module `lakeside`
+homeassistant/components/evohome/entity.py:171:21: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~None) | datetime | int | float | str` and `datetime`
 homeassistant/components/evohome/storage.py:116:13: error[unsupported-operator] Operator `|=` is unsupported between objects of type `dict[str, object]` and `SessionIdEntryT`
 homeassistant/components/ezviz/alarm_control_panel.py:104:17: error[invalid-argument-type] Argument to bound method `api_set_defence_mode` is incorrect: Expected `DefenseModeType`, found `Literal[1]`
 homeassistant/components/ezviz/alarm_control_panel.py:115:17: error[invalid-argument-type] Argument to bound method `api_set_defence_mode` is incorrect: Expected `DefenseModeType`, found `Literal[2]`
@@ -1010,9 +993,6 @@ homeassistant/components/google_assistant/report_state.py:107:47: warning[possib
 homeassistant/components/google_assistant/report_state.py:111:17: warning[possibly-missing-attribute] Attribute `entity_id` may be missing on object of type `Unknown | State | None`
 homeassistant/components/google_assistant/report_state.py:164:54: error[invalid-argument-type] Argument to function `create_checker` is incorrect: Expected `ExtraCheckTypeFunc | None`, found `def extra_significant_check(hass: HomeAssistant, old_state: str, old_attrs: dict[Unknown, Unknown], old_extra_arg: dict[Unknown, Unknown], new_state: str, new_attrs: dict[Unknown, Unknown], new_extra_arg: dict[Unknown, Unknown]) -> Unknown`
 homeassistant/components/google_assistant/report_state.py:178:17: error[invalid-argument-type] Argument to bound method `async_is_significant_change` is incorrect: Expected `State`, found `Unknown | State | None`
-homeassistant/components/google_assistant/report_state.py:190:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/google_assistant/report_state.py:191:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _async_entity_state_listener(event: Event[EventStateChangedData]) -> CoroutineType[Any, Any, None]`
-homeassistant/components/google_assistant/report_state.py:192:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _async_entity_state_filter(data: EventStateChangedData) -> bool`
 homeassistant/components/google_assistant/trait.py:381:9: error[invalid-method-override] Invalid override of method `supported`: Definition is incompatible with `_Trait.supported`
 homeassistant/components/google_assistant/trait.py:420:9: error[invalid-method-override] Invalid override of method `supported`: Definition is incompatible with `_Trait.supported`
 homeassistant/components/google_assistant/trait.py:478:9: error[invalid-method-override] Invalid override of method `supported`: Definition is incompatible with `_Trait.supported`
@@ -1048,8 +1028,6 @@ homeassistant/components/google_maps/device_tracker.py:8:6: error[unresolved-imp
 homeassistant/components/google_maps/device_tracker.py:9:6: error[unresolved-import] Cannot resolve imported module `locationsharinglib.locationsharinglibexceptions`
 homeassistant/components/google_maps/device_tracker.py:115:16: error[unsupported-operator] Operator `<` is not supported between objects of type `datetime` and `str | datetime`
 homeassistant/components/google_maps/device_tracker.py:130:13: error[invalid-assignment] Invalid subscript assignment with key of type `str` and value of type `datetime` on object of type `dict[str, str]`
-homeassistant/components/google_pubsub/__init__.py:77:21: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/google_pubsub/__init__.py:77:42: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def send_to_pubsub(event: Event[EventStateChangedData]) -> Unknown`
 homeassistant/components/google_tasks/api.py:63:28: error[unresolved-attribute] Object of type `Resource` has no attribute `tasklists`
 homeassistant/components/google_tasks/api.py:70:28: error[unresolved-attribute] Object of type `Resource` has no attribute `tasks`
 homeassistant/components/google_tasks/api.py:86:28: error[unresolved-attribute] Object of type `Resource` has no attribute `tasks`
@@ -1103,14 +1081,6 @@ homeassistant/components/harmony/data.py:113:68: error[invalid-argument-type] Ar
 homeassistant/components/harmony/data.py:113:68: error[invalid-argument-type] Argument is incorrect: Expected `Future[Unknown] | Event | ((object, Any | None, /) -> Any) | None`, found `Unknown | (bound method Self@connect._config_updated(_: dict[Unknown, Unknown] | None = None) -> None) | (bound method Self@connect._connected(_: str | None = None) -> None) | ... omitted 3 union elements`
 homeassistant/components/harmony/data.py:113:68: error[invalid-argument-type] Argument is incorrect: Expected `Future[Unknown] | Event | ((object, Any | None, /) -> Any) | None`, found `Unknown | (bound method Self@connect._config_updated(_: dict[Unknown, Unknown] | None = None) -> None) | (bound method Self@connect._connected(_: str | None = None) -> None) | ... omitted 3 union elements`
 homeassistant/components/harmony/data.py:234:21: error[invalid-argument-type] Argument is incorrect: Expected `int`, found `str`
-homeassistant/components/harmony/subscriber.py:13:32: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?
-homeassistant/components/harmony/subscriber.py:13:36: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/components/harmony/subscriber.py:14:33: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[tuple[Unknown, ...]]`?
-homeassistant/components/harmony/subscriber.py:14:42: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/components/hassio/addon_manager.py:38:36: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/hassio/addon_manager.py:38:78: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/hassio/addon_manager.py:44:45: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/hassio/addon_manager.py:45:46: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
 homeassistant/components/hassio/repairs.py:226:18: warning[possibly-missing-attribute] Attribute `key` may be missing on object of type `(SupervisorIssues & ~AlwaysTruthy & ~AlwaysFalsy) | (Issue & ~AlwaysFalsy)`
 homeassistant/components/hassio/repairs.py:228:18: warning[possibly-missing-attribute] Attribute `key` may be missing on object of type `(SupervisorIssues & ~AlwaysTruthy & ~AlwaysFalsy) | (Issue & ~AlwaysFalsy)`
 homeassistant/components/hassio/repairs.py:230:18: warning[possibly-missing-attribute] Attribute `key` may be missing on object of type `(SupervisorIssues & ~AlwaysTruthy & ~AlwaysFalsy) | (Issue & ~AlwaysFalsy)`
@@ -1118,10 +1088,6 @@ homeassistant/components/haveibeenpwned/sensor.py:94:17: error[invalid-argument-
 homeassistant/components/hddtemp/sensor.py:68:23: error[no-matching-overload] No overload of function `iter` matches arguments
 homeassistant/components/hdmi_cec/__init__.py:258:49: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `list[int]`, found `Unknown | Literal[""]`
 homeassistant/components/heatmiser/climate.py:8:6: error[unresolved-import] Cannot resolve imported module `heatmiserv3`
-homeassistant/components/heos/media_player.py:144:30: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/heos/media_player.py:144:56: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/heos/media_player.py:147:39: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/heos/media_player.py:147:67: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
 homeassistant/components/here_travel_time/coordinator.py:226:21: error[invalid-argument-type] Argument is incorrect: Expected `int | float`, found `str`
 homeassistant/components/here_travel_time/coordinator.py:226:48: error[invalid-argument-type] Argument is incorrect: Expected `int | float`, found `str`
 homeassistant/components/here_travel_time/coordinator.py:229:21: error[invalid-argument-type] Argument is incorrect: Expected `int | float`, found `str`
@@ -1385,16 +1351,6 @@ homeassistant/components/horizon/media_player.py:10:6: error[unresolved-import] 
 homeassistant/components/hp_ilo/sensor.py:8:8: error[unresolved-import] Cannot resolve imported module `hpilo`
 homeassistant/components/html5/notify.py:481:13: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | str | dict[Unknown, Unknown]`
 homeassistant/components/html5/notify.py:484:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `str`
-homeassistant/components/http/decorators.py:33:41: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:34:40: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:44:47: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:45:41: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:53:47: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:59:45: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:60:44: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:62:42: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:67:50: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/http/decorators.py:68:45: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
 homeassistant/components/huawei_lte/sensor.py:903:69: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `Unknown | None`
 homeassistant/components/hue/__init__.py:40:37: warning[possibly-missing-attribute] Attribute `bridge_id` may be missing on object of type `Unknown | Config | None | ConfigController`
 homeassistant/components/hue/__init__.py:76:54: warning[possibly-missing-attribute] Attribute `mac_address` may be missing on object of type `Unknown | Config | None | ConfigController`
@@ -1734,7 +1690,7 @@ homeassistant/components/imap/coordinator.py:353:31: warning[possibly-missing-at
 homeassistant/components/imap/coordinator.py:531:46: warning[possibly-missing-attribute] Attribute `idle_start` may be missing on object of type `Unknown | IMAP4_SSL | None`
 homeassistant/components/imap/coordinator.py:532:23: warning[possibly-missing-attribute] Attribute `wait_server_push` may be missing on object of type `Unknown | IMAP4_SSL | None`
 homeassistant/components/imap/coordinator.py:533:17: warning[possibly-missing-attribute] Attribute `idle_done` may be missing on object of type `Unknown | IMAP4_SSL | None`
-homeassistant/components/input_datetime/__init__.py:295:34: warning[possibly-missing-attribute] Attribute `replace` may be missing on object of type `datetime | None | Unknown`
+homeassistant/components/input_datetime/__init__.py:295:34: warning[possibly-missing-attribute] Attribute `replace` may be missing on object of type `datetime | None`
 homeassistant/components/input_datetime/__init__.py:404:20: warning[possibly-missing-attribute] Attribute `date` may be missing on object of type `Unknown | None | datetime`
 homeassistant/components/input_datetime/__init__.py:407:20: warning[possibly-missing-attribute] Attribute `time` may be missing on object of type `Unknown | None | datetime`
 homeassistant/components/input_number/__init__.py:316:40: error[unsupported-operator] Operator `+` is unsupported between objects of type `int | float | None` and `int`
@@ -1944,10 +1900,6 @@ homeassistant/components/isy994/switch.py:173:9: error[invalid-method-override] 
 homeassistant/components/itach/remote.py:9:8: error[unresolved-import] Cannot resolve imported module `pyitachip2ir`
 homeassistant/components/itunes/media_player.py:279:17: warning[possibly-missing-attribute] Attribute `update_state` may be missing on object of type `Unknown | None`
 homeassistant/components/itunes/media_player.py:298:16: error[unsupported-operator] Operator `/` is unsupported between objects of type `Unknown | None` and `float`
-homeassistant/components/izone/climate.py:122:40: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/izone/climate.py:122:70: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/izone/climate.py:123:44: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/izone/climate.py:123:76: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
 homeassistant/components/izone/climate.py:367:16: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `Unknown | int | float | None`
 homeassistant/components/izone/climate.py:469:25: error[invalid-argument-type] Invalid argument to key "identifiers" with declared type `set[tuple[str, str]]` on TypedDict `DeviceInfo`: value of type `set[Unknown | tuple[str, Unknown & ~AlwaysFalsy, int]]`
 homeassistant/components/izone/climate.py:539:16: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `Unknown | int | float | None`
@@ -2133,6 +2085,7 @@ homeassistant/components/lifx/coordinator.py:202:27: error[non-subscriptable] Ca
 homeassistant/components/lifx/coordinator.py:203:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lifx/coordinator.py:209:48: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
 homeassistant/components/lifx/coordinator.py:210:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
+homeassistant/components/lifx/coordinator.py:210:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 homeassistant/components/lifx/coordinator.py:294:27: error[invalid-argument-type] Argument is incorrect: Expected `Message`, found `Light`
 homeassistant/components/lifx/coordinator.py:294:33: error[invalid-argument-type] Argument is incorrect: Expected `dict[str, Any] | None`, found `Message`
 homeassistant/components/lifx/coordinator.py:385:47: error[unresolved-attribute] Object of type `Message` has no attribute `signal`
@@ -2207,9 +2160,6 @@ homeassistant/components/livisi/climate.py:93:13: error[invalid-argument-type] A
 homeassistant/components/livisi/coordinator.py:98:36: error[invalid-assignment] Object of type `Unknown | dict[str, Any] | None` is not assignable to `dict[str, Any]`
 homeassistant/components/livisi/coordinator.py:107:42: error[invalid-assignment] Object of type `Unknown | dict[str, Any]` is not assignable to `list[dict[str, Any]]`
 homeassistant/components/locative/device_tracker.py:58:9: error[call-non-callable] Object of type `None` is not callable
-homeassistant/components/logbook/helpers.py:220:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/logbook/helpers.py:221:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _forward_state_events_filtered(event: Event[EventStateChangedData]) -> None`
-homeassistant/components/logentries/__init__.py:54:21: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
 homeassistant/components/london_underground/config_flow.py:36:9: error[invalid-method-override] Invalid override of method `async_get_options_flow`: Definition is incompatible with `ConfigFlow.async_get_options_flow`
 homeassistant/components/lookin/__init__.py:81:78: error[invalid-argument-type] Argument to function `start_lookin_udp` is incorrect: Expected `str`, found `None`
 homeassistant/components/lookin/__init__.py:82:20: error[invalid-return-type] Return type does not match returned value: expected `LookinUDPSubscriptions`, found `LookinUDPSubscriptions | None`
@@ -2510,8 +2460,6 @@ homeassistant/components/mpd/media_player.py:515:19: warning[possibly-missing-at
 homeassistant/components/mpd/media_player.py:520:19: warning[possibly-missing-attribute] Attribute `play` may be missing on object of type `Unknown | MPDClient`
 homeassistant/components/mpd/media_player.py:526:19: warning[possibly-missing-attribute] Attribute `clear` may be missing on object of type `Unknown | MPDClient`
 homeassistant/components/mpd/media_player.py:531:19: warning[possibly-missing-attribute] Attribute `seekcur` may be missing on object of type `Unknown | MPDClient`
-homeassistant/components/mqtt/client.py:307:18: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[ReceiveMessage]`?
-homeassistant/components/mqtt/client.py:307:36: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/components/mqtt/client.py:879:30: error[unresolved-attribute] Object of type `object` has no attribute `__name__`
 homeassistant/components/mqtt/client.py:881:30: error[unresolved-attribute] Object of type `((ReceiveMessage, /) -> Coroutine[Any, Any, None] | None) & ~Top[partial[Unknown]]` has no attribute `__name__`
 homeassistant/components/mqtt/config_flow.py:3762:65: error[no-matching-overload] No overload of bound method `__init__` matches arguments
@@ -2536,9 +2484,6 @@ homeassistant/components/mqtt/subscription.py:169:28: error[invalid-assignment] 
 homeassistant/components/mqtt/valve.py:335:54: error[invalid-argument-type] Argument to bound method `_process_position_valve_update` is incorrect: Expected `str`, found `Unknown | str | bytes | ... omitted 6 union elements`
 homeassistant/components/mqtt/valve.py:335:72: error[invalid-argument-type] Argument to bound method `_process_position_valve_update` is incorrect: Expected `str`, found `Unknown | str | bytes | ... omitted 6 union elements`
 homeassistant/components/mqtt/valve.py:337:52: error[invalid-argument-type] Argument to bound method `_process_binary_valve_update` is incorrect: Expected `str`, found `Unknown | str | bytes | ... omitted 6 union elements`
-homeassistant/components/mqtt_statestream/__init__.py:104:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/mqtt_statestream/__init__.py:104:34: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _state_publisher(evt: Event[EventStateChangedData]) -> CoroutineType[Any, Any, None]`
-homeassistant/components/mqtt_statestream/__init__.py:104:52: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _event_filter(event_data: EventStateChangedData) -> bool`
 homeassistant/components/msteams/notify.py:7:8: error[unresolved-import] Cannot resolve imported module `pymsteams`
 homeassistant/components/music_assistant/media_player.py:615:39: warning[possibly-missing-attribute] Attribute `uri` may be missing on object of type `QueueItem | None`
 homeassistant/components/music_assistant/media_player.py:616:37: warning[possibly-missing-attribute] Attribute `duration` may be missing on object of type `QueueItem | None`
@@ -2666,6 +2611,8 @@ homeassistant/components/ondilo_ico/coordinator.py:181:55: error[invalid-argumen
 homeassistant/components/onedrive/backup.py:92:17: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@handle_backup_errors]` has no attribute `__name__`
 homeassistant/components/onedrive/backup.py:100:17: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@handle_backup_errors]` has no attribute `__name__`
 homeassistant/components/onewire/onewirehub.py:47:42: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 2
+homeassistant/components/onkyo/receiver.py:85:36: error[invalid-argument-type] Argument is incorrect: Expected `InfoT@connect`, found `ReceiverInfo`
+homeassistant/components/onkyo/receiver.py:93:44: warning[possibly-missing-attribute] Attribute `read` may be missing on object of type `Receiver[ReceiverInfo] | None`
 homeassistant/components/onvif/camera.py:182:17: error[invalid-argument-type] Argument to function `async_aiohttp_proxy_stream` is incorrect: Expected `StreamReader`, found `StreamReader`
 homeassistant/components/onvif/device.py:189:20: error[call-non-callable] Object of type `None` is not callable
 homeassistant/components/onvif/device.py:480:15: error[call-non-callable] Object of type `None` is not callable
@@ -2769,11 +2716,7 @@ homeassistant/components/openai_conversation/entity.py:603:39: error[invalid-ass
 homeassistant/components/openai_conversation/entity.py:603:39: error[invalid-assignment] Invalid assignment to key "content" with declared type `Iterable[Content]` on TypedDict `ResponseReasoningItemParam`: value of type `list[Unknown | dict[Unknown | str, Unknown | str]]`
 homeassistant/components/openai_conversation/entity.py:603:39: error[invalid-assignment] Invalid assignment to key "content" with declared type `str | list[ResponseInputTextParam | ResponseInputImageParam | ResponseInputFileParam]` on TypedDict `EasyInputMessageParam`: value of type `list[Unknown | dict[Unknown | str, Unknown | str]]`
 homeassistant/components/openevse/sensor.py:7:8: error[unresolved-import] Cannot resolve imported module `openevsewifi`
-homeassistant/components/openhome/media_player.py:71:38: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/openhome/media_player.py:71:82: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/openhome/media_player.py:76:47: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/openhome/media_player.py:77:48: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/openhome/media_player.py:88:55: error[unresolved-attribute] Object of type `(...) -> Awaitable[Unknown]` has no attribute `__name__`
+homeassistant/components/openhome/media_player.py:88:55: error[unresolved-attribute] Object of type `(...) -> Awaitable[_R@catch_request_errors]` has no attribute `__name__`
 homeassistant/components/opensensemap/air_quality.py:8:6: error[unresolved-import] Cannot resolve imported module `opensensemap_api`
 homeassistant/components/opensensemap/air_quality.py:9:6: error[unresolved-import] Cannot resolve imported module `opensensemap_api.exceptions`
 homeassistant/components/openweathermap/coordinator.py:190:25: error[invalid-argument-type] Invalid argument to key "temperature" with declared type `None` on TypedDict `Forecast`: value of type `Decimal`
@@ -2830,9 +2773,6 @@ homeassistant/components/peco/__init__.py:73:9: error[invalid-argument-type] Arg
 homeassistant/components/peco/__init__.py:103:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `(() -> Awaitable[dict[str, Any]]) | None`, found `def async_update_meter_data() -> CoroutineType[Any, Any, bool]`
 homeassistant/components/pencom/switch.py:8:6: error[unresolved-import] Cannot resolve imported module `pencompy.pencompy`
 homeassistant/components/persistent_notification/__init__.py:55:5: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 2
-homeassistant/components/person/__init__.py:238:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/person/__init__.py:239:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@async_load._entity_registry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> CoroutineType[Any, Any, None]`
-homeassistant/components/person/__init__.py:240:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `bound method Self@async_load._entity_registry_filter(event_data: _EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update) -> bool`
 homeassistant/components/pglab/__init__.py:48:38: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | bytes | bytearray`
 homeassistant/components/pglab/__init__.py:69:36: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `(str, str, int | None, bool | None, /) -> Coroutine[Any, Any, dict[Unknown, Unknown]]`, found `def mqtt_publish(topic: str, payload: str, qos: int, retain: bool) -> CoroutineType[Any, Any, None]`
 homeassistant/components/pglab/__init__.py:69:66: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `(dict[str, Any], /) -> Coroutine[Any, Any, dict[Unknown, Unknown]]`, found `def mqtt_unsubscribe(sub_state: dict[str, Any]) -> CoroutineType[Any, Any, None]`
@@ -2984,10 +2924,6 @@ homeassistant/components/powerwall/__init__.py:236:43: error[invalid-assignment]
 homeassistant/components/progettihwsw/binary_sensor.py:69:16: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[str, Any].__getitem__(key: str, /) -> Any` cannot be called with key of type `Unknown | int` on object of type `dict[str, Any]`
 homeassistant/components/progettihwsw/switch.py:85:16: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[str, Any].__getitem__(key: str, /) -> Any` cannot be called with key of type `Unknown | int` on object of type `dict[str, Any]`
 homeassistant/components/proliphix/climate.py:7:8: error[unresolved-import] Cannot resolve imported module `proliphix`
-homeassistant/components/prometheus/__init__.py:164:21: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/prometheus/__init__.py:164:42: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method PrometheusMetrics.handle_state_changed_event(event: Event[EventStateChangedData]) -> None`
-homeassistant/components/prometheus/__init__.py:166:9: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/prometheus/__init__.py:167:9: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method PrometheusMetrics.handle_entity_registry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
 homeassistant/components/prometheus/__init__.py:303:34: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/proximity/coordinator.py:125:63: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/proximity/coordinator.py:126:42: error[invalid-key] Unknown key "old_entity_id" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "old_entity_id"
@@ -3027,10 +2963,33 @@ homeassistant/components/raspyrfm/switch.py:12:6: error[unresolved-import] Canno
 homeassistant/components/raspyrfm/switch.py:15:6: error[unresolved-import] Cannot resolve imported module `raspyrfm_client.device_implementations.manufacturer_constants`
 homeassistant/components/recollect_waste/__init__.py:60:9: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `(() -> Awaitable[dict[str, Any]]) | None`, found `def async_get_pickup_events() -> CoroutineType[Any, Any, list[PickupEvent]]`
 homeassistant/components/recorder/core.py:284:13: error[call-non-callable] Object of type `object` is not callable
+homeassistant/components/recorder/db_schema.py:646:13: error[unknown-argument] Argument `metadata_id` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:647:13: error[unknown-argument] Argument `created` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:648:13: error[unknown-argument] Argument `created_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:649:13: error[unknown-argument] Argument `start` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:650:13: error[unknown-argument] Argument `start_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:651:13: error[unknown-argument] Argument `mean` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:652:13: error[unknown-argument] Argument `mean_weight` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:653:13: error[unknown-argument] Argument `min` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:654:13: error[unknown-argument] Argument `max` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:655:13: error[unknown-argument] Argument `last_reset` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:656:13: error[unknown-argument] Argument `last_reset_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:657:13: error[unknown-argument] Argument `state` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:658:13: error[unknown-argument] Argument `sum` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:670:13: error[unknown-argument] Argument `metadata_id` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:671:13: error[unknown-argument] Argument `created` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:672:13: error[unknown-argument] Argument `created_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:673:13: error[unknown-argument] Argument `start` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:674:13: error[unknown-argument] Argument `start_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:675:13: error[unknown-argument] Argument `mean` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:676:13: error[unknown-argument] Argument `mean_weight` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:677:13: error[unknown-argument] Argument `min` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:678:13: error[unknown-argument] Argument `max` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:679:13: error[unknown-argument] Argument `last_reset` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:680:13: error[unknown-argument] Argument `last_reset_ts` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:681:13: error[unknown-argument] Argument `state` does not match any known parameter of bound method `__init__`
+homeassistant/components/recorder/db_schema.py:682:13: error[unknown-argument] Argument `sum` does not match any known parameter of bound method `__init__`
 homeassistant/components/recorder/entity_registry.py:29:36: error[invalid-key] Unknown key "old_entity_id" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "old_entity_id"
-homeassistant/components/recorder/entity_registry.py:52:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/recorder/entity_registry.py:53:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _async_entity_id_changed(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
-homeassistant/components/recorder/entity_registry.py:54:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def entity_registry_changed_filter(event_data: _EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update) -> bool`
 homeassistant/components/recorder/executor.py:55:19: error[invalid-argument-type] Argument to bound method `put` is incorrect: Expected `_WorkItem[Any]`, found `None`
 homeassistant/components/recorder/history/__init__.py:911:53: error[unresolved-reference] Name `prev_state` used when not defined
 homeassistant/components/recorder/history/__init__.py:927:49: error[unresolved-reference] Name `prev_state` used when not defined
@@ -3043,26 +3002,6 @@ homeassistant/components/recorder/statistics.py:2440:12: error[invalid-return-ty
 homeassistant/components/recorder/statistics.py:2458:12: error[invalid-return-type] Return type does not match returned value: expected `list[StatisticsRow]`, found `list[dict[Unknown | str, Unknown | None | int | float] | Unknown]`
 homeassistant/components/recorder/util.py:386:10: error[unresolved-import] Cannot resolve imported module `MySQLdb.constants`
 homeassistant/components/recorder/util.py:387:10: error[unresolved-import] Cannot resolve imported module `MySQLdb.converters`
-homeassistant/components/recorder/util.py:587:30: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:587:52: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:593:38: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:593:62: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:601:37: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:601:66: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:607:45: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:607:76: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:614:30: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:615:26: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:643:30: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:643:50: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:653:28: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:654:24: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:664:37: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:664:64: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:674:35: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:675:31: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/recorder/util.py:684:30: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/recorder/util.py:688:26: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
 homeassistant/components/recswitch/switch.py:8:6: error[unresolved-import] Cannot resolve imported module `pyrecswitch`
 homeassistant/components/reddit/sensor.py:88:12: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `praw`
 homeassistant/components/reddit/sensor.py:156:16: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `praw`
@@ -3089,13 +3028,12 @@ homeassistant/components/repetier/sensor.py:130:16: error[no-matching-overload] 
 homeassistant/components/repetier/sensor.py:151:16: error[no-matching-overload] No overload of function `round` matches arguments
 homeassistant/components/rest/data.py:56:13: error[invalid-assignment] Object of type `DigestAuthMiddleware | BasicAuth | tuple[str, str] | None` is not assignable to attribute `_auth` of type `BasicAuth | DigestAuthMiddleware | None`
 homeassistant/components/rflink/__init__.py:278:43: error[invalid-argument-type] Argument to bound method `set_rflink_protocol` is incorrect: Expected `ProtocolBase | None`, found `Protocol`
+homeassistant/components/rflink/entity.py:219:22: error[unresolved-attribute] Object of type `ProtocolBase | None` has no attribute `send_command_ack`
 homeassistant/components/rflink/entity.py:286:19: error[unresolved-attribute] Object of type `ProtocolBase | None` has no attribute `send_command_ack`
 homeassistant/components/rflink/entity.py:292:13: error[unresolved-attribute] Object of type `ProtocolBase | None` has no attribute `send_command`
 homeassistant/components/rfxtrx/__init__.py:192:38: error[unresolved-attribute] Object of type `RFXtrxEvent & ~ConnectionLost` has no attribute `data`
 homeassistant/components/rfxtrx/__init__.py:234:41: error[unresolved-attribute] Object of type `RFXtrxEvent` has no attribute `data`
 homeassistant/components/rfxtrx/__init__.py:239:39: error[unresolved-attribute] Object of type `RFXtrxEvent` has no attribute `data`
-homeassistant/components/rfxtrx/__init__.py:276:31: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/components/rfxtrx/__init__.py:276:65: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _updated_device(event: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> None`
 homeassistant/components/rfxtrx/cover.py:52:17: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `RFXtrxEvent`, found `RFXtrxEvent | None`
 homeassistant/components/rfxtrx/cover.py:70:9: error[invalid-parameter-default] Default value of type `None` is not assignable to annotated parameter type `RFXtrxEvent`
 homeassistant/components/rfxtrx/cover.py:104:36: warning[possibly-missing-attribute] Attribute `send_up05sec` may be missing on object of type `RollerTrolDevice | RfyDevice | LightingDevice`
@@ -3136,10 +3074,6 @@ homeassistant/components/roborock/vacuum.py:201:16: error[invalid-return-type] R
 homeassistant/components/rocketchat/notify.py:8:6: error[unresolved-import] Cannot resolve imported module `rocketchat_API.APIExceptions.RocketExceptions`
 homeassistant/components/rocketchat/notify.py:12:6: error[unresolved-import] Cannot resolve imported module `rocketchat_API.rocketchat`
 homeassistant/components/roku/browse_media.py:252:9: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `bool`, found `Literal[False, ""] | Unknown`
-homeassistant/components/roku/helpers.py:31:40: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/roku/helpers.py:31:76: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/roku/helpers.py:35:39: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
-homeassistant/components/roku/helpers.py:36:40: error[invalid-type-arguments] Too many type arguments: expected 1, got 2
 homeassistant/components/roomba/vacuum.py:200:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int]`, found `tuple[Unknown | int | float, Unknown]`
 homeassistant/components/roon/media_browser.py:94:24: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `Unknown | str | bool | None`
 homeassistant/components/roon/media_browser.py:94:24: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `Unknown | str | bool | None`
@@ -3350,16 +3284,8 @@ homeassistant/components/sonos/__init__.py:117:5: error[invalid-assignment] Obje
 homeassistant/components/sonos/__init__.py:118:5: error[unresolved-attribute] Unresolved attribute `EVENT_CACHE_TIMEOUT` on type `<module 'soco.zonegroupstate'>`.
 homeassistant/components/sonos/__init__.py:374:21: error[invalid-assignment] Invalid subscript assignment with key of type `Unknown` and value of type `SonosAlarms | SonosFavorites` on object of type `dict[str, SonosAlarms]`
 homeassistant/components/sonos/__init__.py:374:21: error[invalid-assignment] Invalid subscript assignment with key of type `Unknown` and value of type `SonosAlarms | SonosFavorites` on object of type `dict[str, SonosFavorites]`
-homeassistant/components/sonos/helpers.py:46:34: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:46:58: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:52:34: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:52:64: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:57:34: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:57:64: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:60:44: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:60:76: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/components/sonos/helpers.py:70:28: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__qualname__`
-homeassistant/components/sonos/helpers.py:87:17: error[unresolved-attribute] Object of type `(...) -> Unknown` has no attribute `__qualname__`
+homeassistant/components/sonos/helpers.py:70:28: error[unresolved-attribute] Object of type `(...) -> _R@soco_error` has no attribute `__qualname__`
+homeassistant/components/sonos/helpers.py:87:17: error[unresolved-attribute] Object of type `(...) -> _R@soco_error` has no attribute `__qualname__`
 homeassistant/components/sonos/media_browser.py:259:21: error[call-non-callable] Object of type `None` is not callable
 homeassistant/components/sonos/media_browser.py:285:31: error[invalid-argument-type] Argument to function `can_expand` is incorrect: Expected `DidlObject`, found `str`
 homeassistant/components/sonos/media_browser.py:304:21: error[call-non-callable] Object of type `None` is not callable
@@ -3386,7 +3312,6 @@ homeassistant/components/soundtouch/media_player.py:210:16: warning[possibly-mis
 homeassistant/components/soundtouch/media_player.py:215:16: warning[possibly-missing-attribute] Attribute `track` may be missing on object of type `Unknown | None`
 homeassistant/components/soundtouch/media_player.py:220:16: warning[possibly-missing-attribute] Attribute `album` may be missing on object of type `Unknown | None`
 homeassistant/components/splunk/__init__.py:9:6: error[unresolved-import] Cannot resolve imported module `hass_splunk`
-homeassistant/components/splunk/__init__.py:127:27: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
 homeassistant/components/spotify/browse_media.py:331:21: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str | None] | Unknown]` is not assignable to `list[ItemPayload]`
 homeassistant/components/squeezebox/__init__.py:207:42: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `Unknown | str | None`
 homeassistant/components/squeezebox/browse_media.py:162:43: error[invalid-argument-type] Argument to bound method `async_query` is incorrect: Expected `str`, found `Unknown | str | int`
@@ -3400,14 +3325,11 @@ homeassistant/components/squeezebox/media_player.py:581:50: error[invalid-argume
 homeassistant/components/squeezebox/media_player.py:889:17: error[invalid-argument-type] Argument to function `safe_library_call` is incorrect: Expected `(...) -> Awaitable[Any]`, found `Unknown | (bound method Player.generate_image_url_from_track_id(track_id: int) -> str)`
 homeassistant/components/squeezebox/switch.py:150:16: warning[redundant-cast] Value is already of type `bool`
 homeassistant/components/ssdp/common.py:18:42: warning[possibly-missing-attribute] Attribute `scope_id` may be missing on object of type `IPv4Address | IPv6Address`
-homeassistant/components/ssdp/scanner.py:64:5: error[invalid-type-form] List literals are not allowed in this context in a type expression
-homeassistant/components/ssdp/scanner.py:64:37: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/components/ssdp/scanner.py:263:24: warning[possibly-missing-attribute] Attribute `scope_id` may be missing on object of type `IPv4Address | IPv6Address`
 homeassistant/components/ssdp/scanner.py:268:25: warning[possibly-missing-attribute] Attribute `scope_id` may be missing on object of type `IPv4Address | IPv6Address`
 homeassistant/components/ssdp/server.py:174:28: warning[possibly-missing-attribute] Attribute `scope_id` may be missing on object of type `IPv4Address | IPv6Address`
 homeassistant/components/ssdp/server.py:179:29: warning[possibly-missing-attribute] Attribute `scope_id` may be missing on object of type `IPv4Address | IPv6Address`
 homeassistant/components/starlingbank/sensor.py:9:6: error[unresolved-import] Cannot resolve imported module `starlingbank`
-homeassistant/components/statsd/__init__.py:91:21: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
 homeassistant/components/steam_online/config_flow.py:30:5: warning[possibly-missing-attribute] Submodule `api` may not be available as an attribute on module `steam`
 homeassistant/components/steam_online/config_flow.py:31:17: warning[possibly-missing-attribute] Submodule `api` may not be available as an attribute on module `steam`
 homeassistant/components/steam_online/config_flow.py:61:21: warning[possibly-missing-attribute] Submodule `api` may not be available as an attribute on module `steam`
@@ -3465,6 +3387,7 @@ homeassistant/components/switchbot_cloud/__init__.py:135:37: error[invalid-argum
 homeassistant/components/switchbot_cloud/climate.py:144:20: error[no-matching-overload] No overload of bound method `get` matches arguments
 homeassistant/components/switchbot_cloud/climate.py:157:25: error[no-matching-overload] No overload of bound method `get` matches arguments
 homeassistant/components/switchbot_cloud/entity.py:51:13: error[invalid-argument-type] Argument to bound method `send_command` is incorrect: Expected `str`, found `str | None | Unknown`
+homeassistant/components/switchbot_cloud/entity.py:52:13: error[invalid-argument-type] Argument to bound method `send_command` is incorrect: Argument type `Commands` does not satisfy upper bound `CommonCommands` of type variable `T`
 homeassistant/components/switchbot_cloud/entity.py:54:13: error[invalid-argument-type] Argument to bound method `send_command` is incorrect: Expected `dict[Unknown, Unknown] | str`, found `dict[Unknown, Unknown] | str | int`
 homeassistant/components/switchbot_cloud/sensor.py:344:38: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Device`, found `Device | Remote`
 homeassistant/components/switcher_kis/sensor.py:138:16: error[unresolved-attribute] Object of type `SensorEntityDescription` has no attribute `value_fn`
@@ -3491,9 +3414,6 @@ homeassistant/components/tank_utility/sensor.py:9:6: error[unresolved-import] Ca
 homeassistant/components/tapsaff/binary_sensor.py:8:6: error[unresolved-import] Cannot resolve imported module `tapsaff`
 homeassistant/components/tasmota/camera.py:103:24: error[unresolved-attribute] Object of type `object` has no attribute `Request`
 homeassistant/components/tasmota/camera.py:104:10: error[unresolved-attribute] Object of type `object` has no attribute `StreamResponse`
-homeassistant/components/tasmota/device_automation.py:61:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/components/tasmota/device_automation.py:62:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def async_device_removed(event: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> CoroutineType[Any, Any, None]`
-homeassistant/components/tasmota/device_automation.py:63:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _async_device_removed_filter(event_data: _EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update) -> bool`
 homeassistant/components/tautulli/entity.py:35:25: error[invalid-argument-type] Invalid argument to key "identifiers" with declared type `set[tuple[str, str]]` on TypedDict `DeviceInfo`: value of type `set[Unknown | tuple[str, int | None | str]]`
 homeassistant/components/tautulli/sensor.py:42:17: error[not-iterable] Object of type `PyTautulliApiHomeStats` is not iterable
 homeassistant/components/tautulli/sensor.py:252:13: error[invalid-argument-type] Argument is incorrect: Expected `PyTautulliApiHomeStats`, found `Unknown | list[PyTautulliApiHomeStats] | None`
@@ -3925,8 +3845,6 @@ homeassistant/components/vizio/media_player.py:454:25: error[invalid-argument-ty
 homeassistant/components/vlc/media_player.py:8:8: error[unresolved-import] Cannot resolve imported module `vlc`
 homeassistant/components/voicerss/tts.py:196:46: error[invalid-argument-type] Argument to function `async_get_clientsession` is incorrect: Expected `HomeAssistant`, found `HomeAssistant | None | Unknown`
 homeassistant/components/voip/assist_satellite.py:168:9: error[invalid-assignment] Object of type `Self@async_added_to_hass` is not assignable to attribute `protocol` on type `Unknown | VoIPDevice`
-homeassistant/components/voip/devices.py:122:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/components/voip/devices.py:123:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def async_device_removed(ev: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> None`
 homeassistant/components/voip/voip.py:58:16: error[invalid-return-type] Return type does not match returned value: expected `VoipDatagramProtocol`, found `PreRecordMessageProtocol`
 homeassistant/components/voip/voip.py:68:5: error[unresolved-attribute] Object of type `VoipDatagramProtocol` has no attribute `_rtp_input`
 homeassistant/components/voip/voip.py:69:5: error[unresolved-attribute] Object of type `VoipDatagramProtocol` has no attribute `_rtp_output`
@@ -3980,7 +3898,6 @@ homeassistant/components/webostv/config_flow.py:137:9: error[invalid-method-over
 homeassistant/components/webostv/media_player.py:128:51: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@cmd]` has no attribute `__name__`
 homeassistant/components/webostv/media_player.py:134:29: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@cmd]` has no attribute `__name__`
 homeassistant/components/webostv/media_player.py:145:29: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@cmd]` has no attribute `__name__`
-homeassistant/components/websocket_api/commands.py:454:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
 homeassistant/components/websocket_api/connection.py:282:27: warning[possibly-missing-attribute] Submodule `humanize` may not be available as an attribute on module `voluptuous`
 homeassistant/components/websocket_api/decorators.py:37:40: error[unresolved-attribute] Object of type `AsyncWebSocketCommandHandler` has no attribute `__name__`
 homeassistant/components/websocket_api/decorators.py:142:19: error[non-subscriptable] Cannot subscript object of type `All` with no `__getitem__` method
@@ -4022,8 +3939,6 @@ homeassistant/components/websocket_api/http.py:553:21: warning[possibly-missing-
 homeassistant/components/websocket_api/http.py:558:21: warning[possibly-missing-attribute] Attribute `data` may be missing on object of type `Unknown | HomeAssistant | None`
 homeassistant/components/websocket_api/http.py:561:17: error[no-matching-overload] No overload of function `async_dispatcher_send` matches arguments
 homeassistant/components/wemo/__init__.py:92:27: warning[possibly-missing-attribute] Submodule `ssdp` may not be available as an attribute on module `pywemo`
-homeassistant/components/wemo/__init__.py:263:37: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/components/wemo/__init__.py:263:49: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/components/wemo/light.py:196:32: error[invalid-argument-type] Argument to bound method `turn_on` is incorrect: Expected `bool`, found `Unknown | int`
 homeassistant/components/whirlpool/binary_sensor.py:76:16: error[unresolved-attribute] Object of type `BinarySensorEntityDescription` has no attribute `value_fn`
 homeassistant/components/whirlpool/climate.py:88:16: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `int | float | None`
@@ -4141,12 +4056,12 @@ homeassistant/components/xs1/sensor.py:7:6: error[unresolved-import] Cannot reso
 homeassistant/components/xs1/switch.py:7:6: error[unresolved-import] Cannot resolve imported module `xs1_api_client.api_constants`
 homeassistant/components/xs1/switch.py:8:6: error[unresolved-import] Cannot resolve imported module `xs1_api_client.device.actuator`
 homeassistant/components/yale/__init__.py:65:36: error[invalid-argument-type] Argument to bound method `async_setup` is incorrect: Expected `Config`, found `dict[Unknown | str, Unknown | Brand]`
-homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'username' in TypedDict `Config` constructor
-homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'password' in TypedDict `Config` constructor
-homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'login_method' in TypedDict `Config` constructor
 homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'access_token_cache_file' in TypedDict `Config` constructor
 homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'install_id' in TypedDict `Config` constructor
+homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'login_method' in TypedDict `Config` constructor
+homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'password' in TypedDict `Config` constructor
 homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'timeout' in TypedDict `Config` constructor
+homeassistant/components/yale/__init__.py:65:36: error[missing-typed-dict-key] Missing required key 'username' in TypedDict `Config` constructor
 homeassistant/components/yale/binary_sensor.py:75:9: error[invalid-argument-type] Argument is incorrect: Expected `(YaleData, DoorbellDetail | LockDetail, /) -> Activity | None`, found `def retrieve_online_state(data: YaleData, detail: DoorbellDetail | LockDetail) -> bool`
 homeassistant/components/yale/binary_sensor.py:103:12: warning[possibly-missing-attribute] Attribute `doorsense` may be missing on object of type `DoorbellDetail | LockDetail`
 homeassistant/components/yale/binary_sensor.py:106:12: warning[possibly-missing-attribute] Attribute `doorbell` may be missing on object of type `DoorbellDetail | LockDetail`
@@ -4203,9 +4118,12 @@ homeassistant/components/yamaha_musiccast/media_player.py:393:13: error[invalid-
 homeassistant/components/yamaha_musiccast/number.py:65:35: error[invalid-argument-type] Argument to bound method `set` is incorrect: Expected `int`, found `int | float`
 homeassistant/components/yandextts/tts.py:123:46: error[invalid-argument-type] Argument to function `async_get_clientsession` is incorrect: Expected `HomeAssistant`, found `HomeAssistant | None | Unknown`
 homeassistant/components/yeelight/config_flow.py:146:9: error[invalid-method-override] Invalid override of method `is_matching`: Definition is incompatible with `ConfigFlow.is_matching`
+homeassistant/components/yeelight/device.py:200:9: error[invalid-assignment] Object of type `(CaseInsensitiveDict & ~AlwaysFalsy) | dict[Unknown, Unknown]` is not assignable to attribute `capabilities` of type `dict[str, Any]`
 homeassistant/components/yeelight/light.py:256:47: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
 homeassistant/components/yeelight/light.py:264:43: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
 homeassistant/components/yeelight/light.py:270:43: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
+homeassistant/components/yeelight/scanner.py:55:13: error[invalid-assignment] Object of type `Self@async_get` is not assignable to attribute `_scanner` of type `<special form 'typing.Self'> | None`
+homeassistant/components/yeelight/scanner.py:56:16: error[invalid-return-type] Return type does not match returned value: expected `Self@async_get`, found `<special form 'typing.Self'> | None`
 homeassistant/components/yeelightsunflower/light.py:9:8: error[unresolved-import] Cannot resolve imported module `yeelightsunflower`
 homeassistant/components/yi/camera.py:7:6: error[unresolved-import] Cannot resolve imported module `aioftp`
 homeassistant/components/yi/camera.py:144:34: error[invalid-argument-type] Argument to bound method `open_camera` is incorrect: Expected `str`, found `Unknown | None`
@@ -4213,8 +4131,6 @@ homeassistant/components/yi/camera.py:151:17: error[invalid-argument-type] Argum
 homeassistant/components/yolink/switch.py:174:41: error[invalid-assignment] Object of type `None` is not assignable to `ClientRequest`
 homeassistant/components/zabbix/__init__.py:15:6: error[unresolved-import] Cannot resolve imported module `zabbix_utils`
 homeassistant/components/zabbix/__init__.py:16:6: error[unresolved-import] Cannot resolve imported module `zabbix_utils.exceptions`
-homeassistant/components/zabbix/__init__.py:214:25: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/components/zabbix/__init__.py:214:46: error[invalid-argument-type] Argument to bound method `listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@setup._event_listener(event: Event[EventStateChangedData]) -> None`
 homeassistant/components/zabbix/sensor.py:10:6: error[unresolved-import] Cannot resolve imported module `zabbix_utils`
 homeassistant/components/zamg/coordinator.py:51:9: error[invalid-assignment] Object of type `Unknown | dict[Unknown, Unknown] | None` is not assignable to attribute `data` of type `dict[Unknown, Unknown]`
 homeassistant/components/zamg/coordinator.py:54:16: error[invalid-return-type] Return type does not match returned value: expected `ZamgData`, found `Unknown | dict[Unknown, Unknown] | None`
@@ -4230,6 +4146,7 @@ homeassistant/components/zha/alarm_control_panel.py:94:15: error[unresolved-attr
 homeassistant/components/zha/alarm_control_panel.py:100:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_alarm_arm_away`
 homeassistant/components/zha/alarm_control_panel.py:106:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_alarm_arm_night`
 homeassistant/components/zha/alarm_control_panel.py:112:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_alarm_trigger`
+homeassistant/components/zha/api.py:61:24: error[no-matching-overload] No overload of function `max` matches arguments
 homeassistant/components/zha/api.py:108:13: error[invalid-argument-type] Argument to bound method `energy_scan` is incorrect: Expected `Channels`, found `Unknown | Literal[134215680]`
 homeassistant/components/zha/binary_sensor.py:59:16: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `is_on`
 homeassistant/components/zha/button.py:60:15: error[unresolved-attribute] Object of type `PlatformEntity | GroupEntity` has no attribute `async_press`
@@ -4296,8 +4213,6 @@ homeassistant/components/zha/helpers.py:374:31: warning[possibly-missing-attribu
 homeassistant/components/zha/helpers.py:378:33: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | PermitJoins`
 homeassistant/components/zha/helpers.py:388:35: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | RouteStatus`
 homeassistant/components/zha/helpers.py:533:44: warning[possibly-missing-attribute] Submodule `handlers` may not be available as an attribute on module `logging`
-homeassistant/components/zha/helpers.py:542:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/components/zha/helpers.py:543:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@__init__._handle_entity_registry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> CoroutineType[Any, Any, None]`
 homeassistant/components/zha/helpers.py:603:27: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Platform, str], PlatformEntity].__getitem__(key: tuple[Platform, str], /) -> PlatformEntity` cannot be called with key of type `tuple[str, str]` on object of type `dict[tuple[Platform, str], PlatformEntity]`
 homeassistant/components/zha/helpers.py:615:65: error[invalid-argument-type] Argument to bound method `_async_get_or_create_group_proxy` is incorrect: Expected `GroupInfo`, found `Unknown | Group`
 homeassistant/components/zha/helpers.py:701:67: error[invalid-argument-type] Argument to bound method `_async_get_or_create_device_proxy` is incorrect: Expected `Device`, found `Unknown | Device | None`
@@ -4408,85 +4323,42 @@ homeassistant/config_entries.py:207:17: error[invalid-type-arguments] Too many t
 homeassistant/config_entries.py:1273:17: error[invalid-argument-type] Argument to bound method `async_init` is incorrect: Expected `ConfigFlowContext | None`, found `ConfigFlowContext | dict[str, object]`
 homeassistant/config_entries.py:1833:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `UserDict.__setitem__`
 homeassistant/config_entries.py:1904:9: error[invalid-method-override] Invalid override of method `__delitem__`: Definition is incompatible with `UserDict.__delitem__`
-homeassistant/config_entries.py:3853:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/config_entries.py:3854:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@async_setup._handle_entry_updated(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
-homeassistant/config_entries.py:3855:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _handle_entry_updated_filter(event_data: _EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update) -> bool`
 homeassistant/config_entries.py:3930:33: error[invalid-argument-type] Method `__getitem__` of type `(Overload[(key: Literal["action"], /) -> Literal["create", "remove"], (key: Literal["entity_id"], /) -> str]) | (Overload[(key: Literal["action"], /) -> Literal["update"], (key: Literal["entity_id"], /) -> str, (key: Literal["changes"], /) -> dict[str, Any], (key: Literal["old_entity_id"], /) -> str])` cannot be called with key of type `Literal["changes"]` on object of type `EventEntityRegistryUpdatedData`
 homeassistant/config_entries.py:3931:12: error[invalid-argument-type] Method `__getitem__` of type `(Overload[(key: Literal["action"], /) -> Literal["create", "remove"], (key: Literal["entity_id"], /) -> str]) | (Overload[(key: Literal["action"], /) -> Literal["update"], (key: Literal["entity_id"], /) -> str, (key: Literal["changes"], /) -> dict[str, Any], (key: Literal["old_entity_id"], /) -> str])` cannot be called with key of type `Literal["changes"]` on object of type `EventEntityRegistryUpdatedData`
 homeassistant/const.py:979:43: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
-homeassistant/core.py:359:23: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:648:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:658:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:667:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:698:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:707:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:715:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:735:45: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:743:45: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:748:45: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:881:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:890:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:898:31: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:917:45: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:1026:37: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:1032:37: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:1037:37: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/core.py:1277:32: error[invalid-type-form] Variable of type `under_cached_property[Unknown]` is not allowed in a type expression
 homeassistant/core.py:1378:32: error[invalid-type-form] Variable of type `under_cached_property[Unknown]` is not allowed in a type expression
-homeassistant/core.py:1398:13: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_DataT@_FilterableJobType]]`?
-homeassistant/core.py:1398:30: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/core.py:1406:27: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_DataT@_OneTimeListener]]`?
-homeassistant/core.py:1406:44: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/core.py:1504:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_fire] | str`
 homeassistant/core.py:1527:48: error[invalid-argument-type] Argument to function `_event_repr` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_fire_internal] | str`
 homeassistant/core.py:1621:50: error[invalid-argument-type] Argument to bound method `_async_listen_filterable_job` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_listen] | str`
-homeassistant/core.py:1621:62: error[invalid-argument-type] Argument to bound method `_async_listen_filterable_job` is incorrect: Expected `tuple[HassJob[Unknown], ((Mapping[str, Any], /) -> bool) | None]`, found `tuple[HassJob[Unknown], ((_DataT@async_listen, /) -> bool) | None]`
+homeassistant/core.py:1621:62: error[invalid-argument-type] Argument to bound method `_async_listen_filterable_job` is incorrect: Expected `tuple[HassJob[(Event[Mapping[str, Any]], /), Coroutine[Any, Any, None] | None], ((Mapping[str, Any], /) -> bool) | None]`, found `tuple[HassJob[(Event[_DataT@async_listen], /), Unknown], ((_DataT@async_listen, /) -> bool) | None]`
+homeassistant/core.py:1684:33: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `(Event[_DataT@async_listen_once], /) -> Coroutine[Any, Any, None] | None`
 homeassistant/core.py:1687:13: error[invalid-argument-type] Argument to bound method `_async_listen_filterable_job` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_DataT@async_listen_once] | str`
 homeassistant/core.py:1925:32: error[invalid-type-form] Variable of type `under_cached_property[Unknown]` is not allowed in a type expression
 homeassistant/core.py:2048:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `UserDict.__setitem__`
-homeassistant/core.py:2356:17: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[dict[Unknown | str, Unknown | str | datetime | State | None]] | str`, found `EventType[EventStateReportedData]`
+homeassistant/core.py:2356:17: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[EventStateReportedData | dict[Unknown | str, Unknown | str | datetime | State | None]] | str`, found `EventType[EventStateReportedData]`
 homeassistant/data_entry_flow.py:365:27: warning[redundant-cast] Value is already of type `Schema`
-homeassistant/data_entry_flow.py:1016:45: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/data_entry_flow.py:1016:79: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/data_entry_flow.py:1031:44: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/data_entry_flow.py:1032:39: error[invalid-type-arguments] Too many type arguments: expected 2, got 3
-homeassistant/data_entry_flow.py:1037:23: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, Unknown]` has no attribute `__name__`
+homeassistant/data_entry_flow.py:1037:23: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, ResultT@progress_step]` has no attribute `__name__`
 homeassistant/data_entry_flow.py:1063:21: error[invalid-argument-type] Argument to bound method `async_show_progress` is incorrect: Expected `Mapping[str, str] | None`, found `None | @Todo | (dict[str, str] & ~(() -> object)) | (((Any, /) -> dict[str, str]) & ~(() -> object))`
 homeassistant/helpers/area_registry.py:90:32: error[invalid-type-form] Variable of type `cached_property[Unknown]` is not allowed in a type expression
 homeassistant/helpers/area_registry.py:481:16: error[invalid-return-type] Return type does not match returned value: expected `AreasRegistryStoreData`, found `dict[Unknown | str, Unknown | list[dict[Unknown | str, Unknown | list[str] | str | None] | Unknown]]`
 homeassistant/helpers/area_registry.py:482:22: error[invalid-argument-type] Invalid argument to key "areas" with declared type `list[_AreaStoreData]` on TypedDict `AreasRegistryStoreData`: value of type `list[dict[Unknown | str, Unknown | list[str] | str | None] | Unknown]`
 homeassistant/helpers/area_registry.py:521:35: error[invalid-key] Unknown key "floor_id" for TypedDict `_EventFloorRegistryUpdatedData_Reorder`: Unknown key "floor_id"
-homeassistant/helpers/area_registry.py:526:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
-homeassistant/helpers/area_registry.py:527:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _removed_from_registry_filter(event_data: _EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder | EventLabelRegistryUpdatedData) -> bool`
-homeassistant/helpers/area_registry.py:528:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _handle_floor_registry_update(event: Event[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]) -> None`
-homeassistant/helpers/area_registry.py:539:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventLabelRegistryUpdatedData]`
-homeassistant/helpers/area_registry.py:540:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _removed_from_registry_filter(event_data: _EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder | EventLabelRegistryUpdatedData) -> bool`
-homeassistant/helpers/area_registry.py:541:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _handle_label_registry_update(event: Event[EventLabelRegistryUpdatedData]) -> None`
 homeassistant/helpers/category_registry.py:230:16: error[invalid-return-type] Return type does not match returned value: expected `CategoryRegistryStoreData`, found `dict[Unknown | str, Unknown | dict[str | Unknown, list[dict[Unknown | str, Unknown | str | None] | Unknown] | Unknown]]`
 homeassistant/helpers/category_registry.py:231:27: error[invalid-argument-type] Invalid argument to key "categories" with declared type `dict[str, list[_CategoryStoreData]]` on TypedDict `CategoryRegistryStoreData`: value of type `dict[str | Unknown, list[dict[Unknown | str, Unknown | str | None] | Unknown] | Unknown]`
 homeassistant/helpers/condition.py:413:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[str, ConditionProtocol | None]`, found `tuple[str, ModuleType]`
 homeassistant/helpers/condition.py:480:49: error[call-non-callable] Object of type `None` is not callable
 homeassistant/helpers/condition.py:481:39: error[call-non-callable] Object of type `None` is not callable
 homeassistant/helpers/config_validation.py:21:5: error[unresolved-import] Module `socket` has no member `_GLOBAL_DEFAULT_TIMEOUT`
-homeassistant/helpers/debounce.py:43:28: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?
-homeassistant/helpers/debounce.py:43:32: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/deprecation.py:44:25: error[unresolved-attribute] Object of type `(_ObjectT@deprecated_substitute, /) -> Any` has no attribute `__name__`
-homeassistant/helpers/deprecation.py:158:24: error[unresolved-attribute] Object of type `(...) -> _T@deprecated_hass_argument` has no attribute `__name__`
-homeassistant/helpers/deprecation.py:160:34: error[unresolved-attribute] Object of type `(...) -> _T@deprecated_hass_argument` has no attribute `__name__`
+homeassistant/helpers/deprecation.py:158:24: error[unresolved-attribute] Object of type `(**_P@deprecated_hass_argument) -> _T@deprecated_hass_argument` has no attribute `__name__`
+homeassistant/helpers/deprecation.py:160:34: error[unresolved-attribute] Object of type `(**_P@deprecated_hass_argument) -> _T@deprecated_hass_argument` has no attribute `__name__`
 homeassistant/helpers/device_registry.py:1308:20: error[invalid-assignment] Object of type `dict[Unknown | str, Unknown | str]` is not assignable to `EventDeviceRegistryUpdatedData`
 homeassistant/helpers/device_registry.py:1310:20: error[invalid-assignment] Object of type `dict[Unknown | str, Unknown | str | dict[str, Any]]` is not assignable to `EventDeviceRegistryUpdatedData`
-homeassistant/helpers/device_registry.py:1457:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventDeviceRegistryUpdatedData_Remove] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/helpers/device_registry.py:1838:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventLabelRegistryUpdatedData]`
-homeassistant/helpers/device_registry.py:1839:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _label_removed_from_registry_filter(event_data: EventLabelRegistryUpdatedData) -> bool`
-homeassistant/helpers/device_registry.py:1840:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _handle_label_registry_update(event: Event[EventLabelRegistryUpdatedData]) -> None`
 homeassistant/helpers/device_registry.py:1867:36: error[invalid-argument-type] Method `__getitem__` of type `(Overload[(key: Literal["action"], /) -> Literal["create", "remove"], (key: Literal["entity_id"], /) -> str]) | (Overload[(key: Literal["action"], /) -> Literal["update"], (key: Literal["entity_id"], /) -> str, (key: Literal["changes"], /) -> dict[str, Any], (key: Literal["old_entity_id"], /) -> str])` cannot be called with key of type `Literal["changes"]` on object of type `EventEntityRegistryUpdatedData`
-homeassistant/helpers/device_registry.py:1876:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/helpers/device_registry.py:1877:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _async_entity_registry_changed(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
-homeassistant/helpers/device_registry.py:1878:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def entity_registry_changed_filter(event_data: _EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update) -> bool`
 homeassistant/helpers/discovery.py:22:46: error[invalid-type-arguments] Too many type arguments to class `SignalTypeFormat`: expected 0, got 1
 homeassistant/helpers/discovery_flow.py:59:19: error[invalid-assignment] Object of type `dict[str, object]` is not assignable to `ConfigFlowContext`
 homeassistant/helpers/dispatcher.py:30:16: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
-homeassistant/helpers/dispatcher.py:33:22: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/dispatcher.py:41:45: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:55:24: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:72:38: error[invalid-type-arguments] Too many type arguments: expected 0, got 1
@@ -4498,7 +4370,6 @@ homeassistant/helpers/dispatcher.py:131:45: error[invalid-type-arguments] Too ma
 homeassistant/helpers/dispatcher.py:142:45: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:149:24: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:163:24: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
-homeassistant/helpers/dispatcher.py:164:19: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/dispatcher.py:186:45: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:199:45: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/helpers/dispatcher.py:221:45: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
@@ -4513,109 +4384,28 @@ homeassistant/helpers/entity.py:1578:73: error[invalid-key] Unknown key "changes
 homeassistant/helpers/entity_component.py:378:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `EntityPlatformModule | None`, found `ModuleType | None`
 homeassistant/helpers/entity_registry.py:218:5: error[call-non-callable] Object of type `_MISSING_TYPE` is not callable
 homeassistant/helpers/entity_registry.py:443:5: error[call-non-callable] Object of type `_MISSING_TYPE` is not callable
-homeassistant/helpers/entity_registry.py:830:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/helpers/entity_registry.py:831:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `bound method Self@__init__.async_device_modified(event: Event[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]) -> None`
 homeassistant/helpers/entity_registry.py:1061:13: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `None | str`
 homeassistant/helpers/entity_registry.py:1064:13: error[invalid-argument-type] Argument is incorrect: Expected `ReadOnlyEntityOptionsType`, found `ReadOnlyDict[str, ReadOnlyDict[str, Any]] | @Todo | None`
-homeassistant/helpers/entity_registry.py:1080:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventEntityRegistryUpdatedData_CreateRemove] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/helpers/entity_registry.py:1127:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventEntityRegistryUpdatedData_CreateRemove] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
 homeassistant/helpers/entity_registry.py:1150:46: error[invalid-key] Unknown key "device" for TypedDict `_EventDeviceRegistryUpdatedData_Create` - did you mean "device_id"?
 homeassistant/helpers/entity_registry.py:1150:46: error[invalid-key] Unknown key "device" for TypedDict `_EventDeviceRegistryUpdatedData_Update` - did you mean "device_id"?
 homeassistant/helpers/entity_registry.py:1180:45: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Create`: Unknown key "changes"
 homeassistant/helpers/entity_registry.py:1180:45: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Remove`: Unknown key "changes"
 homeassistant/helpers/entity_registry.py:1194:56: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Create`: Unknown key "changes"
 homeassistant/helpers/entity_registry.py:1194:56: error[invalid-key] Unknown key "changes" for TypedDict `_EventDeviceRegistryUpdatedData_Remove`: Unknown key "changes"
-homeassistant/helpers/entity_registry.py:1379:43: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventEntityRegistryUpdatedData_Update] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/helpers/entity_registry.py:1863:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventLabelRegistryUpdatedData]`
-homeassistant/helpers/entity_registry.py:1864:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _removed_from_registry_filter(event_data: EventLabelRegistryUpdatedData | EventCategoryRegistryUpdatedData) -> bool`
-homeassistant/helpers/entity_registry.py:1865:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _handle_label_registry_update(event: Event[EventLabelRegistryUpdatedData]) -> None`
-homeassistant/helpers/entity_registry.py:1876:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventCategoryRegistryUpdatedData]`
-homeassistant/helpers/entity_registry.py:1877:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def _removed_from_registry_filter(event_data: EventLabelRegistryUpdatedData | EventCategoryRegistryUpdatedData) -> bool`
-homeassistant/helpers/entity_registry.py:1878:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def _handle_category_registry_update(event: Event[EventCategoryRegistryUpdatedData]) -> None`
 homeassistant/helpers/entity_registry.py:1917:40: error[invalid-key] Unknown key "old_entity_id" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "old_entity_id"
-homeassistant/helpers/entity_registry.py:1934:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/helpers/entity_registry.py:1935:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def cleanup_restored_states(event: Event[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]) -> None`
-homeassistant/helpers/event.py:105:36: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_TypedDictT@_KeyedEventTracker]]`?
-homeassistant/helpers/event.py:105:58: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:113:36: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_TypedDictT@_KeyedEventTracker]]`?
-homeassistant/helpers/event.py:113:58: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:125:46: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_TypedDictT@_KeyedEventData]]`?
-homeassistant/helpers/event.py:125:68: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:299:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/helpers/event.py:300:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def state_change_dispatcher(event: Event[EventStateChangedData]) -> None`
-homeassistant/helpers/event.py:301:9: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `((Mapping[str, Any], /) -> bool) | None`, found `def state_change_filter(event_data: EventStateChangedData) -> bool`
-homeassistant/helpers/event.py:342:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_StateEventDataT@_async_dispatch_entity_id_event_soon]]`?
-homeassistant/helpers/event.py:342:66: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:352:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_StateEventDataT@_async_dispatch_entity_id_event]]`?
-homeassistant/helpers/event.py:352:66: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:372:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_StateEventDataT@_async_state_filter]]`?
-homeassistant/helpers/event.py:372:66: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:437:18: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_TypedDictT@_remove_listener]]`?
-homeassistant/helpers/event.py:437:40: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:438:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[_TypedDictT@_remove_listener]]`?
-homeassistant/helpers/event.py:438:61: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/event.py:474:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_TypedDictT@_async_track_event] | str`
-homeassistant/helpers/event.py:501:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventEntityRegistryUpdatedData]]`?
-homeassistant/helpers/event.py:501:80: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:525:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventEntityRegistryUpdatedData]]`?
-homeassistant/helpers/event.py:525:80: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:568:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventDeviceRegistryUpdatedData]]`?
-homeassistant/helpers/event.py:568:80: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:578:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventDeviceRegistryUpdatedData]]`?
-homeassistant/helpers/event.py:578:80: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:622:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventStateChangedData]]`?
-homeassistant/helpers/event.py:622:71: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:639:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventStateChangedData]]`?
-homeassistant/helpers/event.py:639:71: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:689:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event[EventStateChangedData]]`?
-homeassistant/helpers/event.py:689:71: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:861:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/helpers/event.py:861:34: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `Unknown | ((Event[EventStateChangedData], /) -> Any)`
-homeassistant/helpers/event.py:1447:13: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventStateChangedData]`
-homeassistant/helpers/event.py:1447:34: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `(Event[Mapping[str, Any]], /) -> Coroutine[Any, Any, None] | None`, found `def state_for_cancel_listener(event: Event[EventStateChangedData]) -> None`
-homeassistant/helpers/event.py:1466:21: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1466:33: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1500:18: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1500:30: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1546:21: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1546:33: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1571:39: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1571:51: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1581:21: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1581:33: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1602:21: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1602:33: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1632:25: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1632:37: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1633:23: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1633:35: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1708:18: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?
-homeassistant/helpers/event.py:1708:22: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1805:18: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1805:30: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/event.py:1807:48: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[datetime]`?
-homeassistant/helpers/event.py:1807:60: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/floor_registry.py:224:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
-homeassistant/helpers/floor_registry.py:237:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
-homeassistant/helpers/floor_registry.py:279:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
-homeassistant/helpers/floor_registry.py:306:13: error[invalid-argument-type] Argument to bound method `async_fire_internal` is incorrect: Expected `EventType[_EventFloorRegistryUpdatedData_Reorder] | str`, found `EventType[_EventFloorRegistryUpdatedData_Create_Remove_Update | _EventFloorRegistryUpdatedData_Reorder]`
 homeassistant/helpers/floor_registry.py:333:16: error[invalid-return-type] Return type does not match returned value: expected `FloorRegistryStoreData`, found `dict[Unknown | str, Unknown | list[dict[Unknown | str, Unknown | list[str] | str | None | int] | Unknown]]`
 homeassistant/helpers/floor_registry.py:334:23: error[invalid-argument-type] Invalid argument to key "floors" with declared type `list[_FloorStoreData]` on TypedDict `FloorRegistryStoreData`: value of type `list[dict[Unknown | str, Unknown | list[str] | str | None | int] | Unknown]`
 homeassistant/helpers/helper_integration.py:73:32: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/helpers/helper_integration.py:81:60: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
-homeassistant/helpers/integration_platform.py:37:26: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `tuple[HomeAssistant, str, Any]`?
-homeassistant/helpers/integration_platform.py:37:53: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/label_registry.py:250:16: error[invalid-return-type] Return type does not match returned value: expected `LabelRegistryStoreData`, found `dict[Unknown | str, Unknown | list[dict[Unknown | str, Unknown | str | None] | Unknown]]`
 homeassistant/helpers/label_registry.py:251:23: error[invalid-argument-type] Invalid argument to key "labels" with declared type `list[_LabelStoreData]` on TypedDict `LabelRegistryStoreData`: value of type `list[dict[Unknown | str, Unknown | str | None] | Unknown]`
 homeassistant/helpers/registry.py:38:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `UserDict.__setitem__`
+homeassistant/helpers/restore_state.py:94:75: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `datetime`, found `(Unknown & ~str) | datetime | None`
 homeassistant/helpers/schema_config_entry_flow.py:258:40: error[invalid-assignment] Object of type `(((dict[str, Any], /) -> Coroutine[Any, Any, str | None]) & ~(() -> object)) | (str & ~(() -> object)) | None` is not assignable to `str | None`
 homeassistant/helpers/script.py:153:36: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 3
 homeassistant/helpers/script.py:154:46: error[invalid-type-arguments] Too many type arguments to class `SignalTypeFormat`: expected 0, got 1
 homeassistant/helpers/script_variables.py:196:9: error[invalid-method-override] Invalid override of method `__setitem__`: Definition is incompatible with `UserDict.__setitem__`
-homeassistant/helpers/service.py:923:9: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[ServiceCall]`?
-homeassistant/helpers/service.py:924:9: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/service.py:1137:38: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
-homeassistant/helpers/service.py:1177:38: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/singleton.py:68:32: error[invalid-await] `_Coro[_T@singleton] | _U@singleton` is not awaitable
 homeassistant/helpers/singleton.py:83:12: error[invalid-return-type] Return type does not match returned value: expected `(_FuncType[_S@singleton], /) -> _FuncType[_S@singleton]`, found `Overload[(func: _FuncType[_Coro[_T@singleton]]) -> _FuncType[_Coro[_T@singleton]], (func: _FuncType[_U@singleton]) -> _FuncType[_U@singleton]]`
 homeassistant/helpers/singleton.py:121:5: error[type-assertion-failure] Type `str` does not match asserted type `Unknown`
@@ -4689,9 +4479,6 @@ homeassistant/helpers/storage.py:436:30: error[non-subscriptable] Cannot subscri
 homeassistant/helpers/storage.py:436:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:437:35: error[invalid-argument-type] Argument to bound method `async_save` is incorrect: Argument type `Unknown | dict[str, Any] | list[Any] | ... omitted 4 union elements` does not satisfy upper bound `Mapping[str, Any] | Sequence[Any]` of type variable `_T`
 homeassistant/helpers/storage.py:437:35: error[invalid-argument-type] Argument to bound method `async_save` is incorrect: Expected `_T@Store`, found `Unknown | dict[str, Any] | list[Any] | ... omitted 4 union elements`
-homeassistant/helpers/target.py:328:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventEntityRegistryUpdatedData_CreateRemove | _EventEntityRegistryUpdatedData_Update]`
-homeassistant/helpers/target.py:331:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[_EventDeviceRegistryUpdatedData_Create | _EventDeviceRegistryUpdatedData_Remove | _EventDeviceRegistryUpdatedData_Update]`
-homeassistant/helpers/target.py:334:17: error[invalid-argument-type] Argument to bound method `async_listen` is incorrect: Expected `EventType[Mapping[str, Any]] | str`, found `EventType[EventAreaRegistryUpdatedData]`
 homeassistant/helpers/template/__init__.py:599:13: warning[possibly-missing-attribute] Attribute `loop` may be missing on object of type `Unknown | HomeAssistant | None`
 homeassistant/helpers/template/__init__.py:1560:14: warning[possibly-missing-attribute] Submodule `filters` may not be available as an attribute on module `jinja2`
 homeassistant/helpers/template/__init__.py:1568:14: warning[possibly-missing-attribute] Submodule `filters` may not be available as an attribute on module `jinja2`
@@ -4699,8 +4486,6 @@ homeassistant/helpers/template/__init__.py:1861:19: warning[possibly-missing-att
 homeassistant/helpers/template/__init__.py:2061:23: warning[possibly-missing-attribute] Submodule `nodes` may not be available as an attribute on module `jinja2`
 homeassistant/helpers/template/__init__.py:2071:23: warning[possibly-missing-attribute] Submodule `nodes` may not be available as an attribute on module `jinja2`
 homeassistant/helpers/template/__init__.py:2080:23: warning[possibly-missing-attribute] Submodule `nodes` may not be available as an attribute on module `jinja2`
-homeassistant/helpers/trigger.py:621:21: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `tuple[dict[str, Any], Context | None]`?
-homeassistant/helpers/trigger.py:621:55: error[invalid-type-arguments] Too many type arguments to class `HassJob`: expected 1, got 2
 homeassistant/helpers/trigger.py:749:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[str, TriggerProtocol]`, found `tuple[Unknown | str, ModuleType]`
 homeassistant/helpers/update_coordinator.py:218:20: error[not-iterable] Object of type `GeneratorType[~None, None, None]` is not iterable
 homeassistant/loader.py:298:16: error[unresolved-import] Cannot resolve imported module `custom_components`
@@ -4766,4 +4551,4 @@ homeassistant/util/signal_type.pyi:61:37: error[invalid-type-arguments] Too many
 homeassistant/util/signal_type.pyi:63:49: error[invalid-type-arguments] Too many type arguments to class `SignalTypeFormat`: expected 0, got 1
 homeassistant/util/signal_type.pyi:64:38: error[invalid-type-arguments] Too many type arguments to class `SignalType`: expected 0, got 1
 homeassistant/util/variance.py:41:43: error[unsupported-operator] Operator `-` is unsupported between objects of type `_R@ignore_variance` and `_R@ignore_variance`
-Found 4768 diagnostics
+Found 4553 diagnostics
