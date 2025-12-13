@@ -933,7 +933,11 @@ impl<'db> Type<'db> {
             // Similarly, don't union together two function literals, since there are several parts
             // of our type inference machinery that assume that we infer a single FunctionLiteral
             // type for each overload of each function definition.
-            (Type::FunctionLiteral(_), Type::FunctionLiteral(_)) => self,
+            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
+                if prev_function.definition(db) == curr_function.definition(db) =>
+            {
+                self
+            }
 
             _ => {
                 // Also avoid unioning in a previous type which contains a Divergent from the
