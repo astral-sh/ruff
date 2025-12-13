@@ -121,6 +121,8 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
+    registry.register_lint(&FROZEN_SUBCLASS_OF_NON_FROZEN_DATACLASS);
+    registry.register_lint(&NON_FROZEN_SUBCLASS_OF_FROZEN_DATACLASS);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -2216,6 +2218,62 @@ declare_lint! {
     pub(crate) static INVALID_METHOD_OVERRIDE = {
         summary: "detects method definitions that violate the Liskov Substitution Principle",
         status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for frozen dataclasses that inherit from non-frozen dataclasses.
+    ///
+    /// ## Why is this bad?
+    /// Python raises a `TypeError` at runtime when a frozen dataclass
+    /// inherits from a non-frozen dataclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass
+    /// class Base:
+    ///     x: int
+    ///
+    /// @dataclass(frozen=True)
+    /// class Child(Base):  # Error raised here
+    ///     y: int
+    /// ```
+    pub(crate) static FROZEN_SUBCLASS_OF_NON_FROZEN_DATACLASS = {
+        summary: "detects frozen dataclasses inheriting from non-frozen dataclasses",
+        status: LintStatus::stable("0.0.1-alpha.35"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for non-frozen dataclasses that inherit from frozen dataclasses.
+    ///
+    /// ## Why is this bad?
+    /// Python raises a `TypeError` at runtime when a non-frozen dataclass
+    /// inherits from a frozen dataclass.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass(frozen=True)
+    /// class Base:
+    ///     x: int
+    ///
+    /// @dataclass
+    /// class Child(Base):  # Error raised here
+    ///     y: int
+    /// ```
+    pub(crate) static NON_FROZEN_SUBCLASS_OF_FROZEN_DATACLASS = {
+        summary: "detects non-frozen dataclasses inheriting from frozen dataclasses",
+        status: LintStatus::stable("0.0.1-alpha.35"),
         default_level: Level::Error,
     }
 }
