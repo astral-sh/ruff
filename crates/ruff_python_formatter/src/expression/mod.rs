@@ -877,7 +877,7 @@ impl<'a> First<'a> {
 /// ).all()
 /// ```
 ///
-/// In `preview`, we also track the position of the leftmost call or
+/// In [`preview`](crate::preview::is_fluent_layout_split_first_call_enabled), we also track the position of the leftmost call or
 /// subscript on an attribute in the chain and break just before the dot.
 ///
 /// So, for example, the right-hand summand in the above expression
