@@ -8,6 +8,260 @@ use super::{
     DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
 };
 
+pub(super) fn structural_type_ordering<'db>(
+    db: &'db dyn Db,
+    left: &Type<'db>,
+    right: &Type<'db>,
+) -> Ordering {
+    match (left, right) {
+        (Type::Never, _) => Ordering::Less,
+        (_, Type::Never) => Ordering::Greater,
+
+        (Type::LiteralString, _) => Ordering::Less,
+        (_, Type::LiteralString) => Ordering::Greater,
+
+        (Type::BooleanLiteral(left), Type::BooleanLiteral(right)) => left.cmp(right),
+        (Type::BooleanLiteral(_), _) => Ordering::Less,
+        (_, Type::BooleanLiteral(_)) => Ordering::Greater,
+
+        (Type::IntLiteral(left), Type::IntLiteral(right)) => left.cmp(right),
+        (Type::IntLiteral(_), _) => Ordering::Less,
+        (_, Type::IntLiteral(_)) => Ordering::Greater,
+
+        (Type::StringLiteral(left), Type::StringLiteral(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::StringLiteral(_), _) => Ordering::Less,
+        (_, Type::StringLiteral(_)) => Ordering::Greater,
+
+        (Type::BytesLiteral(left), Type::BytesLiteral(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::BytesLiteral(_), _) => Ordering::Less,
+        (_, Type::BytesLiteral(_)) => Ordering::Greater,
+
+        (Type::EnumLiteral(left), Type::EnumLiteral(right)) => left.structural_ordering(db, *right),
+        (Type::EnumLiteral(_), _) => Ordering::Less,
+        (_, Type::EnumLiteral(_)) => Ordering::Greater,
+
+        (Type::FunctionLiteral(left), Type::FunctionLiteral(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::FunctionLiteral(_), _) => Ordering::Less,
+        (_, Type::FunctionLiteral(_)) => Ordering::Greater,
+
+        (Type::BoundMethod(left), Type::BoundMethod(right)) => left.structural_ordering(db, *right),
+        (Type::BoundMethod(_), _) => Ordering::Less,
+        (_, Type::BoundMethod(_)) => Ordering::Greater,
+
+        (Type::KnownBoundMethod(left), Type::KnownBoundMethod(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::KnownBoundMethod(_), _) => Ordering::Less,
+        (_, Type::KnownBoundMethod(_)) => Ordering::Greater,
+
+        (Type::WrapperDescriptor(left), Type::WrapperDescriptor(right)) => left.cmp(right),
+        (Type::WrapperDescriptor(_), _) => Ordering::Less,
+        (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
+
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::DataclassDecorator(_), _) => Ordering::Less,
+        (_, Type::DataclassDecorator(_)) => Ordering::Greater,
+
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
+        (Type::DataclassTransformer(_), _) => Ordering::Less,
+        (_, Type::DataclassTransformer(_)) => Ordering::Greater,
+
+        (Type::Callable(left), Type::Callable(right)) => left.structural_ordering(db, *right),
+        (Type::Callable(_), _) => Ordering::Less,
+        (_, Type::Callable(_)) => Ordering::Greater,
+
+        (Type::ModuleLiteral(left), Type::ModuleLiteral(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::ModuleLiteral(_), _) => Ordering::Less,
+        (_, Type::ModuleLiteral(_)) => Ordering::Greater,
+
+        (Type::ClassLiteral(left), Type::ClassLiteral(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::ClassLiteral(_), _) => Ordering::Less,
+        (_, Type::ClassLiteral(_)) => Ordering::Greater,
+
+        (Type::GenericAlias(left), Type::GenericAlias(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::GenericAlias(_), _) => Ordering::Less,
+        (_, Type::GenericAlias(_)) => Ordering::Greater,
+
+        (Type::SubclassOf(left), Type::SubclassOf(right)) => {
+            match (left.subclass_of(), right.subclass_of()) {
+                (SubclassOfInner::Class(left), SubclassOfInner::Class(right)) => {
+                    left.structural_ordering(db, right)
+                }
+                (SubclassOfInner::Class(_), _) => Ordering::Less,
+                (_, SubclassOfInner::Class(_)) => Ordering::Greater,
+                (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
+                    dynamic_elements_ordering(left, right)
+                }
+                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
+                    left.structural_ordering(db, right)
+                }
+                (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
+                (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
+            }
+        }
+
+        (Type::SubclassOf(_), _) => Ordering::Less,
+        (_, Type::SubclassOf(_)) => Ordering::Greater,
+
+        (Type::TypeIs(left), Type::TypeIs(right)) => left.structural_ordering(db, *right),
+        (Type::TypeIs(_), _) => Ordering::Less,
+        (_, Type::TypeIs(_)) => Ordering::Greater,
+
+        (Type::NominalInstance(left), Type::NominalInstance(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::NominalInstance(_), _) => Ordering::Less,
+        (_, Type::NominalInstance(_)) => Ordering::Greater,
+
+        (Type::ProtocolInstance(left), Type::ProtocolInstance(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::ProtocolInstance(_), _) => Ordering::Less,
+        (_, Type::ProtocolInstance(_)) => Ordering::Greater,
+
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.structural_ordering(db, *right),
+        (Type::TypeVar(_), _) => Ordering::Less,
+        (_, Type::TypeVar(_)) => Ordering::Greater,
+
+        (Type::AlwaysTruthy, _) => Ordering::Less,
+        (_, Type::AlwaysTruthy) => Ordering::Greater,
+
+        (Type::AlwaysFalsy, _) => Ordering::Less,
+        (_, Type::AlwaysFalsy) => Ordering::Greater,
+
+        (Type::BoundSuper(left), Type::BoundSuper(right)) => {
+            (match (left.pivot_class(db), right.pivot_class(db)) {
+                (ClassBase::Class(left), ClassBase::Class(right)) => {
+                    left.structural_ordering(db, right)
+                }
+                (ClassBase::Class(_), _) => Ordering::Less,
+                (_, ClassBase::Class(_)) => Ordering::Greater,
+
+                (ClassBase::Protocol, _) => Ordering::Less,
+                (_, ClassBase::Protocol) => Ordering::Greater,
+
+                (ClassBase::Generic, _) => Ordering::Less,
+                (_, ClassBase::Generic) => Ordering::Greater,
+
+                (ClassBase::TypedDict, _) => Ordering::Less,
+                (_, ClassBase::TypedDict) => Ordering::Greater,
+
+                (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
+                    dynamic_elements_ordering(left, right)
+                }
+            })
+            .then_with(|| match (left.owner(db), right.owner(db)) {
+                (SuperOwnerKind::Class(left), SuperOwnerKind::Class(right)) => {
+                    left.structural_ordering(db, right)
+                }
+                (SuperOwnerKind::Class(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::Class(_)) => Ordering::Greater,
+                (SuperOwnerKind::Instance(left), SuperOwnerKind::Instance(right)) => {
+                    left.structural_ordering(db, right)
+                }
+                (SuperOwnerKind::Instance(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
+                (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
+                    dynamic_elements_ordering(left, right)
+                }
+            })
+        }
+        (Type::BoundSuper(_), _) => Ordering::Less,
+        (_, Type::BoundSuper(_)) => Ordering::Greater,
+
+        (Type::SpecialForm(left), Type::SpecialForm(right)) => left.cmp(right),
+        (Type::SpecialForm(_), _) => Ordering::Less,
+        (_, Type::SpecialForm(_)) => Ordering::Greater,
+
+        (Type::KnownInstance(left), Type::KnownInstance(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::KnownInstance(_), _) => Ordering::Less,
+        (_, Type::KnownInstance(_)) => Ordering::Greater,
+
+        (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::PropertyInstance(_), _) => Ordering::Less,
+        (_, Type::PropertyInstance(_)) => Ordering::Greater,
+
+        (Type::Dynamic(left), Type::Dynamic(right)) => dynamic_elements_ordering(*left, *right),
+        (Type::Dynamic(_), _) => Ordering::Less,
+        (_, Type::Dynamic(_)) => Ordering::Greater,
+
+        (Type::TypeAlias(left), Type::TypeAlias(right)) => left.structural_ordering(db, *right),
+        (Type::TypeAlias(_), _) => Ordering::Less,
+        (_, Type::TypeAlias(_)) => Ordering::Greater,
+
+        (Type::TypedDict(left), Type::TypedDict(right)) => left.structural_ordering(db, *right),
+        (Type::TypedDict(_), _) => Ordering::Less,
+        (_, Type::TypedDict(_)) => Ordering::Greater,
+
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => {
+            left.structural_ordering(db, *right)
+        }
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
+
+        (Type::Union(left), Type::Union(right)) => {
+            if left.elements(db).len() != right.elements(db).len() {
+                return left.elements(db).len().cmp(&right.elements(db).len());
+            }
+            for (left, right) in left.elements(db).iter().zip(right.elements(db)) {
+                let ordering = structural_type_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            Ordering::Equal
+        }
+        (Type::Union(_), _) => Ordering::Less,
+        (_, Type::Union(_)) => Ordering::Greater,
+
+        (Type::Intersection(left), Type::Intersection(right)) => {
+            // Lexicographically compare the elements of the two unequal intersections.
+            let left_positive = left.positive(db);
+            let right_positive = right.positive(db);
+            if left_positive.len() != right_positive.len() {
+                return left_positive.len().cmp(&right_positive.len());
+            }
+            let left_negative = left.negative(db);
+            let right_negative = right.negative(db);
+            if left_negative.len() != right_negative.len() {
+                return left_negative.len().cmp(&right_negative.len());
+            }
+            for (left, right) in left_positive.iter().zip(right_positive) {
+                let ordering = structural_type_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+            for (left, right) in left_negative.iter().zip(right_negative) {
+                let ordering = structural_type_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+
+            Ordering::Equal
+        }
+    }
+}
+
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
 /// in an [`crate::types::IntersectionType`] or a [`crate::types::UnionType`] in order for them
 /// to be compared for equivalence.

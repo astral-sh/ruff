@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::{CallableTypeKind, TypeContext};
+use crate::types::{CallableTypeKind, TypeContext, structural_type_ordering};
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -461,6 +461,22 @@ impl<'db> ProtocolInterface<'db> {
             interface: self,
         }
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        let members_count = self.members(db).len().cmp(&other.members(db).len());
+        if members_count != std::cmp::Ordering::Equal {
+            return members_count;
+        }
+
+        for (left, right) in self.members(db).zip(other.members(db)) {
+            let ord = left.structural_ordering(db, &right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+
+        std::cmp::Ordering::Equal
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInterface<'db> {
@@ -810,6 +826,42 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                             disjointness_visitor,
                         )
                     })
+            }
+        }
+    }
+
+    fn structural_ordering(&self, db: &'db dyn Db, other: &Self) -> std::cmp::Ordering {
+        let name_ordering = self.name.cmp(other.name);
+        if name_ordering != std::cmp::Ordering::Equal {
+            return name_ordering;
+        }
+        let qualifiers_ordering = self.qualifiers.cmp(&other.qualifiers);
+        if qualifiers_ordering != std::cmp::Ordering::Equal {
+            return qualifiers_ordering;
+        }
+
+        match (&self.kind, &other.kind) {
+            (ProtocolMemberKind::Method(left), ProtocolMemberKind::Method(right)) => {
+                left.structural_ordering(db, *right)
+            }
+            (ProtocolMemberKind::Property(left), ProtocolMemberKind::Property(right)) => {
+                left.structural_ordering(db, *right)
+            }
+            (ProtocolMemberKind::Other(left), ProtocolMemberKind::Other(right)) => {
+                structural_type_ordering(db, left, right)
+            }
+            (left, right) => {
+                let left_index = match left {
+                    ProtocolMemberKind::Method(_) => 0,
+                    ProtocolMemberKind::Property(_) => 1,
+                    ProtocolMemberKind::Other(_) => 2,
+                };
+                let right_index = match right {
+                    ProtocolMemberKind::Method(_) => 0,
+                    ProtocolMemberKind::Property(_) => 1,
+                    ProtocolMemberKind::Other(_) => 2,
+                };
+                left_index.cmp(&right_index)
             }
         }
     }

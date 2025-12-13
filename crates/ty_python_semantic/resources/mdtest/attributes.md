@@ -2325,7 +2325,7 @@ class C:
     def copy(self, other: "C"):
         self.x = other.x
 
-reveal_type(C().x)  # revealed: Unknown | Literal[1]
+reveal_type(C().x)  # revealed: Literal[1] | Unknown
 ```
 
 If the only assignment to a name is cyclic, we just infer `Unknown` for that attribute:
@@ -2381,8 +2381,8 @@ class B:
     def copy(self, other: "A"):
         self.x = other.x
 
-reveal_type(B().x)  # revealed: Unknown | Literal[1]
-reveal_type(A().x)  # revealed: Unknown | Literal[1]
+reveal_type(B().x)  # revealed: Literal[1] | Unknown
+reveal_type(A().x)  # revealed: Literal[1] | Unknown
 
 class Base:
     def flip(self) -> "Sub":
@@ -2400,7 +2400,7 @@ class C2:
     def replace_with(self, other: "C2"):
         self.x = other.x.flip()
 
-reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
+reveal_type(C2(Sub()).x)  # revealed: Base | Unknown
 
 class C3:
     def __init__(self, x: Sub):
@@ -2409,8 +2409,8 @@ class C3:
     def replace_with(self, other: "C3"):
         self.x = [self.x[0].flip()]
 
-# TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
-reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
+# TODO: should be `list[Unknown | Sub] | list[Unknown | Base] | Unknown`
+reveal_type(C3(Sub()).x)  # revealed: list[Divergent] | list[Unknown | Sub] | Unknown
 ```
 
 And cycles between many attributes:
@@ -2453,13 +2453,13 @@ class ManyCycles:
         self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
         self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
 
-        reveal_type(self.x1)  # revealed: Unknown | int
-        reveal_type(self.x2)  # revealed: Unknown | int
-        reveal_type(self.x3)  # revealed: Unknown | int
-        reveal_type(self.x4)  # revealed: Unknown | int
-        reveal_type(self.x5)  # revealed: Unknown | int
-        reveal_type(self.x6)  # revealed: Unknown | int
-        reveal_type(self.x7)  # revealed: Unknown | int
+        reveal_type(self.x1)  # revealed: int | Unknown
+        reveal_type(self.x2)  # revealed: int | Unknown
+        reveal_type(self.x3)  # revealed: int | Unknown
+        reveal_type(self.x4)  # revealed: int | Unknown
+        reveal_type(self.x5)  # revealed: int | Unknown
+        reveal_type(self.x6)  # revealed: int | Unknown
+        reveal_type(self.x7)  # revealed: int | Unknown
 
 class ManyCycles2:
     def __init__(self: "ManyCycles2"):
@@ -2468,8 +2468,8 @@ class ManyCycles2:
         self.x3 = [1]
 
     def f1(self: "ManyCycles2"):
-        # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
-        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+        # TODO: should be list[Unknown | int] | list[Divergent] | Unknown
+        reveal_type(self.x3)  # revealed: list[Divergent] | list[Divergent] | list[Unknown | int] | Unknown
 
         self.x1 = [self.x2] + [self.x3]
         self.x2 = [self.x1] + [self.x3]
@@ -2528,7 +2528,7 @@ class Counter:
     def increment(self: "Counter"):
         self.count = self.count + 1
 
-reveal_type(Counter().count)  # revealed: Unknown | int
+reveal_type(Counter().count)  # revealed: int | Unknown
 ```
 
 We also handle infinitely nested generics:
@@ -2541,7 +2541,7 @@ class NestedLists:
     def f(self: "NestedLists"):
         self.x = [self.x]
 
-reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+reveal_type(NestedLists().x)  # revealed: Literal[1] | list[Divergent] | Unknown
 
 class NestedMixed:
     def f(self: "NestedMixed"):
@@ -2550,7 +2550,7 @@ class NestedMixed:
     def g(self: "NestedMixed"):
         self.x = {self.x}
 
-reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
+reveal_type(NestedMixed().x)  # revealed: list[Divergent] | set[Divergent] | Unknown
 ```
 
 And cases where the types originate from annotations:
@@ -2567,7 +2567,7 @@ class NestedLists2:
     def f(self: "NestedLists2"):
         self.x = make_list(self.x)
 
-reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
+reveal_type(NestedLists2().x)  # revealed: list[Divergent] | Unknown
 ```
 
 ### Builtin types attributes
@@ -2673,7 +2673,7 @@ class C:
     def f(self, other: "C"):
         self.x = (other.x, 1)
 
-reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x)  # revealed: tuple[Divergent, Literal[1]] | Unknown
 reveal_type(C().x[0])  # revealed: Unknown | Divergent
 ```
 
@@ -2691,7 +2691,7 @@ class D:
     def f(self, other: "D"):
         self.x = make_tuple(other.x)
 
-reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(D().x)  # revealed: tuple[Divergent, Literal[1]] | Unknown
 ```
 
 The tuple type may also expand exponentially "in breadth":
@@ -2704,7 +2704,7 @@ class E:
     def f(self: "E"):
         self.x = duplicate(self.x)
 
-reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+reveal_type(E().x)  # revealed: tuple[Divergent, Divergent] | Unknown
 ```
 
 And it also works for homogeneous tuples:
@@ -2717,7 +2717,7 @@ class F:
     def f(self, other: "F"):
         self.x = make_homogeneous_tuple(other.x)
 
-reveal_type(F().x)  # revealed: Unknown | tuple[Divergent, ...]
+reveal_type(F().x)  # revealed: tuple[Divergent, ...] | Unknown
 ```
 
 ## Attributes of standard library modules that aren't yet defined

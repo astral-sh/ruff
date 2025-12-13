@@ -41,7 +41,7 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
     BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    TypeVarBoundOrConstraints, UnionType, structural_type_ordering,
 };
 use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -629,7 +629,13 @@ impl<'db> UnionBuilder<'db> {
         self.try_build().unwrap_or(Type::Never)
     }
 
-    pub(crate) fn try_build(self) -> Option<Type<'db>> {
+    pub(crate) fn try_build(mut self) -> Option<Type<'db>> {
+        // If the type is defined recursively, the union type is sorted and normalized.
+        // This is because the execution order of the queries is not deterministic and may result in a different order of elements.
+        // The order of the union type does not affect the type check result, but unstable output is undesirable.
+        if self.recursively_defined.is_yes() {
+            self.order_elements = true;
+        }
         let mut types = vec![];
         for element in self.elements {
             match element {
@@ -646,7 +652,13 @@ impl<'db> UnionBuilder<'db> {
             }
         }
         if self.order_elements {
-            types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
+            types.sort_unstable_by(|l, r| {
+                if self.recursively_defined.is_yes() {
+                    structural_type_ordering(self.db, l, r)
+                } else {
+                    union_or_intersection_elements_ordering(self.db, l, r)
+                }
+            });
         }
         match types.len() {
             0 => None,
