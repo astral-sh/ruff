@@ -1126,7 +1126,21 @@ fn place_from_bindings_impl<'db>(
 
             first_definition.get_or_insert(binding);
             let binding_ty = binding_type(db, binding);
-            Some(narrowing_constraint.narrow(db, binding_ty, binding.place(db)))
+            let place_id = binding.place(db);
+            // Apply explicit narrowing constraints first
+            let narrowed_ty = narrowing_constraint.narrow(db, binding_ty, place_id);
+            // Also apply narrowing from the reachability constraint.
+            // This handles cases like `if x is None: noreturn_func()` where the reachability
+            // constraint encodes that `x is not None` for the code to be reachable.
+            let narrowed_ty = reachability_constraints.narrow_by_reachability(
+                db,
+                predicates,
+                reachability_constraint,
+                place_id,
+                binding,
+                narrowed_ty,
+            );
+            Some(narrowed_ty)
         },
     );
 

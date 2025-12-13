@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, NodeIndex};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -745,6 +745,37 @@ impl DefinitionKind<'_> {
 
     pub(crate) const fn is_function_def(&self) -> bool {
         matches!(self, DefinitionKind::Function(_))
+    }
+
+    /// Returns the [`NodeIndex`] of the definition target.
+    ///
+    /// This can be used to determine the relative ordering of definitions and expressions
+    /// in the AST without needing to access the parsed module.
+    pub(crate) fn target_node_index(&self) -> NodeIndex {
+        match self {
+            DefinitionKind::Import(import) => import.node.index(),
+            DefinitionKind::ImportFrom(import) => import.node.index(),
+            DefinitionKind::ImportFromSubmodule(import) => import.node.index(),
+            DefinitionKind::StarImport(import) => import.node.index(),
+            DefinitionKind::Function(function) => function.index(),
+            DefinitionKind::Class(class) => class.index(),
+            DefinitionKind::TypeAlias(type_alias) => type_alias.index(),
+            DefinitionKind::NamedExpression(named) => named.index(),
+            DefinitionKind::Assignment(assignment) => assignment.target.index(),
+            DefinitionKind::AnnotatedAssignment(assign) => assign.target.index(),
+            DefinitionKind::AugmentedAssignment(aug_assign) => aug_assign.index(),
+            DefinitionKind::For(for_stmt) => for_stmt.target.index(),
+            DefinitionKind::Comprehension(comp) => comp.target.index(),
+            DefinitionKind::VariadicPositionalParameter(parameter) => parameter.index(),
+            DefinitionKind::VariadicKeywordParameter(parameter) => parameter.index(),
+            DefinitionKind::Parameter(parameter) => parameter.index(),
+            DefinitionKind::WithItem(with_item) => with_item.target.index(),
+            DefinitionKind::MatchPattern(match_pattern) => match_pattern.identifier.index(),
+            DefinitionKind::ExceptHandler(handler) => handler.handler.index(),
+            DefinitionKind::TypeVar(type_var) => type_var.index(),
+            DefinitionKind::ParamSpec(param_spec) => param_spec.index(),
+            DefinitionKind::TypeVarTuple(type_var_tuple) => type_var_tuple.index(),
+        }
     }
 
     /// Returns the [`TextRange`] of the definition target.

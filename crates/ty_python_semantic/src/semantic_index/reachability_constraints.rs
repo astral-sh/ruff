@@ -209,7 +209,7 @@ use crate::semantic_index::predicate::{
 };
 use crate::types::{
     CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionType,
-    infer_expression_type, static_expression_truthiness,
+    infer_expression_type, infer_narrowing_constraint, static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -952,5 +952,141 @@ impl ReachabilityConstraints {
                 }
             }
         }
+    }
+
+    /// Narrow a type based on the predicates in a reachability constraint.
+    ///
+    /// When code is only reachable under certain conditions (encoded in the reachability constraint),
+    /// those conditions can be used to narrow types. For example, if code is only reachable when
+    /// `val is not None`, we can narrow `val` from `int | None` to `int`.
+    ///
+    /// This function traverses the reachability constraint TDD and extracts predicates that can
+    /// narrow the given place, then applies them to the base type.
+    ///
+    /// The `binding` parameter is used to filter out predicates that were created before the
+    /// binding. Such predicates are about an earlier binding of the same place and shouldn't
+    /// be used to narrow the current binding.
+    pub(crate) fn narrow_by_reachability<'db>(
+        &self,
+        db: &'db dyn Db,
+        predicates: &Predicates<'db>,
+        id: ScopedReachabilityConstraintId,
+        place: crate::semantic_index::place::ScopedPlaceId,
+        binding: crate::semantic_index::definition::Definition<'db>,
+        base_ty: Type<'db>,
+    ) -> Type<'db> {
+        // Get the binding's NodeIndex. We'll use this to filter out predicates that were
+        // created before this binding (and thus are about an earlier binding of the same place).
+        let binding_index = binding.kind(db).target_node_index();
+
+        // Traverse the TDD and collect predicates that affect reachability.
+        // For each predicate, we check if one branch leads to ALWAYS_FALSE while
+        // the other leads to something reachable. If so, we know the predicate
+        // must have the value that leads to the reachable branch.
+        let mut result_ty = base_ty;
+        let mut current_id = id;
+
+        loop {
+            let node = match current_id {
+                ALWAYS_TRUE | AMBIGUOUS | ALWAYS_FALSE => break,
+                _ => {
+                    let raw_index = current_id.as_u32() as usize;
+                    if !self.used_indices.get_bit(raw_index).unwrap_or(false) {
+                        break;
+                    }
+                    let index = self.used_indices.rank(raw_index) as usize;
+                    self.used_interiors[index]
+                }
+            };
+
+            let predicate = &predicates[node.atom];
+            let truthiness = Self::analyze_single(db, predicate);
+
+            // Check if one branch leads to ALWAYS_FALSE (unreachable).
+            // If so, we can narrow based on the condition that makes the other branch reachable.
+            //
+            // For example, in: `if x is None: sys.exit()`
+            // The predicate `x is None` being true leads to the NoReturn call,
+            // which makes that branch unreachable. So the code after the if statement
+            // is only reachable when `x is None` is false, i.e., `x is not None`.
+            //
+            // We only apply this narrowing when:
+            // 1. The predicate is NOT a ReturnsNever predicate (those just mark reachability)
+            // 2. The predicate evaluates to Ambiguous (we don't know the value statically)
+            // 3. Exactly one branch leads to ALWAYS_FALSE
+            if truthiness == Truthiness::Ambiguous
+                && !matches!(predicate.node, PredicateNode::ReturnsNever(_))
+            {
+                let apply_predicate =
+                    if node.if_true == ALWAYS_FALSE && node.if_false != ALWAYS_FALSE {
+                        // The true branch is unreachable (e.g., `if x is None: sys.exit()`).
+                        // The predicate must be false for this code to be reachable.
+                        Some(Predicate {
+                            node: predicate.node,
+                            is_positive: !predicate.is_positive,
+                        })
+                    } else if node.if_false == ALWAYS_FALSE && node.if_true != ALWAYS_FALSE {
+                        // The false branch is unreachable. The predicate must be true.
+                        // This handles: `if x is not None: pass else: sys.exit()` and
+                        // `assert x is not None`.
+                        Some(Predicate {
+                            node: predicate.node,
+                            is_positive: predicate.is_positive,
+                        })
+                    } else {
+                        None
+                    };
+
+                if let Some(pred) = apply_predicate {
+                    // Check if the predicate was created before the binding.
+                    // If so, skip narrowing because the predicate is about an earlier binding.
+                    let predicate_index = match pred.node {
+                        PredicateNode::Expression(expr) => Some(expr._node_ref(db).index()),
+                        PredicateNode::Pattern(pattern) => {
+                            Some(pattern.subject(db)._node_ref(db).index())
+                        }
+                        PredicateNode::ReturnsNever(_)
+                        | PredicateNode::StarImportPlaceholder(_) => {
+                            // These predicates don't narrow places
+                            None
+                        }
+                    };
+
+                    // If the predicate was created before the binding, it's about an earlier
+                    // binding of the same place and shouldn't narrow the current binding.
+                    if predicate_index.is_some_and(|idx| idx < binding_index) {
+                        current_id = match truthiness {
+                            Truthiness::AlwaysTrue => node.if_true,
+                            Truthiness::Ambiguous => node.if_ambiguous,
+                            Truthiness::AlwaysFalse => node.if_false,
+                        };
+                        continue;
+                    }
+
+                    if let Some(narrowed) = infer_narrowing_constraint(db, pred, place) {
+                        let candidate = IntersectionBuilder::new(db)
+                            .add_positive(result_ty)
+                            .add_positive(narrowed)
+                            .build();
+                        // Only apply narrowing if the result is not Never.
+                        // A Never result indicates that the narrowing predicate refers to a
+                        // different value than the current binding (e.g., for assignments where
+                        // the reachability constraint is about the old value, not the new one).
+                        if !candidate.is_equivalent_to(db, Type::Never) {
+                            result_ty = candidate;
+                        }
+                    }
+                }
+            }
+
+            // Follow the branch based on the evaluated truthiness
+            current_id = match truthiness {
+                Truthiness::AlwaysTrue => node.if_true,
+                Truthiness::Ambiguous => node.if_ambiguous,
+                Truthiness::AlwaysFalse => node.if_false,
+            };
+        }
+
+        result_ty
     }
 }
