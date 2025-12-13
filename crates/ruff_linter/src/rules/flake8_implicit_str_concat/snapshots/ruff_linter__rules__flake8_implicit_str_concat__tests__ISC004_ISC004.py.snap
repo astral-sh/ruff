@@ -1,0 +1,24 @@
+---
+source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
+---
+ISC004 Implicit string concatenation in collection literal; did you forget a comma?
+ --> ISC004.py:4:5
+  |
+2 |       "Lobsters have blue blood.",
+3 |       "The liver is the only human organ that can fully regenerate itself.",
+4 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+5 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+  | |______________________________________________________________^
+6 |   )
+  |
+
+ISC004 Implicit string concatenation in collection literal; did you forget a comma?
+  --> ISC004.py:11:5
+   |
+ 9 |       "Lobsters have blue blood.",
+10 |       "The liver is the only human organ that can fully regenerate itself.",
+11 | /     "Clarinets are made almost entirely out of wood from the mpingo tree."
+12 | |     "In 1971, astronaut Alan Shepard played golf on the moon.",
+   | |______________________________________________________________^
+13 |   ]
+   |

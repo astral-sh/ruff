@@ -214,6 +214,13 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             range: _,
             node_index: _,
         }) => {
+            if checker.is_rule_enabled(Rule::ImplicitStringConcatenationInCollectionLiteral) {
+                flake8_implicit_str_concat::rules::implicit_string_concatenation_in_collection_literal(
+                    checker,
+                    expr,
+                    elts,
+                );
+            }
             if ctx.is_store() {
                 let check_too_many_expressions =
                     checker.is_rule_enabled(Rule::ExpressionsInStarAssignment);

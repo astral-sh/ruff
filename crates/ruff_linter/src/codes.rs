@@ -454,6 +454,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "002") => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "003") => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
+        (Flake8ImplicitStrConcat, "004") => rules::flake8_implicit_str_concat::rules::ImplicitStringConcatenationInCollectionLiteral,
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
