@@ -38,6 +38,11 @@ pub fn code_actions(
     {
         actions.extend(import_quick_fix);
     }
+    if is_unresolved_reference
+        && let Some(import_quick_fix) = create_qualify_symbol_quick_fix(db, file, diagnostic_range)
+    {
+        actions.extend(import_quick_fix);
+    }
 
     // Suggest just suppressing the lint (always a valid option, but never ideal)
     actions.push(QuickFix {
@@ -60,6 +65,26 @@ fn create_import_symbol_quick_fix(
 
     Some(
         completion::missing_imports(db, file, &parsed, symbol, node)
+            .into_iter()
+            .map(|import| QuickFix {
+                title: import.label,
+                edits: vec![import.edit],
+                preferred: true,
+            }),
+    )
+}
+
+fn create_qualify_symbol_quick_fix(
+    db: &dyn Db,
+    file: File,
+    diagnostic_range: TextRange,
+) -> Option<impl Iterator<Item = QuickFix>> {
+    let parsed = parsed_module(db, file).load(db);
+    let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
+    let symbol = &node.expr_name()?.id;
+
+    Some(
+        completion::missing_qualifications(db, file, &parsed, symbol, node)
             .into_iter()
             .map(|import| QuickFix {
                 title: import.label,

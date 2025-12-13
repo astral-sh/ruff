@@ -82,6 +82,29 @@ impl<'db> Completions<'db> {
             .collect()
     }
 
+    fn into_qualified(mut self, range: TextRange) -> Vec<ImportEdit> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+            .into_iter()
+            .filter_map(|item| {
+                if item.import.is_none() {
+                    Some(ImportEdit {
+                        label: format!("qualify {}", item.insert.as_ref()?),
+                        edit: Edit::replacement(
+                            item.insert?.into_string(),
+                            range.start(),
+                            range.end(),
+                        ),
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
     /// Attempts to adds the given completion to this collection.
     ///
     /// When added, `true` is returned.
@@ -576,6 +599,29 @@ pub(crate) fn missing_imports(
     );
 
     completions.into_imports()
+}
+
+pub(crate) fn missing_qualifications(
+    db: &dyn Db,
+    file: File,
+    parsed: &ParsedModuleRef,
+    symbol: &str,
+    node: AnyNodeRef,
+) -> Vec<ImportEdit> {
+    let mut completions = Completions::exactly(db, symbol);
+    let scoped = ScopedTarget { node };
+    add_unimported_completions(
+        db,
+        file,
+        parsed,
+        scoped,
+        |module_name: &ModuleName, symbol: &str| {
+            ImportRequest::import(module_name.as_str(), symbol).force()
+        },
+        &mut completions,
+    );
+
+    completions.into_qualified(node.range())
 }
 
 /// Adds completions derived from keywords.
