@@ -7,6 +7,53 @@
 //!
 //! The `mimalloc` feature can be enabled to prefer mimalloc over jemalloc
 //! on platforms that support both.
+//!
+//! # Memory Statistics
+//!
+//! Set `TY_ALLOCATOR_STATS=1` to print memory usage statistics on exit.
+//!
+//! ## jemalloc (default on Unix-like platforms)
+//!
+//! The `TY_ALLOCATOR_STATS` output includes:
+//! - **Allocated**: Total bytes allocated by the application
+//! - **Active**: Total bytes in active pages (may be higher than allocated due to fragmentation)
+//! - **Resident**: Total bytes in physically resident pages
+//! - **Mapped**: Total bytes in active extents mapped by the allocator
+//! - **Retained**: Total bytes in virtual memory mappings retained for future reuse
+//! - **Metadata**: Total bytes dedicated to allocator metadata
+//! - **Fragmentation**: Percentage of resident memory not actively used
+//!
+//! For more detailed jemalloc statistics, use the `MALLOC_CONF` environment variable:
+//! ```bash
+//! # Print stats on exit
+//! MALLOC_CONF=stats_print:true ty check .
+//!
+//! # Print detailed stats including per-arena and per-size-class info
+//! MALLOC_CONF=stats_print:true,stats_print_opts:gblam ty check .
+//! ```
+//!
+//! Available `stats_print_opts` flags:
+//! - `g`: general statistics
+//! - `m`: merged arena statistics
+//! - `d`: destroyed arena statistics (if enabled)
+//! - `a`: per-arena statistics
+//! - `b`: per-size-class statistics for bins
+//! - `l`: per-size-class statistics for large objects
+//! - `x`: mutex statistics (if enabled)
+//!
+//! ## mimalloc (Windows default, or with `--features mimalloc`)
+//!
+//! For detailed mimalloc statistics, use environment variables:
+//! ```bash
+//! # Print stats on exit
+//! MIMALLOC_SHOW_STATS=1 ty check .
+//!
+//! # More verbose output
+//! MIMALLOC_VERBOSE=1 ty check .
+//!
+//! # Both together for maximum detail
+//! MIMALLOC_SHOW_STATS=1 MIMALLOC_VERBOSE=1 ty check .
+//! ```
 
 use std::fmt::Write;
 
@@ -175,14 +222,16 @@ fn jemalloc_stats() -> Option<String> {
 
     let mut output = String::new();
     writeln!(output, "Allocator: jemalloc").ok()?;
-    writeln!(output, "  Allocated:  {} ({} bytes)", format_bytes(allocated), allocated).ok()?;
-    writeln!(output, "  Active:     {} ({} bytes)", format_bytes(active), active).ok()?;
-    writeln!(output, "  Resident:   {} ({} bytes)", format_bytes(resident), resident).ok()?;
-    writeln!(output, "  Mapped:     {} ({} bytes)", format_bytes(mapped), mapped).ok()?;
-    writeln!(output, "  Retained:   {} ({} bytes)", format_bytes(retained), retained).ok()?;
-    writeln!(output, "  Metadata:   {} ({} bytes)", format_bytes(metadata), metadata).ok()?;
+    writeln!(output, "  Allocated:     {} ({} bytes)", format_bytes(allocated), allocated).ok()?;
+    writeln!(output, "  Active:        {} ({} bytes)", format_bytes(active), active).ok()?;
+    writeln!(output, "  Resident:      {} ({} bytes)", format_bytes(resident), resident).ok()?;
+    writeln!(output, "  Mapped:        {} ({} bytes)", format_bytes(mapped), mapped).ok()?;
+    writeln!(output, "  Retained:      {} ({} bytes)", format_bytes(retained), retained).ok()?;
+    writeln!(output, "  Metadata:      {} ({} bytes)", format_bytes(metadata), metadata).ok()?;
     writeln!(output).ok()?;
     writeln!(output, "  Fragmentation: {:.2}%", fragmentation_percent(allocated, resident)).ok()?;
+    writeln!(output).ok()?;
+    writeln!(output, "  Tip: Set MALLOC_CONF=stats_print:true for detailed jemalloc stats on exit").ok()?;
 
     Some(output)
 }
