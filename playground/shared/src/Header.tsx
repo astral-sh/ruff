@@ -21,7 +21,7 @@ export default function Header({
   version: string | null;
   onChangeTheme: (theme: Theme) => void;
   onReset?(): void;
-  onShare: () => void;
+  onShare: () => Promise<void>;
 }) {
   return (
     <div

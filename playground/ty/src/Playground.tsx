@@ -48,11 +48,11 @@ export default function Playground() {
 
   usePersistLocally(files);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const serialized = serializeFiles(files);
 
     if (serialized != null) {
-      persist(serialized).catch((error) => {
+      await persist(serialized).catch((error) => {
         // eslint-disable-next-line no-console
         console.error("Failed to share playground", error);
       });
