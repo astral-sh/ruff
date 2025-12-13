@@ -341,6 +341,7 @@ impl<'db> CallableSignature<'db> {
     fn signatures_is_single_paramspec(
         signatures: &[Signature<'db>],
     ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
+        // TODO: This might need updating once we support `Concatenate`
         let [signature] = signatures else {
             return None;
         };
