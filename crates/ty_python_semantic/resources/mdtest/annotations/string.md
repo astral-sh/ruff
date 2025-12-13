@@ -152,6 +152,10 @@ The expressions in these string annotations aren't valid expressions in this con
 shouldn't panic.
 
 ```py
+# Regression test for https://github.com/astral-sh/ty/issues/1865
+# error: [fstring-type-annotation]
+stringified_fstring_with_conditional: "f'{1 if 1 else 1}'"
+
 a: "1 or 2"
 b: "(x := 1)"
 # error: [invalid-type-form]

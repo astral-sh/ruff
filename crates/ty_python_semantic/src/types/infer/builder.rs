@@ -8278,7 +8278,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             orelse,
         } = if_expression;
 
-        let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
         let body_ty = self.infer_expression(body, tcx);
         let orelse_ty = self.infer_expression(orelse, tcx);
 
