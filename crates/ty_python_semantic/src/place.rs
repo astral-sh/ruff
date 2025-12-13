@@ -1633,6 +1633,34 @@ mod implicit_globals {
     }
 }
 
+/// Looks up the type of an "implicit class body symbol". Returns [`Place::Undefined`] if
+/// `name` is not present as an implicit symbol in class bodies.
+///
+/// Implicit class body symbols are symbols such as `__qualname__`, `__module__`, and
+/// `__firstlineno__` that Python implicitly makes available inside a class body during
+/// class creation.
+///
+/// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>
+pub(crate) fn class_body_implicit_symbol<'db>(
+    db: &'db dyn Db,
+    name: &str,
+) -> PlaceAndQualifiers<'db> {
+    match name {
+        // __qualname__ is the fully-qualified name of the class
+        "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+
+        // __module__ is the module name where the class is defined
+        "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+
+        // __firstlineno__ was added in Python 3.13, but we don't version-check since
+        // it's always available in the class body namespace (just the __firstlineno__
+        // attribute on the class itself may not be present)
+        "__firstlineno__" => Place::bound(KnownClass::Int.to_instance(db)).into(),
+
+        _ => Place::Undefined.into(),
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum RequiresExplicitReExport {
     Yes,
