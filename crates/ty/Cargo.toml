@@ -51,5 +51,22 @@ regex = { workspace = true }
 tempfile = { workspace = true }
 toml = { workspace = true }
 
+[features]
+default = []
+# Prefer mimalloc over jemalloc on platforms that support both
+mimalloc = ["dep:mimalloc"]
+
+# Platform-specific allocator dependencies
+# Windows always uses mimalloc
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { workspace = true }
+
+# Non-Windows platforms (except OpenBSD, AIX, Android) on supported architectures
+# Use jemalloc by default, mimalloc if the feature is enabled
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = { workspace = true }
+tikv-jemalloc-ctl = { workspace = true }
+mimalloc = { workspace = true, optional = true }
+
 [lints]
 workspace = true
