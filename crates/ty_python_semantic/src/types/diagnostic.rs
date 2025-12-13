@@ -30,7 +30,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy};
+use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -121,6 +121,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
+    registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -2220,6 +2221,44 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclasses with invalid frozen inheritance:
+    /// - A frozen dataclass cannot inherit from a non-frozen dataclass.
+    /// - A non-frozen dataclass cannot inherit from a frozen dataclass.
+    ///
+    /// ## Why is this bad?
+    /// Python raises a `TypeError` at runtime when either of these inheritance
+    /// patterns occurs.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass
+    /// class Base:
+    ///     x: int
+    ///
+    /// @dataclass(frozen=True)
+    /// class Child(Base):  # Error raised here
+    ///     y: int
+    ///
+    /// @dataclass(frozen=True)
+    /// class FrozenBase:
+    ///     x: int
+    ///
+    /// @dataclass
+    /// class NonFrozenChild(FrozenBase):  # Error raised here
+    ///     y: int
+    /// ```
+    pub(crate) static INVALID_FROZEN_DATACLASS_SUBCLASS = {
+        summary: "detects dataclasses with invalid frozen/non-frozen subclassing",
+        status: LintStatus::stable("0.0.1-alpha.35"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -4267,6 +4306,94 @@ fn report_unsupported_binary_operation_impl<'a>(
     }
 
     Some(diagnostic)
+}
+
+pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    base_class: ClassLiteral<'db>,
+    base_class_node: &ast::Expr,
+    base_class_params: DataclassFlags,
+) {
+    let db = context.db();
+
+    let Some(builder) =
+        context.report_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS, class.header_range(db))
+    else {
+        return;
+    };
+
+    let mut diagnostic = if base_class_params.is_frozen() {
+        let mut diagnostic =
+            builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
+        diagnostic.set_concise_message(format_args!(
+            "Non-frozen dataclass `{}` cannot inherit from frozen dataclass `{}`",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "Subclass `{}` is not frozen but base class `{}` is",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic
+    } else {
+        let mut diagnostic =
+            builder.into_diagnostic("Frozen dataclass cannot inherit from non-frozen dataclass");
+        diagnostic.set_concise_message(format_args!(
+            "Frozen dataclass `{}` cannot inherit from non-frozen dataclass `{}`",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "Subclass `{}` is frozen but base class `{}` is not",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic
+    };
+
+    diagnostic.annotate(context.secondary(base_class_node));
+
+    if let Some(position) = class.find_dataclass_decorator_position(db) {
+        diagnostic.annotate(
+            context
+                .secondary(&class_node.decorator_list[position])
+                .message(format_args!("`{}` dataclass parameters", class.name(db))),
+        );
+    }
+    diagnostic.info("This causes the class creation to fail");
+
+    if let Some(decorator_position) = base_class.find_dataclass_decorator_position(db) {
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!("Base class definition"),
+        );
+        sub.annotate(
+            Annotation::primary(base_class.header_span(db))
+                .message(format_args!("`{}` definition", base_class.name(db))),
+        );
+
+        let base_class_file = base_class.file(db);
+        let module = parsed_module(db, base_class_file).load(db);
+
+        let decorator_range = base_class
+            .body_scope(db)
+            .node(db)
+            .expect_class()
+            .node(&module)
+            .decorator_list[decorator_position]
+            .range();
+
+        sub.annotate(
+            Annotation::secondary(Span::from(base_class_file).with_range(decorator_range)).message(
+                format_args!("`{}` dataclass parameters", base_class.name(db)),
+            ),
+        );
+
+        diagnostic.sub(sub);
+    }
 }
 
 /// This function receives an unresolved `from foo import bar` import,

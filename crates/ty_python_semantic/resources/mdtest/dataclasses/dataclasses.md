@@ -521,6 +521,73 @@ frozen = MyFrozenChildClass()
 del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
+### frozen/non-frozen inheritance
+
+If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
+catch this error:
+
+<!-- snapshot-diagnostics -->
+
+`a.py`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class FrozenBase:
+    x: int
+
+@dataclass
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+class Child(FrozenBase):
+    y: int
+```
+
+Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
+
+`b.py`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+@dataclass(frozen=True)
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+class FrozenChild(Base):
+    y: int
+```
+
+Example of diagnostics when there are multiple files involved:
+
+`module.py`:
+
+```py
+import dataclasses
+
+@dataclasses.dataclass(frozen=False)
+class NotFrozenBase:
+    x: int
+```
+
+`main.py`:
+
+```py
+from functools import total_ordering
+from typing import final
+from dataclasses import dataclass
+
+from module import NotFrozenBase
+
+@final
+@dataclass(frozen=True)
+@total_ordering
+class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+    y: str
+```
+
 ### `match_args`
 
 If `match_args` is set to `True` (the default), the `__match_args__` attribute is a tuple created

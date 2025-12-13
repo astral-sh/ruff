@@ -1,0 +1,154 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: dataclasses.md - Dataclasses - Other dataclass parameters - frozen/non-frozen inheritance
+mdtest path: crates/ty_python_semantic/resources/mdtest/dataclasses/dataclasses.md
+---
+
+# Python source files
+
+## a.py
+
+```
+ 1 | from dataclasses import dataclass
+ 2 | 
+ 3 | @dataclass(frozen=True)
+ 4 | class FrozenBase:
+ 5 |     x: int
+ 6 | 
+ 7 | @dataclass
+ 8 | # error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+ 9 | class Child(FrozenBase):
+10 |     y: int
+```
+
+## b.py
+
+```
+ 1 | from dataclasses import dataclass
+ 2 | 
+ 3 | @dataclass
+ 4 | class Base:
+ 5 |     x: int
+ 6 | 
+ 7 | @dataclass(frozen=True)
+ 8 | # error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+ 9 | class FrozenChild(Base):
+10 |     y: int
+```
+
+## module.py
+
+```
+1 | import dataclasses
+2 | 
+3 | @dataclasses.dataclass(frozen=False)
+4 | class NotFrozenBase:
+5 |     x: int
+```
+
+## main.py
+
+```
+ 1 | from functools import total_ordering
+ 2 | from typing import final
+ 3 | from dataclasses import dataclass
+ 4 | 
+ 5 | from module import NotFrozenBase
+ 6 | 
+ 7 | @final
+ 8 | @dataclass(frozen=True)
+ 9 | @total_ordering
+10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+11 |     y: str
+```
+
+# Diagnostics
+
+```
+error[invalid-frozen-dataclass-subclass]: Non-frozen dataclass cannot inherit from frozen dataclass
+  --> src/a.py:7:1
+   |
+ 5 |     x: int
+ 6 |
+ 7 | @dataclass
+   | ---------- `Child` dataclass parameters
+ 8 | # error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+ 9 | class Child(FrozenBase):
+   |       ^^^^^^----------^ Subclass `Child` is not frozen but base class `FrozenBase` is
+10 |     y: int
+   |
+info: This causes the class creation to fail
+info: Base class definition
+ --> src/a.py:3:1
+  |
+1 | from dataclasses import dataclass
+2 |
+3 | @dataclass(frozen=True)
+  | ----------------------- `FrozenBase` dataclass parameters
+4 | class FrozenBase:
+  |       ^^^^^^^^^^ `FrozenBase` definition
+5 |     x: int
+  |
+info: rule `invalid-frozen-dataclass-subclass` is enabled by default
+
+```
+
+```
+error[invalid-frozen-dataclass-subclass]: Frozen dataclass cannot inherit from non-frozen dataclass
+  --> src/b.py:7:1
+   |
+ 5 |     x: int
+ 6 |
+ 7 | @dataclass(frozen=True)
+   | ----------------------- `FrozenChild` dataclass parameters
+ 8 | # error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+ 9 | class FrozenChild(Base):
+   |       ^^^^^^^^^^^^----^ Subclass `FrozenChild` is frozen but base class `Base` is not
+10 |     y: int
+   |
+info: This causes the class creation to fail
+info: Base class definition
+ --> src/b.py:3:1
+  |
+1 | from dataclasses import dataclass
+2 |
+3 | @dataclass
+  | ---------- `Base` dataclass parameters
+4 | class Base:
+  |       ^^^^ `Base` definition
+5 |     x: int
+  |
+info: rule `invalid-frozen-dataclass-subclass` is enabled by default
+
+```
+
+```
+error[invalid-frozen-dataclass-subclass]: Frozen dataclass cannot inherit from non-frozen dataclass
+  --> src/main.py:8:1
+   |
+ 7 | @final
+ 8 | @dataclass(frozen=True)
+   | ----------------------- `FrozenChild` dataclass parameters
+ 9 | @total_ordering
+10 | class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+   |       ^^^^^^^^^^^^-------------^ Subclass `FrozenChild` is frozen but base class `NotFrozenBase` is not
+11 |     y: str
+   |
+info: This causes the class creation to fail
+info: Base class definition
+ --> src/module.py:3:1
+  |
+1 | import dataclasses
+2 |
+3 | @dataclasses.dataclass(frozen=False)
+  | ------------------------------------ `NotFrozenBase` dataclass parameters
+4 | class NotFrozenBase:
+  |       ^^^^^^^^^^^^^ `NotFrozenBase` definition
+5 |     x: int
+  |
+info: rule `invalid-frozen-dataclass-subclass` is enabled by default
+
+```

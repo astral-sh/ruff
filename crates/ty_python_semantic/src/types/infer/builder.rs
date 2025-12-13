@@ -69,15 +69,16 @@ use crate::types::diagnostic::{
     UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
     hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
-    report_bad_dunder_set_call, report_cannot_pop_required_field_on_typed_dict,
-    report_duplicate_bases, report_implicit_return_type, report_index_out_of_bounds,
-    report_instance_layout_conflict, report_invalid_arguments_to_annotated,
-    report_invalid_assignment, report_invalid_attribute_assignment,
-    report_invalid_exception_caught, report_invalid_exception_cause,
-    report_invalid_exception_raised, report_invalid_exception_tuple_caught,
-    report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_or_unsupported_base, report_invalid_return_type,
-    report_invalid_type_checking_constant, report_named_tuple_field_with_leading_underscore,
+    report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
+    report_cannot_pop_required_field_on_typed_dict, report_duplicate_bases,
+    report_implicit_return_type, report_index_out_of_bounds, report_instance_layout_conflict,
+    report_invalid_arguments_to_annotated, report_invalid_assignment,
+    report_invalid_attribute_assignment, report_invalid_exception_caught,
+    report_invalid_exception_cause, report_invalid_exception_raised,
+    report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
+    report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
+    report_invalid_return_type, report_invalid_type_checking_constant,
+    report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
@@ -753,6 +754,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             class.name(self.db()),
                             base_class.name(self.db()),
                         ));
+                    }
+                }
+
+                let (base_class_literal, _) = base_class.class_literal(self.db());
+
+                if let (Some(base_params), Some(class_params)) = (
+                    base_class_literal.dataclass_params(self.db()),
+                    class.dataclass_params(self.db()),
+                ) {
+                    let base_params = base_params.flags(self.db());
+                    let class_is_frozen = class_params.flags(self.db()).is_frozen();
+
+                    if base_params.is_frozen() != class_is_frozen {
+                        report_bad_frozen_dataclass_inheritance(
+                            &self.context,
+                            class,
+                            class_node,
+                            base_class_literal,
+                            &class_node.bases()[i],
+                            base_params,
+                        );
                     }
                 }
             }

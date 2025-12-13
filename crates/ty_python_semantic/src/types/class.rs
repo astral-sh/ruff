@@ -1856,6 +1856,28 @@ impl<'db> ClassLiteral<'db> {
             .filter_map(|decorator| decorator.known(db))
     }
 
+    /// Iterate through the decorators on this class, returning the position of the first one
+    /// that matches the given predicate.
+    pub(super) fn find_decorator_position(
+        self,
+        db: &'db dyn Db,
+        predicate: impl Fn(Type<'db>) -> bool,
+    ) -> Option<usize> {
+        self.decorators(db)
+            .iter()
+            .position(|decorator| predicate(*decorator))
+    }
+
+    /// Iterate through the decorators on this class, returning the index of the first one
+    /// that is either `@dataclass` or `@dataclass(...)`.
+    pub(super) fn find_dataclass_decorator_position(self, db: &'db dyn Db) -> Option<usize> {
+        self.find_decorator_position(db, |ty| match ty {
+            Type::FunctionLiteral(function) => function.is_known(db, KnownFunction::Dataclass),
+            Type::DataclassDecorator(_) => true,
+            _ => false,
+        })
+    }
+
     /// Is this class final?
     pub(super) fn is_final(self, db: &'db dyn Db) -> bool {
         self.known_function_decorators(db)

@@ -583,6 +583,16 @@
             }
           ]
         },
+        "invalid-frozen-dataclass-subclass": {
+          "title": "detects dataclasses with invalid frozen/non-frozen subclassing",
+          "description": "## What it does\nChecks for dataclasses with invalid frozen inheritance:\n- A frozen dataclass cannot inherit from a non-frozen dataclass.\n- A non-frozen dataclass cannot inherit from a frozen dataclass.\n\n## Why is this bad?\nPython raises a `TypeError` at runtime when either of these inheritance\npatterns occurs.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Base:\n    x: int\n\n@dataclass(frozen=True)\nclass Child(Base):  # Error raised here\n    y: int\n\n@dataclass(frozen=True)\nclass FrozenBase:\n    x: int\n\n@dataclass\nclass NonFrozenChild(FrozenBase):  # Error raised here\n    y: int\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
           "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
