@@ -11,7 +11,7 @@ use libcst_native as cst;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
-use ruff_python_codegen::Stylist;
+use ruff_python_codegen::{Generator, Stylist};
 use ruff_python_importer::Insertion;
 use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
@@ -88,6 +88,14 @@ impl<'a> Importer<'a> {
                     .into_edit(&required_import)
             }
         }
+    }
+
+    /// Add an import statement to the start of the file.
+    pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
+        let required_import =
+            Generator::new(self.stylist.indentation(), self.stylist.line_ending()).stmt(import);
+        Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
+            .into_edit(&required_import)
     }
 
     /// Move an existing import to the top-level, thereby making it available at runtime.

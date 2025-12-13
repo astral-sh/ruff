@@ -2,7 +2,8 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{PySourceType, Stmt};
 use ruff_text_size::Ranged;
 
-use crate::Violation;
+use crate::{Edit, Fix, FixAvailability, Violation};
+
 use crate::checkers::ast::Checker;
 
 /// ## What it does
@@ -46,6 +47,8 @@ pub(crate) struct ModuleImportNotAtTopOfFile {
 }
 
 impl Violation for ModuleImportNotAtTopOfFile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         if self.source_type.is_ipynb() {
@@ -59,11 +62,30 @@ impl Violation for ModuleImportNotAtTopOfFile {
 /// E402
 pub(crate) fn module_import_not_at_top_of_file(checker: &Checker, stmt: &Stmt) {
     if checker.semantic().seen_import_boundary() && checker.semantic().at_top_level() {
-        checker.report_diagnostic(
+        let mut diagnostic = checker.report_diagnostic(
             ModuleImportNotAtTopOfFile {
                 source_type: checker.source_type,
             },
             stmt.range(),
         );
+
+        let importer = checker.importer();
+        let edit = importer.add_import_at_start(stmt);
+        // Insertion::start_of_file(importer.python_ast, importer.source, importer.stylist, None)
+        //     .into_edit(checker.generator().stmt(stmt));
+
+        diagnostic.set_fix(Fix::unsafe_edits(
+            Edit::range_deletion(stmt.range()),
+            vec![
+                edit,
+                //     Insertion::start_of_file(
+                //         importer.parsed.suite(),
+                //         checker.source(),
+                //         checker.stylist(),
+                //         range,
+                //     )
+                //     .into_edit(),
+            ],
+        ));
     }
 }
