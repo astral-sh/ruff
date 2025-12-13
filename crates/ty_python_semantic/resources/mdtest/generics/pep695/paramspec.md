@@ -619,6 +619,22 @@ reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int,
 reveal_type(foo.method(1, "a"))  # revealed: str
 ```
 
+### Gradual types propagate through `ParamSpec` inference
+
+```py
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@callable_identity
+def f(env: dict) -> None:
+    pass
+
+# revealed: (env: dict[Unknown, Unknown]) -> None
+reveal_type(f)
+```
+
 ### Overloads
 
 `overloaded.pyi`:
