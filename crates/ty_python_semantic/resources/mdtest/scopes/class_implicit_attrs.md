@@ -2,14 +2,15 @@
 
 ## Class body implicit attributes
 
-Python makes certain names available implicitly inside class body scopes. These are `__qualname__`
-and `__module__`, as documented at
+Python makes certain names available implicitly inside class body scopes. These are `__qualname__`,
+`__module__`, and `__doc__`, as documented at
 <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>.
 
 ```py
 class Foo:
     reveal_type(__qualname__)  # revealed: str
     reveal_type(__module__)  # revealed: str
+    reveal_type(__doc__)  # revealed: str | None
 ```
 
 ## `__firstlineno__` (Python 3.13+)

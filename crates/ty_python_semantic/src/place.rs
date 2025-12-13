@@ -1637,8 +1637,8 @@ mod implicit_globals {
 /// Looks up the type of an "implicit class body symbol". Returns [`Place::Undefined`] if
 /// `name` is not present as an implicit symbol in class bodies.
 ///
-/// Implicit class body symbols are symbols such as `__qualname__`, `__module__`, and
-/// `__firstlineno__` that Python implicitly makes available inside a class body during
+/// Implicit class body symbols are symbols such as `__qualname__`, `__module__`, `__doc__`,
+/// and `__firstlineno__` that Python implicitly makes available inside a class body during
 /// class creation.
 ///
 /// See <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>
@@ -1649,6 +1649,13 @@ pub(crate) fn class_body_implicit_symbol<'db>(
     match name {
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
         "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
+        // __doc__ is `str` if there's a docstring, `None` if there isn't
+        "__doc__" => Place::bound(UnionType::from_elements(
+            db,
+            [KnownClass::Str.to_instance(db), Type::none(db)],
+        ))
+        .into(),
+        // __firstlineno__ was added in Python 3.13
         "__firstlineno__" if Program::get(db).python_version(db) >= PythonVersion::PY313 => {
             Place::bound(KnownClass::Int.to_instance(db)).into()
         }

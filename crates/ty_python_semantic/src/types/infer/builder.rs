@@ -9173,18 +9173,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // If we're in a class body, check for implicit class body symbols first.
                 // These take precedence over globals.
                 .or_fall_back_to(db, || {
-                    if scope.node(db).scope_kind().is_class() {
-                        if let Some(symbol) = place_expr.as_symbol() {
-                            let implicit = class_body_implicit_symbol(db, symbol.name());
-                            if implicit.place.is_definitely_bound() {
-                                return implicit.map_type(|ty| {
-                                    self.narrow_place_with_applicable_constraints(
-                                        place_expr,
-                                        ty,
-                                        &constraint_keys,
-                                    )
-                                });
-                            }
+                    if scope.node(db).scope_kind().is_class()
+                        && let Some(symbol) = place_expr.as_symbol()
+                    {
+                        let implicit = class_body_implicit_symbol(db, symbol.name());
+                        if implicit.place.is_definitely_bound() {
+                            return implicit.map_type(|ty| {
+                                self.narrow_place_with_applicable_constraints(
+                                    place_expr,
+                                    ty,
+                                    &constraint_keys,
+                                )
+                            });
                         }
                     }
                     Place::Undefined.into()
