@@ -1,0 +1,4 @@
+a = [
+
+if True:
+	pass

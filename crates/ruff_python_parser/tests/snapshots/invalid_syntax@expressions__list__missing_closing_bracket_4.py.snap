@@ -1,0 +1,83 @@
+---
+source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/list/missing_closing_bracket_4.py
+---
+## AST
+
+```
+Module(
+    ModModule {
+        node_index: NodeIndex(None),
+        range: 0..21,
+        body: [
+            Assign(
+                StmtAssign {
+                    node_index: NodeIndex(None),
+                    range: 0..14,
+                    targets: [
+                        Name(
+                            ExprName {
+                                node_index: NodeIndex(None),
+                                range: 0..1,
+                                id: Name("a"),
+                                ctx: Store,
+                            },
+                        ),
+                    ],
+                    value: If(
+                        ExprIf {
+                            node_index: NodeIndex(None),
+                            range: 4..14,
+                            test: BooleanLiteral(
+                                ExprBooleanLiteral {
+                                    node_index: NodeIndex(None),
+                                    range: 10..14,
+                                    value: true,
+                                },
+                            ),
+                            body: List(
+                                ExprList {
+                                    node_index: NodeIndex(None),
+                                    range: 4..5,
+                                    elts: [],
+                                    ctx: Load,
+                                },
+                            ),
+                            orelse: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 14..14,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
+                    ),
+                },
+            ),
+            Pass(
+                StmtPass {
+                    node_index: NodeIndex(None),
+                    range: 17..21,
+                },
+            ),
+        ],
+    },
+)
+```
+## Errors
+
+  |
+1 | a = [
+2 |
+3 | if True:
+  |        ^ Syntax Error: Expected `else`, found `:`
+4 |     pass
+  |
+
+
+  |
+3 | if True:
+4 |     pass
+  |         ^ Syntax Error: unexpected EOF while parsing
+  |

@@ -14,12 +14,13 @@ Module(
                 StmtExpr {
                     node_index: NodeIndex(None),
                     range: 46..47,
-                    value: Name(
-                        ExprName {
+                    value: Tuple(
+                        ExprTuple {
                             node_index: NodeIndex(None),
-                            range: 47..47,
-                            id: Name(""),
-                            ctx: Invalid,
+                            range: 46..47,
+                            elts: [],
+                            ctx: Load,
+                            parenthesized: true,
                         },
                     ),
                 },

@@ -18,16 +18,7 @@ Module(
                         ExprList {
                             node_index: NodeIndex(None),
                             range: 42..43,
-                            elts: [
-                                Name(
-                                    ExprName {
-                                        node_index: NodeIndex(None),
-                                        range: 43..43,
-                                        id: Name(""),
-                                        ctx: Invalid,
-                                    },
-                                ),
-                            ],
+                            elts: [],
                             ctx: Load,
                         },
                     ),

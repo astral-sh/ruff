@@ -2391,12 +2391,9 @@ def frob(): ...
 ",
         );
 
-        // TODO: it would be good if `bar` was included here, but
-        // the list comprehension is not yet valid and so we do not
-        // detect this as a definition of `bar`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"<No completions found after filtering out completions>",
+            @"bar",
         );
     }
 
