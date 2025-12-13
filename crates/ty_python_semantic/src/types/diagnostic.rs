@@ -2227,8 +2227,8 @@ declare_lint! {
     /// Checks for frozen dataclasses that inherit from non-frozen dataclasses.
     ///
     /// ## Why is this bad?
-    /// A frozen dataclass promises immutability. Inheriting from a non-frozen
-    /// dataclass breaks that guarantee because the base class allows mutation.
+    /// Python raises a `TypeError` at runtime when a frozen dataclass
+    /// inherits from a non-frozen dataclass.
     ///
     /// ## Example
     ///
@@ -2255,8 +2255,8 @@ declare_lint! {
     /// Checks for non-frozen dataclasses that inherit from frozen dataclasses.
     ///
     /// ## Why is this bad?
-    /// A frozen dataclass enforces immutability. Allowing a non-frozen subclass
-    /// would reintroduce mutability and violate the base class contract.
+    /// Python raises a `TypeError` at runtime when a non-frozen dataclass
+    /// inherits from a frozen dataclass.
     ///
     /// ## Example
     ///
@@ -2277,8 +2277,6 @@ declare_lint! {
         default_level: Level::Error,
     }
 }
-
-
 
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
