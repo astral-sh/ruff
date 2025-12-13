@@ -3004,7 +3004,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                 .class_specialization(self.db)?;
 
-            builder.infer(return_ty, tcx).ok()?;
+            builder.infer_reverse(tcx, return_ty).ok()?;
             Some(builder.type_mappings().clone())
         });
 
