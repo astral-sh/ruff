@@ -664,9 +664,15 @@ reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(change_return_type(str_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
-# TODO: Both of these shouldn't raise an error
-# error: [invalid-argument-type]
+# TODO: This should reveal the matching overload instead
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
-# error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+# error: [invalid-argument-type] "Argument to function `with_parameters` is incorrect: Expected `int`, found `None`"
+reveal_type(with_parameters(int_int, None))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+
+def foo(int_or_str: int | str):
+    # Argument type expansion leads to matching both overloads.
+    # TODO: Should this be an error instead?
+    reveal_type(with_parameters(int_int, int_or_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 ```
