@@ -521,7 +521,14 @@ frozen = MyFrozenChildClass()
 del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
-A diagnostic is emitted if a non-frozen dataclass inherits from a frozen dataclass:
+### frozen/non-frozen inheritance
+
+If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
+catch this error:
+
+<!-- snapshot-diagnostics -->
+
+`a.py`:
 
 ```py
 from dataclasses import dataclass
@@ -530,13 +537,15 @@ from dataclasses import dataclass
 class FrozenBase:
     x: int
 
-@dataclass 
-class Child(FrozenBase): # error: [invalid-frozen-dataclass-subclass] "A non-frozen class `Child` cannot inherit from a class `FrozenBase` that is frozen"
-
+@dataclass
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+class Child(FrozenBase):
     y: int
 ```
 
-A diagnostic is emitted if a frozen dataclass inherits from a non-frozen dataclass:
+Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
+
+`b.py`:
 
 ```py
 from dataclasses import dataclass
@@ -546,9 +555,37 @@ class Base:
     x: int
 
 @dataclass(frozen=True)
-class FrozenChild(Base): # error: [invalid-frozen-dataclass-subclass] "A frozen class `FrozenChild` cannot inherit from a class `Base` that is not frozen"
-
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+class FrozenChild(Base):
     y: int
+```
+
+Example of diagnostics when there are multiple files involved:
+
+`module.py`:
+
+```py
+import dataclasses
+
+@dataclasses.dataclass(frozen=False)
+class NotFrozenBase:
+    x: int
+```
+
+`main.py`:
+
+```py
+from functools import total_ordering
+from typing import final
+from dataclasses import dataclass
+
+from module import NotFrozenBase
+
+@final
+@dataclass(frozen=True)
+@total_ordering
+class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+    y: str
 ```
 
 ### `match_args`
