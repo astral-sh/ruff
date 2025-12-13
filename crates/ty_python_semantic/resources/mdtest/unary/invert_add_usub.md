@@ -27,7 +27,7 @@ reveal_type(~a)  # revealed: Literal[True]
 class NoDunder: ...
 
 b = NoDunder()
-+b  # error: [unsupported-operator] "Unary operator `+` is not supported for type `NoDunder`"
--b  # error: [unsupported-operator] "Unary operator `-` is not supported for type `NoDunder`"
-~b  # error: [unsupported-operator] "Unary operator `~` is not supported for type `NoDunder`"
++b  # error: [unsupported-operator] "Unary operator `+` is not supported for object of type `NoDunder`"
+-b  # error: [unsupported-operator] "Unary operator `-` is not supported for object of type `NoDunder`"
+~b  # error: [unsupported-operator] "Unary operator `~` is not supported for object of type `NoDunder`"
 ```

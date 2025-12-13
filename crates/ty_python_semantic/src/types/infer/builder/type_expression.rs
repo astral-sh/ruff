@@ -16,8 +16,8 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, UnionBuilder, UnionType,
-    any_over_type, todo_type,
+    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
+    UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -995,8 +995,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
-                KnownInstanceType::TypeVar(_) => {
-                    self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
+                KnownInstanceType::TypeVar(typevar) => {
+                    // The type variable designated as a generic type alias by `typing.TypeAlias` can be explicitly specialized.
+                    // ```py
+                    // from typing import TypeVar, TypeAlias
+                    // T = TypeVar('T')
+                    // Annotated: TypeAlias = T
+                    // _: Annotated[int] = 1  # valid
+                    // ```
+                    if typevar.identity(self.db()).kind(self.db()) == TypeVarKind::Pep613Alias {
+                        self.infer_explicit_type_alias_specialization(subscript, value_ty, false)
+                    } else {
+                        if let Some(builder) =
+                            self.context.report_lint(&INVALID_TYPE_FORM, subscript)
+                        {
+                            builder.into_diagnostic(format_args!(
+                                "A type variable itself cannot be specialized",
+                            ));
+                        }
+                        Type::unknown()
+                    }
                 }
 
                 KnownInstanceType::UnionType(_)
