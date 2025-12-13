@@ -28,9 +28,9 @@ use crate::module_resolver::{
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    builtins_module_scope, builtins_symbol, class_body_implicit_symbol, explicit_global_symbol,
+    global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    place, place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -9210,6 +9210,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             PlaceAndQualifiers::from(Place::Undefined)
+                // If we're in a class body, check for implicit class body symbols first.
+                // These take precedence over globals.
+                .or_fall_back_to(db, || {
+                    if scope.node(db).scope_kind().is_class()
+                        && let Some(symbol) = place_expr.as_symbol()
+                    {
+                        let implicit = class_body_implicit_symbol(db, symbol.name());
+                        if implicit.place.is_definitely_bound() {
+                            return implicit.map_type(|ty| {
+                                self.narrow_place_with_applicable_constraints(
+                                    place_expr,
+                                    ty,
+                                    &constraint_keys,
+                                )
+                            });
+                        }
+                    }
+                    Place::Undefined.into()
+                })
                 // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {
