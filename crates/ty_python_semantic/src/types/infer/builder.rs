@@ -2408,37 +2408,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .map(|bindings| bindings.return_type(self.db()))
             {
                 Ok(return_ty) => {
-                    fn into_function_like_callable<'d>(
+                    fn propagate_callable_kind<'d>(
                         db: &'d dyn Db,
                         ty: Type<'d>,
+                        kind: CallableTypeKind,
                     ) -> Option<Type<'d>> {
                         match ty {
                             Type::Callable(callable) => Some(Type::Callable(CallableType::new(
                                 db,
                                 callable.signatures(db),
-                                CallableTypeKind::FunctionLike,
+                                kind,
                             ))),
                             Type::Union(union) => union
-                                .try_map(db, |element| into_function_like_callable(db, *element)),
+                                .try_map(db, |element| propagate_callable_kind(db, *element, kind)),
                             // Intersections are currently not handled here because that would require
                             // the decorator to be explicitly annotated as returning an intersection.
                             _ => None,
                         }
                     }
 
-                    let is_input_function_like = inferred_ty
+                    let propagatable_kind = inferred_ty
                         .try_upcast_to_callable(self.db())
                         .and_then(CallableTypes::exactly_one)
-                        .is_some_and(|callable| callable.is_function_like(self.db()));
+                        .and_then(|callable| match callable.kind(self.db()) {
+                            kind @ (CallableTypeKind::FunctionLike
+                            | CallableTypeKind::ClassMethodLike) => Some(kind),
+                            _ => None,
+                        });
 
-                    if is_input_function_like
-                        && let Some(return_ty_function_like) =
-                            into_function_like_callable(self.db(), return_ty)
+                    if let Some(return_ty_modified) = propagatable_kind
+                        .and_then(|kind| propagate_callable_kind(self.db(), return_ty, kind))
                     {
-                        // When a method on a class is decorated with a function that returns a `Callable`, assume that
-                        // the returned callable is also function-like. See "Decorating a method with a `Callable`-typed
-                        // decorator" in `callables_as_descriptors.md` for the extended explanation.
-                        return_ty_function_like
+                        // When a method on a class is decorated with a function that returns a
+                        // `Callable`, assume that the returned callable is also function-like (or
+                        // classmethod-like). See "Decorating a method with a `Callable`-typed
+                        // decorator" in `callables_as_descriptors.md` for the extended
+                        // explanation.
+                        return_ty_modified
                     } else {
                         return_ty
                     }

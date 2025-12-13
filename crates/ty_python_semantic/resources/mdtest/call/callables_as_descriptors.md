@@ -113,9 +113,7 @@ intention that it shouldn't influence the method's descriptor behavior. For exam
 ```py
 from typing import Callable
 
-# TODO: this could use a generic signature, but we don't support
-# `ParamSpec` and solving of typevars inside `Callable` types yet.
-def memoize(f: Callable[[C1, int], str]) -> Callable[[C1, int], str]:
+def memoize[**P, R](f: Callable[P, R]) -> Callable[P, R]:
     raise NotImplementedError
 
 class C1:
@@ -257,6 +255,39 @@ class MyClass:
 
 reveal_type(MyClass().method)  # revealed: (...) -> int
 reveal_type(MyClass().method.__name__)  # revealed: str
+```
+
+## classmethods passed through Callable-returning decorators
+
+The behavior described above is also applied to classmethods. If a method is decorated with
+`@classmethod`, and also with another decorator which returns a Callable type, we make the
+assumption that the decorator returns a callable which still has the classmethod descriptor
+behavior.
+
+```py
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+class C:
+    @callable_identity
+    @classmethod
+    def f1(cls, x: int) -> str:
+        return "a"
+
+    @classmethod
+    @callable_identity
+    def f2(cls, x: int) -> str:
+        return "a"
+
+# error: [too-many-positional-arguments]
+# error: [invalid-argument-type]
+C.f1(C, 1)
+C.f1(1)
+C().f1(1)
+C.f2(1)
+C().f2(1)
 ```
 
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092
