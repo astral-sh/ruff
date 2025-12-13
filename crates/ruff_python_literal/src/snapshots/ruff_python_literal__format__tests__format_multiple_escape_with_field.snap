@@ -1,0 +1,18 @@
+---
+source: crates/ruff_python_literal/src/format.rs
+expression: "FormatString::from_str(\"I am a \\\\\\\\N{snowman}\")"
+---
+Ok(
+    FormatString {
+        format_parts: [
+            Literal(
+                "I am a \\\\N",
+            ),
+            Field {
+                field_name: "snowman",
+                conversion_spec: None,
+                format_spec: "",
+            },
+        ],
+    },
+)

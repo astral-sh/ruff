@@ -276,3 +276,6 @@ if __name__ == "__main__":
     number = 0
     string = "{}".format(number := number + 1)
     print(string)
+
+# Unicode escape
+"\N{angle}AOB = {angle}°".format(angle=180)
