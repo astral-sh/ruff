@@ -362,6 +362,45 @@ def _(x: Sequence[int], y: object):
             reveal_type(item)  # revealed: int
 ```
 
+## Intersection where some elements are not iterable
+
+When iterating over an intersection type, we should only fail if all positive elements fail to
+iterate. If some elements are iterable and some are not, we should iterate over the iterable ones
+and intersect their element types.
+
+```py
+from ty_extensions import Intersection
+
+class NotIterable:
+    pass
+
+def _(x: Intersection[list[int], NotIterable]):
+    # `list[int]` is iterable (yielding `int`), but `NotIterable` is not.
+    # We should still be able to iterate over the intersection.
+    for item in x:
+        reveal_type(item)  # revealed: int
+```
+
+## Intersection where all elements are not iterable
+
+When iterating over an intersection type where all positive elements are not iterable, we should
+fail to iterate.
+
+```py
+from ty_extensions import Intersection
+
+class NotIterable1:
+    pass
+
+class NotIterable2:
+    pass
+
+def _(x: Intersection[NotIterable1, NotIterable2]):
+    # error: [not-iterable]
+    for item in x:
+        reveal_type(item)  # revealed: Unknown
+```
+
 ## Possibly-not-callable `__iter__` method
 
 ```py
