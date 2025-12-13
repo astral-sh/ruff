@@ -481,6 +481,13 @@ fn detect_function_arg_completions<'db>(
     parsed: &ParsedModuleRef,
     offset: TextSize,
 ) -> Option<Vec<Completion<'db>>> {
+    if !covering_node(parsed.syntax().into(), TextRange::empty(offset))
+        .ancestors()
+        .take_while(|node| !node.is_statement())
+        .any(|node| node.is_arguments())
+    {
+        return None;
+    }
     let sig_help = signature_help(db, file, offset)?;
     let set_function_args = detect_set_function_args(parsed, offset);
 
@@ -2420,10 +2427,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        foo
-        foo=
-        ",
+            @"foo",
         );
     }
 
@@ -2437,10 +2441,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        foo
-        foo=
-        ",
+            @"foo",
         );
     }
 
@@ -2454,10 +2455,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        foo
-        foo=
-        ",
+            @"foo",
         );
     }
 
@@ -2471,10 +2469,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        foo
-        foo=
-        ",
+            @"foo",
         );
     }
 
@@ -2522,9 +2517,10 @@ def frob(): ...
 ",
         );
 
+        // FIXME: Should include `foo`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"foo=",
+            @"<No completions found after filtering out completions>",
         );
     }
 
@@ -2536,9 +2532,10 @@ def frob(): ...
 ",
         );
 
+        // FIXME: Should include `foo`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @"foo=",
+            @"<No completions found after filtering out completions>",
         );
     }
 
