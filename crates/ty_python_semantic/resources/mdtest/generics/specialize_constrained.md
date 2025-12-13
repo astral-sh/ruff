@@ -426,7 +426,8 @@ from ty_extensions import ConstraintSet, generic_context
 def mentions[T, U]():
     # (T@mentions ≤ int) ∧ (U@mentions = list[T@mentions])
     constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(list[T], U, list[T])
-    # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
+    # TODO: revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
+    # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = Unknown]
     reveal_type(generic_context(mentions).specialize_constrained(constraints))
 ```
 

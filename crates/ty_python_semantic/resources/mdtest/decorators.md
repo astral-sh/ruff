@@ -144,11 +144,10 @@ from functools import cache
 def f(x: int) -> int:
     return x**2
 
-# TODO: Should be `_lru_cache_wrapper[int]`
-reveal_type(f)  # revealed: _lru_cache_wrapper[Unknown]
-
-# TODO: Should be `int`
-reveal_type(f(1))  # revealed: Unknown
+# revealed: _lru_cache_wrapper[int]
+reveal_type(f)
+# revealed: int
+reveal_type(f(1))
 ```
 
 ## Lambdas as decorators

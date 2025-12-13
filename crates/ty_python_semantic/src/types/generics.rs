@@ -13,15 +13,15 @@ use crate::types::class::ClassType;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::instance::{Protocol, ProtocolInstanceType};
-use crate::types::signatures::{Parameters, ParametersKind};
+use crate::types::signatures::Parameters;
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    CallableSignature, CallableType, CallableTypeKind, CallableTypes, ClassLiteral,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Signature, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
     walk_bound_type_var_type,
 };
@@ -556,6 +556,14 @@ impl<'db> GenericContext<'db> {
                 let partial = PartialSpecialization {
                     generic_context: self,
                     types: &types,
+                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
+                    // check if the result is self-referential after we're done applying the
+                    // partial specialization. But when we apply a paramspec, we don't use the
+                    // callable that it maps to directly; we create a new callable that reuses
+                    // parts of it. That means we can't look for the previous type directly.
+                    // Instead we use this to skip specializing the type in itself in the first
+                    // place.
+                    skip: Some(i),
                 };
                 let updated = types[i].apply_type_mapping(
                     db,
@@ -626,6 +634,7 @@ impl<'db> GenericContext<'db> {
             let partial = PartialSpecialization {
                 generic_context: self,
                 types: &expanded[0..idx],
+                skip: None,
             };
             let default = default.apply_type_mapping(
                 db,
@@ -902,7 +911,11 @@ fn has_relation_in_invariant_position<'db>(
             disjointness_visitor,
         ),
         // And A <~ B (assignability) is Bottom[A] <: Top[B]
-        (None, Some(base_mat), TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            None,
+            Some(base_mat),
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             MaterializationKind::Bottom,
@@ -912,7 +925,11 @@ fn has_relation_in_invariant_position<'db>(
             relation_visitor,
             disjointness_visitor,
         ),
-        (Some(derived_mat), None, TypeRelation::Assignability) => is_subtype_in_invariant_position(
+        (
+            Some(derived_mat),
+            None,
+            TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability,
+        ) => is_subtype_in_invariant_position(
             db,
             derived_type,
             derived_mat,
@@ -1423,6 +1440,9 @@ impl<'db> Specialization<'db> {
 pub struct PartialSpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: &'a [Type<'db>],
+    /// An optional typevar to _not_ substitute when applying the specialization. We use this to
+    /// avoid recursively substituting a type inside of itself.
+    skip: Option<usize>,
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1437,6 +1457,9 @@ impl<'db> PartialSpecialization<'_, 'db> {
             .generic_context
             .variables_inner(db)
             .get_index_of(&bound_typevar.identity(db))?;
+        if self.skip.is_some_and(|skip| skip == index) {
+            return Some(Type::Never);
+        }
         self.types.get(index).copied()
     }
 }
@@ -1494,7 +1517,7 @@ impl<'db> SpecializationBuilder<'db> {
             .map(|(identity, _)| self.types.get(identity).copied());
 
         // TODO Infer the tuple spec for a tuple type
-        generic_context.specialize_partial(self.db, types)
+        generic_context.specialize_recursive(self.db, types)
     }
 
     fn add_type_mapping(
@@ -1528,6 +1551,59 @@ impl<'db> SpecializationBuilder<'db> {
         }
     }
 
+    /// Finds all of the valid specializations of a constraint set, and adds their type mappings to
+    /// the specialization that this builder is building up.
+    ///
+    /// `formal` should be the top-level formal parameter type that we are inferring. This is used
+    /// by our literal promotion logic, which needs to know which typevars are affected by each
+    /// argument, and the variance of those typevars in the corresponding parameter.
+    ///
+    /// TODO: This is a stopgap! Eventually, the builder will maintain a single constraint set for
+    /// the main specialization that we are building, and [`build`][Self::build] will build the
+    /// specialization directly from that constraint set. This method lets us migrate to that brave
+    /// new world incrementally, by using the new constraint set mechanism piecemeal for certain
+    /// type comparisons.
+    fn add_type_mappings_from_constraint_set(
+        &mut self,
+        formal: Type<'db>,
+        constraints: ConstraintSet<'db>,
+        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+    ) {
+        let constraints = constraints.limit_to_valid_specializations(self.db);
+        constraints.for_each_path(self.db, |path| {
+            for constraint in path.positive_constraints() {
+                let typevar = constraint.typevar(self.db);
+                let lower = constraint.lower(self.db);
+                let upper = constraint.upper(self.db);
+                if !upper.is_object() {
+                    let variance = formal.variance_of(self.db, typevar);
+                    self.add_type_mapping(typevar, upper, variance, &mut f);
+                } else if !lower.is_never() {
+                    let variance = formal.variance_of(self.db, typevar);
+                    self.add_type_mapping(typevar, lower, variance, &mut f);
+                }
+                if let Type::TypeVar(lower_bound_typevar) = lower {
+                    let variance = formal.variance_of(self.db, lower_bound_typevar);
+                    self.add_type_mapping(
+                        lower_bound_typevar,
+                        Type::TypeVar(typevar),
+                        variance,
+                        &mut f,
+                    );
+                }
+                if let Type::TypeVar(upper_bound_typevar) = upper {
+                    let variance = formal.variance_of(self.db, upper_bound_typevar);
+                    self.add_type_mapping(
+                        upper_bound_typevar,
+                        Type::TypeVar(typevar),
+                        variance,
+                        &mut f,
+                    );
+                }
+            }
+        });
+    }
+
     /// Infer type mappings for the specialization based on a given type and its declared type.
     pub(crate) fn infer(
         &mut self,
@@ -1557,6 +1633,15 @@ impl<'db> SpecializationBuilder<'db> {
         polarity: TypeVarVariance,
         mut f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
+        // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
+        // type mappings, to represent the specialization that we are building up. At that point,
+        // this method will just need to compare `actual ≤ formal`, using constraint set
+        // assignability, and AND the result into the constraint set we are building.
+        //
+        // To make progress on that migration, we use constraint set assignability whenever
+        // possible when adding any new heuristics here. See the `Callable` clause below for an
+        // example.
+
         if formal == actual {
             return Ok(());
         }
@@ -1812,43 +1897,19 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::Callable(formal_callable), _) => {
-                if let Some(actual_callable) = actual
-                    .try_upcast_to_callable(self.db)
-                    .and_then(CallableTypes::exactly_one)
-                {
-                    // We're only interested in a formal callable of the form `Callable[P, ...]` for
-                    // now where `P` is a `ParamSpec`.
-                    // TODO: This would need to be updated once we support `Concatenate`
-                    // TODO: What to do for overloaded callables?
-                    let [signature] = formal_callable.signatures(self.db).as_slice() else {
-                        return Ok(());
-                    };
-                    let formal_parameters = signature.parameters();
-                    let ParametersKind::ParamSpec(typevar) = formal_parameters.kind() else {
-                        return Ok(());
-                    };
-                    let paramspec_value = match actual_callable.signatures(self.db).as_slice() {
-                        [] => return Ok(()),
-                        [actual_signature] => match actual_signature.parameters().kind() {
-                            ParametersKind::ParamSpec(typevar) => Type::TypeVar(typevar),
-                            _ => Type::Callable(CallableType::new(
-                                self.db,
-                                CallableSignature::single(Signature::new(
-                                    actual_signature.parameters().clone(),
-                                    None,
-                                )),
-                                CallableTypeKind::ParamSpecValue,
-                            )),
-                        },
-                        actual_signatures => Type::Callable(CallableType::new(
+                let Some(actual_callables) = actual.try_upcast_to_callable(self.db) else {
+                    return Ok(());
+                };
+
+                for actual_callable in actual_callables.as_slice() {
+                    let when = actual_callable
+                        .signatures(self.db)
+                        .when_constraint_set_assignable_to(
                             self.db,
-                            CallableSignature::from_overloads(actual_signatures.iter().map(
-                                |signature| Signature::new(signature.parameters().clone(), None),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        )),
-                    };
-                    self.add_type_mapping(typevar, paramspec_value, polarity, &mut f);
+                            formal_callable.signatures(self.db),
+                            self.inferable,
+                        );
+                    self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                 }
             }
 
