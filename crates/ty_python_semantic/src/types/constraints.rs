@@ -78,8 +78,8 @@ use salsa::plumbing::AsId;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
-    UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionBuilder, IntersectionType, Type,
+    TypeVarBoundOrConstraints, UnionBuilder, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -3380,8 +3380,8 @@ impl<'db> GenericContext<'db> {
             // do with that, so instead we just report the ambiguity as a specialization failure.
             let mut satisfied = false;
             let mut unconstrained = false;
-            let mut greatest_lower_bound = Type::Never;
-            let mut least_upper_bound = Type::object();
+            let mut greatest_lower_bound = UnionBuilder::new(db).order_elements(true);
+            let mut least_upper_bound = IntersectionBuilder::new(db).order_elements(true);
             let identity = bound_typevar.identity(db);
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::specialize_constrained",
@@ -3400,10 +3400,8 @@ impl<'db> GenericContext<'db> {
                             upper_bound = %upper_bound.display(db),
                             "found representative type",
                         );
-                        greatest_lower_bound =
-                            UnionType::from_elements(db, [greatest_lower_bound, lower_bound]);
-                        least_upper_bound =
-                            IntersectionType::from_elements(db, [least_upper_bound, upper_bound]);
+                         greatest_lower_bound.add_in_place(lower_bound);
+                         least_upper_bound.add_positive_in_place(upper_bound);
                     }
                     None => {
                         unconstrained = true;
@@ -3437,6 +3435,8 @@ impl<'db> GenericContext<'db> {
 
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
+            let greatest_lower_bound = greatest_lower_bound.build();
+            let least_upper_bound = least_upper_bound.build();
             if !greatest_lower_bound.is_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",

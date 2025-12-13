@@ -316,7 +316,7 @@ def constrained_by_gradual_list_reverse[T: (list[Any], list[Base])]():
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[object]]
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.range(Never, T, list[object])))
     # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[Any]]
-    # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[Any] & list[Base]]
+    # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[Base] & list[Any]]
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.range(Never, T, list[Any])))
     # revealed: None
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.never()))
