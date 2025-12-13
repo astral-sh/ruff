@@ -103,6 +103,7 @@ Settings: Settings {
         "unresolved-global": Warning (Default),
         "unresolved-import": Error (Default),
         "unresolved-reference": Error (Default),
+        "unsound-dataclass-method-override": Error (Default),
         "unsupported-base": Warning (Default),
         "unsupported-bool-conversion": Error (Default),
         "unsupported-operator": Error (Default),
