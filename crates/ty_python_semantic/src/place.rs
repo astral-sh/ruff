@@ -1,4 +1,5 @@
 use ruff_db::files::File;
+use ruff_python_ast::PythonVersion;
 
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
@@ -1646,17 +1647,11 @@ pub(crate) fn class_body_implicit_symbol<'db>(
     name: &str,
 ) -> PlaceAndQualifiers<'db> {
     match name {
-        // __qualname__ is the fully-qualified name of the class
         "__qualname__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
-
-        // __module__ is the module name where the class is defined
         "__module__" => Place::bound(KnownClass::Str.to_instance(db)).into(),
-
-        // __firstlineno__ was added in Python 3.13, but we don't version-check since
-        // it's always available in the class body namespace (just the __firstlineno__
-        // attribute on the class itself may not be present)
-        "__firstlineno__" => Place::bound(KnownClass::Int.to_instance(db)).into(),
-
+        "__firstlineno__" if Program::get(db).python_version(db) >= PythonVersion::PY313 => {
+            Place::bound(KnownClass::Int.to_instance(db)).into()
+        }
         _ => Place::Undefined.into(),
     }
 }

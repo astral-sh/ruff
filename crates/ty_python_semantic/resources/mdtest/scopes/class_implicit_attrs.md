@@ -2,15 +2,43 @@
 
 ## Class body implicit attributes
 
-Python makes certain names available implicitly inside class body scopes. These are `__qualname__`,
-`__module__`, and `__firstlineno__`, as documented at
+Python makes certain names available implicitly inside class body scopes. These are `__qualname__`
+and `__module__`, as documented at
 <https://docs.python.org/3/reference/datamodel.html#creating-the-class-object>.
 
 ```py
 class Foo:
     reveal_type(__qualname__)  # revealed: str
     reveal_type(__module__)  # revealed: str
+```
+
+## `__firstlineno__` (Python 3.13+)
+
+Python 3.13 added `__firstlineno__` to the class body namespace.
+
+### Available in Python 3.13+
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+class Foo:
     reveal_type(__firstlineno__)  # revealed: int
+```
+
+### Not available in Python 3.12 and earlier
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+class Foo:
+    # error: [unresolved-reference]
+    __firstlineno__
 ```
 
 ## Nested classes
@@ -32,17 +60,32 @@ within the class body:
 ```py
 __qualname__ = 42
 __module__ = 42
-__firstlineno__ = "not an int"
 
 class Foo:
     # Inside the class body, these are the implicit class attributes
     reveal_type(__qualname__)  # revealed: str
     reveal_type(__module__)  # revealed: str
-    reveal_type(__firstlineno__)  # revealed: int
 
 # Outside the class, the globals are visible
 reveal_type(__qualname__)  # revealed: Literal[42]
 reveal_type(__module__)  # revealed: Literal[42]
+```
+
+## `__firstlineno__` has priority over globals (Python 3.13+)
+
+The same applies to `__firstlineno__` on Python 3.13+:
+
+```toml
+[environment]
+python-version = "3.13"
+```
+
+```py
+__firstlineno__ = "not an int"
+
+class Foo:
+    reveal_type(__firstlineno__)  # revealed: int
+
 reveal_type(__firstlineno__)  # revealed: Literal["not an int"]
 ```
 
