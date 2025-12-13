@@ -89,8 +89,8 @@ import sub.b
 import attr.b
 
 # In the Python interpreter, `attr.b` is Literal[1]
-reveal_type(sub.b)  # revealed: <module 'sub.b'>
-reveal_type(attr.b)  # revealed: <module 'attr.b'>
+reveal_type(sub.b)  # revealed: Literal[1]
+reveal_type(attr.b)  # revealed: Literal[1]
 ```
 
 `sub/__init__.py`:

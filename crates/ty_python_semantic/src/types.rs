@@ -13301,19 +13301,6 @@ impl<'db> ModuleLiteralType<'db> {
             submodule_type = self.resolve_submodule(db, name);
         }
 
-        // if we're in a module `foo` and `foo` contains `import a.b`,
-        // and the package `a` has a submodule `b`, we assume that the
-        // attribute access `a.b` inside `foo` will resolve to the submodule
-        // `a.b` *even if* `a/__init__.py` also defines a symbol `b` (e.g. `b = 42`).
-        // This is a heuristic, but it's almost certainly what will actually happen
-        // at runtime. However, if `foo` only contains `from a.b import <something>,
-        // we prioritise the `b` attribute in `a/__init__.py` over the submodule `a.b`.
-        if available_submodule_kind == Some(ImportKind::Import)
-            && let Some(submodule) = submodule_type
-        {
-            return Place::bound(submodule).into();
-        }
-
         let place_and_qualifiers = self
             .module(db)
             .file(db)
