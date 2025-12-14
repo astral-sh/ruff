@@ -73,8 +73,8 @@ G004 Logging statement uses f-string
    |
 22 | total = 9
 23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
-24 | logging.info(f"{count} out of {total} files in {directory_path} checked")
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 | logging.info(f"{count} out of {total} files in\n{directory_path} checked")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to lazy `%` formatting
 

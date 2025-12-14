@@ -121,15 +121,15 @@ G004 [*] Logging statement uses f-string
    |
 22 | total = 9
 23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
-24 | logging.info(f"{count} out of {total} files in {directory_path} checked")
-   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+24 | logging.info(f"{count} out of {total} files in\n{directory_path} checked")
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to lazy `%` formatting
 21 | count = 5
 22 | total = 9
 23 | directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
-   - logging.info(f"{count} out of {total} files in {directory_path} checked")
-24 + logging.info("%s out of %s files in %s checked", count, total, directory_path)
+   - logging.info(f"{count} out of {total} files in\n{directory_path} checked")
+24 + logging.info("%s out of %s files in\n%s checked", count, total, directory_path)
 25 | 
 26 | 
 27 | 
@@ -201,7 +201,7 @@ G004 Logging statement uses f-string
    |
 help: Convert to lazy `%` formatting
 
-G004 Logging statement uses f-string
+G004 [*] Logging statement uses f-string
   --> G004.py:43:14
    |
 42 | data = {"status": "active"}
@@ -210,8 +210,16 @@ G004 Logging statement uses f-string
 44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
    |
 help: Convert to lazy `%` formatting
+40 | logging.warning(f"Items: {items_count:d}")
+41 | 
+42 | data = {"status": "active"}
+   - logging.info(f"Processing {len(data)} items")
+43 + logging.info("Processing %s items", len(data))
+44 | logging.info(f"Status: {data.get('status', 'unknown').upper()}")
+45 | 
+46 | 
 
-G004 Logging statement uses f-string
+G004 [*] Logging statement uses f-string
   --> G004.py:44:14
    |
 42 | data = {"status": "active"}
@@ -220,6 +228,14 @@ G004 Logging statement uses f-string
    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
 help: Convert to lazy `%` formatting
+41 | 
+42 | data = {"status": "active"}
+43 | logging.info(f"Processing {len(data)} items")
+   - logging.info(f"Status: {data.get('status', 'unknown').upper()}")
+44 + logging.info("Status: %s", data.get('status', 'unknown').upper())
+45 | 
+46 | 
+47 | result = 123
 
 G004 Logging statement uses f-string
   --> G004.py:48:14
@@ -243,7 +259,7 @@ G004 Logging statement uses f-string
    |
 help: Convert to lazy `%` formatting
 
-G004 Logging statement uses f-string
+G004 [*] Logging statement uses f-string
   --> G004.py:57:14
    |
 55 |         self.name = name
@@ -254,6 +270,14 @@ G004 Logging statement uses f-string
 59 | user = "tron"
    |
 help: Convert to lazy `%` formatting
+54 |     def __init__(self, name: str):
+55 |         self.name = name
+56 | 
+   - logging.info(f"No changes made to {file_path.name}.")
+57 + logging.info("No changes made to %s.", file_path.name)
+58 | 
+59 | user = "tron"
+60 | balance = 123.45
 
 G004 Logging statement uses f-string
   --> G004.py:61:15

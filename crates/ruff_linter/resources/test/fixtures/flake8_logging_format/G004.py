@@ -21,7 +21,7 @@ info(t"{__name__}")
 count = 5
 total = 9
 directory_path = "/home/hamir/ruff/crates/ruff_linter/resources/test/"
-logging.info(f"{count} out of {total} files in {directory_path} checked")
+logging.info(f"{count} out of {total} files in\n{directory_path} checked")
 
 
 

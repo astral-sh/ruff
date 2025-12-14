@@ -69,7 +69,7 @@ fn logging_f_string(
                             if lit.value.as_ref().contains('%') {
                                 return;
                             }
-                            format_string.push_str(lit.value.as_ref());
+                            format_string.push_str(&lit.value.replace('\n', "\\n"));
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
                             if interpolated.format_spec.is_some()
@@ -84,6 +84,14 @@ fn logging_f_string(
                                 Expr::Name(name) => {
                                     format_string.push_str("%s");
                                     args.push(name.id.as_str());
+                                }
+                                Expr::Call(call) => {
+                                    format_string.push_str("%s");
+                                    args.push(checker.locator().slice(call.range));
+                                }
+                                Expr::Attribute(attr) => {
+                                    format_string.push_str("%s");
+                                    args.push(checker.locator().slice(attr.range));
                                 }
                                 _ => return,
                             }
