@@ -23,7 +23,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// )
 /// ```
 ///
-/// Use instead:
+/// Instead, you likely intended:
 /// ```python
 /// facts = (
 ///     "Lobsters have blue blood.",
