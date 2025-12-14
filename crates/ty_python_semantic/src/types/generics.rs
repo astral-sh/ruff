@@ -290,6 +290,18 @@ impl<'db> GenericContext<'db> {
         )
     }
 
+    /// Returns the typevars that are inferable in this generic context. This set might include
+    /// more typevars than the ones directly bound by the generic context. For instance, consider a
+    /// method of a generic class:
+    ///
+    /// ```py
+    /// class C[A]:
+    ///     def method[T](self, t: T):
+    /// ```
+    ///
+    /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
+    /// also includes `A@C`. This is needed because at each call site, we need to infer the
+    /// specialized class instance type whose method is being invoked.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
