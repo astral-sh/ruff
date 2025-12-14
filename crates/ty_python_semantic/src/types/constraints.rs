@@ -940,6 +940,7 @@ impl<'db> Node<'db> {
         }
     }
 
+    /// Returns the smallest source_order associated with the given constraint.
     fn source_order_for(self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> usize {
         fn walk<'db>(
             db: &'db dyn Db,
