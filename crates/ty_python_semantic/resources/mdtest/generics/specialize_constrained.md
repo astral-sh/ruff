@@ -43,6 +43,7 @@ def unbounded[T]():
     # revealed: None
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(bool, T, bool) & ConstraintSet.range(Never, T, str)))
 
+    # TODO: revealed: ty_extensions.Specialization[T@unbounded = int]
     # revealed: ty_extensions.Specialization[T@unbounded = bool]
     reveal_type(generic_context(unbounded).specialize_constrained(ConstraintSet.range(Never, T, int) | ConstraintSet.range(Never, T, bool)))
     # revealed: ty_extensions.Specialization[T@unbounded = Never]
@@ -314,6 +315,7 @@ def constrained_by_gradual_list_reverse[T: (list[Any], list[Base])]():
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.always()))
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[object]]
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.range(Never, T, list[object])))
+    # TODO: revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[Any]]
     # revealed: ty_extensions.Specialization[T@constrained_by_gradual_list_reverse = list[Base] & list[Any]]
     reveal_type(generic_context(constrained_by_gradual_list_reverse).specialize_constrained(ConstraintSet.range(Never, T, list[Any])))
     # revealed: None
