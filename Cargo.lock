@@ -4163,17 +4163,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tikv-jemalloc-ctl"
-version = "0.6.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "661f1f6a57b3a36dc9174a2c10f19513b4866816e13425d3e418b11cc37bc24c"
-dependencies = [
- "libc",
- "paste",
- "tikv-jemalloc-sys",
-]
-
-[[package]]
 name = "tikv-jemalloc-sys"
 version = "0.6.1+5.3.0-1-ge13ca993e8ccb9ba9847cc330696e02839f328f7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4394,7 +4383,6 @@ dependencies = [
  "insta",
  "insta-cmd",
  "jiff",
- "mimalloc",
  "rayon",
  "regex",
  "ruff_db",
@@ -4402,7 +4390,6 @@ dependencies = [
  "ruff_python_trivia",
  "salsa",
  "tempfile",
- "tikv-jemalloc-ctl",
  "tikv-jemallocator",
  "toml",
  "tracing",

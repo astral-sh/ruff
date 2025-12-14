@@ -53,22 +53,9 @@ toml = { workspace = true }
 
 [features]
 default = []
-# Use jemalloc allocator (supported on Unix-like platforms with x86_64, aarch64, powerpc64, riscv64)
-jemalloc = ["dep:tikv-jemallocator", "dep:tikv-jemalloc-ctl"]
-# Use mimalloc allocator (supported on all platforms, always used on Windows)
-mimalloc = ["dep:mimalloc"]
 
-# Platform-specific allocator dependencies
-# Windows always uses mimalloc
-[target.'cfg(target_os = "windows")'.dependencies]
-mimalloc = { workspace = true }
-
-# Non-Windows platforms (except OpenBSD, AIX, Android) on supported architectures
-# Both allocators are optional and require feature flags
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
-tikv-jemallocator = { workspace = true, optional = true }
-tikv-jemalloc-ctl = { workspace = true, optional = true }
-mimalloc = { workspace = true, optional = true }
+[target.'cfg(all(not(target_os = "macos"), not(target_os = "windows"), not(target_os = "openbsd"), not(target_os = "aix"), not(target_os = "android"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = { workspace = true }
 
 [lints]
 workspace = true
