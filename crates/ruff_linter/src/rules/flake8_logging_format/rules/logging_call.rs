@@ -66,10 +66,11 @@ fn logging_f_string(
                             // If the literal text contains a '%' placeholder, bail out: mixing
                             // f-string interpolation with '%' placeholders is ambiguous for our
                             // automatic conversion, so don't offer a fix for this case.
-                            if lit.value.as_ref().contains('%') {
+                            if lit.value.contains('%') {
                                 return;
                             }
-                            format_string.push_str(&lit.value.replace('\n', "\\n"));
+
+                            push_escaped_newlines(&lit.value, &mut format_string);
                         }
                         InterpolatedStringElement::Interpolation(interpolated) => {
                             if interpolated.format_spec.is_some()
@@ -115,6 +116,19 @@ fn logging_f_string(
 
     let fix = Fix::safe_edit(Edit::range_replacement(replacement, msg.range()));
     diagnostic.set_fix(fix);
+}
+
+/// Push str replacing `\n` with `\\n` while writing directly into the
+/// destination buffer, avoiding intermediate allocations.
+#[inline]
+fn push_escaped_newlines(literal: &str, destination: &mut String) {
+    for ch in literal.chars() {
+        if ch == '\n' {
+            destination.push_str("\\n");
+        } else {
+            destination.push(ch);
+        }
+    }
 }
 
 /// Returns `true` if the attribute is a reserved attribute on the `logging` module's `LogRecord`
