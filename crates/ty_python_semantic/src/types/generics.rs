@@ -23,7 +23,7 @@ use crate::types::{
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Signature, Type,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
-    walk_bound_type_var_type,
+    walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -299,7 +299,7 @@ impl<'db> GenericContext<'db> {
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
             fn should_visit_lazy_type_attributes(&self) -> bool {
-                true
+                false
             }
 
             fn visit_bound_type_var_type(
@@ -310,7 +310,10 @@ impl<'db> GenericContext<'db> {
                 self.typevars
                     .borrow_mut()
                     .insert(bound_typevar.identity(db));
-                walk_bound_type_var_type(db, bound_typevar, self);
+                let typevar = bound_typevar.typevar(db);
+                if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
+                    walk_type_var_bounds(db, bound_or_constraints, self);
+                }
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
