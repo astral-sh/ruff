@@ -1104,7 +1104,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if implementation.is_none() && !self.in_stub() {
                 let mut implementation_required = true;
 
-                if let NodeWithScopeKind::Class(class_node_ref) = scope {
+                if function
+                    .iter_overloads_and_implementation(self.db())
+                    .all(|f| {
+                        f.body_scope(self.db())
+                            .scope(self.db())
+                            .in_type_checking_block()
+                    })
+                {
+                    implementation_required = false;
+                } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
                     let class = binding_type(
                         self.db(),
                         self.index
@@ -1113,7 +1122,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect_class_literal();
 
                     if class.is_protocol(self.db())
-                        || (class.is_abstract(self.db())
+                        || (Type::ClassLiteral(class)
+                            .is_subtype_of(self.db(), KnownClass::ABCMeta.to_instance(self.db()))
                             && overloads.iter().all(|overload| {
                                 overload.has_known_decorator(
                                     self.db(),
@@ -1140,8 +1150,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &function_node.name
                         ));
                         diagnostic.info(
-                            "Overloaded functions without implementations are only permitted \
-                            in stub files, on protocols, or for abstract methods",
+                            "Overloaded functions without implementations are only permitted:",
+                        );
+                        diagnostic.info(" - in stub files");
+                        diagnostic.info(" - in `if TYPE_CHECKING` blocks");
+                        diagnostic.info(" - as methods on protocol classes");
+                        diagnostic.info(
+                            " - or as `@abstractmethod`-decorated methods on abstract classes",
                         );
                         diagnostic.info(
                             "See https://docs.python.org/3/library/typing.html#typing.overload \
