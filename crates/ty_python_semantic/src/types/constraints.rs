@@ -1079,8 +1079,21 @@ impl<'db> Node<'db> {
 
     fn or_with_rhs_offset(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysTrue, _) => Node::AlwaysTrue,
-            (_, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
+            (Node::AlwaysTrue, Node::Interior(rhs)) => Node::new(
+                db,
+                rhs.constraint(db),
+                Node::AlwaysTrue,
+                Node::AlwaysTrue,
+                rhs.source_order(db) + rhs_offset,
+            ),
+            (Node::Interior(lhs), Node::AlwaysTrue) => Node::new(
+                db,
+                lhs.constraint(db),
+                Node::AlwaysTrue,
+                Node::AlwaysTrue,
+                lhs.source_order(db),
+            ),
             (Node::AlwaysFalse, rhs) => rhs.with_source_order_offset(db, rhs_offset),
             (lhs, Node::AlwaysFalse) => lhs,
             (Node::Interior(lhs), Node::Interior(rhs)) => lhs.or(db, rhs, rhs_offset),
@@ -1095,8 +1108,21 @@ impl<'db> Node<'db> {
 
     fn and_with_rhs_offset(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
         match (self, other) {
-            (Node::AlwaysFalse, _) => Node::AlwaysFalse,
-            (_, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
+            (Node::AlwaysFalse, Node::Interior(rhs)) => Node::new(
+                db,
+                rhs.constraint(db),
+                Node::AlwaysFalse,
+                Node::AlwaysFalse,
+                rhs.source_order(db) + rhs_offset,
+            ),
+            (Node::Interior(lhs), Node::AlwaysFalse) => Node::new(
+                db,
+                lhs.constraint(db),
+                Node::AlwaysFalse,
+                Node::AlwaysFalse,
+                lhs.source_order(db),
+            ),
             (Node::AlwaysTrue, rhs) => rhs.with_source_order_offset(db, rhs_offset),
             (lhs, Node::AlwaysTrue) => lhs,
             (Node::Interior(lhs), Node::Interior(rhs)) => lhs.and(db, rhs, rhs_offset),
@@ -3676,14 +3702,26 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             (T = str)
-            ┡━₁ (U = str)
-            │   ┡━₁ always
-            │   └─₀ (U = bool)
-            │       ┡━₁ always
-            │       └─₀ never
+            ┡━₁ (T = bool)
+            │   ┡━₁ (U = str)
+            │   │   ┡━₁ (U = bool)
+            │   │   │   ┡━₁ always
+            │   │   │   └─₀ always
+            │   │   └─₀ (U = bool)
+            │   │       ┡━₁ always
+            │   │       └─₀ never
+            │   └─₀ (U = str)
+            │       ┡━₁ (U = bool)
+            │       │   ┡━₁ always
+            │       │   └─₀ always
+            │       └─₀ (U = bool)
+            │           ┡━₁ always
+            │           └─₀ never
             └─₀ (T = bool)
                 ┡━₁ (U = str)
-                │   ┡━₁ always
+                │   ┡━₁ (U = bool)
+                │   │   ┡━₁ always
+                │   │   └─₀ always
                 │   └─₀ (U = bool)
                 │       ┡━₁ always
                 │       └─₀ never
