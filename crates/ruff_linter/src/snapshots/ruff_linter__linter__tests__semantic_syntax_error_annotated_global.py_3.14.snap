@@ -44,3 +44,13 @@ invalid-syntax: annotated name `d` can't be global
 21 |
 22 | e: int = 1
    |
+
+invalid-syntax: annotated name `g` can't be global
+  --> resources/test/fixtures/semantic_errors/annotated_global.py:29:1
+   |
+27 | f: int = 1  # okay
+28 |
+29 | g: int = 1
+   | ^
+30 | global g  # error
+   |

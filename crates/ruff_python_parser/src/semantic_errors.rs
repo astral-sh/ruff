@@ -300,12 +300,15 @@ impl SemanticSyntaxChecker {
                     visitor.visit_expr(annotation);
                 }
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
-                    if ctx.global(id.as_str()).is_some() && ctx.in_function_scope() {
-                        Self::add_error(
-                            ctx,
-                            SemanticSyntaxErrorKind::AnnotatedGlobal(id.to_string()),
-                            target.range(),
-                        );
+                    if let Some(global_stmt) = ctx.global(id.as_str()) {
+                        let global_start = global_stmt.start();
+                        if ctx.in_function_scope() || target.start() < global_start {
+                            Self::add_error(
+                                ctx,
+                                SemanticSyntaxErrorKind::AnnotatedGlobal(id.to_string()),
+                                target.range(),
+                            );
+                        }
                     }
                 }
             }
