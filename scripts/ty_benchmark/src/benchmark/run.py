@@ -56,6 +56,7 @@ def main() -> None:
 
     parser.add_argument(
         "--ty-path",
+        action="append",
         type=Path,
         help="Path to the ty binary to benchmark.",
     )
@@ -108,7 +109,11 @@ def main() -> None:
     for tool_name in args.tool or TOOL_CHOICES:
         match tool_name:
             case "ty":
-                suites.append(Ty(path=args.ty_path))
+                if args.ty_path:
+                    for path in args.ty_path:
+                        suites.append(Ty(path=path))
+                else:
+                    suites.append(Ty())
             case "pyrefly":
                 suites.append(Pyrefly())
             case "pyright":
