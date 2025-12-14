@@ -432,8 +432,8 @@ respect-ignore-files = false
 
 ### `root`
 
-> [!WARN] "Deprecated"
-> This option has been deprecated. Use `environment.root` instead.
+!!! warning "Deprecated"
+    This option has been deprecated. Use `environment.root` instead.
 
 The root of the project, used for finding first-party modules.
 
