@@ -288,7 +288,7 @@ def absolute_path(p: str) -> Path:
 def parse_seed_argument(arg: str) -> int | range:
     """Helper for argument parsing"""
     if "-" in arg:
-        start, end = map(int, arg.split("-"))
+        start, end = map(int, arg.split("-"))  # ty: ignore
         if end <= start:
             raise argparse.ArgumentTypeError(
                 f"Error when parsing seed argument {arg!r}: "
