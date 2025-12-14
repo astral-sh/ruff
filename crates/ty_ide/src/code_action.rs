@@ -29,17 +29,11 @@ pub fn code_actions(
 
     let mut actions = Vec::new();
 
-    // Suggest imports for unresolved references (often ideal)
-    // TODO: suggest qualifying with an already imported symbol
+    // Suggest imports/qualifications for unresolved references (often ideal)
     let is_unresolved_reference =
         lint_id == LintId::of(&UNRESOLVED_REFERENCE) || lint_id == LintId::of(&UNDEFINED_REVEAL);
     if is_unresolved_reference
-        && let Some(import_quick_fix) = create_import_symbol_quick_fix(db, file, diagnostic_range)
-    {
-        actions.extend(import_quick_fix);
-    }
-    if is_unresolved_reference
-        && let Some(import_quick_fix) = create_qualify_symbol_quick_fix(db, file, diagnostic_range)
+        && let Some(import_quick_fix) = unresolved_fixes(db, file, diagnostic_range)
     {
         actions.extend(import_quick_fix);
     }
@@ -54,7 +48,7 @@ pub fn code_actions(
     actions
 }
 
-fn create_import_symbol_quick_fix(
+fn unresolved_fixes(
     db: &dyn Db,
     file: File,
     diagnostic_range: TextRange,
@@ -64,27 +58,7 @@ fn create_import_symbol_quick_fix(
     let symbol = &node.expr_name()?.id;
 
     Some(
-        completion::missing_imports(db, file, &parsed, symbol, node)
-            .into_iter()
-            .map(|import| QuickFix {
-                title: import.label,
-                edits: vec![import.edit],
-                preferred: true,
-            }),
-    )
-}
-
-fn create_qualify_symbol_quick_fix(
-    db: &dyn Db,
-    file: File,
-    diagnostic_range: TextRange,
-) -> Option<impl Iterator<Item = QuickFix>> {
-    let parsed = parsed_module(db, file).load(db);
-    let node = covering_node(parsed.syntax().into(), diagnostic_range).node();
-    let symbol = &node.expr_name()?.id;
-
-    Some(
-        completion::missing_qualifications(db, file, &parsed, symbol, node)
+        completion::unresolved_fixes(db, file, &parsed, symbol, node)
             .into_iter()
             .map(|import| QuickFix {
                 title: import.label,
@@ -501,6 +475,108 @@ mod tests {
         2 +             reveal_type(1)  # ty:ignore[undefined-reveal]
         3 |
         ");
+    }
+
+    #[test]
+    fn unresolved_deprecated() {
+        let test = CodeActionTest::with_source(
+            r#"
+            @<START>deprecated<END>("do not use")
+            def my_func(): ...
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: import warnings.deprecated
+         --> main.py:2:14
+          |
+        2 |             @deprecated("do not use")
+          |              ^^^^^^^^^^
+        3 |             def my_func(): ...
+          |
+        help: This is a preferred code action
+        1 + from warnings import deprecated
+        2 | 
+        3 |             @deprecated("do not use")
+        4 |             def my_func(): ...
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:14
+          |
+        2 |             @deprecated("do not use")
+          |              ^^^^^^^^^^
+        3 |             def my_func(): ...
+          |
+        1 | 
+          -             @deprecated("do not use")
+        2 +             @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        3 |             def my_func(): ...
+        4 |
+        "#);
+    }
+
+    #[test]
+    fn unresolved_deprecated_warnings_imported() {
+        let test = CodeActionTest::with_source(
+            r#"
+            import warnings
+
+            @<START>deprecated<END>("do not use")
+            def my_func(): ...
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
+        info[code-action]: import warnings.deprecated
+         --> main.py:4:14
+          |
+        2 |             import warnings
+        3 |
+        4 |             @deprecated("do not use")
+          |              ^^^^^^^^^^
+        5 |             def my_func(): ...
+          |
+        help: This is a preferred code action
+        1 + from warnings import deprecated
+        2 | 
+        3 |             import warnings
+        4 | 
+
+        info[code-action]: qualify warnings.deprecated
+         --> main.py:4:14
+          |
+        2 |             import warnings
+        3 |
+        4 |             @deprecated("do not use")
+          |              ^^^^^^^^^^
+        5 |             def my_func(): ...
+          |
+        help: This is a preferred code action
+        1 | 
+        2 |             import warnings
+        3 | 
+          -             @deprecated("do not use")
+        4 +             @warnings.deprecated("do not use")
+        5 |             def my_func(): ...
+        6 |         
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:14
+          |
+        2 |             import warnings
+        3 |
+        4 |             @deprecated("do not use")
+          |              ^^^^^^^^^^
+        5 |             def my_func(): ...
+          |
+        1 | 
+        2 |             import warnings
+        3 | 
+          -             @deprecated("do not use")
+        4 +             @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        5 |             def my_func(): ...
+        6 |
+        "#);
     }
 
     pub(super) struct CodeActionTest {
