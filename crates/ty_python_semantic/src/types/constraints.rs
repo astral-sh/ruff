@@ -283,7 +283,7 @@ impl<'db> ConstraintSet<'db> {
             BoundTypeVarIdentity<'db>,
             FxHashSet<BoundTypeVarIdentity<'db>>,
         > = FxHashMap::default();
-        self.node.for_each_constraint(db, &mut |constraint| {
+        self.node.for_each_constraint(db, &mut |constraint, _| {
             let visitor = CollectReachability::default();
             visitor.visit_type(db, constraint.lower(db));
             visitor.visit_type(db, constraint.upper(db));
@@ -942,29 +942,13 @@ impl<'db> Node<'db> {
 
     /// Returns the smallest source_order associated with the given constraint.
     fn source_order_for(self, db: &'db dyn Db, constraint: ConstrainedTypeVar<'db>) -> usize {
-        fn walk<'db>(
-            db: &'db dyn Db,
-            node: Node<'db>,
-            constraint: ConstrainedTypeVar<'db>,
-            best: Option<usize>,
-        ) -> Option<usize> {
-            match node {
-                Node::AlwaysTrue | Node::AlwaysFalse => best,
-                Node::Interior(interior) => {
-                    let best = if interior.constraint(db) == constraint {
-                        Some(best.map_or(interior.source_order(db), |b| {
-                            b.min(interior.source_order(db))
-                        }))
-                    } else {
-                        best
-                    };
-                    let best = walk(db, interior.if_true(db), constraint, best);
-                    walk(db, interior.if_false(db), constraint, best)
-                }
+        let mut best: Option<usize> = None;
+        self.for_each_constraint(db, &mut |candidate, order| {
+            if candidate == constraint {
+                best = Some(best.map_or(order, |b| b.min(order)));
             }
-        }
-
-        walk(db, self, constraint, None).unwrap_or(1)
+        });
+        best.unwrap_or(1)
     }
 
     /// Returns whether this BDD represent the constant function `true`.
@@ -1219,7 +1203,7 @@ impl<'db> Node<'db> {
         }
 
         let mut typevars = FxHashSet::default();
-        self.for_each_constraint(db, &mut |constraint| {
+        self.for_each_constraint(db, &mut |constraint, _| {
             typevars.insert(constraint.typevar(db));
         });
 
@@ -1577,11 +1561,15 @@ impl<'db> Node<'db> {
     /// constraint can appear multiple times in different paths from the root; we do not
     /// deduplicate those constraints, and will instead invoke the callback each time we encounter
     /// the constraint.)
-    fn for_each_constraint(self, db: &'db dyn Db, f: &mut dyn FnMut(ConstrainedTypeVar<'db>)) {
+    fn for_each_constraint(
+        self,
+        db: &'db dyn Db,
+        f: &mut dyn FnMut(ConstrainedTypeVar<'db>, usize),
+    ) {
         let Node::Interior(interior) = self else {
             return;
         };
-        f(interior.constraint(db));
+        f(interior.constraint(db), interior.source_order(db));
         interior.if_true(db).for_each_constraint(db, f);
         interior.if_false(db).for_each_constraint(db, f);
     }
@@ -2081,7 +2069,7 @@ impl<'db> InteriorNode<'db> {
             "create sequent map",
         );
         let mut map = SequentMap::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+        Node::Interior(self).for_each_constraint(db, &mut |constraint, _| {
             map.add(db, constraint);
         });
         map
@@ -2110,7 +2098,7 @@ impl<'db> InteriorNode<'db> {
         // visit queue with all pairs of those constraints. (We use "combinations" because we don't
         // need to compare a constraint against itself, and because ordering doesn't matter.)
         let mut seen_constraints = FxHashSet::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint| {
+        Node::Interior(self).for_each_constraint(db, &mut |constraint, _| {
             seen_constraints.insert(constraint);
         });
         let mut to_visit: Vec<(_, _)> = (seen_constraints.iter().copied())
