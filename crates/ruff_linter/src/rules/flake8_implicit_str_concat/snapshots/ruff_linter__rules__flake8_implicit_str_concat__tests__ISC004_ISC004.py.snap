@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
  --> ISC004.py:4:5
   |
 2 |       "Lobsters have blue blood.",
@@ -23,7 +23,7 @@ help: Wrap implicitly concatenated strings in parentheses
 7 | 
 8 | facts = [
 
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
   --> ISC004.py:11:5
    |
  9 |       "Lobsters have blue blood.",
@@ -45,7 +45,7 @@ help: Wrap implicitly concatenated strings in parentheses
 14 | 
 15 | facts = {
 
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
   --> ISC004.py:18:5
    |
 16 |       "Lobsters have blue blood.",
@@ -67,7 +67,7 @@ help: Wrap implicitly concatenated strings in parentheses
 21 | 
 22 | facts = {
 
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
   --> ISC004.py:30:5
    |
 29 |   facts = (
@@ -90,7 +90,7 @@ help: Wrap implicitly concatenated strings in parentheses
 34 | 
 35 | facts = [
 
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
   --> ISC004.py:36:5
    |
 35 |   facts = [
@@ -113,7 +113,7 @@ help: Wrap implicitly concatenated strings in parentheses
 40 | 
 41 | facts = {
 
-ISC004 [*] Implicit string concatenation in collection literal; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
   --> ISC004.py:42:5
    |
 41 |   facts = {

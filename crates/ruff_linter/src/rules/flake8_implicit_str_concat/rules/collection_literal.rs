@@ -54,7 +54,8 @@ impl Violation for ImplicitStringConcatenationInCollectionLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Implicit string concatenation in collection literal; did you forget a comma?".to_string()
+        "Unparenthesized implicit string concatenation in collection; did you forget a comma?"
+            .to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
