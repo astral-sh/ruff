@@ -579,6 +579,136 @@ mod tests {
         "#);
     }
 
+    // using `importlib.abc.ExecutionLoader` when no imports are in scope
+    #[test]
+    fn unresolved_loader() {
+        let test = CodeActionTest::with_source(
+            r#"
+            <START>ExecutionLoader<END>
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: import importlib.abc.ExecutionLoader
+         --> main.py:2:13
+          |
+        2 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 + from importlib.abc import ExecutionLoader
+        2 | 
+        3 |             ExecutionLoader
+        4 |         
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:2:13
+          |
+        2 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        1 | 
+          -             ExecutionLoader
+        2 +             ExecutionLoader  # ty:ignore[unresolved-reference]
+        3 |
+        ");
+    }
+
+    // using `importlib.abc.ExecutionLoader` when `import importlib` is in scope
+    //
+    // TODO: `importlib.abc` is available whenever `importlib` is, so qualifying
+    // `importlib.abc.ExecutionLoader` without adding imports is actually legal here!
+    #[test]
+    fn unresolved_loader_importlib_imported() {
+        let test = CodeActionTest::with_source(
+            r#"
+            import importlib
+            <START>ExecutionLoader<END>
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: import importlib.abc.ExecutionLoader
+         --> main.py:3:13
+          |
+        2 |             import importlib
+        3 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 + from importlib.abc import ExecutionLoader
+        2 | 
+        3 |             import importlib
+        4 |             ExecutionLoader
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:13
+          |
+        2 |             import importlib
+        3 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        1 | 
+        2 |             import importlib
+          -             ExecutionLoader
+        3 +             ExecutionLoader  # ty:ignore[unresolved-reference]
+        4 |
+        ");
+    }
+
+    // Using `importlib.abc.ExecutionLoader` when `import importlib.abc` is in scope
+    #[test]
+    fn unresolved_loader_abc_imported() {
+        let test = CodeActionTest::with_source(
+            r#"
+            import importlib.abc
+            <START>ExecutionLoader<END>
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: import importlib.abc.ExecutionLoader
+         --> main.py:3:13
+          |
+        2 |             import importlib.abc
+        3 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 + from importlib.abc import ExecutionLoader
+        2 | 
+        3 |             import importlib.abc
+        4 |             ExecutionLoader
+
+        info[code-action]: qualify importlib.abc.ExecutionLoader
+         --> main.py:3:13
+          |
+        2 |             import importlib.abc
+        3 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        help: This is a preferred code action
+        1 | 
+        2 |             import importlib.abc
+          -             ExecutionLoader
+        3 +             importlib.abc.ExecutionLoader
+        4 |         
+
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:3:13
+          |
+        2 |             import importlib.abc
+        3 |             ExecutionLoader
+          |             ^^^^^^^^^^^^^^^
+          |
+        1 | 
+        2 |             import importlib.abc
+          -             ExecutionLoader
+        3 +             ExecutionLoader  # ty:ignore[unresolved-reference]
+        4 |
+        ");
+    }
+
     pub(super) struct CodeActionTest {
         pub(super) db: ty_project::TestDb,
         pub(super) file: File,
