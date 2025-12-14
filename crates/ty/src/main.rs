@@ -1,11 +1,9 @@
-mod allocator;
-
 use colored::Colorize;
 use std::io;
 use ty::{ExitStatus, run};
 
 pub fn main() -> ExitStatus {
-    let result = run().unwrap_or_else(|error| {
+    run().unwrap_or_else(|error| {
         use io::Write;
 
         // Use `writeln` instead of `eprintln` to avoid panicking when the stderr pipe is broken.
@@ -31,27 +29,5 @@ pub fn main() -> ExitStatus {
         }
 
         ExitStatus::Error
-    });
-
-    // Print allocator memory usage if TY_ALLOCATOR_STATS is set
-    if std::env::var("TY_ALLOCATOR_STATS").is_ok() {
-        use io::Write;
-        let mut stderr = io::stderr().lock();
-
-        if let Some(stats) = allocator::memory_usage_stats() {
-            writeln!(stderr).ok();
-            writeln!(stderr, "{}", "Memory Usage Statistics:".bold()).ok();
-            write!(stderr, "{stats}").ok();
-        } else {
-            writeln!(stderr).ok();
-            writeln!(
-                stderr,
-                "Allocator: {} (no detailed stats available)",
-                allocator::allocator_name()
-            )
-            .ok();
-        }
-    }
-
-    result
+    })
 }
