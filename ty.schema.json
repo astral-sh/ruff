@@ -595,7 +595,7 @@
         },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
-          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\nMany of these result in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n\n# error: type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {
@@ -806,16 +806,6 @@
         "invalid-type-guard-definition": {
           "title": "detects malformed type guard functions",
           "description": "## What it does\nChecks for type guard functions without\na first non-self-like non-keyword-only non-variadic parameter.\n\n## Why is this bad?\nType narrowing functions must accept at least one positional argument\n(non-static methods must accept another in addition to `self`/`cls`).\n\nExtra parameters/arguments are allowed but do not affect narrowing.\n\n## Examples\n```python\nfrom typing import TypeIs\n\ndef f() -> TypeIs[int]: ...  # Error, no parameter\ndef f(*, v: object) -> TypeIs[int]: ...  # Error, no positional arguments allowed\ndef f(*args: object) -> TypeIs[int]: ... # Error, expect variadic arguments\nclass C:\n    def f(self) -> TypeIs[int]: ...  # Error, only positional argument expected is `self`\n```",
-          "default": "error",
-          "oneOf": [
-            {
-              "$ref": "#/definitions/Level"
-            }
-          ]
-        },
-        "invalid-type-param-order": {
-          "title": "detects invalid type parameter order",
-          "description": "## What it does\nChecks for type parameters without defaults that come after type parameters with defaults.\n\n## Why is this bad?\nType parameters without defaults must come before type parameters with defaults.\n\n## Example\n\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\")\n# Error: T has no default but comes after U which has a default\nclass Foo(Generic[U = int, T]): ...\n```\n\n## References\n- [PEP 696: Type defaults for type parameters](https://peps.python.org/pep-0696/)",
           "default": "error",
           "oneOf": [
             {

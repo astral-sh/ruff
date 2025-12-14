@@ -78,7 +78,6 @@ Settings: Settings {
         "invalid-type-form": Error (Default),
         "invalid-type-guard-call": Error (Default),
         "invalid-type-guard-definition": Error (Default),
-        "invalid-type-param-order": Error (Default),
         "invalid-type-variable-constraints": Error (Default),
         "missing-argument": Error (Default),
         "missing-typed-dict-key": Error (Default),
