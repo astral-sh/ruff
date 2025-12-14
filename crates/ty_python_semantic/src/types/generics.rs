@@ -21,8 +21,8 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
     ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
     IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    OnlyReorder, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
     walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
@@ -658,10 +658,15 @@ impl<'db> GenericContext<'db> {
         Specialization::new(db, self, self.fill_in_defaults(db, types), None, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         let variables = self
             .variables(db)
-            .map(|bound_typevar| bound_typevar.normalized_impl(db, visitor));
+            .map(|bound_typevar| bound_typevar.normalized_impl(db, only_reorder, visitor));
 
         Self::from_typevar_instances(db, variables)
     }
@@ -1098,16 +1103,23 @@ impl<'db> Specialization<'db> {
         Specialization::new(db, self.generic_context(db), types, None, None)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         let types: Box<[_]> = self
             .types(db)
             .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
             .collect();
         let tuple_inner = self
             .tuple_inner(db)
-            .and_then(|tuple| tuple.normalized_impl(db, visitor));
-        let context = self.generic_context(db).normalized_impl(db, visitor);
+            .and_then(|tuple| tuple.normalized_impl(db, only_reorder, visitor));
+        let context = self
+            .generic_context(db)
+            .normalized_impl(db, only_reorder, visitor);
         Self::new(
             db,
             context,

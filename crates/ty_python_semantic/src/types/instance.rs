@@ -14,8 +14,8 @@ use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
     ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, OnlyReorder,
+    TypeContext, TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -117,6 +117,7 @@ impl<'db> Type<'db> {
             SynthesizedProtocolType::new(
                 db,
                 ProtocolInterface::with_property_members(db, members),
+                OnlyReorder::No,
                 &NormalizedVisitor::default(),
             ),
         ))
@@ -369,14 +370,15 @@ impl<'db> NominalInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
+        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => {
-                Type::tuple(tuple.normalized_impl(db, visitor))
+                Type::tuple(tuple.normalized_impl(db, only_reorder, visitor))
             }
             NominalInstanceInner::NonTuple(class) => Type::NominalInstance(NominalInstanceType(
-                NominalInstanceInner::NonTuple(class.normalized_impl(db, visitor)),
+                NominalInstanceInner::NonTuple(class.normalized_impl(db, only_reorder, visitor)),
             )),
             NominalInstanceInner::Object => Type::object(),
         }
@@ -730,7 +732,7 @@ impl<'db> ProtocolInstanceType<'db> {
     ///
     /// See [`Type::normalized`] for more details.
     pub(super) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
     }
 
     /// Return a "normalized" version of this `Protocol` type.
@@ -739,6 +741,7 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn normalized_impl(
         self,
         db: &'db dyn Db,
+        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         if self.is_equivalent_to_object(db) {
@@ -746,7 +749,7 @@ impl<'db> ProtocolInstanceType<'db> {
         }
         match self.inner {
             Protocol::FromClass(_) => Type::ProtocolInstance(Self::synthesized(
-                SynthesizedProtocolType::new(db, self.inner.interface(db), visitor),
+                SynthesizedProtocolType::new(db, self.inner.interface(db), only_reorder, visitor),
             )),
             Protocol::Synthesized(_) => Type::ProtocolInstance(self),
         }
@@ -909,7 +912,8 @@ mod synthesized_protocol {
     use crate::types::protocol_class::ProtocolInterface;
     use crate::types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor,
-        NormalizedVisitor, Type, TypeContext, TypeMapping, TypeVarVariance, VarianceInferable,
+        NormalizedVisitor, OnlyReorder, Type, TypeContext, TypeMapping, TypeVarVariance,
+        VarianceInferable,
     };
     use crate::{Db, FxOrderSet};
 
@@ -931,9 +935,10 @@ mod synthesized_protocol {
         pub(super) fn new(
             db: &'db dyn Db,
             interface: ProtocolInterface<'db>,
+            only_reorder: OnlyReorder,
             visitor: &NormalizedVisitor<'db>,
         ) -> Self {
-            Self(interface.normalized_impl(db, visitor))
+            Self(interface.normalized_impl(db, only_reorder, visitor))
         }
 
         pub(super) fn apply_type_mapping_impl<'a>(

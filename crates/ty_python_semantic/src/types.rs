@@ -259,6 +259,12 @@ pub(crate) type NormalizedVisitor<'db> = TypeTransformer<'db, Normalized>;
 #[derive(Debug)]
 pub(crate) struct Normalized;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum OnlyReorder {
+    No,
+    Yes,
+}
+
 /// How a generic type has been specialized.
 ///
 /// This matters only if there is at least one invariant type parameter.
@@ -563,11 +569,18 @@ impl<'db> PropertyInstanceType<'db> {
         Self::new(db, getter, setter)
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
-            self.getter(db).map(|ty| ty.normalized_impl(db, visitor)),
-            self.setter(db).map(|ty| ty.normalized_impl(db, visitor)),
+            self.getter(db)
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor)),
+            self.setter(db)
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor)),
         )
     }
 
@@ -1560,56 +1573,75 @@ impl<'db> Type<'db> {
     /// - Converts class-based typeddicts into synthesized typeddicts
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
+    }
+
+    /// Ensures that all union and intersection elements in this type are in a canonical ordering,
+    /// but performs no other normalizations.
+    #[must_use]
+    pub(crate) fn canonically_ordered(self, db: &'db dyn Db) -> Self {
+        self.normalized_impl(db, OnlyReorder::Yes, &NormalizedVisitor::default())
     }
 
     #[must_use]
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
-            Type::Union(union) => visitor.visit(self, || union.normalized_impl(db, visitor)),
+            Type::Union(union) => {
+                visitor.visit(self, || union.normalized_impl(db, only_reorder, visitor))
+            }
             Type::Intersection(intersection) => visitor.visit(self, || {
-                Type::Intersection(intersection.normalized_impl(db, visitor))
+                Type::Intersection(intersection.normalized_impl(db, only_reorder, visitor))
             }),
             Type::Callable(callable) => visitor.visit(self, || {
-                Type::Callable(callable.normalized_impl(db, visitor))
+                Type::Callable(callable.normalized_impl(db, only_reorder, visitor))
             }),
             Type::ProtocolInstance(protocol) => {
-                visitor.visit(self, || protocol.normalized_impl(db, visitor))
+                visitor.visit(self, || protocol.normalized_impl(db, only_reorder, visitor))
             }
             Type::NominalInstance(instance) => {
-                visitor.visit(self, || instance.normalized_impl(db, visitor))
+                visitor.visit(self, || instance.normalized_impl(db, only_reorder, visitor))
             }
             Type::FunctionLiteral(function) => visitor.visit(self, || {
-                Type::FunctionLiteral(function.normalized_impl(db, visitor))
+                Type::FunctionLiteral(function.normalized_impl(db, only_reorder, visitor))
             }),
             Type::PropertyInstance(property) => visitor.visit(self, || {
-                Type::PropertyInstance(property.normalized_impl(db, visitor))
+                Type::PropertyInstance(property.normalized_impl(db, only_reorder, visitor))
             }),
             Type::KnownBoundMethod(method_kind) => visitor.visit(self, || {
-                Type::KnownBoundMethod(method_kind.normalized_impl(db, visitor))
+                Type::KnownBoundMethod(method_kind.normalized_impl(db, only_reorder, visitor))
             }),
             Type::BoundMethod(method) => visitor.visit(self, || {
-                Type::BoundMethod(method.normalized_impl(db, visitor))
+                Type::BoundMethod(method.normalized_impl(db, only_reorder, visitor))
             }),
             Type::BoundSuper(bound_super) => visitor.visit(self, || {
-                Type::BoundSuper(bound_super.normalized_impl(db, visitor))
+                Type::BoundSuper(bound_super.normalized_impl(db, only_reorder, visitor))
             }),
             Type::GenericAlias(generic) => visitor.visit(self, || {
-                Type::GenericAlias(generic.normalized_impl(db, visitor))
+                Type::GenericAlias(generic.normalized_impl(db, only_reorder, visitor))
             }),
             Type::SubclassOf(subclass_of) => visitor.visit(self, || {
-                Type::SubclassOf(subclass_of.normalized_impl(db, visitor))
+                Type::SubclassOf(subclass_of.normalized_impl(db, only_reorder, visitor))
             }),
             Type::TypeVar(bound_typevar) => visitor.visit(self, || {
-                Type::TypeVar(bound_typevar.normalized_impl(db, visitor))
+                Type::TypeVar(bound_typevar.normalized_impl(db, only_reorder, visitor))
             }),
             Type::KnownInstance(known_instance) => visitor.visit(self, || {
-                Type::KnownInstance(known_instance.normalized_impl(db, visitor))
+                Type::KnownInstance(known_instance.normalized_impl(db, only_reorder, visitor))
             }),
             Type::TypeIs(type_is) => visitor.visit(self, || {
-                type_is.with_type(db, type_is.return_type(db).normalized_impl(db, visitor))
+                type_is.with_type(
+                    db,
+                    type_is
+                        .return_type(db)
+                        .normalized_impl(db, only_reorder, visitor),
+                )
             }),
-            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized()),
+            Type::Dynamic(dynamic) => Type::Dynamic(dynamic.normalized(only_reorder)),
             Type::EnumLiteral(enum_literal)
                 if is_single_member_enum(db, enum_literal.enum_class(db)) =>
             {
@@ -1617,16 +1649,18 @@ impl<'db> Type<'db> {
                 enum_literal.enum_class_instance(db)
             }
             Type::TypedDict(typed_dict) => visitor.visit(self, || {
-                Type::TypedDict(typed_dict.normalized_impl(db, visitor))
+                Type::TypedDict(typed_dict.normalized_impl(db, only_reorder, visitor))
             }),
-            Type::TypeAlias(alias) => alias.value_type(db).normalized_impl(db, visitor),
-            Type::NewTypeInstance(newtype) => {
-                visitor.visit(self, || {
-                    Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
-                        class_type.normalized_impl(db, visitor)
-                    }))
-                })
+            Type::TypeAlias(alias) => {
+                alias
+                    .value_type(db)
+                    .normalized_impl(db, only_reorder, visitor)
             }
+            Type::NewTypeInstance(newtype) => visitor.visit(self, || {
+                Type::NewTypeInstance(newtype.map_base_class_type(db, |class_type| {
+                    class_type.normalized_impl(db, only_reorder, visitor)
+                }))
+            }),
             Type::LiteralString
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
@@ -8930,31 +8964,45 @@ impl<'db> VarianceInferable<'db> for KnownInstanceType<'db> {
 }
 
 impl<'db> KnownInstanceType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::SubscriptedProtocol(context) => {
-                Self::SubscriptedProtocol(context.normalized_impl(db, visitor))
+                Self::SubscriptedProtocol(context.normalized_impl(db, only_reorder, visitor))
             }
             Self::SubscriptedGeneric(context) => {
-                Self::SubscriptedGeneric(context.normalized_impl(db, visitor))
+                Self::SubscriptedGeneric(context.normalized_impl(db, only_reorder, visitor))
             }
-            Self::TypeVar(typevar) => Self::TypeVar(typevar.normalized_impl(db, visitor)),
+            Self::TypeVar(typevar) => {
+                Self::TypeVar(typevar.normalized_impl(db, only_reorder, visitor))
+            }
             Self::TypeAliasType(type_alias) => {
-                Self::TypeAliasType(type_alias.normalized_impl(db, visitor))
+                Self::TypeAliasType(type_alias.normalized_impl(db, only_reorder, visitor))
             }
-            Self::Field(field) => Self::Field(field.normalized_impl(db, visitor)),
-            Self::UnionType(instance) => Self::UnionType(instance.normalized_impl(db, visitor)),
-            Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, visitor)),
-            Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, visitor)),
-            Self::TypeGenericAlias(ty) => Self::TypeGenericAlias(ty.normalized_impl(db, visitor)),
-            Self::Callable(callable) => Self::Callable(callable.normalized_impl(db, visitor)),
+            Self::Field(field) => Self::Field(field.normalized_impl(db, only_reorder, visitor)),
+            Self::UnionType(instance) => {
+                Self::UnionType(instance.normalized_impl(db, only_reorder, visitor))
+            }
+            Self::Literal(ty) => Self::Literal(ty.normalized_impl(db, only_reorder, visitor)),
+            Self::Annotated(ty) => Self::Annotated(ty.normalized_impl(db, only_reorder, visitor)),
+            Self::TypeGenericAlias(ty) => {
+                Self::TypeGenericAlias(ty.normalized_impl(db, only_reorder, visitor))
+            }
+            Self::Callable(callable) => {
+                Self::Callable(callable.normalized_impl(db, only_reorder, visitor))
+            }
             Self::LiteralStringAlias(ty) => {
-                Self::LiteralStringAlias(ty.normalized_impl(db, visitor))
+                Self::LiteralStringAlias(ty.normalized_impl(db, only_reorder, visitor))
             }
-            Self::NewType(newtype) => Self::NewType(
-                newtype
-                    .map_base_class_type(db, |class_type| class_type.normalized_impl(db, visitor)),
-            ),
+            Self::NewType(newtype) => {
+                Self::NewType(newtype.map_base_class_type(db, |class_type| {
+                    class_type.normalized_impl(db, only_reorder, visitor)
+                }))
+            }
             Self::Deprecated(_)
             | Self::ConstraintSet(_)
             | Self::GenericContext(_)
@@ -9110,8 +9158,8 @@ pub enum DynamicType<'db> {
 }
 
 impl DynamicType<'_> {
-    fn normalized(self) -> Self {
-        if matches!(self, Self::Divergent(_)) {
+    fn normalized(self, only_reorder: OnlyReorder) -> Self {
+        if only_reorder == OnlyReorder::Yes || matches!(self, Self::Divergent(_)) {
             self
         } else {
             Self::Any
@@ -9483,11 +9531,16 @@ pub struct FieldInstance<'db> {
 impl get_size2::GetSize for FieldInstance<'_> {}
 
 impl<'db> FieldInstance<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         FieldInstance::new(
             db,
             self.default_type(db)
-                .map(|ty| ty.normalized_impl(db, visitor)),
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor)),
             self.init(db),
             self.kw_only(db),
             self.alias(db),
@@ -9726,28 +9779,41 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.identity(db),
             self._bound_or_constraints(db)
                 .and_then(|bound_or_constraints| match bound_or_constraints {
-                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => {
-                        Some(bound_or_constraints.normalized_impl(db, visitor).into())
-                    }
+                    TypeVarBoundOrConstraintsEvaluation::Eager(bound_or_constraints) => Some(
+                        bound_or_constraints
+                            .normalized_impl(db, only_reorder, visitor)
+                            .into(),
+                    ),
                     TypeVarBoundOrConstraintsEvaluation::LazyUpperBound => self
                         .lazy_bound(db)
-                        .map(|bound| bound.normalized_impl(db, visitor).into()),
-                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => self
-                        .lazy_constraints(db)
-                        .map(|constraints| constraints.normalized_impl(db, visitor).into()),
+                        .map(|bound| bound.normalized_impl(db, only_reorder, visitor).into()),
+                    TypeVarBoundOrConstraintsEvaluation::LazyConstraints => {
+                        self.lazy_constraints(db).map(|constraints| {
+                            constraints
+                                .normalized_impl(db, only_reorder, visitor)
+                                .into()
+                        })
+                    }
                 }),
             self.explicit_variance(db),
             self._default(db).and_then(|default| match default {
-                TypeVarDefaultEvaluation::Eager(ty) => Some(ty.normalized_impl(db, visitor).into()),
+                TypeVarDefaultEvaluation::Eager(ty) => {
+                    Some(ty.normalized_impl(db, only_reorder, visitor).into())
+                }
                 TypeVarDefaultEvaluation::Lazy => self
                     .lazy_default(db)
-                    .map(|ty| ty.normalized_impl(db, visitor).into()),
+                    .map(|ty| ty.normalized_impl(db, only_reorder, visitor).into()),
             }),
         )
     }
@@ -10454,10 +10520,15 @@ impl<'db> BoundTypeVarInstance<'db> {
         })
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
-            self.typevar(db).normalized_impl(db, visitor),
+            self.typevar(db).normalized_impl(db, only_reorder, visitor),
             self.binding_context(db),
             self.paramspec_attr(db),
         )
@@ -10619,11 +10690,16 @@ impl<'db> TypeVarConstraints<'db> {
         }
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         let normalized = self
             .elements(db)
             .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
             .collect::<Box<_>>();
         TypeVarConstraints::new(db, normalized)
     }
@@ -10663,13 +10739,22 @@ fn walk_type_var_bounds<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeVarBoundOrConstraints<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
-            TypeVarBoundOrConstraints::UpperBound(bound) => {
-                TypeVarBoundOrConstraints::UpperBound(bound.normalized_impl(db, visitor))
-            }
+            TypeVarBoundOrConstraints::UpperBound(bound) => TypeVarBoundOrConstraints::UpperBound(
+                bound.normalized_impl(db, only_reorder, visitor),
+            ),
             TypeVarBoundOrConstraints::Constraints(constraints) => {
-                TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(db, visitor))
+                TypeVarBoundOrConstraints::Constraints(constraints.normalized_impl(
+                    db,
+                    only_reorder,
+                    visitor,
+                ))
             }
         }
     }
@@ -10850,17 +10935,22 @@ impl<'db> UnionTypeInstance<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         let value_expr_types = self._value_expr_types(db).as_ref().map(|types| {
             types
                 .iter()
-                .map(|ty| ty.normalized_impl(db, visitor))
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
                 .collect::<Box<_>>()
         });
         let union_type = self
             .union_type(db)
             .clone()
-            .map(|ty| ty.normalized_impl(db, visitor));
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor));
 
         Self::new(db, value_expr_types, union_type)
     }
@@ -10917,8 +11007,16 @@ pub struct InternedType<'db> {
 impl get_size2::GetSize for InternedType<'_> {}
 
 impl<'db> InternedType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        InternedType::new(db, self.inner(db).normalized_impl(db, visitor))
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        InternedType::new(
+            db,
+            self.inner(db).normalized_impl(db, only_reorder, visitor),
+        )
     }
 
     fn recursive_type_normalized_impl(
@@ -12240,11 +12338,17 @@ impl<'db> BoundMethodType<'db> {
         )
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
-            self.function(db).normalized_impl(db, visitor),
-            self.self_instance(db).normalized_impl(db, visitor),
+            self.function(db).normalized_impl(db, only_reorder, visitor),
+            self.self_instance(db)
+                .normalized_impl(db, only_reorder, visitor),
         )
     }
 
@@ -12454,10 +12558,16 @@ impl<'db> CallableType<'db> {
     /// Return a "normalized" version of this `Callable` type.
     ///
     /// See [`Type::normalized`] for more details.
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         CallableType::new(
             db,
-            self.signatures(db).normalized_impl(db, visitor),
+            self.signatures(db)
+                .normalized_impl(db, only_reorder, visitor),
             self.kind(db),
         )
     }
@@ -12883,19 +12993,40 @@ impl<'db> KnownBoundMethodType<'db> {
         }
     }
 
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             KnownBoundMethodType::FunctionTypeDunderGet(function) => {
-                KnownBoundMethodType::FunctionTypeDunderGet(function.normalized_impl(db, visitor))
+                KnownBoundMethodType::FunctionTypeDunderGet(function.normalized_impl(
+                    db,
+                    only_reorder,
+                    visitor,
+                ))
             }
             KnownBoundMethodType::FunctionTypeDunderCall(function) => {
-                KnownBoundMethodType::FunctionTypeDunderCall(function.normalized_impl(db, visitor))
+                KnownBoundMethodType::FunctionTypeDunderCall(function.normalized_impl(
+                    db,
+                    only_reorder,
+                    visitor,
+                ))
             }
             KnownBoundMethodType::PropertyDunderGet(property) => {
-                KnownBoundMethodType::PropertyDunderGet(property.normalized_impl(db, visitor))
+                KnownBoundMethodType::PropertyDunderGet(property.normalized_impl(
+                    db,
+                    only_reorder,
+                    visitor,
+                ))
             }
             KnownBoundMethodType::PropertyDunderSet(property) => {
-                KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(db, visitor))
+                KnownBoundMethodType::PropertyDunderSet(property.normalized_impl(
+                    db,
+                    only_reorder,
+                    visitor,
+                ))
             }
             KnownBoundMethodType::StrStartswith(_)
             | KnownBoundMethodType::ConstraintSetRange
@@ -13529,7 +13660,12 @@ impl<'db> PEP695TypeAliasType<'db> {
             })
     }
 
-    fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        _db: &'db dyn Db,
+        _only_reorder: OnlyReorder,
+        _visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         self
     }
 }
@@ -13586,12 +13722,17 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> ManualPEP695TypeAliasType<'db> {
-    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
-            self.value(db).normalized_impl(db, visitor),
+            self.value(db).normalized_impl(db, only_reorder, visitor),
         )
     }
 
@@ -13636,13 +13777,18 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> TypeAliasType<'db> {
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             TypeAliasType::PEP695(type_alias) => {
-                TypeAliasType::PEP695(type_alias.normalized_impl(db, visitor))
+                TypeAliasType::PEP695(type_alias.normalized_impl(db, only_reorder, visitor))
             }
             TypeAliasType::ManualPEP695(type_alias) => {
-                TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
+                TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, only_reorder, visitor))
             }
         }
     }
@@ -13977,21 +14123,26 @@ impl<'db> UnionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Type<'db> {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
     }
 
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
+        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Type<'db> {
         self.elements(db)
             .iter()
-            .map(|ty| ty.normalized_impl(db, visitor))
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
             .fold(
-                UnionBuilder::new(db)
-                    .order_elements(true)
-                    .unpack_aliases(true),
+                if only_reorder == OnlyReorder::Yes {
+                    UnionBuilder::new(db).order_elements(true)
+                } else {
+                    UnionBuilder::new(db)
+                        .order_elements(true)
+                        .unpack_aliases(true)
+                },
                 UnionBuilder::add,
             )
             .recursively_defined(self.recursively_defined(db))
@@ -14170,18 +14321,24 @@ impl<'db> IntersectionType<'db> {
     /// See [`Type::normalized`] for more details.
     #[must_use]
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, &NormalizedVisitor::default())
+        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         fn normalized_set<'db>(
             db: &'db dyn Db,
             elements: &FxOrderSet<Type<'db>>,
+            only_reorder: OnlyReorder,
             visitor: &NormalizedVisitor<'db>,
         ) -> FxOrderSet<Type<'db>> {
             let mut elements: FxOrderSet<Type<'db>> = elements
                 .iter()
-                .map(|ty| ty.normalized_impl(db, visitor))
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
                 .collect();
 
             elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
@@ -14190,8 +14347,8 @@ impl<'db> IntersectionType<'db> {
 
         IntersectionType::new(
             db,
-            normalized_set(db, self.positive(db), visitor),
-            normalized_set(db, self.negative(db), visitor),
+            normalized_set(db, self.positive(db), only_reorder, visitor),
+            normalized_set(db, self.negative(db), only_reorder, visitor),
         )
     }
 

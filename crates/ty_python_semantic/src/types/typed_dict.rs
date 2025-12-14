@@ -21,8 +21,8 @@ use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, OnlyReorder,
+    TypeContext, TypeRelation,
 };
 
 use ordermap::OrderSet;
@@ -298,14 +298,19 @@ impl<'db> TypedDictType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             TypedDictType::Class(_) => {
                 let synthesized = SynthesizedTypedDictType::new(db, self.items(db));
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, only_reorder, visitor))
             }
             TypedDictType::Synthesized(synthesized) => {
-                TypedDictType::Synthesized(synthesized.normalized_impl(db, visitor))
+                TypedDictType::Synthesized(synthesized.normalized_impl(db, only_reorder, visitor))
             }
         }
     }
@@ -768,12 +773,17 @@ impl<'db> SynthesizedTypedDictType<'db> {
         SynthesizedTypedDictType::new(db, items)
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         let items = self
             .items(db)
             .iter()
             .map(|(name, field)| {
-                let field = field.clone().normalized_impl(db, visitor);
+                let field = field.clone().normalized_impl(db, only_reorder, visitor);
                 (name.clone(), field)
             })
             .collect::<TypedDictSchema<'db>>();
@@ -845,9 +855,14 @@ impl<'db> TypedDictField<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(crate) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self {
-            declared_ty: self.declared_ty.normalized_impl(db, visitor),
+            declared_ty: self.declared_ty.normalized_impl(db, only_reorder, visitor),
             flags: self.flags,
             // A normalized typed-dict field does not hold onto the original declaration,
             // since a normalized typed-dict is an abstract type where equality does not depend

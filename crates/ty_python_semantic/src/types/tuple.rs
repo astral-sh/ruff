@@ -29,8 +29,8 @@ use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, Type, TypeMapping, TypeRelation,
-    UnionBuilder, UnionType,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, OnlyReorder, Type, TypeMapping,
+    TypeRelation, UnionBuilder, UnionType,
 };
 use crate::types::{Truthiness, TypeContext};
 use crate::{Db, FxOrderSet, Program};
@@ -225,9 +225,13 @@ impl<'db> TupleType<'db> {
     pub(crate) fn normalized_impl(
         self,
         db: &'db dyn Db,
+        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Option<Self> {
-        TupleType::new(db, &self.tuple(db).normalized_impl(db, visitor))
+        TupleType::new(
+            db,
+            &self.tuple(db).normalized_impl(db, only_reorder, visitor),
+        )
     }
 
     pub(super) fn recursive_type_normalized_impl(
@@ -423,8 +427,17 @@ impl<'db> FixedLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        Self::from_elements(self.0.iter().map(|ty| ty.normalized_impl(db, visitor)))
+    fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
+        Self::from_elements(
+            self.0
+                .iter()
+                .map(|ty| ty.normalized_impl(db, only_reorder, visitor)),
+        )
     }
 
     fn recursive_type_normalized_impl(
@@ -802,16 +815,21 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     }
 
     #[must_use]
-    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
+    fn normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor))
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
             .collect::<Box<_>>();
         let suffix = self
             .prenormalized_suffix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor))
+            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
             .collect::<Box<_>>();
-        let variable = self.variable.normalized_impl(db, visitor);
+        let variable = self.variable.normalized_impl(db, only_reorder, visitor);
         TupleSpec::Variable(Self {
             prefix,
             variable,
@@ -1280,11 +1298,12 @@ impl<'db> Tuple<Type<'db>> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
+        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         match self {
-            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, visitor)),
-            Tuple::Variable(tuple) => tuple.normalized_impl(db, visitor),
+            Tuple::Fixed(tuple) => Tuple::Fixed(tuple.normalized_impl(db, only_reorder, visitor)),
+            Tuple::Variable(tuple) => tuple.normalized_impl(db, only_reorder, visitor),
         }
     }
 

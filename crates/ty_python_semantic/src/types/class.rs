@@ -38,8 +38,8 @@ use crate::types::{
     CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams, DeprecatedInstance,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor,
-    PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
-    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    OnlyReorder, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext, TypeMapping,
+    TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
     determine_upper_bound,
 };
 use crate::{
@@ -274,11 +274,17 @@ pub(super) fn walk_generic_alias<'db, V: super::visitor::TypeVisitor<'db> + ?Siz
 impl get_size2::GetSize for GenericAlias<'_> {}
 
 impl<'db> GenericAlias<'db> {
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         Self::new(
             db,
             self.origin(db),
-            self.specialization(db).normalized_impl(db, visitor),
+            self.specialization(db)
+                .normalized_impl(db, only_reorder, visitor),
         )
     }
 
@@ -442,10 +448,17 @@ impl<'db> ClassType<'db> {
         }
     }
 
-    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    pub(super) fn normalized_impl(
+        self,
+        db: &'db dyn Db,
+        only_reorder: OnlyReorder,
+        visitor: &NormalizedVisitor<'db>,
+    ) -> Self {
         match self {
             Self::NonGeneric(_) => self,
-            Self::Generic(generic) => Self::Generic(generic.normalized_impl(db, visitor)),
+            Self::Generic(generic) => {
+                Self::Generic(generic.normalized_impl(db, only_reorder, visitor))
+            }
         }
     }
 
