@@ -1,18 +1,21 @@
 //! Global allocator configuration for ty.
 //!
-//! By default:
-//! - Windows uses mimalloc
-//! - Unix-like platforms (on supported architectures) use jemalloc
-//! - Other platforms use the system allocator
+//! By default, ty uses the system allocator. Custom allocators can be enabled
+//! via feature flags:
 //!
-//! The `mimalloc` feature can be enabled to prefer mimalloc over jemalloc
-//! on platforms that support both.
+//! - `--features jemalloc`: Use jemalloc (Unix-like platforms with x86_64, aarch64, powerpc64, riscv64)
+//! - `--features mimalloc`: Use mimalloc (all platforms)
+//!
+//! On Windows, mimalloc is always used regardless of feature flags.
+//!
+//! If both features are enabled, jemalloc is used on supported platforms and
+//! mimalloc on all other platforms.
 //!
 //! # Memory Statistics
 //!
 //! Set `TY_ALLOCATOR_STATS=1` to print memory usage statistics on exit.
 //!
-//! ## jemalloc (default on Unix-like platforms)
+//! ## jemalloc (`--features jemalloc`)
 //!
 //! The `TY_ALLOCATOR_STATS` output includes:
 //! - **Allocated**: Total bytes allocated by the application
@@ -41,7 +44,7 @@
 //! - `l`: per-size-class statistics for large objects
 //! - `x`: mutex statistics (if enabled)
 //!
-//! ## mimalloc (Windows default, or with `--features mimalloc`)
+//! ## mimalloc (`--features mimalloc` or Windows)
 //!
 //! For detailed mimalloc statistics, use environment variables:
 //! ```bash
@@ -55,9 +58,19 @@
 //! MIMALLOC_SHOW_STATS=1 MIMALLOC_VERBOSE=1 ty check .
 //! ```
 
+#[cfg(any(
+    target_os = "windows",
+    feature = "mimalloc",
+    feature = "jemalloc"
+))]
 use std::fmt::Write;
 
-// Condition for platforms where we can use either jemalloc or mimalloc
+// Windows always uses mimalloc (when mimalloc feature is enabled)
+#[cfg(all(target_os = "windows", feature = "mimalloc"))]
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+// Supported Unix platforms: use jemalloc if feature enabled (takes precedence over mimalloc)
 #[cfg(all(
     not(target_os = "windows"),
     not(target_os = "openbsd"),
@@ -68,31 +81,48 @@ use std::fmt::Write;
         target_arch = "aarch64",
         target_arch = "powerpc64",
         target_arch = "riscv64"
-    )
+    ),
+    feature = "jemalloc"
 ))]
-mod unix_allocator {
-    #[cfg(feature = "mimalloc")]
-    #[global_allocator]
-    pub(super) static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+#[global_allocator]
+static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-    #[cfg(not(feature = "mimalloc"))]
-    #[global_allocator]
-    pub(super) static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
-}
-
-// Windows always uses mimalloc
-#[cfg(target_os = "windows")]
+// Non-Windows platforms where jemalloc is not available or not enabled: use mimalloc if feature enabled
+#[cfg(all(
+    not(target_os = "windows"),
+    feature = "mimalloc",
+    not(all(
+        not(target_os = "openbsd"),
+        not(target_os = "aix"),
+        not(target_os = "android"),
+        any(
+            target_arch = "x86_64",
+            target_arch = "aarch64",
+            target_arch = "powerpc64",
+            target_arch = "riscv64"
+        ),
+        feature = "jemalloc"
+    ))
+))]
 #[global_allocator]
 static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 
 /// Returns the name of the allocator currently in use.
 #[must_use]
 pub(crate) fn allocator_name() -> &'static str {
-    #[cfg(target_os = "windows")]
+    // Windows with mimalloc feature
+    #[cfg(all(target_os = "windows", feature = "mimalloc"))]
     {
         "mimalloc"
     }
 
+    // Windows without mimalloc feature
+    #[cfg(all(target_os = "windows", not(feature = "mimalloc")))]
+    {
+        "system"
+    }
+
+    // Supported Unix platforms with jemalloc feature (takes precedence)
     #[cfg(all(
         not(target_os = "windows"),
         not(target_os = "openbsd"),
@@ -103,23 +133,18 @@ pub(crate) fn allocator_name() -> &'static str {
             target_arch = "aarch64",
             target_arch = "powerpc64",
             target_arch = "riscv64"
-        )
+        ),
+        feature = "jemalloc"
     ))]
     {
-        #[cfg(feature = "mimalloc")]
-        {
-            "mimalloc"
-        }
-
-        #[cfg(not(feature = "mimalloc"))]
-        {
-            "jemalloc"
-        }
+        "jemalloc"
     }
 
-    #[cfg(not(any(
-        target_os = "windows",
-        all(
+    // Non-Windows platforms where jemalloc is not available or not enabled, with mimalloc feature
+    #[cfg(all(
+        not(target_os = "windows"),
+        feature = "mimalloc",
+        not(all(
             not(target_os = "openbsd"),
             not(target_os = "aix"),
             not(target_os = "android"),
@@ -128,9 +153,31 @@ pub(crate) fn allocator_name() -> &'static str {
                 target_arch = "aarch64",
                 target_arch = "powerpc64",
                 target_arch = "riscv64"
-            )
-        )
-    )))]
+            ),
+            feature = "jemalloc"
+        ))
+    ))]
+    {
+        "mimalloc"
+    }
+
+    // No custom allocator features enabled (system allocator)
+    #[cfg(all(
+        not(target_os = "windows"),
+        not(feature = "mimalloc"),
+        not(all(
+            not(target_os = "openbsd"),
+            not(target_os = "aix"),
+            not(target_os = "android"),
+            any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "powerpc64",
+                target_arch = "riscv64"
+            ),
+            feature = "jemalloc"
+        ))
+    ))]
     {
         "system"
     }
@@ -143,11 +190,19 @@ pub(crate) fn allocator_name() -> &'static str {
 /// for the current allocator.
 #[must_use]
 pub(crate) fn memory_usage_stats() -> Option<String> {
-    #[cfg(target_os = "windows")]
+    // Windows with mimalloc feature
+    #[cfg(all(target_os = "windows", feature = "mimalloc"))]
     {
         mimalloc_stats()
     }
 
+    // Windows without mimalloc feature (system allocator)
+    #[cfg(all(target_os = "windows", not(feature = "mimalloc")))]
+    {
+        None
+    }
+
+    // Supported Unix platforms with jemalloc feature (takes precedence)
     #[cfg(all(
         not(target_os = "windows"),
         not(target_os = "openbsd"),
@@ -158,23 +213,18 @@ pub(crate) fn memory_usage_stats() -> Option<String> {
             target_arch = "aarch64",
             target_arch = "powerpc64",
             target_arch = "riscv64"
-        )
+        ),
+        feature = "jemalloc"
     ))]
     {
-        #[cfg(feature = "mimalloc")]
-        {
-            mimalloc_stats()
-        }
-
-        #[cfg(not(feature = "mimalloc"))]
-        {
-            jemalloc_stats()
-        }
+        jemalloc_stats()
     }
 
-    #[cfg(not(any(
-        target_os = "windows",
-        all(
+    // Non-Windows platforms where jemalloc is not available or not enabled, with mimalloc feature
+    #[cfg(all(
+        not(target_os = "windows"),
+        feature = "mimalloc",
+        not(all(
             not(target_os = "openbsd"),
             not(target_os = "aix"),
             not(target_os = "android"),
@@ -183,9 +233,31 @@ pub(crate) fn memory_usage_stats() -> Option<String> {
                 target_arch = "aarch64",
                 target_arch = "powerpc64",
                 target_arch = "riscv64"
-            )
-        )
-    )))]
+            ),
+            feature = "jemalloc"
+        ))
+    ))]
+    {
+        mimalloc_stats()
+    }
+
+    // No custom allocator features enabled (system allocator)
+    #[cfg(all(
+        not(target_os = "windows"),
+        not(feature = "mimalloc"),
+        not(all(
+            not(target_os = "openbsd"),
+            not(target_os = "aix"),
+            not(target_os = "android"),
+            any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "powerpc64",
+                target_arch = "riscv64"
+            ),
+            feature = "jemalloc"
+        ))
+    ))]
     {
         None
     }
@@ -203,7 +275,7 @@ pub(crate) fn memory_usage_stats() -> Option<String> {
         target_arch = "powerpc64",
         target_arch = "riscv64"
     ),
-    not(feature = "mimalloc")
+    feature = "jemalloc"
 ))]
 fn jemalloc_stats() -> Option<String> {
     use tikv_jemalloc_ctl::{epoch, stats};
@@ -238,29 +310,28 @@ fn jemalloc_stats() -> Option<String> {
 
 /// Collect mimalloc memory statistics
 #[cfg(any(
-    target_os = "windows",
+    all(target_os = "windows", feature = "mimalloc"),
     all(
-        not(target_os = "openbsd"),
-        not(target_os = "aix"),
-        not(target_os = "android"),
-        any(
-            target_arch = "x86_64",
-            target_arch = "aarch64",
-            target_arch = "powerpc64",
-            target_arch = "riscv64"
-        ),
-        feature = "mimalloc"
+        not(target_os = "windows"),
+        feature = "mimalloc",
+        not(all(
+            not(target_os = "openbsd"),
+            not(target_os = "aix"),
+            not(target_os = "android"),
+            any(
+                target_arch = "x86_64",
+                target_arch = "aarch64",
+                target_arch = "powerpc64",
+                target_arch = "riscv64"
+            ),
+            feature = "jemalloc"
+        ))
     )
 ))]
 fn mimalloc_stats() -> Option<String> {
-    // mimalloc doesn't have a simple stats API like jemalloc-ctl
-    // We can use the heap stats from the default heap
     let mut output = String::new();
     writeln!(output, "Allocator: mimalloc").ok()?;
     writeln!(output, "  (Detailed stats available via MIMALLOC_SHOW_STATS=1 environment variable)").ok()?;
-
-    // Try to get basic heap stats if available
-    // mimalloc::heap::stats() is not always available, so we provide basic info
     writeln!(output).ok()?;
     writeln!(output, "  Tip: Set MIMALLOC_SHOW_STATS=1 to see detailed allocation statistics on exit").ok()?;
     writeln!(output, "  Tip: Set MIMALLOC_VERBOSE=1 for even more detailed output").ok()?;
@@ -282,7 +353,7 @@ fn mimalloc_stats() -> Option<String> {
             target_arch = "powerpc64",
             target_arch = "riscv64"
         ),
-        not(feature = "mimalloc")
+        feature = "jemalloc"
     )
 ))]
 fn format_bytes(bytes: usize) -> String {
@@ -313,7 +384,7 @@ fn format_bytes(bytes: usize) -> String {
         target_arch = "powerpc64",
         target_arch = "riscv64"
     ),
-    not(feature = "mimalloc")
+    feature = "jemalloc"
 ))]
 fn fragmentation_percent(allocated: usize, resident: usize) -> f64 {
     if resident == 0 {
