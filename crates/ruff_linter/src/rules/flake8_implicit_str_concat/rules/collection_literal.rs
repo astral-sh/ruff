@@ -75,8 +75,12 @@ pub(crate) fn implicit_string_concatenation_in_collection_literal(
         if !string_like.is_implicit_concatenated() {
             continue;
         }
-        if parenthesized_range(string_like.as_expression_ref(), expr.into(), checker.tokens())
-            .is_some()
+        if parenthesized_range(
+            string_like.as_expression_ref(),
+            expr.into(),
+            checker.tokens(),
+        )
+        .is_some()
         {
             continue;
         }
