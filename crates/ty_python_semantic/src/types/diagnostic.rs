@@ -30,7 +30,7 @@ use crate::types::{
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy};
+use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
 use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
@@ -89,7 +89,6 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_FORM);
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
-    registry.register_lint(&INVALID_TYPE_PARAM_ORDER);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
@@ -895,15 +894,20 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// There are several requirements that you must follow when defining a generic class.
+    /// Many of these result in `TypeError` being raised at runtime if they are violated.
     ///
     /// ## Examples
     /// ```python
-    /// from typing import Generic, TypeVar
+    /// from typing_extensions import Generic, TypeVar
     ///
-    /// T = TypeVar("T")  # okay
+    /// T = TypeVar("T")
+    /// U = TypeVar("U", default=int)
     ///
     /// # error: class uses both PEP-695 syntax and legacy syntax
     /// class C[U](Generic[T]): ...
+    ///
+    /// # error: type parameter with default comes before type parameter without default
+    /// class D(Generic[U, T]): ...
     /// ```
     ///
     /// ## References
@@ -984,33 +988,6 @@ declare_lint! {
     pub(crate) static INVALID_TYPE_ALIAS_TYPE = {
         summary: "detects invalid TypeAliasType definitions",
         status: LintStatus::stable("0.0.1-alpha.6"),
-        default_level: Level::Error,
-    }
-}
-
-declare_lint! {
-    /// ## What it does
-    /// Checks for type parameters without defaults that come after type parameters with defaults.
-    ///
-    /// ## Why is this bad?
-    /// Type parameters without defaults must come before type parameters with defaults.
-    ///
-    /// ## Example
-    ///
-    /// ```python
-    /// from typing import Generic, TypeVar
-    ///
-    /// T = TypeVar("T")
-    /// U = TypeVar("U")
-    /// # Error: T has no default but comes after U which has a default
-    /// class Foo(Generic[U = int, T]): ...
-    /// ```
-    ///
-    /// ## References
-    /// - [PEP 696: Type defaults for type parameters](https://peps.python.org/pep-0696/)
-    pub(crate) static INVALID_TYPE_PARAM_ORDER = {
-        summary: "detects invalid type parameter order",
-        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }
@@ -3726,14 +3703,84 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
-    name: &str,
+    node: &ast::StmtClassDef,
+    typevar_with_default: TypeVarInstance<'db>,
+    invalid_later_typevars: &[TypeVarInstance<'db>],
 ) {
-    if let Some(builder) =
-        context.report_lint(&INVALID_TYPE_PARAM_ORDER, class.header_range(context.db()))
-    {
-        builder.into_diagnostic(format_args!(
-            "Type parameter {name} without a default follows type parameter with a default",
+    let db = context.db();
+
+    let base_index = class
+        .explicit_bases(db)
+        .iter()
+        .position(|base| {
+            matches!(
+                base,
+                Type::KnownInstance(
+                    KnownInstanceType::SubscriptedProtocol(_)
+                        | KnownInstanceType::SubscriptedGeneric(_)
+                )
+            )
+        })
+        .expect(
+            "It should not be possible for a class to have a legacy generic context \
+            if it does not inherit from `Protocol[]` or `Generic[]`",
+        );
+
+    let base_node = &node.bases()[base_index];
+
+    let primary_diagnostic_range = base_node
+        .as_subscript_expr()
+        .map(|subscript| &*subscript.slice)
+        .unwrap_or(base_node)
+        .range();
+
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, primary_diagnostic_range)
+    else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Type parameters without defaults cannot follow type parameters with defaults",
+    );
+
+    diagnostic.set_concise_message(format_args!(
+        "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+        invalid_later_typevars[0].name(db),
+        typevar_with_default.name(db),
+    ));
+
+    if let [single_typevar] = invalid_later_typevars {
+        diagnostic.set_primary_message(format_args!(
+            "Type variable `{}` does not have a default",
+            single_typevar.name(db),
         ));
+    } else {
+        let later_typevars =
+            format_enumeration(invalid_later_typevars.iter().map(|tv| tv.name(db)));
+        diagnostic.set_primary_message(format_args!(
+            "Type variables {later_typevars} do not have defaults",
+        ));
+    }
+
+    diagnostic.annotate(
+        Annotation::primary(Span::from(context.file()).with_range(primary_diagnostic_range))
+            .message(format_args!(
+                "Earlier TypeVar `{}` does",
+                typevar_with_default.name(db)
+            )),
+    );
+
+    for tvar in [typevar_with_default, invalid_later_typevars[0]] {
+        let Some(definition) = tvar.definition(db) else {
+            continue;
+        };
+        let file = definition.file(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, file).load(db)),
+            ))
+            .message(format_args!("`{}` defined here", tvar.name(db))),
+        );
     }
 }
 

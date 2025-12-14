@@ -62,7 +62,7 @@ use crate::types::diagnostic::{
     INVALID_BASE, INVALID_DECLARATION, INVALID_GENERIC_CLASS, INVALID_KEY,
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
-    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL, INVALID_TYPE_PARAM_ORDER,
+    INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
     INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
@@ -949,44 +949,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            if self.context.is_lint_enabled(&INVALID_TYPE_PARAM_ORDER) {
-                if let Some(generic_context) = class.generic_context(self.db()) {
-                    let mut seen_default = false;
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+                if !class.has_pep_695_type_params(self.db())
+                    && let Some(generic_context) = class.legacy_generic_context(self.db())
+                {
+                    struct State<'db> {
+                        typevar_with_default: TypeVarInstance<'db>,
+                        invalid_later_tvars: Vec<TypeVarInstance<'db>>,
+                    }
+
+                    let mut state: Option<State<'db>> = None;
 
                     for bound_typevar in generic_context.variables(self.db()) {
                         let typevar = bound_typevar.typevar(self.db());
                         let has_default = typevar.default_type(self.db()).is_some();
 
-                        if seen_default && !has_default {
-                            report_invalid_type_param_order(
-                                &self.context,
-                                class,
-                                typevar.name(self.db()).as_str(),
-                            );
-                        }
-                        if has_default {
-                            seen_default = true;
+                        if let Some(state) = state.as_mut() {
+                            if !has_default {
+                                state.invalid_later_tvars.push(typevar);
+                            }
+                        } else if has_default {
+                            state = Some(State {
+                                typevar_with_default: typevar,
+                                invalid_later_tvars: vec![],
+                            });
                         }
                     }
+
+                    if let Some(state) = state
+                        && !state.invalid_later_tvars.is_empty()
+                    {
+                        report_invalid_type_param_order(
+                            &self.context,
+                            class,
+                            class_node,
+                            state.typevar_with_default,
+                            &state.invalid_later_tvars,
+                        );
+                    }
                 }
-            }
-            let scope = class.body_scope(self.db()).scope(self.db());
-            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
-                && let Some(parent) = scope.parent()
-            {
-                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
-                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
-                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
-                        if let Some(other_typevar) =
-                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
-                        {
-                            report_rebound_typevar(
-                                &self.context,
-                                self_typevar_name,
-                                class,
-                                class_node,
-                                other_typevar,
-                            );
+
+                let scope = class.body_scope(self.db()).scope(self.db());
+                if let Some(parent) = scope.parent() {
+                    for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                        let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                        for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                            if let Some(other_typevar) =
+                                enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                            {
+                                report_rebound_typevar(
+                                    &self.context,
+                                    self_typevar_name,
+                                    class,
+                                    class_node,
+                                    other_typevar,
+                                );
+                            }
                         }
                     }
                 }
