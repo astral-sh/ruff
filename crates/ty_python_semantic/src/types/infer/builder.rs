@@ -78,7 +78,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
     report_invalid_return_type, report_invalid_type_checking_constant,
-    report_named_tuple_field_with_leading_underscore,
+    report_invalid_type_param_order, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
@@ -949,23 +949,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let scope = class.body_scope(self.db()).scope(self.db());
-            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
-                && let Some(parent) = scope.parent()
-            {
-                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
-                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
-                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
-                        if let Some(other_typevar) =
-                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
-                        {
-                            report_rebound_typevar(
-                                &self.context,
-                                self_typevar_name,
-                                class,
-                                class_node,
-                                other_typevar,
-                            );
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+                if !class.has_pep_695_type_params(self.db())
+                    && let Some(generic_context) = class.legacy_generic_context(self.db())
+                {
+                    struct State<'db> {
+                        typevar_with_default: TypeVarInstance<'db>,
+                        invalid_later_tvars: Vec<TypeVarInstance<'db>>,
+                    }
+
+                    let mut state: Option<State<'db>> = None;
+
+                    for bound_typevar in generic_context.variables(self.db()) {
+                        let typevar = bound_typevar.typevar(self.db());
+                        let has_default = typevar.default_type(self.db()).is_some();
+
+                        if let Some(state) = state.as_mut() {
+                            if !has_default {
+                                state.invalid_later_tvars.push(typevar);
+                            }
+                        } else if has_default {
+                            state = Some(State {
+                                typevar_with_default: typevar,
+                                invalid_later_tvars: vec![],
+                            });
+                        }
+                    }
+
+                    if let Some(state) = state
+                        && !state.invalid_later_tvars.is_empty()
+                    {
+                        report_invalid_type_param_order(
+                            &self.context,
+                            class,
+                            class_node,
+                            state.typevar_with_default,
+                            &state.invalid_later_tvars,
+                        );
+                    }
+                }
+
+                let scope = class.body_scope(self.db()).scope(self.db());
+                if let Some(parent) = scope.parent() {
+                    for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                        let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                        for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                            if let Some(other_typevar) =
+                                enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                            {
+                                report_rebound_typevar(
+                                    &self.context,
+                                    self_typevar_name,
+                                    class,
+                                    class_node,
+                                    other_typevar,
+                                );
+                            }
                         }
                     }
                 }
