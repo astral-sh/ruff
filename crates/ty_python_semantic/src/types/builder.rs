@@ -689,18 +689,8 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
-    pub(crate) fn order_elements(mut self, val: bool) -> Self {
-        self.order_elements = val;
-        self
-    }
-
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
-    }
-
-    pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
-        let updated = std::mem::replace(self, Self::empty(self.db)).add_positive(ty);
-        *self = updated;
     }
 
     pub(crate) fn add_positive_impl(
