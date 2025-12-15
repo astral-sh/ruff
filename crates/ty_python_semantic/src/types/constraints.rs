@@ -172,9 +172,10 @@ where
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
-/// The underlying representation tracks the order that individual constraints appear in the
-/// underlying Python source. For this to work, you should ensure that you call "combining"
-/// operators like [`and`][Self::and] and [`or`][Self::or] in a consistent order.
+/// The underlying representation tracks the order that individual constraints are added to the
+/// constraint set, which typically tracks when they appear in the underlying Python source. For
+/// this to work, you should ensure that you call "combining" operators like [`and`][Self::and] and
+/// [`or`][Self::or] in a consistent order.
 ///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
@@ -349,12 +350,18 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Updates this constraint set to hold the union of itself and another constraint set.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.or(db, other.node);
         *self
     }
 
     /// Updates this constraint set to hold the intersection of itself and another constraint set.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
         self.node = self.node.and(db, other.node);
         *self
@@ -370,6 +377,9 @@ impl<'db> ConstraintSet<'db> {
     /// Returns the intersection of this constraint set and another. The other constraint set is
     /// provided as a thunk, to implement short-circuiting: the thunk is not forced if the
     /// constraint set is already saturated.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn and(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_never_satisfied(db) {
             self.intersect(db, other());
@@ -380,6 +390,9 @@ impl<'db> ConstraintSet<'db> {
     /// Returns the union of this constraint set and another. The other constraint set is provided
     /// as a thunk, to implement short-circuiting: the thunk is not forced if the constraint set is
     /// already saturated.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn or(mut self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         if !self.is_always_satisfied(db) {
             self.union(db, other());
@@ -388,10 +401,17 @@ impl<'db> ConstraintSet<'db> {
     }
 
     /// Returns a constraint set encoding that this constraint set implies another.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn implies(self, db: &'db dyn Db, other: impl FnOnce() -> Self) -> Self {
         self.negate(db).or(db, other)
     }
 
+    /// Returns a constraint set encoding that this constraint set is equivalent to another.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
             node: self.node.iff(db, other.node),
@@ -828,12 +848,12 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// ordering that we use for constraint set BDDs.
 ///
 /// In addition to this BDD variable ordering, we also track a `source_order` for each individual
-/// constraint. This tracks the order in which constraints appear in the underlying Python source
-/// code. This provides an ordering that is stable across multiple runs, for consistent test and
-/// diagnostic output. (We cannot use this ordering as our BDD variable ordering, since we might
-/// have different `source_order`s for the same constraints if they appear in multiple constraint
-/// sets, but we need the BDD variable ordering to be consistent across all BDDs that we create in
-/// the process.)
+/// constraint. This records the order in which constraints are added to the constraint set, which
+/// typically tracks when they appear in the underlying Python source code. This provides an
+/// ordering that is stable across multiple runs, for consistent test and diagnostic output. (We
+/// cannot use this ordering as our BDD variable ordering, since we calculate it from already
+/// constructed BDDs, and we need the BDD variable ordering to be fixed and available before
+/// construction starts.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 enum Node<'db> {
     AlwaysFalse,
@@ -1059,60 +1079,74 @@ impl<'db> Node<'db> {
     }
 
     /// Returns the `or` or union of two BDDs.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
-        let rhs_offset = self.max_source_order(db);
-        self.or_inner(db, other, rhs_offset)
+        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
+        // `source_order` of the lhs to all of the `source_order`s in the rhs.
+        let other_offset = self.max_source_order(db);
+        self.or_inner(db, other, other_offset)
     }
 
-    fn or_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn or_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
-            (Node::AlwaysTrue, Node::Interior(rhs)) => Node::new(
+            (Node::AlwaysTrue, Node::Interior(other_interior)) => Node::new(
                 db,
-                rhs.constraint(db),
+                other_interior.constraint(db),
                 Node::AlwaysTrue,
                 Node::AlwaysTrue,
-                rhs.source_order(db) + rhs_offset,
+                other_interior.source_order(db) + other_offset,
             ),
-            (Node::Interior(lhs), Node::AlwaysTrue) => Node::new(
+            (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
                 db,
-                lhs.constraint(db),
+                self_interior.constraint(db),
                 Node::AlwaysTrue,
                 Node::AlwaysTrue,
-                lhs.source_order(db),
+                self_interior.source_order(db),
             ),
-            (Node::AlwaysFalse, rhs) => rhs.with_adjusted_source_order(db, rhs_offset),
-            (lhs, Node::AlwaysFalse) => lhs,
-            (Node::Interior(lhs), Node::Interior(rhs)) => lhs.or(db, rhs, rhs_offset),
+            (Node::AlwaysFalse, _) => other.with_adjusted_source_order(db, other_offset),
+            (_, Node::AlwaysFalse) => self,
+            (Node::Interior(self_interior), Node::Interior(other_interior)) => {
+                self_interior.or(db, other_interior, other_offset)
+            }
         }
     }
 
     /// Returns the `and` or intersection of two BDDs.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
-        let rhs_offset = self.max_source_order(db);
-        self.and_inner(db, other, rhs_offset)
+        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
+        // `source_order` of the lhs to all of the `source_order`s in the rhs.
+        let other_offset = self.max_source_order(db);
+        self.and_inner(db, other, other_offset)
     }
 
-    fn and_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn and_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
-            (Node::AlwaysFalse, Node::Interior(rhs)) => Node::new(
+            (Node::AlwaysFalse, Node::Interior(other_interior)) => Node::new(
                 db,
-                rhs.constraint(db),
+                other_interior.constraint(db),
                 Node::AlwaysFalse,
                 Node::AlwaysFalse,
-                rhs.source_order(db) + rhs_offset,
+                other_interior.source_order(db) + other_offset,
             ),
-            (Node::Interior(lhs), Node::AlwaysFalse) => Node::new(
+            (Node::Interior(self_interior), Node::AlwaysFalse) => Node::new(
                 db,
-                lhs.constraint(db),
+                self_interior.constraint(db),
                 Node::AlwaysFalse,
                 Node::AlwaysFalse,
-                lhs.source_order(db),
+                self_interior.source_order(db),
             ),
-            (Node::AlwaysTrue, rhs) => rhs.with_adjusted_source_order(db, rhs_offset),
-            (lhs, Node::AlwaysTrue) => lhs,
-            (Node::Interior(lhs), Node::Interior(rhs)) => lhs.and(db, rhs, rhs_offset),
+            (Node::AlwaysTrue, _) => other.with_adjusted_source_order(db, other_offset),
+            (_, Node::AlwaysTrue) => self,
+            (Node::Interior(self_interior), Node::Interior(other_interior)) => {
+                self_interior.and(db, other_interior, other_offset)
+            }
         }
     }
 
@@ -1123,12 +1157,17 @@ impl<'db> Node<'db> {
 
     /// Returns a new BDD that evaluates to `true` when both input BDDs evaluate to the same
     /// result.
+    ///
+    /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
+    /// nodes.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
-        let rhs_offset = self.max_source_order(db);
-        self.iff_inner(db, other, rhs_offset)
+        // To ensure that `self` appears before `other` in `source_order`, we add the maximum
+        // `source_order` of the lhs to all of the `source_order`s in the rhs.
+        let other_offset = self.max_source_order(db);
+        self.iff_inner(db, other, other_offset)
     }
 
-    fn iff_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn iff_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
                 Node::AlwaysTrue
@@ -1139,18 +1178,18 @@ impl<'db> Node<'db> {
             (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(interior)) => Node::new(
                 db,
                 interior.constraint(db),
-                self.iff_inner(db, interior.if_true(db), rhs_offset),
-                self.iff_inner(db, interior.if_false(db), rhs_offset),
-                interior.source_order(db) + rhs_offset,
+                self.iff_inner(db, interior.if_true(db), other_offset),
+                self.iff_inner(db, interior.if_false(db), other_offset),
+                interior.source_order(db) + other_offset,
             ),
             (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
                 db,
                 interior.constraint(db),
-                interior.if_true(db).iff_inner(db, other, rhs_offset),
-                interior.if_false(db).iff_inner(db, other, rhs_offset),
+                interior.if_true(db).iff_inner(db, other, other_offset),
+                interior.if_false(db).iff_inner(db, other, other_offset),
                 interior.source_order(db),
             ),
-            (Node::Interior(a), Node::Interior(b)) => a.iff(db, b, rhs_offset),
+            (Node::Interior(a), Node::Interior(b)) => a.iff(db, b, other_offset),
         }
     }
 
@@ -1758,7 +1797,15 @@ struct InteriorNode<'db> {
     constraint: ConstrainedTypeVar<'db>,
     if_true: Node<'db>,
     if_false: Node<'db>,
+
+    /// Represents the order in which this node's constraint was added to the containing constraint
+    /// set, relative to all of the other constraints in the set. This starts off at 1 for a simple
+    /// single-constraint set (e.g. created with [`Node::new_constraint`] or
+    /// [`Node::new_satisfied_constraint`]). It will get incremented, if needed, as that simple BDD
+    /// is combined into larger BDDs.
     source_order: usize,
+
+    /// The maximum `source_order` across this node and all of its descendants.
     max_source_order: usize,
 }
 
@@ -1779,39 +1826,40 @@ impl<'db> InteriorNode<'db> {
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn or(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Node<'db> {
+    fn or(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
         match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
-                self.if_true(db).or_inner(db, other.if_true(db), rhs_offset),
+                self.if_true(db)
+                    .or_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
-                    .or_inner(db, other.if_false(db), rhs_offset),
+                    .or_inner(db, other.if_false(db), other_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .or_inner(db, Node::Interior(other), rhs_offset),
+                    .or_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
-                    .or_inner(db, Node::Interior(other), rhs_offset),
+                    .or_inner(db, Node::Interior(other), other_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).or_inner(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).or_inner(db, other.if_false(db), rhs_offset),
-                other.source_order(db) + rhs_offset,
+                Node::Interior(self).or_inner(db, other.if_true(db), other_offset),
+                Node::Interior(self).or_inner(db, other.if_false(db), other_offset),
+                other.source_order(db) + other_offset,
             ),
         }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn and(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Node<'db> {
+    fn and(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
         match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
@@ -1819,32 +1867,32 @@ impl<'db> InteriorNode<'db> {
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .and_inner(db, other.if_true(db), rhs_offset),
+                    .and_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
-                    .and_inner(db, other.if_false(db), rhs_offset),
+                    .and_inner(db, other.if_false(db), other_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .and_inner(db, Node::Interior(other), rhs_offset),
+                    .and_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
-                    .and_inner(db, Node::Interior(other), rhs_offset),
+                    .and_inner(db, Node::Interior(other), other_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).and_inner(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).and_inner(db, other.if_false(db), rhs_offset),
-                other.source_order(db) + rhs_offset,
+                Node::Interior(self).and_inner(db, other.if_true(db), other_offset),
+                Node::Interior(self).and_inner(db, other.if_false(db), other_offset),
+                other.source_order(db) + other_offset,
             ),
         }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-    fn iff(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Node<'db> {
+    fn iff(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let other_constraint = other.constraint(db);
         match (self_constraint.ordering(db)).cmp(&other_constraint.ordering(db)) {
@@ -1852,26 +1900,26 @@ impl<'db> InteriorNode<'db> {
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .iff_inner(db, other.if_true(db), rhs_offset),
+                    .iff_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
-                    .iff_inner(db, other.if_false(db), rhs_offset),
+                    .iff_inner(db, other.if_false(db), other_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .iff_inner(db, Node::Interior(other), rhs_offset),
+                    .iff_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
-                    .iff_inner(db, Node::Interior(other), rhs_offset),
+                    .iff_inner(db, Node::Interior(other), other_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).iff_inner(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).iff_inner(db, other.if_false(db), rhs_offset),
-                other.source_order(db) + rhs_offset,
+                Node::Interior(self).iff_inner(db, other.if_true(db), other_offset),
+                Node::Interior(self).iff_inner(db, other.if_false(db), other_offset),
+                other.source_order(db) + other_offset,
             ),
         }
     }
