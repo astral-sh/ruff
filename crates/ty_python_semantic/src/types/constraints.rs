@@ -83,7 +83,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderSet};
+use crate::{Db, FxOrderMap};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -1023,10 +1023,11 @@ impl<'db> Node<'db> {
             Node::AlwaysFalse => {}
             Node::Interior(interior) => {
                 let constraint = interior.constraint(db);
-                path.walk_edge(db, map, constraint.when_true(), |path, _| {
+                let source_order = interior.source_order(db);
+                path.walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
                     interior.if_true(db).for_each_path_inner(db, f, map, path);
                 });
-                path.walk_edge(db, map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
                     interior.if_false(db).for_each_path_inner(db, f, map, path);
                 });
             }
@@ -1060,8 +1061,9 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
+                let source_order = interior.source_order(db);
                 let true_always_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
                         interior
                             .if_true(db)
                             .is_always_satisfied_inner(db, map, path)
@@ -1072,7 +1074,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
                     interior
                         .if_false(db)
                         .is_always_satisfied_inner(db, map, path)
@@ -1109,8 +1111,9 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
+                let source_order = interior.source_order(db);
                 let true_never_satisfied = path
-                    .walk_edge(db, map, constraint.when_true(), |path, _| {
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
                         interior.if_true(db).is_never_satisfied_inner(db, map, path)
                     })
                     .unwrap_or(true);
@@ -1119,7 +1122,7 @@ impl<'db> Node<'db> {
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(db, map, constraint.when_false(), |path, _| {
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
                     interior
                         .if_false(db)
                         .is_never_satisfied_inner(db, map, path)
@@ -2063,6 +2066,7 @@ impl<'db> InteriorNode<'db> {
         path: &mut PathAssignments<'db>,
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
+        let self_source_order = self.source_order(db);
         if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of its if_false/if_true edges. That is, the result is true if there's
@@ -2070,67 +2074,85 @@ impl<'db> InteriorNode<'db> {
             //
             // We also have to check if there are any derived facts that depend on the constraint
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
-            // corresponding branch. We currently reuse the `source_order` of the constraint being
-            // removed when we add these derived facts.
-            //
-            // TODO: This might not be stable enough, if we add more than one derived fact for this
-            // constraint. If we still see inconsistent test output, we might need a more complex
-            // way of tracking source order for derived facts.
-            let self_source_order = self.source_order(db);
+            // corresponding branch.
             let if_true = path
-                .walk_edge(db, map, self_constraint.when_true(), |path, new_range| {
-                    let branch = self
-                        .if_true(db)
-                        .abstract_one_inner(db, should_remove, map, path);
-                    path.assignments[new_range]
-                        .iter()
-                        .filter(|assignment| {
-                            // Don't add back any derived facts if they are ones that we would have
-                            // removed!
-                            !should_remove(assignment.constraint())
-                        })
-                        .fold(branch, |branch, assignment| {
-                            branch.and(
-                                db,
-                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
-                            )
-                        })
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_true(),
+                    self_source_order,
+                    |path, new_range| {
+                        let branch =
+                            self.if_true(db)
+                                .abstract_one_inner(db, should_remove, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    db,
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
+                                )
+                            })
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(db, map, self_constraint.when_false(), |path, new_range| {
-                    let branch = self
-                        .if_false(db)
-                        .abstract_one_inner(db, should_remove, map, path);
-                    path.assignments[new_range]
-                        .iter()
-                        .filter(|assignment| {
-                            // Don't add back any derived facts if they are ones that we would have
-                            // removed!
-                            !should_remove(assignment.constraint())
-                        })
-                        .fold(branch, |branch, assignment| {
-                            branch.and(
-                                db,
-                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
-                            )
-                        })
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_false(),
+                    self_source_order,
+                    |path, new_range| {
+                        let branch =
+                            self.if_false(db)
+                                .abstract_one_inner(db, should_remove, map, path);
+                        path.assignments[new_range]
+                            .iter()
+                            .filter(|(assignment, _)| {
+                                // Don't add back any derived facts if they are ones that we would have
+                                // removed!
+                                !should_remove(assignment.constraint())
+                            })
+                            .fold(branch, |branch, (assignment, source_order)| {
+                                branch.and(
+                                    db,
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
+                                )
+                            })
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             if_true.or(db, if_false)
         } else {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
-                .walk_edge(db, map, self_constraint.when_true(), |path, _| {
-                    self.if_true(db)
-                        .abstract_one_inner(db, should_remove, map, path)
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_true(),
+                    self_source_order,
+                    |path, _| {
+                        self.if_true(db)
+                            .abstract_one_inner(db, should_remove, map, path)
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
-                .walk_edge(db, map, self_constraint.when_false(), |path, _| {
-                    self.if_false(db)
-                        .abstract_one_inner(db, should_remove, map, path)
-                })
+                .walk_edge(
+                    db,
+                    map,
+                    self_constraint.when_false(),
+                    self_source_order,
+                    |path, _| {
+                        self.if_false(db)
+                            .abstract_one_inner(db, should_remove, map, path)
+                    },
+                )
                 .unwrap_or(Node::AlwaysFalse);
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
@@ -3264,7 +3286,7 @@ impl<'db> SequentMap<'db> {
 /// traversing a BDD.
 #[derive(Debug, Default)]
 pub(crate) struct PathAssignments<'db> {
-    assignments: FxOrderSet<ConstraintAssignment<'db>>,
+    assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
 }
 
 impl<'db> PathAssignments<'db> {
@@ -3295,6 +3317,7 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
+        source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
         // Record a snapshot of the assignments that we already knew held — both so that we can
@@ -3307,12 +3330,12 @@ impl<'db> PathAssignments<'db> {
             target: "ty_python_semantic::types::constraints::PathAssignment",
             before = %format_args!(
                 "[{}]",
-                self.assignments[..start].iter().map(|assignment| assignment.display(db)).format(", "),
+                self.assignments[..start].iter().map(|(assignment, _)| assignment.display(db)).format(", "),
             ),
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, map, assignment);
+        let found_conflict = self.add_assignment(db, map, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3327,7 +3350,7 @@ impl<'db> PathAssignments<'db> {
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 new = %format_args!(
                     "[{}]",
-                    self.assignments[start..].iter().map(|assignment| assignment.display(db)).format(", "),
+                    self.assignments[start..].iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                 ),
                 "new assignments",
             );
@@ -3343,17 +3366,17 @@ impl<'db> PathAssignments<'db> {
 
     pub(crate) fn positive_constraints(
         &self,
-    ) -> impl Iterator<Item = ConstrainedTypeVar<'db>> + '_ {
+    ) -> impl Iterator<Item = (ConstrainedTypeVar<'db>, usize)> + '_ {
         self.assignments
             .iter()
-            .filter_map(|assignment| match assignment {
-                ConstraintAssignment::Positive(constraint) => Some(*constraint),
+            .filter_map(|(assignment, source_order)| match assignment {
+                ConstraintAssignment::Positive(constraint) => Some((*constraint, *source_order)),
                 ConstraintAssignment::Negative(_) => None,
             })
     }
 
     fn assignment_holds(&self, assignment: ConstraintAssignment<'db>) -> bool {
-        self.assignments.contains(&assignment)
+        self.assignments.contains_key(&assignment)
     }
 
     /// Adds a new assignment, along with any derived information that we can infer from the new
@@ -3364,26 +3387,34 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
+        source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
         // First add this assignment. If it causes a conflict, return that as an error. If we've
         // already know this assignment holds, just return.
-        if self.assignments.contains(&assignment.negated()) {
+        if self.assignments.contains_key(&assignment.negated()) {
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::PathAssignment",
                 assignment = %assignment.display(db),
                 facts = %format_args!(
                     "[{}]",
-                    self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                    self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                 ),
                 "found contradiction",
             );
             return Err(PathAssignmentConflict);
         }
-        if !self.assignments.insert(assignment) {
+        if self.assignments.insert(assignment, source_order).is_some() {
             return Ok(());
         }
 
-        // Then use our sequents to add additional facts that we know to be true.
+        // Then use our sequents to add additional facts that we know to be true. We currently
+        // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add
+        // these derived facts.
+        //
+        // TODO: This might not be stable enough, if we add more than one derived fact for this
+        // constraint. If we still see inconsistent test output, we might need a more complex
+        // way of tracking source order for derived facts.
+        //
         // TODO: This is very naive at the moment, partly for expediency, and partly because we
         // don't anticipate the sequent maps to be very large. We might consider avoiding the
         // brute-force search.
@@ -3397,7 +3428,7 @@ impl<'db> PathAssignments<'db> {
                     ante = %ante.display(db),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                        self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                     ),
                     "found contradiction",
                 );
@@ -3416,7 +3447,7 @@ impl<'db> PathAssignments<'db> {
                     ante2 = %ante2.display(db),
                     facts = %format_args!(
                         "[{}]",
-                        self.assignments.iter().map(|assignment| assignment.display(db)).format(", "),
+                        self.assignments.iter().map(|(assignment, _)| assignment.display(db)).format(", "),
                     ),
                     "found contradiction",
                 );
@@ -3429,7 +3460,7 @@ impl<'db> PathAssignments<'db> {
                 if self.assignment_holds(ante1.when_true())
                     && self.assignment_holds(ante2.when_true())
                 {
-                    self.add_assignment(db, map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
@@ -3437,7 +3468,7 @@ impl<'db> PathAssignments<'db> {
         for (ante, posts) in &map.single_implications {
             for post in posts {
                 if self.assignment_holds(ante.when_true()) {
-                    self.add_assignment(db, map, post.when_true())?;
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
