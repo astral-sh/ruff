@@ -420,16 +420,6 @@ impl<'db> Completion<'db> {
         let Some(ty) = self.ty else { return false };
         ty.is_notimplemented(db)
     }
-
-    /// Returns true when this completion returns to an
-    /// expression that *may* be iterable.
-    fn is_possibly_iterable(&self) -> bool {
-        let Some(kind) = self.kind else { return true };
-        if kind != CompletionKind::Keyword {
-            return true;
-        }
-        matches!(self.name.as_str(), "await" | "lambda" | "yield")
-    }
 }
 
 /// The "kind" of a completion.
@@ -553,9 +543,7 @@ impl<'m> Context<'m> {
                         )
                     }),
                     is_raising_exception,
-                    is_specifying_for_statement_iterable: self
-                        .cursor
-                        .is_specifying_for_statement_iterable(),
+                    valid_keywords: self.cursor.valid_keywords(),
                 }
             }
         }
@@ -775,17 +763,180 @@ impl<'m> ContextCursor<'m> {
         false
     }
 
+    /// Returns a set of keywords that are valid at
+    /// the current cursor position.
+    ///
+    /// Returns None if no context-based exclusions can
+    /// be identified. Meaning that all keywords are valid.
+    fn valid_keywords(&self) -> Option<FxHashSet<&'static str>> {
+        if self.is_in_decorator_expression() {
+            return Some(FxHashSet::from_iter(["lambda"]));
+        }
+        self.covering_node(self.range).ancestors().find_map(|node| {
+            self.is_in_for_statement_iterable(node)
+                .then(|| FxHashSet::from_iter(["yield", "lambda", "await"]))
+                .or_else(|| {
+                    self.is_expecting_expression(node).then(|| {
+                        FxHashSet::from_iter([
+                            "await", "lambda", "yield", "for", "if", "else", "and", "or", "not",
+                            "in", "is", "True", "False", "None",
+                        ])
+                    })
+                })
+        })
+    }
+
+    /// Returns true if the cursor is after an `@` token
+    /// that corresponds to a decorator declaration
+    ///
+    /// `@` can also be used as an operator, this distinguishes
+    /// between the two usages and only looks for the decorator case.
+    fn is_in_decorator_expression(&self) -> bool {
+        const LIMIT: usize = 10;
+        enum S {
+            Start,
+            At,
+        }
+        let mut state = S::Start;
+        for token in self.tokens_before.iter().rev().take(LIMIT) {
+            // Matches lines that starts with `@` as
+            // heuristic for decorators. When decorators
+            // are constructed they are often not identified
+            // as decorators yet by the AST, hence we use
+            // token matching for the decorator case.
+            //
+            // As the grammar also allows @ to be used as an operator,
+            // we want to distinguish between whether it looks
+            // like it's being used as an operator or a
+            // decorator.
+            //
+            // TODO: This doesn't handle decorators
+            // that start at the very top of the file.
+            state = match (state, token.kind()) {
+                (S::Start, TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent) => break,
+                (S::Start, TokenKind::At) => S::At,
+                (S::Start, _) => S::Start,
+                (
+                    S::At,
+                    TokenKind::Newline
+                    | TokenKind::NonLogicalNewline
+                    | TokenKind::Indent
+                    | TokenKind::Dedent,
+                ) => {
+                    return true;
+                }
+                _ => break,
+            }
+        }
+        false
+    }
+
+    /// Returns true when only an expression is valid after the cursor
+    /// according to the python grammar.
+    ///
+    /// `node` should be the smallest AST node fully covering the
+    /// typed text.
+    fn is_expecting_expression(&self, node: ast::AnyNodeRef) -> bool {
+        let contains = |expr: &ast::Expr| expr.range().contains_range(self.range);
+
+        match node {
+            // All checks here are intended to find cases where
+            // the python grammar disallows anything but expressions.
+
+            // if_stmt := 'if' named_expression ':' block elif_stmt
+            ast::AnyNodeRef::StmtIf(stmt) => {
+                contains(&stmt.test)
+                    || stmt
+                        .elif_else_clauses
+                        .iter()
+                        .any(|clause| clause.test.as_ref().is_some_and(contains))
+            }
+            // while_stmt := 'while' named_expression ':' block [else_block]
+            ast::AnyNodeRef::StmtWhile(stmt) => contains(&stmt.test),
+
+            // for_stmt := 'for' star_targets 'in' ~ star_expressions ':' [TYPE_COMMENT] block [else_block]
+            ast::AnyNodeRef::StmtFor(stmt) => contains(&stmt.iter),
+            // with_item := expression
+            ast::AnyNodeRef::StmtWith(stmt) => {
+                stmt.items.iter().any(|item| contains(&item.context_expr))
+            }
+            // match_stmt := "match" subject_expr ':' NEWLINE INDENT case_block+ DEDENT
+            ast::AnyNodeRef::StmtMatch(stmt) => contains(&stmt.subject),
+            // case_guard := 'if' named_expression
+            ast::AnyNodeRef::MatchCase(case) => {
+                case.guard.as_deref().is_some_and(contains)
+                    || case.pattern.range().contains_range(self.range)
+            }
+            // assert_stmt := 'assert' expression [',' expression ]
+            ast::AnyNodeRef::StmtAssert(stmt) => {
+                contains(&stmt.test) || stmt.msg.as_deref().is_some_and(contains)
+            }
+            // raise_stmt := 'raise' expression ['from' expression ]
+            ast::AnyNodeRef::StmtRaise(stmt) => {
+                stmt.exc.as_deref().is_some_and(contains)
+                    || stmt.cause.as_deref().is_some_and(contains)
+            }
+            // return_stmt := 'return' [star_expressions]
+            ast::AnyNodeRef::StmtReturn(stmt) => stmt.value.as_deref().is_some_and(contains),
+
+            ast::AnyNodeRef::StmtAssign(stmt) => contains(&stmt.value),
+            ast::AnyNodeRef::StmtAugAssign(stmt) => contains(&stmt.value),
+            ast::AnyNodeRef::StmtAnnAssign(stmt) => {
+                contains(&stmt.annotation) || stmt.value.as_deref().is_some_and(contains)
+            }
+            // type_alias := "type" NAME [type_params] '=' expression
+            ast::AnyNodeRef::StmtTypeAlias(stmt) => contains(&stmt.value),
+            // except_clause := 'except' expression ':' block
+            ast::AnyNodeRef::ExceptHandlerExceptHandler(handler) => {
+                handler.type_.as_deref().is_some_and(contains)
+            }
+
+            ast::AnyNodeRef::ExprList(expr) => expr.elts.iter().any(contains),
+            ast::AnyNodeRef::ExprTuple(expr) => expr.elts.iter().any(contains),
+            ast::AnyNodeRef::ExprSet(expr) => expr.elts.iter().any(contains),
+            ast::AnyNodeRef::ExprDict(expr) => expr
+                .items
+                .iter()
+                .any(|item| item.range().contains_range(self.range)),
+
+            // with_item := expression
+            ast::AnyNodeRef::WithItem(item) => contains(&item.context_expr),
+
+            // lambdef := 'lambda' [lambda_params] ':' expression
+            ast::AnyNodeRef::ExprLambda(expr) => contains(&expr.body),
+
+            // arguments := (positional arguments | keyword arguments | "*" expression | "**" expression)*
+            ast::AnyNodeRef::Arguments(args) => {
+                args.args.iter().any(contains) || args.keywords.iter().any(|kw| contains(&kw.value))
+            }
+            ast::AnyNodeRef::Parameter(param) => param.annotation.as_deref().is_some_and(contains),
+            ast::AnyNodeRef::ParameterWithDefault(param) => {
+                param.default.as_deref().is_some_and(contains)
+            }
+            _ => false,
+        }
+    }
+
     /// Returns true when the cursor is after the `in` keyword in a
     /// `for x in <CURSOR>` statement.
-    fn is_specifying_for_statement_iterable(&self) -> bool {
-        let covering = self.covering_node(self.range);
-        covering.parent().is_some_and(|node| {
-            matches!(
-               node,
-               ast::AnyNodeRef::StmtFor(stmt_for)
-                   if stmt_for.iter.range().contains_range(self.range),
-            )
-        })
+    ///
+    /// `node` should be the smallest AST node fully covering the
+    /// typed text.
+    fn is_in_for_statement_iterable(&self, node: AnyNodeRef) -> bool {
+        match node {
+            ast::AnyNodeRef::StmtFor(stmt_for) => stmt_for.iter.range().contains_range(self.range),
+            // Detects `for x in <CURSOR>` statements inside comprehensions.
+            // E.g. `[for x in <CURSOR>]`
+            ast::AnyNodeRef::Comprehension(comprehension) => {
+                comprehension.target.range().contains_range(self.range)
+                    || comprehension.iter.range().contains_range(self.range)
+                    || comprehension
+                        .ifs
+                        .iter()
+                        .any(|expr| expr.range().contains_range(self.range))
+            }
+            _ => false,
+        }
     }
 }
 
@@ -800,8 +951,9 @@ struct CollectionContext<'db> {
     raisable_ty: Option<Type<'db>>,
     /// Whether we're in a `raise <EXPR>` context or not.
     is_raising_exception: bool,
-    /// Whether we're in a `for ... in <EXPR>` context or not.
-    is_specifying_for_statement_iterable: bool,
+    /// When set, the context dictates that only *these* keywords
+    /// are acceptable in this context.
+    valid_keywords: Option<FxHashSet<&'static str>>,
 }
 
 impl<'db> CollectionContext<'db> {
@@ -822,8 +974,10 @@ impl<'db> CollectionContext<'db> {
         if self.is_raising_exception && c.is_notimplemented(db) {
             return true;
         }
-        if self.is_specifying_for_statement_iterable && !c.is_possibly_iterable() {
-            return true;
+        if c.kind == Some(CompletionKind::Keyword)
+            && let Some(ref valid_keywords) = self.valid_keywords
+        {
+            return !valid_keywords.contains(c.name.as_str());
         }
         false
     }
@@ -6094,7 +6248,36 @@ def foo(param: s<CURSOR>)
     }
 
     #[test]
-    fn no_statement_keywords_in_for_statement_simple1() {
+    fn no_statement_keywords_in_if_condition() {
+        completion_test_builder(
+            "\
+if a<CURSOR>:
+    pass
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_while() {
+        completion_test_builder(
+            "\
+while a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn iterable_only_keywords_in_for_statement_simple1() {
         completion_test_builder(
             "\
 for x in a<CURSOR>
@@ -6108,7 +6291,7 @@ for x in a<CURSOR>
     }
 
     #[test]
-    fn no_statement_keywords_in_for_statement_simple2() {
+    fn iterable_only_keywords_in_for_statement_simple2() {
         completion_test_builder(
             "\
 for x, y, _ in a<CURSOR>
@@ -6122,7 +6305,7 @@ for x, y, _ in a<CURSOR>
     }
 
     #[test]
-    fn no_statement_keywords_in_for_statement_simple3() {
+    fn iterable_only_keywords_in_for_statement_simple3() {
         completion_test_builder(
             "\
 for i, (x, y, z) in a<CURSOR>
@@ -6136,7 +6319,7 @@ for i, (x, y, z) in a<CURSOR>
     }
 
     #[test]
-    fn no_statement_keywords_in_for_statement_complex() {
+    fn iterable_only_keywords_in_for_statement_complex() {
         completion_test_builder(
             "\
 for i, (obj.x, (a[0], b['k']), _), *rest in a<CURSOR>
@@ -6147,6 +6330,403 @@ for i, (obj.x, (a[0], b['k']), _), *rest in a<CURSOR>
         .contains("await")
         .not_contains("raise")
         .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_match_subject() {
+        completion_test_builder(
+            "\
+match a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_match_case() {
+        completion_test_builder(
+            "\
+match m:
+    case a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_match_guard() {
+        completion_test_builder(
+            "\
+match m:
+    case foo if a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_assert() {
+        completion_test_builder(
+            "\
+assert a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_raise() {
+        completion_test_builder(
+            "\
+raise a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_return() {
+        completion_test_builder(
+            "\
+return a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_assign() {
+        completion_test_builder(
+            "\
+foo = a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_augassign() {
+        completion_test_builder(
+            "\
+foo = 'bar'
+foo += a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_annotated_assign() {
+        completion_test_builder(
+            "\
+foo: str = a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_type_alias() {
+        completion_test_builder(
+            "\
+type foo = a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_except_handler() {
+        completion_test_builder(
+            "\
+try:
+    a + 1
+except a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_list_literal() {
+        completion_test_builder(
+            "\
+[a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_tuple_literal() {
+        completion_test_builder(
+            "\
+(a<CURSOR>,
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_set_literal() {
+        completion_test_builder(
+            "\
+{a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_dict_literal() {
+        completion_test_builder(
+            "\
+{a<CURSOR>: 1
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    // TODO: Suggesting False doesn't make much sense here.
+    #[test]
+    fn no_statement_keywords_in_with() {
+        completion_test_builder(
+            "\
+with a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_lambda() {
+        completion_test_builder(
+            "\
+lambda foo: a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_arguments() {
+        completion_test_builder(
+            "\
+def foo(bar): ...
+foo(a<CURSOR>)
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_keyword_arguments() {
+        completion_test_builder(
+            "\
+def foo(*, bar): ...
+foo(bar=a<CURSOR>)
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_starred_args_parameter_annotation() {
+        completion_test_builder(
+            "\
+def foo(*args: a<CURSOR>): ...
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_parameter_default() {
+        completion_test_builder(
+            "\
+def foo(bar: str = a<CURSOR>): ...
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    // FIXME: Should not contain False as we're expecting an iterable
+    // or a container.
+    #[test]
+    fn no_statement_keywords_in_if_x_in() {
+        completion_test_builder(
+            "\
+if x in a<CURSOR>:
+    pass
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("False")
+        .not_contains("raise");
+    }
+
+    // TODO: This should not contain raise.
+    // `is_in_decorator_expression` currently doesn't
+    // detect decorators that start at the top of the file.
+    #[test]
+    fn only_lambda_keyword_in_decorator_top_of_file() {
+        completion_test_builder(
+            "\
+@a<CURSOR>
+def func(): ...
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("raise");
+    }
+
+    #[test]
+    fn only_lambda_keyword_in_decorator() {
+        completion_test_builder(
+            "\
+foo = 123
+
+@a<CURSOR>
+def func():
+    ...
+",
+        )
+        .build()
+        .contains("lambda")
+        .not_contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn statement_keywords_in_if_body() {
+        completion_test_builder(
+            "\
+foo = 123
+if foo:
+    a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .contains("raise")
+        .contains("False");
+    }
+
+    #[test]
+    fn iterable_only_in_list_comprehension() {
+        completion_test_builder(
+            "\
+[x for x in a<CURSOR>]
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("False")
+        .not_contains("raise");
+    }
+
+    #[test]
+    fn iterable_only_in_generator() {
+        completion_test_builder(
+            "\
+(x for x in a<CURSOR>)
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("False")
+        .not_contains("raise");
     }
 
     #[test]

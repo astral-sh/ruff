@@ -15,7 +15,7 @@ import-deprioritizes-type_check_only,main.py,3,2
 import-deprioritizes-type_check_only,main.py,4,3
 import-keyword-completion,main.py,0,1
 internal-typeshed-hidden,main.py,0,2
-none-completion,main.py,0,2
+none-completion,main.py,0,1
 numpy-array,main.py,0,159
 numpy-array,main.py,1,1
 object-attr-instance-methods,main.py,0,1
