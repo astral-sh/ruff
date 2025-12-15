@@ -124,6 +124,11 @@ fn get_call_expr(
         })?;
 
     // Find the covering node at the given position that is a function call.
+    // Note that we are okay with the range being anywhere within a call
+    // expression, even if it's not in the arguments portion of the call
+    // expression. This is because, e.g., a user can request signature
+    // information at a call site, and this should ideally work anywhere
+    // within the call site, even at the function name.
     let call = covering_node(root_node, token.range())
         .find_first(|node| {
             if !node.is_expr_call() {
