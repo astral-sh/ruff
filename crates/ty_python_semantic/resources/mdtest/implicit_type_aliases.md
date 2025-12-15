@@ -400,7 +400,7 @@ reveal_type(ListOrTuple)  # revealed: <types.UnionType special form 'list[T@List
 reveal_type(ListOrTupleLegacy)
 reveal_type(MyCallable)  # revealed: <typing.Callable special form '(**P@MyCallable) -> T@MyCallable'>
 reveal_type(AnnotatedType)  # revealed: <special form 'typing.Annotated[T@AnnotatedType, <metadata>]'>
-reveal_type(TransparentAlias)  # revealed: typing.TypeVar
+reveal_type(TransparentAlias)  # revealed: TypeVar
 reveal_type(MyOptional)  # revealed: <types.UnionType special form 'T@MyOptional | None'>
 
 def _(

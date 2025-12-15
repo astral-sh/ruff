@@ -690,6 +690,12 @@ bitflags! {
     }
 }
 
+impl DataclassFlags {
+    pub(crate) const fn is_frozen(self) -> bool {
+        self.contains(Self::FROZEN)
+    }
+}
+
 pub(crate) const DATACLASS_FLAGS: &[(&str, DataclassFlags)] = &[
     ("init", DataclassFlags::INIT),
     ("repr", DataclassFlags::REPR),

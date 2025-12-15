@@ -6635,26 +6635,9 @@ mod tests {
 
         assert_snapshot!(test.inlay_hints(), @r"
         from typing import Protocol, TypeVar
-        T[: typing.TypeVar] = TypeVar([name=]'T')
+        T = TypeVar([name=]'T')
         Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
         ---------------------------------------------
-        info[inlay-hint-location]: Inlay Hint Target
-         --> main.py:3:1
-          |
-        2 | from typing import Protocol, TypeVar
-        3 | T = TypeVar('T')
-          | ^
-        4 | Strange = Protocol[T]
-          |
-        info: Source
-         --> main2.py:3:5
-          |
-        2 | from typing import Protocol, TypeVar
-        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
-          |     ^^^^^^^^^^^^^^
-        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
-          |
-
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:276:13
             |
@@ -6666,11 +6649,11 @@ mod tests {
         278 |             bound: Any | None = None,  # AnnotationForm
             |
         info: Source
-         --> main2.py:3:32
+         --> main2.py:3:14
           |
         2 | from typing import Protocol, TypeVar
-        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
-          |                                ^^^^
+        3 | T = TypeVar([name=]'T')
+          |              ^^^^
         4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
           |
 
@@ -6687,7 +6670,7 @@ mod tests {
          --> main2.py:4:26
           |
         2 | from typing import Protocol, TypeVar
-        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+        3 | T = TypeVar([name=]'T')
         4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
           |                          ^^^^^^^^^^^^^^^
           |
@@ -6704,18 +6687,124 @@ mod tests {
          --> main2.py:4:42
           |
         2 | from typing import Protocol, TypeVar
-        3 | T[: typing.TypeVar] = TypeVar([name=]'T')
+        3 | T = TypeVar([name=]'T')
         4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
+        ");
+    }
 
+    #[test]
+    fn test_paramspec_creation_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from typing import ParamSpec
+        P = ParamSpec('P')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing import ParamSpec
+        P = ParamSpec([name=]'P')
         ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:552:17
+            |
+        550 |             def __new__(
+        551 |                 cls,
+        552 |                 name: str,
+            |                 ^^^^
+        553 |                 *,
+        554 |                 bound: Any | None = None,  # AnnotationForm
+            |
         info: Source
+         --> main2.py:3:16
+          |
+        2 | from typing import ParamSpec
+        3 | P = ParamSpec([name=]'P')
+          |                ^^^^
+          |
+        ");
+    }
 
-        from typing import Protocol, TypeVar
-        T: typing.TypeVar = TypeVar('T')
-        Strange = Protocol[T]
+    #[test]
+    fn test_typealiastype_creation_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from typing_extensions import TypeAliasType
+        A = TypeAliasType('A', str)",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from typing_extensions import TypeAliasType
+        A = TypeAliasType([name=]'A', [value=]str)
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/typing.pyi:2032:26
+             |
+        2030 |         """
+        2031 |
+        2032 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+             |                          ^^^^
+        2033 |         @property
+        2034 |         def __value__(self) -> Any: ...  # AnnotationForm
+             |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | from typing_extensions import TypeAliasType
+        3 | A = TypeAliasType([name=]'A', [value=]str)
+          |                    ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/typing.pyi:2032:37
+             |
+        2030 |         """
+        2031 |
+        2032 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+             |                                     ^^^^^
+        2033 |         @property
+        2034 |         def __value__(self) -> Any: ...  # AnnotationForm
+             |
+        info: Source
+         --> main2.py:3:32
+          |
+        2 | from typing_extensions import TypeAliasType
+        3 | A = TypeAliasType([name=]'A', [value=]str)
+          |                                ^^^^^
+          |
+        "#);
+    }
+
+    #[test]
+    fn test_typevartuple_creation_inlay_hint() {
+        let mut test = inlay_hint_test(
+            "
+        from typing_extensions import TypeVarTuple
+        Ts = TypeVarTuple('Ts')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from typing_extensions import TypeVarTuple
+        Ts = TypeVarTuple([name=]'Ts')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:412:30
+            |
+        410 |             def has_default(self) -> bool: ...
+        411 |         if sys.version_info >= (3, 13):
+        412 |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
+            |                              ^^^^
+        413 |         elif sys.version_info >= (3, 12):
+        414 |             def __new__(cls, name: str) -> Self: ...
+            |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | from typing_extensions import TypeVarTuple
+        3 | Ts = TypeVarTuple([name=]'Ts')
+          |                    ^^^^
+          |
         ");
     }
 

@@ -12,6 +12,10 @@ license = { workspace = true }
 
 [lib]
 
+[[test]]
+name = "fixtures"
+harness = false
+
 [dependencies]
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_trivia = { workspace = true }
@@ -34,7 +38,8 @@ ruff_python_ast = { workspace = true, features = ["serde"] }
 ruff_source_file = { workspace = true }
 
 anyhow = { workspace = true }
-insta = { workspace = true, features = ["glob"] }
+datatest-stable = { workspace = true }
+insta = { workspace = true }
 itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
