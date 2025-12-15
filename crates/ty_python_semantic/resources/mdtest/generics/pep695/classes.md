@@ -800,6 +800,29 @@ def func(x: D): ...
 func(G())  # error: [invalid-argument-type]
 ```
 
+### Self-referential protocol with different specialization
+
+This is a minimal reproduction for [ty#1874](https://github.com/astral-sh/ty/issues/1874).
+
+```py
+from __future__ import annotations
+from typing import Protocol
+from ty_extensions import generic_context
+
+class A[S, R](Protocol):
+    def get(self, s: S) -> R: ...
+    def set(self, s: S, r: R) -> S: ...
+    def merge[R2](self, other: A[S, R2]) -> A[S, tuple[R, R2]]: ...
+
+class Impl[S, R](A[S, R]):
+    def foo(self, s: S) -> S:
+        return self.set(s, self.get(s))
+
+reveal_type(generic_context(A.get))  # revealed: ty_extensions.GenericContext[Self@get]
+reveal_type(generic_context(A.merge))  # revealed: ty_extensions.GenericContext[Self@merge, R2@merge]
+reveal_type(generic_context(Impl.foo))  # revealed: ty_extensions.GenericContext[Self@foo]
+```
+
 ## Tuple as a PEP-695 generic class
 
 Our special handling for `tuple` does not break if `tuple` is defined as a PEP-695 generic class in

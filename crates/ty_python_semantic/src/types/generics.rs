@@ -23,7 +23,7 @@ use crate::types::{
     KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor, Signature, Type,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
-    walk_bound_type_var_type,
+    walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -290,6 +290,18 @@ impl<'db> GenericContext<'db> {
         )
     }
 
+    /// Returns the typevars that are inferable in this generic context. This set might include
+    /// more typevars than the ones directly bound by the generic context. For instance, consider a
+    /// method of a generic class:
+    ///
+    /// ```py
+    /// class C[A]:
+    ///     def method[T](self, t: T):
+    /// ```
+    ///
+    /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
+    /// also includes `A@C`. This is needed because at each call site, we need to infer the
+    /// specialized class instance type whose method is being invoked.
     pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
@@ -299,7 +311,7 @@ impl<'db> GenericContext<'db> {
 
         impl<'db> TypeVisitor<'db> for CollectTypeVars<'db> {
             fn should_visit_lazy_type_attributes(&self) -> bool {
-                true
+                false
             }
 
             fn visit_bound_type_var_type(
@@ -310,7 +322,10 @@ impl<'db> GenericContext<'db> {
                 self.typevars
                     .borrow_mut()
                     .insert(bound_typevar.identity(db));
-                walk_bound_type_var_type(db, bound_typevar, self);
+                let typevar = bound_typevar.typevar(db);
+                if let Some(bound_or_constraints) = typevar.bound_or_constraints(db) {
+                    walk_type_var_bounds(db, bound_or_constraints, self);
+                }
             }
 
             fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
