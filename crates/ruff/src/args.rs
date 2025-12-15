@@ -10,7 +10,7 @@ use anyhow::bail;
 use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::builder::{TypedValueParser, ValueParserFactory};
-use clap::{Parser, Subcommand, command};
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 use itertools::Itertools;
 use path_absolutize::path_dedot;

@@ -418,6 +418,18 @@ Using the `@abstractmethod` decorator requires that the class's metaclass is `AB
 from it.
 
 ```py
+from abc import ABCMeta
+
+class CustomAbstractMetaclass(ABCMeta): ...
+
+class Fine(metaclass=CustomAbstractMetaclass):
+    @overload
+    @abstractmethod
+    def f(self, x: int) -> int: ...
+    @overload
+    @abstractmethod
+    def f(self, x: str) -> str: ...
+
 class Foo:
     @overload
     @abstractmethod
@@ -446,6 +458,52 @@ class PartialFoo(ABC):
     @abstractmethod
     # error: [invalid-overload]
     def f(self, x: str) -> str: ...
+```
+
+#### `TYPE_CHECKING` blocks
+
+As in other areas of ty, we treat `TYPE_CHECKING` blocks the same as "inline stub files", so we
+permit overloaded functions to exist without an implementation if all overloads are defined inside
+an `if TYPE_CHECKING` block:
+
+```py
+from typing import overload, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    @overload
+    def a() -> str: ...
+    @overload
+    def a(x: int) -> int: ...
+
+    class F:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+class G:
+    if TYPE_CHECKING:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b() -> str: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b(x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def c() -> None: ...
+
+# not all overloads are in a `TYPE_CHECKING` block, so this is an error
+@overload
+# error: [invalid-overload]
+def c(x: int) -> int: ...
 ```
 
 ### `@overload`-decorated functions with non-stub bodies

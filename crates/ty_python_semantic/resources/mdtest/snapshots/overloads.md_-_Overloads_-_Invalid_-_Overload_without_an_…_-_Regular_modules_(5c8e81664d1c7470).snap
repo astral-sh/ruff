@@ -42,7 +42,11 @@ error[invalid-overload]: Overloads for function `func` must be followed by a non
 9 | class Foo:
   |
 info: Attempting to call `func` will raise `TypeError` at runtime
-info: Overloaded functions without implementations are only permitted in stub files, on protocols, or for abstract methods
+info: Overloaded functions without implementations are only permitted:
+info:  - in stub files
+info:  - in `if TYPE_CHECKING` blocks
+info:  - as methods on protocol classes
+info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
 info: rule `invalid-overload` is enabled by default
 
@@ -58,7 +62,11 @@ error[invalid-overload]: Overloads for function `method` must be followed by a n
    |         ^^^^^^
    |
 info: Attempting to call `method` will raise `TypeError` at runtime
-info: Overloaded functions without implementations are only permitted in stub files, on protocols, or for abstract methods
+info: Overloaded functions without implementations are only permitted:
+info:  - in stub files
+info:  - in `if TYPE_CHECKING` blocks
+info:  - as methods on protocol classes
+info:  - or as `@abstractmethod`-decorated methods on abstract classes
 info: See https://docs.python.org/3/library/typing.html#typing.overload for more details
 info: rule `invalid-overload` is enabled by default
 

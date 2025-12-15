@@ -27,7 +27,6 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
