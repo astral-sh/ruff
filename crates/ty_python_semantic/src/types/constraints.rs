@@ -1409,7 +1409,7 @@ impl<'db> Node<'db> {
                 // We've been tracking the lower and upper bound that the types for this path must
                 // satisfy. Pass those bounds along and let the caller choose a representative type
                 // from within that range.
-                f(Some(&current_bounds));
+                f(Some(current_bounds));
             }
 
             Node::AlwaysFalse => {
