@@ -564,7 +564,7 @@ from typing_extensions import overload, Generic, TypeVar
 from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
-U = TypeVar("U")
+U = TypeVar("U", covariant=True)
 
 class C(Generic[T]):
     @overload
@@ -614,9 +614,9 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_callable(D)))
 
-reveal_type(D("string"))  # revealed: D[str, str]
-reveal_type(D(1))  # revealed: D[str, int]
-reveal_type(D(1, "string"))  # revealed: D[int, str]
+reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
+reveal_type(D(1))  # revealed: D[str, Literal[1]]
+reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses

@@ -541,6 +541,10 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
 class D[T, U]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
@@ -554,7 +558,7 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
-reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
+reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses
