@@ -1744,7 +1744,13 @@ impl<'db> Node<'db> {
                     Node::AlwaysTrue => write!(f, "always"),
                     Node::AlwaysFalse => write!(f, "never"),
                     Node::Interior(interior) => {
-                        interior.constraint(self.db).display(self.db).fmt(f)?;
+                        write!(
+                            f,
+                            "{} {}/{}",
+                            interior.constraint(self.db).display(self.db),
+                            interior.source_order(self.db),
+                            interior.max_source_order(self.db),
+                        )?;
                         // Calling display_graph recursively here causes rustc to claim that the
                         // expect(unused) up above is unfulfilled!
                         write!(
@@ -3797,28 +3803,28 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (T = str)
-            ┡━₁ (T = bool)
-            │   ┡━₁ (U = str)
-            │   │   ┡━₁ (U = bool)
+            (T = str) 3/4
+            ┡━₁ (T = bool) 4/4
+            │   ┡━₁ (U = str) 1/2
+            │   │   ┡━₁ (U = bool) 2/2
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (U = bool)
+            │   │   └─₀ (U = bool) 2/2
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (U = str)
-            │       ┡━₁ (U = bool)
+            │   └─₀ (U = str) 1/2
+            │       ┡━₁ (U = bool) 2/2
             │       │   ┡━₁ always
             │       │   └─₀ always
-            │       └─₀ (U = bool)
+            │       └─₀ (U = bool) 2/2
             │           ┡━₁ always
             │           └─₀ never
-            └─₀ (T = bool)
-                ┡━₁ (U = str)
-                │   ┡━₁ (U = bool)
+            └─₀ (T = bool) 4/4
+                ┡━₁ (U = str) 1/2
+                │   ┡━₁ (U = bool) 2/2
                 │   │   ┡━₁ always
                 │   │   └─₀ always
-                │   └─₀ (U = bool)
+                │   └─₀ (U = bool) 2/2
                 │       ┡━₁ always
                 │       └─₀ never
                 └─₀ never
@@ -3834,7 +3840,9 @@ mod tests {
         let t_bool = ConstraintSet::range(&db, bool_type, t, bool_type);
         let u_str = ConstraintSet::range(&db, str_type, u, str_type);
         let u_bool = ConstraintSet::range(&db, bool_type, u, bool_type);
-        let constraints = (t_str.or(&db, || t_bool)).and(&db, || u_str.or(&db, || u_bool));
+        // Construct this in a different order than above to make the source_orders more
+        // interesting.
+        let constraints = (u_str.or(&db, || u_bool)).and(&db, || t_str.or(&db, || t_bool));
         let actual = constraints.node.display_graph(&db, &"").to_string();
         assert_eq!(actual, expected);
     }
