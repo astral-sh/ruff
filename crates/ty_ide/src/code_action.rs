@@ -83,6 +83,7 @@ mod tests {
         system::{DbWithWritableSystem, SystemPathBuf},
     };
     use ruff_diagnostics::Fix;
+    use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
@@ -148,15 +149,14 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a / 0  # ty:ignore[division-by-zero]
-          |                 ^
+        2 | b = a / 0  # ty:ignore[division-by-zero]
+          |     ^
           |
         1 | 
-          -             b = a / 0  # ty:ignore[division-by-zero]
-        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
-        3 |
+          - b = a / 0  # ty:ignore[division-by-zero]
+        2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
         ");
     }
 
@@ -170,15 +170,14 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a / 0  # ty:ignore[division-by-zero,]
-          |                 ^
+        2 | b = a / 0  # ty:ignore[division-by-zero,]
+          |     ^
           |
         1 | 
-          -             b = a / 0  # ty:ignore[division-by-zero,]
-        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
-        3 |
+          - b = a / 0  # ty:ignore[division-by-zero,]
+        2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference]
         ");
     }
 
@@ -192,15 +191,14 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a / 0  # ty:ignore[division-by-zero   ]
-          |                 ^
+        2 | b = a / 0  # ty:ignore[division-by-zero   ]
+          |     ^
           |
         1 | 
-          -             b = a / 0  # ty:ignore[division-by-zero   ]
-        2 +             b = a / 0  # ty:ignore[division-by-zero, unresolved-reference   ]
-        3 |
+          - b = a / 0  # ty:ignore[division-by-zero   ]
+        2 + b = a / 0  # ty:ignore[division-by-zero, unresolved-reference   ]
         ");
     }
 
@@ -214,15 +212,14 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a / 0  # ty:ignore[division-by-zero] some explanation
-          |                 ^
+        2 | b = a / 0  # ty:ignore[division-by-zero] some explanation
+          |     ^
           |
         1 | 
-          -             b = a / 0  # ty:ignore[division-by-zero] some explanation
-        2 +             b = a / 0  # ty:ignore[division-by-zero] some explanation  # ty:ignore[unresolved-reference]
-        3 |
+          - b = a / 0  # ty:ignore[division-by-zero] some explanation
+        2 + b = a / 0  # ty:ignore[division-by-zero] some explanation  # ty:ignore[unresolved-reference]
         ");
     }
 
@@ -240,22 +237,22 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:21
+         --> main.py:3:9
           |
-        2 |               b = (
-        3 | /                     a  # ty:ignore[division-by-zero]
-        4 | |                     /
-        5 | |                     0
-          | |_____________________^
-        6 |               )
+        2 |   b = (
+        3 | /         a  # ty:ignore[division-by-zero]
+        4 | |         /
+        5 | |         0
+          | |_________^
+        6 |   )
           |
         1 | 
-        2 |             b = (
-          -                     a  # ty:ignore[division-by-zero]
-        3 +                     a  # ty:ignore[division-by-zero, unresolved-reference]
-        4 |                     /
-        5 |                     0
-        6 |             )
+        2 | b = (
+          -         a  # ty:ignore[division-by-zero]
+        3 +         a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |         /
+        5 |         0
+        6 | )
         ");
     }
 
@@ -273,22 +270,21 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:21
+         --> main.py:3:9
           |
-        2 |               b = (
-        3 | /                     a
-        4 | |                     /
-        5 | |                     0  # ty:ignore[division-by-zero]
-          | |_____________________^
-        6 |               )
+        2 |   b = (
+        3 | /         a
+        4 | |         /
+        5 | |         0  # ty:ignore[division-by-zero]
+          | |_________^
+        6 |   )
           |
-        2 |             b = (
-        3 |                     a
-        4 |                     /
-          -                     0  # ty:ignore[division-by-zero]
-        5 +                     0  # ty:ignore[division-by-zero, unresolved-reference]
-        6 |             )
-        7 |
+        2 | b = (
+        3 |         a
+        4 |         /
+          -         0  # ty:ignore[division-by-zero]
+        5 +         0  # ty:ignore[division-by-zero, unresolved-reference]
+        6 | )
         ");
     }
 
@@ -306,22 +302,22 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:21
+         --> main.py:3:9
           |
-        2 |               b = (
-        3 | /                     a  # ty:ignore[division-by-zero]
-        4 | |                     /
-        5 | |                     0  # ty:ignore[division-by-zero]
-          | |_____________________^
-        6 |               )
+        2 |   b = (
+        3 | /         a  # ty:ignore[division-by-zero]
+        4 | |         /
+        5 | |         0  # ty:ignore[division-by-zero]
+          | |_________^
+        6 |   )
           |
         1 | 
-        2 |             b = (
-          -                     a  # ty:ignore[division-by-zero]
-        3 +                     a  # ty:ignore[division-by-zero, unresolved-reference]
-        4 |                     /
-        5 |                     0  # ty:ignore[division-by-zero]
-        6 |             )
+        2 | b = (
+          -         a  # ty:ignore[division-by-zero]
+        3 +         a  # ty:ignore[division-by-zero, unresolved-reference]
+        4 |         /
+        5 |         0  # ty:ignore[division-by-zero]
+        6 | )
         ");
     }
 
@@ -338,20 +334,19 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:18
+         --> main.py:3:6
           |
-        2 |             b = f"""
-        3 |                 {a}
-          |                  ^
-        4 |                 more text
-        5 |             """
+        2 | b = f"""
+        3 |     {a}
+          |      ^
+        4 |     more text
+        5 | """
           |
-        2 |             b = f"""
-        3 |                 {a}
-        4 |                 more text
-          -             """
-        5 +             """  # ty:ignore[unresolved-reference]
-        6 |
+        2 | b = f"""
+        3 |     {a}
+        4 |     more text
+          - """
+        5 + """  # ty:ignore[unresolved-reference]
         "#);
     }
 
@@ -370,23 +365,23 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:4:17
+         --> main.py:4:5
           |
-        2 |             b = f"""
-        3 |                 {
-        4 |                 a
-          |                 ^
-        5 |                 }
-        6 |                 more text
+        2 | b = f"""
+        3 |     {
+        4 |     a
+          |     ^
+        5 |     }
+        6 |     more text
           |
         1 | 
-        2 |             b = f"""
-        3 |                 {
-          -                 a
-        4 +                 a  # ty:ignore[unresolved-reference]
-        5 |                 }
-        6 |                 more text
-        7 |             """
+        2 | b = f"""
+        3 |     {
+          -     a
+        4 +     a  # ty:ignore[unresolved-reference]
+        5 |     }
+        6 |     more text
+        7 | """
         "#);
     }
 
@@ -402,19 +397,18 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a + """
-          |                 ^
-        3 |                 more text
-        4 |             """
+        2 | b = a + """
+          |     ^
+        3 |     more text
+        4 | """
           |
         1 | 
-        2 |             b = a + """
-        3 |                 more text
-          -             """
-        4 +             """  # ty:ignore[unresolved-reference]
-        5 |
+        2 | b = a + """
+        3 |     more text
+          - """
+        4 + """  # ty:ignore[unresolved-reference]
         "#);
     }
 
@@ -429,17 +423,16 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:17
+         --> main.py:2:5
           |
-        2 |             b = a \
-          |                 ^
-        3 |             + "test"
+        2 | b = a \
+          |     ^
+        3 | + "test"
           |
         1 | 
-        2 |             b = a \
-          -             + "test"
-        3 +             + "test"  # ty:ignore[unresolved-reference]
-        4 |
+        2 | b = a \
+          - + "test"
+        3 + + "test"  # ty:ignore[unresolved-reference]
         "#);
     }
 
@@ -453,27 +446,25 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNDEFINED_REVEAL), @r"
         info[code-action]: import typing.reveal_type
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             reveal_type(1)
-          |             ^^^^^^^^^^^
+        2 | reveal_type(1)
+          | ^^^^^^^^^^^
           |
         help: This is a preferred code action
         1 + from typing import reveal_type
         2 | 
-        3 |             reveal_type(1)
-        4 |         
+        3 | reveal_type(1)
 
         info[code-action]: Ignore 'undefined-reveal' for this line
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             reveal_type(1)
-          |             ^^^^^^^^^^^
+        2 | reveal_type(1)
+          | ^^^^^^^^^^^
           |
         1 | 
-          -             reveal_type(1)
-        2 +             reveal_type(1)  # ty:ignore[undefined-reveal]
-        3 |
+          - reveal_type(1)
+        2 + reveal_type(1)  # ty:ignore[undefined-reveal]
         ");
     }
 
@@ -488,30 +479,29 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
-         --> main.py:2:14
+         --> main.py:2:2
           |
-        2 |             @deprecated("do not use")
-          |              ^^^^^^^^^^
-        3 |             def my_func(): ...
+        2 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        3 | def my_func(): ...
           |
         help: This is a preferred code action
         1 + from warnings import deprecated
         2 | 
-        3 |             @deprecated("do not use")
-        4 |             def my_func(): ...
+        3 | @deprecated("do not use")
+        4 | def my_func(): ...
 
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:14
+         --> main.py:2:2
           |
-        2 |             @deprecated("do not use")
-          |              ^^^^^^^^^^
-        3 |             def my_func(): ...
+        2 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        3 | def my_func(): ...
           |
         1 | 
-          -             @deprecated("do not use")
-        2 +             @deprecated("do not use")  # ty:ignore[unresolved-reference]
-        3 |             def my_func(): ...
-        4 |
+          - @deprecated("do not use")
+        2 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        3 | def my_func(): ...
         "#);
     }
 
@@ -528,54 +518,52 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r#"
         info[code-action]: import warnings.deprecated
-         --> main.py:4:14
+         --> main.py:4:2
           |
-        2 |             import warnings
+        2 | import warnings
         3 |
-        4 |             @deprecated("do not use")
-          |              ^^^^^^^^^^
-        5 |             def my_func(): ...
+        4 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        5 | def my_func(): ...
           |
         help: This is a preferred code action
         1 + from warnings import deprecated
         2 | 
-        3 |             import warnings
+        3 | import warnings
         4 | 
 
         info[code-action]: qualify warnings.deprecated
-         --> main.py:4:14
+         --> main.py:4:2
           |
-        2 |             import warnings
+        2 | import warnings
         3 |
-        4 |             @deprecated("do not use")
-          |              ^^^^^^^^^^
-        5 |             def my_func(): ...
+        4 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        5 | def my_func(): ...
           |
         help: This is a preferred code action
         1 | 
-        2 |             import warnings
+        2 | import warnings
         3 | 
-          -             @deprecated("do not use")
-        4 +             @warnings.deprecated("do not use")
-        5 |             def my_func(): ...
-        6 |         
+          - @deprecated("do not use")
+        4 + @warnings.deprecated("do not use")
+        5 | def my_func(): ...
 
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:4:14
+         --> main.py:4:2
           |
-        2 |             import warnings
+        2 | import warnings
         3 |
-        4 |             @deprecated("do not use")
-          |              ^^^^^^^^^^
-        5 |             def my_func(): ...
+        4 | @deprecated("do not use")
+          |  ^^^^^^^^^^
+        5 | def my_func(): ...
           |
         1 | 
-        2 |             import warnings
+        2 | import warnings
         3 | 
-          -             @deprecated("do not use")
-        4 +             @deprecated("do not use")  # ty:ignore[unresolved-reference]
-        5 |             def my_func(): ...
-        6 |
+          - @deprecated("do not use")
+        4 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
+        5 | def my_func(): ...
         "#);
     }
 
@@ -590,27 +578,25 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: import importlib.abc.ExecutionLoader
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
         2 | 
-        3 |             ExecutionLoader
-        4 |         
+        3 | ExecutionLoader
 
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:2:13
+         --> main.py:2:1
           |
-        2 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         1 | 
-          -             ExecutionLoader
-        2 +             ExecutionLoader  # ty:ignore[unresolved-reference]
-        3 |
+          - ExecutionLoader
+        2 + ExecutionLoader  # ty:ignore[unresolved-reference]
         ");
     }
 
@@ -629,30 +615,29 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: import importlib.abc.ExecutionLoader
-         --> main.py:3:13
+         --> main.py:3:1
           |
-        2 |             import importlib
-        3 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | import importlib
+        3 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
         2 | 
-        3 |             import importlib
-        4 |             ExecutionLoader
+        3 | import importlib
+        4 | ExecutionLoader
 
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:13
+         --> main.py:3:1
           |
-        2 |             import importlib
-        3 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | import importlib
+        3 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         1 | 
-        2 |             import importlib
-          -             ExecutionLoader
-        3 +             ExecutionLoader  # ty:ignore[unresolved-reference]
-        4 |
+        2 | import importlib
+          - ExecutionLoader
+        3 + ExecutionLoader  # ty:ignore[unresolved-reference]
         ");
     }
 
@@ -668,44 +653,42 @@ mod tests {
 
         assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
         info[code-action]: import importlib.abc.ExecutionLoader
-         --> main.py:3:13
+         --> main.py:3:1
           |
-        2 |             import importlib.abc
-        3 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | import importlib.abc
+        3 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
         2 | 
-        3 |             import importlib.abc
-        4 |             ExecutionLoader
+        3 | import importlib.abc
+        4 | ExecutionLoader
 
         info[code-action]: qualify importlib.abc.ExecutionLoader
-         --> main.py:3:13
+         --> main.py:3:1
           |
-        2 |             import importlib.abc
-        3 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | import importlib.abc
+        3 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         help: This is a preferred code action
         1 | 
-        2 |             import importlib.abc
-          -             ExecutionLoader
-        3 +             importlib.abc.ExecutionLoader
-        4 |         
+        2 | import importlib.abc
+          - ExecutionLoader
+        3 + importlib.abc.ExecutionLoader
 
         info[code-action]: Ignore 'unresolved-reference' for this line
-         --> main.py:3:13
+         --> main.py:3:1
           |
-        2 |             import importlib.abc
-        3 |             ExecutionLoader
-          |             ^^^^^^^^^^^^^^^
+        2 | import importlib.abc
+        3 | ExecutionLoader
+          | ^^^^^^^^^^^^^^^
           |
         1 | 
-        2 |             import importlib.abc
-          -             ExecutionLoader
-        3 +             ExecutionLoader  # ty:ignore[unresolved-reference]
-        4 |
+        2 | import importlib.abc
+          - ExecutionLoader
+        3 + ExecutionLoader  # ty:ignore[unresolved-reference]
         ");
     }
 
@@ -724,7 +707,7 @@ mod tests {
 
             db.init_program().unwrap();
 
-            let mut cleansed = source.to_string();
+            let mut cleansed = dedent(source).to_string();
 
             let start = cleansed
                 .find("<START>")
