@@ -1326,7 +1326,9 @@ impl<'db> Node<'db> {
                 }
 
                 // If we reach the `true` terminal, the path we've been following represents one
-                // representative type.
+                // representative type. Before constructing the final lower and upper bound, sort
+                // the constraints by their source order. This should give us a consistently
+                // ordered specialization, regardless of the variable ordering of the original BDD.
                 current_bounds.sort_unstable_by_key(|bounds| bounds.source_order);
                 let greatest_lower_bound =
                     UnionType::from_elements(db, current_bounds.iter().map(|bounds| bounds.lower));
