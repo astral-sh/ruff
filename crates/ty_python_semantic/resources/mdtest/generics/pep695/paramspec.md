@@ -711,6 +711,9 @@ class Child2(Parent):
 
 ### One `ParamSpec` not inferable
 
+Here, `P` is in a non-inferable position while `Q` is inferable. So, they are not considered
+assignable.
+
 ```py
 from typing import Callable
 
