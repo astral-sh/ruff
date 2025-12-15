@@ -538,7 +538,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         if let Type::Union(lower_union) = lower {
             let mut result = Node::AlwaysTrue;
             for lower_element in lower_union.elements(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper),
                 );
@@ -553,13 +553,13 @@ impl<'db> ConstrainedTypeVar<'db> {
         {
             let mut result = Node::AlwaysTrue;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, lower, upper_element),
                 );
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, lower, upper_element.negate(db)),
                 );
@@ -1148,6 +1148,11 @@ impl<'db> Node<'db> {
     fn or_with_offset(self, db: &'db dyn Db, other: Self) -> Self {
         // To ensure that `self` appears before `other` in `source_order`, we add the maximum
         // `source_order` of the lhs to all of the `source_order`s in the rhs.
+        //
+        // TODO: If we store `other_offset` as a new field on InteriorNode, we might be able to
+        // avoid all of the extra work in the calls to with_adjusted_source_order, and apply the
+        // adjustment lazily when walking a BDD tree. (ditto below in the other _with_offset
+        // methods)
         let other_offset = self.max_source_order(db);
         self.or_inner(db, other, other_offset)
     }
@@ -2074,7 +2079,13 @@ impl<'db> InteriorNode<'db> {
             //
             // We also have to check if there are any derived facts that depend on the constraint
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
-            // corresponding branch.
+            // corresponding branch. We currently reuse the `source_order` of the constraint being
+            // removed when we add these derived facts.
+            //
+            // TODO: This might not be stable enough, if we add more than one derived fact for this
+            // constraint. If we still see inconsistent test output, we might need a more complex
+            // way of tracking source order for derived facts.
+            let self_source_order = self.source_order(db);
             let if_true = path
                 .walk_edge(
                     db,
@@ -2448,6 +2459,7 @@ impl<'db> InteriorNode<'db> {
                     // represent that intersection. We also need to add the new constraint to our
                     // seen set and (if we haven't already seen it) to the to-visit queue.
                     if seen_constraints.insert(intersection_constraint) {
+                        source_orders.insert(intersection_constraint, next_source_order);
                         to_visit.extend(
                             (seen_constraints.iter().copied())
                                 .filter(|seen| *seen != intersection_constraint)

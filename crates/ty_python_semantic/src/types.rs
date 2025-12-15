@@ -2028,10 +2028,23 @@ impl<'db> Type<'db> {
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
-    #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_redundant_with_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            self_ty
+                .has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
+                .is_always_satisfied(db)
+        }
+
+        if self == other {
+            return true;
+        }
+
+        is_redundant_with_impl(db, self, other)
     }
 
     fn has_relation_to(
