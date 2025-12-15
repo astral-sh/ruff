@@ -4483,7 +4483,6 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let typevar = error.bound_typevar().typevar(context.db());
                 let argument_type = error.argument_type();
                 let argument_ty_display = argument_type.display(context.db());
 
@@ -4496,21 +4495,51 @@ impl<'db> BindingError<'db> {
                     }
                 ));
 
-                let typevar_name = typevar.name(context.db());
                 match error {
-                    SpecializationError::MismatchedBound { .. } => {
-                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy upper bound `{}` of type variable `{typevar_name}`",
-                        typevar.upper_bound(context.db()).expect("type variable should have an upper bound if this error occurs").display(context.db())
-                    ));
+                    SpecializationError::NoSolution { parameter, .. } => {
+                        diag.set_primary_message(format_args!(
+                            "Argument type `{argument_ty_display}` does not \
+                                satisfy generic parameter annotation `{}",
+                            parameter.display(context.db()),
+                        ));
                     }
-                    SpecializationError::MismatchedConstraint { .. } => {
-                        diag.set_primary_message(format_args!("Argument type `{argument_ty_display}` does not satisfy constraints ({}) of type variable `{typevar_name}`",
-                        typevar.constraints(context.db()).expect("type variable should have constraints if this error occurs").iter().map(|ty| format!("`{}`", ty.display(context.db()))).join(", ")
-                    ));
+                    SpecializationError::MismatchedBound { bound_typevar, .. } => {
+                        let typevar = bound_typevar.typevar(context.db());
+                        let typevar_name = typevar.name(context.db());
+                        diag.set_primary_message(format_args!(
+                            "Argument type `{argument_ty_display}` does not \
+                                satisfy upper bound `{}` of type variable `{typevar_name}`",
+                            typevar
+                                .upper_bound(context.db())
+                                .expect(
+                                    "type variable should have an upper bound if this error occurs"
+                                )
+                                .display(context.db())
+                        ));
+                    }
+                    SpecializationError::MismatchedConstraint { bound_typevar, .. } => {
+                        let typevar = bound_typevar.typevar(context.db());
+                        let typevar_name = typevar.name(context.db());
+                        diag.set_primary_message(format_args!(
+                            "Argument type `{argument_ty_display}` does not \
+                                satisfy constraints ({}) of type variable `{typevar_name}`",
+                            typevar
+                                .constraints(context.db())
+                                .expect(
+                                    "type variable should have constraints if this error occurs"
+                                )
+                                .iter()
+                                .format_with(", ", |ty, f| f(&format_args!(
+                                    "`{}`",
+                                    ty.display(context.db())
+                                )))
+                        ));
                     }
                 }
 
-                if let Some(typevar_definition) = typevar.definition(context.db()) {
+                if let Some(typevar_definition) = error.bound_typevar().and_then(|bound_typevar| {
+                    bound_typevar.typevar(context.db()).definition(context.db())
+                }) {
                     let module = parsed_module(context.db(), typevar_definition.file(context.db()))
                         .load(context.db());
                     let typevar_range = typevar_definition.full_range(context.db(), &module);
