@@ -1604,20 +1604,10 @@ impl<'db> SpecializationBuilder<'db> {
                 let upper = constraint.upper(self.db);
                 if !upper.is_object() {
                     let variance = formal.variance_of(self.db, typevar);
-                    self.add_type_mapping(
-                        typevar,
-                        upper.canonically_ordered(self.db),
-                        variance,
-                        &mut f,
-                    );
+                    self.add_type_mapping(typevar, upper, variance, &mut f);
                 } else if !lower.is_never() {
                     let variance = formal.variance_of(self.db, typevar);
-                    self.add_type_mapping(
-                        typevar,
-                        lower.canonically_ordered(self.db),
-                        variance,
-                        &mut f,
-                    );
+                    self.add_type_mapping(typevar, lower, variance, &mut f);
                 }
                 if let Type::TypeVar(lower_bound_typevar) = lower {
                     let variance = formal.variance_of(self.db, lower_bound_typevar);
