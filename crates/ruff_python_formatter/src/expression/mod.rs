@@ -919,20 +919,20 @@ pub enum AttributeState {
     /// Caveat: If the root of the chain is parenthesized,
     /// it contributes +1 to this count, even if it is not
     /// a call or subscript. But the name
-    /// `CallsOrSubscriptsOrParenthesizedRootPreceding`
+    /// `CallLikeOrParenthesizedRootPreceding`
     /// is a tad unwieldy, and this also rarely occurs.
-    CallsOrSubscriptsPreceding(u32),
+    CallLikePreceding(u32),
     /// Indicates that we are at the first called or
     /// subscripted object in the chain
     ///
     /// For example, if we are at `b` in `a.b()[0]()().c()`
-    FirstCallOrSubscript,
+    FirstCallLike,
     /// Indicates that we are to the left of the first
     /// called or subscripted object in the chain, and therefore
     /// need not break.
     ///
     /// For example, if we are at `a` in `a.b()[0]()().c()`
-    BeforeFirstCallOrSubscript,
+    BeforeFirstCallLike,
 }
 
 impl CallChainLayout {
@@ -941,16 +941,16 @@ impl CallChainLayout {
     #[must_use]
     pub(crate) fn decrement_call_like_count(self) -> Self {
         match self {
-            Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x)) => {
+            Self::Fluent(AttributeState::CallLikePreceding(x)) => {
                 if x > 1 {
                     // Recall that we traverse call chains from right to
                     // left. So after moving from a call/subscript into
                     // an attribute, we _decrease_ the count of
                     // _remaining_ calls or subscripts to the left of our
                     // current position.
-                    Self::Fluent(AttributeState::CallsOrSubscriptsPreceding(x - 1))
+                    Self::Fluent(AttributeState::CallLikePreceding(x - 1))
                 } else {
-                    Self::Fluent(AttributeState::FirstCallOrSubscript)
+                    Self::Fluent(AttributeState::FirstCallLike)
                 }
             }
             _ => self,
@@ -963,15 +963,15 @@ impl CallChainLayout {
     #[must_use]
     pub(crate) fn transition_after_attribute(self) -> Self {
         match self {
-            Self::Fluent(AttributeState::FirstCallOrSubscript) => {
-                Self::Fluent(AttributeState::BeforeFirstCallOrSubscript)
+            Self::Fluent(AttributeState::FirstCallLike) => {
+                Self::Fluent(AttributeState::BeforeFirstCallLike)
             }
             _ => self,
         }
     }
 
     pub(crate) fn is_first_call_like(self) -> bool {
-        matches!(self, Self::Fluent(AttributeState::FirstCallOrSubscript))
+        matches!(self, Self::Fluent(AttributeState::FirstCallLike))
     }
 
     /// Returns either `Fluent` or `NonFluent` depending on a
@@ -1095,7 +1095,7 @@ impl CallChainLayout {
         if computed_attribute_values_after_parentheses + u32::from(root_value_parenthesized) < 2 {
             CallChainLayout::NonFluent
         } else {
-            CallChainLayout::Fluent(AttributeState::CallsOrSubscriptsPreceding(
+            CallChainLayout::Fluent(AttributeState::CallLikePreceding(
                 // We count a parenthesized root value as an extra
                 // call for the purposes of tracking state.
                 //
