@@ -219,6 +219,18 @@ max_message_id = (
 # Note in preview we split at `pl` which some
 # folks may dislike. (Similarly with common
 # `np` and `pd` invocations).
+#
+# This is because we cannot reliably predict,
+# just from syntax, whether a short identifier
+# is being used as a 'namespace' or as an 'object'.
+#
+# As of 2025.12.15, we do not indent methods in
+# fluent formatting. If we ever decide to do so,
+# it may make sense to special case call chain roots
+# that are shorter than the indent-width (like Prettier does).
+# This would have the benefit of handling these common
+# two-letter aliases for libraries.
+
 
 expr = (
     pl.scan_parquet("/data/pypi-parquet/*.parquet")

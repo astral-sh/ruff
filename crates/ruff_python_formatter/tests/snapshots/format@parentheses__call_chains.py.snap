@@ -225,6 +225,18 @@ max_message_id = (
 # Note in preview we split at `pl` which some
 # folks may dislike. (Similarly with common
 # `np` and `pd` invocations).
+#
+# This is because we cannot reliably predict,
+# just from syntax, whether a short identifier
+# is being used as a 'namespace' or as an 'object'.
+#
+# As of 2025.12.15, we do not indent methods in
+# fluent formatting. If we ever decide to do so,
+# it may make sense to special case call chain roots
+# that are shorter than the indent-width (like Prettier does).
+# This would have the benefit of handling these common
+# two-letter aliases for libraries.
+
 
 expr = (
     pl.scan_parquet("/data/pypi-parquet/*.parquet")
@@ -523,6 +535,18 @@ max_message_id = (
 # Note in preview we split at `pl` which some
 # folks may dislike. (Similarly with common
 # `np` and `pd` invocations).
+#
+# This is because we cannot reliably predict,
+# just from syntax, whether a short identifier
+# is being used as a 'namespace' or as an 'object'.
+#
+# As of 2025.12.15, we do not indent methods in
+# fluent formatting. If we ever decide to do so,
+# it may make sense to special case call chain roots
+# that are shorter than the indent-width (like Prettier does).
+# This would have the benefit of handling these common
+# two-letter aliases for libraries.
+
 
 expr = (
     pl.scan_parquet("/data/pypi-parquet/*.parquet")
@@ -687,8 +711,8 @@ x = (
          .groupby(
              1,
          )
-@@ -243,19 +252,19 @@
- # `np` and `pd` invocations).
+@@ -255,19 +264,19 @@
+ 
  
  expr = (
 -    pl.scan_parquet("/data/pypi-parquet/*.parquet")
@@ -718,7 +742,7 @@ x = (
          .str.extract(pattern=r"\.([a-z0-9]+)$", group_index=1)
          .str.replace_all(pattern=r"cxx|cpp|cc|c|hpp|h", value="C/C++")
          .str.replace_all(pattern="^f.*$", value="Fortran")
-@@ -276,9 +285,8 @@
+@@ -288,9 +297,8 @@
          if more_nested_because_line_length:
              identical_hidden_layer_sizes = all(
                  current_hidden_layer_sizes == first_hidden_layer_sizes
@@ -730,7 +754,7 @@ x = (
                  .values()
                  .attr
              )
-@@ -290,7 +298,8 @@
+@@ -302,7 +310,8 @@
              with self.read_ctx(book_type) as cursor:
                  if (
                      entry_count := len(
