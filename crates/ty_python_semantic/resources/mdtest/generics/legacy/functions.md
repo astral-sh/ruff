@@ -418,6 +418,10 @@ reveal_type(extract_t(Q[str]()))  # revealed: str
 Passing anything else results in an error:
 
 ```py
+# TODO: We currently get an error for the specialization failure, and then another because the
+# argument is not assignable to the (default-specialized) parameter annotation. We really only need
+# one of them.
+# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(extract_t([1, 2]))  # revealed: Unknown
 ```
@@ -479,6 +483,10 @@ reveal_type(extract_optional_t(P[int]()))  # revealed: int
 Passing anything else results in an error:
 
 ```py
+# TODO: We currently get an error for the specialization failure, and then another because the
+# argument is not assignable to the (default-specialized) parameter annotation. We really only need
+# one of them.
+# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
 ```
