@@ -1159,7 +1159,7 @@ impl CallChainLayout {
         }
     }
 
-    pub(crate) fn is_fluent(&self) -> bool {
+    pub(crate) fn is_fluent(self) -> bool {
         matches!(self, CallChainLayout::Fluent(_))
     }
 }
