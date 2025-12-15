@@ -283,3 +283,62 @@ TypedDi<CURSOR>
 
     Ok(())
 }
+
+/// Tests that completions for function arguments will
+/// show a `=` suffix.
+#[test]
+fn function_parameter_shows_equals_suffix() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+import re
+re.match('', '', fla<CURSOR>
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default().with_auto_import(false))
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(1, 20));
+
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "flags=",
+        "kind": 6,
+        "detail": "int",
+        "sortText": "0",
+        "insertText": "flags="
+      },
+      {
+        "label": "FloatingPointError",
+        "kind": 7,
+        "detail": "<class 'FloatingPointError'>",
+        "documentation": "Floating-point operation failed.\n",
+        "sortText": "1"
+      },
+      {
+        "label": "PythonFinalizationError",
+        "kind": 7,
+        "detail": "<class 'PythonFinalizationError'>",
+        "documentation": "Operation blocked during Python finalization.\n",
+        "sortText": "2"
+      },
+      {
+        "label": "float",
+        "kind": 7,
+        "detail": "<class 'float'>",
+        "documentation": "Convert a string or number to a floating-point number, if possible.\n",
+        "sortText": "3"
+      }
+    ]
+    "#);
+
+    Ok(())
+}

@@ -36,6 +36,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod signature_help;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::num::NonZeroUsize;
@@ -54,7 +55,8 @@ use lsp_types::notification::{
 };
 use lsp_types::request::{
     Completion, DocumentDiagnosticRequest, HoverRequest, Initialize, InlayHintRequest,
-    PrepareRenameRequest, Request, Shutdown, WorkspaceConfiguration, WorkspaceDiagnosticRequest,
+    PrepareRenameRequest, Request, Shutdown, SignatureHelpRequest, WorkspaceConfiguration,
+    WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
     ClientCapabilities, CompletionItem, CompletionParams, CompletionResponse,
@@ -64,11 +66,11 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
     InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, TextDocumentClientCapabilities,
-    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
-    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
-    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
-    WorkspaceEdit, WorkspaceFolder,
+    PublishDiagnosticsClientCapabilities, Range, SignatureHelp, SignatureHelpParams,
+    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
+    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Url,
+    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
+    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -939,6 +941,28 @@ impl TestServer {
             Some(CompletionResponse::List(lsp_types::CompletionList { items, .. })) => items,
             None => vec![],
         }
+    }
+
+    /// Sends a `textDocument/signatureHelp` request for the document at the given URL and position.
+    pub(crate) fn signature_help_request(
+        &mut self,
+        uri: &Url,
+        position: Position,
+    ) -> Option<SignatureHelp> {
+        let signature_help_id = self.send_request::<SignatureHelpRequest>(SignatureHelpParams {
+            text_document_position_params: TextDocumentPositionParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                position,
+            },
+            work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+            context: Some(lsp_types::SignatureHelpContext {
+                trigger_kind: SignatureHelpTriggerKind::INVOKED,
+                trigger_character: None,
+                is_retrigger: false,
+                active_signature_help: None,
+            }),
+        });
+        self.await_response::<SignatureHelpRequest>(&signature_help_id)
     }
 }
 
