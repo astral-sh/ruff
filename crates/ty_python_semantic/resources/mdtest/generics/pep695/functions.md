@@ -743,6 +743,7 @@ specializations of a generic function.
 
 ```py
 from typing import Any, Callable, NoReturn, overload, Self
+from ty_extensions import generic_context, into_callable
 
 def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
     return callable
@@ -750,11 +751,19 @@ def accepts_callable[**P, R](callable: Callable[P, R]) -> Callable[P, R]:
 def returns_int() -> int:
     raise NotImplementedError
 
+# revealed: () -> int
+reveal_type(into_callable(returns_int))
+# revealed: () -> int
+reveal_type(accepts_callable(returns_int))
 # revealed: int
 reveal_type(accepts_callable(returns_int)())
 
 class ClassWithoutConstructor: ...
 
+# revealed: () -> ClassWithoutConstructor
+reveal_type(into_callable(ClassWithoutConstructor))
+# revealed: () -> ClassWithoutConstructor
+reveal_type(accepts_callable(ClassWithoutConstructor))
 # revealed: ClassWithoutConstructor
 reveal_type(accepts_callable(ClassWithoutConstructor)())
 
@@ -762,12 +771,20 @@ class ClassWithNew:
     def __new__(cls, *args, **kwargs) -> Self:
         raise NotImplementedError
 
+# revealed: (...) -> ClassWithNew
+reveal_type(into_callable(ClassWithNew))
+# revealed: (...) -> ClassWithNew
+reveal_type(accepts_callable(ClassWithNew))
 # revealed: ClassWithNew
 reveal_type(accepts_callable(ClassWithNew)())
 
 class ClassWithInit:
     def __init__(self) -> None: ...
 
+# revealed: () -> ClassWithInit
+reveal_type(into_callable(ClassWithInit))
+# revealed: () -> ClassWithInit
+reveal_type(accepts_callable(ClassWithInit))
 # revealed: ClassWithInit
 reveal_type(accepts_callable(ClassWithInit)())
 
@@ -777,6 +794,10 @@ class ClassWithNewAndInit:
 
     def __init__(self) -> None: ...
 
+# revealed: ((...) -> ClassWithNewAndInit) | (() -> ClassWithNewAndInit)
+reveal_type(into_callable(ClassWithNewAndInit))
+# revealed: (...) -> ClassWithNewAndInit
+reveal_type(accepts_callable(ClassWithNewAndInit))
 # revealed: ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit)())
 
@@ -788,6 +809,14 @@ class ClassWithNoReturnMetatype(metaclass=Meta):
     def __new__(cls, *args: Any, **kwargs: Any) -> Self:
         raise NotImplementedError
 
+# TODO: The return types here are wrong, because we end up creating a constraint (Never ≤ R), which
+# we confuse with "R has no lower bound".
+# revealed: (...) -> Never
+reveal_type(into_callable(ClassWithNoReturnMetatype))
+# TODO: revealed: (...) -> Never
+# revealed: (...) -> Unknown
+reveal_type(accepts_callable(ClassWithNoReturnMetatype))
+# TODO: revealed: Never
 # revealed: Unknown
 reveal_type(accepts_callable(ClassWithNoReturnMetatype)())
 
@@ -799,6 +828,10 @@ class ClassWithIgnoredInit:
 
     def __init__(self, x: int) -> None: ...
 
+# revealed: () -> Proxy
+reveal_type(into_callable(ClassWithIgnoredInit))
+# revealed: () -> Proxy
+reveal_type(accepts_callable(ClassWithIgnoredInit))
 # revealed: Proxy
 reveal_type(accepts_callable(ClassWithIgnoredInit)())
 
@@ -817,6 +850,11 @@ class ClassWithOverloadedInit[T]:
 # overload. We would then also have to determine that R must be equal to the return type of **P's
 # solution.
 
+# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+reveal_type(into_callable(ClassWithOverloadedInit))
+# TODO: revealed: Overload[(x: int) -> ClassWithOverloadedInit[int], (x: str) -> ClassWithOverloadedInit[str]]
+# revealed: Overload[(x: int) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str], (x: str) -> ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]]
+reveal_type(accepts_callable(ClassWithOverloadedInit))
 # TODO: revealed: ClassWithOverloadedInit[int]
 # revealed: ClassWithOverloadedInit[int] | ClassWithOverloadedInit[str]
 reveal_type(accepts_callable(ClassWithOverloadedInit)(0))
@@ -833,6 +871,17 @@ class GenericClass[T]:
 def _(x: list[str]):
     # TODO: This fails because we are not propagating GenericClass's generic context into the
     # Callable that we create for it.
+    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    reveal_type(into_callable(GenericClass))
+    # revealed: ty_extensions.GenericContext[T@GenericClass]
+    reveal_type(generic_context(into_callable(GenericClass)))
+
+    # revealed: (x: list[T@GenericClass], y: list[T@GenericClass]) -> GenericClass[T@GenericClass]
+    reveal_type(accepts_callable(GenericClass))
+    # TODO: revealed: ty_extensions.GenericContext[T@GenericClass]
+    # revealed: None
+    reveal_type(generic_context(accepts_callable(GenericClass)))
+
     # TODO: revealed: GenericClass[str]
     # TODO: no errors
     # revealed: GenericClass[T@GenericClass]
