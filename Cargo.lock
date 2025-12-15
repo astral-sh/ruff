@@ -4390,6 +4390,7 @@ dependencies = [
  "ruff_python_trivia",
  "salsa",
  "tempfile",
+ "tikv-jemallocator",
  "toml",
  "tracing",
  "tracing-flame",
