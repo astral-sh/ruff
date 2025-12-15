@@ -368,11 +368,8 @@ impl<'src> Parser<'src> {
                 self.bump(TokenKind::DoubleStar);
                 let right =
                     self.parse_binary_expression_or_higher(OperatorPrecedence::Exponent, context);
-                // test_ok missing_power_lhs
-                // # parse_options: {"target-version": "3.8"}
-                // {x: **y for x, y in z}
-                // foo(**kwargs)
-                return Expr::BinOp(ast::ExprBinOp {
+
+                let expr = Expr::BinOp(ast::ExprBinOp {
                     left: Box::new(Expr::Name(ast::ExprName {
                         range: TextRange::empty(current_start),
                         id: Name::empty(),
@@ -383,8 +380,23 @@ impl<'src> Parser<'src> {
                     right: Box::new(right.expr),
                     range: self.node_range(start),
                     node_index: AtomicNodeIndex::NONE,
-                })
-                .into();
+                });
+
+                // test_err missing_power_lhs
+                // # parse_options: {"target-version": "3.8"}
+                // {x: **y for x, y in z}
+
+                // test_ok function_kwargs_double_star
+                // # parse_options: {"target-version": "3.8"}
+                // foo(**kwargs)
+
+                self.add_error(
+                    ParseErrorType::OtherError(
+                        "Power operator '**' requires a left operand".to_string(),
+                    ),
+                    &expr,
+                );
+                return expr.into();
             }
             TokenKind::Star => {
                 let starred_expr = self.parse_starred_expression(context);
