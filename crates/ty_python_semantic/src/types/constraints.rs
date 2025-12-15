@@ -496,9 +496,10 @@ impl IntersectionResult<'_> {
 /// lower and upper bound.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) struct ConstrainedTypeVar<'db> {
-    typevar: BoundTypeVarInstance<'db>,
-    lower: Type<'db>,
-    upper: Type<'db>,
+    pub(crate) typevar: BoundTypeVarInstance<'db>,
+    pub(crate) lower: Type<'db>,
+    pub(crate) upper: Type<'db>,
+    pub(crate) explicit: ExplicitConstraint,
 }
 
 // The Salsa heap is tracked separately.
@@ -586,8 +587,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             {
                 return Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object()),
-                    explicit,
+                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object(), explicit),
                     1,
                 )
                 .negate(db);
@@ -639,8 +639,8 @@ impl<'db> ConstrainedTypeVar<'db> {
                         typevar,
                         Type::TypeVar(bound),
                         Type::TypeVar(bound),
+                        explicit,
                     ),
-                    explicit,
                     1,
                 )
             }
@@ -651,14 +651,24 @@ impl<'db> ConstrainedTypeVar<'db> {
             {
                 let lower = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
-                    explicit,
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower,
+                        Type::Never,
+                        Type::TypeVar(typevar),
+                        explicit,
+                    ),
                     1,
                 );
                 let upper = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
-                    explicit,
+                    ConstrainedTypeVar::new(
+                        db,
+                        upper,
+                        Type::TypeVar(typevar),
+                        Type::object(),
+                        explicit,
+                    ),
                     1,
                 );
                 lower.and(db, upper)
@@ -668,8 +678,13 @@ impl<'db> ConstrainedTypeVar<'db> {
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
                 let lower = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
-                    explicit,
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower,
+                        Type::Never,
+                        Type::TypeVar(typevar),
+                        explicit,
+                    ),
                     1,
                 );
                 let upper = if upper.is_object() {
@@ -689,8 +704,13 @@ impl<'db> ConstrainedTypeVar<'db> {
                 };
                 let upper = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
-                    explicit,
+                    ConstrainedTypeVar::new(
+                        db,
+                        upper,
+                        Type::TypeVar(typevar),
+                        Type::object(),
+                        explicit,
+                    ),
                     1,
                 );
                 lower.and(db, upper)
@@ -698,8 +718,7 @@ impl<'db> ConstrainedTypeVar<'db> {
 
             _ => Node::new_constraint(
                 db,
-                ConstrainedTypeVar::new(db, typevar, lower, upper),
-                explicit,
+                ConstrainedTypeVar::new(db, typevar, lower, upper, explicit),
                 1,
             ),
         }
@@ -719,6 +738,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             self.typevar(db),
             self.lower(db).normalized(db),
             self.upper(db).normalized(db),
+            self.explicit(db),
         )
     }
 
@@ -735,7 +755,12 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
-        (self.typevar(db).identity(db), self.as_id())
+        (
+            self.typevar(db).binding_context(db),
+            self.typevar(db).identity(db),
+            self.explicit(db),
+            self.as_id(),
+        )
     }
 
     /// Returns whether this constraint implies another — i.e., whether every type that
@@ -767,7 +792,13 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::CannotSimplify;
         }
 
-        IntersectionResult::Simplified(Self::new(db, self.typevar(db), lower, upper))
+        IntersectionResult::Simplified(Self::new(
+            db,
+            self.typevar(db),
+            lower,
+            upper,
+            self.explicit(db) & other.explicit(db),
+        ))
     }
 
     fn display(self, db: &'db dyn Db) -> impl Display {
@@ -890,7 +921,6 @@ impl<'db> Node<'db> {
         constraint: ConstrainedTypeVar<'db>,
         if_true: Node<'db>,
         if_false: Node<'db>,
-        explicit: ExplicitConstraint,
         source_order: usize,
     ) -> Self {
         debug_assert!((if_true.root_constraint(db)).is_none_or(|root_constraint| {
@@ -912,7 +942,6 @@ impl<'db> Node<'db> {
             constraint,
             if_true,
             if_false,
-            explicit,
             source_order,
             max_source_order,
         ))
@@ -923,7 +952,6 @@ impl<'db> Node<'db> {
     fn new_constraint(
         db: &'db dyn Db,
         constraint: ConstrainedTypeVar<'db>,
-        explicit: ExplicitConstraint,
         source_order: usize,
     ) -> Self {
         Self::Interior(InteriorNode::new(
@@ -931,7 +959,6 @@ impl<'db> Node<'db> {
             constraint,
             Node::AlwaysTrue,
             Node::AlwaysFalse,
-            explicit,
             source_order,
             source_order,
         ))
@@ -943,7 +970,6 @@ impl<'db> Node<'db> {
     fn new_satisfied_constraint(
         db: &'db dyn Db,
         constraint: ConstraintAssignment<'db>,
-        explicit: ExplicitConstraint,
         source_order: usize,
     ) -> Self {
         match constraint {
@@ -952,7 +978,6 @@ impl<'db> Node<'db> {
                 constraint,
                 Node::AlwaysTrue,
                 Node::AlwaysFalse,
-                explicit,
                 source_order,
                 source_order,
             )),
@@ -961,7 +986,6 @@ impl<'db> Node<'db> {
                 constraint,
                 Node::AlwaysFalse,
                 Node::AlwaysTrue,
-                explicit,
                 source_order,
                 source_order,
             )),
@@ -997,7 +1021,6 @@ impl<'db> Node<'db> {
                 interior.constraint(db),
                 interior.if_true(db).with_adjusted_source_order(db, delta),
                 interior.if_false(db).with_adjusted_source_order(db, delta),
-                interior.explicit(db),
                 interior.source_order(db) + delta,
             ),
         }
@@ -1030,39 +1053,24 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "always satisfied" check.
                 let constraint = interior.constraint(db);
-                let explicit = interior.explicit(db);
                 let source_order = interior.source_order(db);
                 let true_always_satisfied = path
-                    .walk_edge(
-                        db,
-                        map,
-                        constraint.when_true(),
-                        explicit,
-                        source_order,
-                        |path, _| {
-                            interior
-                                .if_true(db)
-                                .is_always_satisfied_inner(db, map, path)
-                        },
-                    )
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
+                        interior
+                            .if_true(db)
+                            .is_always_satisfied_inner(db, map, path)
+                    })
                     .unwrap_or(true);
                 if !true_always_satisfied {
                     return false;
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_false(),
-                    explicit,
-                    source_order,
-                    |path, _| {
-                        interior
-                            .if_false(db)
-                            .is_always_satisfied_inner(db, map, path)
-                    },
-                )
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
+                    interior
+                        .if_false(db)
+                        .is_always_satisfied_inner(db, map, path)
+                })
                 .unwrap_or(true)
             }
         }
@@ -1095,35 +1103,22 @@ impl<'db> Node<'db> {
                 // from it) causes the if_true edge to become impossible. We want to ignore
                 // impossible paths, and so we treat them as passing the "never satisfied" check.
                 let constraint = interior.constraint(db);
-                let explicit = interior.explicit(db);
                 let source_order = interior.source_order(db);
                 let true_never_satisfied = path
-                    .walk_edge(
-                        db,
-                        map,
-                        constraint.when_true(),
-                        explicit,
-                        source_order,
-                        |path, _| interior.if_true(db).is_never_satisfied_inner(db, map, path),
-                    )
+                    .walk_edge(db, map, constraint.when_true(), source_order, |path, _| {
+                        interior.if_true(db).is_never_satisfied_inner(db, map, path)
+                    })
                     .unwrap_or(true);
                 if !true_never_satisfied {
                     return false;
                 }
 
                 // Ditto for the if_false branch
-                path.walk_edge(
-                    db,
-                    map,
-                    constraint.when_false(),
-                    explicit,
-                    source_order,
-                    |path, _| {
-                        interior
-                            .if_false(db)
-                            .is_never_satisfied_inner(db, map, path)
-                    },
-                )
+                path.walk_edge(db, map, constraint.when_false(), source_order, |path, _| {
+                    interior
+                        .if_false(db)
+                        .is_never_satisfied_inner(db, map, path)
+                })
                 .unwrap_or(true)
             }
         }
@@ -1166,7 +1161,6 @@ impl<'db> Node<'db> {
                 other_interior.constraint(db),
                 Node::AlwaysTrue,
                 Node::AlwaysTrue,
-                other_interior.explicit(db),
                 other_interior.source_order(db) + other_offset,
             ),
             (Node::Interior(self_interior), Node::AlwaysTrue) => Node::new(
@@ -1174,7 +1168,6 @@ impl<'db> Node<'db> {
                 self_interior.constraint(db),
                 Node::AlwaysTrue,
                 Node::AlwaysTrue,
-                self_interior.explicit(db),
                 self_interior.source_order(db),
             ),
             (Node::AlwaysFalse, _) => other.with_adjusted_source_order(db, other_offset),
@@ -1208,7 +1201,6 @@ impl<'db> Node<'db> {
                 other_interior.constraint(db),
                 Node::AlwaysFalse,
                 Node::AlwaysFalse,
-                other_interior.explicit(db),
                 other_interior.source_order(db) + other_offset,
             ),
             (Node::Interior(self_interior), Node::AlwaysFalse) => Node::new(
@@ -1216,7 +1208,6 @@ impl<'db> Node<'db> {
                 self_interior.constraint(db),
                 Node::AlwaysFalse,
                 Node::AlwaysFalse,
-                self_interior.explicit(db),
                 self_interior.source_order(db),
             ),
             (Node::AlwaysTrue, _) => other.with_adjusted_source_order(db, other_offset),
@@ -1261,7 +1252,6 @@ impl<'db> Node<'db> {
                 interior.constraint(db),
                 self.iff_inner(db, interior.if_true(db), other_offset),
                 self.iff_inner(db, interior.if_false(db), other_offset),
-                interior.explicit(db),
                 interior.source_order(db) + other_offset,
             ),
             (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
@@ -1269,7 +1259,6 @@ impl<'db> Node<'db> {
                 interior.constraint(db),
                 interior.if_true(db).iff_inner(db, other, other_offset),
                 interior.if_false(db).iff_inner(db, other, other_offset),
-                interior.explicit(db),
                 interior.source_order(db),
             ),
             (Node::Interior(a), Node::Interior(b)) => a.iff(db, b, other_offset),
@@ -1595,18 +1584,8 @@ impl<'db> Node<'db> {
         //     false
         //
         //  (Note that the `else` branch shouldn't be reachable, but we have to provide something!)
-        let left_node = Node::new_satisfied_constraint(
-            db,
-            left,
-            ExplicitConstraint::Implicit,
-            left_source_order,
-        );
-        let right_node = Node::new_satisfied_constraint(
-            db,
-            right,
-            ExplicitConstraint::Implicit,
-            right_source_order,
-        );
+        let left_node = Node::new_satisfied_constraint(db, left, left_source_order);
+        let right_node = Node::new_satisfied_constraint(db, right, right_source_order);
         let right_result = right_node.ite(db, Node::AlwaysFalse, when_left_but_not_right);
         let left_result = left_node.ite(db, right_result, when_not_left);
         let result = replacement.ite(db, when_left_and_right, left_result);
@@ -1671,18 +1650,8 @@ impl<'db> Node<'db> {
         // Lastly, verify that the result is consistent with the input. (It must produce the same
         // results when `left ∨ right`.) If it doesn't, the substitution isn't valid, and we should
         // return the original BDD unmodified.
-        let left_node = Node::new_satisfied_constraint(
-            db,
-            left,
-            ExplicitConstraint::Implicit,
-            left_source_order,
-        );
-        let right_node = Node::new_satisfied_constraint(
-            db,
-            right,
-            ExplicitConstraint::Implicit,
-            right_source_order,
-        );
+        let left_node = Node::new_satisfied_constraint(db, left, left_source_order);
+        let right_node = Node::new_satisfied_constraint(db, right, right_source_order);
         let validity = replacement.iff(db, left_node.or(db, right_node));
         let constrained_original = self.and(db, validity);
         let constrained_replacement = result.and(db, validity);
@@ -1837,11 +1806,12 @@ impl<'db> Node<'db> {
                     Node::AlwaysTrue => write!(f, "always"),
                     Node::AlwaysFalse => write!(f, "never"),
                     Node::Interior(interior) => {
+                        let constraint = interior.constraint(self.db);
                         write!(
                             f,
                             "{} {:?} {}/{}",
-                            interior.constraint(self.db).display(self.db),
-                            interior.explicit(self.db),
+                            constraint.display(self.db),
+                            constraint.explicit(self.db),
                             interior.source_order(self.db),
                             interior.max_source_order(self.db),
                         )?;
@@ -1898,7 +1868,9 @@ impl<'db> RepresentativeBounds<'db> {
     }
 }
 
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Hash, get_size2::GetSize, salsa::Update)]
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::Update,
+)]
 pub(crate) enum ExplicitConstraint {
     Implicit,
     Explicit,
@@ -1938,7 +1910,6 @@ struct InteriorNode<'db> {
     constraint: ConstrainedTypeVar<'db>,
     if_true: Node<'db>,
     if_false: Node<'db>,
-    explicit: ExplicitConstraint,
 
     /// Represents the order in which this node's constraint was added to the containing constraint
     /// set, relative to all of the other constraints in the set. This starts off at 1 for a simple
@@ -1963,7 +1934,6 @@ impl<'db> InteriorNode<'db> {
             self.constraint(db),
             self.if_true(db).negate(db),
             self.if_false(db).negate(db),
-            self.explicit(db),
             self.source_order(db),
         )
     }
@@ -1980,7 +1950,6 @@ impl<'db> InteriorNode<'db> {
                     .or_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
                     .or_inner(db, other.if_false(db), other_offset),
-                self.explicit(db) & other.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
@@ -1990,7 +1959,6 @@ impl<'db> InteriorNode<'db> {
                     .or_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
                     .or_inner(db, Node::Interior(other), other_offset),
-                self.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
@@ -1998,7 +1966,6 @@ impl<'db> InteriorNode<'db> {
                 other_constraint,
                 Node::Interior(self).or_inner(db, other.if_true(db), other_offset),
                 Node::Interior(self).or_inner(db, other.if_false(db), other_offset),
-                other.explicit(db),
                 other.source_order(db) + other_offset,
             ),
         }
@@ -2016,7 +1983,6 @@ impl<'db> InteriorNode<'db> {
                     .and_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
                     .and_inner(db, other.if_false(db), other_offset),
-                self.explicit(db) & other.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
@@ -2026,7 +1992,6 @@ impl<'db> InteriorNode<'db> {
                     .and_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
                     .and_inner(db, Node::Interior(other), other_offset),
-                self.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
@@ -2034,7 +1999,6 @@ impl<'db> InteriorNode<'db> {
                 other_constraint,
                 Node::Interior(self).and_inner(db, other.if_true(db), other_offset),
                 Node::Interior(self).and_inner(db, other.if_false(db), other_offset),
-                other.explicit(db),
                 other.source_order(db) + other_offset,
             ),
         }
@@ -2052,7 +2016,6 @@ impl<'db> InteriorNode<'db> {
                     .iff_inner(db, other.if_true(db), other_offset),
                 self.if_false(db)
                     .iff_inner(db, other.if_false(db), other_offset),
-                self.explicit(db) & other.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
@@ -2062,7 +2025,6 @@ impl<'db> InteriorNode<'db> {
                     .iff_inner(db, Node::Interior(other), other_offset),
                 self.if_false(db)
                     .iff_inner(db, Node::Interior(other), other_offset),
-                self.explicit(db),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
@@ -2070,7 +2032,6 @@ impl<'db> InteriorNode<'db> {
                 other_constraint,
                 Node::Interior(self).iff_inner(db, other.if_true(db), other_offset),
                 Node::Interior(self).iff_inner(db, other.if_false(db), other_offset),
-                other.explicit(db),
                 other.source_order(db) + other_offset,
             ),
         }
@@ -2140,7 +2101,6 @@ impl<'db> InteriorNode<'db> {
     ) -> Node<'db> {
         let self_constraint = self.constraint(db);
         let self_source_order = self.source_order(db);
-        let self_explicit = self.explicit(db);
         if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
             // with the OR of its if_false/if_true edges. That is, the result is true if there's
@@ -2154,7 +2114,6 @@ impl<'db> InteriorNode<'db> {
                     db,
                     map,
                     self_constraint.when_true(),
-                    self_explicit,
                     self_source_order,
                     |path, new_range| {
                         let branch =
@@ -2167,15 +2126,10 @@ impl<'db> InteriorNode<'db> {
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, (explicit, source_order))| {
+                            .fold(branch, |branch, (assignment, source_order)| {
                                 branch.and(
                                     db,
-                                    Node::new_satisfied_constraint(
-                                        db,
-                                        *assignment,
-                                        *explicit,
-                                        *source_order,
-                                    ),
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
                                 )
                             })
                     },
@@ -2186,7 +2140,6 @@ impl<'db> InteriorNode<'db> {
                     db,
                     map,
                     self_constraint.when_false(),
-                    self_explicit,
                     self_source_order,
                     |path, new_range| {
                         let branch =
@@ -2199,15 +2152,10 @@ impl<'db> InteriorNode<'db> {
                                 // removed!
                                 !should_remove(assignment.constraint())
                             })
-                            .fold(branch, |branch, (assignment, (explicit, source_order))| {
+                            .fold(branch, |branch, (assignment, source_order)| {
                                 branch.and(
                                     db,
-                                    Node::new_satisfied_constraint(
-                                        db,
-                                        *assignment,
-                                        *explicit,
-                                        *source_order,
-                                    ),
+                                    Node::new_satisfied_constraint(db, *assignment, *source_order),
                                 )
                             })
                     },
@@ -2221,7 +2169,6 @@ impl<'db> InteriorNode<'db> {
                     db,
                     map,
                     self_constraint.when_true(),
-                    self_explicit,
                     self_source_order,
                     |path, _| {
                         self.if_true(db)
@@ -2234,7 +2181,6 @@ impl<'db> InteriorNode<'db> {
                     db,
                     map,
                     self_constraint.when_false(),
-                    self_explicit,
                     self_source_order,
                     |path, _| {
                         self.if_false(db)
@@ -2245,8 +2191,7 @@ impl<'db> InteriorNode<'db> {
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            Node::new_constraint(db, self_constraint, self_explicit, self_source_order)
-                .ite(db, if_true, if_false)
+            Node::new_constraint(db, self_constraint, self_source_order).ite(db, if_true, if_false)
         }
     }
 
@@ -2279,7 +2224,6 @@ impl<'db> InteriorNode<'db> {
                     self_constraint,
                     if_true,
                     if_false,
-                    self.explicit(db),
                     self.source_order(db),
                 ),
                 found_in_true || found_in_false,
@@ -2410,28 +2354,26 @@ impl<'db> InteriorNode<'db> {
                     _ => continue,
                 };
 
-                let new_constraint =
-                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+                let new_constraint = ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    new_lower,
+                    new_upper,
+                    ExplicitConstraint::Implicit,
+                );
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
-                let new_node = Node::new_constraint(
-                    db,
-                    new_constraint,
-                    ExplicitConstraint::Implicit,
-                    next_source_order,
-                );
+                let new_node = Node::new_constraint(db, new_constraint, next_source_order);
                 next_source_order += 1;
                 let positive_left_node = Node::new_satisfied_constraint(
                     db,
                     left_constraint.when_true(),
-                    ExplicitConstraint::Implicit,
                     left_source_order,
                 );
                 let positive_right_node = Node::new_satisfied_constraint(
                     db,
                     right_constraint.when_true(),
-                    ExplicitConstraint::Implicit,
                     right_source_order,
                 );
                 let lhs = positive_left_node.and(db, positive_right_node);
@@ -2482,13 +2424,11 @@ impl<'db> InteriorNode<'db> {
                 let positive_larger_node = Node::new_satisfied_constraint(
                     db,
                     larger_constraint.when_true(),
-                    ExplicitConstraint::Implicit,
                     larger_source_order,
                 );
                 let negative_larger_node = Node::new_satisfied_constraint(
                     db,
                     larger_constraint.when_false(),
-                    ExplicitConstraint::Implicit,
                     larger_source_order,
                 );
 
@@ -2556,13 +2496,11 @@ impl<'db> InteriorNode<'db> {
                     let positive_intersection_node = Node::new_satisfied_constraint(
                         db,
                         intersection_constraint.when_true(),
-                        ExplicitConstraint::Implicit,
                         next_source_order,
                     );
                     let negative_intersection_node = Node::new_satisfied_constraint(
                         db,
                         intersection_constraint.when_false(),
-                        ExplicitConstraint::Implicit,
                         next_source_order,
                     );
                     next_source_order += 1;
@@ -2570,26 +2508,22 @@ impl<'db> InteriorNode<'db> {
                     let positive_left_node = Node::new_satisfied_constraint(
                         db,
                         left_constraint.when_true(),
-                        ExplicitConstraint::Implicit,
                         left_source_order,
                     );
                     let negative_left_node = Node::new_satisfied_constraint(
                         db,
                         left_constraint.when_false(),
-                        ExplicitConstraint::Implicit,
                         left_source_order,
                     );
 
                     let positive_right_node = Node::new_satisfied_constraint(
                         db,
                         right_constraint.when_true(),
-                        ExplicitConstraint::Implicit,
                         right_source_order,
                     );
                     let negative_right_node = Node::new_satisfied_constraint(
                         db,
                         right_constraint.when_false(),
-                        ExplicitConstraint::Implicit,
                         right_source_order,
                     );
 
@@ -2671,13 +2605,11 @@ impl<'db> InteriorNode<'db> {
                     let positive_left_node = Node::new_satisfied_constraint(
                         db,
                         left_constraint.when_true(),
-                        ExplicitConstraint::Implicit,
                         left_source_order,
                     );
                     let positive_right_node = Node::new_satisfied_constraint(
                         db,
                         right_constraint.when_true(),
-                        ExplicitConstraint::Implicit,
                         right_source_order,
                     );
 
@@ -3051,21 +2983,35 @@ impl<'db> SequentMap<'db> {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
                 if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
-                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower_typevar,
+                        Type::Never,
+                        upper,
+                        constraint.explicit(db),
+                    )
                 } else {
                     return;
                 }
             }
 
             // Case 2
-            (Type::TypeVar(lower_typevar), _) => {
-                ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
-            }
+            (Type::TypeVar(lower_typevar), _) => ConstrainedTypeVar::new(
+                db,
+                lower_typevar,
+                Type::Never,
+                upper,
+                constraint.explicit(db),
+            ),
 
             // Case 3
-            (_, Type::TypeVar(upper_typevar)) => {
-                ConstrainedTypeVar::new(db, upper_typevar, lower, Type::object())
-            }
+            (_, Type::TypeVar(upper_typevar)) => ConstrainedTypeVar::new(
+                db,
+                upper_typevar,
+                lower,
+                Type::object(),
+                constraint.explicit(db),
+            ),
 
             _ => return,
         };
@@ -3179,8 +3125,13 @@ impl<'db> SequentMap<'db> {
             _ => return,
         };
 
-        let post_constraint =
-            ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+        let post_constraint = ConstrainedTypeVar::new(
+            db,
+            constrained_typevar,
+            new_lower,
+            new_upper,
+            left_constraint.explicit(db) & right_constraint.explicit(db),
+        );
         self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
         self.enqueue_constraint(post_constraint);
     }
@@ -3202,14 +3153,28 @@ impl<'db> SequentMap<'db> {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
                         if bound_typevar.is_same_typevar_as(db, other_bound_typevar) =>
                     {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                        ConstrainedTypeVar::new(
+                            db,
+                            bound_typevar,
+                            right_lower,
+                            right_upper,
+                            left_constraint.explicit(db) & right_constraint.explicit(db),
+                        )
                     }
-                    (Type::TypeVar(bound_typevar), _) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, Type::Never, right_upper)
-                    }
-                    (_, Type::TypeVar(bound_typevar)) => {
-                        ConstrainedTypeVar::new(db, bound_typevar, right_lower, Type::object())
-                    }
+                    (Type::TypeVar(bound_typevar), _) => ConstrainedTypeVar::new(
+                        db,
+                        bound_typevar,
+                        Type::Never,
+                        right_upper,
+                        left_constraint.explicit(db) & right_constraint.explicit(db),
+                    ),
+                    (_, Type::TypeVar(bound_typevar)) => ConstrainedTypeVar::new(
+                        db,
+                        bound_typevar,
+                        right_lower,
+                        Type::object(),
+                        left_constraint.explicit(db) & right_constraint.explicit(db),
+                    ),
                     _ => return,
                 };
                 self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
@@ -3356,7 +3321,7 @@ impl<'db> SequentMap<'db> {
 /// traversing a BDD.
 #[derive(Debug, Default)]
 pub(crate) struct PathAssignments<'db> {
-    assignments: FxOrderMap<ConstraintAssignment<'db>, (ExplicitConstraint, usize)>,
+    assignments: FxOrderMap<ConstraintAssignment<'db>, usize>,
 }
 
 impl<'db> PathAssignments<'db> {
@@ -3387,7 +3352,6 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
-        explicit: ExplicitConstraint,
         source_order: usize,
         f: impl FnOnce(&mut Self, Range<usize>) -> R,
     ) -> Option<R> {
@@ -3406,7 +3370,7 @@ impl<'db> PathAssignments<'db> {
             edge = %assignment.display(db),
             "walk edge",
         );
-        let found_conflict = self.add_assignment(db, map, assignment, explicit, source_order);
+        let found_conflict = self.add_assignment(db, map, assignment, source_order);
         let result = if found_conflict.is_err() {
             // If that results in the path now being impossible due to a contradiction, return
             // without invoking the callback.
@@ -3439,15 +3403,6 @@ impl<'db> PathAssignments<'db> {
         self.assignments.contains_key(&assignment)
     }
 
-    fn assignment_holds_explicitly(
-        &self,
-        assignment: ConstraintAssignment<'db>,
-    ) -> Option<ExplicitConstraint> {
-        self.assignments
-            .get(&assignment)
-            .map(|(explicit, _)| *explicit)
-    }
-
     /// Adds a new assignment, along with any derived information that we can infer from the new
     /// assignment combined with the assignments we've already seen. If any of this causes the path
     /// to become invalid, due to a contradiction, returns a [`PathAssignmentConflict`] error.
@@ -3456,7 +3411,6 @@ impl<'db> PathAssignments<'db> {
         db: &'db dyn Db,
         map: &SequentMap<'db>,
         assignment: ConstraintAssignment<'db>,
-        explicit: ExplicitConstraint,
         source_order: usize,
     ) -> Result<(), PathAssignmentConflict> {
         // First add this assignment. If it causes a conflict, return that as an error. If we've
@@ -3473,11 +3427,7 @@ impl<'db> PathAssignments<'db> {
             );
             return Err(PathAssignmentConflict);
         }
-        if self
-            .assignments
-            .insert(assignment, (explicit, source_order))
-            .is_some()
-        {
+        if self.assignments.insert(assignment, source_order).is_some() {
             return Ok(());
         }
 
@@ -3531,31 +3481,18 @@ impl<'db> PathAssignments<'db> {
 
         for ((ante1, ante2), posts) in &map.pair_implications {
             for post in posts {
-                if let Some(ante1_explicit) = self.assignment_holds_explicitly(ante1.when_true())
-                    && let Some(ante2_explicit) =
-                        self.assignment_holds_explicitly(ante2.when_true())
+                if self.assignment_holds(ante1.when_true())
+                    && self.assignment_holds(ante2.when_true())
                 {
-                    self.add_assignment(
-                        db,
-                        map,
-                        post.when_true(),
-                        explicit & ante1_explicit & ante2_explicit,
-                        source_order,
-                    )?;
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
 
         for (ante, posts) in &map.single_implications {
             for post in posts {
-                if let Some(ante_explicit) = self.assignment_holds_explicitly(ante.when_true()) {
-                    self.add_assignment(
-                        db,
-                        map,
-                        post.when_true(),
-                        explicit & ante_explicit,
-                        source_order,
-                    )?;
+                if self.assignment_holds(ante.when_true()) {
+                    self.add_assignment(db, map, post.when_true(), source_order)?;
                 }
             }
         }
