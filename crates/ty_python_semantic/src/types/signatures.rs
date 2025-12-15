@@ -387,6 +387,11 @@ impl<'db> CallableSignature<'db> {
             // the other callable's signature. We also need to compare the return types — for
             // instance, to verify in `Callable[P, int]` that the return type is assignable to
             // `int`, or in `Callable[P, T]` to bind `T` to the return type of the other callable.
+            //
+            // TODO: This logic might need to move down into `Signature`, if we need paramspecs to
+            // be able to match a _subset_ of an overloaded callable. (In that case, we need to
+            // check each signature individually, and combine together the ones that match into the
+            // overloaded callable that the paramspec binds to.)
             match (self_is_single_paramspec, other_is_single_paramspec) {
                 (
                     Some((self_bound_typevar, self_return_type)),
