@@ -7,8 +7,8 @@ use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, OnlyReorder, SpecialFormType, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, todo_type,
+    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -263,14 +263,9 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
-            subclass_of: self.subclass_of.normalized_impl(db, only_reorder, visitor),
+            subclass_of: self.subclass_of.normalized_impl(db, visitor),
         }
     }
 
@@ -439,17 +434,12 @@ impl<'db> SubclassOfInner<'db> {
         Self::TypeVar(bound_typevar)
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
-            Self::Class(class) => Self::Class(class.normalized_impl(db, only_reorder, visitor)),
-            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized(only_reorder)),
+            Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
+            Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::TypeVar(bound_typevar) => {
-                Self::TypeVar(bound_typevar.normalized_impl(db, only_reorder, visitor))
+                Self::TypeVar(bound_typevar.normalized_impl(db, visitor))
             }
         }
     }

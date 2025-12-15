@@ -83,9 +83,9 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, OnlyReorder, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness,
-    Type, TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type,
-    definition_expression_type, infer_definition_types, walk_signature,
+    NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, definition_expression_type,
+    infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1156,22 +1156,17 @@ impl<'db> FunctionType<'db> {
     }
 
     pub(crate) fn normalized(self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    pub(crate) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let literal = self.literal(db);
         let updated_signature = self
             .updated_signature(db)
-            .map(|signature| signature.normalized_impl(db, only_reorder, visitor));
+            .map(|signature| signature.normalized_impl(db, visitor));
         let updated_last_definition_signature = self
             .updated_last_definition_signature(db)
-            .map(|signature| signature.normalized_impl(db, only_reorder, visitor));
+            .map(|signature| signature.normalized_impl(db, visitor));
         Self::new(
             db,
             literal,

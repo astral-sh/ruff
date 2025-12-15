@@ -29,13 +29,13 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
 ) -> Ordering {
     debug_assert_eq!(
         *left,
-        left.canonically_ordered(db),
-        "`left` must be canonically ordered before a meaningful ordering can be established"
+        left.normalized(db),
+        "`left` must be normalized before a meaningful ordering can be established"
     );
     debug_assert_eq!(
         *right,
-        right.canonically_ordered(db),
-        "`right` must be canonically ordered before a meaningful ordering can be established"
+        right.normalized(db),
+        "`right` must be normalized before a meaningful ordering can be established"
     );
 
     if left == right {

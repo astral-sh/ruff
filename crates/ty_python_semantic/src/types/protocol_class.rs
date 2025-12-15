@@ -15,8 +15,8 @@ use crate::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
         ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
         InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
-        MemberLookupPolicy, NormalizedVisitor, OnlyReorder, PropertyInstanceType, Signature, Type,
-        TypeMapping, TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
+        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
+        TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -369,22 +369,12 @@ impl<'db> ProtocolInterface<'db> {
         })
     }
 
-    pub(super) fn normalized_impl(
-        self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    pub(super) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.inner(db)
                 .iter()
-                .map(|(name, data)| {
-                    (
-                        name.clone(),
-                        data.normalized_impl(db, only_reorder, visitor),
-                    )
-                })
+                .map(|(name, data)| (name.clone(), data.normalized_impl(db, visitor)))
                 .collect::<BTreeMap<_, _>>(),
         )
     }
@@ -490,17 +480,12 @@ pub(super) struct ProtocolMemberData<'db> {
 
 impl<'db> ProtocolMemberData<'db> {
     fn normalized(&self, db: &'db dyn Db) -> Self {
-        self.normalized_impl(db, OnlyReorder::No, &NormalizedVisitor::default())
+        self.normalized_impl(db, &NormalizedVisitor::default())
     }
 
-    fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self {
-            kind: self.kind.normalized_impl(db, only_reorder, visitor),
+            kind: self.kind.normalized_impl(db, visitor),
             qualifiers: self.qualifiers,
         }
     }
@@ -608,21 +593,16 @@ enum ProtocolMemberKind<'db> {
 }
 
 impl<'db> ProtocolMemberKind<'db> {
-    fn normalized_impl(
-        &self,
-        db: &'db dyn Db,
-        only_reorder: OnlyReorder,
-        visitor: &NormalizedVisitor<'db>,
-    ) -> Self {
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self {
             ProtocolMemberKind::Method(callable) => {
-                ProtocolMemberKind::Method(callable.normalized_impl(db, only_reorder, visitor))
+                ProtocolMemberKind::Method(callable.normalized_impl(db, visitor))
             }
             ProtocolMemberKind::Property(property) => {
-                ProtocolMemberKind::Property(property.normalized_impl(db, only_reorder, visitor))
+                ProtocolMemberKind::Property(property.normalized_impl(db, visitor))
             }
             ProtocolMemberKind::Other(ty) => {
-                ProtocolMemberKind::Other(ty.normalized_impl(db, only_reorder, visitor))
+                ProtocolMemberKind::Other(ty.normalized_impl(db, visitor))
             }
         }
     }

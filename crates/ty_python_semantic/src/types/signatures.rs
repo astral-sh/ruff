@@ -25,8 +25,8 @@ use crate::types::infer::{infer_deferred_types, infer_scope_types};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, OnlyReorder, ParamSpecAttrKind,
-    TypeContext, TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
+    TypeMapping, TypeRelation, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -107,13 +107,12 @@ impl<'db> CallableSignature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self::from_overloads(
             self.overloads
                 .iter()
-                .map(|signature| signature.normalized_impl(db, only_reorder, visitor)),
+                .map(|signature| signature.normalized_impl(db, visitor)),
         )
     }
 
@@ -744,13 +743,12 @@ impl<'db> Signature<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         Self {
             generic_context: self
                 .generic_context
-                .map(|ctx| ctx.normalized_impl(db, only_reorder, visitor)),
+                .map(|ctx| ctx.normalized_impl(db, visitor)),
             // Discard the definition when normalizing, so that two equivalent signatures
             // with different `Definition`s share the same Salsa ID when normalized
             definition: None,
@@ -758,11 +756,11 @@ impl<'db> Signature<'db> {
                 db,
                 self.parameters
                     .iter()
-                    .map(|param| param.normalized_impl(db, only_reorder, visitor)),
+                    .map(|param| param.normalized_impl(db, visitor)),
             ),
             return_ty: self
                 .return_ty
-                .map(|return_ty| return_ty.normalized_impl(db, only_reorder, visitor)),
+                .map(|return_ty| return_ty.normalized_impl(db, visitor)),
         }
     }
 
@@ -2158,7 +2156,6 @@ impl<'db> Parameter<'db> {
     pub(crate) fn normalized_impl(
         &self,
         db: &'db dyn Db,
-        only_reorder: OnlyReorder,
         visitor: &NormalizedVisitor<'db>,
     ) -> Self {
         let Parameter {
@@ -2173,16 +2170,8 @@ impl<'db> Parameter<'db> {
         // with a dynamic type as its annotation. (We must use `Any` here as all dynamic types
         // normalize to `Any`.)
         let annotated_type = annotated_type
-            .map(|ty| ty.normalized_impl(db, only_reorder, visitor))
+            .map(|ty| ty.normalized_impl(db, visitor))
             .unwrap_or_else(Type::any);
-
-        let map_default_type = |ty: Type<'db>| {
-            if only_reorder == OnlyReorder::Yes {
-                ty.normalized_impl(db, only_reorder, visitor)
-            } else {
-                Type::Never
-            }
-        };
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -2193,17 +2182,17 @@ impl<'db> Parameter<'db> {
                 default_type,
             } => ParameterKind::PositionalOnly {
                 name: None,
-                default_type: default_type.map(map_default_type),
+                default_type: default_type.map(|_| Type::Never),
             },
             ParameterKind::PositionalOrKeyword { name, default_type } => {
                 ParameterKind::PositionalOrKeyword {
                     name: name.clone(),
-                    default_type: default_type.map(map_default_type),
+                    default_type: default_type.map(|_| Type::Never),
                 }
             }
             ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
                 name: name.clone(),
-                default_type: default_type.map(map_default_type),
+                default_type: default_type.map(|_| Type::Never),
             },
             ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
                 name: Name::new_static("args"),
