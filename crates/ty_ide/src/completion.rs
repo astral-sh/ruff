@@ -4711,8 +4711,7 @@ from os.<CURSOR>
         let last_nonunderscore = test
             .completions()
             .iter()
-            .filter(|c| !c.name.starts_with('_'))
-            .next_back()
+            .rfind(|c| !c.name.starts_with('_'))
             .unwrap();
 
         assert_eq!(&last_nonunderscore.name, "type_check_only");

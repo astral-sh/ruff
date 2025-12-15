@@ -28,9 +28,9 @@ use crate::module_resolver::{
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
-    builtins_module_scope, builtins_symbol, explicit_global_symbol, global_symbol,
-    module_type_implicit_global_declaration, module_type_implicit_global_symbol, place,
-    place_from_bindings, place_from_declarations, typing_extensions_symbol,
+    builtins_module_scope, builtins_symbol, class_body_implicit_symbol, explicit_global_symbol,
+    global_symbol, module_type_implicit_global_declaration, module_type_implicit_global_symbol,
+    place, place_from_bindings, place_from_declarations, typing_extensions_symbol,
 };
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::ast_ids::{HasScopedUseId, ScopedUseId};
@@ -78,7 +78,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_tuple_caught, report_invalid_generator_function_return_type,
     report_invalid_key_on_typed_dict, report_invalid_or_unsupported_base,
     report_invalid_return_type, report_invalid_type_checking_constant,
-    report_named_tuple_field_with_leading_underscore,
+    report_invalid_type_param_order, report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
@@ -949,23 +949,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            let scope = class.body_scope(self.db()).scope(self.db());
-            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS)
-                && let Some(parent) = scope.parent()
-            {
-                for self_typevar in class.typevars_referenced_in_definition(self.db()) {
-                    let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
-                    for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
-                        if let Some(other_typevar) =
-                            enclosing.binds_named_typevar(self.db(), self_typevar_name)
-                        {
-                            report_rebound_typevar(
-                                &self.context,
-                                self_typevar_name,
-                                class,
-                                class_node,
-                                other_typevar,
-                            );
+            if self.context.is_lint_enabled(&INVALID_GENERIC_CLASS) {
+                if !class.has_pep_695_type_params(self.db())
+                    && let Some(generic_context) = class.legacy_generic_context(self.db())
+                {
+                    struct State<'db> {
+                        typevar_with_default: TypeVarInstance<'db>,
+                        invalid_later_tvars: Vec<TypeVarInstance<'db>>,
+                    }
+
+                    let mut state: Option<State<'db>> = None;
+
+                    for bound_typevar in generic_context.variables(self.db()) {
+                        let typevar = bound_typevar.typevar(self.db());
+                        let has_default = typevar.default_type(self.db()).is_some();
+
+                        if let Some(state) = state.as_mut() {
+                            if !has_default {
+                                state.invalid_later_tvars.push(typevar);
+                            }
+                        } else if has_default {
+                            state = Some(State {
+                                typevar_with_default: typevar,
+                                invalid_later_tvars: vec![],
+                            });
+                        }
+                    }
+
+                    if let Some(state) = state
+                        && !state.invalid_later_tvars.is_empty()
+                    {
+                        report_invalid_type_param_order(
+                            &self.context,
+                            class,
+                            class_node,
+                            state.typevar_with_default,
+                            &state.invalid_later_tvars,
+                        );
+                    }
+                }
+
+                let scope = class.body_scope(self.db()).scope(self.db());
+                if let Some(parent) = scope.parent() {
+                    for self_typevar in class.typevars_referenced_in_definition(self.db()) {
+                        let self_typevar_name = self_typevar.typevar(self.db()).name(self.db());
+                        for enclosing in enclosing_generic_contexts(self.db(), self.index, parent) {
+                            if let Some(other_typevar) =
+                                enclosing.binds_named_typevar(self.db(), self_typevar_name)
+                            {
+                                report_rebound_typevar(
+                                    &self.context,
+                                    self_typevar_name,
+                                    class,
+                                    class_node,
+                                    other_typevar,
+                                );
+                            }
                         }
                     }
                 }
@@ -1104,7 +1143,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if implementation.is_none() && !self.in_stub() {
                 let mut implementation_required = true;
 
-                if let NodeWithScopeKind::Class(class_node_ref) = scope {
+                if function
+                    .iter_overloads_and_implementation(self.db())
+                    .all(|f| {
+                        f.body_scope(self.db())
+                            .scope(self.db())
+                            .in_type_checking_block()
+                    })
+                {
+                    implementation_required = false;
+                } else if let NodeWithScopeKind::Class(class_node_ref) = scope {
                     let class = binding_type(
                         self.db(),
                         self.index
@@ -1113,7 +1161,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect_class_literal();
 
                     if class.is_protocol(self.db())
-                        || (class.is_abstract(self.db())
+                        || (Type::ClassLiteral(class)
+                            .is_subtype_of(self.db(), KnownClass::ABCMeta.to_instance(self.db()))
                             && overloads.iter().all(|overload| {
                                 overload.has_known_decorator(
                                     self.db(),
@@ -1140,8 +1189,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             &function_node.name
                         ));
                         diagnostic.info(
-                            "Overloaded functions without implementations are only permitted \
-                            in stub files, on protocols, or for abstract methods",
+                            "Overloaded functions without implementations are only permitted:",
+                        );
+                        diagnostic.info(" - in stub files");
+                        diagnostic.info(" - in `if TYPE_CHECKING` blocks");
+                        diagnostic.info(" - as methods on protocol classes");
+                        diagnostic.info(
+                            " - or as `@abstractmethod`-decorated methods on abstract classes",
                         );
                         diagnostic.info(
                             "See https://docs.python.org/3/library/typing.html#typing.overload \
@@ -9210,6 +9264,25 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             PlaceAndQualifiers::from(Place::Undefined)
+                // If we're in a class body, check for implicit class body symbols first.
+                // These take precedence over globals.
+                .or_fall_back_to(db, || {
+                    if scope.node(db).scope_kind().is_class()
+                        && let Some(symbol) = place_expr.as_symbol()
+                    {
+                        let implicit = class_body_implicit_symbol(db, symbol.name());
+                        if implicit.place.is_definitely_bound() {
+                            return implicit.map_type(|ty| {
+                                self.narrow_place_with_applicable_constraints(
+                                    place_expr,
+                                    ty,
+                                    &constraint_keys,
+                                )
+                            });
+                        }
+                    }
+                    Place::Undefined.into()
+                })
                 // No nonlocal binding? Check the module's explicit globals.
                 // Avoid infinite recursion if `self.scope` already is the module's global scope.
                 .or_fall_back_to(db, || {

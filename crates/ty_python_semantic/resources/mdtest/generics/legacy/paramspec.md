@@ -424,9 +424,8 @@ p3 = ParamSpecWithDefault4[[int], [str]]()
 reveal_type(p3.attr1)  # revealed: (int, /) -> None
 reveal_type(p3.attr2)  # revealed: (str, /) -> None
 
-# TODO: error
 # Un-ordered type variables as the default of `PAnother` is `P`
-class ParamSpecWithDefault5(Generic[PAnother, P]):
+class ParamSpecWithDefault5(Generic[PAnother, P]):  # error: [invalid-generic-class]
     attr: Callable[PAnother, None]
 
 # TODO: error

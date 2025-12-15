@@ -10691,7 +10691,6 @@ pub struct UnionTypeInstance<'db> {
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
     /// the elements as type expressions. Use `value_expression_types` to get the
     /// corresponding value expression types.
-    #[expect(clippy::ref_option)]
     #[returns(ref)]
     _value_expr_types: Option<Box<[Type<'db>]>>,
 

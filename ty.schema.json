@@ -595,7 +595,7 @@
         },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
-          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\nMany of these result in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n\n# error: type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {
