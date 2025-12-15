@@ -172,6 +172,10 @@ where
 ///
 /// This is called a "set of constraint sets", and denoted _𝒮_, in [[POPL2015][]].
 ///
+/// The underlying representation tracks the order that individual constraints appear in the
+/// underlying Python source. For this to work, you should ensure that you call "combining"
+/// operators like [`and`][Self::and] and [`or`][Self::or] in a consistent order.
+///
 /// [POPL2015]: https://doi.org/10.1145/2676726.2676991
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct ConstraintSet<'db> {
@@ -822,6 +826,14 @@ impl<'db> ConstrainedTypeVar<'db> {
 /// BDD nodes are also _ordered_, meaning that every path from the root of a BDD to a terminal node
 /// visits variables in the same order. [`ConstrainedTypeVar::ordering`] defines the variable
 /// ordering that we use for constraint set BDDs.
+///
+/// In addition to this BDD variable ordering, we also track a `source_order` for each individual
+/// constraint. This tracks the order in which constraints appear in the underlying Python source
+/// code. This provides an ordering that is stable across multiple runs, for consistent test and
+/// diagnostic output. (We cannot use this ordering as our BDD variable ordering, since we might
+/// have different `source_order`s for the same constraints if they appear in multiple constraint
+/// sets, but we need the BDD variable ordering to be consistent across all BDDs that we create in
+/// the process.)
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 enum Node<'db> {
     AlwaysFalse,
