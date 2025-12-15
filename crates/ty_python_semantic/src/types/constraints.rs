@@ -1085,6 +1085,11 @@ impl<'db> Node<'db> {
     fn or_with_offset(self, db: &'db dyn Db, other: Self) -> Self {
         // To ensure that `self` appears before `other` in `source_order`, we add the maximum
         // `source_order` of the lhs to all of the `source_order`s in the rhs.
+        //
+        // TODO: If we store `other_offset` as a new field on InteriorNode, we might be able to
+        // avoid all of the extra work in the calls to with_adjusted_source_order, and apply the
+        // adjustment lazily when walking a BDD tree. (ditto below in the other _with_offset
+        // methods)
         let other_offset = self.max_source_order(db);
         self.or_inner(db, other, other_offset)
     }
