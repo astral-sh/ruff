@@ -580,7 +580,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         // we do not store types for sub-expressions. Re-infer the type here.
                         builder.infer_expression(value, TypeContext::default())
                     } else {
-                        builder.expression_type(value.as_ref())
+                        builder.expression_type(value)
                     };
 
                     value_ty == Type::SpecialForm(SpecialFormType::Unpack)

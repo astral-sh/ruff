@@ -184,21 +184,19 @@ static PYDANTIC: Benchmark = Benchmark::new(
     7000,
 );
 
-static SYMPY: std::sync::LazyLock<Benchmark<'static>> = std::sync::LazyLock::new(|| {
-    Benchmark::new(
-        RealWorldProject {
-            name: "sympy",
-            repository: "https://github.com/sympy/sympy",
-            commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
-            paths: &["sympy"],
-            dependencies: &["mpmath"],
-            max_dep_date: "2025-06-17",
-            python_version: PythonVersion::PY312,
-        },
-        // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
-        70000,
-    )
-});
+static SYMPY: Benchmark = Benchmark::new(
+    RealWorldProject {
+        name: "sympy",
+        repository: "https://github.com/sympy/sympy",
+        commit: "22fc107a94eaabc4f6eb31470b39db65abb7a394",
+        paths: &["sympy"],
+        dependencies: &["mpmath"],
+        max_dep_date: "2025-06-17",
+        python_version: PythonVersion::PY312,
+    },
+    // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
+    70000,
+);
 
 static TANJUN: Benchmark = Benchmark::new(
     RealWorldProject {

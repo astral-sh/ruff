@@ -2,8 +2,6 @@ use compact_str::{CompactString, ToCompactString};
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
-use ruff_python_ast::name::Name;
-use smallvec::{SmallVec, smallvec};
 
 use std::borrow::Cow;
 use std::time::Duration;
@@ -17,7 +15,9 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagno
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
+use smallvec::{SmallVec, smallvec};
 
 use type_ordering::union_or_intersection_elements_ordering;
 

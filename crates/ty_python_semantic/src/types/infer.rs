@@ -193,7 +193,6 @@ pub(crate) fn infer_expression_types<'db>(
     infer_expression_types_impl(db, InferExpression::new(db, expression, tcx))
 }
 
-/// When using types ​​in [`ExpressionInference`], you must use [`ExpressionInference::cycle_recovery`].
 #[salsa::tracked(returns(ref), cycle_fn=expression_cycle_recover, cycle_initial=expression_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(super) fn infer_expression_types_impl<'db>(
     db: &'db dyn Db,
@@ -824,13 +823,6 @@ impl<'db> DefinitionInference<'db> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
     }
 
-    /// When using `DefinitionInference` during type inference,
-    /// use this method to get the cycle recovery type so that divergent types are propagated.
-    #[allow(unused)]
-    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
-        self.fallback_type()
-    }
-
     pub(crate) fn undecorated_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.undecorated_type)
     }
@@ -931,13 +923,6 @@ impl<'db> ExpressionInference<'db> {
 
     fn fallback_type(&self) -> Option<Type<'db>> {
         self.extra.as_ref().and_then(|extra| extra.cycle_recovery)
-    }
-
-    /// When using `ExpressionInference` during type inference,
-    /// use this method to get the cycle recovery type so that divergent types are propagated.
-    #[allow(unused)]
-    pub(super) fn cycle_recovery(&self) -> Option<Type<'db>> {
-        self.fallback_type()
     }
 
     /// Returns true if all places in this expression are definitely bound.
