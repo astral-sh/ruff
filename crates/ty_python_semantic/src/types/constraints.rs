@@ -78,8 +78,8 @@ use salsa::plumbing::AsId;
 use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionBuilder, IntersectionType, Type,
-    TypeVarBoundOrConstraints, UnionBuilder, UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
+    UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -1318,7 +1318,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         bound_typevar: BoundTypeVarIdentity<'db>,
-        mut f: impl FnMut(Option<(Type<'db>, Type<'db>)>),
+        mut f: impl FnMut(Option<(Type<'db>, Type<'db>, usize)>),
     ) {
         self.retain_one(db, bound_typevar)
             .find_representative_types_inner(db, &mut Vec::default(), &mut f);
@@ -1328,7 +1328,7 @@ impl<'db> Node<'db> {
         self,
         db: &'db dyn Db,
         current_bounds: &mut Vec<RepresentativeBounds<'db>>,
-        f: &mut dyn FnMut(Option<(Type<'db>, Type<'db>)>),
+        f: &mut dyn FnMut(Option<(Type<'db>, Type<'db>, usize)>),
     ) {
         match self {
             Node::AlwaysTrue => {
@@ -1354,10 +1354,17 @@ impl<'db> Node<'db> {
                 // process.
                 debug_assert!(greatest_lower_bound.is_assignable_to(db, least_upper_bound));
 
+                // SAFETY: Checked that current_bounds is non-empty above.
+                let minimum_source_order = current_bounds[0].source_order;
+
                 // We've been tracking the lower and upper bound that the types for this path must
                 // satisfy. Pass those bounds along and let the caller choose a representative type
                 // from within that range.
-                f(Some((greatest_lower_bound, least_upper_bound)));
+                f(Some((
+                    greatest_lower_bound,
+                    least_upper_bound,
+                    minimum_source_order,
+                )));
             }
 
             Node::AlwaysFalse => {
@@ -3617,6 +3624,7 @@ impl<'db> GenericContext<'db> {
 
         // Then we find all of the "representative types" for each typevar in the constraint set.
         let mut error_occurred = false;
+        let mut constraints = Vec::new();
         let types = self.variables(db).map(|bound_typevar| {
             // Each representative type represents one of the ways that the typevar can satisfy the
             // constraint, expressed as a lower/upper bound on the types that the typevar can
@@ -3628,10 +3636,7 @@ impl<'db> GenericContext<'db> {
             // (This happens most often with constrained typevars.) We could in the future turn
             // _each_ of the paths into separate specializations, but it's not clear what we would
             // do with that, so instead we just report the ambiguity as a specialization failure.
-            let mut satisfied = false;
             let mut unconstrained = false;
-            let mut greatest_lower_bound = UnionBuilder::new(db).order_elements(true);
-            let mut least_upper_bound = IntersectionBuilder::new(db).order_elements(true);
             let identity = bound_typevar.identity(db);
             tracing::trace!(
                 target: "ty_python_semantic::types::constraints::specialize_constrained",
@@ -3639,38 +3644,22 @@ impl<'db> GenericContext<'db> {
                 abstracted = %abstracted.retain_one(db, identity).display(db),
                 "find specialization for typevar",
             );
-            abstracted.find_representative_types(db, identity, |bounds| {
-                satisfied = true;
-                match bounds {
-                    Some((lower_bound, upper_bound)) => {
-                        tracing::trace!(
-                            target: "ty_python_semantic::types::constraints::specialize_constrained",
-                            bound_typevar = %identity.display(db),
-                            lower_bound = %lower_bound.display(db),
-                            upper_bound = %upper_bound.display(db),
-                            "found representative type",
-                        );
-                         greatest_lower_bound.add_in_place(lower_bound);
-                         least_upper_bound.add_positive_in_place(upper_bound);
-                    }
-                    None => {
-                        unconstrained = true;
-                    }
+            constraints.clear();
+            abstracted.find_representative_types(db, identity, |bounds| match bounds {
+                Some(bounds @ (lower_bound, upper_bound, _)) => {
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::constraints::specialize_constrained",
+                        bound_typevar = %identity.display(db),
+                        lower_bound = %lower_bound.display(db),
+                        upper_bound = %upper_bound.display(db),
+                        "found representative type",
+                    );
+                    constraints.push(bounds);
+                }
+                None => {
+                    unconstrained = true;
                 }
             });
-
-            // If there are no satisfiable paths in the BDD, then there is no valid specialization
-            // for this constraint set.
-            if !satisfied {
-                // TODO: Construct a useful error here
-                tracing::debug!(
-                    target: "ty_python_semantic::types::constraints::specialize_constrained",
-                    bound_typevar = %identity.display(db),
-                    "typevar cannot be satisfied",
-                );
-                error_occurred = true;
-                return None;
-            }
 
             // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
             // specialize_recursive to fall back on the typevar's default.
@@ -3683,10 +3672,25 @@ impl<'db> GenericContext<'db> {
                 return None;
             }
 
+            // If there are no satisfiable paths in the BDD, then there is no valid specialization
+            // for this constraint set.
+            if constraints.is_empty() {
+                // TODO: Construct a useful error here
+                tracing::debug!(
+                    target: "ty_python_semantic::types::constraints::specialize_constrained",
+                    bound_typevar = %identity.display(db),
+                    "typevar cannot be satisfied",
+                );
+                error_occurred = true;
+                return None;
+            }
+
             // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
             // BDD. That's an ambiguous specialization, as described above.
-            let greatest_lower_bound = greatest_lower_bound.build();
-            let least_upper_bound = least_upper_bound.build();
+            let greatest_lower_bound =
+                UnionType::from_elements(db, constraints.iter().map(|(lower, _, _)| *lower));
+            let least_upper_bound =
+                IntersectionType::from_elements(db, constraints.iter().map(|(_, upper, _)| *upper));
             if !greatest_lower_bound.is_assignable_to(db, least_upper_bound) {
                 tracing::debug!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
