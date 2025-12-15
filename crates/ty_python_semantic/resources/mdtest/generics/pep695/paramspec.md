@@ -670,3 +670,59 @@ reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, 
 # error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 ```
+
+## ParamSpec attribute assignability
+
+When comparing signatures with `ParamSpec` attributes (`P.args` and `P.kwargs`), two different
+inferable `ParamSpec` attributes with the same kind are assignable to each other. This enables
+method overrides where both methods have their own `ParamSpec`.
+
+### Same attribute kind, both inferable
+
+```py
+from typing import Callable
+
+class Parent:
+    def method[**P](self, callback: Callable[P, None]) -> Callable[P, None]:
+        return callback
+
+class Child1(Parent):
+    # This is a valid override: Q.args matches P.args, Q.kwargs matches P.kwargs
+    def method[**Q](self, callback: Callable[Q, None]) -> Callable[Q, None]:
+        return callback
+
+# Both signatures use ParamSpec, so they should be compatible
+def outer[**P](f: Callable[P, int]) -> Callable[P, int]:
+    def inner[**Q](g: Callable[Q, int]) -> Callable[Q, int]:
+        return g
+    return inner(f)
+```
+
+We can explicitly mark it as an override using the `@override` decorator.
+
+```py
+from typing import override
+
+class Child2(Parent):
+    @override
+    def method[**Q](self, callback: Callable[Q, None]) -> Callable[Q, None]:
+        return callback
+```
+
+### One `ParamSpec` not inferable
+
+Here, `P` is in a non-inferable position while `Q` is inferable. So, they are not considered
+assignable.
+
+```py
+from typing import Callable
+
+class Container[**P]:
+    def method(self, f: Callable[P, None]) -> Callable[P, None]:
+        return f
+
+    def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
+        # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
+        # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
+        return self.method(f)
+```

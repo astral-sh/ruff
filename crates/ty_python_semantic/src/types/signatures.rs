@@ -1072,6 +1072,29 @@ impl<'db> Signature<'db> {
         let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
+
+            match (type1, type2) {
+                // This is a special case where the _same_ components of two different `ParamSpec`
+                // type variables are assignable to each other when they're both in an inferable
+                // position.
+                //
+                // `ParamSpec` type variables can only occur in parameter lists so this special case
+                // is present here instead of in `Type::has_relation_to_impl`.
+                (Type::TypeVar(typevar1), Type::TypeVar(typevar2))
+                    if typevar1.paramspec_attr(db).is_some()
+                        && typevar1.paramspec_attr(db) == typevar2.paramspec_attr(db)
+                        && typevar1
+                            .without_paramspec_attr(db)
+                            .is_inferable(db, inferable)
+                        && typevar2
+                            .without_paramspec_attr(db)
+                            .is_inferable(db, inferable) =>
+                {
+                    return true;
+                }
+                _ => {}
+            }
+
             !result
                 .intersect(
                     db,
