@@ -12581,7 +12581,7 @@ impl<'db> CallableTypes<'db> {
         }
     }
 
-    fn as_slice(&self) -> &SmallVec<[CallableType<'db>; 1]> {
+    fn as_slice(&self) -> &[CallableType<'db>] {
         &self.0
     }
 
