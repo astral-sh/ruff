@@ -794,6 +794,7 @@ class ClassWithNewAndInit:
 
     def __init__(self, x: int) -> None: ...
 
+# TODO: We do not currently solve a common behavioral supertype for the two solutions of P.
 # revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 reveal_type(into_callable(ClassWithNewAndInit))
 # TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
