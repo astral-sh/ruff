@@ -354,7 +354,7 @@ impl<'db> ConstraintSet<'db> {
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
     pub(crate) fn union(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.or(db, other.node);
+        self.node = self.node.or_with_offset(db, other.node);
         *self
     }
 
@@ -363,7 +363,7 @@ impl<'db> ConstraintSet<'db> {
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
     pub(crate) fn intersect(&mut self, db: &'db dyn Db, other: Self) -> Self {
-        self.node = self.node.and(db, other.node);
+        self.node = self.node.and_with_offset(db, other.node);
         *self
     }
 
@@ -414,7 +414,7 @@ impl<'db> ConstraintSet<'db> {
     /// nodes.
     pub(crate) fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         ConstraintSet {
-            node: self.node.iff(db, other.node),
+            node: self.node.iff_with_offset(db, other.node),
         }
     }
 
@@ -1082,11 +1082,15 @@ impl<'db> Node<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    fn or(self, db: &'db dyn Db, other: Self) -> Self {
+    fn or_with_offset(self, db: &'db dyn Db, other: Self) -> Self {
         // To ensure that `self` appears before `other` in `source_order`, we add the maximum
         // `source_order` of the lhs to all of the `source_order`s in the rhs.
         let other_offset = self.max_source_order(db);
         self.or_inner(db, other, other_offset)
+    }
+
+    fn or(self, db: &'db dyn Db, other: Self) -> Self {
+        self.or_inner(db, other, 0)
     }
 
     fn or_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
@@ -1118,11 +1122,15 @@ impl<'db> Node<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    fn and(self, db: &'db dyn Db, other: Self) -> Self {
+    fn and_with_offset(self, db: &'db dyn Db, other: Self) -> Self {
         // To ensure that `self` appears before `other` in `source_order`, we add the maximum
         // `source_order` of the lhs to all of the `source_order`s in the rhs.
         let other_offset = self.max_source_order(db);
         self.and_inner(db, other, other_offset)
+    }
+
+    fn and(self, db: &'db dyn Db, other: Self) -> Self {
+        self.and_inner(db, other, 0)
     }
 
     fn and_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
@@ -1160,11 +1168,15 @@ impl<'db> Node<'db> {
     ///
     /// In the result, `self` will appear before `other` according to the `source_order` of the BDD
     /// nodes.
-    fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+    fn iff_with_offset(self, db: &'db dyn Db, other: Self) -> Self {
         // To ensure that `self` appears before `other` in `source_order`, we add the maximum
         // `source_order` of the lhs to all of the `source_order`s in the rhs.
         let other_offset = self.max_source_order(db);
         self.iff_inner(db, other, other_offset)
+    }
+
+    fn iff(self, db: &'db dyn Db, other: Self) -> Self {
+        self.iff_inner(db, other, 0)
     }
 
     fn iff_inner(self, db: &'db dyn Db, other: Self, other_offset: usize) -> Self {
@@ -3568,7 +3580,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    specializations = specializations.or(
+                    specializations = specializations.or_with_offset(
                         db,
                         ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper),
                     );
@@ -3618,7 +3630,8 @@ impl<'db> BoundTypeVarInstance<'db> {
                     let constraint =
                         ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper);
                     if constraint_lower == constraint_upper {
-                        non_gradual_constraints = non_gradual_constraints.or(db, constraint);
+                        non_gradual_constraints =
+                            non_gradual_constraints.or_with_offset(db, constraint);
                     } else {
                         gradual_constraints.push(constraint);
                     }
@@ -3659,7 +3672,7 @@ impl<'db> GenericContext<'db> {
         let abstracted = self
             .variables(db)
             .fold(constraints.node, |constraints, bound_typevar| {
-                constraints.and(db, bound_typevar.valid_specializations(db))
+                constraints.and_with_offset(db, bound_typevar.valid_specializations(db))
             });
         tracing::debug!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
