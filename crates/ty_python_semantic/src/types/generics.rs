@@ -1585,8 +1585,20 @@ impl<'db> SpecializationBuilder<'db> {
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
         let constraints = constraints.limit_to_valid_specializations(self.db);
+        let mut sorted_paths = Vec::new();
         constraints.for_each_path(self.db, |path| {
-            for (constraint, _) in path.positive_constraints() {
+            let mut path: Vec<_> = path.positive_constraints().collect();
+            path.sort_unstable_by_key(|(_, source_order)| *source_order);
+            sorted_paths.push(path);
+        });
+        sorted_paths.sort_unstable_by(|path1, path2| {
+            let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
+            let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
+            source_orders1.cmp(source_orders2)
+        });
+
+        for path in sorted_paths {
+            for (constraint, _) in path {
                 let typevar = constraint.typevar(self.db);
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
@@ -1616,7 +1628,7 @@ impl<'db> SpecializationBuilder<'db> {
                     );
                 }
             }
-        });
+        }
     }
 
     /// Infer type mappings for the specialization based on a given type and its declared type.
