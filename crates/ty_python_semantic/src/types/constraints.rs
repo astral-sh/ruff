@@ -3671,9 +3671,10 @@ impl<'db> GenericContext<'db> {
         // each typevar.
         let abstracted = self
             .variables(db)
-            .fold(constraints.node, |constraints, bound_typevar| {
+            .fold(Node::AlwaysTrue, |constraints, bound_typevar| {
                 constraints.and_with_offset(db, bound_typevar.valid_specializations(db))
-            });
+            })
+            .and_with_offset(db, constraints.node);
         tracing::debug!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             valid = %abstracted.display(db),
