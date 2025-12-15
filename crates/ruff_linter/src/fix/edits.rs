@@ -286,12 +286,7 @@ pub(crate) fn add_argument(argument: &str, arguments: &Arguments, tokens: &Token
 
 /// Generic function to add a (regular) parameter to a function definition.
 pub(crate) fn add_parameter(parameter: &str, parameters: &Parameters, source: &str) -> Edit {
-    if let Some(last) = parameters
-        .args
-        .iter()
-        .filter(|arg| arg.default.is_none())
-        .next_back()
-    {
+    if let Some(last) = parameters.args.iter().rfind(|arg| arg.default.is_none()) {
         // Case 1: at least one regular parameter, so append after the last one.
         Edit::insertion(format!(", {parameter}"), last.end())
     } else if !parameters.args.is_empty() {

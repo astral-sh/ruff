@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
-use clap::{Parser, ValueEnum, command};
+use clap::{Parser, ValueEnum};
 
 use ruff_formatter::SourceCode;
 use ruff_python_ast::{PySourceType, PythonVersion};
