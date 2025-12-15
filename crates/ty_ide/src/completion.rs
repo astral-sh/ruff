@@ -4710,7 +4710,8 @@ from os.<CURSOR>
         let test = builder.build();
         let last_nonunderscore = test
             .completions()
-            .iter().rfind(|c| !c.name.starts_with('_'))
+            .iter()
+            .rfind(|c| !c.name.starts_with('_'))
             .unwrap();
 
         assert_eq!(&last_nonunderscore.name, "type_check_only");

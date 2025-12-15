@@ -385,8 +385,8 @@ mod tests {
 
     #[test]
     fn best_fitting_variants_print_as_lists() {
-        use crate::prelude::*;
         use crate::Formatted;
+        use crate::prelude::*;
 
         // The second variant below should be selected when printing at a width of 30
         let formatted_best_fitting = format!(
