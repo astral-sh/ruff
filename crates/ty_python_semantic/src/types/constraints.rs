@@ -1282,14 +1282,11 @@ impl<'db> Node<'db> {
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
-        max_source_order: &mut usize,
     ) -> Self {
         match self {
             Node::AlwaysTrue => Node::AlwaysTrue,
             Node::AlwaysFalse => Node::AlwaysFalse,
-            Node::Interior(interior) => {
-                interior.abstract_one_inner(db, should_remove, map, path, max_source_order)
-            }
+            Node::Interior(interior) => interior.abstract_one_inner(db, should_remove, map, path),
         }
     }
 
@@ -1862,7 +1859,6 @@ impl<'db> InteriorNode<'db> {
     fn exists_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
-        let mut max_source_order = self.max_source_order(db);
         self.abstract_one_inner(
             db,
             // Remove any node that constrains `bound_typevar`, or that has a lower/upper bound of
@@ -1885,7 +1881,6 @@ impl<'db> InteriorNode<'db> {
             },
             map,
             &mut path,
-            &mut max_source_order,
         )
     }
 
@@ -1893,7 +1888,6 @@ impl<'db> InteriorNode<'db> {
     fn retain_one(self, db: &'db dyn Db, bound_typevar: BoundTypeVarIdentity<'db>) -> Node<'db> {
         let map = self.sequent_map(db);
         let mut path = PathAssignments::default();
-        let mut max_source_order = self.max_source_order(db);
         self.abstract_one_inner(
             db,
             // Remove any node that constrains some other typevar than `bound_typevar`, and any
@@ -1913,7 +1907,6 @@ impl<'db> InteriorNode<'db> {
             },
             map,
             &mut path,
-            &mut max_source_order,
         )
     }
 
@@ -1923,9 +1916,7 @@ impl<'db> InteriorNode<'db> {
         should_remove: &mut dyn FnMut(ConstrainedTypeVar<'db>) -> bool,
         map: &SequentMap<'db>,
         path: &mut PathAssignments<'db>,
-        max_source_order: &mut usize,
     ) -> Node<'db> {
-        *max_source_order = (*max_source_order).max(self.max_source_order(db));
         let self_constraint = self.constraint(db);
         if should_remove(self_constraint) {
             // If we should remove constraints involving this typevar, then we replace this node
@@ -1934,16 +1925,18 @@ impl<'db> InteriorNode<'db> {
             //
             // We also have to check if there are any derived facts that depend on the constraint
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
-            // corresponding branch.
+            // corresponding branch. We currently reuse the `source_order` of the constraint being
+            // removed when we add these derived facts.
+            //
+            // TODO: This might not be stable enough, if we add more than one derived fact for this
+            // constraint. If we still see inconsistent test output, we might need a more complex
+            // way of tracking source order for derived facts.
+            let self_source_order = self.source_order(db);
             let if_true = path
                 .walk_edge(db, map, self_constraint.when_true(), |path, new_range| {
-                    let branch = self.if_true(db).abstract_one_inner(
-                        db,
-                        should_remove,
-                        map,
-                        path,
-                        max_source_order,
-                    );
+                    let branch = self
+                        .if_true(db)
+                        .abstract_one_inner(db, should_remove, map, path);
                     path.assignments[new_range]
                         .iter()
                         .filter(|assignment| {
@@ -1952,23 +1945,18 @@ impl<'db> InteriorNode<'db> {
                             !should_remove(assignment.constraint())
                         })
                         .fold(branch, |branch, assignment| {
-                            *max_source_order += 1;
                             branch.and(
                                 db,
-                                Node::new_satisfied_constraint(db, *assignment, *max_source_order),
+                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
                             )
                         })
                 })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
                 .walk_edge(db, map, self_constraint.when_false(), |path, new_range| {
-                    let branch = self.if_false(db).abstract_one_inner(
-                        db,
-                        should_remove,
-                        map,
-                        path,
-                        max_source_order,
-                    );
+                    let branch = self
+                        .if_false(db)
+                        .abstract_one_inner(db, should_remove, map, path);
                     path.assignments[new_range]
                         .iter()
                         .filter(|assignment| {
@@ -1977,10 +1965,9 @@ impl<'db> InteriorNode<'db> {
                             !should_remove(assignment.constraint())
                         })
                         .fold(branch, |branch, assignment| {
-                            *max_source_order += 1;
                             branch.and(
                                 db,
-                                Node::new_satisfied_constraint(db, *assignment, *max_source_order),
+                                Node::new_satisfied_constraint(db, *assignment, self_source_order),
                             )
                         })
                 })
@@ -1990,24 +1977,14 @@ impl<'db> InteriorNode<'db> {
             // Otherwise, we abstract the if_false/if_true edges recursively.
             let if_true = path
                 .walk_edge(db, map, self_constraint.when_true(), |path, _| {
-                    self.if_true(db).abstract_one_inner(
-                        db,
-                        should_remove,
-                        map,
-                        path,
-                        max_source_order,
-                    )
+                    self.if_true(db)
+                        .abstract_one_inner(db, should_remove, map, path)
                 })
                 .unwrap_or(Node::AlwaysFalse);
             let if_false = path
                 .walk_edge(db, map, self_constraint.when_false(), |path, _| {
-                    self.if_false(db).abstract_one_inner(
-                        db,
-                        should_remove,
-                        map,
-                        path,
-                        max_source_order,
-                    )
+                    self.if_false(db)
+                        .abstract_one_inner(db, should_remove, map, path)
                 })
                 .unwrap_or(Node::AlwaysFalse);
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
