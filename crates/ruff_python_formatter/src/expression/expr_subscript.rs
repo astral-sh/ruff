@@ -74,8 +74,8 @@ impl FormatNodeRule<ExprSubscript> for FormatExprSubscript {
                 .fmt(f)
         });
 
-        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && matches!(call_chain_layout, CallChainLayout::Fluent(_));
+        let is_call_chain_root =
+            self.call_chain_layout == CallChainLayout::Default && call_chain_layout.is_fluent();
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -91,14 +91,13 @@ impl NeedsParentheses for ExprSubscript {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         {
-            if matches!(
-                CallChainLayout::from_expression(
-                    self.into(),
-                    context.comments().ranges(),
-                    context.source(),
-                ),
-                CallChainLayout::Fluent(_)
-            ) {
+            if CallChainLayout::from_expression(
+                self.into(),
+                context.comments().ranges(),
+                context.source(),
+            )
+            .is_fluent()
+            {
                 OptionalParentheses::Multiline
             } else if is_expression_parenthesized(
                 self.value.as_ref().into(),

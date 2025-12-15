@@ -70,9 +70,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
         // )
         // ```
-        if matches!(call_chain_layout, CallChainLayout::Fluent(_))
-            && self.call_chain_layout == CallChainLayout::Default
-        {
+        if call_chain_layout.is_fluent() && self.call_chain_layout == CallChainLayout::Default {
             group(&fmt_func).fmt(f)
         } else {
             fmt_func.fmt(f)
@@ -86,14 +84,13 @@ impl NeedsParentheses for ExprCall {
         _parent: AnyNodeRef,
         context: &PyFormatContext,
     ) -> OptionalParentheses {
-        if matches!(
-            CallChainLayout::from_expression(
-                self.into(),
-                context.comments().ranges(),
-                context.source(),
-            ),
-            CallChainLayout::Fluent(_)
-        ) {
+        if CallChainLayout::from_expression(
+            self.into(),
+            context.comments().ranges(),
+            context.source(),
+        )
+        .is_fluent()
+        {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always

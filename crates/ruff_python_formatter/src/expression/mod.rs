@@ -1158,6 +1158,10 @@ impl CallChainLayout {
             layout @ (CallChainLayout::Fluent(_) | CallChainLayout::NonFluent) => layout,
         }
     }
+
+    pub(crate) fn is_fluent(&self) -> bool {
+        matches!(self, CallChainLayout::Fluent(_))
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -48,7 +48,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
                     )
                 };
 
-            if matches!(call_chain_layout, CallChainLayout::Fluent(_)) {
+            if call_chain_layout.is_fluent() {
                 if parenthesize_value {
                     // Don't propagate the call chain layout.
                     value.format().with_options(Parentheses::Always).fmt(f)?;
@@ -127,7 +127,7 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             //      .filter()
             //  )
             // ```
-            else if matches!(call_chain_layout, CallChainLayout::Fluent(_)) {
+            else if call_chain_layout.is_fluent() {
                 if parenthesize_value
                     || value.is_call_expr()
                     || value.is_subscript_expr()
@@ -177,8 +177,8 @@ impl FormatNodeRule<ExprAttribute> for FormatExprAttribute {
             )
         });
 
-        let is_call_chain_root = self.call_chain_layout == CallChainLayout::Default
-            && matches!(call_chain_layout, CallChainLayout::Fluent(_));
+        let is_call_chain_root =
+            self.call_chain_layout == CallChainLayout::Default && call_chain_layout.is_fluent();
         if is_call_chain_root {
             write!(f, [group(&format_inner)])
         } else {
@@ -194,14 +194,13 @@ impl NeedsParentheses for ExprAttribute {
         context: &PyFormatContext,
     ) -> OptionalParentheses {
         // Checks if there are any own line comments in an attribute chain (a.b.c).
-        if matches!(
-            CallChainLayout::from_expression(
-                self.into(),
-                context.comments().ranges(),
-                context.source(),
-            ),
-            CallChainLayout::Fluent(_)
-        ) {
+        if CallChainLayout::from_expression(
+            self.into(),
+            context.comments().ranges(),
+            context.source(),
+        )
+        .is_fluent()
+        {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {
             OptionalParentheses::Always
