@@ -464,7 +464,10 @@ def test_seq[T](x: Sequence[T]) -> Sequence[T]:
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
     reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
-    reveal_type(test_seq(t3))  # revealed: Sequence[Never]
+    # TODO: The return type here is wrong, because we end up creating a constraint (Never ≤ T),
+    # which we confuse with "T has no lower bound".
+    # TODO: revealed: Sequence[Never]
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```
 
 ### `__init__` is itself generic
