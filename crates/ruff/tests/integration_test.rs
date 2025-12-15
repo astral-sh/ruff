@@ -952,8 +952,50 @@ fn rule_f401() {
 }
 
 #[test]
+fn rule_f401_output_json() {
+    insta::with_settings!({filters => vec![
+        (r#"("file": ")[^"]+(",)"#, "$1<FILE>$2"),
+    ]}, {
+        assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "json"]));
+    });
+}
+
+#[test]
+fn rule_f401_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "F401", "--output-format", "text"]));
+}
+
+#[test]
 fn rule_invalid_rule_name() {
     assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_json() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "json"]), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    error: invalid value 'RUF404' for '[RULE]'
+
+    For more information, try '--help'.
+    ");
+}
+
+#[test]
+fn rule_invalid_rule_name_output_text() {
+    assert_cmd_snapshot!(ruff_cmd().args(["rule", "RUF404", "--output-format", "text"]), @r"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1001,7 +1043,7 @@ def mvce(keys, values):
     ----- stdout -----
     1	C416	[*] unnecessary-comprehension
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1031,7 +1073,8 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
-        "fixable": false
+        "fixable": false,
+        "fixable_count": 0
       }
     ]
 
@@ -1064,12 +1107,61 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
-        "fixable": true
+        "fixable": true,
+        "fixable_count": 1
       }
     ]
 
     ----- stderr -----
     "#);
+}
+
+#[test]
+fn show_statistics_json_partial_fix() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "UP035",
+            "--statistics",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from typing import List, AsyncGenerator"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "UP035",
+        "name": "deprecated-import",
+        "count": 2,
+        "fixable": false,
+        "fixable_count": 1
+      }
+    ]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn show_statistics_partial_fix() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "UP035", "--statistics"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from typing import List, AsyncGenerator"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    2	UP035	[-] deprecated-import
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
 }
 
 #[test]
@@ -1689,6 +1781,27 @@ fn check_input_from_argfile() -> Result<()> {
 }
 
 #[test]
+// Regression test for https://github.com/astral-sh/ruff/issues/20655
+fn missing_argfile_reports_error() {
+    let mut cmd = RuffCheck::default().filename("@!.txt").build();
+    insta::with_settings!({filters => vec![
+        ("The system cannot find the file specified.", "No such file or directory")
+    ]}, {
+        assert_cmd_snapshot!(cmd, @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to read CLI arguments from files
+      Cause: failed to open file `!.txt`
+      Cause: No such file or directory (os error 2)
+    ");
+    });
+}
+
+#[test]
 fn check_hints_hidden_unsafe_fixes() {
     let mut cmd = RuffCheck::default()
         .args(["--select", "RUF901,RUF902"])
@@ -1747,7 +1860,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1790,7 +1903,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 2 fixable with the --fix option.
+    [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
     ");

@@ -35,6 +35,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `__bool__` method](https://docs.python.org/3/reference/datamodel.html#object.__bool__)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.3.3")]
 pub(crate) struct InvalidBoolReturnType;
 
 impl Violation for InvalidBoolReturnType {

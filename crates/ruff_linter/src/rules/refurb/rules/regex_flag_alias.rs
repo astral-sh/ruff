@@ -32,6 +32,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RegexFlagAlias {
     flag: RegexFlag,
 }

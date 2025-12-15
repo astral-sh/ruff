@@ -1,0 +1,11 @@
+---
+source: crates/ruff_linter/src/linter.rs
+---
+invalid-syntax: attribute name `x` repeated in class pattern
+ --> resources/test/fixtures/semantic_errors/duplicate_match_class_attribute.py:2:21
+  |
+1 | match x:
+2 |     case Point(x=1, x=2):
+  |                     ^
+3 |         pass
+  |

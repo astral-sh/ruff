@@ -1,0 +1,13 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP029 [*] Unnecessary builtin import: `int`
+ --> UP029_1.py:1:1
+  |
+1 | from builtins import str, int
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove unnecessary builtin import
+  - from builtins import str, int
+1 + from builtins import str
+note: This is an unsafe fix and may change runtime behavior

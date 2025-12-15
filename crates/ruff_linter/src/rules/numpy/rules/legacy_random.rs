@@ -46,6 +46,7 @@ use crate::checkers::ast::Checker;
 /// [Random Sampling]: https://numpy.org/doc/stable/reference/random/index.html#random-quick-start
 /// [NEP 19]: https://numpy.org/neps/nep-0019-rng-policy.html
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.248")]
 pub(crate) struct NumpyLegacyRandom {
     method_name: String,
 }

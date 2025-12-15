@@ -61,6 +61,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -79,5 +80,5 @@ Module(
   |
 5 | f'''{foo:.3f
 6 | '''
-  | ^^^ Syntax Error: f-string: expecting '}'
+  | ^^^ Syntax Error: f-string: expecting `}`
   |

@@ -22,7 +22,7 @@ env:
 jobs:
   ty-ecosystem-analyzer:
     name: Compute diagnostic diff
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     if: contains(github.event.label.name, 'ecosystem-analyzer')
     steps:
@@ -33,11 +33,14 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
       - name: Install Rust toolchain
         run: rustup show
@@ -64,12 +67,12 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@fc0f612798710b0dd69bb7528bc9b361dc60bd43"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@55df3c868f3fa9ab34cff0498dd6106722aac205"
 
           ecosystem-analyzer \
             --repository ruff \
             diff \
-            --profile=release \
+            --profile=profiling \
             --projects-old ruff/projects_old.txt \
             --projects-new ruff/projects_new.txt \
             --old old_commit \
@@ -95,13 +98,19 @@ jobs:
             --new-name "$REF_NAME" \
             --output diff-statistics.md
 
+          ecosystem-analyzer \
+            generate-timing-diff \
+            diagnostics-old.json \
+            diagnostics-new.json \
+            --old-name "main (merge base)" \
+            --new-name "$REF_NAME" \
+            --output-html dist/timing.html
+
           echo '## `ecosystem-analyzer` results' > comment.md
           echo >> comment.md
           cat diff-statistics.md >> comment.md
 
           cat diff-statistics.md >> "$GITHUB_STEP_SUMMARY"
-
-          echo ${{ github.event.number }} > pr-number
 
       - name: "Deploy to Cloudflare Pages"
         if: ${{ env.CF_API_TOKEN_EXISTS == 'true' }}
@@ -118,22 +127,24 @@ jobs:
           DEPLOYMENT_URL: ${{ steps.deploy.outputs.pages-deployment-alias-url }}
         run: |
           echo >> comment.md
-          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)**" >> comment.md
+          echo "**[Full report with detailed diff]($DEPLOYMENT_URL/diff)** ([timing results]($DEPLOYMENT_URL/timing))" >> comment.md
 
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: comment.md
           path: comment.md
 
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
-
       - name: Upload diagnostics diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: diff.html
           path: dist/diff.html
+
+      - name: Upload timing diff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: timing.html
+          path: dist/timing.html

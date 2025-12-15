@@ -26,8 +26,9 @@ _T = TypeVar("_T")
 _P = ParamSpec("_P")
 
 # available after calling `curses.initscr()`
-LINES: Final[int]
-COLS: Final[int]
+# not `Final` as it can change during the terminal resize:
+LINES: int
+COLS: int
 
 # available after calling `curses.start_color()`
 COLORS: Final[int]

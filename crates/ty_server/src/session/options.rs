@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 use ty_combine::Combine;
-use ty_ide::InlayHintSettings;
+use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
@@ -117,14 +117,11 @@ impl ClientOptions {
     }
 
     #[must_use]
-    pub fn with_experimental_rename(mut self, enabled: bool) -> Self {
-        self.global.experimental.get_or_insert_default().rename = Some(enabled);
-        self
-    }
-
-    #[must_use]
-    pub fn with_experimental_auto_import(mut self, enabled: bool) -> Self {
-        self.global.experimental.get_or_insert_default().auto_import = Some(enabled);
+    pub fn with_auto_import(mut self, enabled: bool) -> Self {
+        self.workspace
+            .completions
+            .get_or_insert_default()
+            .auto_import = Some(enabled);
         self
     }
 
@@ -153,10 +150,7 @@ impl GlobalOptions {
     pub(crate) fn into_settings(self) -> GlobalSettings {
         let experimental = self
             .experimental
-            .map(|experimental| ExperimentalSettings {
-                rename: experimental.rename.unwrap_or(false),
-                auto_import: experimental.auto_import.unwrap_or(false),
-            })
+            .map(Experimental::into_settings)
             .unwrap_or_default();
 
         GlobalSettings {
@@ -177,6 +171,9 @@ pub(crate) struct WorkspaceOptions {
 
     /// Options to configure inlay hints.
     inlay_hints: Option<InlayHintOptions>,
+
+    /// Options to configure completions.
+    completions: Option<CompletionOptions>,
 
     /// Information about the currently active Python environment in the VS Code Python extension.
     ///
@@ -213,7 +210,7 @@ impl WorkspaceOptions {
 
             if let Some(python) = &overrides.fallback_python {
                 tracing::debug!(
-                    "Using the Python environment selected in the VS Code Python extension \
+                    "Using the Python environment selected in your editor \
                     in case the configuration doesn't specify a Python environment: {python}",
                     python = python.path()
                 );
@@ -221,7 +218,7 @@ impl WorkspaceOptions {
 
             if let Some(version) = &overrides.fallback_python_version {
                 tracing::debug!(
-                    "Using the Python version selected in the VS Code Python extension: {version} \
+                    "Using the Python version selected in your editor: {version} \
                     in case the configuration doesn't specify a Python version",
                 );
             }
@@ -234,6 +231,10 @@ impl WorkspaceOptions {
             inlay_hints: self
                 .inlay_hints
                 .map(InlayHintOptions::into_settings)
+                .unwrap_or_default(),
+            completions: self
+                .completions
+                .map(CompletionOptions::into_settings)
                 .unwrap_or_default(),
             overrides,
         }
@@ -252,6 +253,26 @@ impl InlayHintOptions {
         InlayHintSettings {
             variable_types: self.variable_types.unwrap_or(true),
             call_argument_names: self.call_argument_names.unwrap_or(true),
+        }
+    }
+}
+
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct CompletionOptions {
+    auto_import: Option<bool>,
+}
+
+impl CompletionOptions {
+    // N.B. It's important for the defaults here to
+    // match the defaults for `CompletionSettings`.
+    // This is because `WorkspaceSettings::default()`
+    // uses `CompletionSettings::default()`. But
+    // `WorkspaceOptions::default().into_settings()` will use this
+    // definition.
+    fn into_settings(self) -> CompletionSettings {
+        CompletionSettings {
+            auto_import: self.auto_import.unwrap_or(true),
         }
     }
 }
@@ -297,15 +318,13 @@ impl Combine for DiagnosticMode {
 
 #[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Experimental {
-    /// Whether to enable the experimental symbol rename feature.
-    pub(crate) rename: Option<bool>,
-    /// Whether to enable the experimental "auto-import" feature.
-    ///
-    /// At time of writing (2025-08-29), this feature is still
-    /// under active development. It may not work right or may be
-    /// incomplete.
-    pub(crate) auto_import: Option<bool>,
+pub(crate) struct Experimental;
+
+impl Experimental {
+    #[expect(clippy::unused_self)]
+    fn into_settings(self) -> ExperimentalSettings {
+        ExperimentalSettings {}
+    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, Default)]

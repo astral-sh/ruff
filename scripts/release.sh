@@ -12,7 +12,7 @@ project_root="$(dirname "$script_root")"
 echo "Updating metadata with rooster..."
 cd "$project_root"
 uvx --python 3.12 --isolated -- \
-    rooster@0.0.10a1 release "$@"
+    rooster@0.1.1 release "$@"
 
 echo "Updating lockfile..."
 cargo update -p ruff

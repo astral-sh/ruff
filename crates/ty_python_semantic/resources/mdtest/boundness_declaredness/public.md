@@ -36,34 +36,26 @@ In particular, we should raise errors in the "possibly-undeclared-and-unbound" a
 If a symbol has a declared type (`int`), we use that even if there is a more precise inferred type
 (`Literal[1]`), or a conflicting inferred type (`str` vs. `Literal[2]` below):
 
-`mod.py`:
-
 ```py
 from typing import Any
 
 def any() -> Any: ...
 
-a: int = 1
-b: str = 2  # error: [invalid-assignment]
-c: Any = 3
-d: int = any()
-```
+class Public:
+    a: int = 1
+    b: str = 2  # error: [invalid-assignment]
+    c: Any = 3
+    d: int = any()
 
-```py
-from mod import a, b, c, d
-
-reveal_type(a)  # revealed: int
-reveal_type(b)  # revealed: str
-reveal_type(c)  # revealed: Any
-reveal_type(d)  # revealed: int
+reveal_type(Public.a)  # revealed: int
+reveal_type(Public.b)  # revealed: str
+reveal_type(Public.c)  # revealed: Any
+reveal_type(Public.d)  # revealed: int
 ```
 
 ### Declared and possibly unbound
 
-If a symbol is declared and *possibly* unbound, we trust that other module and use the declared type
-without raising an error.
-
-`mod.py`:
+If a symbol is declared and *possibly* unbound, we trust the declared type without raising an error.
 
 ```py
 from typing import Any
@@ -72,25 +64,22 @@ def any() -> Any: ...
 def flag() -> bool:
     return True
 
-a: int
-b: str
-c: Any
-d: int
+class Public:
+    a: int
+    b: str
+    c: Any
+    d: int
 
-if flag:
-    a = 1
-    b = 2  # error: [invalid-assignment]
-    c = 3
-    d = any()
-```
+    if flag:
+        a = 1
+        b = 2  # error: [invalid-assignment]
+        c = 3
+        d = any()
 
-```py
-from mod import a, b, c, d
-
-reveal_type(a)  # revealed: int
-reveal_type(b)  # revealed: str
-reveal_type(c)  # revealed: Any
-reveal_type(d)  # revealed: int
+reveal_type(Public.a)  # revealed: int
+reveal_type(Public.b)  # revealed: str
+reveal_type(Public.c)  # revealed: Any
+reveal_type(Public.d)  # revealed: int
 ```
 
 ### Declared and unbound
@@ -98,20 +87,15 @@ reveal_type(d)  # revealed: int
 Similarly, if a symbol is declared but unbound, we do not raise an error. We trust that this symbol
 is available somehow and simply use the declared type.
 
-`mod.py`:
-
 ```py
 from typing import Any
 
-a: int
-b: Any
-```
+class Public:
+    a: int
+    b: Any
 
-```py
-from mod import a, b
-
-reveal_type(a)  # revealed: int
-reveal_type(b)  # revealed: Any
+reveal_type(Public.a)  # revealed: int
+reveal_type(Public.b)  # revealed: Any
 ```
 
 ## Possibly undeclared
@@ -121,8 +105,6 @@ reveal_type(b)  # revealed: Any
 If a symbol is possibly undeclared but definitely bound, we use the union of the declared and
 inferred types:
 
-`mod.py`:
-
 ```py
 from typing import Any
 
@@ -130,28 +112,25 @@ def any() -> Any: ...
 def flag() -> bool:
     return True
 
-a = 1
-b = 2
-c = 3
-d = any()
-if flag():
-    a: int
-    b: Any
-    c: str  # error: [invalid-declaration]
-    d: int
-```
+class Public:
+    a = 1
+    b = 2
+    c = 3
+    d = any()
+    if flag():
+        a: int
+        b: Any
+        c: str  # error: [invalid-declaration]
+        d: int
 
-```py
-from mod import a, b, c, d
-
-reveal_type(a)  # revealed: int
-reveal_type(b)  # revealed: Literal[2] | Any
-reveal_type(c)  # revealed: Literal[3] | Unknown
-reveal_type(d)  # revealed: Any | int
+reveal_type(Public.a)  # revealed: int
+reveal_type(Public.b)  # revealed: Literal[2] | Any
+reveal_type(Public.c)  # revealed: Literal[3] | Unknown
+reveal_type(Public.d)  # revealed: Any | int
 
 # External modifications of `a` that violate the declared type are not allowed:
 # error: [invalid-assignment]
-a = None
+Public.a = None
 ```
 
 ### Possibly undeclared and possibly unbound
@@ -161,32 +140,28 @@ inferred types. This case is interesting because the "possibly declared" definit
 same as the "possibly bound" definition (symbol `b`). Note that we raise a `possibly-missing-import`
 error for both `a` and `b`:
 
-`mod.py`:
-
 ```py
 from typing import Any
 
 def flag() -> bool:
     return True
 
-if flag():
-    a: Any = 1
-    b = 2
-else:
-    b: str
-```
+class Public:
+    if flag():
+        a: Any = 1
+        b = 2
+    else:
+        b: str
 
-```py
-# error: [possibly-missing-import] "Member `a` of module `mod` may be missing"
-# error: [possibly-missing-import] "Member `b` of module `mod` may be missing"
-from mod import a, b
-
-reveal_type(a)  # revealed: Literal[1] | Any
-reveal_type(b)  # revealed: Literal[2] | str
+# error: [possibly-missing-attribute]
+reveal_type(Public.a)  # revealed: Literal[1] | Any
+# error: [possibly-missing-attribute]
+reveal_type(Public.b)  # revealed: Literal[2] | str
 
 # External modifications of `b` that violate the declared type are not allowed:
+# error: [possibly-missing-attribute]
 # error: [invalid-assignment]
-b = None
+Public.b = None
 ```
 
 ### Possibly undeclared and unbound
@@ -194,26 +169,21 @@ b = None
 If a symbol is possibly undeclared and definitely unbound, we currently do not raise an error. This
 seems inconsistent when compared to the case just above.
 
-`mod.py`:
-
 ```py
 def flag() -> bool:
     return True
 
-if flag():
-    a: int
-```
+class Public:
+    if flag():
+        a: int
 
-```py
 # TODO: this should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-from mod import a
-
-reveal_type(a)  # revealed: int
+reveal_type(Public.a)  # revealed: int
 
 # External modifications to `a` that violate the declared type are not allowed:
 # error: [invalid-assignment]
-a = None
+Public.a = None
 ```
 
 ## Undeclared
@@ -224,24 +194,19 @@ If a symbol is *undeclared*, we use the union of `Unknown` with the inferred typ
 treat this case differently from the case where a symbol is implicitly declared with `Unknown`,
 possibly due to the usage of an unknown name in the annotation:
 
-`mod.py`:
-
 ```py
-# Undeclared:
-a = 1
+class Public:
+    # Undeclared:
+    a = 1
 
-# Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
-b: SomeUnknownName = 1  # error: [unresolved-reference]
-```
+    # Implicitly declared with `Unknown`, due to the usage of an unknown name in the annotation:
+    b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-```py
-from mod import a, b
-
-reveal_type(a)  # revealed: Unknown | Literal[1]
-reveal_type(b)  # revealed: Unknown
+reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.b)  # revealed: Unknown
 
 # All external modifications of `a` are allowed:
-a = None
+Public.a = None
 ```
 
 ### Undeclared and possibly unbound
@@ -249,48 +214,39 @@ a = None
 If a symbol is undeclared and *possibly* unbound, we currently do not raise an error. This seems
 inconsistent when compared to the "possibly-undeclared-and-possibly-unbound" case.
 
-`mod.py`:
-
 ```py
 def flag() -> bool:
     return True
 
-if flag:
-    a = 1
-    b: SomeUnknownName = 1  # error: [unresolved-reference]
-```
+class Public:
+    if flag:
+        a = 1
+        b: SomeUnknownName = 1  # error: [unresolved-reference]
 
-```py
-# TODO: this should raise an error. Once we fix this, update the section description and the table
+# TODO: these should raise an error. Once we fix this, update the section description and the table
 # on top of this document.
-from mod import a, b
-
-reveal_type(a)  # revealed: Unknown | Literal[1]
-reveal_type(b)  # revealed: Unknown
+reveal_type(Public.a)  # revealed: Unknown | Literal[1]
+reveal_type(Public.b)  # revealed: Unknown
 
 # All external modifications of `a` are allowed:
-a = None
+Public.a = None
 ```
 
 ### Undeclared and unbound
 
 If a symbol is undeclared *and* unbound, we infer `Unknown` and raise an error.
 
-`mod.py`:
-
 ```py
-if False:
-    a: int = 1
-```
+class Public:
+    if False:
+        a: int = 1
 
-```py
-# error: [unresolved-import]
-from mod import a
+# error: [unresolved-attribute]
+reveal_type(Public.a)  # revealed: Unknown
 
-reveal_type(a)  # revealed: Unknown
-
-# Modifications allowed in this case:
-a = None
+# Modification attempts yield an error:
+# error: [unresolved-attribute]
+Public.a = None
 ```
 
 ## In stub files

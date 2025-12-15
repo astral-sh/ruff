@@ -27,6 +27,7 @@ use crate::{AlwaysFixableViolation, Fix};
 /// ## References
 /// - [Python documentation: `range`](https://docs.python.org/3/library/stdtypes.html#range)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.286")]
 pub(crate) struct UnnecessaryRangeStart;
 
 impl AlwaysFixableViolation for UnnecessaryRangeStart {
@@ -72,11 +73,11 @@ pub(crate) fn unnecessary_range_start(checker: &Checker, call: &ast::ExprCall) {
     let mut diagnostic = checker.report_diagnostic(UnnecessaryRangeStart, start.range());
     diagnostic.try_set_fix(|| {
         remove_argument(
-            &start,
+            start,
             &call.arguments,
             Parentheses::Preserve,
-            checker.locator().contents(),
-            checker.comment_ranges(),
+            checker.source(),
+            checker.tokens(),
         )
         .map(Fix::safe_edit)
     });

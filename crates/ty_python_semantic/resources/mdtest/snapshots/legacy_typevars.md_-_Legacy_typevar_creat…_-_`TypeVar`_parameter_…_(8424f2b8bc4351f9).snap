@@ -1,0 +1,33 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: legacy_typevars.md - Legacy typevar creation diagnostics - `TypeVar` parameter must match variable name
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/legacy_typevars.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypeVar
+2 | 
+3 | # error: [invalid-legacy-type-variable]
+4 | T = TypeVar("Q")
+```
+
+# Diagnostics
+
+```
+error[invalid-legacy-type-variable]: The name of a `TypeVar` (`Q`) must match the name of the variable it is assigned to (`T`)
+ --> src/mdtest_snippet.py:4:1
+  |
+3 | # error: [invalid-legacy-type-variable]
+4 | T = TypeVar("Q")
+  | ^
+  |
+info: rule `invalid-legacy-type-variable` is enabled by default
+
+```

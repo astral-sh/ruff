@@ -2,9 +2,9 @@ use std::cmp::Ordering;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::comment_indentation_after;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_ast::{Stmt, StmtExpr, StmtFor, StmtIf, StmtTry, StmtWhile};
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -31,6 +31,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     bar()
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.9.3")]
 pub(crate) struct NeedlessElse;
 
 impl AlwaysFixableViolation for NeedlessElse {

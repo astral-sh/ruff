@@ -1,44 +1,78 @@
+use std::backtrace::BacktraceStatus;
 use std::fmt::Display;
 use std::io::Write;
+use std::path::Path;
 
+use ruff_db::panic::PanicError;
 use rustc_hash::FxHashMap;
 
 use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, FileResolver, Input, LintName, SecondaryCode, Severity,
-    Span, UnifiedFile,
+    Annotation, Diagnostic, DiagnosticFormat, DiagnosticId, DisplayDiagnosticConfig,
+    DisplayDiagnostics, DisplayGithubDiagnostics, FileResolver, GithubRenderer, Input, LintName,
+    SecondaryCode, Severity, Span, SubDiagnostic, SubDiagnosticSeverity, UnifiedFile,
 };
 use ruff_db::files::File;
 
 pub use grouped::GroupedEmitter;
 use ruff_notebook::NotebookIndex;
-use ruff_source_file::SourceFile;
-use ruff_text_size::{Ranged, TextRange, TextSize};
+use ruff_source_file::{SourceFile, SourceFileBuilder};
+use ruff_text_size::{TextRange, TextSize};
 pub use sarif::SarifEmitter;
-pub use text::TextEmitter;
 
 use crate::Fix;
 use crate::registry::Rule;
+use crate::settings::types::{OutputFormat, RuffOutputFormat};
 
 mod grouped;
 mod sarif;
-mod text;
 
-/// Creates a `Diagnostic` from a syntax error, with the format expected by Ruff.
-///
-/// This is almost identical to `ruff_db::diagnostic::create_syntax_error_diagnostic`, except the
-/// `message` is stored as the primary diagnostic message instead of on the primary annotation.
-///
-/// TODO(brent) These should be unified at some point, but we keep them separate for now to avoid a
-/// ton of snapshot changes while combining ruff's diagnostic type with `Diagnostic`.
-pub fn create_syntax_error_diagnostic(
-    span: impl Into<Span>,
-    message: impl std::fmt::Display,
-    range: impl Ranged,
-) -> Diagnostic {
-    let mut diag = Diagnostic::new(DiagnosticId::InvalidSyntax, Severity::Error, message);
-    let span = span.into().with_range(range.range());
-    diag.annotate(Annotation::primary(span));
-    diag
+/// Create a `Diagnostic` from a panic.
+pub fn create_panic_diagnostic(error: &PanicError, path: Option<&Path>) -> Diagnostic {
+    let mut diagnostic = Diagnostic::new(
+        DiagnosticId::Panic,
+        Severity::Fatal,
+        error.to_diagnostic_message(path.as_ref().map(|path| path.display())),
+    );
+
+    diagnostic.sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        "This indicates a bug in Ruff.",
+    ));
+    let report_message = "If you could open an issue at \
+                            https://github.com/astral-sh/ruff/issues/new?title=%5Bpanic%5D, \
+                            we'd be very appreciative!";
+    diagnostic.sub(SubDiagnostic::new(
+        SubDiagnosticSeverity::Info,
+        report_message,
+    ));
+
+    if let Some(backtrace) = &error.backtrace {
+        match backtrace.status() {
+            BacktraceStatus::Disabled => {
+                diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "run with `RUST_BACKTRACE=1` environment variable to show the full backtrace information",
+                        ));
+            }
+            BacktraceStatus::Captured => {
+                diagnostic.sub(SubDiagnostic::new(
+                    SubDiagnosticSeverity::Info,
+                    format!("Backtrace:\n{backtrace}"),
+                ));
+            }
+            _ => {}
+        }
+    }
+
+    if let Some(path) = path {
+        let file = SourceFileBuilder::new(path.to_string_lossy(), "").finish();
+        let span = Span::from(file);
+        let mut annotation = Annotation::primary(span);
+        annotation.hide_snippet(true);
+        diagnostic.annotate(annotation);
+    }
+
+    diagnostic
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -70,7 +104,7 @@ where
     // actually need it, but we need to be able to cache the new diagnostic model first. See
     // https://github.com/astral-sh/ruff/issues/19688.
     if range == TextRange::default() {
-        annotation.set_file_level(true);
+        annotation.hide_snippet(true);
     }
     diagnostic.annotate(annotation);
 
@@ -91,6 +125,7 @@ where
     }
 
     diagnostic.set_secondary_code(SecondaryCode::new(rule.noqa_code().to_string()));
+    diagnostic.set_documentation_url(rule.url());
 
     diagnostic
 }
@@ -160,21 +195,53 @@ impl<'a> EmitterContext<'a> {
     }
 }
 
+pub fn render_diagnostics(
+    writer: &mut dyn Write,
+    format: OutputFormat,
+    config: DisplayDiagnosticConfig,
+    context: &EmitterContext<'_>,
+    diagnostics: &[Diagnostic],
+) -> std::io::Result<()> {
+    match DiagnosticFormat::try_from(format) {
+        Ok(format) => {
+            let config = config.format(format);
+            let value = DisplayDiagnostics::new(context, &config, diagnostics);
+            write!(writer, "{value}")?;
+        }
+        Err(RuffOutputFormat::Github) => {
+            let renderer = GithubRenderer::new(context, "Ruff");
+            let value = DisplayGithubDiagnostics::new(&renderer, diagnostics);
+            write!(writer, "{value}")?;
+        }
+        Err(RuffOutputFormat::Grouped) => {
+            GroupedEmitter::default()
+                .with_show_fix_status(config.show_fix_status())
+                .with_applicability(config.fix_applicability())
+                .emit(writer, diagnostics, context)
+                .map_err(std::io::Error::other)?;
+        }
+        Err(RuffOutputFormat::Sarif) => {
+            SarifEmitter
+                .emit(writer, diagnostics, context)
+                .map_err(std::io::Error::other)?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use rustc_hash::FxHashMap;
 
     use ruff_db::diagnostic::Diagnostic;
-    use ruff_notebook::NotebookIndex;
     use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
-    use ruff_source_file::{OneIndexed, SourceFileBuilder};
+    use ruff_source_file::SourceFileBuilder;
     use ruff_text_size::{TextRange, TextSize};
 
     use crate::codes::Rule;
     use crate::message::{Emitter, EmitterContext, create_lint_diagnostic};
     use crate::{Edit, Fix};
-
-    use super::create_syntax_error_diagnostic;
 
     pub(super) fn create_syntax_error_diagnostics() -> Vec<Diagnostic> {
         let source = r"from os import
@@ -188,7 +255,7 @@ if call(foo
             .errors()
             .iter()
             .map(|parse_error| {
-                create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+                Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
             })
             .collect()
     }
@@ -257,122 +324,12 @@ def fibonacci(n):
         vec![unused_import, unused_variable, undefined_name]
     }
 
-    pub(super) fn create_notebook_diagnostics()
-    -> (Vec<Diagnostic>, FxHashMap<String, NotebookIndex>) {
-        let notebook = r"# cell 1
-import os
-# cell 2
-import math
-
-print('hello world')
-# cell 3
-def foo():
-    print()
-    x = 1
-";
-
-        let notebook_source = SourceFileBuilder::new("notebook.ipynb", notebook).finish();
-
-        let unused_import_os_start = TextSize::from(16);
-        let unused_import_os = create_lint_diagnostic(
-            "`os` imported but unused",
-            Some("Remove unused import: `os`"),
-            TextRange::new(unused_import_os_start, TextSize::from(18)),
-            Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
-                TextSize::from(9),
-                TextSize::from(19),
-            )))),
-            None,
-            notebook_source.clone(),
-            Some(unused_import_os_start),
-            Rule::UnusedImport,
-        );
-
-        let unused_import_math_start = TextSize::from(35);
-        let unused_import_math = create_lint_diagnostic(
-            "`math` imported but unused",
-            Some("Remove unused import: `math`"),
-            TextRange::new(unused_import_math_start, TextSize::from(39)),
-            Some(Fix::safe_edit(Edit::range_deletion(TextRange::new(
-                TextSize::from(28),
-                TextSize::from(40),
-            )))),
-            None,
-            notebook_source.clone(),
-            Some(unused_import_math_start),
-            Rule::UnusedImport,
-        );
-
-        let unused_variable_start = TextSize::from(98);
-        let unused_variable = create_lint_diagnostic(
-            "Local variable `x` is assigned to but never used",
-            Some("Remove assignment to unused variable `x`"),
-            TextRange::new(unused_variable_start, TextSize::from(99)),
-            Some(Fix::unsafe_edit(Edit::deletion(
-                TextSize::from(94),
-                TextSize::from(104),
-            ))),
-            None,
-            notebook_source,
-            Some(unused_variable_start),
-            Rule::UnusedVariable,
-        );
-
-        let mut notebook_indexes = FxHashMap::default();
-        notebook_indexes.insert(
-            "notebook.ipynb".to_string(),
-            NotebookIndex::new(
-                vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(2),
-                ],
-                vec![
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                    OneIndexed::from_zero_indexed(0),
-                    OneIndexed::from_zero_indexed(1),
-                    OneIndexed::from_zero_indexed(2),
-                    OneIndexed::from_zero_indexed(3),
-                ],
-            ),
-        );
-
-        (
-            vec![unused_import_os, unused_import_math, unused_variable],
-            notebook_indexes,
-        )
-    }
-
     pub(super) fn capture_emitter_output(
         emitter: &mut dyn Emitter,
         diagnostics: &[Diagnostic],
     ) -> String {
         let notebook_indexes = FxHashMap::default();
         let context = EmitterContext::new(&notebook_indexes);
-        let mut output: Vec<u8> = Vec::new();
-        emitter.emit(&mut output, diagnostics, &context).unwrap();
-
-        String::from_utf8(output).expect("Output to be valid UTF-8")
-    }
-
-    pub(super) fn capture_emitter_notebook_output(
-        emitter: &mut dyn Emitter,
-        diagnostics: &[Diagnostic],
-        notebook_indexes: &FxHashMap<String, NotebookIndex>,
-    ) -> String {
-        let context = EmitterContext::new(notebook_indexes);
         let mut output: Vec<u8> = Vec::new();
         emitter.emit(&mut output, diagnostics, &context).unwrap();
 

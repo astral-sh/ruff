@@ -159,6 +159,8 @@ def _(args: list[int]) -> None:
     takes_zero(*args)
     takes_one(*args)
     takes_two(*args)
+    takes_two(*b"ab")
+    takes_two(*b"abc")  # error: [too-many-positional-arguments]
     takes_two_positional_only(*args)
     takes_two_different(*args)  # error: [invalid-argument-type]
     takes_two_different_positional_only(*args)  # error: [invalid-argument-type]
@@ -642,6 +644,141 @@ def f(*args: int) -> int:
 reveal_type(f("foo"))  # revealed: int
 ```
 
+### Variadic argument, variadic parameter
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def f(*args: int) -> int:
+    return 1
+
+def _(args: list[str]) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `str`"
+    reveal_type(f(*args))  # revealed: int
+```
+
+Considering a few different shapes of tuple for the splatted argument:
+
+```py
+def f1(*args: str): ...
+def _(
+    args1: tuple[str, ...],
+    args2: tuple[str, *tuple[str, ...]],
+    args3: tuple[str, *tuple[str, ...], str],
+    args4: tuple[int, *tuple[str, ...]],
+    args5: tuple[int, *tuple[str, ...], str],
+    args6: tuple[*tuple[str, ...], str],
+    args7: tuple[*tuple[str, ...], int],
+    args8: tuple[int, *tuple[str, ...], int],
+    args9: tuple[str, *tuple[str, ...], int],
+    args10: tuple[str, *tuple[int, ...], str],
+):
+    f1(*args1)
+    f1(*args2)
+    f1(*args3)
+    f1(*args4)  # error: [invalid-argument-type]
+    f1(*args5)  # error: [invalid-argument-type]
+    f1(*args6)
+    f1(*args7)  # error: [invalid-argument-type]
+
+    # The reason for two errors here is because of the two fixed elements in the tuple of `args8`
+    # which are both `int`
+    # error: [invalid-argument-type]
+    # error: [invalid-argument-type]
+    f1(*args8)
+
+    f1(*args9)  # error: [invalid-argument-type]
+    f1(*args10)  # error: [invalid-argument-type]
+```
+
+A union of heterogeneous tuples provided to a variadic parameter:
+
+```py
+# Test inspired by ecosystem code at:
+# - <https://github.com/home-assistant/core/blob/bde4eb50111a72f9717fe73ee5929e50eb06911b/homeassistant/components/lovelace/websocket.py#L50-L59>
+# - <https://github.com/pydata/xarray/blob/3572f4e70f2b12ef9935c1f8c3c1b74045d2a092/xarray/tests/test_groupby.py#L3058-L3059>
+
+def f2(a: str, b: bool): ...
+def f3(coinflip: bool):
+    if coinflip:
+        args = "foo", True
+    else:
+        args = "bar", False
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], Literal[False]]
+    reveal_type(args)
+    f2(*args)  # fine
+
+    if coinflip:
+        other_args = "foo", True
+    else:
+        other_args = "bar", (True,)
+
+    # revealed: tuple[Literal["foo"], Literal[True]] | tuple[Literal["bar"], tuple[Literal[True]]]
+    reveal_type(other_args)
+    # error: [invalid-argument-type] "Argument to function `f2` is incorrect: Expected `bool`, found `Literal[True] | tuple[Literal[True]]`"
+    f2(*other_args)
+
+def f4(a=None, b=None, c=None, d=None, e=None): ...
+
+my_args = ((1, 2), (3, 4), (5, 6))
+
+for tup in my_args:
+    f4(*tup, e=None)  # fine
+
+my_other_args = (
+    (1, 2, 3, 4, 5),
+    (6, 7, 8, 9, 10),
+)
+
+for tup in my_other_args:
+    # error: [parameter-already-assigned] "Multiple values provided for parameter `e` of function `f4`"
+    f4(*tup, e=None)
+```
+
+### Mixed argument and parameter containing variadic
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+def f(x: int, *args: str) -> int:
+    return 1
+
+def _(
+    args1: list[int],
+    args2: tuple[int],
+    args3: tuple[int, int],
+    args4: tuple[int, ...],
+    args5: tuple[int, *tuple[str, ...]],
+    args6: tuple[int, int, *tuple[str, ...]],
+) -> None:
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    reveal_type(f(*args1))  # revealed: int
+
+    # This shouldn't raise an error because the unpacking doesn't match the variadic parameter.
+    reveal_type(f(*args2))  # revealed: int
+
+    # But, this should because the second tuple element is not assignable.
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    reveal_type(f(*args3))  # revealed: int
+
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    reveal_type(f(*args4))  # revealed: int
+
+    # The first element of the tuple matches the required argument;
+    # all subsequent elements match the variadic argument
+    reveal_type(f(*args5))  # revealed: int
+
+    # error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `int`"
+    reveal_type(f(*args6))  # revealed: int
+```
+
 ### Keyword argument, positional-or-keyword parameter
 
 ```py
@@ -681,6 +818,30 @@ def f(x: int = 1, y: str = "foo") -> int:
 # error: 15 [invalid-argument-type] "Argument to function `f` is incorrect: Expected `str`, found `Literal[2]`"
 # error: 20 [invalid-argument-type] "Argument to function `f` is incorrect: Expected `int`, found `Literal["bar"]`"
 reveal_type(f(y=2, x="bar"))  # revealed: int
+```
+
+### Diagnostics for union types where the union is not assignable
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import Sized
+
+class Foo: ...
+class Bar: ...
+class Baz: ...
+
+def f(x: Sized): ...
+def g(
+    a: str | Foo,
+    b: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo,
+    c: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar,
+    d: list[str] | str | dict[str, str] | tuple[str, ...] | bytes | frozenset[str] | set[str] | Foo | Bar | Baz,
+):
+    f(a)  # error: [invalid-argument-type]
+    f(b)  # error: [invalid-argument-type]
+    f(c)  # error: [invalid-argument-type]
+    f(d)  # error: [invalid-argument-type]
 ```
 
 ## Too many positional arguments

@@ -1,0 +1,72 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: type_ignore.md - Suppressing errors with `type: ignore` - Nested comments
+mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/type_ignore.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | # fmt: off
+ 2 | a = test /
+ 3 |   + 2  # fmt: skip # type: ignore
+ 4 | 
+ 5 | a = test /
+ 6 |   + 2  # type: ignore # fmt: skip
+ 7 | 
+ 8 | a = (3
+ 9 |   # error: [unused-ignore-comment]
+10 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+11 | 
+12 | a = (3
+13 |   # error: [unused-ignore-comment]
+14 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+```
+
+# Diagnostics
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive
+  --> src/mdtest_snippet.py:10:9
+   |
+ 8 | a = (3
+ 9 |   # error: [unused-ignore-comment]
+10 |   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | a = (3
+   |
+help: Remove the unused suppression comment
+7  | 
+8  | a = (3
+9  |   # error: [unused-ignore-comment]
+   -   + 2)  # ty:ignore[division-by-zero] # fmt: skip
+10 +   + 2)  # fmt: skip
+11 | 
+12 | a = (3
+13 |   # error: [unused-ignore-comment]
+
+```
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive
+  --> src/mdtest_snippet.py:14:21
+   |
+12 | a = (3
+13 |   # error: [unused-ignore-comment]
+14 |   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+   |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Remove the unused suppression comment
+11 | 
+12 | a = (3
+13 |   # error: [unused-ignore-comment]
+   -   + 2)  # fmt: skip # ty:ignore[division-by-zero]
+14 +   + 2)  # fmt: skip 
+
+```

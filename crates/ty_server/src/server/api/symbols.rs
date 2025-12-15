@@ -1,10 +1,10 @@
 //! Utility functions common to language server request handlers
 //! that return symbol information.
 
-use lsp_types::{SymbolInformation, SymbolKind, Url};
-use ruff_source_file::LineIndex;
+use lsp_types::{SymbolInformation, SymbolKind};
 use ty_ide::SymbolInfo;
 
+use crate::Db;
 use crate::document::{PositionEncoding, ToRangeExt};
 
 /// Convert `ty_ide` `SymbolKind` to LSP `SymbolKind`
@@ -26,25 +26,27 @@ pub(crate) fn convert_symbol_kind(kind: ty_ide::SymbolKind) -> SymbolKind {
 }
 
 /// Convert a `ty_ide` `SymbolInfo` to LSP `SymbolInformation`
+///
+/// Returns `None` if the symbol's range cannot be converted to a location
+/// (e.g., if the file cannot be converted to a URL).
 pub(crate) fn convert_to_lsp_symbol_information(
+    db: &dyn Db,
+    file: ruff_db::files::File,
     symbol: SymbolInfo<'_>,
-    uri: &Url,
-    source: &str,
-    line_index: &LineIndex,
     encoding: PositionEncoding,
-) -> SymbolInformation {
+) -> Option<SymbolInformation> {
     let symbol_kind = convert_symbol_kind(symbol.kind);
-
-    SymbolInformation {
+    let location = symbol
+        .full_range
+        .to_lsp_range(db, file, encoding)?
+        .to_location()?;
+    Some(SymbolInformation {
         name: symbol.name.into_owned(),
         kind: symbol_kind,
         tags: None,
         #[allow(deprecated)]
         deprecated: None,
-        location: lsp_types::Location {
-            uri: uri.clone(),
-            range: symbol.full_range.to_lsp_range(source, line_index, encoding),
-        },
+        location,
         container_name: None,
-    }
+    })
 }

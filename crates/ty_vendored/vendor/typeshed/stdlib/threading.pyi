@@ -2,7 +2,7 @@
 
 import _thread
 import sys
-from _thread import _excepthook, _ExceptHookArgs, get_native_id as get_native_id
+from _thread import _ExceptHookArgs, get_native_id as get_native_id
 from _typeshed import ProfileFunction, TraceFunction
 from collections.abc import Callable, Iterable, Mapping
 from contextvars import ContextVar
@@ -447,6 +447,9 @@ class Condition:
     ) -> None: ...
     def acquire(self, blocking: bool = True, timeout: float = -1) -> bool: ...
     def release(self) -> None: ...
+    if sys.version_info >= (3, 14):
+        def locked(self) -> bool: ...
+
     def wait(self, timeout: float | None = None) -> bool:
         """Wait until notified or until a timeout occurs.
 
@@ -647,7 +650,9 @@ class Event:
 
         """
 
-excepthook = _excepthook
+excepthook: Callable[[_ExceptHookArgs], object]
+if sys.version_info >= (3, 10):
+    __excepthook__: Callable[[_ExceptHookArgs], object]
 ExceptHookArgs = _ExceptHookArgs
 
 class Timer(Thread):

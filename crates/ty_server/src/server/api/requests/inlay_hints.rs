@@ -1,16 +1,18 @@
 use std::borrow::Cow;
 
-use crate::document::{RangeExt, TextSizeExt};
+use lsp_types::request::InlayHintRequest;
+use lsp_types::{InlayHintParams, Url};
+use ruff_db::files::File;
+use ty_ide::{InlayHintKind, InlayHintLabel, InlayHintTextEdit, inlay_hints};
+use ty_project::ProjectDatabase;
+
+use crate::PositionEncoding;
+use crate::document::{RangeExt, TextSizeExt, ToLink};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
 use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
-use lsp_types::request::InlayHintRequest;
-use lsp_types::{InlayHintParams, Url};
-use ruff_db::source::{line_index, source_text};
-use ty_ide::{InlayHintKind, InlayHintLabel, inlay_hints};
-use ty_project::ProjectDatabase;
 
 pub(crate) struct InlayHintRequestHandler;
 
@@ -36,32 +38,42 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let index = line_index(db, file);
-        let source = source_text(db, file);
-
-        let range = params
+        let Some(range) = params
             .range
-            .to_text_range(&source, &index, snapshot.encoding());
+            .to_text_range(db, file, snapshot.url(), snapshot.encoding())
+        else {
+            return Ok(None);
+        };
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
         let inlay_hints = inlay_hints
             .into_iter()
-            .map(|hint| lsp_types::InlayHint {
-                position: hint
-                    .position
-                    .to_position(&source, &index, snapshot.encoding()),
-                label: inlay_hint_label(&hint.label),
-                kind: Some(inlay_hint_kind(&hint.kind)),
-                tooltip: None,
-                padding_left: None,
-                padding_right: None,
-                data: None,
-                text_edits: None,
+            .filter_map(|hint| {
+                Some(lsp_types::InlayHint {
+                    position: hint
+                        .position
+                        .to_lsp_position(db, file, snapshot.encoding())?
+                        .local_position(),
+                    label: inlay_hint_label(&hint.label, db, snapshot.encoding()),
+                    kind: Some(inlay_hint_kind(&hint.kind)),
+                    tooltip: None,
+                    padding_left: None,
+                    padding_right: None,
+                    data: None,
+                    text_edits: Some(
+                        hint.text_edits
+                            .into_iter()
+                            .filter_map(|text_edit| {
+                                inlay_hint_text_edit(text_edit, db, file, snapshot.encoding())
+                            })
+                            .collect(),
+                    ),
+                })
             })
             .collect();
 
@@ -78,15 +90,44 @@ fn inlay_hint_kind(inlay_hint_kind: &InlayHintKind) -> lsp_types::InlayHintKind 
     }
 }
 
-fn inlay_hint_label(inlay_hint_label: &InlayHintLabel) -> lsp_types::InlayHintLabel {
+fn inlay_hint_label(
+    inlay_hint_label: &InlayHintLabel,
+    db: &ProjectDatabase,
+    encoding: PositionEncoding,
+) -> lsp_types::InlayHintLabel {
     let mut label_parts = Vec::new();
     for part in inlay_hint_label.parts() {
         label_parts.push(lsp_types::InlayHintLabelPart {
             value: part.text().into(),
-            location: None,
+            location: part
+                .target()
+                .and_then(|target| target.to_location(db, encoding)),
             tooltip: None,
             command: None,
         });
     }
     lsp_types::InlayHintLabel::LabelParts(label_parts)
+}
+
+fn inlay_hint_text_edit(
+    inlay_hint_text_edit: InlayHintTextEdit,
+    db: &ProjectDatabase,
+    file: File,
+    encoding: PositionEncoding,
+) -> Option<lsp_types::TextEdit> {
+    Some(lsp_types::TextEdit {
+        range: lsp_types::Range {
+            start: inlay_hint_text_edit
+                .range
+                .start()
+                .to_lsp_position(db, file, encoding)?
+                .local_position(),
+            end: inlay_hint_text_edit
+                .range
+                .end()
+                .to_lsp_position(db, file, encoding)?
+                .local_position(),
+        },
+        new_text: inlay_hint_text_edit.new_text,
+    })
 }

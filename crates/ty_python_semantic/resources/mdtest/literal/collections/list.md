@@ -25,6 +25,12 @@ x = [a, b]
 reveal_type(x)  # revealed: list[Unknown | ((_: int) -> int)]
 ```
 
+The inferred `Callable` type is function-like, i.e. we can still access attributes like `__name__`:
+
+```py
+reveal_type(x[0].__name__)  # revealed: Unknown | str
+```
+
 ## Mixed list
 
 ```py
@@ -35,5 +41,5 @@ reveal_type([1, (1, 2), (1, 2, 3)])
 ## List comprehensions
 
 ```py
-reveal_type([x for x in range(42)])  # revealed: list[@Todo(list comprehension element type)]
+reveal_type([x for x in range(42)])  # revealed: list[int | Unknown]
 ```

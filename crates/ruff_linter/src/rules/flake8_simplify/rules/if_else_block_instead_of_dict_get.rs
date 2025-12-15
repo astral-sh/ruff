@@ -53,6 +53,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.219")]
 pub(crate) struct IfElseBlockInsteadOfDictGet {
     contents: String,
 }

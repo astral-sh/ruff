@@ -54,6 +54,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: true,
+                                                unclosed: true,
                                             },
                                         },
                                     ),
@@ -82,7 +83,7 @@ Module(
   |
 5 | f"""hello {x # comment    
 6 | y = 1
-  | ^ Syntax Error: f-string: expecting '}'
+  | ^ Syntax Error: f-string: expecting `}`
   |
 
 
@@ -92,7 +93,7 @@ Module(
 5 |   f"""hello {x # comment    
   |  ___________________________^
 6 | | y = 1
-  | |_____^ Syntax Error: Expected FStringEnd, found Unknown
+  | |_____^ Syntax Error: Expected FStringEnd, found FStringMiddle
   |
 
 

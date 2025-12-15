@@ -41,6 +41,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 /// This rule's fix is marked as unsafe for `split()`/`rsplit()` calls that contain `*args` or `**kwargs` arguments, as
 /// adding a `maxsplit` argument to such a call may lead to duplicated arguments.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.11.12")]
 pub(crate) struct MissingMaxsplitArg {
     actual_split_type: String,
     suggested_split_type: String,
@@ -173,12 +174,8 @@ pub(crate) fn missing_maxsplit_arg(checker: &Checker, value: &Expr, slice: &Expr
         SliceBoundary::Last => "rsplit",
     };
 
-    let maxsplit_argument_edit = fix::edits::add_argument(
-        "maxsplit=1",
-        arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    );
+    let maxsplit_argument_edit =
+        fix::edits::add_argument("maxsplit=1", arguments, checker.tokens());
 
     // Only change `actual_split_type` if it doesn't match `suggested_split_type`
     let split_type_edit: Option<Edit> = if actual_split_type == suggested_split_type {

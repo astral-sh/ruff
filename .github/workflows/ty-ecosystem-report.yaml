@@ -19,7 +19,7 @@ env:
 jobs:
   ty-ecosystem-report:
     name: Create ecosystem report
-    runs-on: depot-ubuntu-22.04-32
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -29,11 +29,14 @@ jobs:
           persist-credentials: false
 
       - name: Install the latest version of uv
-        uses: astral-sh/setup-uv@b75a909f75acd358c2196fb9a5f1299a9a8868a4 # v6.7.0
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+        with:
+          enable-cache: true # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+          lookup-only: false # zizmor: ignore[cache-poisoning] acceptable risk for CloudFlare pages artifact
 
       - name: Install Rust toolchain
         run: rustup show
@@ -49,12 +52,13 @@ jobs:
 
           cd ..
 
-          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@fc0f612798710b0dd69bb7528bc9b361dc60bd43"
+          uv tool install "git+https://github.com/astral-sh/ecosystem-analyzer@55df3c868f3fa9ab34cff0498dd6106722aac205"
 
           ecosystem-analyzer \
             --verbose \
             --repository ruff \
             analyze \
+            --profile=profiling \
             --projects ruff/crates/ty_python_semantic/resources/primer/good.txt \
             --output ecosystem-diagnostics.json
 
@@ -62,7 +66,7 @@ jobs:
 
           ecosystem-analyzer \
             generate-report \
-            --max-diagnostics-per-project=1200 \
+            --max-diagnostics-per-project=1000 \
             ecosystem-diagnostics.json \
             --output dist/index.html
 

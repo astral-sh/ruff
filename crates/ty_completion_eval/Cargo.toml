@@ -1,0 +1,32 @@
+[package]
+name = "ty_completion_eval"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true, features = ["os"] }
+ruff_text_size = { workspace = true }
+
+ty_ide = { workspace = true }
+ty_project = { workspace = true }
+ty_python_semantic = { workspace = true }
+
+anyhow = { workspace = true }
+bstr = { workspace = true }
+clap = { workspace = true, features = ["wrap_help", "string", "env"] }
+csv = { workspace = true }
+regex = { workspace = true }
+serde = { workspace = true }
+tempfile = { workspace = true }
+toml = { workspace = true }
+walkdir = { workspace = true }
+
+[lints]
+workspace = true

@@ -28,7 +28,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::lint::{GetLintError, Level, LintSource, RuleSelection};
+use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
     PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
@@ -131,9 +131,7 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
-                        ValueSource::PythonVSCodeExtension => {
-                            PythonVersionSource::PythonVSCodeExtension
-                        }
+                        ValueSource::Editor => PythonVersionSource::Editor,
                     },
                 });
 
@@ -153,7 +151,7 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
-                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
+                ValueSource::Editor => SysPrefixPathOrigin::Editor,
             };
 
             Some(PythonEnvironment::new(
@@ -166,14 +164,24 @@ impl Options {
                 .context("Failed to discover local Python environment")?
         };
 
-        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+        let self_site_packages = self_environment_search_paths(
             python_environment
-                .site_packages_paths(system)
-                .context("Failed to discover the site-packages directory")?
+                .as_ref()
+                .map(ty_python_semantic::PythonEnvironment::origin)
+                .cloned(),
+            system,
+        )
+        .unwrap_or_default();
+
+        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+            self_site_packages.concatenate(
+                python_environment
+                    .site_packages_paths(system)
+                    .context("Failed to discover the site-packages directory")?,
+            )
         } else {
             tracing::debug!("No virtual environment found");
-
-            SitePackagesPaths::default()
+            self_site_packages
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -237,15 +245,16 @@ impl Options {
                 .map(|root| root.absolute(project_root, system))
                 .collect()
         } else {
+            let mut roots = vec![];
             let src = project_root.join("src");
 
-            let mut roots = if system.is_directory(&src) {
+            if system.is_directory(&src) {
                 // Default to `src` and the project root if `src` exists and the root hasn't been specified.
                 // This corresponds to the `src-layout`
                 tracing::debug!(
                     "Including `.` and `./src` in `environment.root` because a `./src` directory exists"
                 );
-                vec![project_root.to_path_buf(), src]
+                roots.push(src);
             } else if system.is_directory(&project_root.join(project_name).join(project_name)) {
                 // `src-layout` but when the folder isn't called `src` but has the same name as the project.
                 // For example, the "src" folder for `psycopg` is called `psycopg` and the python files are in `psycopg/psycopg/_adapters_map.py`
@@ -253,12 +262,11 @@ impl Options {
                     "Including `.` and `/{project_name}` in `environment.root` because a `./{project_name}/{project_name}` directory exists"
                 );
 
-                vec![project_root.to_path_buf(), project_root.join(project_name)]
+                roots.push(project_root.join(project_name));
             } else {
                 // Default to a [flat project structure](https://packaging.python.org/en/latest/discussions/src-layout-vs-flat-layout/).
                 tracing::debug!("Including `.` in `environment.root`");
-                vec![project_root.to_path_buf()]
-            };
+            }
 
             let python = project_root.join("python");
             if system.is_directory(&python)
@@ -277,21 +285,9 @@ impl Options {
                 roots.push(python);
             }
 
-            // Considering pytest test discovery conventions,
-            // we also include the `tests` directory if it exists and is not a package.
-            let tests_dir = project_root.join("tests");
-            if system.is_directory(&tests_dir)
-                && !system.is_file(&tests_dir.join("__init__.py"))
-                && !system.is_file(&tests_dir.join("__init__.pyi"))
-                && !roots.contains(&tests_dir)
-            {
-                // If the `tests` directory exists and is not a package, include it as a source root.
-                tracing::debug!(
-                    "Including `./tests` in `environment.root` because a `./tests` directory exists"
-                );
-
-                roots.push(tests_dir);
-            }
+            // The project root should always be included, and should always come
+            // after any subdirectories such as `./src`, `./tests` and/or `./python`.
+            roots.push(project_root.to_path_buf());
 
             roots
         };
@@ -459,6 +455,42 @@ impl Options {
     }
 }
 
+/// Return the site-packages from the environment ty is installed in, as derived from ty's
+/// executable.
+///
+/// If there's an existing environment with an origin that does not allow including site-packages
+/// from ty's environment, discovery of ty's environment is skipped and [`None`] is returned.
+///
+/// Since ty may be executed from an arbitrary non-Python location, errors during discovery of ty's
+/// environment are not raised, instead [`None`] is returned.
+fn self_environment_search_paths(
+    existing_origin: Option<SysPrefixPathOrigin>,
+    system: &dyn System,
+) -> Option<SitePackagesPaths> {
+    if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
+        return None;
+    }
+
+    let Ok(exe_path) = std::env::current_exe() else {
+        return None;
+    };
+    let ty_path = SystemPath::from_std_path(exe_path.as_path())?;
+
+    let environment = PythonEnvironment::new(ty_path, SysPrefixPathOrigin::SelfEnvironment, system)
+        .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
+        .ok()?;
+
+    let search_paths = environment
+        .site_packages_paths(system)
+        .inspect_err(|err| {
+            tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
+        })
+        .ok();
+
+    tracing::debug!("Using site-packages from ty's environment");
+    search_paths
+}
+
 #[derive(
     Debug,
     Default,
@@ -484,7 +516,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -516,8 +548,8 @@ pub struct EnvironmentOptions {
     /// to reflect the differing contents of the standard library across Python versions.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
-        default = r#""3.13""#,
-        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | <major>.<minor>"#,
+        default = r#""3.14""#,
+        value_type = r#""3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>"#,
         example = r#"
             python-version = "3.12"
         "#
@@ -546,9 +578,14 @@ pub struct EnvironmentOptions {
     )]
     pub python_platform: Option<RangedValue<PythonPlatform>>,
 
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's `MYPYPATH` environment variable,
-    /// or pyright's `stubPath` configuration setting.
+    /// User-provided paths that should take first priority in module resolution.
+    ///
+    /// This is an advanced option that should usually only be used for first-party or third-party
+    /// modules that are not installed into your Python environment in a conventional way.
+    /// Use the `python` option to specify the location of your Python environment.
+    ///
+    /// This option is similar to mypy's `MYPYPATH` environment variable and pyright's `stubPath`
+    /// configuration setting.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"[]"#,
@@ -572,18 +609,27 @@ pub struct EnvironmentOptions {
     )]
     pub typeshed: Option<RelativePathBuf>,
 
-    /// Path to the Python installation from which ty resolves type information and third-party dependencies.
+    /// Path to your project's Python environment or interpreter.
     ///
-    /// ty will search in the path's `site-packages` directories for type information and
-    /// third-party imports.
+    /// ty uses the `site-packages` directory of your project's Python environment
+    /// to resolve third-party (and, in some cases, first-party) imports in your code.
     ///
-    /// This option is commonly used to specify the path to a virtual environment.
+    /// If you're using a project management tool such as uv, you should not generally need
+    /// to specify this option, as commands such as `uv run` will set the `VIRTUAL_ENV`
+    /// environment variable to point to your project's virtual environment. ty can also infer
+    /// the location of your environment from an activated Conda environment, and will look for
+    /// a `.venv` directory in the project root if none of the above apply.
+    ///
+    /// Passing a path to a Python executable is supported, but passing a path to a dynamic executable
+    /// (such as a shim) is not currently supported.
+    ///
+    /// This option can be used to point to virtual or system Python environments.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
         default = r#"null"#,
         value_type = "str",
         example = r#"
-            python = "./.venv"
+            python = "./custom-venv-location/.venv"
         "#
     )]
     pub python: Option<RelativePathBuf>,
@@ -612,7 +658,7 @@ pub struct SrcOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -766,9 +812,7 @@ impl SrcOptions {
     Debug, Default, Clone, Eq, PartialEq, Combine, Serialize, Deserialize, Hash, get_size2::GetSize,
 )]
 #[serde(rename_all = "kebab-case", transparent)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct Rules {
-    #[cfg_attr(feature = "schemars", schemars(with = "schema::Rules"))]
     #[get_size(ignore)] // TODO: Add `GetSize` support for `OrderMap`.
     inner: OrderMap<RangedValue<String>, RangedValue<Level>, BuildHasherDefault<FxHasher>>,
 }
@@ -803,8 +847,8 @@ impl Rules {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
 
-                        ValueSource::PythonVSCodeExtension => {
-                            unreachable!("Can't configure rules from the Python VSCode extension")
+                        ValueSource::Editor => {
+                            unreachable!("Can't configure rules from the user's editor")
                         }
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
@@ -822,28 +866,11 @@ impl Rules {
                         .and_then(|path| system_path_to_file(db, path).ok());
 
                     // TODO: Add a note if the value was configured on the CLI
-                    let diagnostic = match error {
-                        GetLintError::Unknown(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                        GetLintError::PrefixedWithCategory { suggestion, .. } => {
-                            OptionDiagnostic::new(
-                                DiagnosticId::UnknownRule,
-                                format!(
-                                    "Unknown lint rule `{rule_name}`. Did you mean `{suggestion}`?"
-                                ),
-                                Severity::Warning,
-                            )
-                        }
-
-                        GetLintError::Removed(_) => OptionDiagnostic::new(
-                            DiagnosticId::UnknownRule,
-                            format!("Unknown lint rule `{rule_name}`"),
-                            Severity::Warning,
-                        ),
-                    };
+                    let diagnostic = OptionDiagnostic::new(
+                        DiagnosticId::UnknownRule,
+                        error.to_string(),
+                        Severity::Warning,
+                    );
 
                     let annotation = file.map(Span::from).map(|span| {
                         Annotation::primary(span.with_optional_range(rule_name.range()))
@@ -958,7 +985,7 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
+                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
                     }
                 })?;
         }
@@ -1041,8 +1068,8 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!(
-                            "Can't configure excludes from the Python VSCode extension"
+                        ValueSource::Editor => unreachable!(
+                            "Can't configure excludes from the user's editor"
                         )
                     }
                 })?;
@@ -1140,6 +1167,16 @@ impl From<OutputFormat> for DiagnosticFormat {
             OutputFormat::Gitlab => Self::Gitlab,
             OutputFormat::Github => Self::Github,
         }
+    }
+}
+
+impl Combine for OutputFormat {
+    #[inline(always)]
+    fn combine_with(&mut self, _other: Self) {}
+
+    #[inline]
+    fn combine(self, _other: Self) -> Self {
+        self
     }
 }
 
@@ -1534,62 +1571,55 @@ impl std::error::Error for ToSettingsError {}
 
 #[cfg(feature = "schemars")]
 mod schema {
-    use schemars::JsonSchema;
-    use schemars::r#gen::SchemaGenerator;
-    use schemars::schema::{
-        InstanceType, Metadata, ObjectValidation, Schema, SchemaObject, SubschemaValidation,
-    };
-    use ty_python_semantic::lint::Level;
-
-    pub(super) struct Rules;
-
-    impl JsonSchema for Rules {
-        fn schema_name() -> String {
-            "Rules".to_string()
+    impl schemars::JsonSchema for super::Rules {
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            std::borrow::Cow::Borrowed("Rules")
         }
 
-        fn json_schema(generator: &mut SchemaGenerator) -> Schema {
+        fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+            use serde_json::{Map, Value};
+
             let registry = ty_python_semantic::default_lint_registry();
+            let level_schema = generator.subschema_for::<super::Level>();
 
-            let level_schema = generator.subschema_for::<Level>();
-
-            let properties: schemars::Map<String, Schema> = registry
+            let properties: Map<String, Value> = registry
                 .lints()
                 .iter()
                 .map(|lint| {
-                    (
-                        lint.name().to_string(),
-                        Schema::Object(SchemaObject {
-                            metadata: Some(Box::new(Metadata {
-                                title: Some(lint.summary().to_string()),
-                                description: Some(lint.documentation()),
-                                deprecated: lint.status.is_deprecated(),
-                                default: Some(lint.default_level.to_string().into()),
-                                ..Metadata::default()
-                            })),
-                            subschemas: Some(Box::new(SubschemaValidation {
-                                one_of: Some(vec![level_schema.clone()]),
-                                ..Default::default()
-                            })),
-                            ..Default::default()
-                        }),
-                    )
+                    let mut schema = schemars::Schema::default();
+                    let object = schema.ensure_object();
+                    object.insert(
+                        "title".to_string(),
+                        Value::String(lint.summary().to_string()),
+                    );
+                    object.insert(
+                        "description".to_string(),
+                        Value::String(lint.documentation()),
+                    );
+                    if lint.status.is_deprecated() {
+                        object.insert("deprecated".to_string(), Value::Bool(true));
+                    }
+                    object.insert(
+                        "default".to_string(),
+                        Value::String(lint.default_level.to_string()),
+                    );
+                    object.insert(
+                        "oneOf".to_string(),
+                        Value::Array(vec![level_schema.clone().into()]),
+                    );
+
+                    (lint.name().to_string(), schema.into())
                 })
                 .collect();
 
-            Schema::Object(SchemaObject {
-                instance_type: Some(InstanceType::Object.into()),
-                object: Some(Box::new(ObjectValidation {
-                    properties,
-                    // Allow unknown rules: ty will warn about them.
-                    // It gives a better experience when using an older ty version because
-                    // the schema will not deny rules that have been removed in newer versions.
-                    additional_properties: Some(Box::new(level_schema)),
-                    ..ObjectValidation::default()
-                })),
+            let mut schema = schemars::json_schema!({ "type": "object" });
+            let object = schema.ensure_object();
+            object.insert("properties".to_string(), Value::Object(properties));
+            // Allow unknown rules: ty will warn about them. It gives a better experience when using an older
+            // ty version because the schema will not deny rules that have been removed in newer versions.
+            object.insert("additionalProperties".to_string(), level_schema.into());
 
-                ..Default::default()
-            })
+            schema
         }
     }
 }

@@ -6,7 +6,8 @@ use criterion::{
 use ruff_benchmark::{
     LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
 };
-use ruff_python_parser::{Mode, TokenKind, lexer};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_parser::{Mode, lexer};
 
 #[cfg(target_os = "windows")]
 #[global_allocator]

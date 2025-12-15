@@ -10,7 +10,7 @@ use libcst_native::{
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{
     self as ast, AnyNodeRef, Arguments, BoolOp, ExceptHandler, Expr, Keyword, Stmt, UnaryOp,
@@ -61,6 +61,7 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
@@ -108,6 +109,7 @@ impl Violation for PytestCompositeAssertion {
 /// ## References
 /// - [`pytest` documentation: `pytest.raises`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-raises)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestAssertInExcept {
     name: String,
 }
@@ -149,6 +151,7 @@ impl Violation for PytestAssertInExcept {
 /// ## References
 /// - [`pytest` documentation: `pytest.fail`](https://docs.pytest.org/en/latest/reference/reference.html#pytest-fail)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestAssertAlwaysFalse;
 
 impl Violation for PytestAssertAlwaysFalse {
@@ -188,6 +191,7 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.208")]
 pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
@@ -299,8 +303,7 @@ pub(crate) fn unittest_assertion(
                 parenthesized_range(
                     expr.into(),
                     checker.semantic().current_statement().into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
+                    checker.tokens(),
                 )
                 .unwrap_or(expr.range()),
             )));
@@ -343,6 +346,7 @@ pub(crate) fn unittest_assertion(
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }

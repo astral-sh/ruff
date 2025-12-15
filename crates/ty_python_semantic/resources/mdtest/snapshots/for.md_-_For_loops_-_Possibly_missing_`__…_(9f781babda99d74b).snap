@@ -12,52 +12,38 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/loops/for.md
 ## mdtest_snippet.py
 
 ```
- 1 | from typing_extensions import reveal_type
- 2 | 
- 3 | def _(flag: bool):
- 4 |     class Iterator:
- 5 |         def __next__(self) -> int:
- 6 |             return 42
- 7 | 
- 8 |     class Iterable:
- 9 |         if flag:
-10 |             def __iter__(self) -> Iterator:
-11 |                 return Iterator()
-12 |         # invalid signature because it only accepts a `str`,
-13 |         # but the old-style iteration protocol will pass it an `int`
-14 |         def __getitem__(self, key: str) -> bytes:
-15 |             return bytes()
-16 | 
-17 |     # error: [not-iterable]
-18 |     for x in Iterable():
-19 |         reveal_type(x)  # revealed: int | bytes
+ 1 | def _(flag: bool):
+ 2 |     class Iterator:
+ 3 |         def __next__(self) -> int:
+ 4 |             return 42
+ 5 | 
+ 6 |     class Iterable:
+ 7 |         if flag:
+ 8 |             def __iter__(self) -> Iterator:
+ 9 |                 return Iterator()
+10 |         # invalid signature because it only accepts a `str`,
+11 |         # but the old-style iteration protocol will pass it an `int`
+12 |         def __getitem__(self, key: str) -> bytes:
+13 |             return bytes()
+14 | 
+15 |     # error: [not-iterable]
+16 |     for x in Iterable():
+17 |         reveal_type(x)  # revealed: int | bytes
 ```
 
 # Diagnostics
 
 ```
 error[not-iterable]: Object of type `Iterable` may not be iterable
-  --> src/mdtest_snippet.py:18:14
+  --> src/mdtest_snippet.py:16:14
    |
-17 |     # error: [not-iterable]
-18 |     for x in Iterable():
+15 |     # error: [not-iterable]
+16 |     for x in Iterable():
    |              ^^^^^^^^^^
-19 |         reveal_type(x)  # revealed: int | bytes
+17 |         reveal_type(x)  # revealed: int | bytes
    |
 info: It may not have an `__iter__` method and its `__getitem__` method has an incorrect signature for the old-style iteration protocol
 info: `__getitem__` must be at least as permissive as `def __getitem__(self, key: int): ...` to satisfy the old-style iteration protocol
 info: rule `not-iterable` is enabled by default
-
-```
-
-```
-info[revealed-type]: Revealed type
-  --> src/mdtest_snippet.py:19:21
-   |
-17 |     # error: [not-iterable]
-18 |     for x in Iterable():
-19 |         reveal_type(x)  # revealed: int | bytes
-   |                     ^ `int | bytes`
-   |
 
 ```

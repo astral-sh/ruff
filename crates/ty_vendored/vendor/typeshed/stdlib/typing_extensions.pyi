@@ -303,7 +303,7 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     __readonly_keys__: ClassVar[frozenset[str]]
     __mutable_keys__: ClassVar[frozenset[str]]
     # PEP 728
-    __closed__: ClassVar[bool]
+    __closed__: ClassVar[bool | None]
     __extra_items__: ClassVar[AnnotationForm]
     def copy(self) -> Self: ...
     # Using Never so that only calls using mypy plugin hook that specialize the signature
@@ -702,6 +702,7 @@ else:
         def __init__(self, name: str, tp: AnnotationForm) -> None: ...
         def __call__(self, obj: _T, /) -> _T: ...
         __supertype__: type | NewType
+        __name__: str
         if sys.version_info >= (3, 10):
             def __or__(self, other: Any) -> _SpecialForm: ...
             def __ror__(self, other: Any) -> _SpecialForm: ...

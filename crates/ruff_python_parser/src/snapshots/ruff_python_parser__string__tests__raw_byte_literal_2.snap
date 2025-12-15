@@ -26,6 +26,7 @@ expression: suite
                                         uppercase_r: false,
                                     },
                                     triple_quoted: false,
+                                    unclosed: false,
                                 },
                             },
                         ),

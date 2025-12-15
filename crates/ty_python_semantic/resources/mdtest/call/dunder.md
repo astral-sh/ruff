@@ -194,7 +194,7 @@ class_with_descriptor_dunder = ClassWithDescriptorDunder()
 reveal_type(class_with_descriptor_dunder[0])  # revealed: str
 ```
 
-## Dunders can not be overwritten on instances
+## Dunders cannot be overwritten on instances
 
 If we attempt to overwrite a dunder method on an instance, it does not affect the behavior of
 implicit dunder calls:
@@ -205,7 +205,7 @@ class C:
         return str(key)
 
     def f(self):
-        # TODO: This should emit an `invalid-assignment` diagnostic once we understand the type of `self`
+        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class

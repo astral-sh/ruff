@@ -227,8 +227,10 @@ class itemgetter(Generic[_T_co]):
     #   "tuple[int, int]" is incompatible with protocol "SupportsIndex"
     # preventing [_T_co, ...] instead of [Any, ...]
     #
-    # A suspected mypy issue prevents using [..., _T] instead of [..., Any] here.
-    # https://github.com/python/mypy/issues/14032
+    # If we can't infer a literal key from __new__ (ie: `itemgetter[Literal[0]]` for `itemgetter(0)`),
+    # then we can't annotate __call__'s return type or it'll break on tuples
+    #
+    # These issues are best demonstrated by the `itertools.check_itertools_recipes.unique_justseen` test.
     def __call__(self, obj: SupportsGetItem[Any, Any]) -> Any:
         """Call self as a function."""
 

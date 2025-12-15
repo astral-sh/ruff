@@ -193,6 +193,17 @@ impl Files {
         roots.at(&absolute)
     }
 
+    /// The same as [`Self::root`] but panics if no root is found.
+    #[track_caller]
+    pub fn expect_root(&self, db: &dyn Db, path: &SystemPath) -> FileRoot {
+        if let Some(root) = self.root(db, path) {
+            return root;
+        }
+
+        let roots = self.inner.roots.read().unwrap();
+        panic!("No root found for path '{path}'. Known roots: {roots:#?}");
+    }
+
     /// Adds a new root for `path` and returns the root.
     ///
     /// The root isn't added nor is the file root's kind updated if a root for `path` already exists.
@@ -457,6 +468,17 @@ impl File {
     /// Returns `true` if the file should be analyzed as a type stub.
     pub fn is_stub(self, db: &dyn Db) -> bool {
         self.source_type(db).is_stub()
+    }
+
+    /// Returns `true` if the file is an `__init__.pyi`
+    pub fn is_package_stub(self, db: &dyn Db) -> bool {
+        self.path(db).as_str().ends_with("__init__.pyi")
+    }
+
+    /// Returns `true` if the file is an `__init__.pyi`
+    pub fn is_package(self, db: &dyn Db) -> bool {
+        let path = self.path(db).as_str();
+        path.ends_with("__init__.pyi") || path.ends_with("__init__.py")
     }
 
     pub fn source_type(self, db: &dyn Db) -> PySourceType {

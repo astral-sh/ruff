@@ -38,6 +38,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [formatter]: https://docs.astral.sh/ruff/formatter/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.69")]
 pub(crate) struct TripleSingleQuotes {
     expected_quote: Quote,
 }

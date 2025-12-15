@@ -359,14 +359,14 @@ from typing import overload
 @overload
 def func(x: int) -> int: ...
 @overload
-# error: [invalid-overload] "Overloaded non-stub function `func` must have an implementation"
+# error: [invalid-overload] "Overloads for function `func` must be followed by a non-`@overload`-decorated implementation function"
 def func(x: str) -> str: ...
 
 class Foo:
     @overload
     def method(self, x: int) -> int: ...
     @overload
-    # error: [invalid-overload] "Overloaded non-stub function `method` must have an implementation"
+    # error: [invalid-overload] "Overloads for function `method` must be followed by a non-`@overload`-decorated implementation function"
     def method(self, x: str) -> str: ...
 ```
 
@@ -418,6 +418,18 @@ Using the `@abstractmethod` decorator requires that the class's metaclass is `AB
 from it.
 
 ```py
+from abc import ABCMeta
+
+class CustomAbstractMetaclass(ABCMeta): ...
+
+class Fine(metaclass=CustomAbstractMetaclass):
+    @overload
+    @abstractmethod
+    def f(self, x: int) -> int: ...
+    @overload
+    @abstractmethod
+    def f(self, x: str) -> str: ...
+
 class Foo:
     @overload
     @abstractmethod
@@ -446,6 +458,101 @@ class PartialFoo(ABC):
     @abstractmethod
     # error: [invalid-overload]
     def f(self, x: str) -> str: ...
+```
+
+#### `TYPE_CHECKING` blocks
+
+As in other areas of ty, we treat `TYPE_CHECKING` blocks the same as "inline stub files", so we
+permit overloaded functions to exist without an implementation if all overloads are defined inside
+an `if TYPE_CHECKING` block:
+
+```py
+from typing import overload, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    @overload
+    def a() -> str: ...
+    @overload
+    def a(x: int) -> int: ...
+
+    class F:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+class G:
+    if TYPE_CHECKING:
+        @overload
+        def method(self) -> None: ...
+        @overload
+        def method(self, x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b() -> str: ...
+
+if TYPE_CHECKING:
+    @overload
+    def b(x: int) -> int: ...
+
+if TYPE_CHECKING:
+    @overload
+    def c() -> None: ...
+
+# not all overloads are in a `TYPE_CHECKING` block, so this is an error
+@overload
+# error: [invalid-overload]
+def c(x: int) -> int: ...
+```
+
+### `@overload`-decorated functions with non-stub bodies
+
+<!-- snapshot-diagnostics -->
+
+If an `@overload`-decorated function has a non-trivial body, it likely indicates a misunderstanding
+on the part of the user. We emit a warning-level diagnostic to alert them of this.
+
+`...`, `pass` and docstrings are all fine:
+
+```py
+from typing import overload
+
+@overload
+def x(y: int) -> int: ...
+@overload
+def x(y: str) -> str:
+    """Docstring"""
+
+@overload
+def x(y: bytes) -> bytes:
+    pass
+
+@overload
+def x(y: memoryview) -> memoryview:
+    """More docs"""
+    pass
+    ...
+
+def x(y):
+    return y
+```
+
+Anything else, however, will trigger the lint:
+
+```py
+@overload
+def foo(x: int) -> int:
+    return x  # error: [useless-overload-body]
+
+@overload
+def foo(x: str) -> None:
+    """Docstring"""
+    pass
+    print("oh no, a string")  # error: [useless-overload-body]
+
+def foo(x):
+    return x
 ```
 
 ### Inconsistent decorators
@@ -549,6 +656,7 @@ class CheckClassMethod:
     # error: [invalid-overload]
     def try_from3(cls, x: int | str) -> CheckClassMethod | None:
         if isinstance(x, int):
+            # error: [call-non-callable]
             return cls(x)
         return None
 

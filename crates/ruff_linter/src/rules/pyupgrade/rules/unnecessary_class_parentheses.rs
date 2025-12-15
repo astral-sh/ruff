@@ -25,6 +25,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.273")]
 pub(crate) struct UnnecessaryClassParentheses;
 
 impl AlwaysFixableViolation for UnnecessaryClassParentheses {

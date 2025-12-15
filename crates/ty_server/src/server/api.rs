@@ -1,6 +1,5 @@
 use crate::server::schedule::Task;
 use crate::session::Session;
-use crate::system::AnySystemPath;
 use anyhow::anyhow;
 use lsp_server as server;
 use lsp_server::RequestId;
@@ -33,6 +32,9 @@ pub(super) fn request(req: server::Request) -> Task {
 
     match req.method.as_str() {
         requests::ExecuteCommand::METHOD => sync_request_task::<requests::ExecuteCommand>(req),
+        requests::CodeActionRequestHandler::METHOD => background_document_request_task::<
+            requests::CodeActionRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::DocumentDiagnosticRequestHandler::METHOD => background_document_request_task::<
             requests::DocumentDiagnosticRequestHandler,
         >(
@@ -148,6 +150,9 @@ pub(super) fn notification(notif: server::Notification) -> Task {
         notifications::DidOpenNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidOpenNotebookHandler>(notif)
         }
+        notifications::DidChangeNotebookHandler::METHOD => {
+            sync_notification_task::<notifications::DidChangeNotebookHandler>(notif)
+        }
         notifications::DidCloseNotebookHandler::METHOD => {
             sync_notification_task::<notifications::DidCloseNotebookHandler>(notif)
         }
@@ -208,7 +213,7 @@ where
 
         // SAFETY: The `snapshot` is safe to move across the unwind boundary because it is not used
         // after unwinding.
-        let snapshot = AssertUnwindSafe(session.take_session_snapshot());
+        let snapshot = AssertUnwindSafe(session.snapshot_session());
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -253,10 +258,10 @@ where
             .cancellation_token(&id)
             .expect("request should have been tested for cancellation before scheduling");
 
-        let url = R::document_url(&params).into_owned();
+        let url = R::document_url(&params);
 
-        let Ok(path) = AnySystemPath::try_from_url(&url) else {
-            let reason = format!("URL `{url}` isn't a valid system path");
+        let Ok(document) = session.snapshot_document(&url) else {
+            let reason = format!("Document {url} is not open in the session");
             tracing::warn!(
                 "Ignoring request id={id} method={} because {reason}",
                 R::METHOD
@@ -274,8 +279,8 @@ where
             });
         };
 
-        let db = session.project_db(&path).clone();
-        let snapshot = session.take_document_snapshot(url);
+        let path = document.notebook_or_file_path();
+        let db = session.project_db(path).clone();
 
         Box::new(move |client| {
             let _span = tracing::debug_span!("request", %id, method = R::METHOD).entered();
@@ -294,7 +299,9 @@ where
             }
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
-                R::handle_request(&id, &db, snapshot, client, params);
+                salsa::attach(&db, || {
+                    R::handle_request(&id, &db, document, client, params);
+                });
             }) {
                 panic_response::<R>(&id, client, &error, retry);
             }
@@ -371,7 +378,15 @@ where
     let (id, params) = cast_notification::<N>(req)?;
     Ok(Task::background(schedule, move |session: &Session| {
         let url = N::document_url(&params);
-        let snapshot = session.take_document_snapshot((*url).clone());
+        let Ok(snapshot) = session.snapshot_document(&url) else {
+            let reason = format!("Document {url} is not open in the session");
+            tracing::warn!(
+                "Ignoring notification id={id} method={} because {reason}",
+                N::METHOD
+            );
+            return Box::new(|_| {});
+        };
+
         Box::new(move |client| {
             let _span = tracing::debug_span!("notification", method = N::METHOD).entered();
 
@@ -426,7 +441,7 @@ where
         .with_failure_code(server::ErrorCode::InternalError)
 }
 
-/// Sends back a response to the server, but only if the request wasn't cancelled.
+/// Sends back a response to the client, but only if the request wasn't cancelled.
 fn respond<Req>(
     id: &RequestId,
     result: Result<<<Req as RequestHandler>::RequestType as Request>::Result>,

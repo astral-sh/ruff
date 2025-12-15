@@ -1,0 +1,2 @@
+Success: no issues found in 39 source files
+Warning: unused section(s) in pyproject.toml: module = ['importlib_metadata.*', 'tests.*']

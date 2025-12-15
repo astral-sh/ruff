@@ -6,27 +6,29 @@ use colored::Colorize;
 use config::SystemKind;
 use parser as test_parser;
 use ruff_db::Db as _;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig};
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId, DisplayDiagnosticConfig};
 use ruff_db::files::{File, FileRootKind, system_path_to_file};
-use ruff_db::panic::catch_unwind;
+use ruff_db::panic::{PanicError, catch_unwind};
 use ruff_db::parsed::parsed_module;
 use ruff_db::system::{DbWithWritableSystem as _, SystemPath, SystemPathBuf};
 use ruff_db::testing::{setup_logging, setup_logging_with_filter};
+use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
-use std::fmt::Write;
+use std::fmt::{Display, Write};
 use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::check_types;
+use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
     PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
-    resolve_module,
+    resolve_module_confident,
 };
 
 mod assertion;
 mod config;
 mod db;
 mod diagnostic;
+mod external_dependencies;
 mod matcher;
 mod parser;
 
@@ -69,16 +71,21 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
-        let inconsistencies = run_module_resolution_consistency_test(&db);
-        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+            Ok(())
+        } else {
+            run_module_resolution_consistency_test(&db)
+        };
+
+        let this_test_failed = result.is_err() || inconsistencies.is_err();
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
             println!("\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = failures {
+        if let Err(failures) = result {
             let md_index = LineIndex::from_source_text(&source);
 
             for test_failures in failures {
@@ -86,21 +93,34 @@ pub fn run(
                     EmbeddedFileSourceMap::new(&md_index, test_failures.backtick_offsets);
 
                 for (relative_line_number, failures) in test_failures.by_line.iter() {
-                    let absolute_line_number =
-                        source_map.to_absolute_line_number(relative_line_number);
+                    let file = match output_format {
+                        OutputFormat::Cli => relative_fixture_path.as_str(),
+                        OutputFormat::GitHub => absolute_fixture_path.as_str(),
+                    };
+
+                    let absolute_line_number = match source_map
+                        .to_absolute_line_number(relative_line_number)
+                    {
+                        Ok(line_number) => line_number,
+                        Err(last_line_number) => {
+                            print!("{}",
+                                output_format.display_error(
+                                    file,
+                                    last_line_number,
+                                    "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
+                                    not followed by any statement."
+                                )
+                            );
+
+                            continue;
+                        }
+                    };
 
                     for failure in failures {
-                        match output_format {
-                            OutputFormat::Cli => {
-                                let line_info =
-                                    format!("{relative_fixture_path}:{absolute_line_number}")
-                                        .cyan();
-                                println!("  {line_info} {failure}");
-                            }
-                            OutputFormat::GitHub => println!(
-                                "::error file={absolute_fixture_path},line={absolute_line_number}::{failure}"
-                            ),
-                        }
+                        print!(
+                            "{}",
+                            output_format.display_error(file, absolute_line_number, failure)
+                        );
                     }
                 }
             }
@@ -153,6 +173,61 @@ impl OutputFormat {
     const fn is_cli(self) -> bool {
         matches!(self, OutputFormat::Cli)
     }
+
+    fn display_error(self, file: &str, line: OneIndexed, failure: impl Display) -> impl Display {
+        struct Display<'a, T> {
+            format: OutputFormat,
+            file: &'a str,
+            line: OneIndexed,
+            failure: T,
+        }
+
+        impl<T> std::fmt::Display for Display<'_, T>
+        where
+            T: std::fmt::Display,
+        {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                let Display {
+                    format,
+                    file,
+                    line,
+                    failure,
+                } = self;
+
+                match format {
+                    OutputFormat::Cli => {
+                        writeln!(
+                            f,
+                            "  {file_line} {failure}",
+                            file_line = format!("{file}:{line}").cyan()
+                        )
+                    }
+                    OutputFormat::GitHub => {
+                        writeln!(f, "::error file={file},line={line}::{failure}")
+                    }
+                }
+            }
+        }
+
+        Display {
+            format: self,
+            file,
+            line,
+            failure,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestOutcome {
+    Success,
+    Skipped,
+}
+
+impl TestOutcome {
+    const fn has_been_skipped(self) -> bool {
+        matches!(self, TestOutcome::Skipped)
+    }
 }
 
 fn run_test(
@@ -160,7 +235,7 @@ fn run_test(
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
-) -> Result<(), Failures> {
+) -> Result<TestOutcome, Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -191,6 +266,27 @@ fn run_test(
     let custom_typeshed_path = test.configuration().typeshed();
     let python_version = test.configuration().python_version().unwrap_or_default();
 
+    // Setup virtual environment with dependencies if specified
+    let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
+    if let Some(dependencies) = test.configuration().dependencies() {
+        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
+            return Ok(TestOutcome::Skipped);
+        }
+
+        let python_platform = test.configuration().python_platform().expect(
+            "Tests with external dependencies must specify `python-platform` in the configuration",
+        );
+
+        external_dependencies::setup_venv(
+            db,
+            dependencies,
+            python_version,
+            &python_platform,
+            &venv_for_external_dependencies,
+        )
+        .expect("Failed to setup in-memory virtual environment with dependencies");
+    }
+
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
@@ -202,7 +298,10 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "text" | "cfg"),
+                matches!(
+                    embedded.lang,
+                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
+                ),
                 "Supported file types are: py (or python), pyi, text, cfg and ignore"
             );
 
@@ -239,7 +338,16 @@ fn run_test(
                 full_path = new_path;
             }
 
-            db.write_file(&full_path, &embedded.code).unwrap();
+            let temp_string;
+            let to_write = if embedded.lang == "pth" && !embedded.code.starts_with('/') {
+                // Make any relative .pths be relative to src_path
+                temp_string = format!("{src_path}/{}", embedded.code);
+                &*temp_string
+            } else {
+                &*embedded.code
+            };
+
+            db.write_file(&full_path, to_write).unwrap();
 
             if !(full_path.starts_with(&src_path)
                 && matches!(embedded.lang, "py" | "python" | "pyi"))
@@ -281,7 +389,19 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let site_packages_paths = if let Some(python) = configuration.python() {
+    let site_packages_paths = if configuration.dependencies().is_some() {
+        // If dependencies were specified, use the venv we just set up
+        let environment = PythonEnvironment::new(
+            &venv_for_external_dependencies,
+            SysPrefixPathOrigin::PythonCliFlag,
+            db.system(),
+        )
+        .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else if let Some(python) = configuration.python() {
         let environment =
             PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
                 .expect("Python environment to point to a valid path");
@@ -293,6 +413,20 @@ fn run_test(
         vec![]
     };
 
+    // Make any relative extra-paths be relative to src_path
+    let extra_paths = configuration
+        .extra_paths()
+        .unwrap_or_default()
+        .iter()
+        .map(|path| {
+            if path.is_absolute() {
+                path.clone()
+            } else {
+                src_path.join(path)
+            }
+        })
+        .collect();
+
     let settings = ProgramSettings {
         python_version: PythonVersionWithSource {
             version: python_version,
@@ -303,7 +437,7 @@ fn run_test(
             .unwrap_or(PythonPlatform::Identifier("linux".to_string())),
         search_paths: SearchPathSettings {
             src_roots: vec![src_path],
-            extra_paths: configuration.extra_paths().unwrap_or_default().to_vec(),
+            extra_paths,
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
@@ -319,30 +453,11 @@ fn run_test(
     let mut snapshot_diagnostics = vec![];
 
     let mut any_pull_types_failures = false;
+    let mut panic_info = None;
 
     let mut failures: Failures = test_files
         .iter()
         .filter_map(|test_file| {
-            let pull_types_result = attempt_test(
-                db,
-                pull_types,
-                test_file,
-                "\"pull types\"",
-                Some(
-                    "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
-                    directive to this test",
-                ),
-            );
-            match pull_types_result {
-                Ok(()) => {}
-                Err(failures) => {
-                    any_pull_types_failures = true;
-                    if !test.should_skip_pulling_types() {
-                        return Some(failures);
-                    }
-                }
-            }
-
             let parsed = parsed_module(db, test_file.file).load(db);
 
             let mut diagnostics: Vec<Diagnostic> = parsed
@@ -358,10 +473,17 @@ fn run_test(
                     .map(|error| Diagnostic::invalid_syntax(test_file.file, error, error)),
             );
 
-            let mdtest_result = attempt_test(db, check_types, test_file, "run mdtest", None);
+            let mdtest_result = attempt_test(db, check_types, test_file);
             let type_diagnostics = match mdtest_result {
                 Ok(diagnostics) => diagnostics,
-                Err(failures) => return Some(failures),
+                Err(failures) => {
+                    if test.should_expect_panic().is_ok() {
+                        panic_info = Some(failures.info);
+                        return None;
+                    }
+
+                    return Some(failures.into_file_failures(db, "run mdtest", None));
+                }
             };
 
             diagnostics.extend(type_diagnostics);
@@ -377,13 +499,70 @@ fn run_test(
                     by_line: line_failures,
                 }),
             };
+
+            // Filter out `revealed-type` and `undefined-reveal` diagnostics from snapshots,
+            // since they make snapshots very noisy!
             if test.should_snapshot_diagnostics() {
-                snapshot_diagnostics.extend(diagnostics);
+                snapshot_diagnostics.extend(diagnostics.into_iter().filter(|diagnostic| {
+                    diagnostic.id() != DiagnosticId::RevealedType
+                        && !diagnostic.id().is_lint_named(&UNDEFINED_REVEAL.name())
+                }));
+            }
+
+            let pull_types_result = attempt_test(db, pull_types, test_file);
+            match pull_types_result {
+                Ok(()) => {}
+                Err(failures) => {
+                    any_pull_types_failures = true;
+                    if !test.should_skip_pulling_types() {
+                        return Some(failures.into_file_failures(
+                            db,
+                            "\"pull types\"",
+                            Some(
+                                "Note: either fix the panic or add the `<!-- pull-types:skip -->` \
+                    directive to this test",
+                            ),
+                        ));
+                    }
+                }
             }
 
             failure
         })
         .collect();
+
+    match panic_info {
+        Some(panic_info) => {
+            let expected_message = test
+                .should_expect_panic()
+                .expect("panic_info is only set when `should_expect_panic` is `Ok`");
+
+            let message = panic_info
+                .payload
+                .as_str()
+                .unwrap_or("Box<dyn Any>")
+                .to_string();
+
+            if let Some(expected_message) = expected_message {
+                assert!(
+                    message.contains(expected_message),
+                    "Test `{}` is expected to panic with `{expected_message}`, but panicked with `{message}` instead.",
+                    test.name()
+                );
+            }
+        }
+        None => {
+            if let Ok(message) = test.should_expect_panic() {
+                if let Some(message) = message {
+                    panic!(
+                        "Test `{}` is expected to panic with `{message}`, but it didn't.",
+                        test.name()
+                    );
+                }
+                panic!("Test `{}` is expected to panic but it didn't.", test.name());
+            }
+        }
+    }
 
     if test.should_skip_pulling_types() && !any_pull_types_failures {
         let mut by_line = matcher::FailuresByLine::default();
@@ -423,7 +602,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(())
+        Ok(TestOutcome::Success)
     } else {
         Err(failures)
     }
@@ -450,7 +629,9 @@ struct ModuleInconsistency<'db> {
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
     for from_list in list_modules(db) {
-        errs.push(match resolve_module(db, from_list.name(db)) {
+        // TODO: For now list_modules does not partake in desperate module resolution so
+        // only compare against confident module resolution.
+        errs.push(match resolve_module_confident(db, from_list.name(db)) {
             None => ModuleInconsistency {
                 db,
                 from_list,
@@ -540,7 +721,10 @@ fn create_diagnostic_snapshot(
     test: &parser::MarkdownTest,
     diagnostics: impl IntoIterator<Item = Diagnostic>,
 ) -> String {
-    let display_config = DisplayDiagnosticConfig::default().color(false);
+    let display_config = DisplayDiagnosticConfig::default()
+        .color(false)
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
     let mut snapshot = String::new();
     writeln!(snapshot).unwrap();
@@ -590,17 +774,32 @@ fn create_diagnostic_snapshot(
 ///
 /// If a panic occurs, a nicely formatted [`FileFailures`] is returned as an `Err()` variant.
 /// This will be formatted into a diagnostic message by `ty_test`.
-fn attempt_test<'db, T, F>(
+fn attempt_test<'db, 'a, T, F>(
     db: &'db Db,
     test_fn: F,
-    test_file: &TestFile,
-    action: &str,
-    clarification: Option<&str>,
-) -> Result<T, FileFailures>
+    test_file: &'a TestFile,
+) -> Result<T, AttemptTestError<'a>>
 where
     F: FnOnce(&'db dyn ty_python_semantic::Db, File) -> T + std::panic::UnwindSafe,
 {
-    catch_unwind(|| test_fn(db, test_file.file)).map_err(|info| {
+    catch_unwind(|| test_fn(db, test_file.file))
+        .map_err(|info| AttemptTestError { info, test_file })
+}
+
+struct AttemptTestError<'a> {
+    info: PanicError,
+    test_file: &'a TestFile,
+}
+
+impl AttemptTestError<'_> {
+    fn into_file_failures(
+        self,
+        db: &Db,
+        action: &str,
+        clarification: Option<&str>,
+    ) -> FileFailures {
+        let info = self.info;
+
         let mut by_line = matcher::FailuresByLine::default();
         let mut messages = vec![];
         match info.location {
@@ -646,8 +845,8 @@ where
         by_line.push(OneIndexed::from_zero_indexed(0), messages);
 
         FileFailures {
-            backtick_offsets: test_file.backtick_offsets.clone(),
+            backtick_offsets: self.test_file.backtick_offsets.clone(),
             by_line,
         }
-    })
+    }
 }

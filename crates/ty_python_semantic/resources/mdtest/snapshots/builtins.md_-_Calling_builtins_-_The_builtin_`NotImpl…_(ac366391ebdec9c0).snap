@@ -1,0 +1,47 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: builtins.md - Calling builtins - The builtin `NotImplemented` constant is not callable
+mdtest path: crates/ty_python_semantic/resources/mdtest/call/builtins.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | raise NotImplemented()  # error: [call-non-callable]
+2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+```
+
+# Diagnostics
+
+```
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:1:7
+  |
+1 | raise NotImplemented()  # error: [call-non-callable]
+  |       --------------^^
+  |       |
+  |       Did you mean `NotImplementedError`?
+2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+  |
+info: rule `call-non-callable` is enabled by default
+
+```
+
+```
+error[call-non-callable]: `NotImplemented` is not callable
+ --> src/mdtest_snippet.py:2:7
+  |
+1 | raise NotImplemented()  # error: [call-non-callable]
+2 | raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
+  |       --------------^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |       |
+  |       Did you mean `NotImplementedError`?
+  |
+info: rule `call-non-callable` is enabled by default
+
+```

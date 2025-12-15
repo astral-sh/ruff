@@ -361,6 +361,22 @@ and [LSP-ruff](https://github.com/sublimelsp/LSP-ruff) package.
 
 ## PyCharm
 
+Starting with version 2025.3, PyCharm supports Ruff out of the box:
+
+1. Go to **Python | Tools | Ruff** in the Settings dialog.
+
+1. Select the **Enable** checkbox.
+
+1. In the Execution mode setting, select how PyCharm should search for the executable:
+
+    **Interpreter** mode: PyCharm searches for an executable installed in your interpreter. To install the Ruff package for the selected interpreter, click _Install Ruff_.
+
+    **Path** mode: PyCharm searches for an executable in `$PATH`. If the executable is not found, you can specify the path by clicking the Browse... icon.
+
+1. Select which options should be enabled.
+
+For more information, refer to [PyCharm documentation](https://www.jetbrains.com/help/pycharm/2025.3/lsp-tools.html#ruff).
+
 ### Via External Tool
 
 Ruff can be installed as an [External Tool](https://www.jetbrains.com/help/pycharm/configuring-third-party-tools.html)
@@ -384,11 +400,13 @@ Ruff can be utilized as a language server via [`Eglot`](https://github.com/joaot
 To enable Ruff with automatic formatting on save, use the following configuration:
 
 ```elisp
-(add-hook 'python-mode-hook 'eglot-ensure)
 (with-eval-after-load 'eglot
   (add-to-list 'eglot-server-programs
-               '(python-mode . ("ruff" "server")))
-  (add-hook 'after-save-hook 'eglot-format))
+               '(python-base-mode . ("ruff" "server"))))
+(add-hook 'python-base-mode-hook
+          (lambda ()
+            (eglot-ensure)
+            (add-hook 'after-save-hook 'eglot-format nil t)))
 ```
 
 Ruff is available as [`flymake-ruff`](https://melpa.org/#/flymake-ruff) on MELPA:
@@ -422,29 +440,12 @@ bundle for TextMate.
 
 ## Zed
 
-Ruff is available as an extension for the Zed editor. To install it:
+Ruff support is now built into Zed (no separate extension required).
 
-1. Open the command palette with `Cmd+Shift+P`
-1. Search for "zed: extensions"
-1. Search for "ruff" in the extensions list and click "Install"
+By default, Zed uses Ruff for formatting and linting.
 
-To configure Zed to use the Ruff language server for Python files, add the following
-to your `settings.json` file:
-
-```json
-{
-  "languages": {
-    "Python": {
-      "language_servers": ["ruff"]
-      // Or, if there are other language servers you want to use with Python
-      // "language_servers": ["pyright", "ruff"]
-    }
-  }
-}
-```
-
-To configure the language server, you can provide the [server settings](settings.md)
-under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/configuring-zed#lsp) key:
+To set up editor-wide Ruff options, provide the [server settings](settings.md)
+under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/configuring-zed#lsp) key of your `settings.json` file:
 
 ```json
 {
@@ -452,7 +453,7 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
     "ruff": {
       "initialization_options": {
         "settings": {
-          // Ruff server settings goes here
+          // Ruff server settings go here
           "lineLength": 80,
           "lint": {
             "extendSelect": ["I"],
@@ -464,92 +465,33 @@ under the [`lsp.ruff.initialization_options.settings`](https://zed.dev/docs/conf
 }
 ```
 
-!!! note
+[`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) is enabled by default.
+You can disable it for Python by changing `format_on_save` in your `settings.json` file:
 
-    Support for multiple formatters for a given language is only available in Zed version
-    `0.146.0` and later.
-
-You can configure Ruff to format Python code on-save by registering the Ruff formatter
-and enabling the [`format_on_save`](https://zed.dev/docs/configuring-zed#format-on-save) setting:
-
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
-        }
-      }
+```json
+{
+  "languages": {
+    "Python": {
+      "format_on_save": "off"
     }
-    ```
+  }
+}
+```
 
 You can configure Ruff to fix lint violations and/or organize imports on-save by enabling the
 `source.fixAll.ruff` and `source.organizeImports.ruff` code actions respectively:
 
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                // Fix all auto-fixable lint violations
-                "source.fixAll.ruff": true,
-                // Organize imports
-                "source.organizeImports.ruff": true
-              }
-            }
-          ]
-        }
+```json
+{
+  "languages": {
+    "Python": {
+      "code_actions_on_format": {
+        // Organize imports
+        "source.organizeImports.ruff": true,
+        // Fix all auto-fixable lint violations
+        "source.fixAll.ruff": true
       }
     }
-    ```
-
-Taken together, you can configure Ruff to format, fix, and organize imports on-save via the
-following `settings.json`:
-
-!!! note
-
-    For this configuration, it is important to use the correct order of the code action and
-    formatter language server settings. The code actions should be defined before the formatter to
-    ensure that the formatter takes care of any remaining style issues after the code actions have
-    been applied.
-
-=== "Zed 0.146.0+"
-
-    ```json
-    {
-      "languages": {
-        "Python": {
-          "language_servers": ["ruff"],
-          "format_on_save": "on",
-          "formatter": [
-            {
-              "code_actions": {
-                "source.organizeImports.ruff": true,
-                "source.fixAll.ruff": true
-              }
-            },
-            {
-              "language_server": {
-                "name": "ruff"
-              }
-            }
-          ]
-        }
-      }
-    }
-    ```
+  }
+}
+```

@@ -9,14 +9,13 @@ use anyhow::bail;
 use ruff_db::system::{SystemPath, SystemPathBuf};
 use rustc_hash::FxHashMap;
 
+use crate::config::MarkdownTestConfig;
 use ruff_index::{IndexVec, newtype_index};
 use ruff_python_ast::PySourceType;
 use ruff_python_trivia::Cursor;
 use ruff_source_file::{LineIndex, LineRanges, OneIndexed};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_stable_hash::{FromStableHash, SipHasher128Hash, StableSipHasher128};
-
-use crate::config::MarkdownTestConfig;
 
 /// Parse the Markdown `source` as a test suite with given `title`.
 pub(crate) fn parse<'s>(title: &'s str, source: &'s str) -> anyhow::Result<MarkdownTestSuite<'s>> {
@@ -145,13 +144,17 @@ impl<'m, 's> MarkdownTest<'m, 's> {
     pub(super) fn should_snapshot_diagnostics(&self) -> bool {
         self.section
             .directives
-            .contains(MdtestDirectives::SNAPSHOT_DIAGNOSTICS)
+            .has_directive_set(MdtestDirective::SnapshotDiagnostics)
+    }
+
+    pub(super) fn should_expect_panic(&self) -> Result<Option<&str>, ()> {
+        self.section.directives.get(MdtestDirective::ExpectPanic)
     }
 
     pub(super) fn should_skip_pulling_types(&self) -> bool {
         self.section
             .directives
-            .contains(MdtestDirectives::PULL_TYPES_SKIP)
+            .has_directive_set(MdtestDirective::PullTypesSkip)
     }
 }
 
@@ -270,20 +273,36 @@ impl EmbeddedFileSourceMap {
         }
     }
 
-    pub(crate) fn to_absolute_line_number(&self, relative_line_number: OneIndexed) -> OneIndexed {
-        let mut absolute_line_number = 0;
+    /// Returns the absolute line number in the markdown file for a given line number
+    /// relative to the concatenated code blocks.
+    ///
+    /// Returns an `Err` if the relative line number is out of bounds where
+    /// the returned value is the absolute line number of the last code block.
+    ///
+    /// # Panics
+    ///  If called when the markdown file has no code blocks.
+    pub(crate) fn to_absolute_line_number(
+        &self,
+        relative_line_number: OneIndexed,
+    ) -> std::result::Result<OneIndexed, OneIndexed> {
         let mut relative_line_number = relative_line_number.get();
 
         for (start_line, line_count) in &self.start_line_and_line_count {
             if relative_line_number > *line_count {
                 relative_line_number -= *line_count;
             } else {
-                absolute_line_number = start_line + relative_line_number;
-                break;
+                let absolute_line_number = start_line + relative_line_number;
+                return Ok(OneIndexed::new(absolute_line_number)
+                    .expect("absolute line number must be >= 1"));
             }
         }
 
-        OneIndexed::new(absolute_line_number).expect("Relative line number out of bounds")
+        let last_line_number = self
+            .start_line_and_line_count
+            .last()
+            .and_then(|(start_line, line_count)| OneIndexed::new(start_line + line_count));
+
+        Err(last_line_number.expect("markdown file to have at least one code block"))
     }
 }
 
@@ -495,6 +514,7 @@ impl<'s> Parser<'s> {
     fn parse_impl(&mut self) -> anyhow::Result<()> {
         const SECTION_CONFIG_SNAPSHOT: &str = "snapshot-diagnostics";
         const SECTION_CONFIG_PULLTYPES: &str = "pull-types:skip";
+        const SECTION_CONFIG_EXPECT_PANIC: &str = "expect-panic";
         const HTML_COMMENT_ALLOWLIST: &[&str] = &["blacken-docs:on", "blacken-docs:off"];
         const CODE_BLOCK_END: &[u8] = b"```";
         const HTML_COMMENT_END: &[u8] = b"-->";
@@ -506,16 +526,47 @@ impl<'s> Parser<'s> {
                         memchr::memmem::find(self.cursor.as_bytes(), HTML_COMMENT_END)
                     {
                         let html_comment = self.cursor.as_str()[..position].trim();
-                        if html_comment == SECTION_CONFIG_SNAPSHOT {
-                            self.process_mdtest_directive(MdtestDirective::SnapshotDiagnostics)?;
-                        } else if html_comment == SECTION_CONFIG_PULLTYPES {
-                            self.process_mdtest_directive(MdtestDirective::PullTypesSkip)?;
-                        } else if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
-                            bail!(
-                                "Unknown HTML comment `{html_comment}` -- possibly a typo? \
+                        let (directive, value) = match html_comment.split_once(':') {
+                            Some((directive, value)) => {
+                                (directive.trim(), Some(value.trim().to_string()))
+                            }
+                            None => (html_comment, None),
+                        };
+
+                        match directive {
+                            SECTION_CONFIG_SNAPSHOT => {
+                                anyhow::ensure!(
+                                    value.is_none(),
+                                    "The `{SECTION_CONFIG_SNAPSHOT}` directive does not take a value."
+                                );
+                                self.process_mdtest_directive(
+                                    MdtestDirective::SnapshotDiagnostics,
+                                    None,
+                                )?;
+                            }
+                            SECTION_CONFIG_PULLTYPES => {
+                                anyhow::ensure!(
+                                    value.is_none(),
+                                    "The `{SECTION_CONFIG_PULLTYPES}` directive does not take a value."
+                                );
+                                self.process_mdtest_directive(
+                                    MdtestDirective::PullTypesSkip,
+                                    None,
+                                )?;
+                            }
+                            SECTION_CONFIG_EXPECT_PANIC => {
+                                self.process_mdtest_directive(MdtestDirective::ExpectPanic, value)?;
+                            }
+                            _ => {
+                                if !HTML_COMMENT_ALLOWLIST.contains(&html_comment) {
+                                    bail!(
+                                        "Unknown HTML comment `{html_comment}` -- possibly a typo? \
                                 (Add to `HTML_COMMENT_ALLOWLIST` if this is a false positive)"
-                            );
+                                    );
+                                }
+                            }
                         }
+
                         self.cursor.skip_bytes(position + HTML_COMMENT_END.len());
                     } else {
                         bail!("Unterminated HTML comment.");
@@ -646,7 +697,7 @@ impl<'s> Parser<'s> {
             level: header_level.try_into()?,
             parent_id: Some(parent),
             config: self.sections[parent].config.clone(),
-            directives: self.sections[parent].directives,
+            directives: self.sections[parent].directives.clone(),
         };
 
         if !self.current_section_files.is_empty() {
@@ -793,7 +844,11 @@ impl<'s> Parser<'s> {
         Ok(())
     }
 
-    fn process_mdtest_directive(&mut self, directive: MdtestDirective) -> anyhow::Result<()> {
+    fn process_mdtest_directive(
+        &mut self,
+        directive: MdtestDirective,
+        value: Option<String>,
+    ) -> anyhow::Result<()> {
         if self.current_section_has_config {
             bail!(
                 "Section config to enable {directive} must come before \
@@ -814,7 +869,7 @@ impl<'s> Parser<'s> {
                  at most once.",
             );
         }
-        current_section.directives.add_directive(directive);
+        current_section.directives.add_directive(directive, value);
 
         Ok(())
     }
@@ -833,12 +888,14 @@ impl<'s> Parser<'s> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 enum MdtestDirective {
     /// A directive to enable snapshotting diagnostics.
     SnapshotDiagnostics,
     /// A directive to skip pull types.
     PullTypesSkip,
+
+    ExpectPanic,
 }
 
 impl std::fmt::Display for MdtestDirective {
@@ -846,40 +903,31 @@ impl std::fmt::Display for MdtestDirective {
         match self {
             MdtestDirective::SnapshotDiagnostics => f.write_str("snapshotting diagnostics"),
             MdtestDirective::PullTypesSkip => f.write_str("skipping the pull-types visitor"),
+            MdtestDirective::ExpectPanic => f.write_str("expect test to panic"),
         }
     }
 }
 
-bitflags::bitflags! {
-    /// Directives that can be applied to a Markdown test section.
-    #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
-    pub(crate) struct MdtestDirectives: u8 {
-        /// We should snapshot diagnostics for this section.
-        const SNAPSHOT_DIAGNOSTICS = 1 << 0;
-        /// We should skip pulling types for this section.
-        const PULL_TYPES_SKIP = 1 << 1;
-    }
+/// The directives applied to a Markdown test section.
+#[derive(Default, Debug, Clone, PartialEq, Eq)]
+pub(crate) struct MdtestDirectives {
+    directives: FxHashMap<MdtestDirective, Option<String>>,
 }
 
 impl MdtestDirectives {
-    const fn has_directive_set(self, directive: MdtestDirective) -> bool {
-        match directive {
-            MdtestDirective::SnapshotDiagnostics => {
-                self.contains(MdtestDirectives::SNAPSHOT_DIAGNOSTICS)
-            }
-            MdtestDirective::PullTypesSkip => self.contains(MdtestDirectives::PULL_TYPES_SKIP),
-        }
+    fn has_directive_set(&self, directive: MdtestDirective) -> bool {
+        self.directives.contains_key(&directive)
     }
 
-    fn add_directive(&mut self, directive: MdtestDirective) {
-        match directive {
-            MdtestDirective::SnapshotDiagnostics => {
-                self.insert(MdtestDirectives::SNAPSHOT_DIAGNOSTICS);
-            }
-            MdtestDirective::PullTypesSkip => {
-                self.insert(MdtestDirectives::PULL_TYPES_SKIP);
-            }
-        }
+    fn get(&self, directive: MdtestDirective) -> Result<Option<&str>, ()> {
+        self.directives
+            .get(&directive)
+            .map(|s| s.as_deref())
+            .ok_or(())
+    }
+
+    fn add_directive(&mut self, directive: MdtestDirective, value: Option<String>) {
+        self.directives.insert(directive, value);
     }
 }
 
@@ -887,6 +935,7 @@ impl MdtestDirectives {
 mod tests {
     use ruff_python_ast::PySourceType;
     use ruff_python_trivia::textwrap::dedent;
+    use ruff_source_file::OneIndexed;
 
     use insta::assert_snapshot;
 
@@ -897,6 +946,31 @@ mod tests {
         let mf = super::parse("file.md", "").unwrap();
 
         assert!(mf.tests().next().is_none());
+    }
+
+    #[test]
+    fn source_map_to_absolute_line_number() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(10, 5), (25, 3)],
+        };
+
+        let absolute = map
+            .to_absolute_line_number(OneIndexed::new(6).unwrap())
+            .unwrap();
+        assert_eq!(absolute.get(), 26);
+    }
+
+    #[test]
+    fn source_map_reports_invalid_relative_line() {
+        let map = super::EmbeddedFileSourceMap {
+            start_line_and_line_count: vec![(9, 2)],
+        };
+
+        let error = map
+            .to_absolute_line_number(OneIndexed::new(3).unwrap())
+            .unwrap_err();
+
+        assert_eq!(error.get(), 11);
     }
 
     #[test]

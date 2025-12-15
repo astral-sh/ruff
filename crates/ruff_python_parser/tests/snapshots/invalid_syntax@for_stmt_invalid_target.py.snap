@@ -68,6 +68,7 @@ Module(
                                             quote_style: Double,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -388,6 +389,7 @@ Module(
                                                                             quote_style: Double,
                                                                             prefix: Empty,
                                                                             triple_quoted: false,
+                                                                            unclosed: false,
                                                                         },
                                                                     },
                                                                 ),
@@ -496,7 +498,7 @@ Module(
 4 | for *x | y in z: ...
 5 | for await x in z: ...
 6 | for yield x in y: ...
-  |                 ^ Syntax Error: Expected 'in', found ':'
+  |                 ^ Syntax Error: Expected `in`, found `:`
 7 | for [x, 1, y, *["a"]] in z: ...
   |
 

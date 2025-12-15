@@ -54,6 +54,7 @@ from typing import (  # noqa: Y022,UP035
     Any,
     BinaryIO,
     ClassVar,
+    Final,
     Generic,
     Mapping,
     MutableMapping,
@@ -254,8 +255,9 @@ class type:
     __bases__: tuple[type, ...]
     @property
     def __basicsize__(self) -> int: ...
-    @property
-    def __dict__(self) -> types.MappingProxyType[str, Any]: ...  # type: ignore[override]
+    # type.__dict__ is read-only at runtime, but that can't be expressed currently.
+    # See https://github.com/python/typeshed/issues/11033 for a discussion.
+    __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
     @property
     def __dictoffset__(self) -> int: ...
     @property
@@ -301,10 +303,12 @@ class type:
     def __prepare__(metacls, name: str, bases: tuple[type, ...], /, **kwds: Any) -> MutableMapping[str, object]:
         """Create the namespace for the class statement"""
     if sys.version_info >= (3, 10):
-        def __or__(self, value: Any, /) -> types.UnionType:
+        # `int | str` produces an instance of `UnionType`, but `int | int` produces an instance of `type`,
+        # and `abc.ABC | abc.ABC` produces an instance of `abc.ABCMeta`.
+        def __or__(self: _typeshed.Self, value: Any, /) -> types.UnionType | _typeshed.Self:
             """Return self|value."""
 
-        def __ror__(self, value: Any, /) -> types.UnionType:
+        def __ror__(self: _typeshed.Self, value: Any, /) -> types.UnionType | _typeshed.Self:
             """Return value|self."""
     if sys.version_info >= (3, 12):
         __type_params__: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
@@ -359,7 +363,7 @@ class int:
     """
 
     @overload
-    def __new__(cls, x: ConvertibleToInt = ..., /) -> Self: ...
+    def __new__(cls, x: ConvertibleToInt = 0, /) -> Self: ...
     @overload
     def __new__(cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self: ...
     def as_integer_ratio(self) -> tuple[int, Literal[1]]:
@@ -657,7 +661,7 @@ class int:
 class float:
     """Convert a string or number to a floating-point number, if possible."""
 
-    def __new__(cls, x: ConvertibleToFloat = ..., /) -> Self: ...
+    def __new__(cls, x: ConvertibleToFloat = 0, /) -> Self: ...
     def as_integer_ratio(self) -> tuple[int, int]:
         """Return a pair of integers, whose ratio is exactly equal to the original float.
 
@@ -828,8 +832,8 @@ class complex:
     @overload
     def __new__(
         cls,
-        real: complex | SupportsComplex | SupportsFloat | SupportsIndex = ...,
-        imag: complex | SupportsFloat | SupportsIndex = ...,
+        real: complex | SupportsComplex | SupportsFloat | SupportsIndex = 0,
+        imag: complex | SupportsFloat | SupportsIndex = 0,
     ) -> Self: ...
     @overload
     def __new__(cls, real: str | SupportsComplex | SupportsFloat | SupportsIndex | complex) -> Self: ...
@@ -922,9 +926,9 @@ class str(Sequence[str]):
     """
 
     @overload
-    def __new__(cls, object: object = ...) -> Self: ...
+    def __new__(cls, object: object = "") -> Self: ...
     @overload
-    def __new__(cls, object: ReadableBuffer, encoding: str = ..., errors: str = ...) -> Self: ...
+    def __new__(cls, object: ReadableBuffer, encoding: str = "utf-8", errors: str = "strict") -> Self: ...
     @overload
     def capitalize(self: LiteralString) -> LiteralString:
         """Return a capitalized version of the string.
@@ -950,7 +954,7 @@ class str(Sequence[str]):
 
     @overload
     def center(self, width: SupportsIndex, fillchar: str = " ", /) -> str: ...  # type: ignore[misc]
-    def count(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def count(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the number of non-overlapping occurrences of substring sub in string S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -970,7 +974,7 @@ class str(Sequence[str]):
         """
 
     def endswith(
-        self, suffix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, suffix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> bool:
         """Return True if the string ends with the specified suffix, False otherwise.
 
@@ -991,7 +995,7 @@ class str(Sequence[str]):
 
     @overload
     def expandtabs(self, tabsize: SupportsIndex = 8) -> str: ...  # type: ignore[misc]
-    def find(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def find(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1011,7 +1015,7 @@ class str(Sequence[str]):
         The substitutions are identified by braces ('{' and '}').
         """
 
-    def index(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def index(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the lowest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1203,14 +1207,14 @@ class str(Sequence[str]):
 
     @overload
     def removesuffix(self, suffix: str, /) -> str: ...  # type: ignore[misc]
-    def rfind(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def rfind(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the highest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
         Return -1 on failure.
         """
 
-    def rindex(self, sub: str, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /) -> int:
+    def rindex(self, sub: str, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> int:
         """Return the highest index in S where substring sub is found, such that sub is contained within S[start:end].
 
         Optional arguments start and end are interpreted as in slice notation.
@@ -1302,7 +1306,7 @@ class str(Sequence[str]):
     @overload
     def splitlines(self, keepends: bool = False) -> list[str]: ...  # type: ignore[misc]
     def startswith(
-        self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> bool:
         """Return True if the string starts with the specified prefix, False otherwise.
 
@@ -1458,7 +1462,7 @@ class bytes(Sequence[int]):
     @overload
     def __new__(cls, o: Iterable[SupportsIndex] | SupportsIndex | SupportsBytes | ReadableBuffer, /) -> Self: ...
     @overload
-    def __new__(cls, string: str, /, encoding: str, errors: str = ...) -> Self: ...
+    def __new__(cls, string: str, /, encoding: str, errors: str = "strict") -> Self: ...
     @overload
     def __new__(cls) -> Self: ...
     def capitalize(self) -> bytes:
@@ -1475,7 +1479,7 @@ class bytes(Sequence[int]):
         """
 
     def count(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end].
 
@@ -1501,8 +1505,8 @@ class bytes(Sequence[int]):
     def endswith(
         self,
         suffix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytes ends with the specified suffix, False otherwise.
@@ -1522,7 +1526,7 @@ class bytes(Sequence[int]):
         """
 
     def find(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1534,7 +1538,7 @@ class bytes(Sequence[int]):
         Return -1 on failure.
         """
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Create a string of hexadecimal numbers from a bytes object.
 
           sep
@@ -1556,7 +1560,7 @@ class bytes(Sequence[int]):
         """
 
     def index(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1692,7 +1696,7 @@ class bytes(Sequence[int]):
         """
 
     def rfind(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1705,7 +1709,7 @@ class bytes(Sequence[int]):
         """
 
     def rindex(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start,end].
 
@@ -1776,8 +1780,8 @@ class bytes(Sequence[int]):
     def startswith(
         self,
         prefix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytes starts with the specified prefix, False otherwise.
@@ -1913,7 +1917,7 @@ class bytearray(MutableSequence[int]):
     @overload
     def __init__(self, ints: Iterable[SupportsIndex] | SupportsIndex | ReadableBuffer, /) -> None: ...
     @overload
-    def __init__(self, string: str, /, encoding: str, errors: str = ...) -> None: ...
+    def __init__(self, string: str, /, encoding: str, errors: str = "strict") -> None: ...
     def append(self, item: SupportsIndex, /) -> None:
         """Append a single item to the end of the bytearray.
 
@@ -1935,7 +1939,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def count(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the number of non-overlapping occurrences of subsection 'sub' in bytes B[start:end].
 
@@ -1964,8 +1968,8 @@ class bytearray(MutableSequence[int]):
     def endswith(
         self,
         suffix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytearray ends with the specified suffix, False otherwise.
@@ -1992,7 +1996,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def find(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2004,7 +2008,7 @@ class bytearray(MutableSequence[int]):
         Return -1 on failure.
         """
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Create a string of hexadecimal numbers from a bytearray object.
 
           sep
@@ -2026,7 +2030,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def index(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the lowest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2187,7 +2191,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def rfind(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2200,7 +2204,7 @@ class bytearray(MutableSequence[int]):
         """
 
     def rindex(
-        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = ..., end: SupportsIndex | None = ..., /
+        self, sub: ReadableBuffer | SupportsIndex, start: SupportsIndex | None = None, end: SupportsIndex | None = None, /
     ) -> int:
         """Return the highest index in B where subsection 'sub' is found, such that 'sub' is contained within B[start:end].
 
@@ -2272,8 +2276,8 @@ class bytearray(MutableSequence[int]):
     def startswith(
         self,
         prefix: ReadableBuffer | tuple[ReadableBuffer, ...],
-        start: SupportsIndex | None = ...,
-        end: SupportsIndex | None = ...,
+        start: SupportsIndex | None = None,
+        end: SupportsIndex | None = None,
         /,
     ) -> bool:
         """Return True if the bytearray starts with the specified prefix, False otherwise.
@@ -2549,7 +2553,7 @@ class memoryview(Sequence[_I]):
     def release(self) -> None:
         """Release the underlying buffer exposed by the memoryview object."""
 
-    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = ...) -> str:
+    def hex(self, sep: str | bytes = ..., bytes_per_sep: SupportsIndex = 1) -> str:
         """Return the data in the buffer as a str of hexadecimal numbers.
 
           sep
@@ -2590,7 +2594,7 @@ class bool(int):
     The class bool is a subclass of the class int, and cannot be subclassed.
     """
 
-    def __new__(cls, o: object = ..., /) -> Self: ...
+    def __new__(cls, o: object = False, /) -> Self: ...
     # The following overloads could be represented more elegantly with a TypeVar("_B", bool, int),
     # however mypy has a bug regarding TypeVar constraints (https://github.com/python/mypy/issues/11880).
     @overload
@@ -2697,7 +2701,7 @@ class tuple(Sequence[_T_co]):
     If the argument is a tuple, the return value is the same object.
     """
 
-    def __new__(cls, iterable: Iterable[_T_co] = ..., /) -> Self: ...
+    def __new__(cls, iterable: Iterable[_T_co] = (), /) -> Self: ...
     def __len__(self) -> int:
         """Return len(self)."""
 
@@ -3254,7 +3258,7 @@ class range(Sequence[int]):
     @overload
     def __new__(cls, stop: SupportsIndex, /) -> Self: ...
     @overload
-    def __new__(cls, start: SupportsIndex, stop: SupportsIndex, step: SupportsIndex = ..., /) -> Self: ...
+    def __new__(cls, start: SupportsIndex, stop: SupportsIndex, step: SupportsIndex = 1, /) -> Self: ...
     def count(self, value: int, /) -> int:
         """rangeobject.count(value) -> integer -- return number of occurrences of value"""
 
@@ -3328,10 +3332,10 @@ class property:
 
     def __init__(
         self,
-        fget: Callable[[Any], Any] | None = ...,
-        fset: Callable[[Any, Any], None] | None = ...,
-        fdel: Callable[[Any], None] | None = ...,
-        doc: str | None = ...,
+        fget: Callable[[Any], Any] | None = None,
+        fset: Callable[[Any, Any], None] | None = None,
+        fdel: Callable[[Any], None] | None = None,
+        doc: str | None = None,
     ) -> None: ...
     def getter(self, fget: Callable[[Any], Any], /) -> property:
         """Descriptor to obtain a copy of the property with a different getter."""
@@ -3353,13 +3357,6 @@ class property:
 
     def __delete__(self, instance: Any, /) -> None:
         """Delete an attribute of instance."""
-
-@final
-@type_check_only
-class _NotImplementedType(Any):
-    __call__: None
-
-NotImplemented: _NotImplementedType
 
 def abs(x: SupportsAbs[_T], /) -> _T:
     """Return the absolute value of the argument."""
@@ -3437,7 +3434,7 @@ if sys.version_info >= (3, 10):
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: Literal[0],
     dont_inherit: bool = False,
@@ -3462,7 +3459,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     *,
     dont_inherit: bool = False,
@@ -3472,7 +3469,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: Literal[1024],
     dont_inherit: bool = False,
@@ -3483,7 +3480,7 @@ def compile(
 @overload
 def compile(
     source: str | ReadableBuffer | _ast.Module | _ast.Expression | _ast.Interactive,
-    filename: str | ReadableBuffer | PathLike[Any],
+    filename: str | bytes | PathLike[Any],
     mode: str,
     flags: int,
     dont_inherit: bool = False,
@@ -4153,7 +4150,14 @@ def open(
     opener: _Opener | None = None,
 ) -> IO[Any]: ...
 def ord(c: str | bytes | bytearray, /) -> int:
-    """Return the Unicode code point for a one-character string."""
+    """Return the ordinal value of a character.
+
+    If the argument is a one-character string, return the Unicode code
+    point of that character.
+
+    If the argument is a bytes or bytearray object of length 1, return its
+    single byte value.
+    """
 
 @type_check_only
 class _SupportsWriteAndFlush(SupportsWrite[_T_contra], SupportsFlush, Protocol[_T_contra]): ...
@@ -4371,18 +4375,25 @@ class zip(Generic[_T_co]):
 
     if sys.version_info >= (3, 10):
         @overload
-        def __new__(cls, *, strict: bool = ...) -> zip[Any]: ...
+        def __new__(cls, *, strict: bool = False) -> zip[Any]: ...
         @overload
-        def __new__(cls, iter1: Iterable[_T1], /, *, strict: bool = ...) -> zip[tuple[_T1]]: ...
+        def __new__(cls, iter1: Iterable[_T1], /, *, strict: bool = False) -> zip[tuple[_T1]]: ...
         @overload
-        def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /, *, strict: bool = ...) -> zip[tuple[_T1, _T2]]: ...
+        def __new__(cls, iter1: Iterable[_T1], iter2: Iterable[_T2], /, *, strict: bool = False) -> zip[tuple[_T1, _T2]]: ...
         @overload
         def __new__(
-            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /, *, strict: bool = ...
+            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], /, *, strict: bool = False
         ) -> zip[tuple[_T1, _T2, _T3]]: ...
         @overload
         def __new__(
-            cls, iter1: Iterable[_T1], iter2: Iterable[_T2], iter3: Iterable[_T3], iter4: Iterable[_T4], /, *, strict: bool = ...
+            cls,
+            iter1: Iterable[_T1],
+            iter2: Iterable[_T2],
+            iter3: Iterable[_T3],
+            iter4: Iterable[_T4],
+            /,
+            *,
+            strict: bool = False,
         ) -> zip[tuple[_T1, _T2, _T3, _T4]]: ...
         @overload
         def __new__(
@@ -4394,7 +4405,7 @@ class zip(Generic[_T_co]):
             iter5: Iterable[_T5],
             /,
             *,
-            strict: bool = ...,
+            strict: bool = False,
         ) -> zip[tuple[_T1, _T2, _T3, _T4, _T5]]: ...
         @overload
         def __new__(
@@ -4407,7 +4418,7 @@ class zip(Generic[_T_co]):
             iter6: Iterable[Any],
             /,
             *iterables: Iterable[Any],
-            strict: bool = ...,
+            strict: bool = False,
         ) -> zip[tuple[Any, ...]]: ...
     else:
         @overload
@@ -4451,7 +4462,7 @@ def __import__(
     name: str,
     globals: Mapping[str, object] | None = None,
     locals: Mapping[str, object] | None = None,
-    fromlist: Sequence[str] = (),
+    fromlist: Sequence[str] | None = (),
     level: int = 0,
 ) -> types.ModuleType:
     """Import a module.
@@ -4478,14 +4489,14 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     """
 
 if sys.version_info >= (3, 10):
-    from types import EllipsisType
+    from types import EllipsisType, NotImplementedType
 
     # Backwards compatibility hack for folks who relied on the ellipsis type
     # existing in typeshed in Python 3.9 and earlier.
     ellipsis = EllipsisType
 
     Ellipsis: EllipsisType
-
+    NotImplemented: NotImplementedType
 else:
     # Actually the type of Ellipsis is <type 'ellipsis'>, but since it's
     # not exposed anywhere under that name, we make it private here.
@@ -4494,6 +4505,12 @@ else:
     class ellipsis: ...
 
     Ellipsis: ellipsis
+
+    @final
+    @type_check_only
+    class _NotImplementedType(Any): ...
+
+    NotImplemented: _NotImplementedType
 
 @disjoint_base
 class BaseException:
@@ -4509,6 +4526,10 @@ class BaseException:
     def __setstate__(self, state: dict[str, Any] | None, /) -> None: ...
     def with_traceback(self, tb: TracebackType | None, /) -> Self:
         """Set self.__traceback__ to tb and return self."""
+    # Necessary for security-focused static analyzers (e.g, pysa)
+    # See https://github.com/python/typeshed/pull/14900
+    def __str__(self) -> str: ...  # noqa: Y029
+    def __repr__(self) -> str: ...  # noqa: Y029
     if sys.version_info >= (3, 11):
         # only present after add_note() is called
         __notes__: list[str]
@@ -4564,8 +4585,8 @@ if sys.version_info >= (3, 10):
     class AttributeError(Exception):
         """Attribute not found."""
 
-        def __init__(self, *args: object, name: str | None = ..., obj: object = ...) -> None: ...
-        name: str
+        def __init__(self, *args: object, name: str | None = None, obj: object = None) -> None: ...
+        name: str | None
         obj: object
 
 else:
@@ -4582,7 +4603,7 @@ class EOFError(Exception):
 class ImportError(Exception):
     """Import can't find module, or can't find name in module."""
 
-    def __init__(self, *args: object, name: str | None = ..., path: str | None = ...) -> None: ...
+    def __init__(self, *args: object, name: str | None = None, path: str | None = None) -> None: ...
     name: str | None
     path: str | None
     msg: str  # undocumented
@@ -4600,8 +4621,8 @@ if sys.version_info >= (3, 10):
     class NameError(Exception):
         """Name not found globally."""
 
-        def __init__(self, *args: object, name: str | None = ...) -> None: ...
-        name: str
+        def __init__(self, *args: object, name: str | None = None) -> None: ...
+        name: str | None
 
 else:
     class NameError(Exception):

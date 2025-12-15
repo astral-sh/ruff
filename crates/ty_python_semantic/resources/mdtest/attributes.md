@@ -26,9 +26,7 @@ class C:
 c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
-
-# TODO: Same here. This should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 # There is no special handling of attributes that are (directly) assigned to a declared parameter,
 # which means we union with `Unknown` here, since the attribute itself is not declared. This is
@@ -177,8 +175,7 @@ c_instance = C(1)
 
 reveal_type(c_instance.inferred_from_value)  # revealed: Unknown | Literal[1, "a"]
 
-# TODO: Should be `Unknown | Literal[1, "a"]`
-reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown
+reveal_type(c_instance.inferred_from_other_attribute)  # revealed: Unknown | Literal[1, "a"]
 
 reveal_type(c_instance.inferred_from_param)  # revealed: Unknown | int | None
 
@@ -303,14 +300,6 @@ reveal_type(c_instance.b)  # revealed: Unknown | list[Literal[2, 3]]
 #### Attributes defined in for-loop (unpacking)
 
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 1
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
@@ -323,7 +312,7 @@ class NonIterable: ...
 
 class C:
     def __init__(self):
-        for self.x in IntIterable():
+        for self.x in range(3):
             pass
 
         for _, self.y in TupleIterable():
@@ -380,15 +369,12 @@ reveal_type(c_instance.y)  # revealed: Unknown | int
 
 #### Attributes defined in comprehensions
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
-class IntIterator:
-    def __next__(self) -> int:
-        return 1
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 class TupleIterator:
     def __next__(self) -> tuple[int, str]:
         return (1, "a")
@@ -399,44 +385,83 @@ class TupleIterable:
 
 class C:
     def __init__(self) -> None:
-        [... for self.a in IntIterable()]
+        [... for self.a in range(3)]
         [... for (self.b, self.c) in TupleIterable()]
-        [... for self.d in IntIterable() for self.e in IntIterable()]
-        [[... for self.f in IntIterable()] for _ in IntIterable()]
-        [[... for self.g in IntIterable()] for self in [D()]]
+        [... for self.d in range(3) for self.e in range(3)]
+        [[... for self.f in range(3)] for _ in range(3)]
+        [[... for self.g in range(3)] for self in [D()]]
 
 class D:
     g: int
 
 c_instance = C()
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.a)  # revealed: Unknown
+reveal_type(c_instance.a)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.b)  # revealed: Unknown
+reveal_type(c_instance.b)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | str
-# error: [unresolved-attribute]
-reveal_type(c_instance.c)  # revealed: Unknown
+reveal_type(c_instance.c)  # revealed: Unknown | str
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.d)  # revealed: Unknown
+reveal_type(c_instance.d)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.e)  # revealed: Unknown
+reveal_type(c_instance.e)  # revealed: Unknown | int
 
-# TODO: no error, reveal Unknown | int
-# error: [unresolved-attribute]
-reveal_type(c_instance.f)  # revealed: Unknown
+reveal_type(c_instance.f)  # revealed: Unknown | int
 
 # This one is correctly not resolved as an attribute:
 # error: [unresolved-attribute]
 reveal_type(c_instance.g)  # revealed: Unknown
+```
+
+It does not matter how much the comprehension is nested.
+
+Similarly attributes defined by the comprehension in a generic method are recognized.
+
+```py
+class C:
+    def f[T](self):
+        [... for self.a in [1]]
+        [[... for self.b in [1]] for _ in [1]]
+
+c_instance = C()
+
+reveal_type(c_instance.a)  # revealed: Unknown | int
+reveal_type(c_instance.b)  # revealed: Unknown | int
+```
+
+If the comprehension is inside another scope like function then that attribute is not inferred.
+
+```py
+class C:
+    def __init__(self):
+        def f():
+            # error: [unresolved-attribute]
+            [... for self.a in [1]]
+
+        def g():
+            # error: [unresolved-attribute]
+            [... for self.b in [1]]
+        g()
+
+c_instance = C()
+
+# This attribute is in the function f and is not reachable
+# error: [unresolved-attribute]
+reveal_type(c_instance.a)  # revealed: Unknown
+
+# error: [unresolved-attribute]
+reveal_type(c_instance.b)  # revealed: Unknown
+```
+
+If the comprehension is nested in any other eager scope it still can assign attributes.
+
+```py
+class C:
+    def __init__(self):
+        class D:
+            [[... for self.a in [1]] for _ in [1]]
+
+reveal_type(C().a)  # revealed: Unknown | int
 ```
 
 #### Conditionally declared / bound attributes
@@ -598,6 +623,8 @@ class C:
         self.c = c
     if False:
         def set_e(self, e: str) -> None:
+            # TODO: Should not emit this diagnostic
+            # error: [unresolved-attribute]
             self.e = e
 
 # TODO: this would ideally be `Unknown | Literal[1]`
@@ -685,7 +712,7 @@ class C:
     pure_class_variable2: ClassVar = 1
 
     def method(self):
-        # TODO: this should be an error
+        # error: [invalid-attribute-access] "Cannot assign to ClassVar `pure_class_variable1` from an instance of type `Self@method`"
         self.pure_class_variable1 = "value set through instance"
 
 reveal_type(C.pure_class_variable1)  # revealed: str
@@ -820,22 +847,34 @@ reveal_type(C().c)  # revealed: int
 
 ### Inheritance of class/instance attributes
 
-#### Instance variable defined in a base class
-
 ```py
 class Base:
-    declared_in_body: int | None = 1
+    attribute: int | None = 1
 
-    base_class_attribute_1: str | None
-    base_class_attribute_2: str | None
-    base_class_attribute_3: str | None
+    redeclared_with_same_type: str | None
+    redeclared_with_narrower_type: str | None
+    redeclared_with_wider_type: str | None
+
+    redeclared_in_method_with_same_type: str | None
+    redeclared_in_method_with_narrower_type: str | None
+    redeclared_in_method_with_wider_type: str | None
+
+    overwritten_in_subclass_body: str
+    overwritten_in_subclass_method: str
+
+    undeclared = "base"
 
     def __init__(self) -> None:
-        self.defined_in_init: str | None = "value in base"
+        self.pure_attribute: str | None = "value in base"
+
+        self.pure_overwritten_in_subclass_body: str = "value in base"
+        self.pure_overwritten_in_subclass_method: str = "value in base"
+
+        self.pure_undeclared = "base"
 
 class Intermediate(Base):
     # Redeclaring base class attributes with the *same *type is fine:
-    base_class_attribute_1: str | None = None
+    redeclared_with_same_type: str | None = None
 
     # Redeclaring them with a *narrower type* is unsound, because modifications
     # through a `Base` reference could violate that constraint.
@@ -847,22 +886,88 @@ class Intermediate(Base):
     # enabled by default can still be discussed.
     #
     # TODO: This should be an error
-    base_class_attribute_2: str
+    redeclared_with_narrower_type: str
 
     # Redeclaring attributes with a *wider type* directly violates LSP.
     #
     # In this case, both mypy and pyright report an error.
     #
     # TODO: This should be an error
-    base_class_attribute_3: str | int | None
+    redeclared_with_wider_type: str | int | None
+
+    # TODO: This should be an `invalid-assignment` error
+    overwritten_in_subclass_body = None
+
+    # TODO: This should be an `invalid-assignment` error
+    pure_overwritten_in_subclass_body = None
+
+    undeclared = "intermediate"
+
+    def set_attributes(self) -> None:
+        self.redeclared_in_method_with_same_type: str | None = None
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_narrower_type: str = "foo"
+
+        # TODO: This should be an error (violates Liskov)
+        self.redeclared_in_method_with_wider_type: object = object()
+
+        self.overwritten_in_subclass_method = None  # error: [invalid-assignment]
+
+        self.pure_overwritten_in_subclass_method = None  # error: [invalid-assignment]
+
+        self.pure_undeclared = "intermediate"
 
 class Derived(Intermediate): ...
 
-reveal_type(Derived.declared_in_body)  # revealed: int | None
+reveal_type(Derived.attribute)  # revealed: int | None
+reveal_type(Derived().attribute)  # revealed: int | None
 
-reveal_type(Derived().declared_in_body)  # revealed: int | None
+reveal_type(Derived.redeclared_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_with_same_type)  # revealed: str | None
 
-reveal_type(Derived().defined_in_init)  # revealed: str | None
+# We infer the narrower type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_with_narrower_type)  # revealed: str
+reveal_type(Derived().redeclared_with_narrower_type)  # revealed: str
+
+# We infer the wider type here, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_with_wider_type)  # revealed: str | int | None
+reveal_type(Derived().redeclared_with_wider_type)  # revealed: str | int | None
+
+# TODO: Both of these should be `str`
+reveal_type(Derived.overwritten_in_subclass_body)  # revealed: Unknown | None
+reveal_type(Derived().overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+reveal_type(Derived.redeclared_in_method_with_same_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_same_type)  # revealed: str | None
+
+# TODO: both of these should be `str`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_narrower_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_narrower_type)  # revealed: str | None
+
+# TODO: both of these should be `object`, despite the Liskov violation,
+# for compatibility with other type checkers (and to reflect the clear user intent)
+reveal_type(Derived.redeclared_in_method_with_wider_type)  # revealed: str | None
+reveal_type(Derived().redeclared_in_method_with_wider_type)  # revealed: object
+
+reveal_type(Derived.overwritten_in_subclass_method)  # revealed: str
+reveal_type(Derived().overwritten_in_subclass_method)  # revealed: str
+
+reveal_type(Derived().pure_attribute)  # revealed: str | None
+
+# TODO: This should be `str`
+reveal_type(Derived().pure_overwritten_in_subclass_body)  # revealed: Unknown | None | str
+
+reveal_type(Derived().pure_overwritten_in_subclass_method)  # revealed: str
+
+# TODO: Both of these should be `Unknown | Literal["intermediate", "base"]`
+reveal_type(Derived.undeclared)  # revealed: Unknown | Literal["intermediate"]
+reveal_type(Derived().undeclared)  # revealed: Unknown | Literal["intermediate"]
+
+reveal_type(Derived().pure_undeclared)  # revealed: Unknown | Literal["intermediate", "base"]
 ```
 
 ## Accessing attributes on class objects
@@ -1180,13 +1285,13 @@ def _(flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     C.x = 100
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 3]
 
     # error: [invalid-assignment] "Object of type `Literal[100]` is not assignable to attribute `x` on type `C1 | C2 | C3`"
@@ -1212,7 +1317,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     C = C1 if flag1 else C2 if flag2 else C3
 
-    # error: [possibly-missing-attribute] "Attribute `x` on type `<class 'C1'> | <class 'C2'> | <class 'C3'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `<class 'C1'> | <class 'C2'> | <class 'C3'>`"
     reveal_type(C.x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1220,7 +1325,7 @@ def _(flag: bool, flag1: bool, flag2: bool):
 
     # Note: we might want to consider ignoring possibly-missing diagnostics for instance attributes eventually,
     # see the "Possibly unbound/undeclared instance attribute" section below.
-    # error: [possibly-missing-attribute] "Attribute `x` on type `C1 | C2 | C3` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `x` may be missing on object of type `C1 | C2 | C3`"
     reveal_type(C().x)  # revealed: Unknown | Literal[1, 2, 3]
 
     # error: [possibly-missing-attribute]
@@ -1353,7 +1458,7 @@ def _(flag: bool):
     class C2: ...
     C = C1 if flag else C2
 
-    # error: [unresolved-attribute] "Type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
+    # error: [unresolved-attribute] "Object of type `<class 'C1'> | <class 'C2'>` has no attribute `x`"
     reveal_type(C.x)  # revealed: Unknown
 
     # TODO: This should ideally be a `unresolved-attribute` error. We need better union
@@ -1381,6 +1486,8 @@ C.X = "bar"
 ### Multiple inheritance
 
 ```py
+from ty_extensions import reveal_mro
+
 class O: ...
 
 class F(O):
@@ -1394,8 +1501,8 @@ class C(D, F): ...
 class B(E, D): ...
 class A(B, C): ...
 
-# revealed: tuple[<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>]
-reveal_type(A.__mro__)
+# revealed: (<class 'A'>, <class 'B'>, <class 'E'>, <class 'C'>, <class 'D'>, <class 'F'>, <class 'O'>, <class 'object'>)
+reveal_mro(A)
 
 # `E` is earlier in the MRO than `F`, so we should use the type of `E.X`
 reveal_type(A.X)  # revealed: Unknown | Literal[42]
@@ -1595,6 +1702,7 @@ Similar principles apply if `Any` appears in the middle of an inheritance hierar
 
 ```py
 from typing import ClassVar, Literal
+from ty_extensions import reveal_mro
 
 class A:
     x: ClassVar[Literal[1]] = 1
@@ -1602,7 +1710,7 @@ class A:
 class B(Any): ...
 class C(B, A): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, Any, <class 'A'>, <class 'object'>)
 reveal_type(C.x)  # revealed: Literal[1] & Any
 ```
 
@@ -1691,7 +1799,7 @@ reveal_type(date.day)  # revealed: int
 reveal_type(date.month)  # revealed: int
 reveal_type(date.year)  # revealed: int
 
-# error: [unresolved-attribute] "Type `Date` has no attribute `century`"
+# error: [unresolved-attribute] "Object of type `Date` has no attribute `century`"
 reveal_type(date.century)  # revealed: Unknown
 ```
 
@@ -1759,6 +1867,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
+        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -1795,6 +1904,7 @@ we only consider the attribute assignment to be valid if the assigned attribute 
 from typing import Literal
 
 class Date:
+    # error: [invalid-method-override]
     def __setattr__(self, name: Literal["day", "month", "year"], value: int) -> None:
         pass
 
@@ -1803,7 +1913,7 @@ date.day = 8
 date.month = 4
 date.year = 2025
 
-# error: [unresolved-attribute] "Can not assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
+# error: [unresolved-attribute] "Cannot assign object of type `Literal["UTC"]` to attribute `tz` on type `Date` with custom `__setattr__` method."
 date.tz = "UTC"
 ```
 
@@ -1819,10 +1929,10 @@ class Frozen:
     existing: int = 1
 
     def __setattr__(self, name, value) -> Never:
-        raise AttributeError("Attributes can not be modified")
+        raise AttributeError("Attributes cannot be modified")
 
 instance = Frozen()
-instance.non_existing = 2  # error: [invalid-assignment] "Can not assign to unresolved attribute `non_existing` on type `Frozen`"
+instance.non_existing = 2  # error: [invalid-assignment] "Cannot assign to unresolved attribute `non_existing` on type `Frozen`"
 instance.existing = 2  # error: [invalid-assignment] "Cannot assign to attribute `existing` on type `Frozen` whose `__setattr__` method returns `Never`/`NoReturn`"
 ```
 
@@ -1874,7 +1984,7 @@ def flag() -> bool:
 class Frozen:
     if flag():
         def __setattr__(self, name, value) -> Never:
-            raise AttributeError("Attributes can not be modified")
+            raise AttributeError("Attributes cannot be modified")
 
 instance = Frozen()
 instance.non_existing = 2  # error: [invalid-assignment]
@@ -1967,16 +2077,8 @@ mod.global_symbol = 1
 # TODO: this should be an error, but we do not understand list unpackings yet.
 [_, mod.global_symbol] = [1, 2]
 
-class IntIterator:
-    def __next__(self) -> int:
-        return 42
-
-class IntIterable:
-    def __iter__(self) -> IntIterator:
-        return IntIterator()
-
 # error: [invalid-assignment] "Object of type `int` is not assignable to attribute `global_symbol` of type `str`"
-for mod.global_symbol in IntIterable():
+for mod.global_symbol in range(3):
     pass
 ```
 
@@ -2060,8 +2162,8 @@ Some attributes are special-cased, however:
 import types
 from ty_extensions import static_assert, TypeOf, is_subtype_of
 
-reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
-reveal_type(f.__call__)  # revealed: <method-wrapper `__call__` of `f`>
+reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(f.__call__)  # revealed: <method-wrapper '__call__' of function 'f'>
 static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 static_assert(is_subtype_of(TypeOf[f.__call__], types.MethodWrapperType))
 ```
@@ -2107,9 +2209,9 @@ reveal_type(False.real)  # revealed: Literal[0]
 All attribute access on literal `bytes` types is currently delegated to `builtins.bytes`:
 
 ```py
-# revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[@Todo(Support for `typing.TypeAlias`)], /) -> bytes
+# revealed: bound method Literal[b"foo"].join(iterable_of_bytes: Iterable[Buffer], /) -> bytes
 reveal_type(b"foo".join)
-# revealed: bound method Literal[b"foo"].endswith(suffix: @Todo(Support for `typing.TypeAlias`) | tuple[@Todo(Support for `typing.TypeAlias`), ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: bound method Literal[b"foo"].endswith(suffix: Buffer | tuple[Buffer, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(b"foo".endswith)
 ```
 
@@ -2281,6 +2383,107 @@ class B:
 
 reveal_type(B().x)  # revealed: Unknown | Literal[1]
 reveal_type(A().x)  # revealed: Unknown | Literal[1]
+
+class Base:
+    def flip(self) -> "Sub":
+        return Sub()
+
+class Sub(Base):
+    # error: [invalid-method-override]
+    def flip(self) -> "Base":
+        return Base()
+
+class C2:
+    def __init__(self, x: Sub):
+        self.x = x
+
+    def replace_with(self, other: "C2"):
+        self.x = other.x.flip()
+
+reveal_type(C2(Sub()).x)  # revealed: Unknown | Base
+
+class C3:
+    def __init__(self, x: Sub):
+        self.x = [x]
+
+    def replace_with(self, other: "C3"):
+        self.x = [self.x[0].flip()]
+
+# TODO: should be `Unknown | list[Unknown | Sub] | list[Unknown | Base]`
+reveal_type(C3(Sub()).x)  # revealed: Unknown | list[Unknown | Sub] | list[Divergent]
+```
+
+And cycles between many attributes:
+
+```py
+class ManyCycles:
+    def __init__(self: "ManyCycles"):
+        self.x1 = 0
+        self.x2 = 0
+        self.x3 = 0
+        self.x4 = 0
+        self.x5 = 0
+        self.x6 = 0
+        self.x7 = 1
+
+    def f1(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f2(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+    def f3(self: "ManyCycles"):
+        self.x1 = self.x2 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x2 = self.x1 + self.x3 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x3 = self.x1 + self.x2 + self.x4 + self.x5 + self.x6 + self.x7
+        self.x4 = self.x1 + self.x2 + self.x3 + self.x5 + self.x6 + self.x7
+        self.x5 = self.x1 + self.x2 + self.x3 + self.x4 + self.x6 + self.x7
+        self.x6 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x7
+        self.x7 = self.x1 + self.x2 + self.x3 + self.x4 + self.x5 + self.x6
+
+        reveal_type(self.x1)  # revealed: Unknown | int
+        reveal_type(self.x2)  # revealed: Unknown | int
+        reveal_type(self.x3)  # revealed: Unknown | int
+        reveal_type(self.x4)  # revealed: Unknown | int
+        reveal_type(self.x5)  # revealed: Unknown | int
+        reveal_type(self.x6)  # revealed: Unknown | int
+        reveal_type(self.x7)  # revealed: Unknown | int
+
+class ManyCycles2:
+    def __init__(self: "ManyCycles2"):
+        self.x1 = [0]
+        self.x2 = [1]
+        self.x3 = [1]
+
+    def f1(self: "ManyCycles2"):
+        # TODO: should be Unknown | list[Unknown | int] | list[Divergent]
+        reveal_type(self.x3)  # revealed: Unknown | list[Unknown | int] | list[Divergent] | list[Divergent]
+
+        self.x1 = [self.x2] + [self.x3]
+        self.x2 = [self.x1] + [self.x3]
+        self.x3 = [self.x1] + [self.x2]
+
+    def f2(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
+
+    def f3(self: "ManyCycles2"):
+        self.x1 = self.x2 + self.x3
+        self.x2 = self.x1 + self.x3
+        self.x3 = self.x1 + self.x2
 ```
 
 This case additionally tests our union/intersection simplification logic:
@@ -2326,6 +2529,45 @@ class Counter:
         self.count = self.count + 1
 
 reveal_type(Counter().count)  # revealed: Unknown | int
+```
+
+We also handle infinitely nested generics:
+
+```py
+class NestedLists:
+    def __init__(self: "NestedLists"):
+        self.x = 1
+
+    def f(self: "NestedLists"):
+        self.x = [self.x]
+
+reveal_type(NestedLists().x)  # revealed: Unknown | Literal[1] | list[Divergent]
+
+class NestedMixed:
+    def f(self: "NestedMixed"):
+        self.x = [self.x]
+
+    def g(self: "NestedMixed"):
+        self.x = {self.x}
+
+reveal_type(NestedMixed().x)  # revealed: Unknown | list[Divergent] | set[Divergent]
+```
+
+And cases where the types originate from annotations:
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+def make_list(value: T) -> list[T]:
+    return [value]
+
+class NestedLists2:
+    def f(self: "NestedLists2"):
+        self.x = make_list(self.x)
+
+reveal_type(NestedLists2().x)  # revealed: Unknown | list[Divergent]
 ```
 
 ### Builtin types attributes
@@ -2408,7 +2650,7 @@ reveal_type(C().x)  # revealed: int
 ```py
 import enum
 
-reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Unknown]
+reveal_type(enum.Enum.__members__)  # revealed: MappingProxyType[str, Enum]
 
 class Answer(enum.Enum):
     NO = 0
@@ -2416,10 +2658,15 @@ class Answer(enum.Enum):
 
 reveal_type(Answer.NO)  # revealed: Literal[Answer.NO]
 reveal_type(Answer.NO.value)  # revealed: Literal[0]
-reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Unknown]
+reveal_type(Answer.__members__)  # revealed: MappingProxyType[str, Answer]
 ```
 
 ## Divergent inferred implicit instance attribute types
+
+If an implicit attribute is defined recursively and type inference diverges, the divergent part is
+filled in with the dynamic type `Divergent`. Types containing `Divergent` can be seen as "cheap"
+recursive types: they are not true recursive types based on recursive type theory, so no unfolding
+is performed when you use them.
 
 ```py
 class C:
@@ -2427,6 +2674,105 @@ class C:
         self.x = (other.x, 1)
 
 reveal_type(C().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+reveal_type(C().x[0])  # revealed: Unknown | Divergent
+```
+
+This also works if the tuple is not constructed directly:
+
+```py
+from typing import TypeVar, Literal
+
+T = TypeVar("T")
+
+def make_tuple(x: T) -> tuple[T, Literal[1]]:
+    return (x, 1)
+
+class D:
+    def f(self, other: "D"):
+        self.x = make_tuple(other.x)
+
+reveal_type(D().x)  # revealed: Unknown | tuple[Divergent, Literal[1]]
+```
+
+The tuple type may also expand exponentially "in breadth":
+
+```py
+def duplicate(x: T) -> tuple[T, T]:
+    return (x, x)
+
+class E:
+    def f(self: "E"):
+        self.x = duplicate(self.x)
+
+reveal_type(E().x)  # revealed: Unknown | tuple[Divergent, Divergent]
+```
+
+And it also works for homogeneous tuples:
+
+```py
+def make_homogeneous_tuple(x: T) -> tuple[T, ...]:
+    return (x, x)
+
+class F:
+    def f(self, other: "F"):
+        self.x = make_homogeneous_tuple(other.x)
+
+reveal_type(F().x)  # revealed: Unknown | tuple[Divergent, ...]
+```
+
+## Attributes of standard library modules that aren't yet defined
+
+For attributes of stdlib modules that exist in future versions, we can give better diagnostics.
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+`main.py`:
+
+```py
+import datetime
+
+# error: [unresolved-attribute]
+reveal_type(datetime.UTC)  # revealed: Unknown
+# error: [unresolved-attribute]
+reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+## Unimported submodule incorrectly accessed as attribute
+
+We give special diagnostics for this common case too:
+
+<!-- snapshot-diagnostics -->
+
+`foo/__init__.py`:
+
+```py
+```
+
+`foo/bar.py`:
+
+```py
+```
+
+`baz/bar.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import foo
+import baz
+
+# error: [possibly-missing-attribute]
+reveal_type(foo.bar)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(baz.bar)  # revealed: Unknown
 ```
 
 ## References

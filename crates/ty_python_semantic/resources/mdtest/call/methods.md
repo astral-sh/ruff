@@ -34,7 +34,8 @@ from inspect import getattr_static
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(self, x: int) -> str
 
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 
 reveal_type(getattr_static(C, "f").__get__(None, C))  # revealed: def f(self, x: int) -> str
 reveal_type(getattr_static(C, "f").__get__(C(), C))  # revealed: bound method C.f(x: int) -> str
@@ -69,7 +70,9 @@ reveal_type(bound_method(1))  # revealed: str
 When we call the function object itself, we need to pass the `instance` explicitly:
 
 ```py
-C.f(1)  # error: [missing-argument]
+# error: [invalid-argument-type] "Argument to function `f` is incorrect: Expected `C`, found `Literal[1]`"
+# error: [missing-argument]
+C.f(1)
 
 reveal_type(C.f(C(), 1))  # revealed: str
 ```
@@ -198,7 +201,7 @@ python-version = "3.12"
 ```py
 type IntOrStr = int | str
 
-reveal_type(IntOrStr.__or__)  # revealed: bound method typing.TypeAliasType.__or__(right: Any, /) -> _SpecialForm
+reveal_type(IntOrStr.__or__)  # revealed: bound method TypeAliasType.__or__(right: Any, /) -> _SpecialForm
 ```
 
 ## Method calls on types not disjoint from `None`
@@ -256,7 +259,7 @@ class C:
 
 method_wrapper = getattr_static(C, "f").__get__
 
-reveal_type(method_wrapper)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(method_wrapper)  # revealed: <method-wrapper '__get__' of function 'f'>
 
 # All of these are fine:
 method_wrapper(C(), C)
@@ -306,10 +309,10 @@ reveal_type(C.f)  # revealed: bound method <class 'C'>.f(arg: int) -> str
 reveal_type(C.f(1))  # revealed: str
 ```
 
-The method `f` can not be accessed from an instance of the class:
+The method `f` cannot be accessed from an instance of the class:
 
 ```py
-# error: [unresolved-attribute] "Type `C` has no attribute `f`"
+# error: [unresolved-attribute] "Object of type `C` has no attribute `f`"
 C().f
 ```
 
@@ -412,7 +415,8 @@ class C:
     def f(cls): ...
 
 reveal_type(getattr_static(C, "f"))  # revealed: def f(cls) -> Unknown
-reveal_type(getattr_static(C, "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
+reveal_type(getattr_static(C, "f").__get__)
 ```
 
 But we correctly model how the `classmethod` descriptor works:
@@ -586,6 +590,28 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+### `__new__`
+
+`__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`
+argument:
+
+```py
+from typing_extensions import Self
+
+reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
+reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type(int.__new__)
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+reveal_type((42).__new__)
+
+class X:
+    def __init__(self, val: int): ...
+    def make_another(self) -> Self:
+        reveal_type(self.__new__)  # revealed: def __new__(cls) -> Self@__new__
+        return self.__new__(type(self))
+```
+
 ## Builtin functions and methods
 
 Some builtin functions and methods are heavily special-cased by ty. This mdtest checks that various
@@ -608,7 +634,7 @@ class MyClass:
 
 static_assert(is_assignable_to(types.FunctionType, Callable))
 
-# revealed: <wrapper-descriptor `__get__` of `function` objects>
+# revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(types.FunctionType.__get__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
 
@@ -616,7 +642,7 @@ static_assert(is_assignable_to(TypeOf[types.FunctionType.__get__], Callable))
 reveal_type(f)
 static_assert(is_assignable_to(TypeOf[f], Callable))
 
-# revealed: <method-wrapper `__get__` of `f`>
+# revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(f.__get__)
 static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
 
@@ -624,11 +650,11 @@ static_assert(is_assignable_to(TypeOf[f.__get__], Callable))
 reveal_type(types.FunctionType.__call__)
 static_assert(is_assignable_to(TypeOf[types.FunctionType.__call__], Callable))
 
-# revealed: <method-wrapper `__call__` of `f`>
+# revealed: <method-wrapper '__call__' of function 'f'>
 reveal_type(f.__call__)
 static_assert(is_assignable_to(TypeOf[f.__call__], Callable))
 
-# revealed: <wrapper-descriptor `__get__` of `property` objects>
+# revealed: <wrapper-descriptor '__get__' of 'property' objects>
 reveal_type(property.__get__)
 static_assert(is_assignable_to(TypeOf[property.__get__], Callable))
 
@@ -637,23 +663,23 @@ reveal_type(MyClass.my_property)
 static_assert(is_assignable_to(TypeOf[property], Callable))
 static_assert(not is_assignable_to(TypeOf[MyClass.my_property], Callable))
 
-# revealed: <method-wrapper `__get__` of `property` object>
+# revealed: <method-wrapper '__get__' of property 'my_property'>
 reveal_type(MyClass.my_property.__get__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__get__], Callable))
 
-# revealed: <wrapper-descriptor `__set__` of `property` objects>
+# revealed: <wrapper-descriptor '__set__' of 'property' objects>
 reveal_type(property.__set__)
 static_assert(is_assignable_to(TypeOf[property.__set__], Callable))
 
-# revealed: <method-wrapper `__set__` of `property` object>
+# revealed: <method-wrapper '__set__' of property 'my_property'>
 reveal_type(MyClass.my_property.__set__)
 static_assert(is_assignable_to(TypeOf[MyClass.my_property.__set__], Callable))
 
-# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+# revealed: def startswith(self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
 reveal_type(str.startswith)
 static_assert(is_assignable_to(TypeOf[str.startswith], Callable))
 
-# revealed: <method-wrapper `startswith` of `str` object>
+# revealed: <method-wrapper 'startswith' of string 'foo'>
 reveal_type("foo".startswith)
 static_assert(is_assignable_to(TypeOf["foo".startswith], Callable))
 
@@ -687,7 +713,7 @@ def _(
     # revealed: (obj: type) -> None
     reveal_type(e)
 
-    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> Any) | None = None, doc: str | None = None) -> Unknown
+    # revealed: (fget: ((Any, /) -> Any) | None = None, fset: ((Any, Any, /) -> None) | None = None, fdel: ((Any, /) -> None) | None = None, doc: str | None = None) -> property
     reveal_type(f)
 
     # revealed: Overload[(self: property, instance: None, owner: type, /) -> Unknown, (self: property, instance: object, owner: type | None = None, /) -> Unknown]
@@ -705,7 +731,7 @@ def _(
     # revealed: (instance: object, value: object, /) -> Unknown
     reveal_type(j)
 
-    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = ellipsis, end: SupportsIndex | None = ellipsis, /) -> bool
+    # revealed: (self, prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool
     reveal_type(k)
 
     # revealed: (prefix: str | tuple[str, ...], start: SupportsIndex | None = None, end: SupportsIndex | None = None, /) -> bool

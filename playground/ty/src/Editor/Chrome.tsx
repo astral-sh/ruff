@@ -355,6 +355,7 @@ function useCheckResult(
         severity: diagnostic.severity(),
         range: diagnostic.toRange(workspace) ?? null,
         textRange: diagnostic.textRange() ?? null,
+        raw: diagnostic,
       }));
 
       return {

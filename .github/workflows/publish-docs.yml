@@ -20,15 +20,13 @@ on:
 jobs:
   mkdocs:
     runs-on: ubuntu-latest
-    env:
-      MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ inputs.ref }}
           persist-credentials: true
 
-      - uses: actions/setup-python@e797f83bcb11b83ae66e0230d6156d7c80228e7c # v6.0.0
+      - uses: actions/setup-python@83679a892e2d95755f2dac6acb0bfd1e9ac5d548 # v6.1.0
         with:
           python-version: 3.12
 
@@ -59,23 +57,12 @@ jobs:
           echo "branch_name=update-docs-$branch_display_name-$timestamp" >> "$GITHUB_ENV"
           echo "timestamp=$timestamp" >> "$GITHUB_ENV"
 
-      - name: "Add SSH key"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
-
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@98c8021b550208e191a6a3145459bfc9fb29c4c0 # v2.8.0
-
-      - name: "Install Insiders dependencies"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: pip install -r docs/requirements-insiders.txt
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
 
       - name: "Install dependencies"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: pip install -r docs/requirements.txt
 
       - name: "Copy README File"
@@ -83,13 +70,8 @@ jobs:
           python scripts/transform_readme.py --target mkdocs
           python scripts/generate_mkdocs.py
 
-      - name: "Build Insiders docs"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: mkdocs build --strict -f mkdocs.insiders.yml
-
       - name: "Build docs"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: mkdocs build --strict -f mkdocs.public.yml
+        run: mkdocs build --strict -f mkdocs.yml
 
       - name: "Clone docs repo"
         run: git clone https://${{ secrets.ASTRAL_DOCS_PAT }}@github.com/astral-sh/docs.git astral-docs

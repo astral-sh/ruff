@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_text_size::Ranged;
@@ -70,6 +70,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: Dictionary displays](https://docs.python.org/3/reference/expressions.html#dictionary-displays)
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct UnnecessaryDictKwargs;
 
 impl Violation for UnnecessaryDictKwargs {
@@ -128,8 +129,8 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                     keyword,
                     &call.arguments,
                     Parentheses::Preserve,
-                    checker.locator().contents(),
-                    checker.comment_ranges(),
+                    checker.source(),
+                    checker.tokens(),
                 )
                 .map(Fix::safe_edit)
             });
@@ -157,8 +158,7 @@ pub(crate) fn unnecessary_dict_kwargs(checker: &Checker, call: &ast::ExprCall) {
                                         parenthesized_range(
                                             value.into(),
                                             dict.into(),
-                                            checker.comment_ranges(),
-                                            checker.locator().contents(),
+                                            checker.tokens()
                                         )
                                         .unwrap_or(value.range())
                                     )

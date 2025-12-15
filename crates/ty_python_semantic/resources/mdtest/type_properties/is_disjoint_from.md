@@ -45,7 +45,7 @@ class C(B1, B2): ...
 # ... which lies in their intersection:
 static_assert(is_subtype_of(C, Intersection[B1, B2]))
 
-# However, if a class is marked final, it can not be subclassed ...
+# However, if a class is marked final, it cannot be subclassed ...
 @final
 class FinalSubclass(A): ...
 
@@ -85,6 +85,34 @@ static_assert(is_disjoint_from(slice, Foo))
 static_assert(is_disjoint_from(type[slice], type[Foo]))
 static_assert(is_disjoint_from(memoryview, Foo))
 static_assert(is_disjoint_from(type[memoryview], type[Foo]))
+```
+
+## Specialized `@final` types
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, final
+from ty_extensions import static_assert, is_disjoint_from
+
+@final
+class Foo[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class A: ...
+class B: ...
+
+static_assert(not is_disjoint_from(A, B))
+static_assert(not is_disjoint_from(Foo[A], Foo[B]))
+static_assert(not is_disjoint_from(Foo[A], Foo[Any]))
+static_assert(not is_disjoint_from(Foo[Any], Foo[B]))
+
+# `Foo[Never]` is a subtype of both `Foo[int]` and `Foo[str]`.
+static_assert(not is_disjoint_from(Foo[int], Foo[str]))
 ```
 
 ## "Disjoint base" builtin types
@@ -639,6 +667,45 @@ static_assert(not is_disjoint_from(Path, tuple[Path | None, str]))
 static_assert(is_disjoint_from(Path, tuple[Path | None]))
 static_assert(is_disjoint_from(Path, tuple[Path | None, str, int]))
 static_assert(is_disjoint_from(Path, Path2))
+```
+
+## Generic aliases
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_disjoint_from, TypeOf
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(not is_disjoint_from(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(is_disjoint_from(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
 ```
 
 ## Callables

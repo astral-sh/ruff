@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use anyhow::Result;
 use itertools::Itertools;
 use regex::{Captures, Regex};
+use ruff_linter::codes::RuleGroup;
 use strum::IntoEnumIterator;
 
 use ruff_linter::FixAvailability;
@@ -31,6 +32,47 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 
             let _ = writeln!(&mut output, "# {} ({})", rule.name(), rule.noqa_code());
 
+            let status_text = match rule.group() {
+                RuleGroup::Stable { since } => {
+                    format!(
+                        r#"Added in <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>"#
+                    )
+                }
+                RuleGroup::Preview { since } => {
+                    format!(
+                        r#"Preview (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                    )
+                }
+                RuleGroup::Deprecated { since } => {
+                    format!(
+                        r#"Deprecated (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                    )
+                }
+                RuleGroup::Removed { since } => {
+                    format!(
+                        r#"Removed (since <a href="https://github.com/astral-sh/ruff/releases/tag/{since}">{since}</a>)"#
+                    )
+                }
+            };
+
+            let _ = writeln!(
+                &mut output,
+                r#"<small>
+{status_text} ·
+<a href="https://github.com/astral-sh/ruff/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20(%27{encoded_name}%27%20OR%20{rule_code})" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
+</small>
+
+"#,
+                encoded_name =
+                    url::form_urlencoded::byte_serialize(rule.name().as_str().as_bytes())
+                        .collect::<String>(),
+                rule_code = rule.noqa_code(),
+                file =
+                    url::form_urlencoded::byte_serialize(rule.file().replace('\\', "/").as_bytes())
+                        .collect::<String>(),
+                line = rule.line(),
+            );
             let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
             if linter.url().is_some() {
                 let common_prefix: String = match linter.common_prefix() {

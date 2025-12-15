@@ -2,7 +2,7 @@ use anyhow::Context;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_semantic::{Scope, ScopeKind};
 use ruff_python_trivia::{indentation_at_offset, textwrap};
 use ruff_source_file::LineRanges;
@@ -74,6 +74,7 @@ use crate::rules::ruff::helpers::{DataclassKind, dataclass_kind};
 ///
 /// [documentation]: https://docs.python.org/3/library/dataclasses.html#init-only-variables
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.9.0")]
 pub(crate) struct PostInitDefault;
 
 impl Violation for PostInitDefault {
@@ -158,8 +159,7 @@ fn use_initvar(
     let default_loc = parenthesized_range(
         default.into(),
         parameter_with_default.into(),
-        checker.comment_ranges(),
-        checker.source(),
+        checker.tokens(),
     )
     .unwrap_or(default.range());
 

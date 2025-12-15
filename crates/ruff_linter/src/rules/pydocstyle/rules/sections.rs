@@ -4,7 +4,9 @@ use rustc_hash::FxHashSet;
 use std::sync::LazyLock;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::Parameter;
 use ruff_python_ast::docstrings::{clean_space, leading_space};
+use ruff_python_ast::helpers::map_subscript;
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_semantic::analyze::visibility::is_staticmethod;
 use ruff_python_trivia::textwrap::dedent;
@@ -89,6 +91,7 @@ use crate::{Edit, Fix};
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct OverindentedSection {
     name: String,
 }
@@ -192,6 +195,7 @@ impl AlwaysFixableViolation for OverindentedSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct OverindentedSectionUnderline {
     name: String,
 }
@@ -275,6 +279,7 @@ impl AlwaysFixableViolation for OverindentedSectionUnderline {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NonCapitalizedSectionName {
     name: String,
 }
@@ -373,6 +378,7 @@ impl AlwaysFixableViolation for NonCapitalizedSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingNewLineAfterSectionName {
     name: String,
 }
@@ -476,6 +482,7 @@ impl AlwaysFixableViolation for MissingNewLineAfterSectionName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingDashedUnderlineAfterSection {
     name: String,
 }
@@ -582,6 +589,7 @@ impl AlwaysFixableViolation for MissingDashedUnderlineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingSectionUnderlineAfterName {
     name: String,
 }
@@ -686,6 +694,7 @@ impl AlwaysFixableViolation for MissingSectionUnderlineAfterName {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MismatchedSectionUnderlineLength {
     name: String,
 }
@@ -783,6 +792,7 @@ impl AlwaysFixableViolation for MismatchedSectionUnderlineLength {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NoBlankLineAfterSection {
     name: String,
 }
@@ -876,6 +886,7 @@ impl AlwaysFixableViolation for NoBlankLineAfterSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct NoBlankLineBeforeSection {
     name: String,
 }
@@ -971,6 +982,7 @@ impl AlwaysFixableViolation for NoBlankLineBeforeSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct MissingBlankLineAfterLastSection {
     name: String,
 }
@@ -1060,6 +1072,7 @@ impl AlwaysFixableViolation for MissingBlankLineAfterLastSection {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct EmptyDocstringSection {
     name: String,
 }
@@ -1137,6 +1150,7 @@ impl Violation for EmptyDocstringSection {
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Style Guide](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.74")]
 pub(crate) struct MissingSectionNameColon {
     name: String,
 }
@@ -1171,6 +1185,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 ///
 /// This rule is enabled when using the `google` convention, and disabled when
 /// using the `pep257` and `numpy` conventions.
+///
+/// Parameters annotated with `typing.Unpack` are exempt from this rule.
+/// This follows the Python typing specification for unpacking keyword arguments.
 ///
 /// ## Example
 /// ```python
@@ -1221,7 +1238,9 @@ impl AlwaysFixableViolation for MissingSectionNameColon {
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [PEP 287 – reStructuredText Docstring Format](https://peps.python.org/pep-0287/)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
+/// - [Python - Unpack for keyword arguments](https://typing.python.org/en/latest/spec/callables.html#unpack-kwargs)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.73")]
 pub(crate) struct UndocumentedParam {
     /// The name of the function being documented.
     definition: String,
@@ -1304,6 +1323,7 @@ impl Violation for UndocumentedParam {
 /// - [NumPy Style Guide](https://numpydoc.readthedocs.io/en/latest/format.html)
 /// - [Google Python Style Guide - Docstrings](https://google.github.io/styleguide/pyguide.html#38-comments-and-docstrings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct BlankLinesBetweenHeaderAndContent {
     name: String,
 }
@@ -1794,7 +1814,9 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
                 missing_arg_names.insert(starred_arg_name);
             }
         }
-        if let Some(arg) = function.parameters.kwarg.as_ref() {
+        if let Some(arg) = function.parameters.kwarg.as_ref()
+            && !has_unpack_annotation(checker, arg)
+        {
             let arg_name = arg.name.as_str();
             let starred_arg_name = format!("**{arg_name}");
             if !arg_name.starts_with('_')
@@ -1818,6 +1840,15 @@ fn missing_args(checker: &Checker, docstring: &Docstring, docstrings_args: &FxHa
             );
         }
     }
+}
+
+/// Returns `true` if the parameter is annotated with `typing.Unpack`
+fn has_unpack_annotation(checker: &Checker, parameter: &Parameter) -> bool {
+    parameter.annotation.as_ref().is_some_and(|annotation| {
+        checker
+            .semantic()
+            .match_typing_expr(map_subscript(annotation), "Unpack")
+    })
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.

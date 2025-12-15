@@ -28,13 +28,14 @@ use itertools::Itertools;
 use log::debug;
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use ruff_db::diagnostic::{Annotation, Diagnostic, IntoDiagnosticMessage, Span};
+use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticTag, IntoDiagnosticMessage, Span};
 use ruff_diagnostics::{Applicability, Fix, IsolationLevel};
 use ruff_notebook::{CellOffsets, NotebookIndex};
 use ruff_python_ast::helpers::{collect_import_from_member, is_docstring_stmt, to_module_path};
 use ruff_python_ast::identifier::Identifier;
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::str::Quote;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::visitor::{Visitor, walk_except_handler, walk_pattern};
 use ruff_python_ast::{
     self as ast, AnyParameterRef, ArgOrKeyword, Comprehension, ElifElseClause, ExceptHandler, Expr,
@@ -48,7 +49,7 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_python_parser::typing::{AnnotationKind, ParsedAnnotation, parse_type_annotation};
-use ruff_python_parser::{ParseError, Parsed, Tokens};
+use ruff_python_parser::{ParseError, Parsed};
 use ruff_python_semantic::all::{DunderAllDefinition, DunderAllFlags};
 use ruff_python_semantic::analyze::{imports, typing};
 use ruff_python_semantic::{
@@ -68,12 +69,14 @@ use crate::noqa::NoqaMapping;
 use crate::package::PackageRoot;
 use crate::preview::is_undefined_export_in_dunder_init_enabled;
 use crate::registry::Rule;
+use crate::rules::flake8_bugbear::rules::ReturnInGenerator;
 use crate::rules::pyflakes::rules::{
     LateFutureImport, MultipleStarredExpressions, ReturnOutsideFunction,
     UndefinedLocalWithNestedImportStarUsage, YieldOutsideFunction,
 };
 use crate::rules::pylint::rules::{
-    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, YieldFromInAsyncFunction,
+    AwaitOutsideAsync, LoadBeforeGlobalDeclaration, NonlocalWithoutBinding,
+    YieldFromInAsyncFunction,
 };
 use crate::rules::{flake8_pyi, flake8_type_checking, pyflakes, pyupgrade};
 use crate::settings::rule_table::RuleTable;
@@ -434,6 +437,15 @@ impl<'a> Checker<'a> {
         }
     }
 
+    /// Returns the [`Tokens`] for the parsed source file.
+    ///
+    ///
+    /// Unlike [`Self::tokens`], this method always returns
+    /// the tokens for the current file, even when within a parsed type annotation.
+    pub(crate) fn source_tokens(&self) -> &'a Tokens {
+        self.parsed.tokens()
+    }
+
     /// The [`Locator`] for the current file, which enables extraction of source code from byte
     /// offsets.
     pub(crate) const fn locator(&self) -> &'a Locator<'a> {
@@ -641,6 +653,10 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.semantic.global(name)
     }
 
+    fn has_nonlocal_binding(&self, name: &str) -> bool {
+        self.semantic.nonlocal(name).is_some()
+    }
+
     fn report_semantic_error(&self, error: SemanticSyntaxError) {
         match error.kind {
             SemanticSyntaxErrorKind::LateFutureImport => {
@@ -696,13 +712,48 @@ impl SemanticSyntaxContext for Checker<'_> {
                     self.report_diagnostic(MultipleStarredExpressions, error.range);
                 }
             }
+            SemanticSyntaxErrorKind::FutureFeatureNotDefined(name) => {
+                // F407
+                if self.is_rule_enabled(Rule::FutureFeatureNotDefined) {
+                    self.report_diagnostic(
+                        pyflakes::rules::FutureFeatureNotDefined { name },
+                        error.range,
+                    );
+                }
+            }
+            SemanticSyntaxErrorKind::BreakOutsideLoop => {
+                // F701
+                if self.is_rule_enabled(Rule::BreakOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::BreakOutsideLoop, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::ContinueOutsideLoop => {
+                // F702
+                if self.is_rule_enabled(Rule::ContinueOutsideLoop) {
+                    self.report_diagnostic(pyflakes::rules::ContinueOutsideLoop, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::NonlocalWithoutBinding(name) => {
+                // PLE0117
+                if self.is_rule_enabled(Rule::NonlocalWithoutBinding) {
+                    self.report_diagnostic(NonlocalWithoutBinding { name }, error.range);
+                }
+            }
+            SemanticSyntaxErrorKind::ReturnInGenerator => {
+                // B901
+                if self.is_rule_enabled(Rule::ReturnInGenerator) {
+                    self.report_diagnostic(ReturnInGenerator, error.range);
+                }
+            }
             SemanticSyntaxErrorKind::ReboundComprehensionVariable
             | SemanticSyntaxErrorKind::DuplicateTypeParameter
             | SemanticSyntaxErrorKind::MultipleCaseAssignment(_)
             | SemanticSyntaxErrorKind::IrrefutableCasePattern(_)
             | SemanticSyntaxErrorKind::SingleStarredAssignment
             | SemanticSyntaxErrorKind::WriteToDebug(_)
+            | SemanticSyntaxErrorKind::DifferentMatchPatternBindings
             | SemanticSyntaxErrorKind::InvalidExpression(..)
+            | SemanticSyntaxErrorKind::GlobalParameter(_)
             | SemanticSyntaxErrorKind::DuplicateMatchKey(_)
             | SemanticSyntaxErrorKind::DuplicateMatchClassAttribute(_)
             | SemanticSyntaxErrorKind::InvalidStarExpression
@@ -712,6 +763,7 @@ impl SemanticSyntaxContext for Checker<'_> {
             | SemanticSyntaxErrorKind::LoadBeforeNonlocalDeclaration { .. }
             | SemanticSyntaxErrorKind::NonlocalAndGlobal(_)
             | SemanticSyntaxErrorKind::AnnotatedGlobal(_)
+            | SemanticSyntaxErrorKind::TypeParameterDefaultOrder(_)
             | SemanticSyntaxErrorKind::AnnotatedNonlocal(_) => {
                 self.semantic_errors.borrow_mut().push(error);
             }
@@ -745,6 +797,10 @@ impl SemanticSyntaxContext for Checker<'_> {
             match scope.kind {
                 ScopeKind::Class(_) => return false,
                 ScopeKind::Function(_) | ScopeKind::Lambda(_) => return true,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                } => return true,
                 ScopeKind::Generator { .. }
                 | ScopeKind::Module
                 | ScopeKind::Type
@@ -794,27 +850,67 @@ impl SemanticSyntaxContext for Checker<'_> {
         self.source_type.is_ipynb()
     }
 
-    fn in_generator_scope(&self) -> bool {
-        matches!(
-            &self.semantic.current_scope().kind,
-            ScopeKind::Generator {
-                kind: GeneratorKind::Generator,
-                ..
+    fn in_generator_context(&self) -> bool {
+        for scope in self.semantic.current_scopes() {
+            if matches!(
+                scope.kind,
+                ScopeKind::Generator {
+                    kind: GeneratorKind::Generator,
+                    ..
+                }
+            ) {
+                return true;
             }
-        )
+        }
+        false
+    }
+
+    fn in_loop_context(&self) -> bool {
+        let mut child = self.semantic.current_statement();
+
+        for parent in self.semantic.current_statements().skip(1) {
+            match parent {
+                Stmt::For(ast::StmtFor { orelse, .. })
+                | Stmt::While(ast::StmtWhile { orelse, .. }) => {
+                    if !orelse.contains(child) {
+                        return true;
+                    }
+                }
+                Stmt::FunctionDef(_) | Stmt::ClassDef(_) => {
+                    break;
+                }
+                _ => {}
+            }
+            child = parent;
+        }
+        false
+    }
+
+    fn is_bound_parameter(&self, name: &str) -> bool {
+        match self.semantic.current_scope().kind {
+            ScopeKind::Function(ast::StmtFunctionDef { parameters, .. }) => {
+                parameters.includes(name)
+            }
+            ScopeKind::Class(_)
+            | ScopeKind::Lambda(_)
+            | ScopeKind::Generator { .. }
+            | ScopeKind::Module
+            | ScopeKind::Type
+            | ScopeKind::DunderClassCell => false,
+        }
     }
 }
 
 impl<'a> Visitor<'a> for Checker<'a> {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        // Step 0: Pre-processing
+        self.semantic.push_node(stmt);
+
         // For functions, defer semantic syntax error checks until the body of the function is
         // visited
         if !stmt.is_function_def_stmt() {
             self.with_semantic_checker(|semantic, context| semantic.visit_stmt(stmt, context));
         }
-
-        // Step 0: Pre-processing
-        self.semantic.push_node(stmt);
 
         // For Jupyter Notebooks, we'll reset the `IMPORT_BOUNDARY` flag when
         // we encounter a cell boundary.
@@ -1334,6 +1430,14 @@ impl<'a> Visitor<'a> for Checker<'a> {
                     self.target_version(),
                 ) {
                     AnnotationContext::RuntimeRequired => {
+                        self.visit_runtime_required_annotation(annotation);
+                    }
+                    AnnotationContext::RuntimeEvaluated
+                        if flake8_type_checking::helpers::is_dataclass_meta_annotation(
+                            annotation,
+                            self.semantic(),
+                        ) =>
+                    {
                         self.visit_runtime_required_annotation(annotation);
                     }
                     AnnotationContext::RuntimeEvaluated => {
@@ -2052,7 +2156,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
             | Expr::DictComp(_)
             | Expr::SetComp(_) => {
                 self.analyze.scopes.push(self.semantic.scope_id);
-                self.semantic.pop_scope();
+                self.semantic.pop_scope(); // Lambda/Generator/Comprehension scope
             }
             _ => {}
         }
@@ -2352,7 +2456,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    /// Visit an body of [`Stmt`] nodes within a type-checking block.
+    /// Visit a body of [`Stmt`] nodes within a type-checking block.
     fn visit_type_checking_block(&mut self, body: &'a [Stmt]) {
         let snapshot = self.semantic.flags;
         self.semantic.flags |= SemanticModelFlags::TYPE_CHECKING_BLOCK;
@@ -2977,7 +3081,35 @@ impl<'a> Checker<'a> {
                 if let Some(parameters) = parameters {
                     self.visit_parameters(parameters);
                 }
+
+                // Here we add the implicit scope surrounding a lambda which allows code in the
+                // lambda to access `__class__` at runtime when the lambda is defined within a class.
+                // See the `ScopeKind::DunderClassCell` docs for more information.
+                let added_dunder_class_scope = if self
+                    .semantic
+                    .current_scopes()
+                    .any(|scope| scope.kind.is_class())
+                {
+                    self.semantic.push_scope(ScopeKind::DunderClassCell);
+                    let binding_id = self.semantic.push_binding(
+                        TextRange::default(),
+                        BindingKind::DunderClassCell,
+                        BindingFlags::empty(),
+                    );
+                    self.semantic
+                        .current_scope_mut()
+                        .add("__class__", binding_id);
+                    true
+                } else {
+                    false
+                };
+
                 self.visit_expr(body);
+
+                // Pop the DunderClassCell scope if it was added
+                if added_dunder_class_scope {
+                    self.semantic.pop_scope();
+                }
             }
         }
         self.semantic.restore(snapshot);
@@ -3317,6 +3449,56 @@ impl DiagnosticGuard<'_, '_> {
     /// method can be used where this is unavoidable.
     pub(crate) fn defuse(mut self) {
         self.diagnostic = None;
+    }
+
+    /// Set the message on the primary annotation for this diagnostic.
+    ///
+    /// If a message already exists on the primary annotation, then this
+    /// overwrites the existing message.
+    ///
+    /// This message is associated with the primary annotation created
+    /// for every `Diagnostic` that uses the `DiagnosticGuard` API.
+    /// Specifically, the annotation is derived from the `TextRange` given to
+    /// the `LintContext::report_diagnostic` API.
+    ///
+    /// Callers can add additional primary or secondary annotations via the
+    /// `DerefMut` trait implementation to a `Diagnostic`.
+    pub(crate) fn set_primary_message(&mut self, message: impl IntoDiagnosticMessage) {
+        // N.B. It is normally bad juju to define `self` methods
+        // on types that implement `Deref`. Instead, it's idiomatic
+        // to do `fn foo(this: &mut LintDiagnosticGuard)`, which in
+        // turn forces callers to use
+        // `LintDiagnosticGuard(&mut guard, message)`. But this is
+        // supremely annoying for what is expected to be a common
+        // case.
+        //
+        // Moreover, most of the downside that comes from these sorts
+        // of methods is a semver hazard. Because the deref target type
+        // could also define a method by the same name, and that leads
+        // to confusion. But we own all the code involved here and
+        // there is no semver boundary. So... ¯\_(ツ)_/¯ ---AG
+
+        // OK because we know the diagnostic was constructed with a single
+        // primary annotation that will always come before any other annotation
+        // in the diagnostic. (This relies on the `Diagnostic` API not exposing
+        // any methods for removing annotations or re-ordering them, which is
+        // true as of 2025-04-11.)
+        let ann = self.primary_annotation_mut().unwrap();
+        ann.set_message(message);
+    }
+
+    /// Adds a tag on the primary annotation for this diagnostic.
+    ///
+    /// This tag is associated with the primary annotation created
+    /// for every `Diagnostic` that uses the `DiagnosticGuard` API.
+    /// Specifically, the annotation is derived from the `TextRange` given to
+    /// the `LintContext::report_diagnostic` API.
+    ///
+    /// Callers can add additional primary or secondary annotations via the
+    /// `DerefMut` trait implementation to a `Diagnostic`.
+    pub(crate) fn add_primary_tag(&mut self, tag: DiagnosticTag) {
+        let ann = self.primary_annotation_mut().unwrap();
+        ann.push_tag(tag);
     }
 }
 

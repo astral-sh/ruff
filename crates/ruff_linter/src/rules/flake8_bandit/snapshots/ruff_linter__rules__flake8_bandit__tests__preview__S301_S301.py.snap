@@ -1,15 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
- --> S301.py:3:1
-  |
-1 | import pickle
-2 |
-3 | pickle.loads()
-  | ^^^^^^^^^^^^^^
-  |
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
 
+--- Summary ---
+Removed: 0
+Added: 2
+
+--- Added ---
 S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
  --> S301.py:7:5
   |
@@ -18,6 +18,7 @@ S301 `pickle` and modules that wrap it can be unsafe when used to deserialize un
   |     ^^^^^^^^^^^
 8 | foo = pickle.load
   |
+
 
 S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
  --> S301.py:8:7

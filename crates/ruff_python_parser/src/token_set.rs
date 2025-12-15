@@ -1,4 +1,4 @@
-use crate::TokenKind;
+use ruff_python_ast::token::TokenKind;
 
 /// A bit-set of `TokenKind`s
 #[derive(Clone, Copy)]
@@ -42,7 +42,7 @@ impl<const N: usize> From<[TokenKind; N]> for TokenSet {
 
 #[test]
 fn token_set_works_for_tokens() {
-    use crate::TokenKind::*;
+    use ruff_python_ast::token::TokenKind::*;
     let mut ts = TokenSet::new([EndOfFile, Name]);
     assert!(ts.contains(EndOfFile));
     assert!(ts.contains(Name));

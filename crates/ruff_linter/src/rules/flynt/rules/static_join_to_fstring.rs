@@ -2,7 +2,7 @@ use ast::FStringFlags;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags};
+use ruff_python_ast::{self as ast, Arguments, Expr, StringFlags, str::Quote};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -39,6 +39,7 @@ use crate::rules::flynt::helpers;
 /// ## References
 /// - [Python documentation: f-strings](https://docs.python.org/3/reference/lexical_analysis.html#f-strings)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.266")]
 pub(crate) struct StaticJoinToFString {
     expression: SourceCodeSnippet,
 }
@@ -115,6 +116,8 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
     }
 
     let mut f_string_elements = Vec::with_capacity(joinees.len() * 2);
+    let mut has_single_quote = joiner.contains('\'');
+    let mut has_double_quote = joiner.contains('"');
     let mut first = true;
 
     for expr in joinees {
@@ -126,14 +129,31 @@ fn build_fstring(joiner: &str, joinees: &[Expr], flags: FStringFlags) -> Option<
         if !std::mem::take(&mut first) {
             f_string_elements.push(helpers::to_interpolated_string_literal_element(joiner));
         }
-        f_string_elements.push(helpers::to_interpolated_string_element(expr)?);
+        let element = helpers::to_interpolated_string_element(expr)?;
+        if let ast::InterpolatedStringElement::Literal(ast::InterpolatedStringLiteralElement {
+            value,
+            ..
+        }) = &element
+        {
+            has_single_quote |= value.contains('\'');
+            has_double_quote |= value.contains('"');
+        }
+        f_string_elements.push(element);
     }
+
+    let quote = flags.quote_style();
+    let adjusted_quote = match quote {
+        Quote::Single if has_single_quote && !has_double_quote => quote.opposite(),
+        Quote::Double if has_double_quote && !has_single_quote => quote.opposite(),
+        _ if has_double_quote && has_single_quote => return None,
+        _ => quote,
+    };
 
     let node = ast::FString {
         elements: f_string_elements.into(),
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        flags,
+        flags: flags.with_quote_style(adjusted_quote),
     };
     Some(node.into())
 }

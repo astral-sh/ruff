@@ -551,6 +551,7 @@ a_dict = {
 }
 
 # Regression test for https://github.com/psf/black/issues/3506.
+# Regressed again by https://github.com/psf/black/pull/4498
 s = (
     "With single quote: ' "
     f" {my_dict['foo']}"

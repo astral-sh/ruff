@@ -737,79 +737,185 @@ AIR311 [*] `airflow.models.Param` is removed in Airflow 3.0; It still works in A
 96 | # airflow.models
 97 | Param()
    | ^^^^^
+98 | DagParam()
+99 | ParamsDict()
    |
 help: Use `Param` from `airflow.sdk.definitions.param` instead.
 91 | task_decorator_factory()
 92 | 
 93 | 
-   - from airflow.models import Param
-94 + from airflow.sdk.definitions.param import Param
-95 | 
+   - from airflow.models import DagParam, Param, ParamsDict
+94 + from airflow.models import DagParam, ParamsDict
+95 + from airflow.sdk.definitions.param import Param
+96 | 
+97 | # airflow.models
+98 | Param()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.DagParam` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:98:1
+   |
 96 | # airflow.models
 97 | Param()
+98 | DagParam()
+   | ^^^^^^^^
+99 | ParamsDict()
+   |
+help: Use `DagParam` from `airflow.sdk.definitions.param` instead.
+91 | task_decorator_factory()
+92 | 
+93 | 
+   - from airflow.models import DagParam, Param, ParamsDict
+94 + from airflow.models import Param, ParamsDict
+95 + from airflow.sdk.definitions.param import DagParam
+96 | 
+97 | # airflow.models
+98 | Param()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.ParamsDict` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+  --> AIR311_names.py:99:1
+   |
+97 | Param()
+98 | DagParam()
+99 | ParamsDict()
+   | ^^^^^^^^^^
+   |
+help: Use `ParamsDict` from `airflow.sdk.definitions.param` instead.
+91 | task_decorator_factory()
+92 | 
+93 | 
+   - from airflow.models import DagParam, Param, ParamsDict
+94 + from airflow.models import DagParam, Param
+95 + from airflow.sdk.definitions.param import ParamsDict
+96 | 
+97 | # airflow.models
+98 | Param()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.param.Param` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:105:1
+    |
+104 | # airflow.models.param
+105 | Param()
+    | ^^^^^
+106 | DagParam()
+107 | ParamsDict()
+    |
+help: Use `Param` from `airflow.sdk.definitions.param` instead.
+99  | ParamsDict()
+100 | 
+101 | 
+    - from airflow.models.param import DagParam, Param, ParamsDict
+102 + from airflow.models.param import DagParam, ParamsDict
+103 + from airflow.sdk.definitions.param import Param
+104 | 
+105 | # airflow.models.param
+106 | Param()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.param.DagParam` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:106:1
+    |
+104 | # airflow.models.param
+105 | Param()
+106 | DagParam()
+    | ^^^^^^^^
+107 | ParamsDict()
+    |
+help: Use `DagParam` from `airflow.sdk.definitions.param` instead.
+99  | ParamsDict()
+100 | 
+101 | 
+    - from airflow.models.param import DagParam, Param, ParamsDict
+102 + from airflow.models.param import Param, ParamsDict
+103 + from airflow.sdk.definitions.param import DagParam
+104 | 
+105 | # airflow.models.param
+106 | Param()
+note: This is an unsafe fix and may change runtime behavior
+
+AIR311 [*] `airflow.models.param.ParamsDict` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
+   --> AIR311_names.py:107:1
+    |
+105 | Param()
+106 | DagParam()
+107 | ParamsDict()
+    | ^^^^^^^^^^
+    |
+help: Use `ParamsDict` from `airflow.sdk.definitions.param` instead.
+99  | ParamsDict()
+100 | 
+101 | 
+    - from airflow.models.param import DagParam, Param, ParamsDict
+102 + from airflow.models.param import DagParam, Param
+103 + from airflow.sdk.definitions.param import ParamsDict
+104 | 
+105 | # airflow.models.param
+106 | Param()
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.BaseSensorOperator` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
-   --> AIR311_names.py:107:1
+   --> AIR311_names.py:117:1
     |
-106 | # airflow.sensors.base
-107 | BaseSensorOperator()
+116 | # airflow.sensors.base
+117 | BaseSensorOperator()
     | ^^^^^^^^^^^^^^^^^^
-108 | PokeReturnValue()
-109 | poke_mode_only()
+118 | PokeReturnValue()
+119 | poke_mode_only()
     |
 help: Use `BaseSensorOperator` from `airflow.sdk` instead.
-98  | 
-99  | 
-100 | from airflow.sensors.base import (
+108 | 
+109 | 
+110 | from airflow.sensors.base import (
     -     BaseSensorOperator,
-101 |     PokeReturnValue,
-102 |     poke_mode_only,
-103 | )
-104 + from airflow.sdk import BaseSensorOperator
-105 | 
-106 | # airflow.sensors.base
-107 | BaseSensorOperator()
+111 |     PokeReturnValue,
+112 |     poke_mode_only,
+113 | )
+114 + from airflow.sdk import BaseSensorOperator
+115 | 
+116 | # airflow.sensors.base
+117 | BaseSensorOperator()
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.PokeReturnValue` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
-   --> AIR311_names.py:108:1
+   --> AIR311_names.py:118:1
     |
-106 | # airflow.sensors.base
-107 | BaseSensorOperator()
-108 | PokeReturnValue()
+116 | # airflow.sensors.base
+117 | BaseSensorOperator()
+118 | PokeReturnValue()
     | ^^^^^^^^^^^^^^^
-109 | poke_mode_only()
+119 | poke_mode_only()
     |
 help: Use `PokeReturnValue` from `airflow.sdk` instead.
-99  | 
-100 | from airflow.sensors.base import (
-101 |     BaseSensorOperator,
+109 | 
+110 | from airflow.sensors.base import (
+111 |     BaseSensorOperator,
     -     PokeReturnValue,
-102 |     poke_mode_only,
-103 | )
-104 + from airflow.sdk import PokeReturnValue
-105 | 
-106 | # airflow.sensors.base
-107 | BaseSensorOperator()
+112 |     poke_mode_only,
+113 | )
+114 + from airflow.sdk import PokeReturnValue
+115 | 
+116 | # airflow.sensors.base
+117 | BaseSensorOperator()
 note: This is an unsafe fix and may change runtime behavior
 
 AIR311 [*] `airflow.sensors.base.poke_mode_only` is removed in Airflow 3.0; It still works in Airflow 3.0 but is expected to be removed in a future version.
-   --> AIR311_names.py:109:1
+   --> AIR311_names.py:119:1
     |
-107 | BaseSensorOperator()
-108 | PokeReturnValue()
-109 | poke_mode_only()
+117 | BaseSensorOperator()
+118 | PokeReturnValue()
+119 | poke_mode_only()
     | ^^^^^^^^^^^^^^
     |
 help: Use `poke_mode_only` from `airflow.sdk` instead.
-100 | from airflow.sensors.base import (
-101 |     BaseSensorOperator,
-102 |     PokeReturnValue,
+110 | from airflow.sensors.base import (
+111 |     BaseSensorOperator,
+112 |     PokeReturnValue,
     -     poke_mode_only,
-103 | )
-104 + from airflow.sdk import poke_mode_only
-105 | 
-106 | # airflow.sensors.base
-107 | BaseSensorOperator()
+113 | )
+114 + from airflow.sdk import poke_mode_only
+115 | 
+116 | # airflow.sensors.base
+117 | BaseSensorOperator()
 note: This is an unsafe fix and may change runtime behavior

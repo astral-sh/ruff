@@ -24,7 +24,7 @@ impl From<String> for PythonPlatform {
     fn from(platform: String) -> Self {
         match platform.as_str() {
             "all" => PythonPlatform::All,
-            _ => PythonPlatform::Identifier(platform.to_string()),
+            _ => PythonPlatform::Identifier(platform.clone()),
         }
     }
 }
@@ -58,77 +58,45 @@ impl Default for PythonPlatform {
 mod schema {
     use crate::PythonPlatform;
     use ruff_db::RustDoc;
-    use schemars::_serde_json::Value;
-    use schemars::JsonSchema;
-    use schemars::r#gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SchemaObject, SubschemaValidation};
+    use schemars::{JsonSchema, Schema, SchemaGenerator};
+    use serde_json::Value;
 
     impl JsonSchema for PythonPlatform {
-        fn schema_name() -> String {
-            "PythonPlatform".to_string()
+        fn schema_name() -> std::borrow::Cow<'static, str> {
+            std::borrow::Cow::Borrowed("PythonPlatform")
         }
 
         fn json_schema(_gen: &mut SchemaGenerator) -> Schema {
-            Schema::Object(SchemaObject {
-                // Hard code some well known values, but allow any other string as well.
-                subschemas: Some(Box::new(SubschemaValidation {
-                    any_of: Some(vec![
-                        Schema::Object(SchemaObject {
-                            instance_type: Some(schemars::schema::InstanceType::String.into()),
-                            ..SchemaObject::default()
-                        }),
-                        // Promote well-known values for better auto-completion.
-                        // Using `const` over `enumValues` as recommended [here](https://github.com/SchemaStore/schemastore/blob/master/CONTRIBUTING.md#documenting-enums).
-                        Schema::Object(SchemaObject {
-                            const_value: Some(Value::String("all".to_string())),
-                            metadata: Some(Box::new(Metadata {
-                                description: Some(
-                                    "Do not make any assumptions about the target platform."
-                                        .to_string(),
-                                ),
-                                ..Metadata::default()
-                            })),
+            fn constant(value: &str, description: &str) -> Value {
+                let mut schema = schemars::json_schema!({ "const": value });
+                schema.ensure_object().insert(
+                    "description".to_string(),
+                    Value::String(description.to_string()),
+                );
+                schema.into()
+            }
 
-                            ..SchemaObject::default()
-                        }),
-                        Schema::Object(SchemaObject {
-                            const_value: Some(Value::String("darwin".to_string())),
-                            metadata: Some(Box::new(Metadata {
-                                description: Some("Darwin".to_string()),
-                                ..Metadata::default()
-                            })),
+            // Hard code some well known values, but allow any other string as well.
+            let mut any_of = vec![schemars::json_schema!({ "type": "string" }).into()];
+            // Promote well-known values for better auto-completion.
+            // Using `const` over `enumValues` as recommended [here](https://github.com/SchemaStore/schemastore/blob/master/CONTRIBUTING.md#documenting-enums).
+            any_of.push(constant(
+                "all",
+                "Do not make any assumptions about the target platform.",
+            ));
+            any_of.push(constant("darwin", "Darwin"));
+            any_of.push(constant("linux", "Linux"));
+            any_of.push(constant("win32", "Windows"));
 
-                            ..SchemaObject::default()
-                        }),
-                        Schema::Object(SchemaObject {
-                            const_value: Some(Value::String("linux".to_string())),
-                            metadata: Some(Box::new(Metadata {
-                                description: Some("Linux".to_string()),
-                                ..Metadata::default()
-                            })),
+            let mut schema = Schema::default();
+            let object = schema.ensure_object();
+            object.insert("anyOf".to_string(), Value::Array(any_of));
+            object.insert(
+                "description".to_string(),
+                Value::String(<PythonPlatform as RustDoc>::rust_doc().to_string()),
+            );
 
-                            ..SchemaObject::default()
-                        }),
-                        Schema::Object(SchemaObject {
-                            const_value: Some(Value::String("win32".to_string())),
-                            metadata: Some(Box::new(Metadata {
-                                description: Some("Windows".to_string()),
-                                ..Metadata::default()
-                            })),
-
-                            ..SchemaObject::default()
-                        }),
-                    ]),
-
-                    ..SubschemaValidation::default()
-                })),
-                metadata: Some(Box::new(Metadata {
-                    description: Some(<PythonPlatform as RustDoc>::rust_doc().to_string()),
-                    ..Metadata::default()
-                })),
-
-                ..SchemaObject::default()
-            })
+            schema
         }
     }
 }

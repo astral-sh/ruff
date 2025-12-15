@@ -3,7 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::ImportAliasResolution;
+use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
 /// Navigate to the declaration of a symbol.
 ///
@@ -16,10 +16,11 @@ pub fn goto_declaration(
     offset: TextSize,
 ) -> Option<RangedValue<NavigationTargets>> {
     let module = parsed_module(db, file).load(db);
-    let goto_target = find_goto_target(&module, offset)?;
+    let model = SemanticModel::new(db, file);
+    let goto_target = find_goto_target(&model, &module, offset)?;
 
     let declaration_targets = goto_target
-        .get_definition_targets(file, db, ImportAliasResolution::ResolveAliases)?
+        .get_definition_targets(&model, ImportAliasResolution::ResolveAliases)?
         .declaration_targets(db)?;
 
     Some(RangedValue {
@@ -30,15 +31,9 @@ pub fn goto_declaration(
 
 #[cfg(test)]
 mod tests {
-    use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
-    use crate::{NavigationTarget, goto_declaration};
+    use crate::goto_declaration;
+    use crate::tests::{CursorTest, cursor_test};
     use insta::assert_snapshot;
-    use ruff_db::diagnostic::{
-        Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span, SubDiagnostic,
-        SubDiagnosticSeverity,
-    };
-    use ruff_db::files::FileRange;
-    use ruff_text_size::Ranged;
 
     #[test]
     fn goto_declaration_function_call_to_definition() {
@@ -52,20 +47,20 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:5
-          |
-        2 | def my_function(x, y):
-          |     ^^^^^^^^^^^
-        3 |     return x + y
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:5:10
           |
         3 |     return x + y
         4 |
         5 | result = my_function(1, 2)
-          |          ^^^^^^^^^^^
+          |          ^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:5
+          |
+        2 | def my_function(x, y):
+          |     -----------
+        3 |     return x + y
           |
         ");
     }
@@ -80,19 +75,19 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:1
-          |
-        2 | x = 42
-          | ^
-        3 | y = x
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:5
           |
         2 | x = 42
         3 | y = x
-          |     ^
+          |     ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:1
+          |
+        2 | x = 42
+          | -
+        3 | y = x
           |
         ");
     }
@@ -110,38 +105,22 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:6:12
+          |
+        4 |         pass
+        5 |
+        6 | instance = MyClass()
+          |            ^^^^^^^ Clicking here
+          |
+        info: Found 2 declarations
          --> main.py:2:7
           |
         2 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         3 |     def __init__(self):
+          |         --------
         4 |         pass
-          |
-        info: Source
-         --> main.py:6:12
-          |
-        4 |         pass
-        5 |
-        6 | instance = MyClass()
-          |            ^^^^^^^
-          |
-
-        info[goto-declaration]: Declaration
-         --> main.py:3:9
-          |
-        2 | class MyClass:
-        3 |     def __init__(self):
-          |         ^^^^^^^^
-        4 |         pass
-          |
-        info: Source
-         --> main.py:6:12
-          |
-        4 |         pass
-        5 |
-        6 | instance = MyClass()
-          |            ^^^^^^^
           |
         ");
     }
@@ -156,19 +135,19 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:9
-          |
-        2 | def foo(param):
-          |         ^^^^^
-        3 |     return param * 2
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:12
           |
         2 | def foo(param):
         3 |     return param * 2
-          |            ^^^^^
+          |            ^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:9
+          |
+        2 | def foo(param):
+          |         -----
+        3 |     return param * 2
           |
         ");
     }
@@ -184,20 +163,20 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:18
-          |
-        2 | def generic_func[T](value: T) -> T:
-          |                  ^
-        3 |     v: T = value
-        4 |     return v
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:8
           |
         2 | def generic_func[T](value: T) -> T:
         3 |     v: T = value
-          |        ^
+          |        ^ Clicking here
+        4 |     return v
+          |
+        info: Found 1 declaration
+         --> main.py:2:18
+          |
+        2 | def generic_func[T](value: T) -> T:
+          |                  -
+        3 |     v: T = value
         4 |     return v
           |
         ");
@@ -214,20 +193,20 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:20
-          |
-        2 | class GenericClass[T]:
-          |                    ^
-        3 |     def __init__(self, value: T):
-        4 |         self.value = value
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:31
           |
         2 | class GenericClass[T]:
         3 |     def __init__(self, value: T):
-          |                               ^
+          |                               ^ Clicking here
+        4 |         self.value = value
+          |
+        info: Found 1 declaration
+         --> main.py:2:20
+          |
+        2 | class GenericClass[T]:
+          |                    -
+        3 |     def __init__(self, value: T):
         4 |         self.value = value
           |
         ");
@@ -246,22 +225,22 @@ mod tests {
         );
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> main.py:2:1
-          |
-        2 | x = "outer"
-          | ^
-        3 | def outer_func():
-        4 |     def inner_func():
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:5:16
           |
         3 | def outer_func():
         4 |     def inner_func():
         5 |         return x  # Should find outer x
-          |                ^
+          |                ^ Clicking here
         6 |     return inner_func
+          |
+        info: Found 1 declaration
+         --> main.py:2:1
+          |
+        2 | x = "outer"
+          | -
+        3 | def outer_func():
+        4 |     def inner_func():
           |
         "#);
     }
@@ -272,7 +251,7 @@ mod tests {
             r#"
 class A:
     x = 1
-    
+
     def method(self):
         def inner():
             return <CURSOR>x  # Should NOT find class variable x
@@ -306,20 +285,20 @@ variable = 42
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mymodule.py:1:1
-          |
-        1 |
-          | ^
-        2 | def function():
-        3 |     return "hello from mymodule"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
         2 | import mymodule
         3 | print(mymodule.function())
-          |       ^^^^^^^^
+          |       ^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> mymodule.py:1:1
+          |
+        1 |
+          | -
+        2 | def function():
+        3 |     return "hello from mymodule"
           |
         "#);
     }
@@ -347,19 +326,19 @@ def other_function():
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mymodule.py:2:5
-          |
-        2 | def my_function():
-          |     ^^^^^^^^^^^
-        3 |     return "hello"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
         2 | from mymodule import my_function
         3 | print(my_function())
-          |       ^^^^^^^^^^^
+          |       ^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> mymodule.py:2:5
+          |
+        2 | def my_function():
+          |     -----------
+        3 |     return "hello"
           |
         "#);
     }
@@ -389,22 +368,22 @@ FOO = 0
             .build();
 
         // Should find the submodule file itself
-        assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mymodule/submodule.py:1:1
-          |
-        1 |
-          | ^
-        2 | FOO = 0
-          |
-        info: Source
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
         2 | import mymodule.submodule as sub
         3 | print(sub.helper())
-          |       ^^^
+          |       ^^^ Clicking here
           |
-        "#);
+        info: Found 1 declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | -
+        2 | FOO = 0
+          |
+        ");
     }
 
     #[test]
@@ -428,19 +407,19 @@ def func(arg):
 
         // Should resolve to the actual function definition, not the import statement
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> utils.py:2:5
-          |
-        2 | def func(arg):
-          |     ^^^^
-        3 |     return f"Processed: {arg}"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
         2 | from utils import func as h
         3 | print(h("test"))
-          |       ^
+          |       ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> utils.py:2:5
+          |
+        2 | def func(arg):
+          |     ----
+        3 |     return f"Processed: {arg}"
           |
         "#);
     }
@@ -472,19 +451,19 @@ def shared_function():
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> original.py:2:5
-          |
-        2 | def shared_function():
-          |     ^^^^^^^^^^^^^^^
-        3 |     return "from original"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:7
           |
         2 | from intermediate import shared_function
         3 | print(shared_function())
-          |       ^^^^^^^^^^^^^^^
+          |       ^^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> original.py:2:5
+          |
+        2 | def shared_function():
+          |     ---------------
+        3 |     return "from original"
           |
         "#);
     }
@@ -514,20 +493,20 @@ def multiply_numbers(a, b):
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> math_utils.py:2:5
-          |
-        2 | def add_numbers(a, b):
-          |     ^^^^^^^^^^^
-        3 |     """Add two numbers together."""
-        4 |     return a + b
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:3:10
           |
         2 | from math_utils import *
         3 | result = add_numbers(5, 3)
-          |          ^^^^^^^^^^^
+          |          ^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> math_utils.py:2:5
+          |
+        2 | def add_numbers(a, b):
+          |     -----------
+        3 |     """Add two numbers together."""
+        4 |     return a + b
           |
         "#);
     }
@@ -564,20 +543,20 @@ def another_helper():
 
         // Should resolve the relative import to find the actual function definition
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> package/utils.py:2:5
-          |
-        2 | def helper_function(arg):
-          |     ^^^^^^^^^^^^^^^
-        3 |     """A helper function in utils module."""
-        4 |     return f"Processed: {arg}"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> package/main.py:3:10
           |
         2 | from .utils import helper_function
         3 | result = helper_function("test")
-          |          ^^^^^^^^^^^^^^^
+          |          ^^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> package/utils.py:2:5
+          |
+        2 | def helper_function(arg):
+          |     ---------------
+        3 |     """A helper function in utils module."""
+        4 |     return f"Processed: {arg}"
           |
         "#);
     }
@@ -613,20 +592,20 @@ def another_helper():
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> package/utils.py:2:5
-          |
-        2 | def helper_function(arg):
-          |     ^^^^^^^^^^^^^^^
-        3 |     """A helper function in utils module."""
-        4 |     return f"Processed: {arg}"
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> package/main.py:3:10
           |
         2 | from .utils import *
         3 | result = helper_function("test")
-          |          ^^^^^^^^^^^^^^^
+          |          ^^^^^^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> package/utils.py:2:5
+          |
+        2 | def helper_function(arg):
+          |     ---------------
+        3 |     """A helper function in utils module."""
+        4 |     return f"Processed: {arg}"
           |
         "#);
     }
@@ -656,19 +635,19 @@ FOO = 0
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> mymodule/submodule.py:1:1
-          |
-        1 |
-          | ^
-        2 | FOO = 0
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:2:30
           |
         2 | import mymodule.submodule as sub
-          |                              ^^^
+          |                              ^^^ Clicking here
         3 | print(sub.helper())
+          |
+        info: Found 1 declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | -
+        2 | FOO = 0
           |
         ");
     }
@@ -698,19 +677,19 @@ FOO = 0
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> mymodule/submodule.py:1:1
-          |
-        1 |
-          | ^
-        2 | FOO = 0
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:2:17
           |
         2 | import mymodule.submodule as sub
-          |                 ^^^^^^^^^
+          |                 ^^^^^^^^^ Clicking here
         3 | print(sub.helper())
+          |
+        info: Found 1 declaration
+         --> mymodule/submodule.py:1:1
+          |
+        1 |
+          | -
+        2 | FOO = 0
           |
         ");
     }
@@ -744,19 +723,19 @@ def another_helper(path):
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mypackage/utils.py:2:5
-          |
-        2 | def helper(a, b):
-          |     ^^^^^^
-        3 |     return a + "/" + b
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:2:29
           |
         2 | from mypackage.utils import helper as h
-          |                             ^^^^^^
+          |                             ^^^^^^ Clicking here
         3 | result = h("/a", "/b")
+          |
+        info: Found 1 declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ------
+        3 |     return a + "/" + b
           |
         "#);
     }
@@ -790,19 +769,19 @@ def another_helper(path):
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mypackage/utils.py:2:5
-          |
-        2 | def helper(a, b):
-          |     ^^^^^^
-        3 |     return a + "/" + b
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:2:39
           |
         2 | from mypackage.utils import helper as h
-          |                                       ^
+          |                                       ^ Clicking here
         3 | result = h("/a", "/b")
+          |
+        info: Found 1 declaration
+         --> mypackage/utils.py:2:5
+          |
+        2 | def helper(a, b):
+          |     ------
+        3 |     return a + "/" + b
           |
         "#);
     }
@@ -836,20 +815,20 @@ def another_helper(path):
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> mypackage/utils.py:1:1
-          |
-        1 |
-          | ^
-        2 | def helper(a, b):
-        3 |     return a + "/" + b
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:2:16
           |
         2 | from mypackage.utils import helper as h
-          |                ^^^^^
+          |                ^^^^^ Clicking here
         3 | result = h("/a", "/b")
+          |
+        info: Found 1 declaration
+         --> mypackage/utils.py:1:1
+          |
+        1 |
+          | -
+        2 | def helper(a, b):
+        3 |     return a + "/" + b
           |
         "#);
     }
@@ -868,24 +847,243 @@ def another_helper(path):
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:7:7
+          |
+        6 | c = C()
+        7 | y = c.x
+          |       ^ Clicking here
+          |
+        info: Found 1 declaration
          --> main.py:4:9
           |
         2 | class C:
         3 |     def __init__(self):
         4 |         self.x: int = 1
-          |         ^^^^^^
+          |         ------
         5 |
         6 | c = C()
           |
-        info: Source
-         --> main.py:7:7
-          |
-        6 | c = C()
-        7 | y = c.x
-          |       ^
-          |
         ");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCla<CURSOR>ss" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:5
+          |
+        2 | a: "MyClass" = 1
+          |     ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | a: "MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation2() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyCl<CURSOR>ass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation3() {
+        let test = cursor_test(
+            r#"
+        a: "None |<CURSOR> MyClass" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation4() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass<CURSOR>" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:12
+          |
+        2 | a: "None | MyClass" = 1
+          |            ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | a: "None | MyClass" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation5() {
+        let test = cursor_test(
+            r#"
+        a: "None | MyClass"<CURSOR> = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling1() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass |" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling2() {
+        let test = cursor_test(
+            r#"
+        a: "MyCl<CURSOR>ass | No" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:5
+          |
+        2 | a: "MyClass | No" = 1
+          |     ^^^^^^^ Clicking here
+        3 |
+        4 | class MyClass:
+          |
+        info: Found 1 declaration
+         --> main.py:4:7
+          |
+        2 | a: "MyClass | No" = 1
+        3 |
+        4 | class MyClass:
+          |       -------
+        5 |     """some docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_dangling3() {
+        let test = cursor_test(
+            r#"
+        a: "MyClass | N<CURSOR>o" = 1
+
+        class MyClass:
+            """some docs"""
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:6
+          |
+        2 | ab: "ab"
+          |      ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | --
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
     }
 
     #[test]
@@ -906,23 +1104,23 @@ def another_helper(path):
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:9
+           |
+        10 | d = D()
+        11 | y = d.y.x
+           |         ^ Clicking here
+           |
+        info: Found 1 declaration
          --> main.py:4:9
           |
         2 | class C:
         3 |     def __init__(self):
         4 |         self.x: int = 1
-          |         ^^^^^^
+          |         ------
         5 |
         6 | class D:
           |
-        info: Source
-          --> main.py:11:9
-           |
-        10 | d = D()
-        11 | y = d.y.x
-           |         ^
-           |
         ");
     }
 
@@ -940,22 +1138,22 @@ def another_helper(path):
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:7:7
+          |
+        6 | c = C()
+        7 | y = c.x
+          |       ^ Clicking here
+          |
+        info: Found 1 declaration
          --> main.py:4:9
           |
         2 | class C:
         3 |     def __init__(self):
         4 |         self.x = 1
-          |         ^^^^^^
+          |         ------
         5 |
         6 | c = C()
-          |
-        info: Source
-         --> main.py:7:7
-          |
-        6 | c = C()
-        7 | y = c.x
-          |       ^
           |
         ");
     }
@@ -974,20 +1172,20 @@ def another_helper(path):
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:3:9
-          |
-        2 | class C:
-        3 |     def foo(self):
-          |         ^^^
-        4 |         return 42
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:7:9
           |
         6 | c = C()
         7 | res = c.foo()
-          |         ^^^
+          |         ^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:3:9
+          |
+        2 | class C:
+        3 |     def foo(self):
+          |         ---
+        4 |         return 42
           |
         ");
     }
@@ -1024,7 +1222,7 @@ x: i<CURSOR>nt = 42
             "Should find the int class definition"
         );
         assert!(
-            result.contains("info[goto-declaration]: Declaration"),
+            result.contains("info[goto-declaration]: Go to declaration"),
             "Should be a goto-declaration result"
         );
     }
@@ -1035,37 +1233,76 @@ x: i<CURSOR>nt = 42
             r#"
 def outer():
     x = "outer_value"
-    
+
     def inner():
         nonlocal x
         x = "modified"
         return x<CURSOR>  # Should find the nonlocal x declaration in outer scope
-    
+
     return inner
 "#,
         );
 
         // Should find the variable declaration in the outer scope, not the nonlocal statement
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> main.py:3:5
-          |
-        2 | def outer():
-        3 |     x = "outer_value"
-          |     ^
-        4 |
-        5 |     def inner():
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
           --> main.py:8:16
            |
          6 |         nonlocal x
          7 |         x = "modified"
          8 |         return x  # Should find the nonlocal x declaration in outer scope
-           |                ^
+           |                ^ Clicking here
          9 |
         10 |     return inner
            |
+        info: Found 1 declaration
+         --> main.py:3:5
+          |
+        2 | def outer():
+        3 |     x = "outer_value"
+          |     -
+        4 |
+        5 |     def inner():
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_nonlocal_stmt() {
+        let test = cursor_test(
+            r#"
+def outer():
+    xy = "outer_value"
+
+    def inner():
+        nonlocal x<CURSOR>y
+        xy = "modified"
+        return x  # Should find the nonlocal x declaration in outer scope
+
+    return inner
+"#,
+        );
+
+        // Should find the variable declaration in the outer scope, not the nonlocal statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:6:18
+          |
+        5 |     def inner():
+        6 |         nonlocal xy
+          |                  ^^ Clicking here
+        7 |         xy = "modified"
+        8 |         return x  # Should find the nonlocal x declaration in outer scope
+          |
+        info: Found 1 declaration
+         --> main.py:3:5
+          |
+        2 | def outer():
+        3 |     xy = "outer_value"
+          |     --
+        4 |
+        5 |     def inner():
+          |
         "#);
     }
 
@@ -1084,21 +1321,56 @@ def function():
 
         // Should find the global variable declaration, not the global statement
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> main.py:2:1
-          |
-        2 | global_var = "global_value"
-          | ^^^^^^^^^^
-        3 |
-        4 | def function():
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:7:12
           |
         5 |     global global_var
         6 |     global_var = "modified"
         7 |     return global_var  # Should find the global variable declaration
-          |            ^^^^^^^^^^
+          |            ^^^^^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:1
+          |
+        2 | global_var = "global_value"
+          | ----------
+        3 |
+        4 | def function():
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_global_stmt() {
+        let test = cursor_test(
+            r#"
+global_var = "global_value"
+
+def function():
+    global global_<CURSOR>var
+    global_var = "modified"
+    return global_var  # Should find the global variable declaration
+"#,
+        );
+
+        // Should find the global variable declaration, not the global statement
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:5:12
+          |
+        4 | def function():
+        5 |     global global_var
+          |            ^^^^^^^^^^ Clicking here
+        6 |     global_var = "modified"
+        7 |     return global_var  # Should find the global variable declaration
+          |
+        info: Found 1 declaration
+         --> main.py:2:1
+          |
+        2 | global_var = "global_value"
+          | ----------
+        3 |
+        4 | def function():
           |
         "#);
     }
@@ -1119,21 +1391,501 @@ def function():
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:3:5
-          |
-        2 | class A:
-        3 |     x = 10
-          |     ^
-        4 |
-        5 | class B(A):
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:9:7
           |
         8 | b = B()
         9 | y = b.x
-          |       ^
+          |       ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:3:5
+          |
+        2 | class A:
+        3 |     x = 10
+          |     -
+        4 |
+        5 | class B(A):
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_match_name_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      ^^ Clicking here
+        5 |             x = ab
+          |
+        info: Found 1 declaration
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_name_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+        5 |             x = ab
+          |                 ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:4:22
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ab]:
+          |                      --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_rest_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       ^^ Clicking here
+        5 |             x = ab
+          |
+        info: Found 1 declaration
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_rest_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", *ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+        5 |             x = ab
+          |                 ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:4:23
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", *ab]:
+          |                       --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_as_stmt() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as a<CURSOR>b]:
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     ^^ Clicking here
+        5 |             x = ab
+          |
+        info: Found 1 declaration
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_as_binding() {
+        let test = cursor_test(
+            r#"
+            def my_func(command: str):
+                match command.split():
+                    case ["get", ("a" | "b") as ab]:
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:5:17
+          |
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+        5 |             x = ab
+          |                 ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:4:37
+          |
+        2 | def my_func(command: str):
+        3 |     match command.split():
+        4 |         case ["get", ("a" | "b") as ab]:
+          |                                     --
+        5 |             x = ab
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_keyword_stmt() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=a<CURSOR>b):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              ^^ Clicking here
+        11 |             x = ab
+           |
+        info: Found 1 declaration
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              --
+        11 |             x = ab
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_match_keyword_binding() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, button=ab):
+                        x = a<CURSOR>b
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+          --> main.py:11:17
+           |
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+        11 |             x = ab
+           |                 ^^ Clicking here
+           |
+        info: Found 1 declaration
+          --> main.py:10:30
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |                              --
+        11 |             x = ab
+           |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_match_class_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Cl<CURSOR>ick(x, button=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+          --> main.py:10:14
+           |
+         8 | def my_func(event: Click):
+         9 |     match event:
+        10 |         case Click(x, button=ab):
+           |              ^^^^^ Clicking here
+        11 |             x = ab
+           |
+        info: Found 1 declaration
+         --> main.py:2:7
+          |
+        2 | class Click:
+          |       -----
+        3 |     __match_args__ = ("position", "button")
+        4 |     def __init__(self, pos, btn):
+          |
+        "#);
+    }
+
+    #[test]
+    fn goto_declaration_match_class_field_name() {
+        let test = cursor_test(
+            r#"
+            class Click:
+                __match_args__ = ("position", "button")
+                def __init__(self, pos, btn):
+                    self.position: int = pos
+                    self.button: str = btn
+
+            def my_func(event: Click):
+                match event:
+                    case Click(x, but<CURSOR>ton=ab):
+                        x = ab
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_name_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias1[A<CURSOR>B: int = bool] = tuple[AB, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_name_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias1[AB: int = bool] = tuple[A<CURSOR>B, list[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:37
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |                                     ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:13
+          |
+        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
+          |             --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_spec_stmt() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**A<CURSOR>B = [int, str]] = Callable[AB, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_spec_binding() {
+        let test = cursor_test(
+            r#"
+            from typing import Callable
+            type Alias2[**AB = [int, str]] = Callable[A<CURSOR>B, tuple[AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:3:43
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |                                           ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:3:15
+          |
+        2 | from typing import Callable
+        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
+          |               --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_tuple_stmt() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*A<CURSOR>B = ()] = tuple[tuple[*AB], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              --
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_typevar_tuple_binding() {
+        let test = cursor_test(
+            r#"
+            type Alias3[*AB = ()] = tuple[tuple[*A<CURSOR>B], tuple[*AB]]
+            "#,
+        );
+
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:2:38
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |                                      ^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:14
+          |
+        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
+          |              --
           |
         ");
     }
@@ -1145,7 +1897,7 @@ def function():
             class C:
                 def __init__(self):
                     self._value = 0
-                
+
                 @property
                 def value(self):
                     return self._value
@@ -1156,21 +1908,21 @@ def function():
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:7:9
-          |
-        6 |     @property
-        7 |     def value(self):
-          |         ^^^^^
-        8 |         return self._value
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
           --> main.py:11:3
            |
         10 | c = C()
         11 | c.value = 42
-           |   ^^^^^
+           |   ^^^^^ Clicking here
            |
+        info: Found 1 declaration
+         --> main.py:7:9
+          |
+        6 |     @property
+        7 |     def value(self):
+          |         -----
+        8 |         return self._value
+          |
         ");
     }
 
@@ -1208,7 +1960,7 @@ def function():
             "Should find the __doc__ attribute definition"
         );
         assert!(
-            result.contains("info[goto-declaration]: Declaration"),
+            result.contains("info[goto-declaration]: Go to declaration"),
             "Should be a goto-declaration result"
         );
     }
@@ -1229,22 +1981,22 @@ def function():
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:9:9
+          |
+        8 | def use_drawable(obj: Drawable):
+        9 |     obj.name
+          |         ^^^^ Clicking here
+          |
+        info: Found 1 declaration
          --> main.py:6:5
           |
         4 | class Drawable(Protocol):
         5 |     def draw(self) -> None: ...
         6 |     name: str
-          |     ^^^^
+          |     ----
         7 |
         8 | def use_drawable(obj: Drawable):
-          |
-        info: Source
-         --> main.py:9:9
-          |
-        8 | def use_drawable(obj: Drawable):
-        9 |     obj.name
-          |         ^^^^
           |
         ");
     }
@@ -1255,7 +2007,7 @@ def function():
             r#"
 class MyClass:
     ClassType = int
-    
+
     def generic_method[T](self, value: Class<CURSOR>Type) -> T:
         return value
 "#,
@@ -1263,23 +2015,23 @@ class MyClass:
 
         // Should find the ClassType defined in the class body, not fail to resolve
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:3:5
-          |
-        2 | class MyClass:
-        3 |     ClassType = int
-          |     ^^^^^^^^^
-        4 |
-        5 |     def generic_method[T](self, value: ClassType) -> T:
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:5:40
           |
         3 |     ClassType = int
         4 |
         5 |     def generic_method[T](self, value: ClassType) -> T:
-          |                                        ^^^^^^^^^
+          |                                        ^^^^^^^^^ Clicking here
         6 |         return value
+          |
+        info: Found 1 declaration
+         --> main.py:3:5
+          |
+        2 | class MyClass:
+        3 |     ClassType = int
+          |     ---------
+        4 |
+        5 |     def generic_method[T](self, value: ClassType) -> T:
           |
         ");
     }
@@ -1296,20 +2048,20 @@ class MyClass:
         );
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> main.py:2:20
-          |
-        2 | def my_function(x, y, z=10):
-          |                    ^
-        3 |     return x + y + z
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:5:25
           |
         3 |     return x + y + z
         4 |
         5 | result = my_function(1, y=2, z=3)
-          |                         ^
+          |                         ^ Clicking here
+          |
+        info: Found 1 declaration
+         --> main.py:2:20
+          |
+        2 | def my_function(x, y, z=10):
+          |                    -
+        3 |     return x + y + z
           |
         ");
     }
@@ -1336,38 +2088,25 @@ class MyClass:
 
         // Should navigate to the parameter in both matching overloads
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
-         --> main.py:5:24
-          |
-        4 | @overload
-        5 | def process(data: str, format: str) -> str: ...
-          |                        ^^^^^^
-        6 |
-        7 | @overload
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
           --> main.py:14:27
            |
         13 | # Call the overloaded function
         14 | result = process("hello", format="json")
-           |                           ^^^^^^
+           |                           ^^^^^^ Clicking here
            |
-
-        info[goto-declaration]: Declaration
-          --> main.py:8:24
+        info: Found 2 declarations
+          --> main.py:5:24
            |
+         4 | @overload
+         5 | def process(data: str, format: str) -> str: ...
+           |                        ------
+         6 |
          7 | @overload
          8 | def process(data: int, format: int) -> int: ...
-           |                        ^^^^^^
+           |                        ------
          9 |
         10 | def process(data, format):
-           |
-        info: Source
-          --> main.py:14:27
-           |
-        13 | # Call the overloaded function
-        14 | result = process("hello", format="json")
-           |                           ^^^^^^
            |
         "#);
     }
@@ -1405,38 +2144,24 @@ def ab(a: str): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^ Clicking here
+          |
+        info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
         4 | @overload
         5 | def ab(a: int): ...
-          |     ^^
+          |     --
         6 |
         7 | @overload
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:8:5
-          |
-        7 | @overload
         8 | def ab(a: str): ...
-          |     ^^
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
+          |     --
           |
         ");
     }
@@ -1474,38 +2199,24 @@ def ab(a: str): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r#"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab("hello")
+          | ^^ Clicking here
+          |
+        info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
         4 | @overload
         5 | def ab(a: int): ...
-          |     ^^
+          |     --
         6 |
         7 | @overload
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab("hello")
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:8:5
-          |
-        7 | @overload
         8 | def ab(a: str): ...
-          |     ^^
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab("hello")
-          | ^^
+          |     --
           |
         "#);
     }
@@ -1543,38 +2254,24 @@ def ab(a: int): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1, 2)
+          | ^^ Clicking here
+          |
+        info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
         4 | @overload
         5 | def ab(a: int, b: int): ...
-          |     ^^
+          |     --
         6 |
         7 | @overload
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, 2)
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:8:5
-          |
-        7 | @overload
         8 | def ab(a: int): ...
-          |     ^^
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, 2)
-          | ^^
+          |     --
           |
         ");
     }
@@ -1612,38 +2309,24 @@ def ab(a: int): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
+        info[goto-declaration]: Go to declaration
+         --> main.py:4:1
+          |
+        2 | from mymodule import ab
+        3 |
+        4 | ab(1)
+          | ^^ Clicking here
+          |
+        info: Found 2 declarations
          --> mymodule.pyi:5:5
           |
         4 | @overload
         5 | def ab(a: int, b: int): ...
-          |     ^^
+          |     --
         6 |
         7 | @overload
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:8:5
-          |
-        7 | @overload
         8 | def ab(a: int): ...
-          |     ^^
-          |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1)
-          | ^^
+          |     --
           |
         ");
     }
@@ -1684,57 +2367,29 @@ def ab(a: int, *, c: int): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:5:5
-          |
-        4 | @overload
-        5 | def ab(a: int): ...
-          |     ^^
-        6 |
-        7 | @overload
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
         2 | from mymodule import ab
         3 |
         4 | ab(1, b=2)
-          | ^^
+          | ^^ Clicking here
           |
-
-        info[goto-declaration]: Declaration
-          --> mymodule.pyi:8:5
+        info: Found 3 declarations
+          --> mymodule.pyi:5:5
            |
+         4 | @overload
+         5 | def ab(a: int): ...
+           |     --
+         6 |
          7 | @overload
          8 | def ab(a: int, *, b: int): ...
-           |     ^^
+           |     --
          9 |
         10 | @overload
-           |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, b=2)
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-          --> mymodule.pyi:11:5
-           |
-        10 | @overload
         11 | def ab(a: int, *, c: int): ...
-           |     ^^
+           |     --
            |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, b=2)
-          | ^^
-          |
         ");
     }
 
@@ -1774,64 +2429,365 @@ def ab(a: int, *, c: int): ...
             .build();
 
         assert_snapshot!(test.goto_declaration(), @r"
-        info[goto-declaration]: Declaration
-         --> mymodule.pyi:5:5
-          |
-        4 | @overload
-        5 | def ab(a: int): ...
-          |     ^^
-        6 |
-        7 | @overload
-          |
-        info: Source
+        info[goto-declaration]: Go to declaration
          --> main.py:4:1
           |
         2 | from mymodule import ab
         3 |
         4 | ab(1, c=2)
-          | ^^
+          | ^^ Clicking here
           |
-
-        info[goto-declaration]: Declaration
-          --> mymodule.pyi:8:5
+        info: Found 3 declarations
+          --> mymodule.pyi:5:5
            |
+         4 | @overload
+         5 | def ab(a: int): ...
+           |     --
+         6 |
          7 | @overload
          8 | def ab(a: int, *, b: int): ...
-           |     ^^
+           |     --
          9 |
         10 | @overload
-           |
-        info: Source
-         --> main.py:4:1
-          |
-        2 | from mymodule import ab
-        3 |
-        4 | ab(1, c=2)
-          | ^^
-          |
-
-        info[goto-declaration]: Declaration
-          --> mymodule.pyi:11:5
-           |
-        10 | @overload
         11 | def ab(a: int, *, c: int): ...
-           |     ^^
+           |     --
            |
-        info: Source
-         --> main.py:4:1
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should only highlight `subpkg` in the import statement
+        // This happens because DefinitionKind::ImportFromSubmodule claims the entire ImportFrom node,
+        // which is correct but unhelpful. Unfortunately even if it only claimed the LHS identifier it
+        // would highlight `subpkg.submod` which is strictly better but still isn't what we want.
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:4:5
           |
-        2 | from mymodule import ab
+        2 | from .subpkg.submod import val
         3 |
-        4 | ab(1, c=2)
-          | ^^
+        4 | x = subpkg
+          |     ^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+         --> mypackage/__init__.py:2:1
+          |
+        2 | from .subpkg.submod import val
+          | ------------------------------
+        3 |
+        4 | x = subpkg
           |
         ");
     }
 
+    #[test]
+    fn goto_declaration_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): I don't *think* this is what we want..?
+        // It's a bit confusing because this symbol is essentially the LHS *and* RHS of
+        // `subpkg = mypackage.subpkg`. As in, it's both defining a local `subpkg` and
+        // loading the module `mypackage.subpkg`, so, it's understandable to get confused!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg.submod import val
+          |       ^^^^^^ Clicking here
+        3 |
+        4 | x = subpkg
+          |
+        info: Found 1 declaration
+        --> mypackage/subpkg/__init__.py:1:1
+         |
+         |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No result is correct!
+        assert_snapshot!(test.goto_declaration(), @"No goto target found");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // Going to the submod module is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:2:14
+          |
+        2 | from .subpkg.submod import val
+          |              ^^^^^^ Clicking here
+        3 |
+        4 | x = submod
+          |
+        info: Found 1 declaration
+         --> mypackage/subpkg/submod.py:1:1
+          |
+        1 |
+          | -
+        2 | val: int = 0
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Going to the subpkg module is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:2:7
+          |
+        2 | from .subpkg import subpkg
+          |       ^^^^^^ Clicking here
+        3 |
+        4 | x = subpkg
+          |
+        info: Found 1 declaration
+         --> mypackage/subpkg/__init__.py:1:1
+          |
+        1 |
+          | -
+        2 | subpkg: int = 10
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // Going to the subpkg `int` is correct!
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ^^^^^^ Clicking here
+        3 |
+        4 | x = subpkg
+          |
+        info: Found 1 declaration
+         --> mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    #[test]
+    fn goto_declaration_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): Ok this one is FASCINATING and it's kinda right but confusing!
+        //
+        // So there's 3 relevant definitions here:
+        //
+        // * `subpkg: int = 10` in the other file is in fact the original definition
+        //
+        // *  the LHS `subpkg` in the import is an instance of `subpkg = ...`
+        //    because it's a `DefinitionKind::ImportFromSubmodle`.
+        //    This is the span that covers the entire import.
+        //
+        // * `the RHS `subpkg` in the import is a second instance of `subpkg = ...`
+        //    that *immediately* overwrites the `ImportFromSubmodule`'s definition
+        //    This span seemingly doesn't appear at all!? Is it getting hidden by the LHS span?
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ^^^^^^ Clicking here
+          |
+        info: Found 2 declarations
+         --> mypackage/__init__.py:2:1
+          |
+        2 | from .subpkg import subpkg
+          | --------------------------
+        3 |
+        4 | x = subpkg
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    // TODO: Should only return `a: int`
+    #[test]
+    fn redeclarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+
+                a: bool = True
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.goto_declaration(), @r#"
+        info[goto-declaration]: Go to declaration
+         --> main.py:6:7
+          |
+        4 | a: int = 10
+        5 |
+        6 | print(a)
+          |       ^ Clicking here
+        7 |
+        8 | a: bool = True
+          |
+        info: Found 3 declarations
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | -
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+        7 |
+        8 | a: bool = True
+          | -
+          |
+        "#);
+    }
+
     impl CursorTest {
         fn goto_declaration(&self) -> String {
-            let Some(targets) = goto_declaration(&self.db, self.cursor.file, self.cursor.offset)
-            else {
+            let Some(targets) = salsa::attach(&self.db, || {
+                goto_declaration(&self.db, self.cursor.file, self.cursor.offset)
+            }) else {
                 return "No goto target found".to_string();
             };
 
@@ -1839,47 +2795,10 @@ def ab(a: int, *, c: int): ...
                 return "No declarations found".to_string();
             }
 
-            let source = targets.range;
-            self.render_diagnostics(
-                targets
-                    .into_iter()
-                    .map(|target| GotoDeclarationDiagnostic::new(source, &target)),
-            )
-        }
-    }
-
-    struct GotoDeclarationDiagnostic {
-        source: FileRange,
-        target: FileRange,
-    }
-
-    impl GotoDeclarationDiagnostic {
-        fn new(source: FileRange, target: &NavigationTarget) -> Self {
-            Self {
-                source,
-                target: FileRange::new(target.file(), target.focus_range()),
-            }
-        }
-    }
-
-    impl IntoDiagnostic for GotoDeclarationDiagnostic {
-        fn into_diagnostic(self) -> Diagnostic {
-            let mut source = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Source");
-            source.annotate(Annotation::primary(
-                Span::from(self.source.file()).with_range(self.source.range()),
-            ));
-
-            let mut main = Diagnostic::new(
-                DiagnosticId::Lint(LintName::of("goto-declaration")),
-                Severity::Info,
-                "Declaration".to_string(),
-            );
-            main.annotate(Annotation::primary(
-                Span::from(self.target.file()).with_range(self.target.range()),
-            ));
-            main.sub(source);
-
-            main
+            self.render_diagnostics([crate::goto_definition::test::GotoDiagnostic::new(
+                crate::goto_definition::test::GotoAction::Declaration,
+                targets,
+            )])
         }
     }
 }

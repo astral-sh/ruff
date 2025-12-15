@@ -9,7 +9,7 @@ name, and not just by its numeric position within the tuple:
 
 ```py
 from typing import NamedTuple
-from ty_extensions import static_assert, is_subtype_of, is_assignable_to
+from ty_extensions import static_assert, is_subtype_of, is_assignable_to, reveal_mro
 
 class Person(NamedTuple):
     id: int
@@ -25,8 +25,8 @@ reveal_type(alice.id)  # revealed: int
 reveal_type(alice.name)  # revealed: str
 reveal_type(alice.age)  # revealed: int | None
 
-# revealed: tuple[<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(Person.__mro__)
+# revealed: (<class 'Person'>, <class 'tuple[int, str, int | None]'>, <class 'Sequence[int | str | None]'>, <class 'Reversible[int | str | None]'>, <class 'Collection[int | str | None]'>, <class 'Iterable[int | str | None]'>, <class 'Container[int | str | None]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Person)
 
 static_assert(is_subtype_of(Person, tuple[int, str, int | None]))
 static_assert(is_subtype_of(Person, tuple[object, ...]))
@@ -208,8 +208,7 @@ class SuperUser(User):
     def now_called_robert(self):
         self.name = "Robert"  # fine because overridden with a mutable attribute
 
-        # TODO: this should cause us to emit an error as we're assigning to a read-only property
-        # inherited from the `NamedTuple` superclass (requires https://github.com/astral-sh/ty/issues/159)
+        # error: 9 [invalid-assignment] "Cannot assign to read-only property `nickname` on object of type `Self@now_called_robert`"
         self.nickname = "Bob"
 
 james = SuperUser(0, "James", 42, "Jimmy")
@@ -272,14 +271,12 @@ reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(itera
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
+reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
 person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(person._replace(name="Bob"))  # revealed: Unknown
+reveal_type(person._replace(name="Bob"))  # revealed: Person
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -296,8 +293,7 @@ class Box(NamedTuple, Generic[T]):
 class IntBox(Box[int]):
     pass
 
-# TODO: should be `IntBox` once we support the implicit type of `self`
-reveal_type(IntBox(1)._replace(content=42))  # revealed: Unknown
+reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```
 
 ## `collections.namedtuple`
@@ -332,9 +328,8 @@ reveal_type(typing.NamedTuple.__name__)  # revealed: str
 reveal_type(typing.NamedTuple.__qualname__)  # revealed: str
 reveal_type(typing.NamedTuple.__kwdefaults__)  # revealed: dict[str, Any] | None
 
-# TODO: this should cause us to emit a diagnostic and reveal `Unknown` (function objects don't have an `__mro__` attribute),
-# but the fact that we don't isn't actually a `NamedTuple` bug (https://github.com/astral-sh/ty/issues/986)
-reveal_type(typing.NamedTuple.__mro__)  # revealed: tuple[<class 'FunctionType'>, <class 'object'>]
+# error: [unresolved-attribute]
+reveal_type(typing.NamedTuple.__mro__)  # revealed: Unknown
 ```
 
 By the normal rules, `NamedTuple` and `type[NamedTuple]` should not be valid in type expressions --
@@ -411,4 +406,227 @@ class Vec2(NamedTuple):
     def __getattr__(self, attrs: str): ...
 
 Vec2(0.0, 0.0)
+```
+
+## `super()` is not supported in NamedTuple methods
+
+Using `super()` in a method of a `NamedTuple` class will raise an exception at runtime. In Python
+3.14+, a `TypeError` is raised; in earlier versions, a confusing `RuntimeError` about
+`__classcell__` is raised.
+
+```py
+from typing import NamedTuple
+
+class F(NamedTuple):
+    x: int
+
+    def method(self):
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        super()
+
+    def method_with_args(self):
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        super(F, self)
+
+    def method_with_different_pivot(self):
+        # Even passing a different pivot class fails.
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        super(tuple, self)
+
+    @classmethod
+    def class_method(cls):
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        super()
+
+    @staticmethod
+    def static_method():
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        super()
+
+    @property
+    def prop(self):
+        # error: [super-call-in-named-tuple-method] "Cannot use `super()` in a method of NamedTuple class `F`"
+        return super()
+```
+
+However, classes that **inherit from** a `NamedTuple` class (but don't directly inherit from
+`NamedTuple`) can use `super()` normally:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    x: int
+
+class Child(Base):
+    def method(self):
+        super()
+```
+
+And regular classes that don't inherit from `NamedTuple` at all can use `super()` as normal:
+
+```py
+class Regular:
+    def method(self):
+        super()  # fine
+```
+
+Using `super()` on a `NamedTuple` class also works fine if it occurs outside the class:
+
+```py
+from typing import NamedTuple
+
+class F(NamedTuple):
+    x: int
+
+super(F, F(42))  # fine
+```
+
+## NamedTuples cannot have field names starting with underscores
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import NamedTuple
+
+class Foo(NamedTuple):
+    # error: [invalid-named-tuple] "NamedTuple field `_bar` cannot start with an underscore"
+    _bar: int
+
+class Bar(NamedTuple):
+    x: int
+
+class Baz(Bar):
+    _whatever: str  # `Baz` is not a NamedTuple class, so this is fine
+```
+
+## Prohibited NamedTuple attributes
+
+`NamedTuple` classes have certain synthesized attributes that cannot be overwritten. Attempting to
+assign to these attributes (without type annotations) will raise an `AttributeError` at runtime.
+
+```py
+from typing import NamedTuple
+
+class F(NamedTuple):
+    x: int
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+    _asdict = 42
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_make`"
+    _make = "foo"
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_replace`"
+    _replace = lambda self: self
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_fields`"
+    _fields = ()
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_field_defaults`"
+    _field_defaults = {}
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__new__`"
+    __new__ = None
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__init__`"
+    __init__ = None
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `__getnewargs__`"
+    __getnewargs__ = None
+```
+
+However, other attributes (including those starting with underscores) can be assigned without error:
+
+```py
+from typing import NamedTuple
+
+class G(NamedTuple):
+    x: int
+
+    # These are fine (not prohibited attributes)
+    _custom = 42
+    __custom__ = "ok"
+    regular_attr = "value"
+```
+
+Note that type-annotated attributes become NamedTuple fields, not attribute overrides. They are not
+flagged as prohibited attribute overrides (though field names starting with `_` are caught by the
+underscore field name check):
+
+```py
+from typing import NamedTuple
+
+class H(NamedTuple):
+    x: int
+    # This is a field declaration, not an override. It's not flagged as an override,
+    # but is flagged because field names cannot start with underscores.
+    # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+    _asdict: int = 0
+```
+
+The check also applies to assignments within conditional blocks:
+
+```py
+from typing import NamedTuple
+
+class I(NamedTuple):
+    x: int
+
+    if True:
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        _asdict = 42
+```
+
+Method definitions with prohibited names are also flagged:
+
+```py
+from typing import NamedTuple
+
+class J(NamedTuple):
+    x: int
+
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+    def _asdict(self):
+        return {}
+
+    @classmethod
+    # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_make`"
+    def _make(cls, iterable):
+        return cls(*iterable)
+```
+
+Classes that inherit from a `NamedTuple` class (but don't directly inherit from `NamedTuple`) are
+not subject to these restrictions:
+
+```py
+from typing import NamedTuple
+
+class Base(NamedTuple):
+    x: int
+
+class Child(Base):
+    # This is fine - Child is not directly a NamedTuple
+    _asdict = 42
+```
+
+## Edge case: multiple reachable definitions with distinct issues
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import NamedTuple
+
+def coinflip() -> bool:
+    return True
+
+class Foo(NamedTuple):
+    if coinflip():
+        _asdict: bool  # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+    else:
+        # TODO: there should only be one diagnostic here...
+        #
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        _asdict = True
 ```

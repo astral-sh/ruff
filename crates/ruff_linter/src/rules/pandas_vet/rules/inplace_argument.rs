@@ -1,8 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::is_const_true;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::{Tokens, parenthesized_range};
 use ruff_python_ast::{self as ast, Keyword, Stmt};
-use ruff_python_trivia::CommentRanges;
 use ruff_text_size::Ranged;
 
 use crate::Locator;
@@ -36,6 +35,7 @@ use ruff_python_semantic::Modules;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas `inplace=True`_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.188")]
 pub(crate) struct PandasUseOfInplaceArgument;
 
 impl Violation for PandasUseOfInplaceArgument {
@@ -90,7 +90,7 @@ pub(crate) fn inplace_argument(checker: &Checker, call: &ast::ExprCall) {
                         call,
                         keyword,
                         statement,
-                        checker.comment_ranges(),
+                        checker.tokens(),
                         checker.locator(),
                     ) {
                         diagnostic.set_fix(fix);
@@ -110,21 +110,16 @@ fn convert_inplace_argument_to_assignment(
     call: &ast::ExprCall,
     keyword: &Keyword,
     statement: &Stmt,
-    comment_ranges: &CommentRanges,
+    tokens: &Tokens,
     locator: &Locator,
 ) -> Option<Fix> {
     // Add the assignment.
     let attr = call.func.as_attribute_expr()?;
     let insert_assignment = Edit::insertion(
         format!("{name} = ", name = locator.slice(attr.value.range())),
-        parenthesized_range(
-            call.into(),
-            statement.into(),
-            comment_ranges,
-            locator.contents(),
-        )
-        .unwrap_or(call.range())
-        .start(),
+        parenthesized_range(call.into(), statement.into(), tokens)
+            .unwrap_or(call.range())
+            .start(),
     );
 
     // Remove the `inplace` argument.
@@ -133,7 +128,7 @@ fn convert_inplace_argument_to_assignment(
         &call.arguments,
         Parentheses::Preserve,
         locator.contents(),
-        comment_ranges,
+        tokens,
     )
     .ok()?;
 

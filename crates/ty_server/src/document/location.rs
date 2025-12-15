@@ -1,12 +1,10 @@
-use crate::PositionEncoding;
-use crate::document::{FileRangeExt, ToRangeExt};
-use crate::system::file_to_url;
 use lsp_types::Location;
 use ruff_db::files::FileRange;
-use ruff_db::source::{line_index, source_text};
-use ruff_text_size::Ranged;
 use ty_ide::{NavigationTarget, ReferenceTarget};
-use ty_project::Db;
+
+use crate::Db;
+use crate::PositionEncoding;
+use crate::document::{FileRangeExt, ToRangeExt};
 
 pub(crate) trait ToLink {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location>;
@@ -21,7 +19,9 @@ pub(crate) trait ToLink {
 
 impl ToLink for NavigationTarget {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
-        FileRange::new(self.file(), self.focus_range()).to_location(db, encoding)
+        FileRange::new(self.file(), self.focus_range())
+            .to_lsp_range(db, encoding)?
+            .to_location()
     }
 
     fn to_link(
@@ -31,22 +31,24 @@ impl ToLink for NavigationTarget {
         encoding: PositionEncoding,
     ) -> Option<lsp_types::LocationLink> {
         let file = self.file();
-        let uri = file_to_url(db, file)?;
-        let source = source_text(db, file);
-        let index = line_index(db, file);
 
-        let target_range = self.full_range().to_lsp_range(&source, &index, encoding);
-        let selection_range = self.focus_range().to_lsp_range(&source, &index, encoding);
+        // Get target_range and URI together to ensure they're consistent (same cell for notebooks)
+        let target_location = self
+            .full_range()
+            .to_lsp_range(db, file, encoding)?
+            .into_location()?;
+        let target_range = target_location.range;
 
-        let src = src.map(|src| {
-            let source = source_text(db, src.file());
-            let index = line_index(db, src.file());
+        // For selection_range, we can use as_local_range since we know it's in the same document/cell
+        let selection_range = self
+            .focus_range()
+            .to_lsp_range(db, file, encoding)?
+            .local_range();
 
-            src.range().to_lsp_range(&source, &index, encoding)
-        });
+        let src = src.and_then(|src| Some(src.to_lsp_range(db, encoding)?.local_range()));
 
         Some(lsp_types::LocationLink {
-            target_uri: uri,
+            target_uri: target_location.uri,
             target_range,
             target_selection_range: selection_range,
             origin_selection_range: src,
@@ -56,7 +58,9 @@ impl ToLink for NavigationTarget {
 
 impl ToLink for ReferenceTarget {
     fn to_location(&self, db: &dyn Db, encoding: PositionEncoding) -> Option<Location> {
-        self.file_range().to_location(db, encoding)
+        self.file_range()
+            .to_lsp_range(db, encoding)?
+            .into_location()
     }
 
     fn to_link(
@@ -65,22 +69,18 @@ impl ToLink for ReferenceTarget {
         src: Option<FileRange>,
         encoding: PositionEncoding,
     ) -> Option<lsp_types::LocationLink> {
-        let uri = file_to_url(db, self.file())?;
-        let source = source_text(db, self.file());
-        let index = line_index(db, self.file());
-
-        let target_range = self.range().to_lsp_range(&source, &index, encoding);
+        // Get target_range and URI together to ensure they're consistent (same cell for notebooks)
+        let target_location = self
+            .range()
+            .to_lsp_range(db, self.file(), encoding)?
+            .into_location()?;
+        let target_range = target_location.range;
         let selection_range = target_range;
 
-        let src = src.map(|src| {
-            let source = source_text(db, src.file());
-            let index = line_index(db, src.file());
-
-            src.range().to_lsp_range(&source, &index, encoding)
-        });
+        let src = src.and_then(|src| Some(src.to_lsp_range(db, encoding)?.local_range()));
 
         Some(lsp_types::LocationLink {
-            target_uri: uri,
+            target_uri: target_location.uri,
             target_range,
             target_selection_range: selection_range,
             origin_selection_range: src,

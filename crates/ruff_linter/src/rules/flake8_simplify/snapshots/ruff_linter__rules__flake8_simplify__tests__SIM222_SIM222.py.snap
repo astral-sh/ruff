@@ -1062,3 +1062,105 @@ help: Replace with `"bar"`
 170 | 
 171 | 
 note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `f"{b''}"` instead of `f"{b''}" or ...`
+   --> SIM222.py:202:7
+    |
+201 | # https://github.com/astral-sh/ruff/issues/20703
+202 | print(f"{b''}" or "bar")  # SIM222
+    |       ^^^^^^^^^^^^^^^^^
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+    |
+help: Replace with `f"{b''}"`
+199 | def f(a: "'b' or 'c'"): ...
+200 | 
+201 | # https://github.com/astral-sh/ruff/issues/20703
+    - print(f"{b''}" or "bar")  # SIM222
+202 + print(f"{b''}")  # SIM222
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+205 | (lambda: 1) or True  # SIM222
+note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `f"{x=}"` instead of `f"{x=}" or ...`
+   --> SIM222.py:204:7
+    |
+202 | print(f"{b''}" or "bar")  # SIM222
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+    |       ^^^^^^^^^^^^^^^^
+205 | (lambda: 1) or True  # SIM222
+206 | (i for i in range(1)) or "bar"  # SIM222
+    |
+help: Replace with `f"{x=}"`
+201 | # https://github.com/astral-sh/ruff/issues/20703
+202 | print(f"{b''}" or "bar")  # SIM222
+203 | x = 1
+    - print(f"{x=}" or "bar")  # SIM222
+204 + print(f"{x=}")  # SIM222
+205 | (lambda: 1) or True  # SIM222
+206 | (i for i in range(1)) or "bar"  # SIM222
+207 | 
+note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `lambda: 1` instead of `lambda: 1 or ...`
+   --> SIM222.py:205:1
+    |
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+205 | (lambda: 1) or True  # SIM222
+    | ^^^^^^^^^^^^^^^^^^^
+206 | (i for i in range(1)) or "bar"  # SIM222
+    |
+help: Replace with `lambda: 1`
+202 | print(f"{b''}" or "bar")  # SIM222
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+    - (lambda: 1) or True  # SIM222
+205 + lambda: 1  # SIM222
+206 | (i for i in range(1)) or "bar"  # SIM222
+207 | 
+208 | # https://github.com/astral-sh/ruff/issues/21136
+note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `(i for i in range(1))` instead of `(i for i in range(1)) or ...`
+   --> SIM222.py:206:1
+    |
+204 | print(f"{x=}" or "bar")  # SIM222
+205 | (lambda: 1) or True  # SIM222
+206 | (i for i in range(1)) or "bar"  # SIM222
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+207 |
+208 | # https://github.com/astral-sh/ruff/issues/21136
+    |
+help: Replace with `(i for i in range(1))`
+203 | x = 1
+204 | print(f"{x=}" or "bar")  # SIM222
+205 | (lambda: 1) or True  # SIM222
+    - (i for i in range(1)) or "bar"  # SIM222
+206 + (i for i in range(1))  # SIM222
+207 | 
+208 | # https://github.com/astral-sh/ruff/issues/21136
+209 | def get_items():
+note: This is an unsafe fix and may change runtime behavior
+
+SIM222 [*] Use `True` instead of `... or True`
+   --> SIM222.py:222:1
+    |
+221 | # https://github.com/astral-sh/ruff/issues/21473
+222 | tuple("") or True  # SIM222
+    | ^^^^^^^^^^^^^^^^^
+223 | tuple(t"") or True  # OK
+224 | tuple(0) or True  # OK
+    |
+help: Replace with `True`
+219 | 
+220 | 
+221 | # https://github.com/astral-sh/ruff/issues/21473
+    - tuple("") or True  # SIM222
+222 + True  # SIM222
+223 | tuple(t"") or True  # OK
+224 | tuple(0) or True  # OK
+225 | tuple(1) or True  # OK
+note: This is an unsafe fix and may change runtime behavior

@@ -5,6 +5,7 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_project::metadata::settings::TerminalSettings;
 use ty_static::EnvVars;
 
 use std::fmt::Write;
@@ -14,14 +15,16 @@ use anyhow::Result;
 use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
-use crate::logging::setup_tracing;
+use crate::logging::{VerbosityLevel, setup_tracing};
 use crate::printer::Printer;
 use anyhow::{Context, anyhow};
 use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -71,12 +74,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
-    let printer = Printer::default().with_verbosity(verbosity);
-
-    tracing::warn!(
-        "ty is pre-release software and not ready for production use. \
-            Expect to encounter bugs, missing features, and fatal errors.",
-    );
+    let printer = Printer::new(verbosity, args.no_progress);
 
     tracing::debug!("Version: {}", version::version());
 
@@ -133,6 +131,8 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
 
+    db.project()
+        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
     if !check_paths.is_empty() {
         db.project().set_included_paths(&mut db, check_paths);
     }
@@ -194,6 +194,12 @@ pub enum ExitStatus {
     /// Internal ty error (panic, or any other error that isn't due to the user using the
     /// program incorrectly or transient environment errors).
     InternalError = 101,
+}
+
+impl ExitStatus {
+    pub const fn is_internal_error(self) -> bool {
+        matches!(self, ExitStatus::InternalError)
+    }
 }
 
 impl Termination for ExitStatus {
@@ -283,7 +289,7 @@ impl MainLoop {
 
                         match salsa::Cancelled::catch(|| {
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish();
+                            reporter.bar.finish_and_clear();
                             reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
@@ -307,7 +313,8 @@ impl MainLoop {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
                         .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .show_fix_diff(true);
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
@@ -337,11 +344,8 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            let max_severity = result
-                                .iter()
-                                .map(Diagnostic::severity)
-                                .max()
-                                .unwrap_or(Severity::Info);
+                            let exit_status =
+                                exit_status_from_diagnostics(&result, terminal_settings);
 
                             // Only render diagnostics if they're going to be displayed, since doing
                             // so is expensive.
@@ -362,25 +366,14 @@ impl MainLoop {
                                 )?;
                             }
 
-                            if max_severity.is_fatal() {
+                            if exit_status.is_internal_error() {
                                 tracing::warn!(
                                     "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                                 );
                             }
 
                             if self.watcher.is_none() {
-                                return Ok(match max_severity {
-                                    Severity::Info => ExitStatus::Success,
-                                    Severity::Warning => {
-                                        if terminal_settings.error_on_warning {
-                                            ExitStatus::Failure
-                                        } else {
-                                            ExitStatus::Success
-                                        }
-                                    }
-                                    Severity::Error => ExitStatus::Failure,
-                                    Severity::Fatal => ExitStatus::InternalError,
-                                });
+                                return Ok(exit_status);
                             }
                         }
                     } else {
@@ -410,6 +403,40 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+}
+
+fn exit_status_from_diagnostics(
+    diagnostics: &[Diagnostic],
+    terminal_settings: &TerminalSettings,
+) -> ExitStatus {
+    if diagnostics.is_empty() {
+        return ExitStatus::Success;
+    }
+
+    let mut max_severity = Severity::Info;
+    let mut io_error = false;
+
+    for diagnostic in diagnostics {
+        max_severity = max_severity.max(diagnostic.severity());
+        io_error = io_error || matches!(diagnostic.id(), DiagnosticId::Io);
+    }
+
+    if !max_severity.is_fatal() && io_error {
+        return ExitStatus::Error;
+    }
+
+    match max_severity {
+        Severity::Info => ExitStatus::Success,
+        Severity::Warning => {
+            if terminal_settings.error_on_warning {
+                ExitStatus::Failure
+            } else {
+                ExitStatus::Success
+            }
+        }
+        Severity::Error => ExitStatus::Failure,
+        Severity::Fatal => ExitStatus::InternalError,
     }
 }
 
@@ -453,12 +480,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
         self.bar.inc(1);
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.collector.report_diagnostics(db, diagnostics);
     }
 }

@@ -12,6 +12,7 @@ license.workspace = true
 
 [dependencies]
 ruff_db = { workspace = true, features = ["os", "testing"] }
+ruff_diagnostics = { workspace = true }
 ruff_index = { workspace = true }
 ruff_notebook = { workspace = true }
 ruff_python_trivia = { workspace = true }
@@ -23,11 +24,12 @@ ty_static = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
-bitflags = { workspace = true }
 camino = { workspace = true }
+dunce = { workspace = true }
 colored = { workspace = true }
 insta = { workspace = true, features = ["filters"] }
 memchr = { workspace = true }
+path-slash = { workspace = true }
 regex = { workspace = true }
 rustc-hash = { workspace = true }
 rustc-stable-hash = { workspace = true }

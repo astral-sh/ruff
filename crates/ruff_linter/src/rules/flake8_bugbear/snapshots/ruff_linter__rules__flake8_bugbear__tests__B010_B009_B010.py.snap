@@ -118,3 +118,19 @@ help: Replace `setattr` with assignment
 56 | 
 57 | # Regression test for: https://github.com/astral-sh/ruff/issues/7455#issuecomment-1722458885
 58 | assert getattr(func, '_rpc')is True
+
+B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+  --> B009_B010.py:81:1
+   |
+79 | # Example: the long s character "ſ" normalizes to "s" under NFKC.
+80 | getattr(foo, "ſ")
+81 | setattr(foo, "ſ", 1)
+   | ^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace `setattr` with assignment
+78 | # `ns.ſ` would be interpreted as `ns.s` at runtime, changing behavior.
+79 | # Example: the long s character "ſ" normalizes to "s" under NFKC.
+80 | getattr(foo, "ſ")
+   - setattr(foo, "ſ", 1)
+81 + foo.ſ = 1
+note: This is an unsafe fix and may change runtime behavior

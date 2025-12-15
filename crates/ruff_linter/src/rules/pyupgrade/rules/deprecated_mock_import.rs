@@ -49,6 +49,7 @@ pub(crate) enum MockReference {
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.206")]
 pub(crate) struct DeprecatedMockImport {
     reference_type: MockReference,
 }
@@ -265,6 +266,7 @@ pub(crate) fn deprecated_mock_attribute(checker: &Checker, attribute: &ast::Expr
             },
             attribute.value.range(),
         );
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
         diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
             "mock".to_string(),
             attribute.value.range(),
@@ -313,6 +315,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                             },
                             name.range(),
                         );
+                        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
                         if let Some(content) = content.as_ref() {
                             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
                                 content.clone(),
@@ -351,6 +354,7 @@ pub(crate) fn deprecated_mock_import(checker: &Checker, stmt: &Stmt) {
                     },
                     stmt.range(),
                 );
+                diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Deprecated);
                 if let Some(indent) = indentation(checker.source(), stmt) {
                     diagnostic.try_set_fix(|| {
                         format_import_from(stmt, indent, checker.locator(), checker.stylist())

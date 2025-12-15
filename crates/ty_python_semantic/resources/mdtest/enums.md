@@ -15,10 +15,8 @@ reveal_type(Color.RED)  # revealed: Literal[Color.RED]
 reveal_type(Color.RED.name)  # revealed: Literal["RED"]
 reveal_type(Color.RED.value)  # revealed: Literal[1]
 
-# TODO: Should be `Color` or `Literal[Color.RED]`
-reveal_type(Color["RED"])  # revealed: Unknown
-
 # TODO: Could be `Literal[Color.RED]` to be more precise
+reveal_type(Color["RED"])  # revealed: Color
 reveal_type(Color(1))  # revealed: Color
 
 reveal_type(Color.RED in Color)  # revealed: bool
@@ -265,6 +263,41 @@ reveal_type(enum_members(Color))
 reveal_type(Color.red)
 ```
 
+Multiple aliases to the same member are also supported. This is a regression test for
+<https://github.com/astral-sh/ty/issues/1293>:
+
+```py
+from ty_extensions import enum_members
+
+class ManyAliases(Enum):
+    real_member = "real_member"
+    alias1 = "real_member"
+    alias2 = "real_member"
+    alias3 = "real_member"
+
+    other_member = "other_real_member"
+
+# revealed: tuple[Literal["real_member"], Literal["other_member"]]
+reveal_type(enum_members(ManyAliases))
+
+reveal_type(ManyAliases.real_member)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias1)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias2)  # revealed: Literal[ManyAliases.real_member]
+reveal_type(ManyAliases.alias3)  # revealed: Literal[ManyAliases.real_member]
+
+reveal_type(ManyAliases.real_member.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.real_member.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias1.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias1.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias2.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias2.name)  # revealed: Literal["real_member"]
+
+reveal_type(ManyAliases.alias3.value)  # revealed: Literal["real_member"]
+reveal_type(ManyAliases.alias3.name)  # revealed: Literal["real_member"]
+```
+
 ### Using `auto()`
 
 ```toml
@@ -285,6 +318,11 @@ reveal_type(enum_members(Answer))
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
+
+class SingleMember(Enum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal[1]
 ```
 
 Usages of `auto()` can be combined with manual value assignments:
@@ -313,6 +351,11 @@ class Answer(StrEnum):
 
 reveal_type(Answer.YES.value)  # revealed: Literal["yes"]
 reveal_type(Answer.NO.value)  # revealed: Literal["no"]
+
+class SingleMember(StrEnum):
+    SINGLE = auto()
+
+reveal_type(SingleMember.SINGLE.value)  # revealed: Literal["single"]
 ```
 
 Using `auto()` with `IntEnum` also works as expected:
@@ -326,6 +369,52 @@ class Answer(IntEnum):
 
 reveal_type(Answer.YES.value)  # revealed: Literal[1]
 reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+As does using `auto()` for other enums that use `int` as a mixin:
+
+```py
+from enum import Enum, auto
+
+class Answer(int, Enum):
+    YES = auto()
+    NO = auto()
+
+reveal_type(Answer.YES.value)  # revealed: Literal[1]
+reveal_type(Answer.NO.value)  # revealed: Literal[2]
+```
+
+It's [hard to predict](https://github.com/astral-sh/ruff/pull/20541#discussion_r2381878613) what the
+effect of using `auto()` will be for an arbitrary non-integer mixin, so for anything that isn't a
+`StrEnum` and has a non-`int` mixin, we simply fallback to typeshed's annotation of `Any` for the
+`value` property:
+
+```python
+from enum import Enum, auto
+
+class A(str, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(A.X.value)  # revealed: Any
+
+class B(bytes, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(B.X.value)  # revealed: Any
+
+class C(tuple, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(C.X.value)  # revealed: Any
+
+class D(float, Enum):
+    X = auto()
+    Y = auto()
+
+reveal_type(D.X.value)  # revealed: Any
 ```
 
 Combining aliases with `auto()`:
@@ -810,7 +899,7 @@ def color_name_misses_one_variant(color: Color) -> str:
     elif color is Color.GREEN:
         return "Green"
     else:
-        assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+        assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1
@@ -865,7 +954,7 @@ def color_name_misses_one_variant(color: Color) -> str:
         case Color.GREEN:
             return "Green"
         case _:
-            assert_never(color)  # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+            assert_never(color)  # error: [type-assertion-failure] "Type `Literal[Color.BLUE]` is not equivalent to `Never`"
 
 class Singleton(Enum):
     VALUE = 1

@@ -38,16 +38,24 @@ impl<'a, 'src> StringNormalizer<'a, 'src> {
     /// it can't because the string contains the preferred quotes OR
     /// it leads to more escaping.
     ///
-    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`,
-    /// make sure to also add them to [`FormatImplicitConcatenatedStringFlat::new`].
+    /// Note: If you add more cases here where we return `QuoteStyle::Preserve`, make sure to also
+    /// add them to
+    /// [`FormatImplicitConcatenatedStringFlat::new`](crate::string::implicit::FormatImplicitConcatenatedStringFlat::new).
     pub(super) fn preferred_quote_style(&self, string: StringLikePart) -> QuoteStyle {
         let preferred_quote_style = self
             .preferred_quote_style
             .unwrap_or(self.context.options().quote_style());
         let supports_pep_701 = self.context.options().target_version().supports_pep_701();
 
+        // Preserve the existing quote style for nested interpolations more than one layer deep, if
+        // PEP 701 isn't supported.
+        if !supports_pep_701 && self.context.interpolated_string_state().is_nested() {
+            return QuoteStyle::Preserve;
+        }
+
         // For f-strings and t-strings prefer alternating the quotes unless The outer string is triple quoted and the inner isn't.
-        if let InterpolatedStringState::InsideInterpolatedElement(parent_context) =
+        if let InterpolatedStringState::InsideInterpolatedElement(parent_context)
+        | InterpolatedStringState::NestedInterpolatedElement(parent_context) =
             self.context.interpolated_string_state()
         {
             let parent_flags = parent_context.flags();

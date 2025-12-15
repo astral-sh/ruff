@@ -28,8 +28,8 @@ Module(
                             node_index: NodeIndex(None),
                             pattern: MatchAs(
                                 PatternMatchAs {
-                                    range: 18..27,
                                     node_index: NodeIndex(None),
+                                    range: 18..27,
                                     pattern: None,
                                     name: Some(
                                         Identifier {

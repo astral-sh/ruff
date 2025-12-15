@@ -69,7 +69,7 @@ if sys.version_info >= (3, 13):
 
 _T1 = TypeVar("_T1")
 _T2 = TypeVar("_T2")
-_KT = TypeVar("_KT")
+_KT_co = TypeVar("_KT_co", covariant=True)
 _VT_co = TypeVar("_VT_co", covariant=True)
 
 # Make sure this class definition stays roughly in line with `builtins.function`
@@ -337,51 +337,51 @@ class CodeType:
         __replace__ = replace
 
 @final
-class MappingProxyType(Mapping[_KT, _VT_co]):
+class MappingProxyType(Mapping[_KT_co, _VT_co]):  # type: ignore[type-var]  # pyright: ignore[reportInvalidTypeArguments]
     """Read-only proxy of a mapping."""
 
     __hash__: ClassVar[None]  # type: ignore[assignment]
-    def __new__(cls, mapping: SupportsKeysAndGetItem[_KT, _VT_co]) -> Self: ...
-    def __getitem__(self, key: _KT, /) -> _VT_co:
+    def __new__(cls, mapping: SupportsKeysAndGetItem[_KT_co, _VT_co]) -> Self: ...
+    def __getitem__(self, key: _KT_co, /) -> _VT_co:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues]
         """Return self[key]."""
 
-    def __iter__(self) -> Iterator[_KT]:
+    def __iter__(self) -> Iterator[_KT_co]:
         """Implement iter(self)."""
 
     def __len__(self) -> int:
         """Return len(self)."""
 
     def __eq__(self, value: object, /) -> bool: ...
-    def copy(self) -> dict[_KT, _VT_co]:
+    def copy(self) -> dict[_KT_co, _VT_co]:
         """D.copy() -> a shallow copy of D"""
 
-    def keys(self) -> KeysView[_KT]:
+    def keys(self) -> KeysView[_KT_co]:
         """D.keys() -> a set-like object providing a view on D's keys"""
 
     def values(self) -> ValuesView[_VT_co]:
         """D.values() -> an object providing a view on D's values"""
 
-    def items(self) -> ItemsView[_KT, _VT_co]:
+    def items(self) -> ItemsView[_KT_co, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
 
     @overload
-    def get(self, key: _KT, /) -> _VT_co | None:
+    def get(self, key: _KT_co, /) -> _VT_co | None:  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
         """Return the value for key if key is in the mapping, else default."""
 
     @overload
-    def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: _KT_co, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
-    def get(self, key: _KT, default: _T2, /) -> _VT_co | _T2: ...
+    def get(self, key: _KT_co, default: _T2, /) -> _VT_co | _T2: ...  # type: ignore[misc]  # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
-    def __reversed__(self) -> Iterator[_KT]:
+    def __reversed__(self) -> Iterator[_KT_co]:
         """D.__reversed__() -> reverse iterator"""
 
-    def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
+    def __or__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
         """Return self|value."""
 
-    def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT | _T1, _VT_co | _T2]:
+    def __ror__(self, value: Mapping[_T1, _T2], /) -> dict[_KT_co | _T1, _VT_co | _T2]:
         """Return value|self."""
 
 if sys.version_info >= (3, 12):
@@ -467,8 +467,8 @@ class CellType:
     cell_contents: Any
 
 _YieldT_co = TypeVar("_YieldT_co", covariant=True)
-_SendT_contra = TypeVar("_SendT_contra", contravariant=True)
-_ReturnT_co = TypeVar("_ReturnT_co", covariant=True)
+_SendT_contra = TypeVar("_SendT_contra", contravariant=True, default=None)
+_ReturnT_co = TypeVar("_ReturnT_co", covariant=True, default=None)
 
 @final
 class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
@@ -561,8 +561,12 @@ class AsyncGeneratorType(AsyncGenerator[_YieldT_co, _SendT_contra]):
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
         """See PEP 585"""
 
+# Non-default variations to accommodate coroutines
+_SendT_nd_contra = TypeVar("_SendT_nd_contra", contravariant=True)
+_ReturnT_nd_co = TypeVar("_ReturnT_nd_co", covariant=True)
+
 @final
-class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
+class CoroutineType(Coroutine[_YieldT_co, _SendT_nd_contra, _ReturnT_nd_co]):
     __name__: str
     __qualname__: str
     @property
@@ -571,8 +575,13 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
 
     @property
     def cr_code(self) -> CodeType: ...
-    @property
-    def cr_frame(self) -> FrameType: ...
+    if sys.version_info >= (3, 12):
+        @property
+        def cr_frame(self) -> FrameType | None: ...
+    else:
+        @property
+        def cr_frame(self) -> FrameType: ...
+
     @property
     def cr_running(self) -> bool: ...
     @property
@@ -584,10 +593,10 @@ class CoroutineType(Coroutine[_YieldT_co, _SendT_contra, _ReturnT_co]):
     def close(self) -> None:
         """close() -> raise GeneratorExit inside coroutine."""
 
-    def __await__(self) -> Generator[Any, None, _ReturnT_co]:
+    def __await__(self) -> Generator[Any, None, _ReturnT_nd_co]:
         """Return an iterator to be used in await expression."""
 
-    def send(self, arg: _SendT_contra, /) -> _YieldT_co:
+    def send(self, arg: _SendT_nd_contra, /) -> _YieldT_co:
         """send(arg) -> send 'arg' into coroutine,
         return next iterated value or raise StopIteration.
         """
@@ -948,9 +957,10 @@ if sys.version_info >= (3, 10):
     class EllipsisType:
         """The type of the Ellipsis singleton."""
 
-    from builtins import _NotImplementedType
+    @final
+    class NotImplementedType(Any):
+        """The type of the NotImplemented singleton."""
 
-    NotImplementedType = _NotImplementedType
     @final
     class UnionType:
         """Represent a union type
@@ -963,15 +973,24 @@ if sys.version_info >= (3, 10):
         @property
         def __parameters__(self) -> tuple[Any, ...]:
             """Type variables in the types.UnionType."""
-
-        def __or__(self, value: Any, /) -> UnionType:
+        # `(int | str) | Literal["foo"]` returns a generic alias to an instance of `_SpecialForm` (`Union`).
+        # Normally we'd express this using the return type of `_SpecialForm.__ror__`,
+        # but because `UnionType.__or__` accepts `Any`, type checkers will use
+        # the return type of `UnionType.__or__` to infer the result of this operation
+        # rather than `_SpecialForm.__ror__`. To mitigate this, we use `| Any`
+        # in the return type of `UnionType.__(r)or__`.
+        def __or__(self, value: Any, /) -> UnionType | Any:
             """Return self|value."""
 
-        def __ror__(self, value: Any, /) -> UnionType:
+        def __ror__(self, value: Any, /) -> UnionType | Any:
             """Return value|self."""
 
         def __eq__(self, value: object, /) -> bool: ...
         def __hash__(self) -> int: ...
+        # you can only subscript a `UnionType` instance if at least one of the elements
+        # in the union is a generic alias instance that has a non-empty `__parameters__`
+        def __getitem__(self, parameters: Any) -> object:
+            """Return self[key]."""
 
 if sys.version_info >= (3, 13):
     @final

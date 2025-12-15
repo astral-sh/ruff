@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: The `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct AssertTuple;
 
 impl Violation for AssertTuple {

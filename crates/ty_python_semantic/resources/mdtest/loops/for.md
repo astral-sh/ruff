@@ -108,8 +108,6 @@ reveal_type(x)
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class NotIterable:
         if flag:
@@ -228,13 +226,63 @@ def _(flag: bool):
         reveal_type(x)  # revealed: Result1A | Result1B | Result2A | Result2B | Result3 | Result4
 ```
 
+## Union type as iterable where `Iterator[]` is used as the return type of `__iter__`
+
+This test differs from the above tests in that `Iterator` (an abstract type) is used as the return
+annotation of the `__iter__` methods, rather than a concrete type being used as the return
+annotation.
+
+```py
+from typing import Iterator, Literal
+
+class IntIterator:
+    def __iter__(self) -> Iterator[int]:
+        return iter(range(42))
+
+class StrIterator:
+    def __iter__(self) -> Iterator[str]:
+        return iter("foo")
+
+def f(x: IntIterator | StrIterator):
+    for a in x:
+        reveal_type(a)  # revealed: int | str
+```
+
+Most real-world iterable types use `Iterator` as the return annotation of their `__iter__` methods:
+
+```py
+def g(
+    a: tuple[int, ...] | tuple[str, ...],
+    b: list[str] | list[int],
+    c: Literal["foo", b"bar"],
+):
+    for x in a:
+        reveal_type(x)  # revealed: int | str
+    for y in b:
+        reveal_type(y)  # revealed: str | int
+```
+
+## Union type as iterable where some elements in the union have precise tuple specs
+
+If all elements in a union can be iterated over, we "union together" their "tuple specs" and are
+able to infer the iterable element precisely when iterating over the union, in the same way that we
+infer a precise type for the iterable element when iterating over a `Literal` string or bytes type:
+
+```py
+from typing import Literal
+
+def f(x: Literal["foo", b"bar"], y: Literal["foo"] | range):
+    for item in x:
+        reveal_type(item)  # revealed: Literal["f", "o", 98, 97, 114]
+    for item in y:
+        reveal_type(item)  # revealed: Literal["f", "o"] | int
+```
+
 ## Union type as iterable where one union element has no `__iter__` method
 
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -254,8 +302,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class TestIter:
     def __next__(self) -> int:
         return 42
@@ -332,8 +378,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -352,8 +396,6 @@ for x in Iterable():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     def __iter__(self) -> int:
         return 42
@@ -386,8 +428,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator1:
     def __next__(self, extra_arg) -> int:
         return 42
@@ -417,8 +457,6 @@ for y in Iterable2():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator:
         def __next__(self) -> int:
@@ -471,8 +509,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -496,8 +532,6 @@ def _(flag1: bool, flag2: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Bad:
     __getitem__: None = None
 
@@ -511,8 +545,6 @@ for x in Bad():
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class CustomCallable:
         if flag:
@@ -547,8 +579,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterable:
     # invalid because it will implicitly be passed an `int`
     # by the interpreter
@@ -588,8 +618,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> int:
         return 42
@@ -625,8 +653,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterator1:
         if flag:
@@ -666,8 +692,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 def _(flag: bool):
     class Iterable1:
         if flag:
@@ -699,8 +723,6 @@ def _(flag: bool):
 <!-- snapshot-diagnostics -->
 
 ```py
-from typing_extensions import reveal_type
-
 class Iterator:
     def __next__(self) -> bytes:
         return b"foo"
@@ -776,11 +798,11 @@ A class literal can be iterated over if it has `Any` or `Unknown` in its MRO, si
 ```py
 from unresolved_module import SomethingUnknown  # error: [unresolved-import]
 from typing import Any, Iterable
-from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown
+from ty_extensions import static_assert, is_assignable_to, TypeOf, Unknown, reveal_mro
 
 class Foo(SomethingUnknown): ...
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 
 # TODO: these should pass
 static_assert(is_assignable_to(TypeOf[Foo], Iterable[Unknown]))  # error: [static-assert-error]
@@ -793,7 +815,7 @@ for x in Foo:
 
 class Bar(Any): ...
 
-reveal_type(Bar.__mro__)  # revealed: tuple[<class 'Bar'>, Any, <class 'object'>]
+reveal_mro(Bar)  # revealed: (<class 'Bar'>, Any, <class 'object'>)
 
 # TODO: these should pass
 static_assert(is_assignable_to(TypeOf[Bar], Iterable[Any]))  # error: [static-assert-error]

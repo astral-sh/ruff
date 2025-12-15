@@ -99,7 +99,6 @@ help: Replace with `Fraction` constructor
 12 | _ = Fraction.from_decimal(Decimal("-4.2"))
 13 | _ = Fraction.from_decimal(Decimal.from_float(4.2))
 14 | _ = Decimal.from_float(0.1)
-note: This is an unsafe fix and may change runtime behavior
 
 FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
   --> FURB164.py:12:5
@@ -120,7 +119,6 @@ help: Replace with `Fraction` constructor
 13 | _ = Fraction.from_decimal(Decimal.from_float(4.2))
 14 | _ = Decimal.from_float(0.1)
 15 | _ = Decimal.from_float(-0.5)
-note: This is an unsafe fix and may change runtime behavior
 
 FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
   --> FURB164.py:13:5
@@ -484,7 +482,6 @@ help: Replace with `Fraction` constructor
 32 | _ = Decimal.from_float(f=4.2)
 33 | 
 34 | # Cases with invalid argument counts - should not get fixes
-note: This is an unsafe fix and may change runtime behavior
 
 FURB164 Verbose method `from_float` in `Decimal` construction
   --> FURB164.py:32:5
@@ -658,6 +655,7 @@ help: Replace with `Decimal` constructor
 64 + _ = Decimal("nan")
 65 | _ = Decimal.from_float(float("\x2dnan"))
 66 | _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
+67 | 
 
 FURB164 [*] Verbose method `from_float` in `Decimal` construction
   --> FURB164.py:65:5
@@ -675,6 +673,8 @@ help: Replace with `Decimal` constructor
    - _ = Decimal.from_float(float("\x2dnan"))
 65 + _ = Decimal("nan")
 66 | _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
+67 | 
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
 
 FURB164 [*] Verbose method `from_float` in `Decimal` construction
   --> FURB164.py:66:5
@@ -683,6 +683,8 @@ FURB164 [*] Verbose method `from_float` in `Decimal` construction
 65 | _ = Decimal.from_float(float("\x2dnan"))
 66 | _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+67 |
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
    |
 help: Replace with `Decimal` constructor
 63 | # Cases with non-finite floats - should produce safe fixes
@@ -690,3 +692,38 @@ help: Replace with `Decimal` constructor
 65 | _ = Decimal.from_float(float("\x2dnan"))
    - _ = Decimal.from_float(float("\N{HYPHEN-MINUS}nan"))
 66 + _ = Decimal("nan")
+67 | 
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
+69 | # fixes must be safe
+
+FURB164 [*] Verbose method `from_float` in `Fraction` construction
+  --> FURB164.py:70:5
+   |
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
+69 | # fixes must be safe
+70 | _ = Fraction.from_float(f=4.2)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
+71 | _ = Fraction.from_decimal(dec=4)
+   |
+help: Replace with `Fraction` constructor
+67 | 
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
+69 | # fixes must be safe
+   - _ = Fraction.from_float(f=4.2)
+70 + _ = Fraction(4.2)
+71 | _ = Fraction.from_decimal(dec=4)
+
+FURB164 [*] Verbose method `from_decimal` in `Fraction` construction
+  --> FURB164.py:71:5
+   |
+69 | # fixes must be safe
+70 | _ = Fraction.from_float(f=4.2)
+71 | _ = Fraction.from_decimal(dec=4)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+help: Replace with `Fraction` constructor
+68 | # See: https://github.com/astral-sh/ruff/issues/21257
+69 | # fixes must be safe
+70 | _ = Fraction.from_float(f=4.2)
+   - _ = Fraction.from_decimal(dec=4)
+71 + _ = Fraction(4)

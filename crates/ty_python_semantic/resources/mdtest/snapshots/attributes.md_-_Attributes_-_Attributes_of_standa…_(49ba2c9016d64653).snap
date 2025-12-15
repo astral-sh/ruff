@@ -1,0 +1,52 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attributes.md - Attributes - Attributes of standard library modules that aren't yet defined
+mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
+---
+
+# Python source files
+
+## main.py
+
+```
+1 | import datetime
+2 | 
+3 | # error: [unresolved-attribute]
+4 | reveal_type(datetime.UTC)  # revealed: Unknown
+5 | # error: [unresolved-attribute]
+6 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Module `datetime` has no member `UTC`
+ --> src/main.py:4:13
+  |
+3 | # error: [unresolved-attribute]
+4 | reveal_type(datetime.UTC)  # revealed: Unknown
+  |             ^^^^^^^^^^^^
+5 | # error: [unresolved-attribute]
+6 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
+  |
+info: The member may be available on other Python versions or platforms
+info: Python 3.10 was assumed when resolving the `UTC` attribute because it was specified on the command line
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Module `datetime` has no member `fakenotreal`
+ --> src/main.py:6:13
+  |
+4 | reveal_type(datetime.UTC)  # revealed: Unknown
+5 | # error: [unresolved-attribute]
+6 | reveal_type(datetime.fakenotreal)  # revealed: Unknown
+  |             ^^^^^^^^^^^^^^^^^^^^
+  |
+info: rule `unresolved-attribute` is enabled by default
+
+```

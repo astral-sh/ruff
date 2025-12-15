@@ -179,7 +179,22 @@ impl NeedsParentheses for ExprAttribute {
             context.comments().ranges(),
             context.source(),
         ) {
-            OptionalParentheses::Never
+            // We have to avoid creating syntax errors like
+            // ```python
+            // variable = (something) # trailing
+            // .my_attribute
+            // ```
+            // See https://github.com/astral-sh/ruff/issues/19350
+            if context
+                .comments()
+                .trailing(self.value.as_ref())
+                .iter()
+                .any(|comment| comment.line_position().is_end_of_line())
+            {
+                OptionalParentheses::Multiline
+            } else {
+                OptionalParentheses::Never
+            }
         } else {
             self.value.needs_parentheses(self.into(), context)
         }

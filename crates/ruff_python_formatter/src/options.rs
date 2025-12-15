@@ -403,15 +403,12 @@ pub enum DocstringCodeLineWidth {
 #[cfg(feature = "schemars")]
 mod schema {
     use ruff_formatter::LineWidth;
-    use schemars::r#gen::SchemaGenerator;
-    use schemars::schema::{Metadata, Schema, SubschemaValidation};
+    use schemars::{Schema, SchemaGenerator};
+    use serde_json::Value;
 
     /// A dummy type that is used to generate a schema for `DocstringCodeLineWidth::Dynamic`.
     pub(super) fn dynamic(_: &mut SchemaGenerator) -> Schema {
-        Schema::Object(schemars::schema::SchemaObject {
-            const_value: Some("dynamic".to_string().into()),
-            ..Default::default()
-        })
+        schemars::json_schema!({ "const": "dynamic" })
     }
 
     // We use a manual schema for `fixed` even thought it isn't strictly necessary according to the
@@ -422,19 +419,14 @@ mod schema {
     // `allOf`. There's no semantic difference between `allOf` and `oneOf` for single element lists.
     pub(super) fn fixed(generator: &mut SchemaGenerator) -> Schema {
         let schema = generator.subschema_for::<LineWidth>();
-        Schema::Object(schemars::schema::SchemaObject {
-            metadata: Some(Box::new(Metadata {
-                description: Some(
-                    "Wrap docstring code examples at a fixed line width.".to_string(),
-                ),
-                ..Metadata::default()
-            })),
-            subschemas: Some(Box::new(SubschemaValidation {
-                one_of: Some(vec![schema]),
-                ..SubschemaValidation::default()
-            })),
-            ..Default::default()
-        })
+        let mut schema_object = Schema::default();
+        let map = schema_object.ensure_object();
+        map.insert(
+            "description".to_string(),
+            Value::String("Wrap docstring code examples at a fixed line width.".to_string()),
+        );
+        map.insert("oneOf".to_string(), Value::Array(vec![schema.into()]));
+        schema_object
     }
 }
 

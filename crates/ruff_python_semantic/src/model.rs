@@ -3,12 +3,13 @@ use std::path::Path;
 use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 
-use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::helpers::{from_relative_import, map_subscript};
 use ruff_python_ast::name::{QualifiedName, UnqualifiedName};
 use ruff_python_ast::{self as ast, Expr, ExprContext, PySourceType, Stmt};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::Imported;
+use crate::analyze::visibility;
 use crate::binding::{
     Binding, BindingFlags, BindingId, BindingKind, Bindings, Exceptions, FromImport, Import,
     SubmoduleImport,
@@ -1684,6 +1685,48 @@ impl<'a> SemanticModel<'a> {
         left == right
     }
 
+    /// Returns `true` if any execution path to `node` passes through `dominator`.
+    ///
+    /// More precisely, it returns true if the path of branches leading
+    /// to `dominator` is a prefix of the path of branches leading to `node`.
+    ///
+    /// In this code snippet:
+    ///
+    /// ```python
+    /// if cond:
+    ///     dominator
+    ///     if other_cond:
+    ///         node
+    /// else:
+    ///     other_node
+    /// ```
+    ///
+    /// we have that `node` is dominated by `dominator` but that
+    /// `other_node` is not dominated by `dominator`.
+    ///
+    /// This implementation assumes that the statements are in the same scope.
+    pub fn dominates(&self, dominator: NodeId, node: NodeId) -> bool {
+        // Collect the branch path for the left statement.
+        let dominator = self
+            .nodes
+            .branch_id(dominator)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Collect the branch path for the right statement.
+        let node = self
+            .nodes
+            .branch_id(node)
+            .iter()
+            .flat_map(|branch_id| self.branches.ancestor_ids(*branch_id))
+            .collect::<Vec<_>>();
+
+        // Note that the paths are in "reverse" order -
+        // from most nested to least nested.
+        node.ends_with(&dominator)
+    }
+
     /// Returns `true` if the given expression is an unused variable, or consists solely of
     /// references to other unused variables. This method is conservative in that it considers a
     /// variable to be "used" if it's shadowed by another variable with usages.
@@ -2101,7 +2144,7 @@ impl<'a> SemanticModel<'a> {
     /// Finds and returns the [`Scope`] corresponding to a given [`ast::StmtFunctionDef`].
     ///
     /// This method searches all scopes created by a function definition, comparing the
-    /// [`TextRange`] of the provided `function_def` with the the range of the function
+    /// [`TextRange`] of the provided `function_def` with the range of the function
     /// associated with the scope.
     pub fn function_scope(&self, function_def: &ast::StmtFunctionDef) -> Option<&Scope<'_>> {
         self.scopes.iter().find(|scope| {
@@ -2109,6 +2152,21 @@ impl<'a> SemanticModel<'a> {
                 return false;
             };
             function.range() == function_def.range()
+        })
+    }
+
+    /// Return `true` if the model is in a `typing.Protocol` subclass or an abstract
+    /// method.
+    pub fn in_protocol_or_abstract_method(&self) -> bool {
+        self.current_scopes().any(|scope| match scope.kind {
+            ScopeKind::Class(class_def) => class_def
+                .bases()
+                .iter()
+                .any(|base| self.match_typing_expr(map_subscript(base), "Protocol")),
+            ScopeKind::Function(function_def) => {
+                visibility::is_abstract(&function_def.decorator_list, self)
+            }
+            _ => false,
         })
     }
 }

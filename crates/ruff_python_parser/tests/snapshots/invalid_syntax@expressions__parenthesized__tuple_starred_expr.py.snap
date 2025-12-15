@@ -1542,5 +1542,5 @@ Module(
 18 | *x if True else y, z, *x if True else y
 19 | *lambda x: x, z, *lambda x: x
 20 | *x := 2, z, *x := 2
-   |                ^^ Syntax Error: Expected ',', found ':='
+   |                ^^ Syntax Error: Expected `,`, found `:=`
    |

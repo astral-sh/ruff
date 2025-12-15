@@ -2,7 +2,7 @@ use anyhow::Result;
 use itertools::Itertools;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Arguments, Expr};
 use ruff_python_semantic::SemanticModel;
 use ruff_text_size::Ranged;
@@ -60,6 +60,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// [microbenchmarks]: https://github.com/astral-sh/ruff/issues/5073#issuecomment-1591836349
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.285")]
 pub(crate) struct QuadraticListSummation;
 
 impl AlwaysFixableViolation for QuadraticListSummation {
@@ -115,13 +116,8 @@ fn convert_to_reduce(iterable: &Expr, call: &ast::ExprCall, checker: &Checker) -
     )?;
 
     let iterable = checker.locator().slice(
-        parenthesized_range(
-            iterable.into(),
-            (&call.arguments).into(),
-            checker.comment_ranges(),
-            checker.locator().contents(),
-        )
-        .unwrap_or(iterable.range()),
+        parenthesized_range(iterable.into(), (&call.arguments).into(), checker.tokens())
+            .unwrap_or(iterable.range()),
     );
 
     Ok(Fix::unsafe_edits(

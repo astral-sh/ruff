@@ -32,6 +32,7 @@ use crate::{AlwaysFixableViolation, Applicability, Edit, Fix};
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct TrailingWhitespace;
 
 impl AlwaysFixableViolation for TrailingWhitespace {
@@ -69,6 +70,7 @@ impl AlwaysFixableViolation for TrailingWhitespace {
 ///
 /// [PEP 8]: https://peps.python.org/pep-0008/#other-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.253")]
 pub(crate) struct BlankLineWithWhitespace;
 
 impl AlwaysFixableViolation for BlankLineWithWhitespace {

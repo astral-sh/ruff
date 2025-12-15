@@ -34,7 +34,7 @@ class _:
 [reveal_type(a.z) for _ in range(1)]  # revealed: Literal[0]
 
 def _():
-    reveal_type(a.x)  # revealed: Unknown | int | None
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -75,7 +75,7 @@ class _:
 
     if cond():
         a = A()
-    reveal_type(a.x)  # revealed: int | None | Unknown
+    reveal_type(a.x)  # revealed: int | None
     reveal_type(a.y)  # revealed: Unknown | None
     reveal_type(a.z)  # revealed: Unknown | None
 
@@ -206,7 +206,7 @@ dd: defaultdict[int, int] = defaultdict(int)
 dd[0] = 0
 cm: ChainMap[int, int] = ChainMap({1: 1}, {0: 0})
 cm[0] = 0
-reveal_type(cm)  # revealed: ChainMap[Unknown | int, Unknown | int]
+reveal_type(cm)  # revealed: ChainMap[int, int]
 
 reveal_type(l[0])  # revealed: Literal[0]
 reveal_type(d[0])  # revealed: Literal[0]
@@ -295,10 +295,10 @@ class C:
 
 def _():
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x[0])  # revealed: Unknown | int | None
+    reveal_type(b.a.x[0])  # revealed: int | None
     # error: [possibly-missing-attribute]
-    reveal_type(b.a.x)  # revealed: Unknown | list[int | None]
-    reveal_type(b.a)  # revealed: Unknown | A | None
+    reveal_type(b.a.x)  # revealed: list[int | None]
+    reveal_type(b.a)  # revealed: A | None
 ```
 
 ## Invalid assignments are not used for narrowing
@@ -313,7 +313,7 @@ def f(c: C, s: str):
     reveal_type(c.x)  # revealed: int | None
     s = c.x  # error: [invalid-assignment]
 
-    # error: [invalid-assignment] "Method `__setitem__` of type `Overload[(key: SupportsIndex, value: int, /) -> None, (key: slice[Any, Any, Any], value: Iterable[int], /) -> None]` cannot be called with a key of type `Literal[0]` and a value of type `str` on object of type `list[int]`"
+    # error: [invalid-assignment] "Invalid subscript assignment with key of type `Literal[0]` and value of type `str` on object of type `list[int]`"
     c.l[0] = s
     reveal_type(c.l[0])  # revealed: int
 ```

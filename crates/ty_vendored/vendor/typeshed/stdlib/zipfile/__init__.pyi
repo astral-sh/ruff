@@ -483,6 +483,15 @@ class ZipInfo:
         decide based upon the file_size and compress_size, if known,
         False otherwise.
         """
+    if sys.version_info >= (3, 14):
+        def _for_archive(self, archive: ZipFile) -> Self:
+            """Resolve suitable defaults from the archive.
+
+            Resolve the date_time, compression attributes, and external attributes
+            to suitable defaults as used by :method:`ZipFile.writestr`.
+
+            Return self.
+            """
 
 if sys.version_info >= (3, 12):
     from zipfile._path import CompleteDirs as CompleteDirs, Path as Path

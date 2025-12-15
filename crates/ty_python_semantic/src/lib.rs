@@ -5,12 +5,16 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{INVALID_IGNORE_COMMENT, UNKNOWN_RULE, UNUSED_IGNORE_COMMENT};
+use crate::suppression::{
+    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_IGNORE_COMMENT,
+};
 pub use db::Db;
+pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
-    Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules, list_modules,
-    resolve_module, resolve_real_module, system_module_search_paths,
+    KnownModule, Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules,
+    list_modules, resolve_module, resolve_module_confident, resolve_real_module,
+    resolve_real_module_confident, resolve_real_shadowable_module, system_module_search_paths,
 };
 pub use program::{
     Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
@@ -22,12 +26,13 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
+pub use suppression::create_suppression_fix;
 pub use types::DisplaySettings;
 pub use types::ide_support::{
-    ImportAliasResolution, ResolvedDefinition, definitions_for_attribute,
-    definitions_for_imported_symbol, definitions_for_name, map_stub_definition,
+    ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,
+    definitions_for_imported_symbol, definitions_for_name, definitions_for_unary_op,
+    map_stub_definition,
 };
-pub use util::diagnostics::add_inferred_python_version_hint_to_diagnostic;
 
 pub mod ast_node_ref;
 mod db;
@@ -44,11 +49,12 @@ mod rank;
 pub mod semantic_index;
 mod semantic_model;
 pub(crate) mod site_packages;
+mod subscript;
 mod suppression;
 pub mod types;
 mod unpack;
-mod util;
 
+mod diagnostic;
 #[cfg(feature = "testing")]
 pub mod pull_types;
 
@@ -72,6 +78,6 @@ pub fn default_lint_registry() -> &'static LintRegistry {
 pub fn register_lints(registry: &mut LintRegistryBuilder) {
     types::register_lints(registry);
     registry.register_lint(&UNUSED_IGNORE_COMMENT);
-    registry.register_lint(&UNKNOWN_RULE);
+    registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
 }

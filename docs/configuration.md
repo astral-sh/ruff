@@ -345,12 +345,14 @@ formatting `.pyi` files, but would continue to include them in linting:
 By default, Ruff will also skip any files that are omitted via `.ignore`, `.gitignore`,
 `.git/info/exclude`, and global `gitignore` files (see: [`respect-gitignore`](settings.md#respect-gitignore)).
 
-Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria.
-For example, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
+Files that are passed to `ruff` directly are always analyzed, regardless of the above criteria, 
+unless [`force-exclude`](settings.md#force-exclude) is also enabled (via CLI or settings file).
+For example, without `force-exclude` enabled, `ruff check /path/to/excluded/file.py` will always lint `file.py`.
 
 ### Default inclusions
 
 By default, Ruff will discover files matching `*.py`, `*.pyi`, `*.ipynb`, or `pyproject.toml`.
+In [preview](preview.md) mode, Ruff will also discover `*.pyw` by default.
 
 To lint or format files with additional file extensions, use the [`extend-include`](settings.md#extend-include) setting.
 You can also change the default selection using the [`include`](settings.md#include) setting.
@@ -618,8 +620,9 @@ Options:
           notebooks, use `--extension ipy:ipynb`
       --statistics
           Show counts for every rule with at least one violation
-      --add-noqa
-          Enable automatic additions of `noqa` directives to failing lines
+      --add-noqa[=<REASON>]
+          Enable automatic additions of `noqa` directives to failing lines.
+          Optionally provide a reason to append after the codes
       --show-files
           See the files Ruff will be run against with the current settings
       --show-settings
@@ -727,6 +730,11 @@ Options:
       --preview
           Enable preview mode; enables unstable formatting. Use `--no-preview`
           to disable
+      --output-format <OUTPUT_FORMAT>
+          Output serialization format for violations, when used with `--check`.
+          The default serialization format is "full" [env: RUFF_OUTPUT_FORMAT=]
+          [possible values: concise, full, json, json-lines, junit, grouped,
+          github, gitlab, pylint, rdjson, azure, sarif]
   -h, --help
           Print help (see more with '--help')
 

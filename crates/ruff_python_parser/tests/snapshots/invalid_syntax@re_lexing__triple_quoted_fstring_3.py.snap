@@ -77,6 +77,7 @@ Module(
                                                                 quote_style: Single,
                                                                 prefix: Regular,
                                                                 triple_quoted: true,
+                                                                unclosed: false,
                                                             },
                                                         },
                                                     ),
@@ -109,7 +110,7 @@ Module(
   |
 5 | if call(f'''{x:.3f
 6 | '''
-  | ^^^ Syntax Error: f-string: expecting '}'
+  | ^^^ Syntax Error: f-string: expecting `}`
 7 |     pass
   |
 
@@ -117,6 +118,6 @@ Module(
   |
 5 | if call(f'''{x:.3f
 6 | '''
-  |    ^ Syntax Error: Expected ')', found newline
+  |    ^ Syntax Error: Expected `)`, found newline
 7 |     pass
   |

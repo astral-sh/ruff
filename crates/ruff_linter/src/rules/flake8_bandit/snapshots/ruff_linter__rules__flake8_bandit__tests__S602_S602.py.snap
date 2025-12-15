@@ -127,3 +127,44 @@ S602 `subprocess` call with `shell=True` identified, security issue
 21 |
 22 | # Check dict display with only double-starred expressions can be falsey.
    |
+
+S602 `subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`
+  --> S602.py:38:1
+   |
+37 | # Additional truthiness cases for generator, lambda, and f-strings
+38 | Popen("true", shell=(i for i in ()))
+   | ^^^^^
+39 | Popen("true", shell=lambda: 0)
+40 | Popen("true", shell=f"{b''}")
+   |
+
+S602 `subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`
+  --> S602.py:39:1
+   |
+37 | # Additional truthiness cases for generator, lambda, and f-strings
+38 | Popen("true", shell=(i for i in ()))
+39 | Popen("true", shell=lambda: 0)
+   | ^^^^^
+40 | Popen("true", shell=f"{b''}")
+41 | x = 1
+   |
+
+S602 `subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`
+  --> S602.py:40:1
+   |
+38 | Popen("true", shell=(i for i in ()))
+39 | Popen("true", shell=lambda: 0)
+40 | Popen("true", shell=f"{b''}")
+   | ^^^^^
+41 | x = 1
+42 | Popen("true", shell=f"{x=}")
+   |
+
+S602 `subprocess` call with truthy `shell` seems safe, but may be changed in the future; consider rewriting without `shell`
+  --> S602.py:42:1
+   |
+40 | Popen("true", shell=f"{b''}")
+41 | x = 1
+42 | Popen("true", shell=f"{x=}")
+   | ^^^^^
+   |

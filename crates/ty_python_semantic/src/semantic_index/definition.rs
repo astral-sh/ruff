@@ -22,7 +22,12 @@ use crate::unpack::{Unpack, UnpackPosition};
 /// because a new scope gets inserted before the `Definition` or a new place is inserted
 /// before this `Definition`. However, the ID can be considered stable and it is okay to use
 /// `Definition` in cross-module` salsa queries or as a field on other salsa tracked structs.
+///
+/// # Ordering
+/// Ordering is based on the definition's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the definition was garbage collected and recreated.
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(Ord, PartialOrd)]
 pub struct Definition<'db> {
     /// The file in which the definition occurs.
     pub file: File,
@@ -84,6 +89,12 @@ impl<'db> Definition<'db> {
                         .as_str()
                         .to_string(),
                 )
+            }
+            DefinitionKind::Assignment(assignment) => {
+                let target_node = assignment.target.node(&module);
+                target_node
+                    .as_name_expr()
+                    .map(|name_expr| name_expr.id.as_str().to_string())
             }
             _ => None,
         }
@@ -204,6 +215,7 @@ impl<'db> DefinitionState<'db> {
 pub(crate) enum DefinitionNodeRef<'ast, 'db> {
     Import(ImportDefinitionNodeRef<'ast>),
     ImportFrom(ImportFromDefinitionNodeRef<'ast>),
+    ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef<'ast>),
     ImportStar(StarImportDefinitionNodeRef<'ast>),
     For(ForStmtDefinitionNodeRef<'ast, 'db>),
     Function(&'ast ast::StmtFunctionDef),
@@ -285,6 +297,12 @@ impl<'ast> From<ImportFromDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '
     }
 }
 
+impl<'ast> From<ImportFromSubmoduleDefinitionNodeRef<'ast>> for DefinitionNodeRef<'ast, '_> {
+    fn from(node_ref: ImportFromSubmoduleDefinitionNodeRef<'ast>) -> Self {
+        Self::ImportFromSubmodule(node_ref)
+    }
+}
+
 impl<'ast, 'db> From<ForStmtDefinitionNodeRef<'ast, 'db>> for DefinitionNodeRef<'ast, 'db> {
     fn from(value: ForStmtDefinitionNodeRef<'ast, 'db>) -> Self {
         Self::For(value)
@@ -351,6 +369,11 @@ pub(crate) struct ImportFromDefinitionNodeRef<'ast> {
     pub(crate) node: &'ast ast::StmtImportFrom,
     pub(crate) alias_index: usize,
     pub(crate) is_reexported: bool,
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ImportFromSubmoduleDefinitionNodeRef<'ast> {
+    pub(crate) node: &'ast ast::StmtImportFrom,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -422,7 +445,6 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported,
             }),
-
             DefinitionNodeRef::ImportFrom(ImportFromDefinitionNodeRef {
                 node,
                 alias_index,
@@ -431,6 +453,11 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 node: AstNodeRef::new(parsed, node),
                 alias_index,
                 is_reexported,
+            }),
+            DefinitionNodeRef::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef {
+                node,
+            }) => DefinitionKind::ImportFromSubmodule(ImportFromSubmoduleDefinitionKind {
+                node: AstNodeRef::new(parsed, node),
             }),
             DefinitionNodeRef::ImportStar(star_import) => {
                 let StarImportDefinitionNodeRef { node, symbol_id } = star_import;
@@ -557,7 +584,7 @@ impl<'db> DefinitionNodeRef<'_, 'db> {
                 alias_index,
                 is_reexported: _,
             }) => (&node.names[alias_index]).into(),
-
+            Self::ImportFromSubmodule(ImportFromSubmoduleDefinitionNodeRef { node }) => node.into(),
             // INVARIANT: for an invalid-syntax statement such as `from foo import *, bar, *`,
             // we only create a `StarImportDefinitionKind` for the *first* `*` alias in the names list.
             Self::ImportStar(StarImportDefinitionNodeRef { node, symbol_id: _ }) => node
@@ -656,6 +683,7 @@ impl DefinitionCategory {
 pub enum DefinitionKind<'db> {
     Import(ImportDefinitionKind),
     ImportFrom(ImportFromDefinitionKind),
+    ImportFromSubmodule(ImportFromSubmoduleDefinitionKind),
     StarImport(StarImportDefinitionKind),
     Function(AstNodeRef<ast::StmtFunctionDef>),
     Class(AstNodeRef<ast::StmtClassDef>),
@@ -682,6 +710,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.is_reexported(),
             DefinitionKind::ImportFrom(import) => import.is_reexported(),
+            DefinitionKind::ImportFromSubmodule(_) => true,
             _ => true,
         }
     }
@@ -693,12 +722,20 @@ impl DefinitionKind<'_> {
         }
     }
 
+    pub(crate) const fn as_class(&self) -> Option<&AstNodeRef<ast::StmtClassDef>> {
+        match self {
+            DefinitionKind::Class(class) => Some(class),
+            _ => None,
+        }
+    }
+
     pub(crate) fn is_import(&self) -> bool {
         matches!(
             self,
             DefinitionKind::Import(_)
                 | DefinitionKind::ImportFrom(_)
                 | DefinitionKind::StarImport(_)
+                | DefinitionKind::ImportFromSubmodule(_)
         )
     }
 
@@ -706,11 +743,8 @@ impl DefinitionKind<'_> {
         matches!(self, DefinitionKind::Assignment(_))
     }
 
-    pub(crate) fn as_typevar(&self) -> Option<&AstNodeRef<ast::TypeParamTypeVar>> {
-        match self {
-            DefinitionKind::TypeVar(type_var) => Some(type_var),
-            _ => None,
-        }
+    pub(crate) const fn is_function_def(&self) -> bool {
+        matches!(self, DefinitionKind::Function(_))
     }
 
     /// Returns the [`TextRange`] of the definition target.
@@ -721,6 +755,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
             DefinitionKind::StarImport(import) => import.alias(module).range(),
             DefinitionKind::Function(function) => function.node(module).name.range(),
             DefinitionKind::Class(class) => class.node(module).name.range(),
@@ -758,6 +793,7 @@ impl DefinitionKind<'_> {
         match self {
             DefinitionKind::Import(import) => import.alias(module).range(),
             DefinitionKind::ImportFrom(import) => import.alias(module).range(),
+            DefinitionKind::ImportFromSubmodule(import) => import.import(module).range(),
             DefinitionKind::StarImport(import) => import.import(module).range(),
             DefinitionKind::Function(function) => function.node(module).range(),
             DefinitionKind::Class(class) => class.node(module).range(),
@@ -848,6 +884,7 @@ impl DefinitionKind<'_> {
             | DefinitionKind::Comprehension(_)
             | DefinitionKind::WithItem(_)
             | DefinitionKind::MatchPattern(_)
+            | DefinitionKind::ImportFromSubmodule(_)
             | DefinitionKind::ExceptHandler(_) => DefinitionCategory::Binding,
         }
     }
@@ -993,6 +1030,16 @@ impl ImportFromDefinitionKind {
         self.is_reexported
     }
 }
+#[derive(Clone, Debug, get_size2::GetSize)]
+pub struct ImportFromSubmoduleDefinitionKind {
+    node: AstNodeRef<ast::StmtImportFrom>,
+}
+
+impl ImportFromSubmoduleDefinitionKind {
+    pub fn import<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::StmtImportFrom {
+        self.node.node(module)
+    }
+}
 
 #[derive(Clone, Debug, get_size2::GetSize)]
 pub struct AssignmentDefinitionKind<'db> {
@@ -1006,7 +1053,7 @@ impl<'db> AssignmentDefinitionKind<'db> {
         self.target_kind
     }
 
-    pub(crate) fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
+    pub fn value<'ast>(&self, module: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self.value.node(module)
     }
 
@@ -1119,6 +1166,12 @@ pub(crate) struct DefinitionNodeKey(NodeKey);
 
 impl From<&ast::Alias> for DefinitionNodeKey {
     fn from(node: &ast::Alias) -> Self {
+        Self(NodeKey::from_node(node))
+    }
+}
+
+impl From<&ast::StmtImportFrom> for DefinitionNodeKey {
+    fn from(node: &ast::StmtImportFrom) -> Self {
         Self(NodeKey::from_node(node))
     }
 }

@@ -3,7 +3,7 @@ use std::collections::hash_map::Entry;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::{ComparableExpr, HashableExpr};
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::Ranged;
 
@@ -49,6 +49,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyLiteral {
     name: SourceCodeSnippet,
     existing: SourceCodeSnippet,
@@ -121,6 +122,7 @@ impl Violation for MultiValueRepeatedKeyLiteral {
 /// ## References
 /// - [Python documentation: Dictionaries](https://docs.python.org/3/tutorial/datastructures.html#dictionaries)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.30")]
 pub(crate) struct MultiValueRepeatedKeyVariable {
     name: SourceCodeSnippet,
 }
@@ -191,16 +193,14 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),
@@ -222,16 +222,14 @@ pub(crate) fn repeated_keys(checker: &Checker, dict: &ast::ExprDict) {
                                     parenthesized_range(
                                         dict.value(i - 1).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i - 1).range())
                                     .end(),
                                     parenthesized_range(
                                         dict.value(i).into(),
                                         dict.into(),
-                                        checker.comment_ranges(),
-                                        checker.locator().contents(),
+                                        checker.tokens(),
                                     )
                                     .unwrap_or_else(|| dict.value(i).range())
                                     .end(),

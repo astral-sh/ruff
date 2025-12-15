@@ -35,7 +35,6 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "###);
 
     case.write_file(
@@ -47,7 +46,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -64,8 +63,7 @@ fn configuration_rule_severity() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -89,7 +87,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
 
     // Assert that there's an `unresolved-reference` diagnostic (error)
     // and an unresolved-import (error) diagnostic by default.
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -120,8 +118,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     assert_cmd_snapshot!(
         case
@@ -132,7 +129,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--warn")
             .arg("unresolved-import"),
-        @r"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -165,8 +162,7 @@ fn cli_rule_severity() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     Ok(())
@@ -206,7 +202,6 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "###);
 
     assert_cmd_snapshot!(
@@ -218,7 +213,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
             .arg("division-by-zero")
             .arg("--ignore")
             .arg("unresolved-reference"),
-        @r"
+        @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -235,8 +230,7 @@ fn cli_rule_severity_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "
+    "###
     );
 
     Ok(())
@@ -260,7 +254,7 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
      --> pyproject.toml:3:1
       |
     2 | [tool.ty.rules]
@@ -271,7 +265,6 @@ fn configuration_unknown_rules() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "#);
 
     Ok(())
@@ -286,12 +279,11 @@ fn cli_unknown_rules() -> anyhow::Result<()> {
     success: true
     exit_code: 0
     ----- stdout -----
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
 
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ");
 
     Ok(())
@@ -371,7 +363,6 @@ fn overrides_basic() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     "###);
 
     Ok(())
@@ -414,7 +405,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -429,8 +420,7 @@ fn overrides_precedence() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -466,7 +456,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -489,8 +479,7 @@ fn overrides_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    ");
+    "###);
 
     Ok(())
 }
@@ -530,7 +519,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -564,8 +553,7 @@ fn overrides_inherit_global() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -594,13 +582,12 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: error[invalid-glob]: Invalid include pattern
      --> pyproject.toml:6:12
@@ -611,7 +598,7 @@ fn overrides_invalid_include_glob() -> anyhow::Result<()> {
     7 | [tool.ty.overrides.rules]
     8 | division-by-zero = "warn"
       |
-    "#);
+    "###);
 
     Ok(())
 }
@@ -641,13 +628,12 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 2
     ----- stdout -----
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
     ty failed
       Cause: error[invalid-glob]: Invalid exclude pattern
      --> pyproject.toml:7:12
@@ -659,7 +645,7 @@ fn overrides_invalid_exclude_glob() -> anyhow::Result<()> {
     8 | [tool.ty.overrides.rules]
     9 | division-by-zero = "warn"
       |
-    "#);
+    "###);
 
     Ok(())
 }
@@ -688,7 +674,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -717,8 +703,7 @@ fn overrides_missing_include_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -747,7 +732,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -773,8 +758,7 @@ fn overrides_empty_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -802,7 +786,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r#"
+    assert_cmd_snapshot!(case.command(), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -831,8 +815,7 @@ fn overrides_no_actual_overrides() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "#);
+    "###);
 
     Ok(())
 }
@@ -869,7 +852,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -881,7 +864,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
       |
     info: rule `division-by-zero` was selected in the configuration file
 
-    warning[unknown-rule]: Unknown lint rule `division-by-zer`
+    warning[unknown-rule]: Unknown rule `division-by-zer`. Did you mean `division-by-zero`?
       --> pyproject.toml:10:1
        |
      8 | [tool.ty.overrides.rules]
@@ -901,8 +884,7 @@ fn overrides_unknown_rules() -> anyhow::Result<()> {
     Found 3 diagnostics
 
     ----- stderr -----
-    WARN ty is pre-release software and not ready for production use. Expect to encounter bugs, missing features, and fatal errors.
-    "###);
+    "#);
 
     Ok(())
 }

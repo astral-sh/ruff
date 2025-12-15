@@ -51,6 +51,6 @@ reveal_type({"a": 1, "b": (1, 2), "c": (1, 2, 3)})
 ## Dict comprehensions
 
 ```py
-# revealed: dict[@Todo(dict comprehension key type), @Todo(dict comprehension value type)]
+# revealed: dict[int | Unknown, int | Unknown]
 reveal_type({x: y for x, y in enumerate(range(42))})
 ```

@@ -42,38 +42,52 @@ fn logging_f_string(
     // Default to double quotes if we can't determine it.
     let quote_str = f_string
         .value
-        .f_strings()
+        .iter()
+        .map(|part| match part {
+            ast::FStringPart::Literal(literal) => literal.flags.quote_str(),
+            ast::FStringPart::FString(f) => f.flags.quote_str(),
+        })
         .next()
-        .map(|f| f.flags.quote_str())
         .unwrap_or("\"");
 
-    for f in f_string.value.f_strings() {
-        for element in &f.elements {
-            match element {
-                InterpolatedStringElement::Literal(lit) => {
-                    // If the literal text contains a '%' placeholder, bail out: mixing
-                    // f-string interpolation with '%' placeholders is ambiguous for our
-                    // automatic conversion, so don't offer a fix for this case.
-                    if lit.value.as_ref().contains('%') {
-                        return;
-                    }
-                    format_string.push_str(lit.value.as_ref());
+    for part in &f_string.value {
+        match part {
+            ast::FStringPart::Literal(literal) => {
+                let literal_text = literal.as_str();
+                if literal_text.contains('%') {
+                    return;
                 }
-                InterpolatedStringElement::Interpolation(interpolated) => {
-                    if interpolated.format_spec.is_some()
-                        || !matches!(
-                            interpolated.conversion,
-                            ruff_python_ast::ConversionFlag::None
-                        )
-                    {
-                        return;
-                    }
-                    match interpolated.expression.as_ref() {
-                        Expr::Name(name) => {
-                            format_string.push_str("%s");
-                            args.push(name.id.as_str());
+                format_string.push_str(literal_text);
+            }
+            ast::FStringPart::FString(f) => {
+                for element in &f.elements {
+                    match element {
+                        InterpolatedStringElement::Literal(lit) => {
+                            // If the literal text contains a '%' placeholder, bail out: mixing
+                            // f-string interpolation with '%' placeholders is ambiguous for our
+                            // automatic conversion, so don't offer a fix for this case.
+                            if lit.value.as_ref().contains('%') {
+                                return;
+                            }
+                            format_string.push_str(lit.value.as_ref());
                         }
-                        _ => return,
+                        InterpolatedStringElement::Interpolation(interpolated) => {
+                            if interpolated.format_spec.is_some()
+                                || !matches!(
+                                    interpolated.conversion,
+                                    ruff_python_ast::ConversionFlag::None
+                                )
+                            {
+                                return;
+                            }
+                            match interpolated.expression.as_ref() {
+                                Expr::Name(name) => {
+                                    format_string.push_str("%s");
+                                    args.push(name.id.as_str());
+                                }
+                                _ => return,
+                            }
+                        }
                     }
                 }
             }

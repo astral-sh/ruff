@@ -17,7 +17,8 @@ from datetime import time
 t = time(12, 0, 0)
 t = replace(t, minute=30)
 
-reveal_type(t)  # revealed: time
+# TODO: this should be `time`, once we support specialization of generic protocols
+reveal_type(t)  # revealed: Unknown
 ```
 
 ## The `__replace__` protocol
@@ -47,7 +48,8 @@ b = a.__replace__(x=3, y=4)
 reveal_type(b)  # revealed: Point
 
 b = replace(a, x=3, y=4)
-reveal_type(b)  # revealed: Point
+# TODO: this should be `Point`, once we support specialization of generic protocols
+reveal_type(b)  # revealed: Unknown
 ```
 
 A call to `replace` does not require all keyword arguments:
@@ -57,7 +59,8 @@ c = a.__replace__(y=4)
 reveal_type(c)  # revealed: Point
 
 d = replace(a, y=4)
-reveal_type(d)  # revealed: Point
+# TODO: this should be `Point`, once we support specialization of generic protocols
+reveal_type(d)  # revealed: Unknown
 ```
 
 Invalid calls to `__replace__` or `replace` will raise an error:

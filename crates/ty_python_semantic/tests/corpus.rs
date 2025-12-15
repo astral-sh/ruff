@@ -79,8 +79,7 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
     let root = SystemPathBuf::from("/src");
 
     let mut db = CorpusDb::new();
-    db.memory_file_system()
-        .create_directory_all(root.as_ref())?;
+    db.memory_file_system().create_directory_all(&root)?;
 
     let workspace_root = get_cargo_workspace_root()?;
     let workspace_root = workspace_root.to_string();
@@ -169,9 +168,6 @@ fn run_corpus_tests(pattern: &str) -> anyhow::Result<()> {
 /// Whether or not the .py/.pyi version of this file is expected to fail
 #[rustfmt::skip]
 const KNOWN_FAILURES: &[(&str, bool, bool)] = &[
-    // Fails with too-many-cycle-iterations due to a self-referential
-    // type alias, see https://github.com/astral-sh/ty/issues/256
-    ("crates/ruff_linter/resources/test/fixtures/pyflakes/F401_34.py", true, true),
 ];
 
 #[salsa::db]
@@ -254,6 +250,10 @@ impl ty_python_semantic::Db for CorpusDb {
 
     fn lint_registry(&self) -> &LintRegistry {
         default_lint_registry()
+    }
+
+    fn verbose(&self) -> bool {
+        false
     }
 }
 

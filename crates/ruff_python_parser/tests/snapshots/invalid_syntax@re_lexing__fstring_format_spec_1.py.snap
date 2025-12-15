@@ -50,6 +50,7 @@ Module(
                                                                                 quote_style: Single,
                                                                                 prefix: Empty,
                                                                                 triple_quoted: false,
+                                                                                unclosed: false,
                                                                             },
                                                                         },
                                                                     ),
@@ -80,6 +81,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -113,6 +115,33 @@ Module(
                             range: 199..203,
                             id: Name("spec"),
                             ctx: Load,
+                        },
+                    ),
+                },
+            ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 203..205,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 203..205,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 203..205,
+                                        node_index: NodeIndex(None),
+                                        value: "}",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: true,
+                                        },
+                                    },
+                                ),
+                            },
                         },
                     ),
                 },
@@ -157,6 +186,7 @@ Module(
                                                                                 quote_style: Single,
                                                                                 prefix: Empty,
                                                                                 triple_quoted: false,
+                                                                                unclosed: false,
                                                                             },
                                                                         },
                                                                     ),
@@ -169,7 +199,15 @@ Module(
                                                             InterpolatedStringFormatSpec {
                                                                 range: 226..228,
                                                                 node_index: NodeIndex(None),
-                                                                elements: [],
+                                                                elements: [
+                                                                    Literal(
+                                                                        InterpolatedStringLiteralElement {
+                                                                            range: 226..228,
+                                                                            node_index: NodeIndex(None),
+                                                                            value: "\\",
+                                                                        },
+                                                                    ),
+                                                                ],
                                                             },
                                                         ),
                                                     },
@@ -179,6 +217,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: true,
                                             },
                                         },
                                     ),
@@ -206,6 +245,7 @@ Module(
                                             quote_style: Single,
                                             prefix: Empty,
                                             triple_quoted: false,
+                                            unclosed: false,
                                         },
                                     },
                                 ),
@@ -254,6 +294,7 @@ Module(
                                                                                 quote_style: Single,
                                                                                 prefix: Empty,
                                                                                 triple_quoted: false,
+                                                                                unclosed: false,
                                                                             },
                                                                         },
                                                                     ),
@@ -284,6 +325,7 @@ Module(
                                                 quote_style: Single,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -321,6 +363,33 @@ Module(
                     ),
                 },
             ),
+            Expr(
+                StmtExpr {
+                    node_index: NodeIndex(None),
+                    range: 296..298,
+                    value: StringLiteral(
+                        ExprStringLiteral {
+                            node_index: NodeIndex(None),
+                            range: 296..298,
+                            value: StringLiteralValue {
+                                inner: Single(
+                                    StringLiteral {
+                                        range: 296..298,
+                                        node_index: NodeIndex(None),
+                                        value: "}",
+                                        flags: StringLiteralFlags {
+                                            quote_style: Single,
+                                            prefix: Empty,
+                                            triple_quoted: false,
+                                            unclosed: true,
+                                        },
+                                    },
+                                ),
+                            },
+                        },
+                    ),
+                },
+            ),
         ],
     },
 )
@@ -330,7 +399,7 @@ Module(
   |
 5 | f'middle {'string':\
 6 |         'format spec'}
-  |         ^ Syntax Error: f-string: expecting '}'
+  |         ^ Syntax Error: f-string: expecting `}`
 7 |
 8 | f'middle {'string':\\
   |
@@ -364,16 +433,6 @@ Module(
 
 
   |
-5 | f'middle {'string':\
-6 |         'format spec'}
-  |                       ^ Syntax Error: Expected a statement
-7 |
-8 | f'middle {'string':\\
-9 |         'format spec'}
-  |
-
-
-  |
 6 |         'format spec'}
 7 |
 8 | f'middle {'string':\\
@@ -386,7 +445,7 @@ Module(
  6 |         'format spec'}
  7 |
  8 | f'middle {'string':\\
-   |                      ^ Syntax Error: f-string: expecting '}'
+   |                      ^ Syntax Error: f-string: expecting `}`
  9 |         'format spec'}
 10 |
 11 | f'middle {'string':\\\
@@ -433,7 +492,7 @@ Module(
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
-   |         ^ Syntax Error: f-string: expecting '}'
+   |         ^ Syntax Error: f-string: expecting `}`
    |
 
 
@@ -454,12 +513,5 @@ Module(
    |
 11 | f'middle {'string':\\\
 12 |         'format spec'}
-   |                     ^^ Syntax Error: Got unexpected string
-   |
-
-
-   |
-11 | f'middle {'string':\\\
-12 |         'format spec'}
-   |                       ^ Syntax Error: Expected a statement
+   |                     ^^ Syntax Error: missing closing quote in string literal
    |

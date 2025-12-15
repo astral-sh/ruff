@@ -21,11 +21,8 @@ help: Move into type-checking block
 7  | 
    -     from django.contrib.auth.models import AbstractBaseUser
 8  | 
-   -     def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
-9  +     def test_union_literal_mixed_quotes(user: 'AbstractBaseUser[Union[Literal["active", "inactive"], str]]'):
+9  |     def test_union_literal_mixed_quotes(user: AbstractBaseUser[Union[Literal['active', "inactive"], str]]):
 10 |         pass
-11 | 
-12 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
@@ -52,11 +49,8 @@ help: Move into type-checking block
 16 | 
    -     from django.contrib.auth.models import AbstractBaseUser
 17 | 
-   -     def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
-18 +     def test_callable_literal_mixed_quotes(callable_fn: 'AbstractBaseUser[Callable[[int, Literal["admin", "user"]], bool]]'):
+18 |     def test_callable_literal_mixed_quotes(callable_fn: AbstractBaseUser[Callable[["int", Literal['admin', "user"]], 'bool']]):
 19 |         pass
-20 | 
-21 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models.AbstractBaseUser` into a type-checking block
@@ -83,11 +77,8 @@ help: Move into type-checking block
 25 | 
    -     from django.contrib.auth.models import AbstractBaseUser
 26 | 
-   -     def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
-27 +     def test_callable_annotated_literal(callable_fn: 'AbstractBaseUser[Callable[[int, Annotated[str, Literal["active", "inactive"]]], bool]]'):
+27 |     def test_callable_annotated_literal(callable_fn: AbstractBaseUser[Callable[[int, Annotated[str, Literal['active', "inactive"]]], bool]]):
 28 |         pass
-29 | 
-30 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
@@ -114,11 +105,8 @@ help: Move into type-checking block
 34 | 
    -     from django.contrib.auth import models
 35 | 
-   -     def test_attribute(arg: models.AbstractBaseUser["int"]):
-36 +     def test_attribute(arg: 'models.AbstractBaseUser[int]'):
+36 |     def test_attribute(arg: models.AbstractBaseUser["int"]):
 37 |         pass
-38 | 
-39 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `django.contrib.auth.models` into a type-checking block
@@ -145,11 +133,8 @@ help: Move into type-checking block
 43 | 
    -     from django.contrib.auth import models
 44 | 
-   -     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
-45 +     def test_attribute_typing_literal(arg: 'models.AbstractBaseUser[Literal["admin"]]'):
+45 |     def test_attribute_typing_literal(arg: models.AbstractBaseUser[Literal["admin"]]):
 46 |         pass
-47 | 
-48 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `third_party.Type` into a type-checking block
@@ -176,11 +161,8 @@ help: Move into type-checking block
 62 |     from typing import Literal
    -     from third_party import Type
 63 | 
-   -     def test_string_contains_opposite_quote(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
-64 +     def test_string_contains_opposite_quote(self, type1: 'Type[Literal["\'"]]', type2: 'Type[Literal["\'"]]'):
+64 |     def test_string_contains_opposite_quote(self, type1: Type[Literal["'"]], type2: Type[Literal["\'"]]):
 65 |         pass
-66 | 
-67 | 
 note: This is an unsafe fix and may change runtime behavior
 
 TC002 [*] Move third-party import `third_party.Type` into a type-checking block
@@ -207,7 +189,6 @@ help: Move into type-checking block
 70 |     from typing import Literal
    -     from third_party import Type
 71 | 
-   -     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
-72 +     def test_quote_contains_backslash(self, type1: 'Type[Literal["\\n"]]', type2: 'Type[Literal[\'"\']]'):
+72 |     def test_quote_contains_backslash(self, type1: Type[Literal["\n"]], type2: Type[Literal["\""]]):
 73 |         pass
 note: This is an unsafe fix and may change runtime behavior

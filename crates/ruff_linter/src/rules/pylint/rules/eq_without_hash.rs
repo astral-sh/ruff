@@ -64,6 +64,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `object.__hash__`](https://docs.python.org/3/reference/datamodel.html#object.__hash__)
 /// - [Python glossary: hashable](https://docs.python.org/3/glossary.html#term-hashable)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.12.0")]
 pub(crate) struct EqWithoutHash;
 
 impl Violation for EqWithoutHash {

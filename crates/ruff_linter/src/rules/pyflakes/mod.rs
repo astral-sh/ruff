@@ -28,8 +28,9 @@ mod tests {
     use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
-    use crate::{Locator, assert_diagnostics, directives};
+    use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
@@ -166,6 +167,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -390,6 +392,186 @@ mod tests {
         )?;
         assert_diagnostics!(diagnostics);
         Ok(())
+    }
+
+    #[test_case(Rule::UnusedImport, Path::new("F401_0.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_1.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_2.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_3.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_4.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_5.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_6.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_7.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_8.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_9.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_10.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_11.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_12.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_13.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_14.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_15.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_16.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_17.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_18.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_19.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_20.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_21.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_22.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_23.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_32.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_34.py"))]
+    #[test_case(Rule::UnusedImport, Path::new("F401_35.py"))]
+    fn f401_preview_refined_submodule_handling_diffs(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("preview_diff__{}", path.to_string_lossy());
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("pyflakes").join(path).as_path(),
+            &LinterSettings::for_rule(rule_code),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(rule_code)
+            }
+        );
+        Ok(())
+    }
+
+    #[test_case(
+        r"
+        import a
+        import a.b
+        import a.c",
+        "f401_multiple_unused_submodules"
+    )]
+    #[test_case(
+        r"
+        import a
+        import a.b
+        a.foo()",
+        "f401_use_top_member"
+    )]
+    #[test_case(
+        r"
+        import a
+        import a.b
+        a.foo()
+        a.bar()",
+        "f401_use_top_member_twice"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        import a.b",
+        "f401_use_top_member_before_second_import"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        a = 1
+        import a.b",
+        "f401_use_top_member_and_redefine_before_second_import"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between imports
+        import a
+        a.foo()
+        import a.b
+        a = 1",
+        "f401_use_top_member_then_import_then_redefine"
+    )]
+    #[test_case(
+        r#"
+        import a
+        import a.b
+        __all__ = ["a"]"#,
+        "f401_use_in_dunder_all"
+    )]
+    #[test_case(
+        r"
+        import a.c
+        import a.b
+        a.foo()",
+        "f401_import_submodules_but_use_top_level"
+    )]
+    #[test_case(
+        r"
+        import a.c
+        import a.b.d
+        a.foo()",
+        "f401_import_submodules_different_lengths_but_use_top_level"
+    )]
+    #[test_case(
+        r"
+        # refined logic only applied _within_ scope
+        import a
+        def foo():
+            import a.b
+            a.foo()",
+        "f401_import_submodules_in_function_scope"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between bindings
+        import a
+        a.b
+        import a.b",
+        "f401_use_in_between_imports"
+    )]
+    #[test_case(
+        r"
+        # reverts to stable behavior - used between bindings
+        import a.b
+        a
+        import a",
+        "f401_use_in_between_imports"
+    )]
+    #[test_case(
+        r"
+        if cond:
+            import a
+            import a.b
+            a.foo()
+        ",
+        "f401_same_branch"
+    )]
+    #[test_case(
+        r"
+        try:
+            import a.b.c
+        except ImportError:
+            import argparse
+            import a
+            a.b = argparse.Namespace()
+        ",
+        "f401_different_branch"
+    )]
+    #[test_case(
+        r"
+        import mlflow.pyfunc.loaders.chat_agent
+        import mlflow.pyfunc.loaders.chat_model
+        import mlflow.pyfunc.loaders.code_model
+        from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
+
+        if IS_PYDANTIC_V2_OR_NEWER:
+            import mlflow.pyfunc.loaders.responses_agent
+        ",
+        "f401_type_checking"
+    )]
+    fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
+        let diagnostics = test_contents(
+            &SourceKind::Python(dedent(contents).to_string()),
+            Path::new("f401_preview_submodule.py"),
+            &LinterSettings {
+                preview: PreviewMode::Enabled,
+                ..LinterSettings::for_rule(Rule::UnusedImport)
+            },
+        )
+        .0;
+        assert_diagnostics!(snapshot, diagnostics);
     }
 
     #[test]
@@ -774,6 +956,8 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions =
+            Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens());
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -787,6 +971,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages
@@ -3621,7 +3806,7 @@ lambda: fu
         def f(a: A) -> A: pass
         class A: pass
         ",
-            &[Rule::UndefinedName, Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"
@@ -3635,7 +3820,7 @@ lambda: fu
         a: A
         class A: pass
         ",
-            &[Rule::UndefinedName],
+            &[],
         );
         flakes(
             r"

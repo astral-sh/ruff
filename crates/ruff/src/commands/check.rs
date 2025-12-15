@@ -9,11 +9,10 @@ use ignore::Error;
 use log::{debug, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_linter::message::create_panic_diagnostic;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{
-    Annotation, Diagnostic, DiagnosticId, Span, SubDiagnostic, SubDiagnosticSeverity,
-};
+use ruff_db::diagnostic::Diagnostic;
 use ruff_db::panic::catch_unwind;
 use ruff_linter::package::PackageRoot;
 use ruff_linter::registry::Rule;
@@ -195,23 +194,7 @@ fn lint_path(
     match result {
         Ok(inner) => inner,
         Err(error) => {
-            let message = match error.payload.as_str() {
-                Some(summary) => format!("Fatal error while linting: {summary}"),
-                _ => "Fatal error while linting".to_owned(),
-            };
-            let mut diagnostic = Diagnostic::new(
-                DiagnosticId::Panic,
-                ruff_db::diagnostic::Severity::Fatal,
-                message,
-            );
-            let span = Span::from(SourceFileBuilder::new(path.to_string_lossy(), "").finish());
-            let mut annotation = Annotation::primary(span);
-            annotation.set_file_level(true);
-            diagnostic.annotate(annotation);
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!("{error}"),
-            ));
+            let diagnostic = create_panic_diagnostic(&error, Some(path));
             Ok(Diagnostics::new(vec![diagnostic], FxHashMap::default()))
         }
     }
@@ -227,7 +210,8 @@ mod test {
     use rustc_hash::FxHashMap;
     use tempfile::TempDir;
 
-    use ruff_linter::message::{Emitter, EmitterContext, TextEmitter};
+    use ruff_db::diagnostic::{DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics};
+    use ruff_linter::message::EmitterContext;
     use ruff_linter::registry::Rule;
     use ruff_linter::settings::types::UnsafeFixes;
     use ruff_linter::settings::{LinterSettings, flags};
@@ -280,19 +264,16 @@ mod test {
             UnsafeFixes::Enabled,
         )
         .unwrap();
-        let mut output = Vec::new();
 
-        TextEmitter::default()
-            .with_show_fix_status(true)
-            .with_color(false)
-            .emit(
-                &mut output,
-                &diagnostics.inner,
-                &EmitterContext::new(&FxHashMap::default()),
-            )
-            .unwrap();
-
-        let messages = String::from_utf8(output).unwrap();
+        let config = DisplayDiagnosticConfig::default()
+            .format(DiagnosticFormat::Concise)
+            .hide_severity(true);
+        let messages = DisplayDiagnostics::new(
+            &EmitterContext::new(&FxHashMap::default()),
+            &config,
+            &diagnostics.inner,
+        )
+        .to_string();
 
         insta::with_settings!({
             omit_expression => true,

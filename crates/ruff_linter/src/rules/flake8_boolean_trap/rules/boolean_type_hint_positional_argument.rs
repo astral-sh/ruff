@@ -28,7 +28,7 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// the argument.
 ///
 /// Dunder methods that define operators are exempt from this rule, as are
-/// setters and `@override` definitions.
+/// setters and [`@override`][override] definitions.
 ///
 /// ## Example
 ///
@@ -93,7 +93,10 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanTypeHintPositionalArgument;
 
 impl Violation for BooleanTypeHintPositionalArgument {

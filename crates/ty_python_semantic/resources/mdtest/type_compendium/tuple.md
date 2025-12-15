@@ -68,6 +68,10 @@ reveal_type((1,).__class__())  # revealed: tuple[Literal[1]]
 
 # error: [missing-argument] "No argument provided for required parameter `iterable`"
 reveal_type((1, 2).__class__())  # revealed: tuple[Literal[1], Literal[2]]
+
+def g(x: tuple[int, str] | tuple[bytes, bool], y: tuple[int, str] | tuple[bytes, bool, bytes]):
+    reveal_type(tuple(x))  # revealed: tuple[int, str] | tuple[bytes, bool]
+    reveal_type(tuple(y))  # revealed: tuple[int, str] | tuple[bytes, bool, bytes]
 ```
 
 ## Instantiating tuple subclasses
@@ -510,10 +514,8 @@ For covariant types, such as `frozenset`, the ideal behaviour would be to not pr
 types to their instance supertypes: doing so causes more false positives than it fixes:
 
 ```py
-# TODO: better here would be `frozenset[Literal[1, 2, 3]]`
-reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[int]
-# TODO: better here would be `frozenset[tuple[Literal[1], Literal[2], Literal[3]]]`
-reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[int, int, int]]
+reveal_type(frozenset((1, 2, 3)))  # revealed: frozenset[Literal[1, 2, 3]]
+reveal_type(frozenset(((1, 2, 3),)))  # revealed: frozenset[tuple[Literal[1], Literal[2], Literal[3]]]
 ```
 
 Literals are always promoted for invariant containers such as `list`, however, even though this can
@@ -525,10 +527,6 @@ from typing import Literal
 reveal_type(list((1, 2, 3)))  # revealed: list[int]
 reveal_type(list(((1, 2, 3),)))  # revealed: list[tuple[int, int, int]]
 
-# TODO: we could bidirectionally infer that the user does not want literals to be promoted here,
-# and avoid this diagnostic
-#
-# error: [invalid-assignment] "`list[int]` is not assignable to `list[Literal[1, 2, 3]]`"
 x: list[Literal[1, 2, 3]] = list((1, 2, 3))
 reveal_type(x)  # revealed: list[Literal[1, 2, 3]]
 ```

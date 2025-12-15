@@ -1,6 +1,6 @@
 use super::options::DiagnosticMode;
 
-use ty_ide::InlayHintSettings;
+use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::options::ProjectOptionsOverrides;
 
 /// Resolved client settings that are shared across all workspaces.
@@ -11,26 +11,13 @@ pub(crate) struct GlobalSettings {
 }
 
 impl GlobalSettings {
-    pub(crate) fn is_rename_enabled(&self) -> bool {
-        self.experimental.rename
-    }
-
-    pub(crate) fn is_auto_import_enabled(&self) -> bool {
-        self.experimental.auto_import
-    }
-}
-
-impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
     }
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
-pub(crate) struct ExperimentalSettings {
-    pub(super) rename: bool,
-    pub(super) auto_import: bool,
-}
+pub(crate) struct ExperimentalSettings;
 
 /// Resolved client settings for a specific workspace.
 ///
@@ -40,6 +27,7 @@ pub(crate) struct ExperimentalSettings {
 pub(crate) struct WorkspaceSettings {
     pub(super) disable_language_services: bool,
     pub(super) inlay_hints: InlayHintSettings,
+    pub(super) completions: CompletionSettings,
     pub(super) overrides: Option<ProjectOptionsOverrides>,
 }
 
@@ -54,5 +42,9 @@ impl WorkspaceSettings {
 
     pub(crate) fn inlay_hints(&self) -> &InlayHintSettings {
         &self.inlay_hints
+    }
+
+    pub(crate) fn completions(&self) -> &CompletionSettings {
+        &self.completions
     }
 }

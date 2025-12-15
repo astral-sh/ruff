@@ -73,10 +73,10 @@ __spec__ = 42  # error: [invalid-assignment] "Object of type `Literal[42]` is no
 ```py
 import module
 
-reveal_type(module.__file__)  # revealed: Unknown | None
+reveal_type(module.__file__)  # revealed: None
 reveal_type(module.__path__)  # revealed: list[str]
 reveal_type(module.__doc__)  # revealed: Unknown
-reveal_type(module.__spec__)  # revealed: Unknown | ModuleSpec | None
+reveal_type(module.__spec__)  # revealed: ModuleSpec | None
 # error: [unresolved-attribute]
 reveal_type(module.__warningregistry__)  # revealed: Unknown
 
@@ -97,7 +97,7 @@ inside the module:
 import typing
 
 reveal_type(typing.__name__)  # revealed: str
-reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = ellipsis) -> None
+reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name: str, doc: str | None = EllipsisType) -> None
 
 # For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
 # unset, but we follow typeshed here):
@@ -118,6 +118,21 @@ we're dealing with:
 ```py
 # error: [unresolved-attribute]
 reveal_type(typing.__getattr__)  # revealed: Unknown
+```
+
+However, if we have a `ModuleType` instance, we make `__getattr__` available. This means that
+arbitrary attribute accesses are allowed (with a result type of `Any`):
+
+```py
+import types
+
+reveal_type(types.ModuleType.__getattr__)  # revealed: def __getattr__(self, name: str) -> Any
+
+def f(module: types.ModuleType):
+    reveal_type(module.__getattr__)  # revealed: bound method ModuleType.__getattr__(name: str) -> Any
+
+    reveal_type(module.__all__)  # revealed: Any
+    reveal_type(module.whatever)  # revealed: Any
 ```
 
 ## `types.ModuleType.__dict__` takes precedence over global variable `__dict__`

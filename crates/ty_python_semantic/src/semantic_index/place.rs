@@ -181,7 +181,8 @@ impl PlaceTable {
     }
 
     /// Looks up a symbol by its name and returns a reference to it, if it exists.
-    #[cfg(test)]
+    ///
+    /// This should only be used in diagnostics and tests.
     pub(crate) fn symbol_by_name(&self, name: &str) -> Option<&Symbol> {
         self.symbols.symbol_id(name).map(|id| self.symbol(id))
     }

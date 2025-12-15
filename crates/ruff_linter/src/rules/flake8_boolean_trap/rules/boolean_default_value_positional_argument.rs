@@ -25,6 +25,11 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// keyword-only argument, to force callers to be explicit when providing
 /// the argument.
 ///
+/// This rule exempts methods decorated with [`@typing.override`][override],
+/// since changing the signature of a subclass method that overrides a
+/// superclass method may cause type checkers to complain about a violation of
+/// the Liskov Substitution Principle.
+///
 /// ## Example
 /// ```python
 /// from math import ceil, floor
@@ -89,7 +94,10 @@ use crate::rules::flake8_boolean_trap::helpers::is_allowed_func_def;
 /// ## References
 /// - [Python documentation: Calls](https://docs.python.org/3/reference/expressions.html#calls)
 /// - [_How to Avoid “The Boolean Trap”_ by Adam Johnson](https://adamj.eu/tech/2021/07/10/python-type-hints-how-to-avoid-the-boolean-trap/)
+///
+/// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.127")]
 pub(crate) struct BooleanDefaultValuePositionalArgument;
 
 impl Violation for BooleanDefaultValuePositionalArgument {

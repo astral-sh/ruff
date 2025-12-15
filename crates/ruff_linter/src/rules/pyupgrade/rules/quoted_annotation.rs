@@ -1,6 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
-use ruff_python_parser::TokenKind;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_semantic::SemanticModel;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{TextLen, TextRange, TextSize};
@@ -87,6 +87,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// [TC008]: https://docs.astral.sh/ruff/rules/quoted-type-alias/
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.242")]
 pub(crate) struct QuotedAnnotation;
 
 impl AlwaysFixableViolation for QuotedAnnotation {

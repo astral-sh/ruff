@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.13.1"
+version = "0.14.9"
 publish = true
 authors = { workspace = true }
 edition = { workspace = true }
@@ -72,6 +72,7 @@ dunce = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true, features = ["filters", "json"] }
 insta-cmd = { workspace = true }
+ruff_python_trivia = { workspace = true }
 tempfile = { workspace = true }
 test-case = { workspace = true }
 

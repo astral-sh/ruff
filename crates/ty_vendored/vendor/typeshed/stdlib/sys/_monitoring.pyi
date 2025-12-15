@@ -17,6 +17,10 @@ PROFILER_ID: Final = 2
 OPTIMIZER_ID: Final = 5
 
 def use_tool_id(tool_id: int, name: str, /) -> None: ...
+
+if sys.version_info >= (3, 14):
+    def clear_tool_id(tool_id: int, /) -> None: ...
+
 def free_tool_id(tool_id: int, /) -> None: ...
 def get_tool(tool_id: int, /) -> str | None: ...
 
@@ -43,10 +47,10 @@ class _events:
     STOP_ITERATION: Final[int]
     if sys.version_info >= (3, 14):
         BRANCH_LEFT: Final[int]
-        BRANCH_TAKEN: Final[int]
+        BRANCH_RIGHT: Final[int]
 
         @property
-        @deprecated("Deprecated since Python 3.14. Use `BRANCH_LEFT` or `BRANCH_TAKEN` instead.")
+        @deprecated("Deprecated since Python 3.14. Use `BRANCH_LEFT` or `BRANCH_RIGHT` instead.")
         def BRANCH(self) -> int: ...
 
     else:

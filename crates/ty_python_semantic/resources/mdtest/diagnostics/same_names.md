@@ -43,8 +43,7 @@ import b
 df: a.DataFrame = b.DataFrame()  # error: [invalid-assignment] "Object of type `b.DataFrame` is not assignable to `a.DataFrame`"
 
 def _(dfs: list[b.DataFrame]):
-    # TODO should be"Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`
-    # error: [invalid-assignment] "Object of type `list[DataFrame]` is not assignable to `list[DataFrame]`"
+    # error: [invalid-assignment] "Object of type `list[b.DataFrame]` is not assignable to `list[a.DataFrame]`"
     dataframes: list[a.DataFrame] = dfs
 ```
 
@@ -60,6 +59,35 @@ class DataFrame:
 ```py
 class DataFrame:
     pass
+```
+
+## Class from different module with the same qualified name
+
+`package/__init__.py`:
+
+```py
+from .foo import MyClass
+
+def make_MyClass() -> MyClass:
+    return MyClass()
+```
+
+`package/foo.pyi`:
+
+```pyi
+class MyClass: ...
+```
+
+`package/foo.py`:
+
+```py
+class MyClass: ...
+
+def get_MyClass() -> MyClass:
+    from . import make_MyClass
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `package.foo.MyClass @ src/package/foo.py:1`, found `package.foo.MyClass @ src/package/foo.pyi:1`"
+    return make_MyClass()
 ```
 
 ## Enum from different modules
@@ -143,7 +171,7 @@ class Config:
 import generic_a
 import generic_b
 
-# TODO should be error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
+# error: [invalid-assignment] "Object of type `<class 'generic_b.Container[int]'>` is not assignable to `type[generic_a.Container[int]]`"
 container: type[generic_a.Container[int]] = generic_b.Container[int]
 ```
 
@@ -171,13 +199,43 @@ class Container(Generic[T]):
 
 ## Protocols
 
+### Differing members
+
+`bad.py`:
+
+```py
+from typing import Protocol, TypeVar
+
+T_co = TypeVar("T_co", covariant=True)
+
+class Iterator(Protocol[T_co]):
+    def __nexxt__(self) -> T_co: ...
+
+def bad() -> Iterator[str]:
+    raise NotImplementedError
+```
+
+`main.py`:
+
+```py
+from typing import Iterator
+
+def f() -> Iterator[str]:
+    import bad
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `typing.Iterator[str]`, found `bad.Iterator[str]"
+    return bad.bad()
+```
+
+### Same members but with different types
+
 ```py
 from typing import Protocol
 import proto_a
 import proto_b
 
-# TODO should be error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
 def _(drawable_b: proto_b.Drawable):
+    # error: [invalid-assignment] "Object of type `proto_b.Drawable` is not assignable to `proto_a.Drawable`"
     drawable: proto_a.Drawable = drawable_b
 ```
 
@@ -207,7 +265,7 @@ import dict_a
 import dict_b
 
 def _(b_person: dict_b.Person):
-    # TODO should be error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
+    # error: [invalid-assignment] "Object of type `dict_b.Person` is not assignable to `dict_a.Person`"
     person_var: dict_a.Person = b_person
 ```
 
@@ -227,4 +285,22 @@ from typing import TypedDict
 
 class Person(TypedDict):
     name: bytes
+```
+
+## Tuple specializations
+
+`module.py`:
+
+```py
+class Model: ...
+```
+
+```py
+class Model: ...
+
+def get_models_tuple() -> tuple[Model]:
+    from module import Model
+
+    # error: [invalid-return-type] "Return type does not match returned value: expected `tuple[mdtest_snippet.Model]`, found `tuple[module.Model]`"
+    return (Model(),)
 ```

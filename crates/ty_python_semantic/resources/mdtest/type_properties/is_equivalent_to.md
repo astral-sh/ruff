@@ -133,6 +133,16 @@ class Single(Enum):
     VALUE = 1
 
 static_assert(is_equivalent_to(P | Q | Single, Literal[Single.VALUE] | Q | P))
+
+static_assert(is_equivalent_to(Any, Any | Intersection[Any, str]))
+static_assert(is_equivalent_to(Any, Intersection[str, Any] | Any))
+static_assert(is_equivalent_to(Any, Any | Intersection[Any, Not[None]]))
+static_assert(is_equivalent_to(Any, Intersection[Not[None], Any] | Any))
+
+static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, str]))
+static_assert(is_equivalent_to(Any, Intersection[str, Unknown] | Unknown))
+static_assert(is_equivalent_to(Any, Unknown | Intersection[Unknown, Not[None]]))
+static_assert(is_equivalent_to(Any, Intersection[Not[None], Unknown] | Unknown))
 ```
 
 ## Tuples
@@ -454,7 +464,7 @@ gradual types. The cases with fully static types and using different combination
 are covered above.
 
 ```py
-from ty_extensions import Unknown, CallableTypeOf, is_equivalent_to, static_assert
+from ty_extensions import Unknown, CallableTypeOf, TypeOf, is_equivalent_to, static_assert
 from typing import Any, Callable
 
 static_assert(is_equivalent_to(Callable[..., int], Callable[..., int]))
@@ -466,14 +476,17 @@ static_assert(not is_equivalent_to(Callable[[int, str], None], Callable[[int, st
 static_assert(not is_equivalent_to(Callable[..., None], Callable[[], None]))
 ```
 
-A function with no explicit return type should be gradual equivalent to a callable with a return
-type of `Any`.
+A function with no explicit return type should be gradually equivalent to a function-like callable
+with a return type of `Any`.
 
 ```py
 def f1():
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f1], Callable[[], Any]))
+def f1_equivalent() -> Any:
+    return
+
+static_assert(is_equivalent_to(CallableTypeOf[f1], CallableTypeOf[f1_equivalent]))
 ```
 
 And, similarly for parameters with no annotations.
@@ -482,12 +495,15 @@ And, similarly for parameters with no annotations.
 def f2(a, b, /) -> None:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[f2], Callable[[Any, Any], None]))
+def f2_equivalent(a: Any, b: Any, /) -> None:
+    return
+
+static_assert(is_equivalent_to(CallableTypeOf[f2], CallableTypeOf[f2_equivalent]))
 ```
 
-Additionally, as per the spec, a function definition that includes both `*args` and `**kwargs`
-parameter that are annotated as `Any` or kept unannotated should be gradual equivalent to a callable
-with `...` as the parameter type.
+A function definition that includes both `*args` and `**kwargs` parameter that are annotated as
+`Any` or kept unannotated should be gradual equivalent to a callable with `...` as the parameter
+type.
 
 ```py
 def variadic_without_annotation(*args, **kwargs):
@@ -496,12 +512,27 @@ def variadic_without_annotation(*args, **kwargs):
 def variadic_with_annotation(*args: Any, **kwargs: Any) -> Any:
     return
 
-static_assert(is_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
-static_assert(is_equivalent_to(CallableTypeOf[variadic_with_annotation], Callable[..., Any]))
+def _(
+    signature_variadic_without_annotation: CallableTypeOf[variadic_without_annotation],
+    signature_variadic_with_annotation: CallableTypeOf[variadic_with_annotation],
+) -> None:
+    # revealed: (...) -> Unknown
+    reveal_type(signature_variadic_without_annotation)
+    # revealed: (...) -> Any
+    reveal_type(signature_variadic_with_annotation)
 ```
 
-But, a function with either `*args` or `**kwargs` (and not both) is not gradual equivalent to a
-callable with `...` as the parameter type.
+Note that `variadic_without_annotation` and `variadic_with_annotation` are *not* considered
+gradually equivalent to `Callable[..., Any]`, because the latter is not a function-like callable
+type:
+
+```py
+static_assert(not is_equivalent_to(CallableTypeOf[variadic_without_annotation], Callable[..., Any]))
+static_assert(not is_equivalent_to(CallableTypeOf[variadic_with_annotation], Callable[..., Any]))
+```
+
+A function with either `*args` or `**kwargs` (and not both) is is not equivalent to a callable with
+`...` as the parameter type.
 
 ```py
 def variadic_args(*args):
@@ -509,6 +540,15 @@ def variadic_args(*args):
 
 def variadic_kwargs(**kwargs):
     return
+
+def _(
+    signature_variadic_args: CallableTypeOf[variadic_args],
+    signature_variadic_kwargs: CallableTypeOf[variadic_kwargs],
+) -> None:
+    # revealed: (*args) -> Unknown
+    reveal_type(signature_variadic_args)
+    # revealed: (**kwargs) -> Unknown
+    reveal_type(signature_variadic_kwargs)
 
 static_assert(not is_equivalent_to(CallableTypeOf[variadic_args], Callable[..., Any]))
 static_assert(not is_equivalent_to(CallableTypeOf[variadic_kwargs], Callable[..., Any]))
@@ -567,23 +607,33 @@ module:
 `module2.py`:
 
 ```py
-import importlib
-import importlib.abc
+import imported
+import imported.abc
+```
+
+`imported/__init__.pyi`:
+
+```pyi
+```
+
+`imported/abc.pyi`:
+
+```pyi
 ```
 
 `main2.py`:
 
 ```py
-import importlib
-from module2 import importlib as other_importlib
+import imported
+from module2 import imported as other_imported
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
-# error: [unresolved-attribute] "Type `<module 'importlib'>` has no attribute `abc`"
-reveal_type(importlib.abc)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(imported.abc)  # revealed: Unknown
 
-reveal_type(other_importlib.abc)  # revealed: <module 'importlib.abc'>
+reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 
-static_assert(not is_equivalent_to(TypeOf[importlib], TypeOf[other_importlib]))
+static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
 ```
 
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize

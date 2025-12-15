@@ -1,3 +1,4 @@
+use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 
@@ -47,6 +48,7 @@ use crate::{FixAvailability, Violation};
 /// - [Why you should be using pathlib](https://treyhunner.com/2018/12/why-you-should-be-using-pathlib/)
 /// - [No really, pathlib is great](https://treyhunner.com/2019/01/no-really-pathlib-is-great/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.231")]
 pub(crate) struct OsRmdir;
 
 impl Violation for OsRmdir {
@@ -83,6 +85,6 @@ pub(crate) fn os_rmdir(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         "path",
         is_fix_os_rmdir_enabled(checker.settings()),
         OsRmdir,
-        None,
+        Applicability::Safe,
     );
 }

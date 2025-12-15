@@ -1,24 +1,15 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
 ---
-S307 Use of possibly insecure function; consider using `ast.literal_eval`
- --> S307.py:3:7
-  |
-1 | import os
-2 |
-3 | print(eval("1+1"))  # S307
-  |       ^^^^^^^^^^^
-4 | print(eval("os.getcwd()"))  # S307
-  |
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
 
-S307 Use of possibly insecure function; consider using `ast.literal_eval`
- --> S307.py:4:7
-  |
-3 | print(eval("1+1"))  # S307
-4 | print(eval("os.getcwd()"))  # S307
-  |       ^^^^^^^^^^^^^^^^^^^
-  |
+--- Summary ---
+Removed: 0
+Added: 2
 
+--- Added ---
 S307 Use of possibly insecure function; consider using `ast.literal_eval`
   --> S307.py:16:5
    |
@@ -27,6 +18,7 @@ S307 Use of possibly insecure function; consider using `ast.literal_eval`
    |     ^^^^
 17 | foo = eval
    |
+
 
 S307 Use of possibly insecure function; consider using `ast.literal_eval`
   --> S307.py:17:7

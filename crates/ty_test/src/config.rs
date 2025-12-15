@@ -4,8 +4,12 @@
 //!
 //! ```toml
 //! log = true # or log = "ty=WARN"
+//!
 //! [environment]
 //! python-version = "3.10"
+//!
+//! [project]
+//! dependencies = ["pydantic==2.12.2"]
 //! ```
 
 use anyhow::Context;
@@ -25,6 +29,9 @@ pub(crate) struct MarkdownTestConfig {
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
     pub(crate) system: Option<SystemKind>,
+
+    /// Project configuration for installing external dependencies.
+    pub(crate) project: Option<Project>,
 }
 
 impl MarkdownTestConfig {
@@ -51,6 +58,10 @@ impl MarkdownTestConfig {
     pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
     }
+
+    pub(crate) fn dependencies(&self) -> Option<&[String]> {
+        self.project.as_ref()?.dependencies.as_deref()
+    }
 }
 
 #[derive(Deserialize, Debug, Default, Clone)]
@@ -63,7 +74,7 @@ pub(crate) struct Environment {
     ///
     /// By default, the Python version is inferred as the lower bound of the project's
     /// `requires-python` field from the `pyproject.toml`, if available. Otherwise, the latest
-    /// stable version supported by ty is used, which is currently 3.13.
+    /// stable version supported by ty is used (see `ty check --help` output).
     ///
     /// ty will not infer the Python version from the Python environment at this time.
     pub(crate) python_version: Option<PythonVersion>,
@@ -115,4 +126,17 @@ pub(crate) enum SystemKind {
     ///
     /// This system should only be used when testing system or OS specific behavior.
     Os,
+}
+
+/// Project configuration for tests that need external dependencies.
+#[derive(Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Project {
+    /// List of Python package dependencies in `pyproject.toml` format.
+    ///
+    /// These will be installed using `uv sync` into a temporary virtual environment.
+    /// The site-packages directory will then be copied into the test's filesystem.
+    ///
+    /// Example: `dependencies = ["pydantic==2.12.2"]`
+    pub(crate) dependencies: Option<Vec<String>>,
 }

@@ -1,0 +1,51 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+[
+  {
+    "title": "Ignore 'possibly-missing-attribute' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 0
+          },
+          "end": {
+            "line": 1,
+            "character": 11
+          }
+        },
+        "severity": 2,
+        "code": "possibly-missing-attribute",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#possibly-missing-attribute"
+        },
+        "source": "ty",
+        "message": "Submodule `parser` may not be available as an attribute on module `html`"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 11
+              },
+              "end": {
+                "line": 1,
+                "character": 11
+              }
+            },
+            "newText": "  # ty:ignore[possibly-missing-attribute]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]

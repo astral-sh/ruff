@@ -1,14 +1,15 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::helpers::map_subscript;
+use ruff_python_ast::helpers::{map_callable, map_subscript};
 use ruff_python_ast::name::QualifiedName;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{self as ast, Expr, Stmt, visitor};
 use ruff_python_semantic::analyze::{function_type, visibility};
 use ruff_python_semantic::{Definition, SemanticModel};
-use ruff_source_file::NewlineWithTrailingNewline;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_source_file::{LineRanges, NewlineWithTrailingNewline};
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashMap;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
@@ -17,6 +18,63 @@ use crate::docstrings::sections::{SectionContext, SectionContexts, SectionKind};
 use crate::docstrings::styles::SectionStyle;
 use crate::registry::Rule;
 use crate::rules::pydocstyle::settings::Convention;
+
+/// ## What it does
+/// Checks for function docstrings that include parameters which are not
+/// in the function signature.
+///
+/// ## Why is this bad?
+/// If a docstring documents a parameter which is not in the function signature,
+/// it can be misleading to users and/or a sign of incomplete documentation or
+/// refactors.
+///
+/// ## Example
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///         acceleration: Rate of change of speed.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def calculate_speed(distance: float, time: float) -> float:
+///     """Calculate speed as distance divided by time.
+///
+///     Args:
+///         distance: Distance traveled.
+///         time: Time spent traveling.
+///
+///     Returns:
+///         Speed as distance divided by time.
+///     """
+///     return distance / time
+/// ```
+#[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.14.1")]
+pub(crate) struct DocstringExtraneousParameter {
+    id: String,
+}
+
+impl Violation for DocstringExtraneousParameter {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DocstringExtraneousParameter { id } = self;
+        format!("Documented parameter `{id}` is not in the function's signature")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some("Remove the extraneous parameter from the docstring".to_string())
+    }
+}
 
 /// ## What it does
 /// Checks for functions with `return` statements that do not have "Returns"
@@ -56,6 +114,7 @@ use crate::rules::pydocstyle::settings::Convention;
 ///     return distance / time
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringMissingReturns;
 
 impl Violation for DocstringMissingReturns {
@@ -107,6 +166,7 @@ impl Violation for DocstringMissingReturns {
 ///         print("Hello!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.6")]
 pub(crate) struct DocstringExtraneousReturns;
 
 impl Violation for DocstringExtraneousReturns {
@@ -159,6 +219,7 @@ impl Violation for DocstringExtraneousReturns {
 ///         yield i
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringMissingYields;
 
 impl Violation for DocstringMissingYields {
@@ -210,6 +271,7 @@ impl Violation for DocstringMissingYields {
 ///         print("Hello!")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.7")]
 pub(crate) struct DocstringExtraneousYields;
 
 impl Violation for DocstringExtraneousYields {
@@ -281,6 +343,7 @@ impl Violation for DocstringExtraneousYields {
 ///         raise FasterThanLightError from exc
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringMissingException {
     id: String,
 }
@@ -348,6 +411,7 @@ impl Violation for DocstringMissingException {
 /// could possibly raise, even those which are not explicitly raised using
 /// `raise` statements in the function body.
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "0.5.5")]
 pub(crate) struct DocstringExtraneousException {
     ids: Vec<String>,
 }
@@ -396,6 +460,19 @@ impl GenericSection {
     }
 }
 
+/// A parameter in a docstring with its text range.
+#[derive(Debug, Clone)]
+struct ParameterEntry<'a> {
+    name: &'a str,
+    range: TextRange,
+}
+
+impl Ranged for ParameterEntry<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
 /// A "Raises" section in a docstring.
 #[derive(Debug)]
 struct RaisesSection<'a> {
@@ -414,8 +491,36 @@ impl<'a> RaisesSection<'a> {
     /// a "Raises" section.
     fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
         Self {
-            raised_exceptions: parse_entries(section.following_lines_str(), style),
+            raised_exceptions: parse_raises(section.following_lines_str(), style),
             range: section.range(),
+        }
+    }
+}
+
+/// An "Args" or "Parameters" section in a docstring.
+#[derive(Debug)]
+struct ParametersSection<'a> {
+    parameters: Vec<ParameterEntry<'a>>,
+    range: TextRange,
+}
+
+impl Ranged for ParametersSection<'_> {
+    fn range(&self) -> TextRange {
+        self.range
+    }
+}
+
+impl<'a> ParametersSection<'a> {
+    /// Return the parameters for the docstring, or `None` if the docstring does not contain
+    /// an "Args" or "Parameters" section.
+    fn from_section(section: &SectionContext<'a>, style: Option<SectionStyle>) -> Self {
+        Self {
+            parameters: parse_parameters(
+                section.following_lines_str(),
+                section.following_range().start(),
+                style,
+            ),
+            range: section.section_name_range(),
         }
     }
 }
@@ -425,6 +530,7 @@ struct DocstringSections<'a> {
     returns: Option<GenericSection>,
     yields: Option<GenericSection>,
     raises: Option<RaisesSection<'a>>,
+    parameters: Option<ParametersSection<'a>>,
 }
 
 impl<'a> DocstringSections<'a> {
@@ -432,6 +538,10 @@ impl<'a> DocstringSections<'a> {
         let mut docstring_sections = Self::default();
         for section in sections {
             match section.kind() {
+                SectionKind::Args | SectionKind::Arguments | SectionKind::Parameters => {
+                    docstring_sections.parameters =
+                        Some(ParametersSection::from_section(&section, style));
+                }
                 SectionKind::Raises => {
                     docstring_sections.raises = Some(RaisesSection::from_section(&section, style));
                 }
@@ -448,18 +558,22 @@ impl<'a> DocstringSections<'a> {
     }
 }
 
-/// Parse the entries in a "Raises" section of a docstring.
+/// Parse the entries in a "Parameters" section of a docstring.
 ///
 /// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
 /// entries are found.
-fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName<'_>> {
+fn parse_parameters(
+    content: &str,
+    content_start: TextSize,
+    style: Option<SectionStyle>,
+) -> Vec<ParameterEntry<'_>> {
     match style {
-        Some(SectionStyle::Google) => parse_entries_google(content),
-        Some(SectionStyle::Numpy) => parse_entries_numpy(content),
+        Some(SectionStyle::Google) => parse_parameters_google(content, content_start),
+        Some(SectionStyle::Numpy) => parse_parameters_numpy(content, content_start),
         None => {
-            let entries = parse_entries_google(content);
+            let entries = parse_parameters_google(content, content_start);
             if entries.is_empty() {
-                parse_entries_numpy(content)
+                parse_parameters_numpy(content, content_start)
             } else {
                 entries
             }
@@ -467,26 +581,176 @@ fn parse_entries(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedNam
     }
 }
 
-/// Parses Google-style docstring sections of the form:
+/// Parses Google-style "Args" sections of the form:
+///
+/// ```python
+/// Args:
+///     a (int): The first number to add.
+///     b (int): The second number to add.
+/// ```
+fn parse_parameters_google(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
+    let mut entries: Vec<ParameterEntry> = Vec::new();
+    // Find first entry to determine indentation
+    let Some(first_arg) = content.lines().next() else {
+        return entries;
+    };
+    let indentation = &first_arg[..first_arg.len() - first_arg.trim_start().len()];
+
+    let mut current_pos = TextSize::ZERO;
+    for line in content.lines() {
+        let line_start = current_pos;
+        current_pos = content.full_line_end(line_start);
+
+        if let Some(entry) = line.strip_prefix(indentation) {
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
+                let Some((before_colon, _)) = entry.split_once(':') else {
+                    continue;
+                };
+                if let Some(param) = before_colon.split_whitespace().next() {
+                    let param_name = param.trim_start_matches('*');
+                    if is_identifier(param_name) {
+                        let param_start = line_start + indentation.text_len();
+                        let param_end = param_start + param.text_len();
+
+                        entries.push(ParameterEntry {
+                            name: param_name,
+                            range: TextRange::new(
+                                content_start + param_start,
+                                content_start + param_end,
+                            ),
+                        });
+                    }
+                }
+            }
+        }
+    }
+    entries
+}
+
+/// Parses NumPy-style "Parameters" sections of the form:
+///
+/// ```python
+/// Parameters
+/// ----------
+/// a : int
+///     The first number to add.
+/// b : int
+///     The second number to add.
+/// ```
+fn parse_parameters_numpy(content: &str, content_start: TextSize) -> Vec<ParameterEntry<'_>> {
+    let mut entries: Vec<ParameterEntry> = Vec::new();
+    let mut lines = content.lines();
+    let Some(dashes) = lines.next() else {
+        return entries;
+    };
+    let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
+
+    let mut current_pos = content.full_line_end(dashes.text_len());
+    for potential in lines {
+        let line_start = current_pos;
+        current_pos = content.full_line_end(line_start);
+
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if entry
+                .chars()
+                .next()
+                .is_some_and(|first_char| !first_char.is_whitespace())
+            {
+                if let Some(before_colon) = entry.split(':').next() {
+                    let param_line = before_colon.trim_end();
+
+                    // Split on commas to handle comma-separated parameters
+                    let mut current_offset = TextSize::from(0);
+                    for param_part in param_line.split(',') {
+                        let param_part_trimmed = param_part.trim();
+                        let param_name = param_part_trimmed.trim_start_matches('*');
+                        if is_identifier(param_name) {
+                            // Calculate the position of this specific parameter part within the line
+                            // Account for leading whitespace that gets trimmed
+                            let param_start_in_line = current_offset
+                                + (param_part.text_len() - param_part_trimmed.text_len());
+                            let param_start =
+                                line_start + indentation.text_len() + param_start_in_line;
+
+                            entries.push(ParameterEntry {
+                                name: param_name,
+                                range: TextRange::at(
+                                    content_start + param_start,
+                                    param_part_trimmed.text_len(),
+                                ),
+                            });
+                        }
+                        // Update offset for next iteration: add the part length plus comma length
+                        current_offset = current_offset + param_part.text_len() + ','.text_len();
+                    }
+                }
+            }
+        }
+    }
+    entries
+}
+
+/// Parse the entries in a "Raises" section of a docstring.
+///
+/// Attempts to parse using the specified [`SectionStyle`], falling back to the other style if no
+/// entries are found.
+fn parse_raises(content: &str, style: Option<SectionStyle>) -> Vec<QualifiedName<'_>> {
+    match style {
+        Some(SectionStyle::Google) => parse_raises_google(content),
+        Some(SectionStyle::Numpy) => parse_raises_numpy(content),
+        None => {
+            let entries = parse_raises_google(content);
+            if entries.is_empty() {
+                parse_raises_numpy(content)
+            } else {
+                entries
+            }
+        }
+    }
+}
+
+/// Parses Google-style "Raises" section of the form:
 ///
 /// ```python
 /// Raises:
 ///     FasterThanLightError: If speed is greater than the speed of light.
 ///     DivisionByZero: If attempting to divide by zero.
 /// ```
-fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
+fn parse_raises_google(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
-    for potential in content.lines() {
-        let Some(colon_idx) = potential.find(':') else {
-            continue;
-        };
-        let entry = potential[..colon_idx].trim();
-        entries.push(QualifiedName::user_defined(entry));
+    let mut lines = content.lines().peekable();
+    let Some(first) = lines.peek() else {
+        return entries;
+    };
+    let indentation = &first[..first.len() - first.trim_start().len()];
+    for potential in lines {
+        if let Some(entry) = potential.strip_prefix(indentation) {
+            if let Some(first_char) = entry.chars().next() {
+                if !first_char.is_whitespace() {
+                    if let Some(colon_idx) = entry.find(':') {
+                        let entry = entry[..colon_idx].trim();
+                        if !entry.is_empty() {
+                            entries.push(QualifiedName::user_defined(entry));
+                        }
+                    }
+                }
+            }
+        } else {
+            // If we can't strip the expected indentation, check if this is a dedented line
+            // (not blank) - if so, break early as we've reached the end of this section
+            if !potential.trim().is_empty() {
+                break;
+            }
+        }
     }
     entries
 }
 
-/// Parses NumPy-style docstring sections of the form:
+/// Parses NumPy-style "Raises" section of the form:
 ///
 /// ```python
 /// Raises
@@ -496,7 +760,7 @@ fn parse_entries_google(content: &str) -> Vec<QualifiedName<'_>> {
 /// DivisionByZero
 ///     If attempting to divide by zero.
 /// ```
-fn parse_entries_numpy(content: &str) -> Vec<QualifiedName<'_>> {
+fn parse_raises_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let mut entries: Vec<QualifiedName> = Vec::new();
     let mut lines = content.lines();
     let Some(dashes) = lines.next() else {
@@ -505,6 +769,12 @@ fn parse_entries_numpy(content: &str) -> Vec<QualifiedName<'_>> {
     let indentation = &dashes[..dashes.len() - dashes.trim_start().len()];
     for potential in lines {
         if let Some(entry) = potential.strip_prefix(indentation) {
+            // Check for Sphinx directives (lines starting with ..) - these indicate the end of the
+            // section. In numpy-style, exceptions are dedented to the same level as sphinx
+            // directives.
+            if entry.starts_with("..") {
+                break;
+            }
             if let Some(first_char) = entry.chars().next() {
                 if !first_char.is_whitespace() {
                     entries.push(QualifiedName::user_defined(entry.trim_end()));
@@ -590,6 +860,8 @@ struct BodyVisitor<'a> {
     currently_suspended_exceptions: Option<&'a ast::Expr>,
     raised_exceptions: Vec<ExceptionEntry<'a>>,
     semantic: &'a SemanticModel<'a>,
+    /// Maps exception variable names to their exception expressions in the current except clause
+    exception_variables: FxHashMap<&'a str, &'a ast::Expr>,
 }
 
 impl<'a> BodyVisitor<'a> {
@@ -600,6 +872,7 @@ impl<'a> BodyVisitor<'a> {
             currently_suspended_exceptions: None,
             raised_exceptions: Vec::new(),
             semantic,
+            exception_variables: FxHashMap::default(),
         }
     }
 
@@ -631,20 +904,47 @@ impl<'a> BodyVisitor<'a> {
             raised_exceptions,
         }
     }
+
+    /// Store `exception` if its qualified name does not correspond to one of the exempt types.
+    fn maybe_store_exception(&mut self, exception: &'a Expr, range: TextRange) {
+        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception) else {
+            return;
+        };
+        if is_exception_or_base_exception(&qualified_name) {
+            return;
+        }
+        self.raised_exceptions.push(ExceptionEntry {
+            qualified_name,
+            range,
+        });
+    }
 }
 
 impl<'a> Visitor<'a> for BodyVisitor<'a> {
     fn visit_except_handler(&mut self, handler: &'a ast::ExceptHandler) {
         let ast::ExceptHandler::ExceptHandler(handler_inner) = handler;
         self.currently_suspended_exceptions = handler_inner.type_.as_deref();
+
+        // Track exception variable bindings
+        if let Some(name) = handler_inner.name.as_ref() {
+            if let Some(exceptions) = self.currently_suspended_exceptions {
+                // Store the exception expression(s) for later resolution
+                self.exception_variables
+                    .insert(name.id.as_str(), exceptions);
+            }
+        }
+
         visitor::walk_except_handler(self, handler);
         self.currently_suspended_exceptions = None;
+        // Clear exception variables when leaving the except handler
+        self.exception_variables.clear();
     }
 
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match stmt {
             Stmt::Raise(ast::StmtRaise { exc, .. }) => {
                 if let Some(exc) = exc.as_ref() {
+                    // First try to resolve the exception directly
                     if let Some(qualified_name) =
                         self.semantic.resolve_qualified_name(map_callable(exc))
                     {
@@ -652,28 +952,27 @@ impl<'a> Visitor<'a> for BodyVisitor<'a> {
                             qualified_name,
                             range: exc.range(),
                         });
+                    } else if let ast::Expr::Name(name) = exc.as_ref() {
+                        // If it's a variable name, check if it's bound to an exception in the
+                        // current except clause
+                        if let Some(exception_expr) = self.exception_variables.get(name.id.as_str())
+                        {
+                            if let ast::Expr::Tuple(tuple) = exception_expr {
+                                for exception in tuple {
+                                    self.maybe_store_exception(exception, stmt.range());
+                                }
+                            } else {
+                                self.maybe_store_exception(exception_expr, stmt.range());
+                            }
+                        }
                     }
                 } else if let Some(exceptions) = self.currently_suspended_exceptions {
-                    let mut maybe_store_exception = |exception| {
-                        let Some(qualified_name) = self.semantic.resolve_qualified_name(exception)
-                        else {
-                            return;
-                        };
-                        if is_exception_or_base_exception(&qualified_name) {
-                            return;
-                        }
-                        self.raised_exceptions.push(ExceptionEntry {
-                            qualified_name,
-                            range: stmt.range(),
-                        });
-                    };
-
                     if let ast::Expr::Tuple(tuple) = exceptions {
                         for exception in tuple {
-                            maybe_store_exception(exception);
+                            self.maybe_store_exception(exception, stmt.range());
                         }
                     } else {
-                        maybe_store_exception(exceptions);
+                        self.maybe_store_exception(exceptions, stmt.range());
                     }
                 }
             }
@@ -867,6 +1166,17 @@ fn is_generator_function_annotated_as_returning_none(
         .is_some_and(GeneratorOrIteratorArguments::indicates_none_returned)
 }
 
+fn parameters_from_signature<'a>(docstring: &'a Docstring) -> Vec<&'a str> {
+    let mut parameters = Vec::new();
+    let Some(function) = docstring.definition.as_function_def() else {
+        return parameters;
+    };
+    for param in &function.parameters {
+        parameters.push(param.name());
+    }
+    parameters
+}
+
 fn is_one_line(docstring: &Docstring) -> bool {
     let mut non_empty_line_count = 0;
     for line in NewlineWithTrailingNewline::from(docstring.body().as_str()) {
@@ -880,7 +1190,7 @@ fn is_one_line(docstring: &Docstring) -> bool {
     true
 }
 
-/// DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
+/// DOC102, DOC201, DOC202, DOC402, DOC403, DOC501, DOC502
 pub(crate) fn check_docstring(
     checker: &Checker,
     definition: &Definition,
@@ -919,6 +1229,8 @@ pub(crate) fn check_docstring(
         visitor.visit_body(&function_def.body);
         visitor.finish()
     };
+
+    let signature_parameters = parameters_from_signature(docstring);
 
     // DOC201
     if checker.is_rule_enabled(Rule::DocstringMissingReturns) {
@@ -1004,6 +1316,25 @@ pub(crate) fn check_docstring(
                     },
                     docstring.range(),
                 );
+            }
+        }
+    }
+
+    // DOC102
+    if checker.is_rule_enabled(Rule::DocstringExtraneousParameter) {
+        // Don't report extraneous parameters if the signature defines *args or **kwargs
+        if function_def.parameters.vararg.is_none() && function_def.parameters.kwarg.is_none() {
+            if let Some(docstring_params) = docstring_sections.parameters {
+                for docstring_param in &docstring_params.parameters {
+                    if !signature_parameters.contains(&docstring_param.name) {
+                        checker.report_diagnostic(
+                            DocstringExtraneousParameter {
+                                id: docstring_param.name.to_string(),
+                            },
+                            docstring_param.range(),
+                        );
+                    }
+                }
             }
         }
     }

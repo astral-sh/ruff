@@ -223,6 +223,11 @@ impl DisplayParseError {
     pub fn path(&self) -> Option<&Path> {
         self.path.as_deref()
     }
+
+    /// Return the underlying [`ParseError`].
+    pub fn error(&self) -> &ParseError {
+        &self.error
+    }
 }
 
 impl std::error::Error for DisplayParseError {}

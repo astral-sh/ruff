@@ -28,6 +28,7 @@ use crate::checkers::ast::Checker;
 /// print(a)  # 3
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedeclaredAssignedName {
     name: String,
 }

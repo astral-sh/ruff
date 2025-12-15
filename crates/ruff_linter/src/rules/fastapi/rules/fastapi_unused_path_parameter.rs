@@ -1,6 +1,7 @@
-use std::iter::Peekable;
 use std::ops::Range;
-use std::str::CharIndices;
+use std::sync::LazyLock;
+
+use regex::{CaptureMatches, Regex};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
@@ -63,6 +64,7 @@ use crate::{FixAvailability, Violation};
 /// This rule's fix is marked as unsafe, as modifying a function signature can
 /// change the behavior of the code.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.10.0")]
 pub(crate) struct FastApiUnusedPathParameter {
     arg_name: String,
     function_name: String,
@@ -165,11 +167,6 @@ pub(crate) fn fastapi_unused_path_parameter(
 
     // Check if any of the path parameters are not in the function signature.
     for (path_param, range) in path_params {
-        // Ignore invalid identifiers (e.g., `user-id`, as opposed to `user_id`)
-        if !is_identifier(path_param) {
-            continue;
-        }
-
         // If the path parameter is already in the function or the dependency signature,
         // we don't need to do anything.
         if named_args.contains(&path_param) {
@@ -196,7 +193,7 @@ pub(crate) fn fastapi_unused_path_parameter(
                 .add_start(TextSize::from(range.start as u32 + 1))
                 .sub_end(TextSize::from((path.len() - range.end + 1) as u32)),
         );
-        if !is_positional {
+        if !is_positional && is_identifier(path_param) && path_param != "__debug__" {
             diagnostic.set_fix(Fix::unsafe_edit(add_parameter(
                 path_param,
                 &function_def.parameters,
@@ -461,15 +458,19 @@ fn parameter_alias<'a>(parameter: &'a Parameter, semantic: &SemanticModel) -> Op
 /// the parameter name. For example, `/{x}` is a valid parameter, but `/{ x }` is treated literally.
 #[derive(Debug)]
 struct PathParamIterator<'a> {
-    input: &'a str,
-    chars: Peekable<CharIndices<'a>>,
+    inner: CaptureMatches<'a, 'a>,
 }
 
 impl<'a> PathParamIterator<'a> {
     fn new(input: &'a str) -> Self {
-        PathParamIterator {
-            input,
-            chars: input.char_indices().peekable(),
+        /// Matches the Starlette pattern for path parameters with optional converters from
+        /// <https://github.com/Kludex/starlette/blob/e18637c68e36d112b1983bc0c8b663681e6a4c50/starlette/routing.py#L121>
+        static FASTAPI_PATH_PARAM_REGEX: LazyLock<Regex> = LazyLock::new(|| {
+            Regex::new(r"\{([a-zA-Z_][a-zA-Z0-9_]*)(?::[a-zA-Z_][a-zA-Z0-9_]*)?\}").unwrap()
+        });
+
+        Self {
+            inner: FASTAPI_PATH_PARAM_REGEX.captures_iter(input),
         }
     }
 }
@@ -478,19 +479,10 @@ impl<'a> Iterator for PathParamIterator<'a> {
     type Item = (&'a str, Range<usize>);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((start, c)) = self.chars.next() {
-            if c == '{' {
-                if let Some((end, _)) = self.chars.by_ref().find(|&(_, ch)| ch == '}') {
-                    let param_content = &self.input[start + 1..end];
-                    // We ignore text after a colon, since those are path converters
-                    // See also: https://fastapi.tiangolo.com/tutorial/path-params/?h=path#path-convertor
-                    let param_name_end = param_content.find(':').unwrap_or(param_content.len());
-                    let param_name = &param_content[..param_name_end];
-
-                    return Some((param_name, start..end + 1));
-                }
-            }
-        }
-        None
+        self.inner
+            .next()
+            // Extract the first capture group (the path parameter), but return the range of the
+            // whole match (everything in braces and including the braces themselves).
+            .and_then(|capture| Some((capture.get(1)?.as_str(), capture.get(0)?.range())))
     }
 }

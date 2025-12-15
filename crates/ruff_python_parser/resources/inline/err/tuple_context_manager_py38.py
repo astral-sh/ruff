@@ -4,8 +4,6 @@
 # anyway
 with (foo, bar): ...
 with (
-  open('foo.txt')) as foo: ...
-with (
   foo,
   bar,
   baz,

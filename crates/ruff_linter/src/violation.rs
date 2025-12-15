@@ -1,12 +1,17 @@
 use std::fmt::{Debug, Display};
 
+use serde::Serialize;
+
 use ruff_db::diagnostic::Diagnostic;
 use ruff_source_file::SourceFile;
 use ruff_text_size::TextRange;
 
-use crate::{codes::Rule, message::create_lint_diagnostic};
+use crate::{
+    codes::{Rule, RuleGroup},
+    message::create_lint_diagnostic,
+};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, Serialize)]
 pub enum FixAvailability {
     Sometimes,
     Always,
@@ -30,6 +35,15 @@ pub trait ViolationMetadata {
     /// Returns an explanation of what this violation catches,
     /// why it's bad, and what users should do instead.
     fn explain() -> Option<&'static str>;
+
+    /// Returns the rule group for this violation.
+    fn group() -> RuleGroup;
+
+    /// Returns the file where the violation is declared.
+    fn file() -> &'static str;
+
+    /// Returns the 1-based line where the violation is declared.
+    fn line() -> u32;
 }
 
 pub trait Violation: ViolationMetadata + Sized {

@@ -43,3 +43,44 @@ S609 Possible wildcard injection in call due to `*` usage
  9 |
 10 | subprocess.Popen(["chmod", "+w", "*.py"], shell={**{}})
    |
+
+S609 Possible wildcard injection in call due to `*` usage
+  --> S609.py:14:18
+   |
+13 | # Additional truthiness cases for generator, lambda, and f-strings
+14 | subprocess.Popen("chmod +w foo*", shell=(i for i in ()))
+   |                  ^^^^^^^^^^^^^^^
+15 | subprocess.Popen("chmod +w foo*", shell=lambda: 0)
+16 | subprocess.Popen("chmod +w foo*", shell=f"{b''}")
+   |
+
+S609 Possible wildcard injection in call due to `*` usage
+  --> S609.py:15:18
+   |
+13 | # Additional truthiness cases for generator, lambda, and f-strings
+14 | subprocess.Popen("chmod +w foo*", shell=(i for i in ()))
+15 | subprocess.Popen("chmod +w foo*", shell=lambda: 0)
+   |                  ^^^^^^^^^^^^^^^
+16 | subprocess.Popen("chmod +w foo*", shell=f"{b''}")
+17 | x = 1
+   |
+
+S609 Possible wildcard injection in call due to `*` usage
+  --> S609.py:16:18
+   |
+14 | subprocess.Popen("chmod +w foo*", shell=(i for i in ()))
+15 | subprocess.Popen("chmod +w foo*", shell=lambda: 0)
+16 | subprocess.Popen("chmod +w foo*", shell=f"{b''}")
+   |                  ^^^^^^^^^^^^^^^
+17 | x = 1
+18 | subprocess.Popen("chmod +w foo*", shell=f"{x=}")
+   |
+
+S609 Possible wildcard injection in call due to `*` usage
+  --> S609.py:18:18
+   |
+16 | subprocess.Popen("chmod +w foo*", shell=f"{b''}")
+17 | x = 1
+18 | subprocess.Popen("chmod +w foo*", shell=f"{x=}")
+   |                  ^^^^^^^^^^^^^^^
+   |

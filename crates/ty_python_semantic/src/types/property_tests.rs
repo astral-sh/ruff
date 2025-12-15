@@ -38,7 +38,6 @@ use type_generation::{intersection, union};
 ///
 /// where `t1`, `t2`, ..., `tn` are identifiers that represent arbitrary types, and `<property>`
 /// is an expression using these identifiers.
-///
 macro_rules! type_property_test {
     ($test_name:ident, $db:ident, forall types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
@@ -46,20 +45,34 @@ macro_rules! type_property_test {
         fn $test_name($($types: crate::types::property_tests::type_generation::Ty),+) -> bool {
             let $db = &crate::types::property_tests::setup::get_cached_db();
             $(let $types = $types.into_type($db);)+
+            let result = $property;
 
-            $property
+            if !result {
+                println!("\nFailing types were:");
+                $(println!("{}", $types.display($db));)+
+            }
+
+            result
         }
     };
+
     ($test_name:ident, $db:ident, forall fully_static_types $($types:ident),+ . $property:expr) => {
         #[quickcheck_macros::quickcheck]
         #[ignore]
         fn $test_name($($types: crate::types::property_tests::type_generation::FullyStaticTy),+) -> bool {
             let $db = &crate::types::property_tests::setup::get_cached_db();
             $(let $types = $types.into_type($db);)+
+            let result = $property;
 
-            $property
+            if !result {
+                println!("\nFailing types were:");
+                $(println!("{}", $types.display($db));)+
+            }
+
+            result
         }
     };
+
     // A property test with a logical implication.
     ($name:ident, $db:ident, forall $typekind:ident $($types:ident),+ . $premise:expr => $conclusion:expr) => {
         type_property_test!($name, $db, forall $typekind $($types),+ . !($premise) || ($conclusion));

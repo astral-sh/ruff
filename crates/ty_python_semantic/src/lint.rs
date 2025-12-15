@@ -1,10 +1,11 @@
+use crate::diagnostic::did_you_mean;
 use core::fmt;
 use itertools::Itertools;
 use ruff_db::diagnostic::{DiagnosticId, LintName, Severity};
 use rustc_hash::FxHashMap;
+use std::error::Error;
 use std::fmt::Formatter;
 use std::hash::Hasher;
-use thiserror::Error;
 
 #[derive(Debug, Clone)]
 pub struct LintMetadata {
@@ -115,6 +116,10 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
+    pub fn documentation_url(&self) -> String {
+        lint_documentation_url(self.name())
+    }
+
     pub fn default_level(&self) -> Level {
         self.default_level
     }
@@ -130,6 +135,10 @@ impl LintMetadata {
     pub fn line(&self) -> u32 {
         self.line
     }
+}
+
+pub fn lint_documentation_url(lint_name: LintName) -> String {
+    format!("https://ty.dev/rules#{lint_name}")
 }
 
 #[doc(hidden)]
@@ -380,7 +389,12 @@ impl LintRegistry {
                     }
                 }
 
-                Err(GetLintError::Unknown(code.to_string()))
+                let suggestion = did_you_mean(self.by_name.keys(), code);
+
+                Err(GetLintError::Unknown {
+                    code: code.to_string(),
+                    suggestion,
+                })
             }
         }
     }
@@ -415,23 +429,43 @@ impl LintRegistry {
     }
 }
 
-#[derive(Error, Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
 pub enum GetLintError {
     /// The name maps to this removed lint.
-    #[error("lint `{0}` has been removed")]
     Removed(LintName),
 
     /// No lint with the given name is known.
-    #[error("unknown lint `{0}`")]
-    Unknown(String),
+    Unknown {
+        code: String,
+        suggestion: Option<String>,
+    },
 
     /// The name uses the full qualified diagnostic id `lint:<rule>` instead of just `rule`.
     /// The String is the name without the `lint:` category prefix.
-    #[error("unknown lint `{prefixed}`. Did you mean `{suggestion}`?")]
     PrefixedWithCategory {
         prefixed: String,
         suggestion: String,
     },
+}
+
+impl Error for GetLintError {}
+
+impl std::fmt::Display for GetLintError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            GetLintError::Removed(code) => write!(f, "Removed rule `{code}`"),
+            GetLintError::Unknown { code, suggestion } => match suggestion {
+                None => write!(f, "Unknown rule `{code}`"),
+                Some(suggestion) => {
+                    write!(f, "Unknown rule `{code}`. Did you mean `{suggestion}`?")
+                }
+            },
+            GetLintError::PrefixedWithCategory {
+                prefixed,
+                suggestion,
+            } => write!(f, "Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]

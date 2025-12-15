@@ -80,7 +80,7 @@ def if_else_isinstance_error(obj: A | B):
     elif isinstance(obj, C):
         pass
     else:
-        # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+        # error: [type-assertion-failure] "Type `B & ~A & ~C` is not equivalent to `Never`"
         assert_never(obj)
 
 def if_else_singletons_success(obj: Literal[1, "a"] | None):
@@ -101,7 +101,7 @@ def if_else_singletons_error(obj: Literal[1, "a"] | None):
     elif obj is None:
         pass
     else:
-        # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+        # error: [type-assertion-failure] "Type `Literal["a"]` is not equivalent to `Never`"
         assert_never(obj)
 
 def match_singletons_success(obj: Literal[1, "a"] | None):
@@ -125,7 +125,9 @@ def match_singletons_error(obj: Literal[1, "a"] | None):
             pass
         case _ as obj:
             # TODO: We should emit an error here, but the message should
-            # show the type `Literal["a"]` instead of `@Todo(…)`.
-            # error: [type-assertion-failure] "Argument does not have asserted type `Never`"
+            # show the type `Literal["a"]` instead of `@Todo(…)`. We only
+            # assert on the first part of the message because the `@Todo`
+            # message is not available in release mode builds.
+            # error: [type-assertion-failure] "Type `@Todo"
             assert_never(obj)
 ```

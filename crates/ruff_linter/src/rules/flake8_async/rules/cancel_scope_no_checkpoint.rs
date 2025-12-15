@@ -45,6 +45,7 @@ use crate::rules::flake8_async::helpers::MethodName;
 /// - [`anyio` timeouts](https://anyio.readthedocs.io/en/stable/cancellation.html)
 /// - [`trio` timeouts](https://trio.readthedocs.io/en/stable/reference-core.html#cancellation-and-timeouts)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.269")]
 pub(crate) struct CancelScopeNoCheckpoint {
     method_name: MethodName,
 }

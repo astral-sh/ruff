@@ -59,6 +59,7 @@ use crate::{AlwaysFixableViolation, Fix};
 ///     return item
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.8.0")]
 pub(crate) struct FastApiRedundantResponseModel;
 
 impl AlwaysFixableViolation for FastApiRedundantResponseModel {
@@ -90,8 +91,8 @@ pub(crate) fn fastapi_redundant_response_model(checker: &Checker, function_def: 
                 response_model_arg,
                 &call.arguments,
                 Parentheses::Preserve,
-                checker.locator().contents(),
-                checker.comment_ranges(),
+                checker.source(),
+                checker.tokens(),
             )
             .map(Fix::unsafe_edit)
         });

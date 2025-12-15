@@ -51,6 +51,7 @@ use crate::rules::pandas_vet::helpers::{Resolution, test_expression};
 /// - [Pandas Cookbook: "Constant Series"](https://pandas.pydata.org/docs/user_guide/cookbook.html#constant-series)
 /// - [Pandas documentation: `nunique`](https://pandas.pydata.org/docs/reference/api/pandas.Series.nunique.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.279")]
 pub(crate) struct PandasNuniqueConstantSeriesCheck;
 
 impl Violation for PandasNuniqueConstantSeriesCheck {

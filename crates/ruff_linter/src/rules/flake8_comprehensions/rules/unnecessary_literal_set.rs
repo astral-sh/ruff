@@ -34,6 +34,7 @@ use crate::rules::flake8_comprehensions::helpers;
 /// This rule's fix is marked as unsafe, as it may occasionally drop comments
 /// when rewriting the call. In most cases, though, comments will be preserved.
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.61")]
 pub(crate) struct UnnecessaryLiteralSet {
     kind: UnnecessaryLiteral,
 }

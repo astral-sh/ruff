@@ -307,11 +307,10 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpec)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpec)
+    reveal_type(P1.args)  # revealed: P1@_.args
+    reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
 
-    # TODO: Signature should be (**P1) -> int
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P1@_) -> int
 ```
 
 And, using the legacy syntax:
@@ -321,9 +320,8 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P2@_) -> int
 ```
 
 ## Using `typing.Unpack`
@@ -366,7 +364,7 @@ on function-like callables:
 
 ```py
 def f_wrong(c: Callable[[], None]):
-    # error: [unresolved-attribute] "Type `() -> None` has no attribute `__qualname__`"
+    # error: [unresolved-attribute] "Object of type `() -> None` has no attribute `__qualname__`"
     c.__qualname__
 
     # error: [unresolved-attribute] "Unresolved attribute `__qualname__` on type `() -> None`."

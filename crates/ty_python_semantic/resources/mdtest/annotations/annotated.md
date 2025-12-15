@@ -72,21 +72,33 @@ Inheriting from `Annotated[T, ...]` is equivalent to inheriting from `T` itself.
 
 ```py
 from typing_extensions import Annotated
+from ty_extensions import reveal_mro
 
 class C(Annotated[int, "foo"]): ...
 
-# TODO: Should be `tuple[Literal[C], Literal[int], Literal[object]]`
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, @Todo(Inference of subscript on special form), <class 'object'>]
+# revealed: (<class 'C'>, <class 'int'>, <class 'object'>)
+reveal_mro(C)
+
+class D(Annotated[list[str], "foo"]): ...
+
+# revealed: (<class 'D'>, <class 'list[str]'>, <class 'MutableSequence[str]'>, <class 'Sequence[str]'>, <class 'Reversible[str]'>, <class 'Collection[str]'>, <class 'Iterable[str]'>, <class 'Container[str]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(D)
+
+class E(Annotated[list["E"], "metadata"]): ...
+
+# error: [revealed-type] "Revealed MRO: (<class 'E'>, <class 'list[E]'>, <class 'MutableSequence[E]'>, <class 'Sequence[E]'>, <class 'Reversible[E]'>, <class 'Collection[E]'>, <class 'Iterable[E]'>, <class 'Container[E]'>, typing.Protocol, typing.Generic, <class 'object'>)"
+reveal_mro(E)
 ```
 
 ### Not parameterized
 
 ```py
 from typing_extensions import Annotated
+from ty_extensions import reveal_mro
 
 # At runtime, this is an error.
 # error: [invalid-base]
 class C(Annotated): ...
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, Unknown, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, Unknown, <class 'object'>)
 ```

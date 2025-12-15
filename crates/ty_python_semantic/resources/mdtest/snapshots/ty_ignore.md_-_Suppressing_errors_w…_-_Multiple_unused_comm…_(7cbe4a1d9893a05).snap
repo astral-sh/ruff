@@ -1,0 +1,109 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: ty_ignore.md - Suppressing errors with `ty: ignore` - Multiple unused comments
+mdtest path: crates/ty_python_semantic/resources/mdtest/suppressions/ty_ignore.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
+2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+3 | 
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+6 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+7 | 
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+9 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+```
+
+# Diagnostics
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive
+ --> src/mdtest_snippet.py:2:13
+  |
+1 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
+2 | a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+  |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+3 |
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+  |
+help: Remove the unused suppression comment
+1 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive"
+  - a = 10 / 2  # ty: ignore[division-by-zero, unresolved-reference]
+2 + a = 10 / 2
+3 | 
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+
+```
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment'
+ --> src/mdtest_snippet.py:6:26
+  |
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+6 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |                          ^^^^^^^^^^^^^^^^^^
+7 |
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+  |
+help: Remove the unused suppression code
+3 | 
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+  - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+6 + a = 10 / 0  # ty: ignore[division-by-zero, unresolved-reference]
+7 | 
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+9 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+
+```
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
+ --> src/mdtest_snippet.py:6:64
+  |
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+6 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+  |                                                                ^^^^^^^^^^^^^^^^^^^^
+7 |
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+  |
+help: Remove the unused suppression code
+3 | 
+4 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment'"
+5 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'unresolved-reference'"
+  - a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+6 + a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero]
+7 | 
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+9 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+
+```
+
+```
+info[unused-ignore-comment]: Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'
+ --> src/mdtest_snippet.py:9:26
+  |
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+9 | a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  |
+help: Remove the unused suppression codes
+6 | a = 10 / 0  # ty: ignore[invalid-assignment, division-by-zero, unresolved-reference]
+7 | 
+8 | # error: [unused-ignore-comment] "Unused `ty: ignore` directive: 'invalid-assignment', 'unresolved-reference'"
+  - a = 10 / 0  # ty: ignore[invalid-assignment, unresolved-reference, division-by-zero]
+9 + a = 10 / 0  # ty: ignore[division-by-zero]
+
+```

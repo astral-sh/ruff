@@ -7,6 +7,7 @@ pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
 use crate::{ProgressReporter, Project, ProjectMetadata};
+use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
@@ -129,7 +130,10 @@ impl ProjectDatabase {
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let memory_usage = ruff_memory_usage::attach_tracker(StandardTracker::new(), || {
+            <dyn salsa::Database>::memory_usage(self)
+        });
+
         let mut ingredients = memory_usage
             .structs
             .into_iter()
@@ -457,6 +461,10 @@ impl SemanticDb for ProjectDatabase {
     fn lint_registry(&self) -> &LintRegistry {
         ty_python_semantic::default_lint_registry()
     }
+
+    fn verbose(&self) -> bool {
+        self.project().verbose(self)
+    }
 }
 
 #[salsa::db]
@@ -512,11 +520,13 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::Files;
+    use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ty_python_semantic::Program;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+    use ty_python_semantic::{
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+    };
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -555,6 +565,27 @@ pub(crate) mod tests {
             let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
+        }
+
+        pub fn init_program(&mut self) -> anyhow::Result<()> {
+            let root = self.project().root(self);
+
+            let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
+                .to_search_paths(self.system(), self.vendored())
+                .expect("Valid search path settings");
+
+            Program::from_settings(
+                self,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
+            Ok(())
         }
     }
 
@@ -608,6 +639,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
+        }
+
+        fn verbose(&self) -> bool {
+            false
         }
     }
 

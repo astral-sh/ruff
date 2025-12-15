@@ -1,0 +1,101 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: final.md - Tests for the `@typing(_extensions).final` decorator - Only the first `@final` violation is reported
+mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import final
+ 2 | 
+ 3 | class A:
+ 4 |     @final
+ 5 |     def f(self): ...
+ 6 | 
+ 7 | class B(A):
+ 8 |     @final
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+10 | 
+11 | class C(B):
+12 |     @final
+13 |     # we only emit one error here, not two
+14 |     def f(self): ...  # error: [override-of-final-method]
+```
+
+# Diagnostics
+
+```
+error[override-of-final-method]: Cannot override `A.f`
+  --> src/mdtest_snippet.py:9:9
+   |
+ 7 | class B(A):
+ 8 |     @final
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+   |         ^ Overrides a definition from superclass `A`
+10 |
+11 | class C(B):
+   |
+info: `A.f` is decorated with `@final`, forbidding overrides
+ --> src/mdtest_snippet.py:4:5
+  |
+3 | class A:
+4 |     @final
+  |     ------
+5 |     def f(self): ...
+  |         - `A.f` defined here
+6 |
+7 | class B(A):
+  |
+help: Remove the override of `f`
+info: rule `override-of-final-method` is enabled by default
+5  |     def f(self): ...
+6  | 
+7  | class B(A):
+   -     @final
+   -     def f(self): ...  # error: [override-of-final-method]
+8  +     pass  # error: [override-of-final-method]
+9  | 
+10 | class C(B):
+11 |     @final
+note: This is an unsafe fix and may change runtime behavior
+
+```
+
+```
+error[override-of-final-method]: Cannot override `B.f`
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |     @final
+13 |     # we only emit one error here, not two
+14 |     def f(self): ...  # error: [override-of-final-method]
+   |         ^ Overrides a definition from superclass `B`
+   |
+info: `B.f` is decorated with `@final`, forbidding overrides
+  --> src/mdtest_snippet.py:8:5
+   |
+ 7 | class B(A):
+ 8 |     @final
+   |     ------
+ 9 |     def f(self): ...  # error: [override-of-final-method]
+   |         - `B.f` defined here
+10 |
+11 | class C(B):
+   |
+help: Remove the override of `f`
+info: rule `override-of-final-method` is enabled by default
+9  |     def f(self): ...  # error: [override-of-final-method]
+10 | 
+11 | class C(B):
+   -     @final
+   -     # we only emit one error here, not two
+   -     def f(self): ...  # error: [override-of-final-method]
+12 +     pass  # error: [override-of-final-method]
+note: This is an unsafe fix and may change runtime behavior
+
+```

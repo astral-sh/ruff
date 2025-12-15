@@ -56,10 +56,11 @@ allowed, even when the unknown superclass is `int`. The assignment to `y` should
 
 ```py
 from typing import Any
+from ty_extensions import reveal_mro
 
 class SubclassOfAny(Any): ...
 
-reveal_type(SubclassOfAny.__mro__)  # revealed: tuple[<class 'SubclassOfAny'>, Any, <class 'object'>]
+reveal_mro(SubclassOfAny)  # revealed: (<class 'SubclassOfAny'>, Any, <class 'object'>)
 
 x: SubclassOfAny = 1  # error: [invalid-assignment]
 y: int = SubclassOfAny()
@@ -117,7 +118,7 @@ def takes_other_protocol(f: OtherProtocol): ...
 takes_other_protocol(SubclassOfAny())
 ```
 
-A subclass of `Any` cannot be assigned to literal types, since those can not be subclassed:
+A subclass of `Any` cannot be assigned to literal types, since those cannot be subclassed:
 
 ```py
 from typing import Any, Literal
@@ -168,13 +169,13 @@ def f(x: Any[int]):
 `Any` cannot be called (this leads to a `TypeError` at runtime):
 
 ```py
-Any()  # error: [call-non-callable] "Object of type `typing.Any` is not callable"
+Any()  # error: [call-non-callable] "Object of type `<special form 'typing.Any'>` is not callable"
 ```
 
 `Any` also cannot be used as a metaclass (under the hood, this leads to an implicit call to `Any`):
 
 ```py
-class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `typing.Any` is not callable"
+class F(metaclass=Any): ...  # error: [invalid-metaclass] "Metaclass type `<special form 'typing.Any'>` is not callable"
 ```
 
 And `Any` cannot be used in `isinstance()` checks:

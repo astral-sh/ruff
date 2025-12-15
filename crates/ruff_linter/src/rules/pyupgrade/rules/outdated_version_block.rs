@@ -52,6 +52,7 @@ use ruff_python_semantic::SemanticModel;
 /// ## References
 /// - [Python documentation: `sys.version_info`](https://docs.python.org/3/library/sys.html#sys.version_info)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.240")]
 pub(crate) struct OutdatedVersionBlock {
     reason: Reason,
 }

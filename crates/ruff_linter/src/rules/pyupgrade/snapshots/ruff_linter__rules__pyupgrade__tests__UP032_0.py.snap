@@ -1320,6 +1320,8 @@ UP032 [*] Use f-string instead of `format` call
 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
 271 | x: "'{} + {}'.format(x, y)"
     |     ^^^^^^^^^^^^^^^^^^^^^^
+272 |
+273 | # Regression https://github.com/astral-sh/ruff/issues/21000
     |
 help: Convert to f-string
 268 | 
@@ -1327,3 +1329,23 @@ help: Convert to f-string
 270 | # Refer: https://github.com/astral-sh/ruff/issues/11736
     - x: "'{} + {}'.format(x, y)"
 271 + x: "f'{x} + {y}'"
+272 | 
+273 | # Regression https://github.com/astral-sh/ruff/issues/21000
+274 | # Fix should parenthesize walrus
+
+UP032 [*] Use f-string instead of `format` call
+   --> UP032_0.py:277:14
+    |
+275 | if __name__ == "__main__":
+276 |     number = 0
+277 |     string = "{}".format(number := number + 1)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+278 |     print(string)
+    |
+help: Convert to f-string
+274 | # Fix should parenthesize walrus
+275 | if __name__ == "__main__":
+276 |     number = 0
+    -     string = "{}".format(number := number + 1)
+277 +     string = f"{(number := number + 1)}"
+278 |     print(string)

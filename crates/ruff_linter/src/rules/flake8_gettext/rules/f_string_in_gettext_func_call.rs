@@ -41,6 +41,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Python documentation: `gettext` — Multilingual internationalization services](https://docs.python.org/3/library/gettext.html)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.260")]
 pub(crate) struct FStringInGetTextFuncCall;
 
 impl Violation for FStringInGetTextFuncCall {

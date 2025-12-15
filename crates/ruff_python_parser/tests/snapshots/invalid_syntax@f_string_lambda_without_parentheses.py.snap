@@ -87,6 +87,7 @@ Module(
                                                 quote_style: Double,
                                                 prefix: Regular,
                                                 triple_quoted: false,
+                                                unclosed: false,
                                             },
                                         },
                                     ),
@@ -116,7 +117,7 @@ Module(
 
   |
 1 | f"{lambda x: x}"
-  |             ^^ Syntax Error: f-string: expecting '}'
+  |             ^^ Syntax Error: f-string: expecting `}`
   |
 
 

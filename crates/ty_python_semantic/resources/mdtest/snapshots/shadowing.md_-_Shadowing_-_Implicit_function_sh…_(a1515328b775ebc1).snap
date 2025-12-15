@@ -26,7 +26,9 @@ error[invalid-assignment]: Implicit shadowing of function `f`
 1 | def f(): ...
 2 |
 3 | f = 1  # error: [invalid-assignment]
-  | ^
+  | -   ^ Incompatible value of type `Literal[1]`
+  | |
+  | Declared type `def f() -> Unknown`
   |
 info: Annotate to make it explicit if this is intentional
 info: rule `invalid-assignment` is enabled by default

@@ -3,7 +3,7 @@ use ruff_python_ast::{self as ast, BoolOp, CmpOp, Expr};
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::parenthesize::parenthesized_range;
+use ruff_python_ast::token::parenthesized_range;
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
@@ -29,6 +29,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     ...
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct UnnecessaryKeyCheck;
 
 impl AlwaysFixableViolation for UnnecessaryKeyCheck {
@@ -107,22 +108,12 @@ pub(crate) fn unnecessary_key_check(checker: &Checker, expr: &Expr) {
         format!(
             "{}.get({})",
             checker.locator().slice(
-                parenthesized_range(
-                    obj_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(obj_right.range())
+                parenthesized_range(obj_right.into(), right.into(), checker.tokens(),)
+                    .unwrap_or(obj_right.range())
             ),
             checker.locator().slice(
-                parenthesized_range(
-                    key_right.into(),
-                    right.into(),
-                    checker.comment_ranges(),
-                    checker.locator().contents(),
-                )
-                .unwrap_or(key_right.range())
+                parenthesized_range(key_right.into(), right.into(), checker.tokens(),)
+                    .unwrap_or(key_right.range())
             ),
         ),
         expr.range(),

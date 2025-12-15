@@ -41,6 +41,7 @@ use crate::{checkers::ast::Checker, fix::edits::add_argument};
 /// ## References
 /// - [Python documentation: `warnings.warn`](https://docs.python.org/3/library/warnings.html#warnings.warn)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.257")]
 pub(crate) struct NoExplicitStacklevel;
 
 impl AlwaysFixableViolation for NoExplicitStacklevel {
@@ -91,12 +92,7 @@ pub(crate) fn no_explicit_stacklevel(checker: &Checker, call: &ast::ExprCall) {
     }
     let mut diagnostic = checker.report_diagnostic(NoExplicitStacklevel, call.func.range());
 
-    let edit = add_argument(
-        "stacklevel=2",
-        &call.arguments,
-        checker.comment_ranges(),
-        checker.locator().contents(),
-    );
+    let edit = add_argument("stacklevel=2", &call.arguments, checker.tokens());
 
     diagnostic.set_fix(Fix::unsafe_edit(edit));
 }

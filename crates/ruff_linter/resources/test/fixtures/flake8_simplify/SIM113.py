@@ -46,7 +46,8 @@ def func():
 
 
 def func():
-    # OK (index doesn't start at 0
+    # SIM113
+    # https://github.com/astral-sh/ruff/pull/21395
     idx = 10
     for x in range(5):
         g(x, idx)

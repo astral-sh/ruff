@@ -1,10 +1,11 @@
 use std::cmp::Ordering;
 
-use crate::db::Db;
+use salsa::plumbing::AsId;
+
+use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, SuperOwnerKind, TodoType, Type, TypeIsType, class_base::ClassBase,
-    subclass_of::SubclassOfInner,
+    DynamicType, TodoType, Type, TypeIsType, class_base::ClassBase, subclass_of::SubclassOfInner,
 };
 
 /// Return an [`Ordering`] that describes the canonical order in which two types should appear
@@ -84,15 +85,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::WrapperDescriptor(_), _) => Ordering::Less,
         (_, Type::WrapperDescriptor(_)) => Ordering::Greater,
 
-        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassDecorator(left), Type::DataclassDecorator(right)) => left.cmp(right),
         (Type::DataclassDecorator(_), _) => Ordering::Less,
         (_, Type::DataclassDecorator(_)) => Ordering::Greater,
 
-        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => {
-            left.bits().cmp(&right.bits())
-        }
+        (Type::DataclassTransformer(left), Type::DataclassTransformer(right)) => left.cmp(right),
         (Type::DataclassTransformer(_), _) => Ordering::Less,
         (_, Type::DataclassTransformer(_)) => Ordering::Greater,
 
@@ -120,6 +117,11 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
+                (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
+                    left.as_id().cmp(&right.as_id())
+                }
+                (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
+                (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
             }
         }
 
@@ -142,11 +144,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::ProtocolInstance(_), _) => Ordering::Less,
         (_, Type::ProtocolInstance(_)) => Ordering::Greater,
 
-        (Type::NonInferableTypeVar(left), Type::NonInferableTypeVar(right)) => left.cmp(right),
-        (Type::NonInferableTypeVar(_), _) => Ordering::Less,
-        (_, Type::NonInferableTypeVar(_)) => Ordering::Greater,
-
-        (Type::TypeVar(left), Type::TypeVar(right)) => left.cmp(right),
+        // This is one place where we want to compare the typevar identities directly, instead of
+        // falling back on `is_same_typevar_as` or `can_be_bound_for`.
+        (Type::TypeVar(left), Type::TypeVar(right)) => left.as_id().cmp(&right.as_id()),
         (Type::TypeVar(_), _) => Ordering::Less,
         (_, Type::TypeVar(_)) => Ordering::Greater,
 
@@ -218,6 +218,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::TypedDict(_), _) => Ordering::Less,
         (_, Type::TypedDict(_)) => Ordering::Greater,
 
+        (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
+        (Type::NewTypeInstance(_), _) => Ordering::Less,
+        (_, Type::NewTypeInstance(_)) => Ordering::Greater,
+
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");
         }
@@ -261,24 +265,22 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
         (DynamicType::Unknown, _) => Ordering::Less,
         (_, DynamicType::Unknown) => Ordering::Greater,
 
+        (DynamicType::UnknownGeneric(_), _) => Ordering::Less,
+        (_, DynamicType::UnknownGeneric(_)) => Ordering::Greater,
+
         #[cfg(debug_assertions)]
         (DynamicType::Todo(TodoType(left)), DynamicType::Todo(TodoType(right))) => left.cmp(right),
 
         #[cfg(not(debug_assertions))]
         (DynamicType::Todo(TodoType), DynamicType::Todo(TodoType)) => Ordering::Equal,
 
-        (DynamicType::TodoPEP695ParamSpec, _) => Ordering::Less,
-        (_, DynamicType::TodoPEP695ParamSpec) => Ordering::Greater,
-
         (DynamicType::TodoUnpack, _) => Ordering::Less,
         (_, DynamicType::TodoUnpack) => Ordering::Greater,
 
-        (DynamicType::TodoTypeAlias, _) => Ordering::Less,
-        (_, DynamicType::TodoTypeAlias) => Ordering::Greater,
+        (DynamicType::TodoStarredExpression, _) => Ordering::Less,
+        (_, DynamicType::TodoStarredExpression) => Ordering::Greater,
 
-        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => {
-            left.scope.cmp(&right.scope)
-        }
+        (DynamicType::Divergent(left), DynamicType::Divergent(right)) => left.cmp(&right),
         (DynamicType::Divergent(_), _) => Ordering::Less,
         (_, DynamicType::Divergent(_)) => Ordering::Greater,
     }

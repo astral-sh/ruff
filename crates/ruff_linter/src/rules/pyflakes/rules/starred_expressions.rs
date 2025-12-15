@@ -18,6 +18,7 @@ use crate::{Violation, checkers::ast::Checker};
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.32")]
 pub(crate) struct ExpressionsInStarAssignment;
 
 impl Violation for ExpressionsInStarAssignment {
@@ -44,6 +45,7 @@ impl Violation for ExpressionsInStarAssignment {
 /// ## References
 /// - [PEP 3132 – Extended Iterable Unpacking](https://peps.python.org/pep-3132/)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.32")]
 pub(crate) struct MultipleStarredExpressions;
 
 impl Violation for MultipleStarredExpressions {

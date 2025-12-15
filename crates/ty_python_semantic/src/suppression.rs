@@ -1,16 +1,23 @@
-use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-use crate::types::TypeCheckDiagnostics;
-use crate::{Db, declare_lint, lint::LintId};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, Span};
-use ruff_db::{files::File, parsed::parsed_module, source::source_text};
-use ruff_python_parser::TokenKind;
-use ruff_python_trivia::Cursor;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use smallvec::{SmallVec, smallvec};
 use std::error::Error;
 use std::fmt;
 use std::fmt::Formatter;
+use std::fmt::Write as _;
 use thiserror::Error;
+
+use crate::diagnostic::DiagnosticGuard;
+use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
+use crate::types::TypeCheckDiagnostics;
+use crate::{Db, declare_lint, lint::LintId};
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+};
+use ruff_db::{files::File, parsed::parsed_module, source::source_text};
+use ruff_diagnostics::{Edit, Fix};
+use ruff_python_ast::token::TokenKind;
+use ruff_python_trivia::Cursor;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 declare_lint! {
     /// ## What it does
@@ -32,7 +39,7 @@ declare_lint! {
     /// ```
     pub(crate) static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
     }
 }
@@ -55,9 +62,9 @@ declare_lint! {
     /// ```py
     /// a = 20 / 0  # ty: ignore[division-by-zero]
     /// ```
-    pub(crate) static UNKNOWN_RULE = {
+    pub(crate) static IGNORE_COMMENT_UNKNOWN_RULE = {
         summary: "detects `ty: ignore` comments that reference unknown rules",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
     }
 }
@@ -81,7 +88,7 @@ declare_lint! {
     /// ```
     pub(crate) static INVALID_IGNORE_COMMENT = {
         summary: "detects ignore comments that use invalid syntax",
-        status: LintStatus::preview("1.0.0"),
+        status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Warn,
     }
 }
@@ -106,7 +113,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 for comment in parser {
                     match comment {
                         Ok(comment) => {
-                            builder.add_comment(&comment, TextRange::new(line_start, token.end()));
+                            builder.add_comment(comment, TextRange::new(line_start, token.end()));
                         }
                         Err(error) => match error.kind {
                             ParseErrorKind::NotASuppression
@@ -133,47 +140,29 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
-pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+pub(crate) fn check_suppressions(
+    db: &dyn Db,
+    file: File,
+    diagnostics: TypeCheckDiagnostics,
+) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
     check_unused_suppressions(&mut context);
+
+    context.diagnostics.into_inner().into_diagnostics()
 }
 
 /// Checks for `ty: ignore` comments that reference unknown rules.
 fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&UNKNOWN_RULE) {
+    if context.is_lint_disabled(&IGNORE_COMMENT_UNKNOWN_RULE) {
         return;
     }
 
     for unknown in &context.suppressions.unknown {
-        match &unknown.reason {
-            GetLintError::Removed(removed) => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Removed rule `{removed}`"),
-                );
-            }
-            GetLintError::Unknown(rule) => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Unknown rule `{rule}`"),
-                );
-            }
-
-            GetLintError::PrefixedWithCategory {
-                prefixed,
-                suggestion,
-            } => {
-                context.report_lint(
-                    &UNKNOWN_RULE,
-                    unknown.range,
-                    format_args!("Unknown rule `{prefixed}`. Did you mean `{suggestion}`?"),
-                );
-            }
+        if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
+            diag.into_diagnostic(&unknown.reason);
         }
     }
 }
@@ -184,15 +173,13 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
     }
 
     for invalid in &context.suppressions.invalid {
-        context.report_lint(
-            &INVALID_IGNORE_COMMENT,
-            invalid.error.range,
-            format_args!(
+        if let Some(diag) = context.report_lint(&INVALID_IGNORE_COMMENT, invalid.error.range) {
+            diag.into_diagnostic(format_args!(
                 "Invalid `{kind}` comment: {reason}",
                 kind = invalid.kind,
                 reason = &invalid.error
-            ),
-        );
+            ));
+        }
     }
 }
 
@@ -205,17 +192,19 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         return;
     }
 
+    let diagnostics = context.diagnostics.get_mut();
+
     let all = context.suppressions;
     let mut unused = Vec::with_capacity(
         all.file
             .len()
             .saturating_add(all.line.len())
-            .saturating_sub(context.diagnostics.used_len()),
+            .saturating_sub(diagnostics.used_len()),
     );
 
     // Collect all suppressions that are unused after type-checking.
     for suppression in all {
-        if context.diagnostics.is_used(suppression.id()) {
+        if diagnostics.is_used(suppression.id()) {
             continue;
         }
 
@@ -229,7 +218,7 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
             // A `unused-ignore-comment` suppression can't ignore itself.
             // It can only ignore other suppressions.
             if unused_suppression.id() != suppression.id() {
-                context.diagnostics.mark_used(unused_suppression.id());
+                diagnostics.mark_used(unused_suppression.id());
                 continue;
             }
         }
@@ -237,55 +226,247 @@ fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
         unused.push(suppression);
     }
 
-    for suppression in unused {
-        // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
-        // in case the "unused" directive comes after it:
-        // ```py
-        // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
-        // ```
-        if context.diagnostics.is_used(suppression.id()) {
-            continue;
-        }
+    let mut unused_iter = unused
+        .iter()
+        .filter(|suppression| {
+            // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
+            // in case the "unused" directive comes after it:
+            // ```py
+            // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
+            // ```
+            !context.is_suppression_used(suppression.id())
+        })
+        .peekable();
 
-        match suppression.target {
-            SuppressionTarget::All => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused blanket `{}` directive", suppression.kind),
-            ),
-            SuppressionTarget::Lint(lint) => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!(
-                    "Unused `{kind}` directive: '{code}'",
-                    kind = suppression.kind,
-                    code = lint.name()
-                ),
-            ),
-            SuppressionTarget::Empty => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused `{kind}` without a code", kind = suppression.kind),
-            ),
+    let source = source_text(context.db, context.file);
+
+    while let Some(suppression) = unused_iter.next() {
+        let mut diag = match suppression.target {
+            SuppressionTarget::All => {
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
+                else {
+                    continue;
+                };
+
+                diag.into_diagnostic(format_args!(
+                    "Unused blanket `{}` directive",
+                    suppression.kind
+                ))
+            }
+            SuppressionTarget::Lint(lint) => {
+                // A single code in a `ty: ignore[<code1>, <code2>, ...]` directive
+
+                // Is this the first code directly after the `[`?
+                let includes_first_code = source[..suppression.range.start().to_usize()]
+                    .trim_end()
+                    .ends_with('[');
+
+                let mut current = suppression;
+                let mut unused_codes = Vec::new();
+
+                // Group successive codes together into a single diagnostic,
+                // or report the entire directive if all codes are unused.
+                while let Some(next) = unused_iter.peek() {
+                    if let SuppressionTarget::Lint(next_lint) = next.target
+                        && next.comment_range == current.comment_range
+                        && source[TextRange::new(current.range.end(), next.range.start())]
+                            .chars()
+                            .all(|c| c.is_whitespace() || c == ',')
+                    {
+                        unused_codes.push(next_lint);
+                        current = *next;
+                        unused_iter.next();
+                    } else {
+                        break;
+                    }
+                }
+
+                // Is the last suppression code the last code before the closing `]`.
+                let includes_last_code = source[current.range.end().to_usize()..]
+                    .trim_start()
+                    .starts_with(']');
+
+                // If only some codes are unused
+                if !includes_first_code || !includes_last_code {
+                    let mut codes = format!("'{}'", lint.name());
+                    for code in &unused_codes {
+                        let _ = write!(&mut codes, ", '{code}'", code = code.name());
+                    }
+
+                    if let Some(diag) = context.report_unchecked(
+                        &UNUSED_IGNORE_COMMENT,
+                        TextRange::new(suppression.range.start(), current.range.end()),
+                    ) {
+                        let mut diag = diag.into_diagnostic(format_args!(
+                            "Unused `{kind}` directive: {codes}",
+                            kind = suppression.kind
+                        ));
+
+                        diag.primary_annotation_mut()
+                            .unwrap()
+                            .push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+
+                        // Delete everything up to the start of the next code.
+                        let trailing_len: TextSize = source[current.range.end().to_usize()..]
+                            .chars()
+                            .take_while(|c: &char| c.is_whitespace() || *c == ',')
+                            .map(TextLen::text_len)
+                            .sum();
+
+                        // If we delete the last codes before `]`, ensure we delete any trailing comma
+                        let leading_len: TextSize = if includes_last_code {
+                            source[..suppression.range.start().to_usize()]
+                                .chars()
+                                .rev()
+                                .take_while(|c: &char| c.is_whitespace() || *c == ',')
+                                .map(TextLen::text_len)
+                                .sum()
+                        } else {
+                            TextSize::default()
+                        };
+
+                        let fix_range = TextRange::new(
+                            suppression.range.start() - leading_len,
+                            current.range.end() + trailing_len,
+                        );
+                        diag.set_fix(Fix::safe_edit(Edit::range_deletion(fix_range)));
+
+                        if unused_codes.is_empty() {
+                            diag.help("Remove the unused suppression code");
+                        } else {
+                            diag.help("Remove the unused suppression codes");
+                        }
+                    }
+
+                    continue;
+                }
+
+                // All codes are unused
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.comment_range)
+                else {
+                    continue;
+                };
+
+                diag.into_diagnostic(format_args!(
+                    "Unused `{kind}` directive",
+                    kind = suppression.kind
+                ))
+            }
+            SuppressionTarget::Empty => {
+                let Some(diag) =
+                    context.report_unchecked(&UNUSED_IGNORE_COMMENT, suppression.range)
+                else {
+                    continue;
+                };
+                diag.into_diagnostic(format_args!(
+                    "Unused `{kind}` without a code",
+                    kind = suppression.kind
+                ))
+            }
+        };
+
+        diag.primary_annotation_mut()
+            .unwrap()
+            .push_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
+        diag.set_fix(remove_comment_fix(suppression, &source));
+        diag.help("Remove the unused suppression comment");
+    }
+}
+
+/// Creates a fix for adding a suppression comment to suppress `lint` for `range`.
+///
+/// The fix prefers adding the code to an existing `ty: ignore[]` comment over
+/// adding a new suppression comment.
+pub fn create_suppression_fix(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
+    let suppressions = suppressions(db, file);
+    let source = source_text(db, file);
+
+    let mut existing_suppressions = suppressions.line_suppressions(range).filter(|suppression| {
+        matches!(
+            suppression.target,
+            SuppressionTarget::Lint(_) | SuppressionTarget::Empty,
+        )
+    });
+
+    // If there's an existing `ty: ignore[]` comment, append the code to it instead of creating a new suppression comment.
+    if let Some(existing) = existing_suppressions.next() {
+        let comment_text = &source[existing.comment_range];
+        // Only add to the existing ignore comment if it has no reason.
+        if let Some(before_closing_paren) = comment_text.trim_end().strip_suffix(']') {
+            let up_to_last_code = before_closing_paren.trim_end();
+
+            let insertion = if up_to_last_code.ends_with(',') {
+                format!(" {id}", id = id.name())
+            } else {
+                format!(", {id}", id = id.name())
+            };
+
+            let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
+
+            return Fix::safe_edit(Edit::insertion(
+                insertion,
+                existing.comment_range.end() - relative_offset_from_end,
+            ));
         }
     }
+
+    // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
+    // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
+    let parsed = parsed_module(db, file).load(db);
+    let tokens = parsed.tokens().at_offset(range.end());
+    let token_range = match tokens {
+        ruff_python_ast::token::TokenAt::None => range,
+        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
+        ruff_python_ast::token::TokenAt::Between(..) => range,
+    };
+    let tokens_after = parsed.tokens().after(token_range.end());
+
+    // Same as for `line_end` when building up the `suppressions`: Ignore newlines
+    // in multiline-strings, inside f-strings, or after a line continuation because we can't
+    // place a comment on those lines.
+    let line_end = tokens_after
+        .iter()
+        .find(|token| {
+            matches!(
+                token.kind(),
+                TokenKind::Newline | TokenKind::NonLogicalNewline
+            )
+        })
+        .map(Ranged::start)
+        .unwrap_or(source.text_len());
+
+    let up_to_line_end = &source[..line_end.to_usize()];
+    let up_to_first_content = up_to_line_end.trim_end();
+    let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();
+
+    let insertion = format!("  # ty:ignore[{id}]", id = id.name());
+
+    Fix::safe_edit(if trailing_whitespace_len == TextSize::ZERO {
+        Edit::insertion(insertion, line_end)
+    } else {
+        // `expr # fmt: off<trailing_whitespace>`
+        // Trim the trailing whitespace
+        Edit::replacement(insertion, line_end - trailing_whitespace_len, line_end)
+    })
 }
 
 struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
     file: File,
     suppressions: &'a Suppressions,
-    diagnostics: &'a mut TypeCheckDiagnostics,
+    diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: &'a mut TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
             file,
             suppressions,
-            diagnostics,
+            diagnostics: diagnostics.into(),
         }
     }
 
@@ -296,37 +477,77 @@ impl<'a> CheckSuppressionsContext<'a> {
             .is_enabled(LintId::of(lint))
     }
 
-    fn report_lint(
-        &mut self,
+    fn is_suppression_used(&self, id: FileSuppressionId) -> bool {
+        self.diagnostics.borrow().is_used(id)
+    }
+
+    fn report_lint<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: fmt::Arguments,
-    ) {
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
         if let Some(suppression) = self.suppressions.find_suppression(range, LintId::of(lint)) {
-            self.diagnostics.mark_used(suppression.id());
-            return;
+            self.diagnostics.borrow_mut().mark_used(suppression.id());
+            return None;
         }
 
-        self.report_unchecked(lint, range, message);
+        self.report_unchecked(lint, range)
     }
 
     /// Reports a diagnostic without checking if the lint at the given range is suppressed or marking
     /// the suppression as used.
-    fn report_unchecked(
-        &mut self,
+    fn report_unchecked<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: fmt::Arguments,
-    ) {
-        let Some(severity) = self.db.rule_selection(self.file).severity(LintId::of(lint)) else {
-            return;
-        };
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
+        SuppressionDiagnosticGuardBuilder::new(self, lint, range)
+    }
+}
 
-        let id = DiagnosticId::Lint(lint.name());
-        let mut diag = Diagnostic::new(id, severity, "");
-        let span = Span::from(self.file).with_range(range);
-        diag.annotate(Annotation::primary(span).message(message));
-        self.diagnostics.push(diag);
+/// A builder for constructing a diagnostic guard.
+///
+/// This type exists to separate the phases of "check if a diagnostic should
+/// be reported" and "build the actual diagnostic."
+pub(crate) struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    ctx: &'ctx CheckSuppressionsContext<'db>,
+    id: DiagnosticId,
+    range: TextRange,
+    severity: Severity,
+}
+
+impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    fn new(
+        ctx: &'ctx CheckSuppressionsContext<'db>,
+        lint: &'static LintMetadata,
+        range: TextRange,
+    ) -> Option<Self> {
+        let severity = ctx.db.rule_selection(ctx.file).severity(LintId::of(lint))?;
+
+        Some(Self {
+            ctx,
+            id: DiagnosticId::Lint(lint.name()),
+            severity,
+            range,
+        })
+    }
+
+    /// Create a new guard.
+    ///
+    /// This initializes a new diagnostic using the given message along with
+    /// the ID and severity used to create this builder.
+    ///
+    /// The diagnostic can be further mutated on the guard via its `DerefMut`
+    /// impl to `Diagnostic`.
+    pub(crate) fn into_diagnostic(
+        self,
+        message: impl IntoDiagnosticMessage,
+    ) -> DiagnosticGuard<'ctx> {
+        let mut diag = Diagnostic::new(self.id, self.severity, message);
+
+        let primary_span = Span::from(self.ctx.file).with_range(self.range);
+        diag.annotate(Annotation::primary(primary_span));
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }
 
@@ -429,12 +650,22 @@ pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
 
-    /// The range of this specific suppression.
-    /// This is the same as `comment_range` except for suppression comments that suppress multiple
-    /// codes. For those, the range is limited to the specific code.
+    /// The range of the code in this suppression.
+    ///
+    /// This is the same as the `comment_range` for the
+    /// targets [`SuppressionTarget::All`] and [`SuppressionTarget::Empty`].
     range: TextRange,
 
     /// The range of the suppression comment.
+    ///
+    /// This isn't the range of the entire comment if this is a nested comment:
+    ///
+    /// ```py
+    /// a # ty: ignore # fmt: off
+    ///   ^^^^^^^^^^^^^
+    /// ```
+    ///
+    /// It doesn't include the range of the nested `# fmt: off` comment.
     comment_range: TextRange,
 
     /// The range for which this suppression applies.
@@ -532,7 +763,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn add_comment(&mut self, comment: &SuppressionComment, line_range: TextRange) {
+    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
         // `type: ignore` comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
         // > imports, or other executable code, silences all errors in the file.
@@ -555,7 +786,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         };
 
-        match comment.codes.as_deref() {
+        match comment.codes {
             // `type: ignore`
             None => {
                 push_type_ignore_suppression(Suppression {
@@ -581,7 +812,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
 
             // `ty: ignore[]`
-            Some([]) => {
+            Some(codes) if codes.is_empty() => {
                 self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind,
@@ -594,25 +825,20 @@ impl<'a> SuppressionsBuilder<'a> {
             // `ty: ignore[a, b]`
             Some(codes) => {
                 for code_range in codes {
-                    let code = &self.source[*code_range];
-                    let range = if codes.len() == 1 {
-                        comment.range
-                    } else {
-                        *code_range
-                    };
+                    let code = &self.source[code_range];
 
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
                             self.line.push(Suppression {
                                 target: SuppressionTarget::Lint(lint),
                                 kind: comment.kind,
-                                range,
+                                range: code_range,
                                 comment_range: comment.range,
                                 suppressed_range,
                             });
                         }
                         Err(error) => self.unknown.push(UnknownSuppression {
-                            range,
+                            range: code_range,
                             comment_range: comment.range,
                             reason: error,
                         }),
@@ -755,8 +981,6 @@ impl<'src> SuppressionParser<'src> {
             self.eat_whitespace();
 
             if !self.cursor.eat_char(',') {
-                self.eat_whitespace();
-
                 if self.cursor.eat_char(']') {
                     break Ok(Some(codes));
                 }
@@ -921,6 +1145,37 @@ enum ParseErrorKind {
     /// `ty: ignore[a, b`
     #[error("expected a closing bracket")]
     CodesMissingClosingBracket(SuppressionKind),
+}
+
+fn remove_comment_fix(suppression: &Suppression, source: &str) -> Fix {
+    let comment_end = suppression.comment_range.end();
+    let comment_start = suppression.comment_range.start();
+    let after_comment = &source[comment_end.to_usize()..];
+
+    if !after_comment.starts_with(['\n', '\r']) {
+        // For example: `# ty: ignore # fmt: off`
+        // Don't remove the trailing whitespace up to the `ty: ignore` comment
+        return Fix::safe_edit(Edit::range_deletion(suppression.comment_range));
+    }
+
+    // Remove any leading whitespace before the comment
+    // to avoid unnecessary trailing whitespace once the comment is removed
+    let before_comment = &source[..comment_start.to_usize()];
+
+    let mut leading_len = TextSize::default();
+
+    for c in before_comment.chars().rev() {
+        match c {
+            '\n' | '\r' => break,
+            c if c.is_whitespace() => leading_len += c.text_len(),
+            _ => break,
+        }
+    }
+
+    Fix::safe_edit(Edit::range_deletion(TextRange::new(
+        comment_start - leading_len,
+        comment_end,
+    )))
 }
 
 #[cfg(test)]

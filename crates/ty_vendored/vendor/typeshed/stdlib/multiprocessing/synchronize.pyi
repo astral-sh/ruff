@@ -1,3 +1,4 @@
+import sys
 import threading
 from collections.abc import Callable
 from multiprocessing.context import BaseContext
@@ -45,6 +46,8 @@ class SemLock:
     # These methods are copied from the wrapped _multiprocessing.SemLock object
     def acquire(self, block: bool = True, timeout: float | None = None) -> bool: ...
     def release(self) -> None: ...
+    if sys.version_info >= (3, 14):
+        def locked(self) -> bool: ...
 
 class Lock(SemLock):
     def __init__(self, *, ctx: BaseContext) -> None: ...

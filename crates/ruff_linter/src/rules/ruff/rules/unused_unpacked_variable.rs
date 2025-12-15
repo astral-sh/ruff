@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [F841]: https://docs.astral.sh/ruff/rules/unused-variable/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct UnusedUnpackedVariable {
     pub name: String,
 }
@@ -100,4 +101,6 @@ pub(crate) fn unused_unpacked_variable(checker: &Checker, name: &str, binding: &
     if let Some(fix) = remove_unused_variable(binding, checker) {
         diagnostic.set_fix(fix);
     }
+    // Add Unnecessary tag for unused unpacked variables
+    diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
 }

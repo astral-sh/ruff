@@ -8,7 +8,8 @@ use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::preview::{
-    is_optional_as_none_in_union_enabled, is_unnecessary_default_type_args_stubs_enabled,
+    is_future_required_preview_generics_enabled, is_optional_as_none_in_union_enabled,
+    is_unnecessary_default_type_args_stubs_enabled,
 };
 use crate::registry::Rule;
 use crate::rules::{
@@ -69,7 +70,11 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                     && checker.semantic.in_annotation()
                     && checker.semantic.in_runtime_evaluated_annotation()
                     && !checker.semantic.in_string_type_definition()
-                    && typing::is_pep585_generic(value, &checker.semantic)
+                    && typing::is_pep585_generic(
+                        value,
+                        &checker.semantic,
+                        is_future_required_preview_generics_enabled(checker.settings()),
+                    )
                 {
                     flake8_future_annotations::rules::future_required_type_annotation(
                         checker,
@@ -1029,6 +1034,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                 Rule::FormatInGetTextFuncCall,
                 Rule::PrintfInGetTextFuncCall,
             ]) && flake8_gettext::is_gettext_func_call(
+                checker,
                 func,
                 &checker.settings().flake8_gettext.functions_names,
             ) {

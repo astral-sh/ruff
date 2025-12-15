@@ -28,6 +28,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///     pass
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotInTest;
 
 impl AlwaysFixableViolation for NotInTest {
@@ -64,6 +65,7 @@ impl AlwaysFixableViolation for NotInTest {
 ///
 /// [PEP8]: https://peps.python.org/pep-0008/#programming-recommendations
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.28")]
 pub(crate) struct NotIsTest;
 
 impl AlwaysFixableViolation for NotIsTest {
@@ -105,7 +107,7 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                             &[CmpOp::NotIn],
                             comparators,
                             unary_op.into(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                             checker.source(),
                         ),
                         unary_op.range(),
@@ -125,7 +127,7 @@ pub(crate) fn not_tests(checker: &Checker, unary_op: &ast::ExprUnaryOp) {
                             &[CmpOp::IsNot],
                             comparators,
                             unary_op.into(),
-                            checker.comment_ranges(),
+                            checker.tokens(),
                             checker.source(),
                         ),
                         unary_op.range(),

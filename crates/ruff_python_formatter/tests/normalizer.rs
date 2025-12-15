@@ -1,8 +1,5 @@
+use regex::Regex;
 use std::sync::LazyLock;
-use {
-    itertools::Either::{Left, Right},
-    regex::Regex,
-};
 
 use ruff_python_ast::{
     self as ast, BytesLiteralFlags, Expr, FStringFlags, FStringPart, InterpolatedStringElement,
@@ -46,18 +43,9 @@ impl Transformer for Normalizer {
     fn visit_stmt(&self, stmt: &mut Stmt) {
         if let Stmt::Delete(delete) = stmt {
             // Treat `del a, b` and `del (a, b)` equivalently.
-            delete.targets = delete
-                .targets
-                .clone()
-                .into_iter()
-                .flat_map(|target| {
-                    if let Expr::Tuple(tuple) = target {
-                        Left(tuple.elts.into_iter())
-                    } else {
-                        Right(std::iter::once(target))
-                    }
-                })
-                .collect();
+            if let [Expr::Tuple(tuple)] = delete.targets.as_slice() {
+                delete.targets = tuple.elts.clone();
+            }
         }
 
         transformer::walk_stmt(self, stmt);

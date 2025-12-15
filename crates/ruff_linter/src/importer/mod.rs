@@ -9,10 +9,11 @@ use anyhow::Result;
 use libcst_native as cst;
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{self as ast, Expr, ModModule, Stmt};
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
-use ruff_python_parser::{Parsed, Tokens};
+use ruff_python_parser::Parsed;
 use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
@@ -67,17 +68,25 @@ impl<'a> Importer<'a> {
     /// Add an import statement to import the given module.
     ///
     /// If there are no existing imports, the new import will be added at the top
-    /// of the file. Otherwise, it will be added after the most recent top-level
-    /// import statement.
+    /// of the file. If there are future imports, the new import will be added
+    /// after the last future import. Otherwise, it will be added after the most
+    /// recent top-level import statement.
     pub(crate) fn add_import(&self, import: &NameImport, at: TextSize) -> Edit {
         let required_import = import.to_string();
         if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             Insertion::end_of_statement(stmt, self.source, self.stylist).into_edit(&required_import)
         } else {
-            // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
-                .into_edit(&required_import)
+            // Check if there are any future imports that we need to respect
+            if let Some(last_future_import) = self.find_last_future_import() {
+                // Insert after the last future import
+                Insertion::end_of_statement(last_future_import, self.source, self.stylist)
+                    .into_edit(&required_import)
+            } else {
+                // Insert at the start of the file.
+                Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
+                    .into_edit(&required_import)
+            }
         }
     }
 
@@ -105,7 +114,7 @@ impl<'a> Importer<'a> {
             Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
         };
         let add_import_edit = insertion.into_edit(&content);
 
@@ -490,7 +499,7 @@ impl<'a> Importer<'a> {
             Insertion::end_of_statement(stmt, self.source, self.stylist)
         } else {
             // Insert at the start of the file.
-            Insertion::start_of_file(self.python_ast, self.source, self.stylist)
+            Insertion::start_of_file(self.python_ast, self.source, self.stylist, None)
         };
         if insertion.is_inline() {
             Err(anyhow::anyhow!(
@@ -522,6 +531,18 @@ impl<'a> Importer<'a> {
         } else {
             None
         }
+    }
+
+    /// Find the last `from __future__` import statement in the AST.
+    fn find_last_future_import(&self) -> Option<&'a Stmt> {
+        let mut body = self.python_ast.iter().peekable();
+        let _docstring = body.next_if(|stmt| ast::helpers::is_docstring_stmt(stmt));
+
+        body.take_while(|stmt| {
+            stmt.as_import_from_stmt()
+                .is_some_and(|import_from| import_from.module.as_deref() == Some("__future__"))
+        })
+        .last()
     }
 
     /// Add a `from __future__ import annotations` import.

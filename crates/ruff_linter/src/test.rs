@@ -10,7 +10,9 @@ use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
 
-use ruff_db::diagnostic::{Diagnostic, Span};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig, DisplayDiagnostics, Span,
+};
 use ruff_notebook::Notebook;
 #[cfg(not(fuzzing))]
 use ruff_notebook::NotebookError;
@@ -24,12 +26,13 @@ use ruff_source_file::SourceFileBuilder;
 use crate::codes::Rule;
 use crate::fix::{FixResult, fix_file};
 use crate::linter::check_path;
-use crate::message::{Emitter, EmitterContext, TextEmitter, create_syntax_error_diagnostic};
+use crate::message::EmitterContext;
 use crate::package::PackageRoot;
 use crate::packaging::detect_package_root;
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Applicability, FixAvailability};
 use crate::{Locator, directives};
 
@@ -232,6 +235,7 @@ pub(crate) fn test_contents<'a>(
         &locator,
         &indexer,
     );
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
     let messages = check_path(
         path,
         path.parent()
@@ -247,6 +251,7 @@ pub(crate) fn test_contents<'a>(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let source_has_errors = parsed.has_invalid_syntax();
@@ -297,6 +302,8 @@ pub(crate) fn test_contents<'a>(
                 &indexer,
             );
 
+            let suppressions =
+                Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
             let fixed_messages = check_path(
                 path,
                 None,
@@ -310,6 +317,7 @@ pub(crate) fn test_contents<'a>(
                 source_type,
                 &parsed,
                 target_version,
+                &suppressions,
             );
 
             if parsed.has_invalid_syntax() && !source_has_errors {
@@ -403,7 +411,7 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
             diagnostic
         })
         .chain(parsed.errors().iter().map(|parse_error| {
-            create_syntax_error_diagnostic(source_code.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_code.clone(), &parse_error.error, parse_error)
         }))
         .sorted_by(Diagnostic::ruff_start_ordering)
         .collect();
@@ -417,7 +425,7 @@ fn print_syntax_errors(errors: &[ParseError], path: &Path, source: &SourceKind) 
     let messages: Vec<_> = errors
         .iter()
         .map(|parse_error| {
-            create_syntax_error_diagnostic(source_file.clone(), &parse_error.error, parse_error)
+            Diagnostic::invalid_syntax(source_file.clone(), &parse_error.error, parse_error)
         })
         .collect();
 
@@ -444,42 +452,38 @@ pub(crate) fn print_jupyter_messages(
     path: &Path,
     notebook: &Notebook,
 ) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_fix_applicability(Applicability::DisplayOnly)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::from_iter([(
-                path.file_name().unwrap().to_string_lossy().to_string(),
-                notebook.index().clone(),
-            )])),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::from_iter([(
+            path.file_name().unwrap().to_string_lossy().to_string(),
+            notebook.index().clone(),
+        )])),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
 pub(crate) fn print_messages(diagnostics: &[Diagnostic]) -> String {
-    let mut output = Vec::new();
-
-    TextEmitter::default()
+    let config = DisplayDiagnosticConfig::default()
+        .format(DiagnosticFormat::Full)
+        .hide_severity(true)
         .with_show_fix_status(true)
-        .with_show_fix_diff(true)
-        .with_show_source(true)
-        .with_fix_applicability(Applicability::DisplayOnly)
-        .emit(
-            &mut output,
-            diagnostics,
-            &EmitterContext::new(&FxHashMap::default()),
-        )
-        .unwrap();
+        .show_fix_diff(true)
+        .with_fix_applicability(Applicability::DisplayOnly);
 
-    String::from_utf8(output).unwrap()
+    DisplayDiagnostics::new(
+        &EmitterContext::new(&FxHashMap::default()),
+        &config,
+        diagnostics,
+    )
+    .to_string()
 }
 
 #[macro_export]
@@ -510,10 +514,16 @@ macro_rules! assert_diagnostics {
 
 #[macro_export]
 macro_rules! assert_diagnostics_diff {
-    ($snapshot:expr, $path:expr, $settings_before:expr, $settings_after:expr) => {{
+    ($snapshot:expr, $path:expr, $settings_before:expr, $settings_after:expr $(,)?) => {{
         let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
         insta::with_settings!({ omit_expression => true }, {
             insta::assert_snapshot!($snapshot, format!("{}", diff));
+        });
+    }};
+    ($path:expr, $settings_before:expr, $settings_after:expr $(,)?) => {{
+        let diff = $crate::test::test_path_with_settings_diff($path, $settings_before, $settings_after)?;
+        insta::with_settings!({ omit_expression => true }, {
+            insta::assert_snapshot!(format!("{}", diff));
         });
     }};
 }

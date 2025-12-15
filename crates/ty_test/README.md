@@ -180,6 +180,20 @@ snapshotting.
 At present, there is no way to do inline snapshotting or to request more granular
 snapshotting of specific diagnostics.
 
+## Expected panics
+
+It is possible to write tests that expect the type checker to panic during checking. Ideally, we'd fix those panics
+but being able to add regression tests even before is useful.
+
+To mark a test as expecting a panic, add an HTML comment like this:
+
+```markdown
+<!-- expect-panic: assertion `left == right` failed: Can't merge cycle heads -->
+```
+
+The text after `expect-panic:` is a substring that must appear in the panic message. The message is optional;
+but it is recommended to avoid false positives.
+
 ## Multi-file tests
 
 Some tests require multiple files, with imports from one file into another. For this purpose,
@@ -301,6 +315,44 @@ section. Nested sections can override configurations from their parent sections.
 To enable logging in an mdtest, set `log = true` at the top level of the TOML block.
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
 for the full list of supported configuration options.
+
+### Testing with external dependencies
+
+Tests can specify external Python dependencies using a `[project]` section in the TOML configuration.
+This allows testing code that uses third-party libraries like `pydantic`, `numpy`, etc.
+
+It is recommended to specify exact versions of packages to ensure reproducibility. The specified
+Python version and platform are required for tests with external dependencies, as they are used
+during package resolution.
+
+````markdown
+```toml
+[environment]
+python-version = "3.13"
+python-platform = "linux"
+
+[project]
+dependencies = ["pydantic==2.12.2"]
+```
+
+```py
+import pydantic
+
+# use pydantic in the test
+```
+````
+
+When a test has dependencies:
+
+1. The test framework creates a `pyproject.toml` in a temporary directory.
+1. Runs `uv sync` to install the dependencies.
+1. Copies the installed packages from the virtual environment's `site-packages` directory into the test's
+    in-memory filesystem.
+1. Configures the type checker to use these packages.
+
+**Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
+are installed fresh for each test that specifies them, so tests with many dependencies may be slower
+to run.
 
 ### Specifying a custom typeshed
 

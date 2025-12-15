@@ -3,7 +3,7 @@
 use self::schedule::spawn_main_loop;
 use crate::PositionEncoding;
 use crate::capabilities::{ResolvedClientCapabilities, server_capabilities};
-use crate::session::{InitializationOptions, Session};
+use crate::session::{InitializationOptions, Session, warn_about_unknown_options};
 use anyhow::Context;
 use lsp_server::Connection;
 use lsp_types::{ClientCapabilities, InitializeParams, MessageType, Url};
@@ -65,19 +65,15 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
-        tracing::debug!("Initialization options: {initialization_options:?}");
+        tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
+
+        tracing::debug!("Resolved client capabilities: {resolved_client_capabilities}");
+
         let position_encoding = Self::find_best_position_encoding(&client_capabilities);
-        let server_capabilities = server_capabilities(
-            position_encoding,
-            resolved_client_capabilities,
-            &initialization_options
-                .options
-                .global
-                .clone()
-                .into_settings(),
-        );
+        let server_capabilities =
+            server_capabilities(position_encoding, resolved_client_capabilities);
 
         let version = ruff_db::program_version().unwrap_or("Unknown");
         tracing::info!("Version: {version}");
@@ -100,29 +96,7 @@ impl Server {
 
         let unknown_options = &initialization_options.options.unknown;
         if !unknown_options.is_empty() {
-            // HACK: Old versions of the ty VS Code extension used a custom schema for settings
-            // which was changed in version 2025.35.0. This is to ensure that users don't receive
-            // unnecessary warnings when using an older version of the extension. This should be
-            // removed after a few releases.
-            if !unknown_options.contains_key("settings")
-                || !unknown_options.contains_key("globalSettings")
-            {
-                tracing::warn!(
-                    "Received unknown options during initialization: {}",
-                    serde_json::to_string_pretty(&unknown_options)
-                        .unwrap_or_else(|_| format!("{unknown_options:?}"))
-                );
-
-                client.show_warning_message(format_args!(
-                    "Received unknown options during initialization: '{}'. \
-                    Refer to the logs for more details",
-                    unknown_options
-                        .keys()
-                        .map(String::as_str)
-                        .collect::<Vec<_>>()
-                        .join("', '")
-                ));
-            }
+            warn_about_unknown_options(&client, None, unknown_options);
         }
 
         // Get workspace URLs without settings - settings will come from workspace/configuration

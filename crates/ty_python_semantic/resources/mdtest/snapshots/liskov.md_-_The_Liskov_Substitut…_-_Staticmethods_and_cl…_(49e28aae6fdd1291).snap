@@ -1,0 +1,220 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Staticmethods and classmethods
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.pyi
+
+```
+ 1 | class Parent:
+ 2 |     def instance_method(self, x: int) -> int: ...
+ 3 |     @classmethod
+ 4 |     def class_method(cls, x: int) -> int: ...
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+ 7 | 
+ 8 | class BadChild1(Parent):
+ 9 |     @staticmethod
+10 |     def instance_method(self, x: int) -> int: ...  # error: [invalid-method-override]
+11 |     # TODO: we should emit `invalid-method-override` here.
+12 |     # Although the method has the same signature as `Parent.class_method`
+13 |     # when accessed on instances, it does not have the same signature as
+14 |     # `Parent.class_method` when accessed on the class object itself
+15 |     def class_method(cls, x: int) -> int: ...
+16 |     def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+17 | 
+18 | class BadChild2(Parent):
+19 |     # TODO: we should emit `invalid-method-override` here.
+20 |     # Although the method has the same signature as `Parent.class_method`
+21 |     # when accessed on instances, it does not have the same signature as
+22 |     # `Parent.class_method` when accessed on the class object itself.
+23 |     #
+24 |     # Note that whereas `BadChild1.class_method` is reported as a Liskov violation by
+25 |     # mypy, pyright and pyrefly, pyright is the only one of those three to report a
+26 |     # Liskov violation on this method as of 2025-11-23.
+27 |     @classmethod
+28 |     def instance_method(self, x: int) -> int: ...
+29 |     @staticmethod
+30 |     def class_method(cls, x: int) -> int: ...  # error: [invalid-method-override]
+31 |     @classmethod
+32 |     def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+33 | 
+34 | class BadChild3(Parent):
+35 |     @classmethod
+36 |     def class_method(cls, x: bool) -> object: ...  # error: [invalid-method-override]
+37 |     @staticmethod
+38 |     def static_method(x: bool) -> object: ...  # error: [invalid-method-override]
+39 | 
+40 | class GoodChild1(Parent):
+41 |     @classmethod
+42 |     def class_method(cls, x: int) -> int: ...
+43 |     @staticmethod
+44 |     def static_method(x: int) -> int: ...
+45 | 
+46 | class GoodChild2(Parent):
+47 |     @classmethod
+48 |     def class_method(cls, x: object) -> bool: ...
+49 |     @staticmethod
+50 |     def static_method(x: object) -> bool: ...
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `instance_method`
+  --> src/mdtest_snippet.pyi:10:9
+   |
+ 8 | class BadChild1(Parent):
+ 9 |     @staticmethod
+10 |     def instance_method(self, x: int) -> int: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.instance_method`
+11 |     # TODO: we should emit `invalid-method-override` here.
+12 |     # Although the method has the same signature as `Parent.class_method`
+   |
+  ::: src/mdtest_snippet.pyi:2:9
+   |
+ 1 | class Parent:
+ 2 |     def instance_method(self, x: int) -> int: ...
+   |         ------------------------------------ `Parent.instance_method` defined here
+ 3 |     @classmethod
+ 4 |     def class_method(cls, x: int) -> int: ...
+   |
+info: `BadChild1.instance_method` is a staticmethod but `Parent.instance_method` is an instance method
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `static_method`
+  --> src/mdtest_snippet.pyi:16:9
+   |
+14 |     # `Parent.class_method` when accessed on the class object itself
+15 |     def class_method(cls, x: int) -> int: ...
+16 |     def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
+17 |
+18 | class BadChild2(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:6:9
+   |
+ 4 |     def class_method(cls, x: int) -> int: ...
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+   |         ---------------------------- `Parent.static_method` defined here
+ 7 |
+ 8 | class BadChild1(Parent):
+   |
+info: `BadChild1.static_method` is an instance method but `Parent.static_method` is a staticmethod
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `class_method`
+  --> src/mdtest_snippet.pyi:30:9
+   |
+28 |     def instance_method(self, x: int) -> int: ...
+29 |     @staticmethod
+30 |     def class_method(cls, x: int) -> int: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method`
+31 |     @classmethod
+32 |     def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 2 |     def instance_method(self, x: int) -> int: ...
+ 3 |     @classmethod
+ 4 |     def class_method(cls, x: int) -> int: ...
+   |         -------------------------------- `Parent.class_method` defined here
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+   |
+info: `BadChild2.class_method` is a staticmethod but `Parent.class_method` is a classmethod
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `static_method`
+  --> src/mdtest_snippet.pyi:32:9
+   |
+30 |     def class_method(cls, x: int) -> int: ...  # error: [invalid-method-override]
+31 |     @classmethod
+32 |     def static_method(x: int) -> int: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
+33 |
+34 | class BadChild3(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:6:9
+   |
+ 4 |     def class_method(cls, x: int) -> int: ...
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+   |         ---------------------------- `Parent.static_method` defined here
+ 7 |
+ 8 | class BadChild1(Parent):
+   |
+info: `BadChild2.static_method` is a classmethod but `Parent.static_method` is a staticmethod
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `class_method`
+  --> src/mdtest_snippet.pyi:36:9
+   |
+34 | class BadChild3(Parent):
+35 |     @classmethod
+36 |     def class_method(cls, x: bool) -> object: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.class_method`
+37 |     @staticmethod
+38 |     def static_method(x: bool) -> object: ...  # error: [invalid-method-override]
+   |
+  ::: src/mdtest_snippet.pyi:4:9
+   |
+ 2 |     def instance_method(self, x: int) -> int: ...
+ 3 |     @classmethod
+ 4 |     def class_method(cls, x: int) -> int: ...
+   |         -------------------------------- `Parent.class_method` defined here
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `static_method`
+  --> src/mdtest_snippet.pyi:38:9
+   |
+36 |     def class_method(cls, x: bool) -> object: ...  # error: [invalid-method-override]
+37 |     @staticmethod
+38 |     def static_method(x: bool) -> object: ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `Parent.static_method`
+39 |
+40 | class GoodChild1(Parent):
+   |
+  ::: src/mdtest_snippet.pyi:6:9
+   |
+ 4 |     def class_method(cls, x: int) -> int: ...
+ 5 |     @staticmethod
+ 6 |     def static_method(x: int) -> int: ...
+   |         ---------------------------- `Parent.static_method` defined here
+ 7 |
+ 8 | class BadChild1(Parent):
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

@@ -181,10 +181,16 @@ impl Format<PyFormatContext<'_>> for FormatInterpolatedElement<'_> {
 
             let item = format_with(|f: &mut PyFormatter| {
                 // Update the context to be inside the f-string expression element.
-                let f = &mut WithInterpolatedStringState::new(
-                    InterpolatedStringState::InsideInterpolatedElement(self.context),
-                    f,
-                );
+                let state = match f.context().interpolated_string_state() {
+                    InterpolatedStringState::InsideInterpolatedElement(_)
+                    | InterpolatedStringState::NestedInterpolatedElement(_) => {
+                        InterpolatedStringState::NestedInterpolatedElement(self.context)
+                    }
+                    InterpolatedStringState::Outside => {
+                        InterpolatedStringState::InsideInterpolatedElement(self.context)
+                    }
+                };
+                let f = &mut WithInterpolatedStringState::new(state, f);
 
                 write!(f, [bracket_spacing, expression.format()])?;
 

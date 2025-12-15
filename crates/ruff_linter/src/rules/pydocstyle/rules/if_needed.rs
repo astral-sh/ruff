@@ -67,6 +67,7 @@ use crate::docstrings::Docstring;
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 /// - [Python documentation: `typing.overload`](https://docs.python.org/3/library/typing.html#typing.overload)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.71")]
 pub(crate) struct OverloadWithDocstring;
 
 impl Violation for OverloadWithDocstring {

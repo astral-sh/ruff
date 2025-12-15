@@ -34,6 +34,7 @@ use crate::rules::flake8_bugbear::helpers::at_last_top_level_expression_in_cell;
 /// ## References
 /// - [Python documentation: `assert` statement](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.102")]
 pub(crate) struct UselessComparison {
     at: ComparisonLocationAt,
 }

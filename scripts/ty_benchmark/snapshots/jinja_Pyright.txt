@@ -1,0 +1,114 @@
+<CWD>/src/jinja2/async_utils.py
+  <CWD>/src/jinja2/async_utils.py:91:25 - error: Cannot access attribute "__aiter__" for class "Iterable[V@auto_aiter]"
+    Attribute "__aiter__" is unknown (reportAttributeAccessIssue)
+  <CWD>/src/jinja2/async_utils.py:93:41 - error: No overloads for "iter" match the provided arguments (reportCallIssue)
+  <CWD>/src/jinja2/async_utils.py:93:46 - error: Argument of type "AsyncIterable[V@auto_aiter] | Iterable[V@auto_aiter]" cannot be assigned to parameter "object" of type "_GetItemIterable[_T@iter]" in function "iter"
+    Type "AsyncIterable[V@auto_aiter] | Iterable[V@auto_aiter]" is not assignable to type "_GetItemIterable[_T@iter]"
+      "AsyncIterable[V@auto_aiter]" is incompatible with protocol "_GetItemIterable[_T@iter]"
+        "__getitem__" is not present (reportArgumentType)
+<CWD>/src/jinja2/compiler.py
+  <CWD>/src/jinja2/compiler.py:1257:27 - error: "loop_filter_func" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/compiler.py:1280:31 - error: "iteration_indicator" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/compiler.py:1287:34 - error: "iteration_indicator" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/compiler.py:1410:9 - error: Declaration "finalize" is obscured by a declaration of the same name (reportRedeclaration)
+  <CWD>/src/jinja2/compiler.py:1424:24 - error: Type "None" is not assignable to declared type "(value: Any) -> Any"
+    Type "None" is not assignable to type "(value: Any) -> Any" (reportAssignmentType)
+<CWD>/src/jinja2/debug.py
+  <CWD>/src/jinja2/debug.py:78:6 - error: Function with declared return type "TracebackType" must return value on all code paths
+    "None" is not assignable to "TracebackType" (reportReturnType)
+<CWD>/src/jinja2/environment.py
+  <CWD>/src/jinja2/environment.py:711:9 - error: Overload 1 for "compile" overlaps overload 2 and returns an incompatible type (reportOverlappingOverload)
+  <CWD>/src/jinja2/environment.py:823:9 - error: Parameter declaration "log_function" is obscured by a declaration of the same name (reportRedeclaration)
+  <CWD>/src/jinja2/environment.py:894:17 - error: "zip_file" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/environment.py:901:9 - error: Parameter declaration "filter_func" is obscured by a declaration of the same name (reportRedeclaration)
+  <CWD>/src/jinja2/environment.py:1617:17 - error: No overloads for "writelines" match the provided arguments (reportCallIssue)
+  <CWD>/src/jinja2/environment.py:1617:36 - error: Argument of type "Generator[bytes, None, None] | Self@TemplateStream" cannot be assigned to parameter "lines" of type "Iterable[bytes]" in function "writelines"
+    Type "Generator[bytes, None, None] | TemplateStream*" is not assignable to type "Iterable[bytes]"
+      "TemplateStream*" is incompatible with protocol "Iterable[bytes]"
+        "__iter__" is an incompatible type
+          Type "() -> TemplateStream" is not assignable to type "() -> Iterator[_T_co@Iterable]"
+            Function return type "TemplateStream" is incompatible with type "Iterator[_T_co@Iterable]" (reportArgumentType)
+  <CWD>/src/jinja2/environment.py:1617:36 - error: Argument of type "Generator[bytes, None, None] | Self@TemplateStream" cannot be assigned to parameter "lines" of type "Iterable[ReadableBuffer]" in function "writelines"
+    Type "Generator[bytes, None, None] | TemplateStream*" is not assignable to type "Iterable[ReadableBuffer]"
+      "TemplateStream*" is incompatible with protocol "Iterable[ReadableBuffer]"
+        "__iter__" is an incompatible type
+          Type "() -> TemplateStream" is not assignable to type "() -> Iterator[_T_co@Iterable]"
+            Function return type "TemplateStream" is incompatible with type "Iterator[_T_co@Iterable]" (reportArgumentType)
+  <CWD>/src/jinja2/environment.py:1620:21 - error: No overloads for "write" match the provided arguments (reportCallIssue)
+  <CWD>/src/jinja2/environment.py:1620:35 - error: Argument of type "bytes | str" cannot be assigned to parameter "s" of type "bytes" in function "write"
+    Type "bytes | str" is not assignable to type "bytes"
+      "str" is not assignable to "bytes" (reportArgumentType)
+  <CWD>/src/jinja2/environment.py:1620:35 - error: Argument of type "bytes | str" cannot be assigned to parameter "buffer" of type "ReadableBuffer" in function "write"
+    Type "bytes | str" is not assignable to type "ReadableBuffer"
+      "str" is incompatible with protocol "Buffer"
+        "__buffer__" is not present (reportArgumentType)
+<CWD>/src/jinja2/exceptions.py
+  <CWD>/src/jinja2/exceptions.py:45:14 - error: "message" incorrectly overrides property of same name in class "TemplateError" (reportIncompatibleMethodOverride)
+<CWD>/src/jinja2/ext.py
+  <CWD>/src/jinja2/ext.py:30:67 - error: Function with declared return type "str" must return value on all code paths
+    "None" is not assignable to "str" (reportReturnType)
+<CWD>/src/jinja2/filters.py
+  <CWD>/src/jinja2/filters.py:40:31 - error: Function with declared return type "str" must return value on all code paths
+    "None" is not assignable to "str" (reportReturnType)
+  <CWD>/src/jinja2/filters.py:120:13 - error: No overloads for "__setitem__" match the provided arguments (reportCallIssue)
+  <CWD>/src/jinja2/filters.py:120:13 - error: Argument of type "Any | Undefined" cannot be assigned to parameter "value" of type "None" in function "__setitem__"
+    Type "Any | Undefined" is not assignable to type "None"
+      "Undefined" is not assignable to "None" (reportArgumentType)
+  <CWD>/src/jinja2/filters.py:169:48 - error: Type "dict_items[str, Any] | dict_items[tuple[str, Any], Unknown]" is not assignable to declared type "Iterable[tuple[str, Any]]"
+    Type "dict_items[str, Any] | dict_items[tuple[str, Any], Unknown]" is not assignable to type "Iterable[tuple[str, Any]]"
+      "dict_items[tuple[str, Any], Unknown]" is not assignable to "Iterable[tuple[str, Any]]"
+        Type parameter "_T_co@Iterable" is covariant, but "tuple[tuple[str, Any], Unknown]" is not a subtype of "tuple[str, Any]"
+          "tuple[tuple[str, Any], Unknown]" is not assignable to "tuple[str, Any]"
+            Tuple entry 1 is incorrect type (reportAssignmentType)
+  <CWD>/src/jinja2/filters.py:730:34 - error: "unit" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/filters.py:730:45 - error: "prefix" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/filters.py:803:19 - error: Object of type "None" cannot be used as iterable value (reportOptionalIterable)
+  <CWD>/src/jinja2/filters.py:905:12 - error: Operator ">=" not supported for "None" (reportOptionalOperand)
+  <CWD>/src/jinja2/filters.py:907:18 - error: Operator "+" not supported for types "int" and "int | None"
+    Operator "+" not supported for types "int" and "None" (reportOperatorIssue)
+  <CWD>/src/jinja2/filters.py:1345:16 - error: Type "(Any) -> Any" is not assignable to declared type "(x: V@do_sum) -> V@do_sum"
+    Type "(Any) -> Any" is not assignable to type "(x: V@do_sum) -> V@do_sum"
+      Missing keyword parameter "x"
+        Position-only parameter mismatch; parameter "x" is not position-only
+        Position-only parameter mismatch; expected 1 but received 0 (reportAssignmentType)
+  <CWD>/src/jinja2/filters.py:1352:9 - error: Operator "+=" not supported for types "V@do_sum" and "V@do_sum"
+    Operator "+" not supported for types "object*" and "object*" (reportOperatorIssue)
+  <CWD>/src/jinja2/filters.py:1730:16 - error: Type "(Any) -> Any" is not assignable to declared type "(item: Any) -> Any"
+    Type "(Any) -> Any" is not assignable to type "(item: Any) -> Any"
+      Missing keyword parameter "item"
+        Position-only parameter mismatch; parameter "item" is not position-only
+        Position-only parameter mismatch; expected 1 but received 0 (reportAssignmentType)
+  <CWD>/src/jinja2/filters.py:1759:21 - error: Type "(Any) -> Any" is not assignable to declared type "(x: V@transfunc) -> V@transfunc"
+    Type "(Any) -> Any" is not assignable to type "(x: V@transfunc) -> V@transfunc"
+      Missing keyword parameter "x"
+        Position-only parameter mismatch; parameter "x" is not position-only
+        Position-only parameter mismatch; expected 1 but received 0 (reportAssignmentType)
+<CWD>/src/jinja2/loaders.py
+  <CWD>/src/jinja2/loaders.py:143:32 - error: "bucket" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/loaders.py:144:13 - error: "bucket" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/loaders.py:145:28 - error: "bucket" is possibly unbound (reportPossiblyUnboundVariable)
+  <CWD>/src/jinja2/loaders.py:374:9 - error: Declaration "up_to_date" is obscured by a declaration of the same name (reportRedeclaration)
+  <CWD>/src/jinja2/loaders.py:399:26 - error: Type "None" is not assignable to declared type "() -> bool"
+    Type "None" is not assignable to type "() -> bool" (reportAssignmentType)
+<CWD>/src/jinja2/nodes.py
+  <CWD>/src/jinja2/nodes.py:217:25 - error: Argument of type "Iterator[Node]" cannot be assigned to parameter "iterable" of type "Iterable[Self@Node]" in function "extend"
+    "Iterator[Node]" is not assignable to "Iterable[Self@Node]"
+      Type parameter "_T_co@Iterable" is covariant, but "Node" is not a subtype of "Self@Node"
+        Type "Node" is not assignable to type "Self@Node" (reportArgumentType)
+  <CWD>/src/jinja2/nodes.py:228:25 - error: Argument of type "Iterator[Node]" cannot be assigned to parameter "iterable" of type "Iterable[Self@Node]" in function "extend"
+    "Iterator[Node]" is not assignable to "Iterable[Self@Node]"
+      Type parameter "_T_co@Iterable" is covariant, but "Node" is not a subtype of "Self@Node"
+        Type "Node" is not assignable to type "Self@Node" (reportArgumentType)
+  <CWD>/src/jinja2/nodes.py:237:25 - error: Argument of type "Iterator[Node]" cannot be assigned to parameter "iterable" of type "Iterable[Self@Node]" in function "extend"
+    "Iterator[Node]" is not assignable to "Iterable[Self@Node]"
+      Type parameter "_T_co@Iterable" is covariant, but "Node" is not a subtype of "Self@Node"
+        Type "Node" is not assignable to type "Self@Node" (reportArgumentType)
+<CWD>/src/jinja2/runtime.py
+  <CWD>/src/jinja2/runtime.py:144:14 - error: Cannot access attribute "register" for class "type[Mapping[_KT@Mapping, _VT_co@Mapping]]"
+    Attribute "register" is unknown (reportAttributeAccessIssue)
+<CWD>/src/jinja2/utils.py
+  <CWD>/src/jinja2/utils.py:91:28 - warning: TypeVar "F" appears only once in generic function signature
+    Use "(...) -> Any" instead (reportInvalidTypeVarUse)
+  <CWD>/src/jinja2/utils.py:431:21 - error: Cannot access attribute "register" for class "type[MutableMapping[_KT@MutableMapping, _VT@MutableMapping]]"
+    Attribute "register" is unknown (reportAttributeAccessIssue)
+44 errors, 1 warning, 0 informations

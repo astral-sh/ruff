@@ -104,7 +104,7 @@ fn generate_set(output: &mut String, set: Set, parents: &mut Vec<Set>) {
         generate_set(
             output,
             Set::Named {
-                name: set_name.to_string(),
+                name: set_name.clone(),
                 set: *sub_set,
             },
             parents,
@@ -144,8 +144,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
 
     if let Some(deprecated) = &field.deprecated {
-        output.push_str("> [!WARN] \"Deprecated\"\n");
-        output.push_str("> This option has been deprecated");
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
 
         if let Some(since) = deprecated.since {
             write!(output, " in {since}").unwrap();

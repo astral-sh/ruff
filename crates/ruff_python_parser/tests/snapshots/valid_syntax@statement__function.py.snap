@@ -2387,8 +2387,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1712..1713,
                                         node_index: NodeIndex(None),
+                                        range: 1712..1713,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1712..1713,
@@ -2473,8 +2473,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1747..1753,
                                         node_index: NodeIndex(None),
+                                        range: 1747..1753,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1747..1748,
@@ -2568,8 +2568,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1787..1802,
                                         node_index: NodeIndex(None),
+                                        range: 1787..1802,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1787..1788,
@@ -2681,8 +2681,8 @@ Module(
                             type_params: [
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 1836..1839,
                                         node_index: NodeIndex(None),
+                                        range: 1836..1839,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 1837..1839,
@@ -2800,8 +2800,8 @@ Module(
                             type_params: [
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 1885..1888,
                                         node_index: NodeIndex(None),
+                                        range: 1885..1888,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 1887..1888,
@@ -2915,8 +2915,8 @@ Module(
                             type_params: [
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1946..1947,
                                         node_index: NodeIndex(None),
+                                        range: 1946..1947,
                                         name: Identifier {
                                             id: Name("T"),
                                             range: 1946..1947,
@@ -2928,8 +2928,8 @@ Module(
                                 ),
                                 TypeVar(
                                     TypeParamTypeVar {
-                                        range: 1949..1955,
                                         node_index: NodeIndex(None),
+                                        range: 1949..1955,
                                         name: Identifier {
                                             id: Name("U"),
                                             range: 1949..1950,
@@ -2950,8 +2950,8 @@ Module(
                                 ),
                                 TypeVarTuple(
                                     TypeParamTypeVarTuple {
-                                        range: 1957..1960,
                                         node_index: NodeIndex(None),
+                                        range: 1957..1960,
                                         name: Identifier {
                                             id: Name("Ts"),
                                             range: 1958..1960,
@@ -2962,8 +2962,8 @@ Module(
                                 ),
                                 ParamSpec(
                                     TypeParamParamSpec {
-                                        range: 1962..1965,
                                         node_index: NodeIndex(None),
+                                        range: 1962..1965,
                                         name: Identifier {
                                             id: Name("P"),
                                             range: 1964..1965,
@@ -3642,6 +3642,7 @@ Module(
                                                                 quote_style: Double,
                                                                 prefix: Empty,
                                                                 triple_quoted: false,
+                                                                unclosed: false,
                                                             },
                                                         },
                                                     ),

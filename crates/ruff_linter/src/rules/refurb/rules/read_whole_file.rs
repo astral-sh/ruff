@@ -1,14 +1,17 @@
+use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::visitor::{self, Visitor};
-use ruff_python_ast::{self as ast, Expr};
+use ruff_python_ast::{
+    self as ast, Expr, Stmt,
+    visitor::{self, Visitor},
+};
 use ruff_python_codegen::Generator;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::Violation;
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
-
+use crate::importer::ImportRequest;
 use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `open` and `read` that can be replaced by `pathlib`
@@ -31,22 +34,35 @@ use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
 ///
 /// contents = Path(filename).read_text()
 /// ```
+/// ## Fix Safety
+/// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
 ///
 /// ## References
 /// - [Python documentation: `Path.read_bytes`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_bytes)
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.1.2")]
 pub(crate) struct ReadWholeFile {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
 }
 
 impl Violation for ReadWholeFile {
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
         format!("`open` and `read` should be replaced by `Path({filename}).{suggestion}`")
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        Some(format!(
+            "Replace with `Path({}).{}`",
+            self.filename.truncated_display(),
+            self.suggestion.truncated_display(),
+        ))
     }
 }
 
@@ -64,7 +80,7 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
     }
 
     // Then we need to match each `open` operation with exactly one `read` call.
-    let mut matcher = ReadMatcher::new(checker, candidates);
+    let mut matcher = ReadMatcher::new(checker, candidates, with);
     visitor::walk_body(&mut matcher, &with.body);
 }
 
@@ -72,13 +88,19 @@ pub(crate) fn read_whole_file(checker: &Checker, with: &ast::StmtWith) {
 struct ReadMatcher<'a, 'b> {
     checker: &'a Checker<'b>,
     candidates: Vec<FileOpen<'a>>,
+    with_stmt: &'a ast::StmtWith,
 }
 
 impl<'a, 'b> ReadMatcher<'a, 'b> {
-    fn new(checker: &'a Checker<'b>, candidates: Vec<FileOpen<'a>>) -> Self {
+    fn new(
+        checker: &'a Checker<'b>,
+        candidates: Vec<FileOpen<'a>>,
+        with_stmt: &'a ast::StmtWith,
+    ) -> Self {
         Self {
             checker,
             candidates,
+            with_stmt,
         }
     }
 }
@@ -92,15 +114,22 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                 .position(|open| open.is_ref(read_from))
             {
                 let open = self.candidates.remove(open);
-                self.checker.report_diagnostic(
+                let suggestion = make_suggestion(&open, self.checker.generator());
+                let mut diagnostic = self.checker.report_diagnostic(
                     ReadWholeFile {
                         filename: SourceCodeSnippet::from_str(
                             &self.checker.generator().expr(open.filename),
                         ),
-                        suggestion: make_suggestion(&open, self.checker.generator()),
+                        suggestion: SourceCodeSnippet::from_str(&suggestion),
                     },
                     open.item.range(),
                 );
+
+                if let Some(fix) =
+                    generate_fix(self.checker, &open, expr, self.with_stmt, &suggestion)
+                {
+                    diagnostic.set_fix(fix);
+                }
             }
             return;
         }
@@ -125,7 +154,7 @@ fn match_read_call(expr: &Expr) -> Option<&Expr> {
     Some(&*attr.value)
 }
 
-fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnippet {
+fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> String {
     let name = ast::ExprName {
         id: open.mode.pathlib_method(),
         ctx: ast::ExprContext::Load,
@@ -143,5 +172,77 @@ fn make_suggestion(open: &FileOpen<'_>, generator: Generator) -> SourceCodeSnipp
         range: TextRange::default(),
         node_index: ruff_python_ast::AtomicNodeIndex::NONE,
     };
-    SourceCodeSnippet::from_str(&generator.expr(&call.into()))
+    generator.expr(&call.into())
+}
+
+fn generate_fix(
+    checker: &Checker,
+    open: &FileOpen,
+    expr: &Expr,
+    with_stmt: &ast::StmtWith,
+    suggestion: &str,
+) -> Option<Fix> {
+    if with_stmt.items.len() != 1 {
+        return None;
+    }
+
+    let locator = checker.locator();
+
+    let filename_code = locator.slice(open.filename.range());
+
+    let (import_edit, binding) = checker
+        .importer()
+        .get_or_import_symbol(
+            &ImportRequest::import("pathlib", "Path"),
+            with_stmt.start(),
+            checker.semantic(),
+        )
+        .ok()?;
+
+    // Only replace context managers with a single assignment or annotated assignment in the body.
+    // The assignment's RHS must also be the same as the `read` call in `expr`, otherwise this fix
+    // would remove the rest of the expression.
+    let replacement = match with_stmt.body.as_slice() {
+        [Stmt::Assign(ast::StmtAssign { targets, value, .. })] if value.range() == expr.range() => {
+            match targets.as_slice() {
+                [Expr::Name(name)] => {
+                    format!(
+                        "{name} = {binding}({filename_code}).{suggestion}",
+                        name = name.id
+                    )
+                }
+                _ => return None,
+            }
+        }
+        [
+            Stmt::AnnAssign(ast::StmtAnnAssign {
+                target,
+                annotation,
+                value: Some(value),
+                ..
+            }),
+        ] if value.range() == expr.range() => match target.as_ref() {
+            Expr::Name(name) => {
+                format!(
+                    "{var}: {ann} = {binding}({filename_code}).{suggestion}",
+                    var = name.id,
+                    ann = locator.slice(annotation.range())
+                )
+            }
+            _ => return None,
+        },
+        _ => return None,
+    };
+
+    let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
+    Some(Fix::applicable_edits(
+        Edit::range_replacement(replacement, with_stmt.range()),
+        [import_edit],
+        applicability,
+    ))
 }

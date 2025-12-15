@@ -34,6 +34,7 @@ use crate::checkers::ast::Checker;
 /// ## References
 /// - [Paramiko documentation: set_missing_host_key_policy](https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.set_missing_host_key_policy)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct SSHNoHostKeyVerification;
 
 impl Violation for SSHNoHostKeyVerification {

@@ -171,6 +171,40 @@ help: Convert to `X | Y`
 35 | 
 36 | 
 
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007.py:37:10
+   |
+37 | def f(x: Union["str", int]) -> None:
+   |          ^^^^^^^^^^^^^^^^^
+38 |     ...
+   |
+help: Convert to `X | Y`
+34 |     ...
+35 | 
+36 | 
+   - def f(x: Union["str", int]) -> None:
+37 + def f(x: "str" | int) -> None:
+38 |     ...
+39 | 
+40 | 
+
+UP007 [*] Use `X | Y` for type annotations
+  --> UP007.py:41:10
+   |
+41 | def f(x: Union[("str", "int"), float]) -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+42 |     ...
+   |
+help: Convert to `X | Y`
+38 |     ...
+39 | 
+40 | 
+   - def f(x: Union[("str", "int"), float]) -> None:
+41 + def f(x: "str" | "int" | float) -> None:
+42 |     ...
+43 | 
+44 | 
+
 UP007 Use `X | Y` for type annotations
   --> UP007.py:46:9
    |

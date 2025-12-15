@@ -37,6 +37,7 @@ use ruff_text_size::TextRange;
 /// Asset(uri="test://test/")
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "0.13.0")]
 pub(crate) struct Airflow3SuggestedUpdate {
     deprecated: String,
     replacement: Replacement,
@@ -55,7 +56,7 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::None
             | Replacement::AttrName(_)
             | Replacement::Message(_)
-            | Replacement::AutoImport { module: _, name: _ }
+            | Replacement::Rename { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!(
                     "`{deprecated}` is removed in Airflow 3.0; \
@@ -71,7 +72,7 @@ impl Violation for Airflow3SuggestedUpdate {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
             Replacement::Message(message) => Some((*message).to_string()),
-            Replacement::AutoImport { module, name } => {
+            Replacement::Rename { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
             }
             Replacement::SourceModuleMoved { module, name } => {
@@ -191,30 +192,30 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
 
     let replacement = match qualified_name.segments() {
         // airflow.datasets.metadata
-        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::AutoImport {
+        ["airflow", "datasets", "metadata", "Metadata"] => Replacement::Rename {
             module: "airflow.sdk",
             name: "Metadata",
         },
         // airflow.datasets
-        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::AutoImport {
+        ["airflow", "Dataset"] | ["airflow", "datasets", "Dataset"] => Replacement::Rename {
             module: "airflow.sdk",
             name: "Asset",
         },
         ["airflow", "datasets", rest] => match *rest {
             "DatasetAliasEvent" => Replacement::None,
-            "DatasetAlias" => Replacement::AutoImport {
+            "DatasetAlias" => Replacement::Rename {
                 module: "airflow.sdk",
                 name: "AssetAlias",
             },
-            "DatasetAll" => Replacement::AutoImport {
+            "DatasetAll" => Replacement::Rename {
                 module: "airflow.sdk",
                 name: "AssetAll",
             },
-            "DatasetAny" => Replacement::AutoImport {
+            "DatasetAny" => Replacement::Rename {
                 module: "airflow.sdk",
                 name: "AssetAny",
             },
-            "expand_alias_to_datasets" => Replacement::AutoImport {
+            "expand_alias_to_datasets" => Replacement::Rename {
                 module: "airflow.models.asset",
                 name: "expand_alias_to_assets",
             },
@@ -261,9 +262,14 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
                 name: (*rest).to_string(),
             }
         }
-        ["airflow", "models", "Param"] => Replacement::AutoImport {
+        [
+            "airflow",
+            "models",
+            ..,
+            rest @ ("Param" | "ParamsDict" | "DagParam"),
+        ] => Replacement::SourceModuleMoved {
             module: "airflow.sdk.definitions.param",
-            name: "Param",
+            name: (*rest).to_string(),
         },
 
         // airflow.models.baseoperator
@@ -276,16 +282,18 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             module: "airflow.sdk",
             name: (*rest).to_string(),
         },
-        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::AutoImport {
+        ["airflow", "models", "baseoperatorlink", "BaseOperatorLink"] => Replacement::Rename {
             module: "airflow.sdk",
             name: "BaseOperatorLink",
         },
 
         // airflow.model..DAG
-        ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
-            module: "airflow.sdk",
-            name: "DAG".to_string(),
-        },
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk",
+                name: "DAG".to_string(),
+            }
+        }
 
         // airflow.sensors.base
         [
@@ -299,7 +307,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.timetables
-        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::AutoImport {
+        ["airflow", "timetables", "datasets", "DatasetOrTimeSchedule"] => Replacement::Rename {
             module: "airflow.timetables.assets",
             name: "AssetOrTimeSchedule",
         },
@@ -310,7 +318,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
             "utils",
             "dag_parsing_context",
             "get_parsing_context",
-        ] => Replacement::AutoImport {
+        ] => Replacement::Rename {
             module: "airflow.sdk",
             name: "get_parsing_context",
         },
@@ -319,7 +327,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     };
 
     let (module, name) = match &replacement {
-        Replacement::AutoImport { module, name } => (module, *name),
+        Replacement::Rename { module, name } => (module, *name),
         Replacement::SourceModuleMoved { module, name } => (module, name.as_str()),
         _ => {
             checker.report_diagnostic(

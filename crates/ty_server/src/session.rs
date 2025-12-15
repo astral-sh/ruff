@@ -1,11 +1,15 @@
 //! Data model, state management, and configuration resolution.
 
+use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
+use std::ops::{Deref, DerefMut};
+use std::panic::RefUnwindSafe;
+use std::sync::Arc;
+
 use anyhow::{Context, anyhow};
-use index::DocumentQueryError;
 use lsp_server::{Message, RequestId};
 use lsp_types::notification::{DidChangeWatchedFiles, Exit, Notification};
 use lsp_types::request::{
-    DocumentDiagnosticRequest, RegisterCapability, Rename, Request, Shutdown, UnregisterCapability,
+    DocumentDiagnosticRequest, RegisterCapability, Request, Shutdown, UnregisterCapability,
     WorkspaceDiagnosticRequest,
 };
 use lsp_types::{
@@ -13,29 +17,26 @@ use lsp_types::{
     DidChangeWatchedFilesRegistrationOptions, FileSystemWatcher, Registration, RegistrationParams,
     TextDocumentContentChangeEvent, Unregistration, UnregistrationParams, Url,
 };
-use options::GlobalOptions;
 use ruff_db::Db;
-use ruff_db::files::File;
+use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use std::collections::{BTreeMap, HashSet, VecDeque};
-use std::ops::{Deref, DerefMut};
-use std::panic::RefUnwindSafe;
-use std::sync::Arc;
+use ruff_python_ast::PySourceType;
 use ty_combine::Combine;
 use ty_project::metadata::Options;
-use ty_project::watch::ChangeEvent;
+use ty_project::watch::{ChangeEvent, CreatedKind};
 use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetadata};
 
-pub(crate) use self::index::DocumentQuery;
+use index::DocumentError;
+use options::GlobalOptions;
+
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
-use crate::capabilities::{
-    ResolvedClientCapabilities, server_diagnostic_options, server_rename_options,
-};
+use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
 use crate::server::{Action, publish_settings_diagnostics};
 use crate::session::client::Client;
+use crate::session::index::Document;
 use crate::session::request_queue::RequestQueue;
 use crate::system::{AnySystemPath, LSPSystem};
 use crate::{PositionEncoding, TextDocument};
@@ -439,13 +440,6 @@ impl Session {
         self.projects.values_mut().chain(default_project)
     }
 
-    /// Returns the [`DocumentKey`] for the given URL.
-    ///
-    /// Refer to [`Index::key_from_url`] for more details.
-    pub(crate) fn key_from_url(&self, url: Url) -> Result<DocumentKey, Url> {
-        self.index().key_from_url(url)
-    }
-
     pub(crate) fn initialize_workspaces(
         &mut self,
         workspace_settings: Vec<(Url, ClientOptions)>,
@@ -472,28 +466,7 @@ impl Session {
 
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {
-                // HACK: This is to ensure that users with an older version of the ty VS Code
-                // extension don't get warnings about unknown options when they are using a newer
-                // version of the language server. This should be removed after a few releases.
-                if !unknown_options.contains_key("importStrategy")
-                    && !unknown_options.contains_key("interpreter")
-                {
-                    tracing::warn!(
-                        "Received unknown options for workspace `{url}`: {}",
-                        serde_json::to_string_pretty(unknown_options)
-                            .unwrap_or_else(|_| format!("{unknown_options:?}"))
-                    );
-
-                    client.show_warning_message(format!(
-                        "Received unknown options for workspace `{url}`: '{}'. \
-                        Refer to the logs for more details.",
-                        unknown_options
-                            .keys()
-                            .map(String::as_str)
-                            .collect::<Vec<_>>()
-                            .join("', '")
-                    ));
-                }
+                warn_about_unknown_options(client, Some(&url), unknown_options);
             }
 
             combined_global_options.combine_with(Some(global));
@@ -569,7 +542,7 @@ impl Session {
             publish_settings_diagnostics(self, client, root);
         }
 
-        if let Some(global_options) = combined_global_options.take() {
+        if let Some(global_options) = combined_global_options {
             let global_settings = global_options.into_settings();
             if global_settings.diagnostic_mode().is_workspace() {
                 for project in self.projects.values_mut() {
@@ -608,7 +581,6 @@ impl Session {
     /// `ty.experimental.rename` global setting.
     fn register_capabilities(&mut self, client: &Client) {
         static DIAGNOSTIC_REGISTRATION_ID: &str = "ty/textDocument/diagnostic";
-        static RENAME_REGISTRATION_ID: &str = "ty/textDocument/rename";
         static FILE_WATCHER_REGISTRATION_ID: &str = "ty/workspace/didChangeWatchedFiles";
 
         let mut registrations = vec![];
@@ -648,31 +620,6 @@ impl Session {
                     .unwrap(),
                 ),
             });
-        }
-
-        if self
-            .resolved_client_capabilities
-            .supports_rename_dynamic_registration()
-        {
-            let is_rename_enabled = self.global_settings.is_rename_enabled();
-
-            if !is_rename_enabled {
-                tracing::debug!("Rename capability is disabled in the resolved global settings");
-                if self.registrations.contains(Rename::METHOD) {
-                    unregistrations.push(Unregistration {
-                        id: RENAME_REGISTRATION_ID.into(),
-                        method: Rename::METHOD.into(),
-                    });
-                }
-            }
-
-            if is_rename_enabled {
-                registrations.push(Registration {
-                    id: RENAME_REGISTRATION_ID.into(),
-                    method: Rename::METHOD.into(),
-                    register_options: Some(serde_json::to_value(server_rename_options()).unwrap()),
-                });
-            }
         }
 
         if let Some(register_options) = self.file_watcher_registration_options() {
@@ -819,25 +766,25 @@ impl Session {
     }
 
     /// Creates a document snapshot with the URL referencing the document to snapshot.
-    pub(crate) fn take_document_snapshot(&self, url: Url) -> DocumentSnapshot {
-        let key = self
-            .key_from_url(url)
-            .map_err(DocumentQueryError::InvalidUrl);
-        DocumentSnapshot {
+    pub(crate) fn snapshot_document(&self, url: &Url) -> Result<DocumentSnapshot, DocumentError> {
+        let index = self.index();
+        let document_handle = index.document_handle(url)?;
+
+        Ok(DocumentSnapshot {
             resolved_client_capabilities: self.resolved_client_capabilities,
             global_settings: self.global_settings.clone(),
-            workspace_settings: key
-                .as_ref()
-                .ok()
-                .and_then(|key| self.workspaces.settings_for_path(key.path().as_system()?))
+            workspace_settings: document_handle
+                .notebook_or_file_path()
+                .as_system()
+                .and_then(|path| self.workspaces.settings_for_path(path))
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
-            document_query_result: key.and_then(|key| self.index().make_document_ref(key)),
-        }
+            document: document_handle,
+        })
     }
 
     /// Creates a snapshot of the current state of the [`Session`].
-    pub(crate) fn take_session_snapshot(&self) -> SessionSnapshot {
+    pub(crate) fn snapshot_session(&self) -> SessionSnapshot {
         SessionSnapshot {
             projects: self
                 .projects
@@ -855,56 +802,83 @@ impl Session {
     }
 
     /// Iterates over the document keys for all open text documents.
-    pub(super) fn text_document_keys(&self) -> impl Iterator<Item = DocumentKey> + '_ {
+    pub(super) fn text_document_handles(&self) -> impl Iterator<Item = DocumentHandle> + '_ {
         self.index()
-            .text_document_paths()
-            .map(|path| DocumentKey::Text(path.clone()))
+            .text_documents()
+            .map(|(_, document)| DocumentHandle::from_text_document(document))
+    }
+
+    /// Returns a handle to the document specified by its URL.
+    ///
+    /// # Errors
+    ///
+    /// If the document is not found.
+    pub(crate) fn document_handle(
+        &self,
+        url: &lsp_types::Url,
+    ) -> Result<DocumentHandle, DocumentError> {
+        self.index().document_handle(url)
     }
 
     /// Registers a notebook document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_notebook_document(
-        &mut self,
-        path: &AnySystemPath,
-        document: NotebookDocument,
-    ) {
-        self.index_mut().open_notebook_document(path, document);
-        self.bump_revision();
+    ///
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_notebook_document(&mut self, document: NotebookDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_notebook_document(document);
+        self.open_document_in_db(&handle);
+        handle
     }
 
     /// Registers a text document at the provided `path`.
     /// If a document is already open here, it will be overwritten.
-    pub(crate) fn open_text_document(&mut self, path: &AnySystemPath, document: TextDocument) {
-        self.index_mut().open_text_document(path, document);
-        self.bump_revision();
-    }
-
-    /// Updates a text document at the associated `key`.
     ///
-    /// The document key must point to a text document, or this will throw an error.
-    pub(crate) fn update_text_document(
-        &mut self,
-        key: &DocumentKey,
-        content_changes: Vec<TextDocumentContentChangeEvent>,
-        new_version: DocumentVersion,
-    ) -> crate::Result<()> {
-        let position_encoding = self.position_encoding;
-        self.index_mut().update_text_document(
-            key,
-            content_changes,
-            new_version,
-            position_encoding,
-        )?;
-        self.bump_revision();
-        Ok(())
+    /// Returns a handle to the opened document.
+    pub(crate) fn open_text_document(&mut self, document: TextDocument) -> DocumentHandle {
+        let handle = self.index_mut().open_text_document(document);
+        self.open_document_in_db(&handle);
+        handle
     }
 
-    /// De-registers a document, specified by its key.
-    /// Calling this multiple times for the same document is a logic error.
-    pub(crate) fn close_document(&mut self, key: &DocumentKey) -> crate::Result<()> {
-        self.index_mut().close_document(key)?;
+    fn open_document_in_db(&mut self, document: &DocumentHandle) {
+        let path = document.notebook_or_file_path();
+
+        // This is a "maybe" because the `File` might've not been interned yet i.e., the
+        // `try_system` call will return `None` which doesn't mean that the file is new, it's just
+        // that the server didn't need the file yet.
+        let is_maybe_new_system_file = path.as_system().is_some_and(|system_path| {
+            let db = self.project_db(path);
+            db.files()
+                .try_system(db, system_path)
+                .is_none_or(|file| !file.exists(db))
+        });
+
+        match path {
+            AnySystemPath::System(system_path) => {
+                let event = if is_maybe_new_system_file {
+                    ChangeEvent::Created {
+                        path: system_path.clone(),
+                        kind: CreatedKind::File,
+                    }
+                } else {
+                    ChangeEvent::Opened(system_path.clone())
+                };
+                self.apply_changes(path, vec![event]);
+
+                let db = self.project_db_mut(path);
+                match system_path_to_file(db, system_path) {
+                    Ok(file) => db.project().open_file(db, file),
+                    Err(err) => tracing::warn!("Failed to open file {system_path}: {err}"),
+                }
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                let db = self.project_db_mut(path);
+                let virtual_file = db.files().virtual_file(db, virtual_path);
+                db.project().open_file(db, virtual_file.file());
+            }
+        }
+
         self.bump_revision();
-        Ok(())
     }
 
     /// Returns a reference to the index.
@@ -1003,7 +977,7 @@ pub(crate) struct DocumentSnapshot {
     global_settings: Arc<GlobalSettings>,
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
-    document_query_result: Result<DocumentQuery, DocumentQueryError>,
+    document: DocumentHandle,
 }
 
 impl DocumentSnapshot {
@@ -1018,6 +992,7 @@ impl DocumentSnapshot {
     }
 
     /// Returns the client settings for all workspaces.
+    #[expect(unused)]
     pub(crate) fn global_settings(&self) -> &GlobalSettings {
         &self.global_settings
     }
@@ -1028,26 +1003,27 @@ impl DocumentSnapshot {
     }
 
     /// Returns the result of the document query for this snapshot.
-    pub(crate) fn document(&self) -> Result<&DocumentQuery, &DocumentQueryError> {
-        self.document_query_result.as_ref()
+    pub(crate) fn document(&self) -> &DocumentHandle {
+        &self.document
     }
 
-    pub(crate) fn file(&self, db: &dyn Db) -> Option<File> {
-        let document = match self.document() {
-            Ok(document) => document,
-            Err(err) => {
-                tracing::debug!("Failed to resolve file: {}", err);
-                return None;
-            }
-        };
-        let file = document.file(db);
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        self.document.url()
+    }
+
+    pub(crate) fn to_notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        let file = self.document.notebook_or_file(db);
         if file.is_none() {
             tracing::debug!(
-                "Failed to resolve file: file not found for path `{}`",
-                document.file_path()
+                "Failed to resolve file: file not found for `{}`",
+                self.document.url()
             );
         }
         file
+    }
+
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        self.document.notebook_or_file_path()
     }
 }
 
@@ -1319,4 +1295,310 @@ impl SuspendedWorkspaceDiagnosticRequest {
 
         None
     }
+}
+
+/// A handle to a document stored within [`Index`].
+///
+/// Allows identifying the document within the index but it also carries the URL used by the
+/// client to reference the document as well as the version of the document.
+///
+/// It also exposes methods to get the file-path of the corresponding ty-file.
+#[derive(Clone, Debug)]
+pub(crate) enum DocumentHandle {
+    Text {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Notebook {
+        url: lsp_types::Url,
+        path: AnySystemPath,
+        version: DocumentVersion,
+    },
+    Cell {
+        url: lsp_types::Url,
+        version: DocumentVersion,
+        notebook_path: AnySystemPath,
+    },
+}
+
+impl DocumentHandle {
+    fn from_text_document(document: &TextDocument) -> Self {
+        match document.notebook() {
+            None => Self::Text {
+                version: document.version(),
+                url: document.url().clone(),
+                path: DocumentKey::from_url(document.url()).into_file_path(),
+            },
+            Some(notebook) => Self::Cell {
+                notebook_path: notebook.clone(),
+                version: document.version(),
+                url: document.url().clone(),
+            },
+        }
+    }
+
+    fn from_notebook_document(document: &NotebookDocument) -> Self {
+        Self::Notebook {
+            path: DocumentKey::from_url(document.url()).into_file_path(),
+            url: document.url().clone(),
+            version: document.version(),
+        }
+    }
+
+    fn from_document(document: &Document) -> Self {
+        match document {
+            Document::Text(text) => Self::from_text_document(text),
+            Document::Notebook(notebook) => Self::from_notebook_document(notebook),
+        }
+    }
+
+    fn key(&self) -> DocumentKey {
+        DocumentKey::from_url(self.url())
+    }
+
+    pub(crate) const fn version(&self) -> DocumentVersion {
+        match self {
+            Self::Text { version, .. }
+            | Self::Notebook { version, .. }
+            | Self::Cell { version, .. } => *version,
+        }
+    }
+
+    /// The URL as used by the client to reference this document.
+    pub(crate) fn url(&self) -> &lsp_types::Url {
+        match self {
+            Self::Text { url, .. } | Self::Notebook { url, .. } | Self::Cell { url, .. } => url,
+        }
+    }
+
+    /// The path to the enclosing file for this document.
+    ///
+    /// This is the path corresponding to the URL, except for notebook cells where the
+    /// path corresponds to the notebook file.
+    pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => path,
+            Self::Cell { notebook_path, .. } => notebook_path,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn file_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            Self::Text { path, .. } | Self::Notebook { path, .. } => Some(path),
+            Self::Cell { .. } => None,
+        }
+    }
+
+    #[expect(unused)]
+    pub(crate) fn notebook_path(&self) -> Option<&AnySystemPath> {
+        match self {
+            DocumentHandle::Notebook { path, .. } => Some(path),
+            DocumentHandle::Cell { notebook_path, .. } => Some(notebook_path),
+            DocumentHandle::Text { .. } => None,
+        }
+    }
+
+    /// Returns the salsa interned [`File`] for the document selected by this query.
+    ///
+    /// It returns [`None`] for the following cases:
+    /// - For virtual file, if it's not yet opened
+    /// - For regular file, if it does not exists or is a directory
+    pub(crate) fn notebook_or_file(&self, db: &dyn Db) -> Option<File> {
+        match &self.notebook_or_file_path() {
+            AnySystemPath::System(path) => system_path_to_file(db, path).ok(),
+            AnySystemPath::SystemVirtual(virtual_path) => db
+                .files()
+                .try_virtual_file(virtual_path)
+                .map(|virtual_file| virtual_file.file()),
+        }
+    }
+
+    pub(crate) fn is_cell(&self) -> bool {
+        matches!(self, Self::Cell { .. })
+    }
+
+    pub(crate) fn is_cell_or_notebook(&self) -> bool {
+        matches!(self, Self::Cell { .. } | Self::Notebook { .. })
+    }
+
+    pub(crate) fn update_text_document(
+        &mut self,
+        session: &mut Session,
+        content_changes: Vec<TextDocumentContentChangeEvent>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        {
+            let mut index = session.index_mut();
+
+            let document_mut = index.document_mut(&self.key())?;
+
+            let Some(document) = document_mut.as_text_mut() else {
+                anyhow::bail!("Text document path does not point to a text document");
+            };
+
+            if content_changes.is_empty() {
+                document.update_version(new_version);
+            } else {
+                document.apply_changes(content_changes, new_version, position_encoding);
+            }
+
+            self.set_version(document.version());
+        }
+
+        self.update_in_db(session);
+
+        Ok(())
+    }
+
+    pub(crate) fn update_notebook_document(
+        &mut self,
+        session: &mut Session,
+        cells: Option<lsp_types::NotebookDocumentCellChange>,
+        metadata: Option<lsp_types::LSPObject>,
+        new_version: DocumentVersion,
+    ) -> crate::Result<()> {
+        let position_encoding = session.position_encoding();
+        {
+            let mut index = session.index_mut();
+
+            index.update_notebook_document(
+                &self.key(),
+                cells,
+                metadata,
+                new_version,
+                position_encoding,
+            )?;
+
+            self.set_version(new_version);
+        }
+
+        self.update_in_db(session);
+        Ok(())
+    }
+
+    fn update_in_db(&self, session: &mut Session) {
+        let path = self.notebook_or_file_path();
+        let changes = match path {
+            AnySystemPath::System(system_path) => {
+                vec![ChangeEvent::file_content_changed(system_path.clone())]
+            }
+            AnySystemPath::SystemVirtual(virtual_path) => {
+                vec![ChangeEvent::ChangedVirtual(virtual_path.clone())]
+            }
+        };
+
+        session.apply_changes(path, changes);
+    }
+
+    fn set_version(&mut self, version: DocumentVersion) {
+        let self_version = match self {
+            DocumentHandle::Text { version, .. }
+            | DocumentHandle::Notebook { version, .. }
+            | DocumentHandle::Cell { version, .. } => version,
+        };
+
+        *self_version = version;
+    }
+
+    /// De-registers a document, specified by its key.
+    /// Calling this multiple times for the same document is a logic error.
+    ///
+    /// Returns `true` if the client needs to clear the diagnostics for this document.
+    pub(crate) fn close(&self, session: &mut Session) -> crate::Result<bool> {
+        let is_cell = self.is_cell();
+        let path = self.notebook_or_file_path();
+
+        let removed_document = session.index_mut().close_document(&self.key())?;
+
+        // Close the text or notebook file in the database but skip this
+        // step for cells because closing a cell doesn't close its notebook.
+        let requires_clear_diagnostics = if is_cell {
+            true
+        } else {
+            let db = session.project_db_mut(path);
+
+            match path {
+                AnySystemPath::System(system_path) => {
+                    if let Some(file) = db.files().try_system(db, system_path) {
+                        db.project().close_file(db, file);
+
+                        // In case we preferred the language given by the Client
+                        // over the one detected by the file extension, remove the file
+                        // from the project to handle cases where a user changes the language
+                        // of a file (which results in a didClose and didOpen for the same path but with different languages).
+                        if removed_document.language_id().is_some()
+                            && system_path
+                                .extension()
+                                .and_then(PySourceType::try_from_extension)
+                                .is_none()
+                        {
+                            db.project().remove_file(db, file);
+                        }
+                    } else {
+                        // This can only fail when the path is a directory or it doesn't exists but the
+                        // file should exists for this handler in this branch. This is because every
+                        // close call is preceded by an open call, which ensures that the file is
+                        // interned in the lookup table (`Files`).
+                        tracing::warn!("Salsa file does not exists for {}", system_path);
+                    }
+
+                    // For non-virtual files, we clear diagnostics if:
+                    //
+                    // 1. The file does not belong to any workspace e.g., opening a random file from
+                    //    outside the workspace because closing it acts like the file doesn't exists
+                    // 2. The diagnostic mode is set to open-files only
+                    session.workspaces().for_path(system_path).is_none()
+                        || session
+                            .global_settings()
+                            .diagnostic_mode()
+                            .is_open_files_only()
+                }
+                AnySystemPath::SystemVirtual(virtual_path) => {
+                    if let Some(virtual_file) = db.files().try_virtual_file(virtual_path) {
+                        db.project().close_file(db, virtual_file.file());
+                        virtual_file.close(db);
+                    } else {
+                        tracing::warn!("Salsa virtual file does not exists for {}", virtual_path);
+                    }
+
+                    // Always clear diagnostics for virtual files, as they don't really exist on disk
+                    // which means closing them is like deleting the file.
+                    true
+                }
+            }
+        };
+
+        session.bump_revision();
+
+        Ok(requires_clear_diagnostics)
+    }
+}
+
+/// Warns about unknown options received by the server.
+///
+/// If `workspace_url` is `Some`, it indicates that the unknown options were received during a
+/// workspace initialization, otherwise they were received during the server initialization.
+pub(super) fn warn_about_unknown_options(
+    client: &Client,
+    workspace_url: Option<&Url>,
+    unknown_options: &HashMap<String, serde_json::Value>,
+) {
+    let message = if let Some(workspace_url) = workspace_url {
+        format!(
+            "Received unknown options for workspace `{workspace_url}`: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    } else {
+        format!(
+            "Received unknown options during initialization: {}",
+            serde_json::to_string_pretty(unknown_options)
+                .unwrap_or_else(|_| format!("{unknown_options:?}"))
+        )
+    };
+    tracing::warn!("{message}");
+    client.show_warning_message(message);
 }

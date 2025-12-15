@@ -20,6 +20,7 @@ use ruff_linter::{
     packaging::detect_package_root,
     settings::flags,
     source_kind::SourceKind,
+    suppression::Suppressions,
 };
 use ruff_notebook::Notebook;
 use ruff_python_codegen::Stylist;
@@ -118,6 +119,10 @@ pub(crate) fn check(
     // Extract the `# noqa` and `# isort: skip` directives from the source.
     let directives = extract_directives(parsed.tokens(), Flags::all(), &locator, &indexer);
 
+    // Parse range suppression comments
+    let suppressions =
+        Suppressions::from_tokens(&settings.linter, locator.contents(), parsed.tokens());
+
     // Generate checks.
     let diagnostics = check_path(
         &document_path,
@@ -132,6 +137,7 @@ pub(crate) fn check(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     let noqa_edits = generate_noqa_edits(
@@ -142,6 +148,7 @@ pub(crate) fn check(
         &settings.linter.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        &suppressions,
     );
 
     let mut diagnostics_map = DiagnosticsMap::default();
@@ -283,27 +290,30 @@ fn to_lsp_diagnostic(
         range = diagnostic_range.to_range(source_kind.source_code(), index, encoding);
     }
 
-    let (severity, tags, code) = if let Some(code) = code {
-        let code = code.to_string();
-        (
-            Some(severity(&code)),
-            tags(&code),
-            Some(lsp_types::NumberOrString::String(code)),
-        )
+    let (severity, code) = if let Some(code) = code {
+        (severity(code), code.to_string())
     } else {
-        (None, None, None)
+        (
+            match diagnostic.severity() {
+                ruff_db::diagnostic::Severity::Info => lsp_types::DiagnosticSeverity::INFORMATION,
+                ruff_db::diagnostic::Severity::Warning => lsp_types::DiagnosticSeverity::WARNING,
+                ruff_db::diagnostic::Severity::Error => lsp_types::DiagnosticSeverity::ERROR,
+                ruff_db::diagnostic::Severity::Fatal => lsp_types::DiagnosticSeverity::ERROR,
+            },
+            diagnostic.id().to_string(),
+        )
     };
 
     (
         cell,
         lsp_types::Diagnostic {
             range,
-            severity,
-            tags,
-            code,
-            code_description: diagnostic.to_ruff_url().and_then(|url| {
+            severity: Some(severity),
+            tags: tags(diagnostic),
+            code: Some(lsp_types::NumberOrString::String(code)),
+            code_description: diagnostic.documentation_url().and_then(|url| {
                 Some(lsp_types::CodeDescription {
-                    href: lsp_types::Url::parse(&url).ok()?,
+                    href: lsp_types::Url::parse(url).ok()?,
                 })
             }),
             source: Some(DIAGNOSTIC_NAME.into()),
@@ -338,12 +348,17 @@ fn severity(code: &str) -> lsp_types::DiagnosticSeverity {
     }
 }
 
-fn tags(code: &str) -> Option<Vec<lsp_types::DiagnosticTag>> {
-    match code {
-        // F401: <module> imported but unused
-        // F841: local variable <name> is assigned to but never used
-        // RUF059: Unused unpacked variable
-        "F401" | "F841" | "RUF059" => Some(vec![lsp_types::DiagnosticTag::UNNECESSARY]),
-        _ => None,
-    }
+fn tags(diagnostic: &Diagnostic) -> Option<Vec<lsp_types::DiagnosticTag>> {
+    diagnostic.primary_tags().map(|tags| {
+        tags.iter()
+            .map(|tag| match tag {
+                ruff_db::diagnostic::DiagnosticTag::Unnecessary => {
+                    lsp_types::DiagnosticTag::UNNECESSARY
+                }
+                ruff_db::diagnostic::DiagnosticTag::Deprecated => {
+                    lsp_types::DiagnosticTag::DEPRECATED
+                }
+            })
+            .collect()
+    })
 }

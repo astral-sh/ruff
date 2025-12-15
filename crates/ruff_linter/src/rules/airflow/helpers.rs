@@ -17,13 +17,13 @@ use ruff_text_size::TextRange;
 pub(crate) enum Replacement {
     // There's no replacement or suggestion other than removal
     None,
+    // Additional information. Used when there's no direct maaping replacement.
+    Message(&'static str),
     // The attribute name of a class has been changed.
     AttrName(&'static str),
-    // Additional information. Used when there's replacement but they're not direct mapping.
-    Message(&'static str),
     // Symbols updated in Airflow 3 with replacement
     // e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`
-    AutoImport {
+    Rename {
         module: &'static str,
         name: &'static str,
     },
@@ -37,7 +37,7 @@ pub(crate) enum Replacement {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
-    AutoImport {
+    Rename {
         module: &'static str,
         name: &'static str,
         provider: &'static str,

@@ -182,12 +182,20 @@ def match_non_exhaustive(x: Color):
 
 ## `isinstance` checks
 
+```toml
+[environment]
+python-version = "3.12"
+```
+
 ```py
 from typing import assert_never
 
 class A: ...
 class B: ...
 class C: ...
+
+class GenericClass[T]:
+    x: T
 
 def if_else_exhaustive(x: A | B | C):
     if isinstance(x, A):
@@ -253,6 +261,17 @@ def match_non_exhaustive(x: A | B | C):
 
             # this diagnostic is correct: the inferred type of `x` is `B & ~A & ~C`
             assert_never(x)  # error: [type-assertion-failure]
+
+# Note: no invalid-return-type diagnostic; the `match` is exhaustive
+def match_exhaustive_generic[T](obj: GenericClass[T]) -> GenericClass[T]:
+    match obj:
+        case GenericClass(x=42):
+            reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
+            return obj
+        case GenericClass(x=x):
+            reveal_type(x)  # revealed: @Todo(`match` pattern definition types)
+            reveal_type(obj)  # revealed: GenericClass[T@match_exhaustive_generic]
+            return obj
 ```
 
 ## `isinstance` checks with generics
@@ -265,10 +284,17 @@ python-version = "3.12"
 ```py
 from typing import assert_never
 
-class A[T]: ...
+class A[T]:
+    value: T
+
 class ASub[T](A[T]): ...
-class B[T]: ...
-class C[T]: ...
+
+class B[T]:
+    value: T
+
+class C[T]:
+    value: T
+
 class D: ...
 class E: ...
 class F: ...
@@ -312,12 +338,10 @@ def match_exhaustive(x: A[D] | B[E] | C[F]):
         case C():
             pass
         case _:
-            # TODO: both of these are false positives (https://github.com/astral-sh/ty/issues/456)
-            no_diagnostic_here  # error: [unresolved-reference]
-            assert_never(x)  # error: [type-assertion-failure]
+            no_diagnostic_here
+            assert_never(x)
 
-# TODO: false-positive diagnostic (https://github.com/astral-sh/ty/issues/456)
-def match_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:  # error: [invalid-return-type]
+def match_exhaustive_no_assertion(x: A[D] | B[E] | C[F]) -> int:
     match x:
         case A():
             return 0
@@ -380,4 +404,75 @@ def as_pattern_non_exhaustive(subject: int | str):
 
             # this diagnostic is correct: the inferred type of `subject` is `str`
             assert_never(subject)  # error: [type-assertion-failure]
+```
+
+## Exhaustiveness checking for methods of enums
+
+```py
+from enum import Enum
+
+class Answer(Enum):
+    YES = "yes"
+    NO = "no"
+
+    def is_yes(self) -> bool:
+        reveal_type(self)  # revealed: Self@is_yes
+
+        match self:
+            case Answer.YES:
+                return True
+            case Answer.NO:
+                return False
+```
+
+## Exhaustiveness checking for type variables with bounds or constraints
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import assert_never, Literal
+
+def f[T: bool](x: T) -> T:
+    match x:
+        case True:
+            return x
+        case False:
+            return x
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+def g[T: Literal["foo", "bar"]](x: T) -> T:
+    match x:
+        case "foo":
+            return x
+        case "bar":
+            return x
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+def h[T: int | str](x: T) -> T:
+    if isinstance(x, int):
+        return x
+    elif isinstance(x, str):
+        return x
+    else:
+        reveal_type(x)  # revealed: Never
+        assert_never(x)
+
+def i[T: (int, str)](x: T) -> T:
+    match x:
+        case int():
+            pass
+        case str():
+            pass
+        case _:
+            reveal_type(x)  # revealed: Never
+            assert_never(x)
+
+    return x
 ```

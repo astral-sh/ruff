@@ -1,0 +1,83 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: overloads.md - Overloads - Invalid - `@overload`-decorated functions with non-stub bodies
+mdtest path: crates/ty_python_semantic/resources/mdtest/overloads.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import overload
+ 2 | 
+ 3 | @overload
+ 4 | def x(y: int) -> int: ...
+ 5 | @overload
+ 6 | def x(y: str) -> str:
+ 7 |     """Docstring"""
+ 8 | 
+ 9 | @overload
+10 | def x(y: bytes) -> bytes:
+11 |     pass
+12 | 
+13 | @overload
+14 | def x(y: memoryview) -> memoryview:
+15 |     """More docs"""
+16 |     pass
+17 |     ...
+18 | 
+19 | def x(y):
+20 |     return y
+21 | @overload
+22 | def foo(x: int) -> int:
+23 |     return x  # error: [useless-overload-body]
+24 | 
+25 | @overload
+26 | def foo(x: str) -> None:
+27 |     """Docstring"""
+28 |     pass
+29 |     print("oh no, a string")  # error: [useless-overload-body]
+30 | 
+31 | def foo(x):
+32 |     return x
+```
+
+# Diagnostics
+
+```
+warning[useless-overload-body]: Useless body for `@overload`-decorated function `foo`
+  --> src/mdtest_snippet.py:23:5
+   |
+21 | @overload
+22 | def foo(x: int) -> int:
+23 |     return x  # error: [useless-overload-body]
+   |     ^^^^^^^^ This statement will never be executed
+24 |
+25 | @overload
+   |
+info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
+help: Consider replacing this function body with `...` or `pass`
+info: rule `useless-overload-body` is enabled by default
+
+```
+
+```
+warning[useless-overload-body]: Useless body for `@overload`-decorated function `foo`
+  --> src/mdtest_snippet.py:29:5
+   |
+27 |     """Docstring"""
+28 |     pass
+29 |     print("oh no, a string")  # error: [useless-overload-body]
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ This statement will never be executed
+30 |
+31 | def foo(x):
+   |
+info: `@overload`-decorated functions are solely for type checkers and must be overwritten at runtime by a non-`@overload`-decorated implementation
+help: Consider replacing this function body with `...` or `pass`
+info: rule `useless-overload-body` is enabled by default
+
+```

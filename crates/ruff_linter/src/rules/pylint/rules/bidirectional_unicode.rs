@@ -50,6 +50,7 @@ const BIDI_UNICODE: [char; 11] = [
 /// ## References
 /// - [PEP 672: Bidirectional Marks, Embeddings, Overrides and Isolates](https://peps.python.org/pep-0672/#bidirectional-marks-embeddings-overrides-and-isolates)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.244")]
 pub(crate) struct BidirectionalUnicode;
 
 impl Violation for BidirectionalUnicode {

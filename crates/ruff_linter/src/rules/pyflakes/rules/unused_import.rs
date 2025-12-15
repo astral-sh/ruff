@@ -5,19 +5,22 @@ use anyhow::{Result, anyhow, bail};
 use std::collections::BTreeMap;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::name::QualifiedName;
+use ruff_python_ast::name::{QualifiedName, QualifiedNameBuilder};
 use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::{
-    AnyImport, BindingKind, Exceptions, Imported, NodeId, Scope, ScopeId, SemanticModel,
-    SubmoduleImport,
+    AnyImport, Binding, BindingFlags, BindingId, BindingKind, Exceptions, Imported, NodeId, Scope,
+    ScopeId, SemanticModel, SubmoduleImport,
 };
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::fix;
-use crate::preview::is_dunder_init_fix_unused_import_enabled;
+use crate::preview::{
+    is_dunder_init_fix_unused_import_enabled, is_refined_submodule_import_match_enabled,
+};
 use crate::registry::Rule;
 use crate::rules::{isort, isort::ImportSection, isort::ImportType};
+use crate::settings::LinterSettings;
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -48,6 +51,43 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 ///
 /// __all__ = ["some_module"]
 /// ```
+///
+/// ## Preview
+/// When [preview] is enabled (and certain simplifying assumptions
+/// are met), we analyze all import statements for a given module
+/// when determining whether an import is used, rather than simply
+/// the last of these statements. This can result in both different and
+/// more import statements being marked as unused.
+///
+/// For example, if a module consists of
+///
+/// ```python
+/// import a
+/// import a.b
+/// ```
+///
+/// then both statements are marked as unused under [preview], whereas
+/// only the second is marked as unused under stable behavior.
+///
+/// As another example, if a module consists of
+///
+/// ```python
+/// import a.b
+/// import a
+///
+/// a.b.foo()
+/// ```
+///
+/// then a diagnostic will only be emitted for the first line under [preview],
+/// whereas a diagnostic would only be emitted for the second line under
+/// stable behavior.
+///
+/// Note that this behavior is somewhat subjective and is designed
+/// to conform to the developer's intuition rather than Python's actual
+/// execution. To wit, the statement `import a.b` automatically executes
+/// `import a`, so in some sense `import a` is _always_ redundant
+/// in the presence of `import a.b`.
+///
 ///
 /// ## Fix safety
 ///
@@ -100,7 +140,10 @@ use crate::{Applicability, Fix, FixAvailability, Violation};
 /// - [Python documentation: `import`](https://docs.python.org/3/reference/simple_stmts.html#the-import-statement)
 /// - [Python documentation: `importlib.util.find_spec`](https://docs.python.org/3/library/importlib.html#importlib.util.find_spec)
 /// - [Typing documentation: interface conventions](https://typing.python.org/en/latest/spec/distributing.html#library-interface-public-and-private-symbols)
+///
+/// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.18")]
 pub(crate) struct UnusedImport {
     /// Qualified name of the import
     name: String,
@@ -284,17 +327,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
     let mut unused: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
     let mut ignored: BTreeMap<(NodeId, Exceptions), Vec<ImportBinding>> = BTreeMap::default();
 
-    for binding_id in scope.binding_ids() {
-        let binding = checker.semantic().binding(binding_id);
-
-        if binding.is_used()
-            || binding.is_explicit_export()
-            || binding.is_nonlocal()
-            || binding.is_global()
-        {
-            continue;
-        }
-
+    for binding in unused_imports_in_scope(checker.semantic(), scope, checker.settings()) {
         let Some(import) = binding.as_any_import() else {
             continue;
         };
@@ -435,6 +468,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
                     diagnostic.set_fix(fix.clone());
                 }
             }
+
+            diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
         }
     }
 
@@ -455,6 +490,8 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         if let Some(range) = binding.parent_range {
             diagnostic.set_parent(range.start());
         }
+
+        diagnostic.add_primary_tag(ruff_db::diagnostic::DiagnosticTag::Unnecessary);
     }
 }
 
@@ -581,4 +618,335 @@ fn fix_by_reexporting<'a>(
 
     let isolation = Checker::isolation(checker.semantic().parent_statement_id(node_id));
     Ok(Fix::safe_edits(head, tail).isolate(isolation))
+}
+
+/// Returns an iterator over bindings to import statements that appear unused.
+///
+/// The stable behavior is to return those bindings to imports
+/// satisfying the following properties:
+///
+/// - they are not shadowed
+/// - they are not `global`, not `nonlocal`, and not explicit exports (i.e. `import foo as foo`)
+/// - they have no references, according to the semantic model
+///
+/// Under preview, there is a more refined analysis performed
+/// in the case where all bindings shadowed by a given import
+/// binding (including the binding itself) are of a simple form:
+/// they are required to be un-aliased imports or submodule imports.
+///
+/// This alternative analysis is described in the documentation for
+/// [`unused_imports_from_binding`].
+fn unused_imports_in_scope<'a, 'b>(
+    semantic: &'a SemanticModel<'b>,
+    scope: &'a Scope,
+    settings: &'a LinterSettings,
+) -> impl Iterator<Item = &'a Binding<'b>> {
+    scope
+        .binding_ids()
+        .map(|id| (id, semantic.binding(id)))
+        .filter(|(_, bdg)| {
+            matches!(
+                bdg.kind,
+                BindingKind::Import(_)
+                    | BindingKind::FromImport(_)
+                    | BindingKind::SubmoduleImport(_)
+            )
+        })
+        .filter(|(_, bdg)| !bdg.is_global() && !bdg.is_nonlocal() && !bdg.is_explicit_export())
+        .flat_map(|(id, bdg)| {
+            if is_refined_submodule_import_match_enabled(settings)
+                // No need to apply refined logic if there is only a single binding
+                && scope.shadowed_bindings(id).nth(1).is_some()
+                // Only apply the new logic in certain situations to avoid
+                // complexity, false positives, and intersection with
+                // `redefined-while-unused` (`F811`).
+                && has_simple_shadowed_bindings(scope, id, semantic)
+            {
+                unused_imports_from_binding(semantic, id, scope)
+            } else if bdg.is_used() {
+                vec![]
+            } else {
+                vec![bdg]
+            }
+        })
+}
+
+/// Returns a `Vec` of bindings to unused import statements that
+/// are shadowed by a given binding.
+///
+/// This is best explained by example. So suppose we have:
+///
+/// ```python
+/// import a
+/// import a.b
+/// import a.b.c
+///
+/// __all__ = ["a"]
+///
+/// a.b.foo()
+/// ```
+///
+/// As of 2025-09-25, Ruff's semantic model, upon visiting
+/// the whole module, will have a single live binding for
+/// the symbol `a` that points to the line `import a.b.c`,
+/// and the remaining two import bindings are considered shadowed
+/// by the last.
+///
+/// This function expects to receive the `id`
+/// for the live binding and will begin by collecting
+/// all bindings shadowed by the given one - i.e. all
+/// the different import statements binding the symbol `a`.
+/// We iterate over references to this
+/// module and decide (somewhat subjectively) which
+/// import statement the user "intends" to reference. To that end,
+/// to each reference we attempt to build a [`QualifiedName`]
+/// corresponding to an iterated attribute access (e.g. `a.b.foo`).
+/// We then determine the closest matching import statement to that
+/// qualified name, and mark it as used.
+///
+/// In the present example, the qualified name associated to the
+/// reference from the dunder all export is `"a"` and the qualified
+/// name associated to the reference in the last line is `"a.b.foo"`.
+/// The closest matches are `import a` and `import a.b`, respectively,
+/// leaving `import a.b.c` unused.
+///
+/// For a precise definition of "closest match" see [`best_match`]
+/// and [`rank_matches`].
+///
+/// Note: if any reference comes from something other than
+/// a `Name` or a dunder all expression, then we return just
+/// the original binding, thus reverting the stable behavior.
+fn unused_imports_from_binding<'a, 'b>(
+    semantic: &'a SemanticModel<'b>,
+    id: BindingId,
+    scope: &'a Scope,
+) -> Vec<&'a Binding<'b>> {
+    let mut marked = MarkedBindings::from_binding_id(semantic, id, scope);
+
+    let binding = semantic.binding(id);
+
+    // ensure we only do this once
+    let mut marked_dunder_all = false;
+
+    for ref_id in binding.references() {
+        let resolved_reference = semantic.reference(ref_id);
+        if !marked_dunder_all && resolved_reference.in_dunder_all_definition() {
+            let first = *binding
+                                .as_any_import()
+                                .expect("binding to be import binding since current function called after restricting to these in `unused_imports_in_scope`")
+                                .qualified_name()
+                                .segments().first().expect("import binding to have nonempty qualified name");
+            mark_uses_of_qualified_name(&mut marked, &QualifiedName::user_defined(first));
+            marked_dunder_all = true;
+            continue;
+        }
+        let Some(expr_id) = resolved_reference.expression_id() else {
+            // If there is some other kind of reference, abandon
+            // the refined approach for the usual one
+            return vec![binding];
+        };
+        let Some(prototype) = expand_to_qualified_name_attribute(semantic, expr_id) else {
+            return vec![binding];
+        };
+
+        mark_uses_of_qualified_name(&mut marked, &prototype);
+    }
+
+    marked.into_unused()
+}
+
+#[derive(Debug)]
+struct MarkedBindings<'a, 'b> {
+    bindings: Vec<&'a Binding<'b>>,
+    used: Vec<bool>,
+}
+
+impl<'a, 'b> MarkedBindings<'a, 'b> {
+    fn from_binding_id(semantic: &'a SemanticModel<'b>, id: BindingId, scope: &'a Scope) -> Self {
+        let bindings: Vec<_> = scope
+            .shadowed_bindings(id)
+            .map(|id| semantic.binding(id))
+            .collect();
+
+        Self {
+            used: vec![false; bindings.len()],
+            bindings,
+        }
+    }
+
+    fn into_unused(self) -> Vec<&'a Binding<'b>> {
+        self.bindings
+            .into_iter()
+            .zip(self.used)
+            .filter_map(|(bdg, is_used)| (!is_used).then_some(bdg))
+            .collect()
+    }
+
+    fn iter_mut(&mut self) -> impl Iterator<Item = (&'a Binding<'b>, &mut bool)> {
+        self.bindings.iter().copied().zip(self.used.iter_mut())
+    }
+}
+
+/// Returns `Some` [`QualifiedName`] delineating the path for the
+/// maximal [`ExprName`] or [`ExprAttribute`] containing the expression
+/// associated to the given [`NodeId`], or `None` otherwise.
+///
+/// For example, if the `expr_id` points to `a` in `a.b.c.foo()`
+/// then the qualified name would have segments [`a`, `b`, `c`, `foo`].
+fn expand_to_qualified_name_attribute<'b>(
+    semantic: &SemanticModel<'b>,
+    expr_id: NodeId,
+) -> Option<QualifiedName<'b>> {
+    let mut builder = QualifiedNameBuilder::with_capacity(16);
+
+    let mut expr_id = expr_id;
+
+    let expr = semantic.expression(expr_id)?;
+
+    let name = expr.as_name_expr()?;
+
+    builder.push(&name.id);
+
+    while let Some(node_id) = semantic.parent_expression_id(expr_id) {
+        let Some(expr) = semantic.expression(node_id) else {
+            break;
+        };
+        let Some(expr_attr) = expr.as_attribute_expr() else {
+            break;
+        };
+        builder.push(expr_attr.attr.as_str());
+        expr_id = node_id;
+    }
+    Some(builder.build())
+}
+
+fn mark_uses_of_qualified_name(marked: &mut MarkedBindings, prototype: &QualifiedName) {
+    let Some(best) = best_match(&marked.bindings, prototype) else {
+        return;
+    };
+
+    let Some(best_import) = best.as_any_import() else {
+        return;
+    };
+
+    let best_name = best_import.qualified_name();
+
+    // We loop through all bindings in case there are repeated instances
+    // of the `best_name`. For example, if we have
+    //
+    // ```python
+    // import a
+    // import a
+    //
+    // a.foo()
+    // ```
+    //
+    // then we want to mark both import statements as used. It
+    // is the job of `redefined-while-unused` (`F811`) to catch
+    // the repeated binding in this case.
+    for (binding, is_used) in marked.iter_mut() {
+        if *is_used {
+            continue;
+        }
+
+        if binding
+            .as_any_import()
+            .is_some_and(|imp| imp.qualified_name() == best_name)
+        {
+            *is_used = true;
+        }
+    }
+}
+
+/// Returns a pair with first component the length of the largest
+/// shared prefix between the qualified name of the import binding
+/// and the `prototype` and second component the length of the
+/// qualified name of the import binding (i.e. the number of path
+/// segments). Moreover, we regard the second component as ordered
+/// in reverse.
+///
+/// For example, if the binding corresponds to `import a.b.c`
+/// and the prototype to `a.b.foo()`, then the function returns
+/// `(2,std::cmp::Reverse(3))`.
+fn rank_matches(binding: &Binding, prototype: &QualifiedName) -> (usize, std::cmp::Reverse<usize>) {
+    let Some(import) = binding.as_any_import() else {
+        unreachable!()
+    };
+    let qname = import.qualified_name();
+    let left = qname
+        .segments()
+        .iter()
+        .zip(prototype.segments())
+        .take_while(|(x, y)| x == y)
+        .count();
+    (left, std::cmp::Reverse(qname.segments().len()))
+}
+
+/// Returns the import binding that shares the longest prefix
+/// with the `prototype` and is of minimal length amongst these.
+///
+/// See also [`rank_matches`].
+fn best_match<'a, 'b>(
+    bindings: &Vec<&'a Binding<'b>>,
+    prototype: &QualifiedName,
+) -> Option<&'a Binding<'b>> {
+    bindings
+        .iter()
+        .copied()
+        .max_by_key(|binding| rank_matches(binding, prototype))
+}
+
+#[inline]
+fn has_simple_shadowed_bindings(scope: &Scope, id: BindingId, semantic: &SemanticModel) -> bool {
+    let Some(binding_node) = semantic.binding(id).source else {
+        return false;
+    };
+
+    scope.shadowed_bindings(id).enumerate().all(|(i, shadow)| {
+        let shadowed_binding = semantic.binding(shadow);
+        // Bail if one of the shadowed bindings is
+        // used before the last live binding. This is
+        // to avoid situations like this:
+        //
+        // ```
+        // import a
+        // a.b
+        // import a.b
+        // ```
+        if i > 0 && shadowed_binding.is_used() {
+            return false;
+        }
+        // We want to allow a situation like this:
+        //
+        // ```python
+        // import a.b
+        // if TYPE_CHECKING:
+        //     import a.b.c
+        // ```
+        // but bail in a situation like this:
+        //
+        // ```python
+        // try:
+        //     import a.b
+        // except ImportError:
+        //     import argparse
+        //     import a
+        //     a.b = argparse.Namespace()
+        // ```
+        //
+        // So we require that all the shadowed bindings dominate the
+        // last live binding for the import. That is: if the last live
+        // binding is executed it should imply that all the shadowed
+        // bindings were executed as well.
+        if shadowed_binding
+            .source
+            .is_none_or(|node_id| !semantic.dominates(node_id, binding_node))
+        {
+            return false;
+        }
+        matches!(
+            shadowed_binding.kind,
+            BindingKind::Import(_) | BindingKind::SubmoduleImport(_)
+        ) && !shadowed_binding.flags.contains(BindingFlags::ALIAS)
+    })
 }

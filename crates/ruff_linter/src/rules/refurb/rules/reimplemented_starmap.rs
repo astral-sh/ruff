@@ -46,6 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// [PEP 709]: https://peps.python.org/pep-0709/
 /// [#7771]: https://github.com/astral-sh/ruff/issues/7771
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "v0.0.291")]
 pub(crate) struct ReimplementedStarmap;
 
 impl Violation for ReimplementedStarmap {

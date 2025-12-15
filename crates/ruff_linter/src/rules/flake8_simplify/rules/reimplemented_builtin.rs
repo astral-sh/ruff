@@ -44,6 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.211")]
 pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }
@@ -115,7 +116,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );
@@ -211,7 +212,7 @@ pub(crate) fn convert_for_loop_to_any_all(checker: &Checker, stmt: &Stmt) {
 
             let mut diagnostic = checker.report_diagnostic(
                 ReimplementedBuiltin {
-                    replacement: contents.to_string(),
+                    replacement: contents.clone(),
                 },
                 TextRange::new(stmt.start(), terminal.stmt.end()),
             );

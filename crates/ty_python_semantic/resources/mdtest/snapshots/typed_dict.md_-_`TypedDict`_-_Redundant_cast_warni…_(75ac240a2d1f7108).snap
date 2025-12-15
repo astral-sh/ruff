@@ -1,0 +1,55 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: typed_dict.md - `TypedDict` - Redundant cast warnings
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict, cast
+ 2 | 
+ 3 | class Foo2(TypedDict):
+ 4 |     x: int
+ 5 | 
+ 6 | class Bar2(TypedDict):
+ 7 |     x: int
+ 8 | 
+ 9 | foo: Foo2 = {"x": 1}
+10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
+11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
+```
+
+# Diagnostics
+
+```
+warning[redundant-cast]: Value is already of type `Foo2`
+  --> src/mdtest_snippet.py:10:5
+   |
+ 9 | foo: Foo2 = {"x": 1}
+10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
+   |     ^^^^^^^^^^^^^^^
+11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
+   |
+info: rule `redundant-cast` is enabled by default
+
+```
+
+```
+warning[redundant-cast]: Value is already of type `Bar2`
+  --> src/mdtest_snippet.py:11:5
+   |
+ 9 | foo: Foo2 = {"x": 1}
+10 | _ = cast(Foo2, foo)  # error: [redundant-cast]
+11 | _ = cast(Bar2, foo)  # error: [redundant-cast]
+   |     ^^^^^^^^^^^^^^^
+   |
+info: `Bar2` is equivalent to `Foo2`
+info: rule `redundant-cast` is enabled by default
+
+```

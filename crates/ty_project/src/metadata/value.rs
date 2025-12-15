@@ -28,8 +28,11 @@ pub enum ValueSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from an LSP client configuration.
-    PythonVSCodeExtension,
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
+    Editor,
 }
 
 impl ValueSource {
@@ -37,7 +40,7 @@ impl ValueSource {
         match self {
             ValueSource::File(path) => Some(&**path),
             ValueSource::Cli => None,
-            ValueSource::PythonVSCodeExtension => None,
+            ValueSource::Editor => None,
         }
     }
 
@@ -86,7 +89,6 @@ impl Drop for ValueSourceGuard {
 /// or if the values were loaded from different sources.
 #[derive(Clone, serde::Serialize, get_size2::GetSize)]
 #[serde(transparent)]
-#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
 pub struct RangedValue<T> {
     value: T,
     #[serde(skip)]
@@ -100,6 +102,34 @@ pub struct RangedValue<T> {
     range: Option<TextRange>,
 }
 
+#[cfg(feature = "schemars")]
+impl<T> schemars::JsonSchema for RangedValue<T>
+where
+    T: schemars::JsonSchema,
+{
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        T::schema_name()
+    }
+
+    fn schema_id() -> std::borrow::Cow<'static, str> {
+        T::schema_id()
+    }
+
+    fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        T::json_schema(generator)
+    }
+
+    fn _schemars_private_non_optional_json_schema(
+        generator: &mut schemars::SchemaGenerator,
+    ) -> schemars::Schema {
+        T::_schemars_private_non_optional_json_schema(generator)
+    }
+
+    fn _schemars_private_is_option() -> bool {
+        T::_schemars_private_is_option()
+    }
+}
+
 impl<T> RangedValue<T> {
     pub fn new(value: T, source: ValueSource) -> Self {
         Self::with_range(value, source, TextRange::default())
@@ -110,11 +140,7 @@ impl<T> RangedValue<T> {
     }
 
     pub fn python_extension(value: T) -> Self {
-        Self::with_range(
-            value,
-            ValueSource::PythonVSCodeExtension,
-            TextRange::default(),
-        )
+        Self::with_range(value, ValueSource::Editor, TextRange::default())
     }
 
     pub fn with_range(value: T, source: ValueSource, range: TextRange) -> Self {
@@ -153,14 +179,13 @@ impl<T> RangedValue<T> {
     }
 }
 
-impl<T> Combine for RangedValue<T> {
-    fn combine(self, _other: Self) -> Self
-    where
-        Self: Sized,
-    {
-        self
+impl<T> Combine for RangedValue<T>
+where
+    T: Combine,
+{
+    fn combine_with(&mut self, other: Self) {
+        self.value.combine_with(other.value);
     }
-    fn combine_with(&mut self, _other: Self) {}
 }
 
 impl<T> IntoIterator for RangedValue<T>
@@ -341,7 +366,7 @@ impl RelativePathBuf {
     }
 
     pub fn python_extension(path: impl AsRef<SystemPath>) -> Self {
-        Self::new(path, ValueSource::PythonVSCodeExtension)
+        Self::new(path, ValueSource::Editor)
     }
 
     /// Returns the relative path as specified by the user.
@@ -371,7 +396,7 @@ impl RelativePathBuf {
     pub fn absolute(&self, project_root: &SystemPath, system: &dyn System) -> SystemPathBuf {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
         SystemPath::absolute(&self.0, relative_to)
@@ -427,7 +452,7 @@ impl RelativeGlobPattern {
     ) -> Result<AbsolutePortableGlobPattern, PortableGlobError> {
         let relative_to = match &self.0.source {
             ValueSource::File(_) => project_root,
-            ValueSource::Cli | ValueSource::PythonVSCodeExtension => system.current_directory(),
+            ValueSource::Cli | ValueSource::Editor => system.current_directory(),
         };
 
         let pattern = PortableGlobPattern::parse(&self.0, kind)?;

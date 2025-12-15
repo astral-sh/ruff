@@ -26,9 +26,9 @@ def _(flag: bool):
 
     reveal_type(A.union_declared)  # revealed: int | str
 
-    # error: [possibly-missing-attribute] "Attribute `possibly_unbound` on type `<class 'A'>` may be missing"
+    # error: [possibly-missing-attribute] "Attribute `possibly_unbound` may be missing on class `A`"
     reveal_type(A.possibly_unbound)  # revealed: str
 
-    # error: [unresolved-attribute] "Type `<class 'A'>` has no attribute `non_existent`"
+    # error: [unresolved-attribute] "Class `A` has no attribute `non_existent`"
     reveal_type(A.non_existent)  # revealed: Unknown
 ```

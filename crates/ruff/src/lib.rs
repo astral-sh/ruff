@@ -205,12 +205,18 @@ pub fn run(
 }
 
 fn format(args: FormatCommand, global_options: GlobalConfigArgs) -> Result<ExitStatus> {
+    let cli_output_format_set = args.output_format.is_some();
     let (cli, config_arguments) = args.partition(global_options)?;
-
+    let pyproject_config = resolve::resolve(&config_arguments, cli.stdin_filename.as_deref())?;
+    if cli_output_format_set && !pyproject_config.settings.formatter.preview.is_enabled() {
+        warn_user_once!(
+            "The --output-format flag for the formatter is unstable and requires preview mode to use."
+        );
+    }
     if is_stdin(&cli.files, cli.stdin_filename.as_deref()) {
-        commands::format_stdin::format_stdin(&cli, &config_arguments)
+        commands::format_stdin::format_stdin(&cli, &config_arguments, &pyproject_config)
     } else {
-        commands::format::format(cli, &config_arguments)
+        commands::format::format(cli, &config_arguments, &pyproject_config)
     }
 }
 
@@ -313,12 +319,20 @@ pub fn check(args: CheckCommand, global_options: GlobalConfigArgs) -> Result<Exi
         warn_user!("Detected debug build without --no-cache.");
     }
 
-    if cli.add_noqa {
+    if let Some(reason) = &cli.add_noqa {
         if !fix_mode.is_generate() {
             warn_user!("--fix is incompatible with --add-noqa.");
         }
+        if reason.contains(['\n', '\r']) {
+            return Err(anyhow::anyhow!(
+                "--add-noqa <reason> cannot contain newline characters"
+            ));
+        }
+
+        let reason_opt = (!reason.is_empty()).then_some(reason.as_str());
+
         let modifications =
-            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments)?;
+            commands::add_noqa::add_noqa(&files, &pyproject_config, &config_arguments, reason_opt)?;
         if modifications > 0 && config_arguments.log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[expect(clippy::print_stderr)]

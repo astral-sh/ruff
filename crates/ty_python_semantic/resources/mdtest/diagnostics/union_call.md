@@ -138,3 +138,27 @@ def _(n: int):
     # error: [unknown-argument]
     y = f("foo", name="bar", unknown="quux")
 ```
+
+### Truncation for long unions and literals
+
+This test demonstrates a call where the expected type is a large mixed union. The diagnostic must
+therefore truncate the long expected union type to avoid overwhelming output.
+
+```py
+from typing import Literal, Union
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+class E: ...
+class F: ...
+
+def f1(x: Union[Literal[1, 2, 3, 4, 5, 6, 7, 8], A, B, C, D, E, F]) -> int:
+    return 0
+
+def _(n: int):
+    x = n
+    # error: [invalid-argument-type]
+    f1(x)
+```

@@ -11,11 +11,11 @@ mod tests {
     use ruff_python_ast::PythonVersion;
     use test_case::test_case;
 
-    use crate::assert_diagnostics;
     use crate::registry::Rule;
     use crate::settings;
     use crate::settings::types::PreviewMode;
     use crate::test::test_path;
+    use crate::{assert_diagnostics, assert_diagnostics_diff};
 
     #[test_case(Path::new("full_name.py"))]
     #[test_case(Path::new("import_as.py"))]
@@ -79,6 +79,29 @@ mod tests {
             &settings::LinterSettings::for_rule(rule_code),
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210.py"))]
+    #[test_case(Rule::InvalidPathlibWithSuffix, Path::new("PTH210_1.py"))]
+    fn deferred_annotations_diff(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!(
+            "deferred_annotations_diff_{}_{}",
+            rule_code.name(),
+            path.to_string_lossy()
+        );
+        assert_diagnostics_diff!(
+            snapshot,
+            Path::new("flake8_use_pathlib").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY314.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        );
         Ok(())
     }
 

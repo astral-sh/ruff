@@ -215,4 +215,62 @@ help: Use `map` instead
 59 +         
 60 | )
 61 | 
-62 |
+62 | 
+
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+  --> RUF058_0.py:71:1
+   |
+69 | starmap(func, zip(a, b, c), lorem=ipsum)
+70 |
+71 | starmap(func, zip(a, b, c, strict=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+72 | starmap(func, zip(a, b, c, strict=False))
+73 | starmap(func, zip(a, b, c, strict=strict))
+   |
+help: Use `map` instead
+68 | starmap(func, zip(a, b, c, lorem=ipsum))
+69 | starmap(func, zip(a, b, c), lorem=ipsum)
+70 | 
+   - starmap(func, zip(a, b, c, strict=True))
+71 + map(func, a, b, c, strict=True)
+72 | starmap(func, zip(a, b, c, strict=False))
+73 | starmap(func, zip(a, b, c, strict=strict))
+74 | 
+
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+  --> RUF058_0.py:72:1
+   |
+71 | starmap(func, zip(a, b, c, strict=True))
+72 | starmap(func, zip(a, b, c, strict=False))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+73 | starmap(func, zip(a, b, c, strict=strict))
+   |
+help: Use `map` instead
+69 | starmap(func, zip(a, b, c), lorem=ipsum)
+70 | 
+71 | starmap(func, zip(a, b, c, strict=True))
+   - starmap(func, zip(a, b, c, strict=False))
+72 + map(func, a, b, c, strict=False)
+73 | starmap(func, zip(a, b, c, strict=strict))
+74 | 
+75 | # https://github.com/astral-sh/ruff/issues/15742
+
+RUF058 [*] `itertools.starmap` called on `zip` iterable
+  --> RUF058_0.py:73:1
+   |
+71 | starmap(func, zip(a, b, c, strict=True))
+72 | starmap(func, zip(a, b, c, strict=False))
+73 | starmap(func, zip(a, b, c, strict=strict))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+74 |
+75 | # https://github.com/astral-sh/ruff/issues/15742
+   |
+help: Use `map` instead
+70 | 
+71 | starmap(func, zip(a, b, c, strict=True))
+72 | starmap(func, zip(a, b, c, strict=False))
+   - starmap(func, zip(a, b, c, strict=strict))
+73 + map(func, a, b, c, strict=strict)
+74 | 
+75 | # https://github.com/astral-sh/ruff/issues/15742
+76 | starmap(func, zip(*a))

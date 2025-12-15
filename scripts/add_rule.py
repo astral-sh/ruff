@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import argparse
 import subprocess
+from pathlib import Path
 
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 
@@ -109,6 +110,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// ```
 #[derive(ViolationMetadata)]
+#[violation_metadata(preview_since = "TODO: current version + 1")]
 pub(crate) struct {name};
 
 impl Violation for {name} {{
@@ -140,7 +142,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
         linter_name = linter.split(" ")[0].replace("-", "_")
         rule = f"""rules::{linter_name}::rules::{name}"""
         lines.append(
-            " " * 8 + f"""({variant}, "{code}") => (RuleGroup::Preview, {rule}),\n""",
+            " " * 8 + f"""({variant}, "{code}") => {rule},\n""",
         )
         lines.sort()
         text += "".join(lines)
@@ -152,7 +154,7 @@ pub(crate) fn {rule_name_snake}(checker: &mut Checker) {{}}
     _rustfmt(rules_mod)
 
 
-def _rustfmt(path: str) -> None:
+def _rustfmt(path: str | Path) -> None:
     subprocess.run(["rustfmt", path])
 
 

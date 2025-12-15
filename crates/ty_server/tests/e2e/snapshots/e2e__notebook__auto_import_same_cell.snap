@@ -1,0 +1,48 @@
+---
+source: crates/ty_server/tests/e2e/notebook.rs
+expression: completions
+---
+[
+  {
+    "label": "Literal (import typing)",
+    "kind": 6,
+    "sortText": "[RANKING]",
+    "insertText": "Literal",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 32
+          },
+          "end": {
+            "line": 0,
+            "character": 32
+          }
+        },
+        "newText": ", Literal"
+      }
+    ]
+  },
+  {
+    "label": "LiteralString (import typing)",
+    "kind": 6,
+    "sortText": "[RANKING]",
+    "insertText": "LiteralString",
+    "additionalTextEdits": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 32
+          },
+          "end": {
+            "line": 0,
+            "character": 32
+          }
+        },
+        "newText": ", LiteralString"
+      }
+    ]
+  }
+]

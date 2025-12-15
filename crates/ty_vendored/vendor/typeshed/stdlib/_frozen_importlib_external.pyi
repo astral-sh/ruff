@@ -251,7 +251,7 @@ class SourceLoader(_LoaderBasics):
         """
 
     def source_to_code(
-        self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: ReadableBuffer | StrPath
+        self, data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive, path: bytes | StrPath
     ) -> types.CodeType:
         """Return the code object compiled from source.
 
@@ -281,10 +281,10 @@ class FileLoader:
     def get_data(self, path: str) -> bytes:
         """Return the data from path as raw bytes."""
 
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
-    def load_module(self, name: str | None = None) -> types.ModuleType:
+    def load_module(self, fullname: str | None = None) -> types.ModuleType:
         """Load a module from a file.
 
         This method is deprecated.  Use exec_module() instead.
@@ -311,7 +311,7 @@ class SourceFileLoader(importlib.abc.FileLoader, FileLoader, importlib.abc.Sourc
     def source_to_code(  # type: ignore[override]  # incompatible with InspectLoader.source_to_code
         self,
         data: ReadableBuffer | str | _ast.Module | _ast.Expression | _ast.Interactive,
-        path: ReadableBuffer | StrPath,
+        path: bytes | StrPath,
         *,
         _optimize: int = -1,
     ) -> types.CodeType:
@@ -335,7 +335,7 @@ class ExtensionFileLoader(FileLoader, _LoaderBasics, importlib.abc.ExecutionLoad
     """
 
     def __init__(self, name: str, path: str) -> None: ...
-    def get_filename(self, name: str | None = None) -> str:
+    def get_filename(self, fullname: str | None = None) -> str:
         """Return the path to the source file as found by the finder."""
 
     def get_source(self, fullname: str) -> None:
