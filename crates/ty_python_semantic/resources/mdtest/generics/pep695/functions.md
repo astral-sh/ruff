@@ -792,10 +792,11 @@ class ClassWithNewAndInit:
     def __new__(cls, *args, **kwargs) -> Self:
         raise NotImplementedError
 
-    def __init__(self) -> None: ...
+    def __init__(self, x: int) -> None: ...
 
-# revealed: ((...) -> ClassWithNewAndInit) | (() -> ClassWithNewAndInit)
+# revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 reveal_type(into_callable(ClassWithNewAndInit))
+# TODO: revealed: ((...) -> ClassWithNewAndInit) | ((x: int) -> ClassWithNewAndInit)
 # revealed: (...) -> ClassWithNewAndInit
 reveal_type(accepts_callable(ClassWithNewAndInit))
 # revealed: ClassWithNewAndInit
