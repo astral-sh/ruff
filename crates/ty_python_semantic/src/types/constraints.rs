@@ -520,7 +520,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         if let Type::Union(lower_union) = lower {
             let mut result = Node::AlwaysTrue;
             for lower_element in lower_union.elements(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper),
                 );
@@ -535,13 +535,13 @@ impl<'db> ConstrainedTypeVar<'db> {
         {
             let mut result = Node::AlwaysTrue;
             for upper_element in upper_intersection.iter_positive(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, lower, upper_element),
                 );
             }
             for upper_element in upper_intersection.iter_negative(db) {
-                result = result.and(
+                result = result.and_with_offset(
                     db,
                     ConstrainedTypeVar::new_node(db, typevar, lower, upper_element.negate(db)),
                 );
