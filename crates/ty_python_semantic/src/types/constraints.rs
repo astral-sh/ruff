@@ -1312,33 +1312,41 @@ impl<'db> Node<'db> {
         mut f: impl FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         self.retain_one(db, bound_typevar)
-            .find_representative_types_inner(db, None, &mut f);
+            .find_representative_types_inner(db, &mut Vec::default(), &mut f);
     }
 
     fn find_representative_types_inner(
         self,
         db: &'db dyn Db,
-        current_bounds: Option<(Type<'db>, Type<'db>)>,
+        current_bounds: &mut Vec<RepresentativeBounds<'db>>,
         f: &mut dyn FnMut(Option<(Type<'db>, Type<'db>)>),
     ) {
         match self {
             Node::AlwaysTrue => {
+                if current_bounds.is_empty() {
+                    f(None);
+                    return;
+                }
+
                 // If we reach the `true` terminal, the path we've been following represents one
                 // representative type.
+                current_bounds.sort_unstable_by_key(|bounds| bounds.source_order);
+                let greatest_lower_bound =
+                    UnionType::from_elements(db, current_bounds.iter().map(|bounds| bounds.lower));
+                let least_upper_bound = IntersectionType::from_elements(
+                    db,
+                    current_bounds.iter().map(|bounds| bounds.upper),
+                );
 
                 // If `lower ≰ upper`, then this path somehow represents in invalid specialization.
                 // That should have been removed from the BDD domain as part of the simplification
                 // process.
-                debug_assert!(current_bounds.is_none_or(
-                    |(greatest_lower_bound, least_upper_bound)| {
-                        greatest_lower_bound.is_assignable_to(db, least_upper_bound)
-                    }
-                ));
+                debug_assert!(greatest_lower_bound.is_assignable_to(db, least_upper_bound));
 
                 // We've been tracking the lower and upper bound that the types for this path must
                 // satisfy. Pass those bounds along and let the caller choose a representative type
                 // from within that range.
-                f(current_bounds);
+                f(Some((greatest_lower_bound, least_upper_bound)));
             }
 
             Node::AlwaysFalse => {
@@ -1347,8 +1355,7 @@ impl<'db> Node<'db> {
             }
 
             Node::Interior(interior) => {
-                let (greatest_lower_bound, least_upper_bound) =
-                    current_bounds.unwrap_or((Type::Never, Type::object()));
+                let reset_point = current_bounds.len();
 
                 // For an interior node, there are two outgoing paths: one for the `if_true`
                 // branch, and one for the `if_false` branch.
@@ -1357,16 +1364,11 @@ impl<'db> Node<'db> {
                 // on the types that satisfy the current path through the BDD. So we intersect the
                 // current glb/lub with the constraint's bounds to get the new glb/lub for the
                 // recursive call.
-                let constraint = interior.constraint(db);
-                let new_greatest_lower_bound =
-                    UnionType::from_elements(db, [greatest_lower_bound, constraint.lower(db)]);
-                let new_least_upper_bound =
-                    IntersectionType::from_elements(db, [least_upper_bound, constraint.upper(db)]);
-                interior.if_true(db).find_representative_types_inner(
-                    db,
-                    Some((new_greatest_lower_bound, new_least_upper_bound)),
-                    f,
-                );
+                current_bounds.push(RepresentativeBounds::from_interior_node(db, interior));
+                interior
+                    .if_true(db)
+                    .find_representative_types_inner(db, current_bounds, f);
+                current_bounds.truncate(reset_point);
 
                 // For the `if_false` branch, then the types that satisfy the current path through
                 // the BDD do _not_ satisfy the node's constraint. Because we used `retain_one` to
@@ -1378,11 +1380,9 @@ impl<'db> Node<'db> {
                 // without updating the lower/upper bounds, relying on the other constraints along
                 // the path to incorporate that negative "hole" in the set of valid types for this
                 // path.
-                interior.if_false(db).find_representative_types_inner(
-                    db,
-                    Some((greatest_lower_bound, least_upper_bound)),
-                    f,
-                );
+                interior
+                    .if_false(db)
+                    .find_representative_types_inner(db, current_bounds, f);
             }
         }
     }
@@ -1711,6 +1711,26 @@ impl<'db> Node<'db> {
         }
 
         DisplayNode::new(db, self, prefix)
+    }
+}
+
+struct RepresentativeBounds<'db> {
+    lower: Type<'db>,
+    upper: Type<'db>,
+    source_order: usize,
+}
+
+impl<'db> RepresentativeBounds<'db> {
+    fn from_interior_node(db: &'db dyn Db, interior: InteriorNode<'db>) -> Self {
+        let constraint = interior.constraint(db);
+        let lower = constraint.lower(db);
+        let upper = constraint.upper(db);
+        let source_order = interior.source_order(db);
+        Self {
+            lower,
+            upper,
+            source_order,
+        }
     }
 }
 
