@@ -923,8 +923,9 @@ impl<'db> Node<'db> {
         }
     }
 
-    fn with_source_order_offset(self, db: &'db dyn Db, offset: usize) -> Self {
-        if offset == 0 {
+    /// Returns a copy of this BDD node with all `source_order`s adjusted by the given amount.
+    fn with_adjusted_source_order(self, db: &'db dyn Db, delta: usize) -> Self {
+        if delta == 0 {
             return self;
         }
         match self {
@@ -933,9 +934,9 @@ impl<'db> Node<'db> {
             Node::Interior(interior) => Node::new(
                 db,
                 interior.constraint(db),
-                interior.if_true(db).with_source_order_offset(db, offset),
-                interior.if_false(db).with_source_order_offset(db, offset),
-                interior.source_order(db) + offset,
+                interior.if_true(db).with_adjusted_source_order(db, delta),
+                interior.if_false(db).with_adjusted_source_order(db, delta),
+                interior.source_order(db) + delta,
             ),
         }
     }
@@ -1048,10 +1049,10 @@ impl<'db> Node<'db> {
     /// Returns the `or` or union of two BDDs.
     fn or(self, db: &'db dyn Db, other: Self) -> Self {
         let rhs_offset = self.max_source_order(db);
-        self.or_with_rhs_offset(db, other, rhs_offset)
+        self.or_inner(db, other, rhs_offset)
     }
 
-    fn or_with_rhs_offset(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn or_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysTrue, Node::AlwaysTrue) => Node::AlwaysTrue,
             (Node::AlwaysTrue, Node::Interior(rhs)) => Node::new(
@@ -1068,7 +1069,7 @@ impl<'db> Node<'db> {
                 Node::AlwaysTrue,
                 lhs.source_order(db),
             ),
-            (Node::AlwaysFalse, rhs) => rhs.with_source_order_offset(db, rhs_offset),
+            (Node::AlwaysFalse, rhs) => rhs.with_adjusted_source_order(db, rhs_offset),
             (lhs, Node::AlwaysFalse) => lhs,
             (Node::Interior(lhs), Node::Interior(rhs)) => lhs.or(db, rhs, rhs_offset),
         }
@@ -1077,10 +1078,10 @@ impl<'db> Node<'db> {
     /// Returns the `and` or intersection of two BDDs.
     fn and(self, db: &'db dyn Db, other: Self) -> Self {
         let rhs_offset = self.max_source_order(db);
-        self.and_with_rhs_offset(db, other, rhs_offset)
+        self.and_inner(db, other, rhs_offset)
     }
 
-    fn and_with_rhs_offset(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn and_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, Node::AlwaysFalse) => Node::AlwaysFalse,
             (Node::AlwaysFalse, Node::Interior(rhs)) => Node::new(
@@ -1097,7 +1098,7 @@ impl<'db> Node<'db> {
                 Node::AlwaysFalse,
                 lhs.source_order(db),
             ),
-            (Node::AlwaysTrue, rhs) => rhs.with_source_order_offset(db, rhs_offset),
+            (Node::AlwaysTrue, rhs) => rhs.with_adjusted_source_order(db, rhs_offset),
             (lhs, Node::AlwaysTrue) => lhs,
             (Node::Interior(lhs), Node::Interior(rhs)) => lhs.and(db, rhs, rhs_offset),
         }
@@ -1112,10 +1113,10 @@ impl<'db> Node<'db> {
     /// result.
     fn iff(self, db: &'db dyn Db, other: Self) -> Self {
         let rhs_offset = self.max_source_order(db);
-        self.iff_with_rhs_offset(db, other, rhs_offset)
+        self.iff_inner(db, other, rhs_offset)
     }
 
-    fn iff_with_rhs_offset(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
+    fn iff_inner(self, db: &'db dyn Db, other: Self, rhs_offset: usize) -> Self {
         match (self, other) {
             (Node::AlwaysFalse, Node::AlwaysFalse) | (Node::AlwaysTrue, Node::AlwaysTrue) => {
                 Node::AlwaysTrue
@@ -1126,19 +1127,15 @@ impl<'db> Node<'db> {
             (Node::AlwaysTrue | Node::AlwaysFalse, Node::Interior(interior)) => Node::new(
                 db,
                 interior.constraint(db),
-                self.iff_with_rhs_offset(db, interior.if_true(db), rhs_offset),
-                self.iff_with_rhs_offset(db, interior.if_false(db), rhs_offset),
+                self.iff_inner(db, interior.if_true(db), rhs_offset),
+                self.iff_inner(db, interior.if_false(db), rhs_offset),
                 interior.source_order(db) + rhs_offset,
             ),
             (Node::Interior(interior), Node::AlwaysTrue | Node::AlwaysFalse) => Node::new(
                 db,
                 interior.constraint(db),
-                interior
-                    .if_true(db)
-                    .iff_with_rhs_offset(db, other, rhs_offset),
-                interior
-                    .if_false(db)
-                    .iff_with_rhs_offset(db, other, rhs_offset),
+                interior.if_true(db).iff_inner(db, other, rhs_offset),
+                interior.if_false(db).iff_inner(db, other, rhs_offset),
                 interior.source_order(db),
             ),
             (Node::Interior(a), Node::Interior(b)) => a.iff(db, b, rhs_offset),
@@ -1751,26 +1748,25 @@ impl<'db> InteriorNode<'db> {
             Ordering::Equal => Node::new(
                 db,
                 self_constraint,
-                self.if_true(db)
-                    .or_with_rhs_offset(db, other.if_true(db), rhs_offset),
+                self.if_true(db).or_inner(db, other.if_true(db), rhs_offset),
                 self.if_false(db)
-                    .or_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                    .or_inner(db, other.if_false(db), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .or_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .or_inner(db, Node::Interior(other), rhs_offset),
                 self.if_false(db)
-                    .or_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .or_inner(db, Node::Interior(other), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).or_with_rhs_offset(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).or_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                Node::Interior(self).or_inner(db, other.if_true(db), rhs_offset),
+                Node::Interior(self).or_inner(db, other.if_false(db), rhs_offset),
                 other.source_order(db) + rhs_offset,
             ),
         }
@@ -1785,25 +1781,25 @@ impl<'db> InteriorNode<'db> {
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .and_with_rhs_offset(db, other.if_true(db), rhs_offset),
+                    .and_inner(db, other.if_true(db), rhs_offset),
                 self.if_false(db)
-                    .and_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                    .and_inner(db, other.if_false(db), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .and_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .and_inner(db, Node::Interior(other), rhs_offset),
                 self.if_false(db)
-                    .and_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .and_inner(db, Node::Interior(other), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).and_with_rhs_offset(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).and_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                Node::Interior(self).and_inner(db, other.if_true(db), rhs_offset),
+                Node::Interior(self).and_inner(db, other.if_false(db), rhs_offset),
                 other.source_order(db) + rhs_offset,
             ),
         }
@@ -1818,25 +1814,25 @@ impl<'db> InteriorNode<'db> {
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .iff_with_rhs_offset(db, other.if_true(db), rhs_offset),
+                    .iff_inner(db, other.if_true(db), rhs_offset),
                 self.if_false(db)
-                    .iff_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                    .iff_inner(db, other.if_false(db), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Less => Node::new(
                 db,
                 self_constraint,
                 self.if_true(db)
-                    .iff_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .iff_inner(db, Node::Interior(other), rhs_offset),
                 self.if_false(db)
-                    .iff_with_rhs_offset(db, Node::Interior(other), rhs_offset),
+                    .iff_inner(db, Node::Interior(other), rhs_offset),
                 self.source_order(db),
             ),
             Ordering::Greater => Node::new(
                 db,
                 other_constraint,
-                Node::Interior(self).iff_with_rhs_offset(db, other.if_true(db), rhs_offset),
-                Node::Interior(self).iff_with_rhs_offset(db, other.if_false(db), rhs_offset),
+                Node::Interior(self).iff_inner(db, other.if_true(db), rhs_offset),
+                Node::Interior(self).iff_inner(db, other.if_false(db), rhs_offset),
                 other.source_order(db) + rhs_offset,
             ),
         }
