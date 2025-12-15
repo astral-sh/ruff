@@ -67,6 +67,7 @@ impl<'db> Completions<'db> {
         self.items
     }
 
+    // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
         self.items.sort_by(compare_suggestions);
         self.items
@@ -77,6 +78,28 @@ impl<'db> Completions<'db> {
                 Some(ImportEdit {
                     label: format!("import {}", item.qualified?),
                     edit: item.import?,
+                })
+            })
+            .collect()
+    }
+
+    // Convert this collection into a list of "qualify..." fixes
+    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+            .into_iter()
+            .filter_map(|item| {
+                // If we would have to actually import something, don't suggest the qualification
+                // (we could, maybe we should, but for now, we don't)
+                if item.import.is_some() {
+                    return None;
+                }
+
+                Some(ImportEdit {
+                    label: format!("qualify {}", item.insert.as_ref()?),
+                    edit: Edit::replacement(item.insert?.into_string(), range.start(), range.end()),
                 })
             })
             .collect()
@@ -555,15 +578,19 @@ pub(crate) struct ImportEdit {
     pub edit: Edit,
 }
 
-pub(crate) fn missing_imports(
+/// Get fixes that would resolve an unresolved reference
+pub(crate) fn unresolved_fixes(
     db: &dyn Db,
     file: File,
     parsed: &ParsedModuleRef,
     symbol: &str,
     node: AnyNodeRef,
 ) -> Vec<ImportEdit> {
-    let mut completions = Completions::exactly(db, symbol);
+    let mut results = Vec::new();
     let scoped = ScopedTarget { node };
+
+    // Request imports we could add to put the symbol in scope
+    let mut completions = Completions::exactly(db, symbol);
     add_unimported_completions(
         db,
         file,
@@ -574,8 +601,23 @@ pub(crate) fn missing_imports(
         },
         &mut completions,
     );
+    results.extend(completions.into_imports());
 
-    completions.into_imports()
+    // Request qualifications we could apply to the symbol to make it resolve
+    let mut completions = Completions::exactly(db, symbol);
+    add_unimported_completions(
+        db,
+        file,
+        parsed,
+        scoped,
+        |module_name: &ModuleName, symbol: &str| {
+            ImportRequest::import(module_name.as_str(), symbol).force()
+        },
+        &mut completions,
+    );
+    results.extend(completions.into_qualifications(node.range()));
+
+    results
 }
 
 /// Adds completions derived from keywords.
