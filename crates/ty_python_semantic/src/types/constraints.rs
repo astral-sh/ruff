@@ -2153,7 +2153,10 @@ impl<'db> InteriorNode<'db> {
             .collect();
 
         // Repeatedly pop constraint pairs off of the visit queue, checking whether each pair can
-        // be simplified.
+        // be simplified. If we add any derived constraints, we will place them at the end in
+        // source order. (We do not have any test cases that depend on constraint sets being
+        // displayed in a consistent ordering, so we don't need to be clever in assigning these
+        // `source_order`s.)
         let mut simplified = Node::Interior(self);
         let mut next_source_order = self.max_source_order(db) + 1;
         while let Some((left_constraint, right_constraint)) = to_visit.pop() {
@@ -2358,7 +2361,6 @@ impl<'db> InteriorNode<'db> {
                         intersection_constraint.when_true(),
                         next_source_order,
                     );
-                    next_source_order += 1;
                     let negative_intersection_node = Node::new_satisfied_constraint(
                         db,
                         intersection_constraint.when_false(),
