@@ -1566,6 +1566,9 @@ impl<'db> ClassLiteral<'db> {
         })
     }
 
+    #[salsa::tracked(cycle_initial=generic_context_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size,
+    )]
     pub(crate) fn legacy_generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
         self.explicit_bases(db).iter().find_map(|base| match base {
             Type::KnownInstance(
