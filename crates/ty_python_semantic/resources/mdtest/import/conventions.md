@@ -53,8 +53,8 @@ in `import os.path as os.path` the `os.path` is not a valid identifier.
 ```py
 from b import Any, Literal, foo
 
-reveal_type(Any)  # revealed: <special form 'typing.Any'>
-reveal_type(Literal)  # revealed: <special form 'typing.Literal'>
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
+reveal_type(Literal)  # revealed: <special-form 'typing.Literal'>
 reveal_type(foo)  # revealed: <module 'foo'>
 ```
 
@@ -132,7 +132,7 @@ reveal_type(Any)  # revealed: Unknown
 ```pyi
 from typing import Any
 
-reveal_type(Any)  # revealed: <special form 'typing.Any'>
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
 ```
 
 ## Nested mixed re-export and not
@@ -169,7 +169,7 @@ reveal_type(Any)  # revealed: Unknown
 ```pyi
 from typing import Any
 
-reveal_type(Any)  # revealed: <special form 'typing.Any'>
+reveal_type(Any)  # revealed: <special-form 'typing.Any'>
 ```
 
 ## Exported as different name

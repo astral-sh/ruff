@@ -63,7 +63,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
 10 |     # error: [invalid-argument-type]
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
-info: Elements `<special form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
 info: rule `invalid-argument-type` is enabled by default
 
 ```
@@ -82,7 +82,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
 13 |     else:
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
-info: Element `<special form 'typing.Any'>` in the union, and 2 more elements, are not class objects
+info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
 info: rule `invalid-argument-type` is enabled by default
 
 ```

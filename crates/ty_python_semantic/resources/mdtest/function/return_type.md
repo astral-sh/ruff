@@ -80,7 +80,7 @@ class Foo(Protocol):
     def f[T](self, v: T) -> T: ...
 
 t = (Protocol, int)
-reveal_type(t[0])  # revealed: <special form 'typing.Protocol'>
+reveal_type(t[0])  # revealed: <special-form 'typing.Protocol'>
 
 class Lorem(t[0]):
     def f(self) -> int: ...

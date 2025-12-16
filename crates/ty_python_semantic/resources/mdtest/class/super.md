@@ -602,13 +602,13 @@ super(object, object()).__class__
 # Not all objects valid in a class's bases list are valid as the first argument to `super()`.
 # For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
 #
-# error: [invalid-super-argument] "`<special form 'typing.ChainMap'>` is not a valid class"
+# error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
 reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 
 # Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
 # but it *is* valid as the first argument to `super()`.
 #
-# revealed: <super: <special form 'typing.Generic'>, <class 'SupportsInt'>>
+# revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
 reveal_type(super(typing.Generic, typing.SupportsInt))
 
 def _(x: type[typing.Any], y: typing.Any):
