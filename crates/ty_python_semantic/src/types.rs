@@ -4601,15 +4601,18 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         match self {
-            Type::Callable(callable) if callable.is_function_like(db) => {
-                // For "function-like" callables, model the behavior of `FunctionType.__get__`.
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
+            {
+                // For "function-like" or "classmethod-like" callables, model the behavior of
+                // `FunctionType.__get__` or `classmethod.__get__`.
                 //
                 // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
                 // we should instead return a new method-wrapper type variant for the synthesized `__get__`
                 // method of these synthesized functions. The method-wrapper would then be returned from
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                return if instance.is_none(db) {
+                return if instance.is_none(db) && callable.is_function_like(db) {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
@@ -12243,6 +12246,10 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
+    /// A callable type that we believe represents a classmethod (i.e. it will unconditionally bind
+    /// the first argument on `__get__`).
+    ClassMethodLike,
+
     /// Represents the value bound to a `typing.ParamSpec` type variable.
     ParamSpecValue,
 }
@@ -12337,6 +12344,10 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::ClassMethodLike)
     }
 
     pub(crate) fn bind_self(
