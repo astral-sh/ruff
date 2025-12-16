@@ -7926,7 +7926,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let Some(first_comprehension) = comprehensions_iter.next() else {
             unreachable!("Comprehension must contain at least one generator");
         };
-        self.infer_standalone_expression(&first_comprehension.iter, TypeContext::default());
+        self.infer_maybe_standalone_expression(&first_comprehension.iter, TypeContext::default());
 
         if first_comprehension.is_async {
             EvaluationMode::Async
@@ -7946,9 +7946,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let evaluation_mode = self.infer_first_comprehension_iter(generators);
 
-        let scope_id = self
+        let Some(scope_id) = self
             .index
-            .node_scope(NodeWithScopeRef::GeneratorExpression(generator));
+            .try_node_scope(NodeWithScopeRef::GeneratorExpression(generator))
+        else {
+            return Type::unknown();
+        };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope);
         let yield_type = inference.expression_type(elt.as_ref());
@@ -8021,9 +8024,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        let scope_id = self
+        let Some(scope_id) = self
             .index
-            .node_scope(NodeWithScopeRef::ListComprehension(listcomp));
+            .try_node_scope(NodeWithScopeRef::ListComprehension(listcomp))
+        else {
+            return Type::unknown();
+        };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope);
         let element_type = inference.expression_type(elt.as_ref());
@@ -8046,9 +8052,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        let scope_id = self
+        let Some(scope_id) = self
             .index
-            .node_scope(NodeWithScopeRef::DictComprehension(dictcomp));
+            .try_node_scope(NodeWithScopeRef::DictComprehension(dictcomp))
+        else {
+            return Type::unknown();
+        };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope);
         let key_type = inference.expression_type(key.as_ref());
@@ -8071,9 +8080,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         self.infer_first_comprehension_iter(generators);
 
-        let scope_id = self
+        let Some(scope_id) = self
             .index
-            .node_scope(NodeWithScopeRef::SetComprehension(setcomp));
+            .try_node_scope(NodeWithScopeRef::SetComprehension(setcomp))
+        else {
+            return Type::unknown();
+        };
         let scope = scope_id.to_scope_id(self.db(), self.file());
         let inference = infer_scope_types(self.db(), scope);
         let element_type = inference.expression_type(elt.as_ref());
@@ -8165,14 +8177,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     builder.module(),
                 )
             } else {
-                builder.infer_standalone_expression(iter, tcx)
+                builder.infer_maybe_standalone_expression(iter, tcx)
             }
             .iterate(builder.db())
             .homogeneous_element_type(builder.db())
         });
 
         for expr in ifs {
-            self.infer_standalone_expression(expr, TypeContext::default());
+            self.infer_maybe_standalone_expression(expr, TypeContext::default());
         }
     }
 
@@ -8278,7 +8290,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             orelse,
         } = if_expression;
 
-        let test_ty = self.infer_standalone_expression(test, TypeContext::default());
+        let test_ty = self.infer_maybe_standalone_expression(test, TypeContext::default());
         let body_ty = self.infer_expression(body, tcx);
         let orelse_ty = self.infer_expression(orelse, tcx);
 
@@ -10341,7 +10353,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let ty = if index == values.len() - 1 {
                     builder.infer_expression(value, TypeContext::default())
                 } else {
-                    builder.infer_standalone_expression(value, TypeContext::default())
+                    builder.infer_maybe_standalone_expression(value, TypeContext::default())
                 };
 
                 (ty, value.range())
