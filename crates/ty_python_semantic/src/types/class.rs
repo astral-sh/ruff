@@ -4261,6 +4261,7 @@ pub enum KnownClass {
     Specialization,
 }
 
+#[salsa::tracked]
 impl KnownClass {
     pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
@@ -5075,35 +5076,52 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral<'_>> {
-        // a cache of the `KnownClass`es that we have already failed to lookup in typeshed
-        // (and therefore that we've already logged a warning for)
-        static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
+        #[salsa::interned]
+        struct KnownClassArgument {
+            class: KnownClass,
+        }
 
-        self.try_to_class_literal_without_logging(db)
-            .or_else(|lookup_error| {
-                if MESSAGES.lock().unwrap().insert(self) {
+        fn known_class_to_class_literal_initial<'db>(
+            _db: &'db dyn Db,
+            _id: salsa::Id,
+            _class: KnownClassArgument<'db>,
+        ) -> Option<ClassLiteral<'db>> {
+            None
+        }
+
+        #[salsa::tracked(cycle_initial=known_class_to_class_literal_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn known_class_to_class_literal<'db>(
+            db: &'db dyn Db,
+            class: KnownClassArgument<'db>,
+        ) -> Option<ClassLiteral<'db>> {
+            let class = class.class(db);
+            class
+                .try_to_class_literal_without_logging(db)
+                .or_else(|lookup_error| {
                     if matches!(
                         lookup_error,
                         KnownClassLookupError::ClassPossiblyUnbound { .. }
                     ) {
-                        tracing::info!("{}", lookup_error.display(db, self));
+                        tracing::info!("{}", lookup_error.display(db, class));
                     } else {
                         tracing::info!(
                             "{}. Falling back to `Unknown` for the symbol instead.",
-                            lookup_error.display(db, self)
+                            lookup_error.display(db, class)
                         );
                     }
-                }
 
-                match lookup_error {
-                    KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
-                        Ok(class_literal)
+                    match lookup_error {
+                        KnownClassLookupError::ClassPossiblyUnbound { class_literal, .. } => {
+                            Ok(class_literal)
+                        }
+                        KnownClassLookupError::ClassNotFound { .. }
+                        | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
                     }
-                    KnownClassLookupError::ClassNotFound { .. }
-                    | KnownClassLookupError::SymbolNotAClass { .. } => Err(()),
-                }
-            })
-            .ok()
+                })
+                .ok()
+        }
+
+        known_class_to_class_literal(db, KnownClassArgument::new(db, self))
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`] representing that class-literal.
