@@ -336,6 +336,12 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
+    pub(crate) fn is_single_paramspec(
+        &self,
+    ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
+        Self::signatures_is_single_paramspec(&self.overloads)
+    }
+
     /// Checks whether the given slice contains a single signature, and that signature is a
     /// `ParamSpec` signature. If so, returns the [`BoundTypeVarInstance`] for the `ParamSpec`,
     /// along with the return type of the signature.
@@ -388,11 +394,6 @@ impl<'db> CallableSignature<'db> {
             // the other callable's signature. We also need to compare the return types — for
             // instance, to verify in `Callable[P, int]` that the return type is assignable to
             // `int`, or in `Callable[P, T]` to bind `T` to the return type of the other callable.
-            //
-            // TODO: This logic might need to move down into `Signature`, if we need paramspecs to
-            // be able to match a _subset_ of an overloaded callable. (In that case, we need to
-            // check each signature individually, and combine together the ones that match into the
-            // overloaded callable that the paramspec binds to.)
             match (self_is_single_paramspec, other_is_single_paramspec) {
                 (
                     Some((self_bound_typevar, self_return_type)),
@@ -1095,6 +1096,65 @@ impl<'db> Signature<'db> {
         result
     }
 
+    pub(crate) fn when_constraint_set_assignable_to_signatures(
+        &self,
+        db: &'db dyn Db,
+        other: &CallableSignature<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        // If this signature is a paramspec, bind it to the entire overloaded other callable.
+        if let Some(self_bound_typevar) = self.parameters.as_paramspec()
+            && other.is_single_paramspec().is_none()
+        {
+            let upper = Type::Callable(CallableType::new(
+                db,
+                CallableSignature::from_overloads(
+                    other
+                        .overloads
+                        .iter()
+                        .map(|signature| Signature::new(signature.parameters().clone(), None)),
+                ),
+                CallableTypeKind::ParamSpecValue,
+            ));
+            let param_spec_matches =
+                ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
+            let return_types_match = self.return_ty.when_some_and(|self_return_type| {
+                other
+                    .overloads
+                    .iter()
+                    .filter_map(|signature| signature.return_ty)
+                    .when_any(db, |other_return_type| {
+                        self_return_type.when_constraint_set_assignable_to(
+                            db,
+                            other_return_type,
+                            inferable,
+                        )
+                    })
+            });
+            return param_spec_matches.and(db, || return_types_match);
+        }
+
+        other.overloads.iter().when_all(db, |other_signature| {
+            self.when_constraint_set_assignable_to(db, other_signature, inferable)
+        })
+    }
+
+    fn when_constraint_set_assignable_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to_impl(
+            db,
+            other,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+            &HasRelationToVisitor::default(),
+            &IsDisjointVisitor::default(),
+        )
+    }
+
     /// Implementation of subtyping and assignability for signature.
     fn has_relation_to_impl(
         &self,
@@ -1281,6 +1341,60 @@ impl<'db> Signature<'db> {
                 ),
             );
             return result;
+        }
+
+        if relation.is_constraint_set_assignability() {
+            let self_is_paramspec = self.parameters.as_paramspec();
+            let other_is_paramspec = other.parameters.as_paramspec();
+
+            // If either signature is a ParamSpec, the constraint set should bind the ParamSpec to
+            // the other signature.
+            match (self_is_paramspec, other_is_paramspec) {
+                (Some(self_bound_typevar), Some(other_bound_typevar)) => {
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::TypeVar(other_bound_typevar),
+                        Type::TypeVar(other_bound_typevar),
+                    );
+                    result.intersect(db, param_spec_matches);
+                    return result;
+                }
+
+                (Some(self_bound_typevar), None) => {
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(other.parameters.clone(), None)),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                    );
+                    result.intersect(db, param_spec_matches);
+                    return result;
+                }
+
+                (None, Some(other_bound_typevar)) => {
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(self.parameters.clone(), None)),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        other_bound_typevar,
+                        lower,
+                        Type::object(),
+                    );
+                    result.intersect(db, param_spec_matches);
+                    return result;
+                }
+
+                (None, None) => {}
+            }
         }
 
         let mut parameters = ParametersZip {

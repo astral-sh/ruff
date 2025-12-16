@@ -1937,15 +1937,30 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 };
 
+                let formal_callable = formal_callable.signatures(self.db);
+                let formal_is_single_paramspec = formal_callable.is_single_paramspec().is_some();
+
                 for actual_callable in actual_callables.as_slice() {
-                    let when = actual_callable
-                        .signatures(self.db)
-                        .when_constraint_set_assignable_to(
-                            self.db,
-                            formal_callable.signatures(self.db),
-                            self.inferable,
-                        );
-                    self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                    if formal_is_single_paramspec {
+                        let when = actual_callable
+                            .signatures(self.db)
+                            .when_constraint_set_assignable_to(
+                                self.db,
+                                formal_callable,
+                                self.inferable,
+                            );
+                        self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                    } else {
+                        for actual_signature in &actual_callable.signatures(self.db).overloads {
+                            let when = actual_signature
+                                .when_constraint_set_assignable_to_signatures(
+                                    self.db,
+                                    formal_callable,
+                                    self.inferable,
+                                );
+                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        }
+                    }
                 }
             }
 
