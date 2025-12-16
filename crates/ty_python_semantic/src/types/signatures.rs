@@ -10,9 +10,10 @@
 //! argument types and return types. For each callable type in the union, the call expression's
 //! arguments must match _at least one_ overload.
 
-use std::{collections::HashMap, slice::Iter};
+use std::slice::Iter;
 
 use itertools::{EitherOrBoth, Itertools};
+use rustc_hash::FxHashMap;
 use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
@@ -1324,7 +1325,7 @@ impl<'db> Signature<'db> {
         let (self_parameters, other_parameters) = parameters.into_remaining();
 
         // Collect all the keyword-only parameters and the unmatched standard parameters.
-        let mut self_keywords = HashMap::new();
+        let mut self_keywords = FxHashMap::default();
 
         // Type of the variadic keyword parameter in `self`.
         //
@@ -1337,7 +1338,7 @@ impl<'db> Signature<'db> {
             match self_parameter.kind() {
                 ParameterKind::KeywordOnly { name, .. }
                 | ParameterKind::PositionalOrKeyword { name, .. } => {
-                    self_keywords.insert(name.clone(), self_parameter);
+                    self_keywords.insert(name.as_str(), self_parameter);
                 }
                 ParameterKind::KeywordVariadic { .. } => {
                     self_keyword_variadic = Some(self_parameter.annotated_type());
@@ -1363,7 +1364,7 @@ impl<'db> Signature<'db> {
                     name: other_name,
                     default_type: other_default,
                 } => {
-                    if let Some(self_parameter) = self_keywords.remove(other_name) {
+                    if let Some(self_parameter) = self_keywords.remove(other_name.as_str()) {
                         match self_parameter.kind() {
                             ParameterKind::PositionalOrKeyword {
                                 default_type: self_default,
