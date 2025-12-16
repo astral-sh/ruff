@@ -87,25 +87,25 @@ class C:
         def inner_a(positional=self.a):
             return
         self.a = inner_a
-        # revealed: def inner_a(positional=Unknown | (def inner_a(positional=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_a(positional=self.a) -> Unknown
         reveal_type(inner_a)
 
         def inner_b(*, kw_only=self.b):
             return
         self.b = inner_b
-        # revealed: def inner_b(*, kw_only=Unknown | (def inner_b(*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_b(*, kw_only=self.b) -> Unknown
         reveal_type(inner_b)
 
         def inner_c(positional_only=self.c, /):
             return
         self.c = inner_c
-        # revealed: def inner_c(positional_only=Unknown | (def inner_c(positional_only=Unknown, /) -> Unknown), /) -> Unknown
+        # revealed: def inner_c(positional_only=self.c, /) -> Unknown
         reveal_type(inner_c)
 
         def inner_d(*, kw_only=self.d):
             return
         self.d = inner_d
-        # revealed: def inner_d(*, kw_only=Unknown | (def inner_d(*, kw_only=Unknown) -> Unknown)) -> Unknown
+        # revealed: def inner_d(*, kw_only=self.d) -> Unknown
         reveal_type(inner_d)
 ```
 
@@ -114,7 +114,7 @@ We do, however, still check assignability of the default value to the parameter 
 ```py
 class D:
     def f(self: "D"):
-        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = Unknown | (def inner_a(a: int = Unknown) -> Unknown)) -> Unknown)` is not assignable to annotated parameter type `int`"
+        # error: [invalid-parameter-default] "Default value of type `Unknown | (def inner_a(a: int = self.a) -> Unknown)` is not assignable to annotated parameter type `int`"
         def inner_a(a: int = self.a): ...
         self.a = inner_a
 ```

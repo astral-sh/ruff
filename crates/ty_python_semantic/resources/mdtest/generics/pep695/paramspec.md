@@ -477,7 +477,7 @@ def keyword_only_with_default_2(*, y: int = 42) -> int:
 # parameter list i.e., `()`
 # TODO: This shouldn't error
 # error: [invalid-argument-type]
-# revealed (*, x: int = 42) -> bool
+# revealed: (*, x: int = 42) -> bool
 reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
 
 def keyword_only1(*, x: int) -> int:
