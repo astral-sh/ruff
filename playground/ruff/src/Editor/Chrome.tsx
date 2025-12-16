@@ -22,7 +22,7 @@ export default function Chrome() {
     }
 
 			try {
-        await persist(serialized);
+        await persist(settings, pythonSource);
       } catch (error) {
         // eslint-disable-next-line no-console
         console.error("Failed to share playground", error);
