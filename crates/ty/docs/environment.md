@@ -2,6 +2,15 @@
 
 ty defines and respects the following environment variables:
 
+### `TY_CONFIG_FILE`
+
+Path to a `ty.toml` configuration file to use.
+
+When set, ty will use this file for configuration instead of
+discovering configuration files automatically.
+
+Equivalent to the `--config-file` command-line argument.
+
 ### `TY_LOG`
 
 If set, ty will use this value as the log level for its `--verbose` output.
