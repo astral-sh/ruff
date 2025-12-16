@@ -380,7 +380,7 @@ pub struct MemberDefinition<'db> {
 /// single-underscore names. This matches the order of the variants defined for
 /// this enum, which is in turn picked up by the derived trait implementation
 /// for `Ord`.
-#[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum NameKind {
     Normal,
     Dunder,
