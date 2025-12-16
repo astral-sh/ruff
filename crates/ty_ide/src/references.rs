@@ -354,6 +354,11 @@ impl LocalReferencesFinder<'_> {
                 if self.navigation_targets_match(&current_definitions) {
                     // Determine if this is a read or write reference
                     let kind = self.determine_reference_kind(covering_node);
+                    if kind == ReferenceKind::Write
+                        && self.mode == ReferencesMode::ReferencesSkipDeclaration
+                    {
+                        return;
+                    }
                     let target =
                         ReferenceTarget::new(self.model.file(), covering_node.node().range(), kind);
                     self.references.push(target);
