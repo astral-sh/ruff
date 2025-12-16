@@ -19,11 +19,11 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
-    Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
-    walk_type_var_bounds,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionBuilder,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
+    NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType,
+    declaration_type, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1584,6 +1584,20 @@ impl<'db> SpecializationBuilder<'db> {
         constraints: ConstraintSet<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
+        struct Bounds<'db> {
+            lower: UnionBuilder<'db>,
+            upper: IntersectionBuilder<'db>,
+        }
+
+        impl<'db> Bounds<'db> {
+            fn new(db: &'db dyn Db) -> Self {
+                Self {
+                    lower: UnionBuilder::new(db),
+                    upper: IntersectionBuilder::new(db),
+                }
+            }
+        }
+
         let constraints = constraints.limit_to_valid_specializations(self.db);
         let mut sorted_paths = Vec::new();
         constraints.for_each_path(self.db, |path| {
@@ -1597,35 +1611,44 @@ impl<'db> SpecializationBuilder<'db> {
             source_orders1.cmp(source_orders2)
         });
 
+        let mut mappings: FxHashMap<BoundTypeVarInstance<'db>, Bounds<'db>> = FxHashMap::default();
         for path in sorted_paths {
+            mappings.clear();
             for (constraint, _) in path {
                 let typevar = constraint.typevar(self.db);
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
-                if !upper.is_object() {
-                    let variance = formal.variance_of(self.db, typevar);
-                    self.add_type_mapping(typevar, upper, variance, &mut f);
-                } else if !lower.is_never() {
-                    let variance = formal.variance_of(self.db, typevar);
-                    self.add_type_mapping(typevar, lower, variance, &mut f);
-                }
+                let bounds = mappings
+                    .entry(typevar)
+                    .or_insert_with(|| Bounds::new(self.db));
+                bounds.lower.add_in_place(lower);
+                bounds.upper.add_positive_in_place(upper);
+
                 if let Type::TypeVar(lower_bound_typevar) = lower {
-                    let variance = formal.variance_of(self.db, lower_bound_typevar);
-                    self.add_type_mapping(
-                        lower_bound_typevar,
-                        Type::TypeVar(typevar),
-                        variance,
-                        &mut f,
-                    );
+                    let bounds = mappings
+                        .entry(lower_bound_typevar)
+                        .or_insert_with(|| Bounds::new(self.db));
+                    bounds.upper.add_positive_in_place(Type::TypeVar(typevar));
                 }
+
                 if let Type::TypeVar(upper_bound_typevar) = upper {
-                    let variance = formal.variance_of(self.db, upper_bound_typevar);
-                    self.add_type_mapping(
-                        upper_bound_typevar,
-                        Type::TypeVar(typevar),
-                        variance,
-                        &mut f,
-                    );
+                    let bounds = mappings
+                        .entry(upper_bound_typevar)
+                        .or_insert_with(|| Bounds::new(self.db));
+                    bounds.lower.add_in_place(Type::TypeVar(typevar));
+                }
+            }
+
+            for (bound_typevar, bounds) in mappings.drain() {
+                let variance = formal.variance_of(self.db, bound_typevar);
+                let upper = bounds.upper.build();
+                if !upper.is_object() {
+                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
+                    continue;
+                }
+                let lower = bounds.lower.build();
+                if !lower.is_never() {
+                    self.add_type_mapping(bound_typevar, lower, variance, &mut f);
                 }
             }
         }
