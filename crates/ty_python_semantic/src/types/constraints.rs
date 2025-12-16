@@ -3992,28 +3992,28 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (T = str) 3/4
-            ┡━₁ (T = bool) 4/4
-            │   ┡━₁ (U = str) 1/2
-            │   │   ┡━₁ (U = bool) 2/2
+            (T = str) Explicit 3/4
+            ┡━₁ (T = bool) Explicit 4/4
+            │   ┡━₁ (U = str) Explicit 1/2
+            │   │   ┡━₁ (U = bool) Explicit 2/2
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (U = bool) 2/2
+            │   │   └─₀ (U = bool) Explicit 2/2
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (U = str) 1/2
-            │       ┡━₁ (U = bool) 2/2
+            │   └─₀ (U = str) Explicit 1/2
+            │       ┡━₁ (U = bool) Explicit 2/2
             │       │   ┡━₁ always
             │       │   └─₀ always
-            │       └─₀ (U = bool) 2/2
+            │       └─₀ (U = bool) Explicit 2/2
             │           ┡━₁ always
             │           └─₀ never
-            └─₀ (T = bool) 4/4
-                ┡━₁ (U = str) 1/2
-                │   ┡━₁ (U = bool) 2/2
+            └─₀ (T = bool) Explicit 4/4
+                ┡━₁ (U = str) Explicit 1/2
+                │   ┡━₁ (U = bool) Explicit 2/2
                 │   │   ┡━₁ always
                 │   │   └─₀ always
-                │   └─₀ (U = bool) 2/2
+                │   └─₀ (U = bool) Explicit 2/2
                 │       ┡━₁ always
                 │       └─₀ never
                 └─₀ never
