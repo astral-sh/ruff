@@ -1844,16 +1844,47 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 } else {
                     f.write_str("=")?;
                 }
-                write!(f, "{default_value}")?;
+                // Omit long default values or ones that contain newlines
+                if default_value.len() > 12 || default_value.contains('\n') {
+                    f.write_str("...")?;
+                } else {
+                    f.write_str(default_value)?;
+                }
             } else if let Some(default_type) = self.param.default_type() {
+                // Ideally we'd never end up in here, but complex situations like dataclasses
+                // can result in us computing the type Literal[1] but not having the default_value set
                 if self.param.annotated_type().is_some() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
                 }
-                default_type
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
+                match default_type {
+                    Type::IntLiteral(_)
+                    | Type::BooleanLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::EnumLiteral(_)
+                    | Type::BytesLiteral(_) => {
+                        // For Literal types display the value without `Literal[..]` wrapping
+                        let representation =
+                            default_type.representation(self.db, self.settings.clone());
+                        representation.fmt_detailed(f)?;
+                    }
+                    Type::NominalInstance(instance) => {
+                        // Some key default types like `None` are worth showing
+                        let class = instance.class(self.db);
+
+                        match (class, class.known(self.db)) {
+                            (_, Some(KnownClass::NoneType)) => {
+                                f.with_type(default_type).write_str("None")?
+                            }
+                            (_, Some(KnownClass::NoDefaultType)) => {
+                                f.with_type(default_type).write_str("NoDefault")?
+                            }
+                            _ => f.write_str("...")?,
+                        }
+                    }
+                    _ => f.write_str("...")?,
+                }
             }
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
@@ -2605,7 +2636,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"(x=int, y: str = str) -> None"
+            @"(x=..., y: str = ...) -> None"
         );
 
         // All positional only parameters.
@@ -2690,7 +2721,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            @"(a, b: int, c=Literal[1], d: int = Literal[2], /, e=Literal[3], f: int = Literal[4], *args: object, *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
+            @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, *, g=5, h: int = 6, **kwargs: str) -> bytes"
         );
     }
 
@@ -2732,8 +2763,8 @@ mod tests {
             ),
             @r"
         (
-            x=int,
-            y: str = str
+            x=...,
+            y: str = ...
         ) -> None
         "
         );
@@ -2848,15 +2879,15 @@ mod tests {
         (
             a,
             b: int,
-            c=Literal[1],
-            d: int = Literal[2],
+            c=1,
+            d: int = 2,
             /,
-            e=Literal[3],
-            f: int = Literal[4],
+            e=3,
+            f: int = 4,
             *args: object,
             *,
-            g=Literal[5],
-            h: int = Literal[6],
+            g=5,
+            h: int = 6,
             **kwargs: str
         ) -> bytes
         "

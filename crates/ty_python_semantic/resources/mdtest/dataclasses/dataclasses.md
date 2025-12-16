@@ -1082,7 +1082,7 @@ class C(Base):
     z: int = 10
     x: int = 15
 
-reveal_type(C.__init__)  # revealed:(self: C, x: int = Literal[15], y: int = Literal[0], z: int = 10) -> None
+reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 10) -> None
 ```
 
 ## Conditionally defined fields
@@ -1243,7 +1243,7 @@ class UppercaseString:
 class C:
     upper: UppercaseString = UppercaseString()
 
-reveal_type(C.__init__)  # revealed: (self: C, upper: str = str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, upper: str = ...) -> None
 
 c = C("abc")
 reveal_type(c.upper)  # revealed: str
@@ -1328,7 +1328,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-reveal_type(C.__init__)  # revealed: (self: C, field: str | int = int) -> None
+reveal_type(C.__init__)  # revealed: (self: C, field: str | int = ...) -> None
 ```
 
 ## `dataclasses.field`

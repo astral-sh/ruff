@@ -749,8 +749,8 @@ class Outer:
     outer_a: int = outer_field(init=False)
     outer_b: str = inner_field(init=False)
 
-reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = Any) -> None
-reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = Any) -> None
+reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = ...) -> None
+reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = ...) -> None
 ```
 
 ## Overloaded dataclass-like decorators
