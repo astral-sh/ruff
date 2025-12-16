@@ -4261,7 +4261,6 @@ pub enum KnownClass {
     Specialization,
 }
 
-#[salsa::tracked]
 impl KnownClass {
     pub(crate) const fn is_bool(self) -> bool {
         matches!(self, Self::Bool)
