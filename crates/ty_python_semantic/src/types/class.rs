@@ -5076,7 +5076,7 @@ impl KnownClass {
     ///
     /// If the class cannot be found in typeshed, a debug-level log message will be emitted stating this.
     pub(crate) fn try_to_class_literal(self, db: &dyn Db) -> Option<ClassLiteral<'_>> {
-        #[salsa::interned]
+        #[salsa::interned(heap_size=ruff_memory_usage::heap_size)]
         struct KnownClassArgument {
             class: KnownClass,
         }
