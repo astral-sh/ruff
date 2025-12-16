@@ -21,12 +21,12 @@ export default function Chrome() {
       return;
     }
 
-			try {
-        await persist(settings, pythonSource);
-      } catch (error) {
-        // eslint-disable-next-line no-console
-        console.error("Failed to share playground", error);
-      }
+    try {
+      await persist(settings, pythonSource);
+    } catch (error) {
+      // eslint-disable-next-line no-console
+      console.error("Failed to share playground", error);
+    }
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
