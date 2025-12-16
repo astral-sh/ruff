@@ -209,7 +209,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):

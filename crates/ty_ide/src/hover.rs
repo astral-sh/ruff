@@ -151,14 +151,19 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     Some(TypeVarVariance::Bivariant) => " (bivariant)",
                     None => "",
                 };
+
+                // Special types like `<special-form of whatever 'blahblah' with 'florps'>`
+                // render poorly with python syntax-highlighting but well as xml
+                let ty_string = ty
+                    .display_with(self.db, DisplaySettings::default().multiline())
+                    .to_string();
+                let syntax = if ty_string.starts_with('<') {
+                    "xml"
+                } else {
+                    "python"
+                };
                 self.kind
-                    .fenced_code_block(
-                        format!(
-                            "{}{variance}",
-                            ty.display_with(self.db, DisplaySettings::default().multiline())
-                        ),
-                        "python",
-                    )
+                    .fenced_code_block(format!("{ty_string}{variance}"), syntax)
                     .fmt(f)
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
@@ -358,7 +363,7 @@ mod tests {
         Everyone loves my class!!
 
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'MyClass'>
         ```
         ---
@@ -420,7 +425,7 @@ mod tests {
         Everyone loves my class!!
 
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'MyClass'>
         ```
         ---
@@ -480,7 +485,7 @@ mod tests {
         initializes MyClass (perfectly)
 
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'MyClass'>
         ```
         ---
@@ -536,7 +541,7 @@ mod tests {
         initializes MyClass (perfectly)
 
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'MyClass'>
         ```
         ---
@@ -595,7 +600,7 @@ mod tests {
         Everyone loves my class!!
 
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'MyClass'>
         ```
         ---
@@ -1680,7 +1685,7 @@ def ab(a: int, *, c: int):
         Wow this module rocks.
 
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'lib'>
         ```
         ---
@@ -2029,7 +2034,7 @@ def function():
         assert_snapshot!(test.hover(), @r"
         <class 'Click'>
         ---------------------------------------------
-        ```python
+        ```xml
         <class 'Click'>
         ```
         ---------------------------------------------
@@ -2234,7 +2239,7 @@ def function():
         Wow this module rocks.
 
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'lib'>
         ```
         ---
@@ -3343,7 +3348,7 @@ def function():
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'mypackage.subpkg'>
         ```
         ---------------------------------------------
@@ -3385,7 +3390,7 @@ def function():
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'mypackage.subpkg'>
         ```
         ---------------------------------------------
@@ -3469,7 +3474,7 @@ def function():
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg.submod'>
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'mypackage.subpkg.submod'>
         ```
         ---------------------------------------------
@@ -3510,7 +3515,7 @@ def function():
         assert_snapshot!(test.hover(), @r"
         <module 'mypackage.subpkg'>
         ---------------------------------------------
-        ```python
+        ```xml
         <module 'mypackage.subpkg'>
         ```
         ---------------------------------------------

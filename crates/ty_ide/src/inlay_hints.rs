@@ -6216,7 +6216,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Literal
 
-        a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:351:1
@@ -6232,7 +6232,7 @@ mod tests {
           |
         2 | from typing import Literal
         3 |
-        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        4 | a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
           |                    ^^^^^^^
           |
 
@@ -6250,7 +6250,7 @@ mod tests {
           |
         2 | from typing import Literal
         3 |
-        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        4 | a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
           |                            ^^^
           |
 
@@ -6268,7 +6268,7 @@ mod tests {
           |
         2 | from typing import Literal
         3 |
-        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        4 | a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
           |                                 ^^^
           |
 
@@ -6286,7 +6286,7 @@ mod tests {
           |
         2 | from typing import Literal
         3 |
-        4 | a[: <special form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
+        4 | a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
           |                                      ^^^
           |
         "#);
@@ -6636,7 +6636,7 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         from typing import Protocol, TypeVar
         T = TypeVar([name=]'T')
-        Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+        Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
            --> stdlib/typing.pyi:276:13
@@ -6654,7 +6654,7 @@ mod tests {
         2 | from typing import Protocol, TypeVar
         3 | T = TypeVar([name=]'T')
           |              ^^^^
-        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+        4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
@@ -6671,7 +6671,7 @@ mod tests {
           |
         2 | from typing import Protocol, TypeVar
         3 | T = TypeVar([name=]'T')
-        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+        4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                          ^^^^^^^^^^^^^^^
           |
 
@@ -6688,7 +6688,7 @@ mod tests {
           |
         2 | from typing import Protocol, TypeVar
         3 | T = TypeVar([name=]'T')
-        4 | Strange[: <special form 'typing.Protocol[T]'>] = Protocol[T]
+        4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
         ");
