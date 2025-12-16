@@ -883,7 +883,7 @@ reveal_type(C[int]().y)  # revealed: int
 class D[T = T]:
     x: T
 
-reveal_type(D().x)  # revealed: T@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

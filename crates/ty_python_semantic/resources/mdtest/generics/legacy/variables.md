@@ -518,8 +518,7 @@ V = TypeVar("V", default="V")
 class D(Generic[V]):
     x: V
 
-# TODO: we shouldn't leak a typevar like this in type inference
-reveal_type(D().x)  # revealed: V@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 ## Regression
