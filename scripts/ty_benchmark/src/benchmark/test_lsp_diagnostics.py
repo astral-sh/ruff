@@ -376,6 +376,10 @@ class IncrementalEditTest(LspTest):
             "The after edit diagnostics should be initialized if the test ran at least once. Did you forget to call `run`?"
         )
 
+        new_diagnostics = diff_diagnostics(
+            self.before_edit_diagnostics, self.after_edit_diagnostics
+        )
+
         before_edit_count = sum(
             len(diagnostics) for _, diagnostics in self.before_edit_diagnostics
         )
@@ -384,7 +388,7 @@ class IncrementalEditTest(LspTest):
             len(diagnostics) for _, diagnostics in self.after_edit_diagnostics
         )
 
-        assert after_edit_count > before_edit_count, (
+        assert len(new_diagnostics) > 0, (
             f"Expected more diagnostics after the change. "
             f"Initial: {before_edit_count}, After change: {after_edit_count}"
         )
