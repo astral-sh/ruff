@@ -1230,7 +1230,7 @@ pub struct TerminalOptions {
 ///
 /// For example, to relax enforcement of rules in test files:
 ///
-/// ```toml title="pyproject.toml"
+/// ```toml
 /// [[tool.ty.overrides]]
 /// include = ["tests/**", "**/test_*.py"]
 ///
@@ -1240,7 +1240,7 @@ pub struct TerminalOptions {
 ///
 /// Or, to ignore a rule in generated files but retain enforcement in an important file:
 ///
-/// ```toml title="pyproject.toml"
+/// ```toml
 /// [[tool.ty.overrides]]
 /// include = ["generated/**"]
 /// exclude = ["generated/important.py"]
