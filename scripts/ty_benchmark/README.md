@@ -1,10 +1,8 @@
 ## Getting started
 
 1. [Install `uv`](https://docs.astral.sh/uv/getting-started/installation/)
-
-- Unix: `curl -LsSf https://astral.sh/uv/install.sh | sh`
-- Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
-
+    - Unix: `curl -LsSf https://astral.sh/uv/install.sh | sh`
+    - Windows: `powershell -c "irm https://astral.sh/uv/install.ps1 | iex"`
 1. Build ty: `cargo build --bin ty --release`
 1. `cd` into the benchmark directory: `cd scripts/ty_benchmark`
 1. Install Pyright: `npm ci --ignore-scripts`
