@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
  --> ISC004.py:4:5
   |
 2 |       "Lobsters have blue blood.",
@@ -12,6 +12,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 6 |   )
   |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 1 | facts = (
 2 |     "Lobsters have blue blood.",
 3 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -22,8 +23,9 @@ help: Wrap implicitly concatenated strings in parentheses
 6 | )
 7 | 
 8 | facts = [
+note: This is an unsafe fix and may change runtime behavior
 
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
   --> ISC004.py:11:5
    |
  9 |       "Lobsters have blue blood.",
@@ -34,6 +36,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 13 |   ]
    |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 8  | facts = [
 9  |     "Lobsters have blue blood.",
 10 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -44,8 +47,9 @@ help: Wrap implicitly concatenated strings in parentheses
 13 | ]
 14 | 
 15 | facts = {
+note: This is an unsafe fix and may change runtime behavior
 
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
   --> ISC004.py:18:5
    |
 16 |       "Lobsters have blue blood.",
@@ -56,6 +60,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 20 |   }
    |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 15 | facts = {
 16 |     "Lobsters have blue blood.",
 17 |     "The liver is the only human organ that can fully regenerate itself.",
@@ -66,8 +71,9 @@ help: Wrap implicitly concatenated strings in parentheses
 20 | }
 21 | 
 22 | facts = {
+note: This is an unsafe fix and may change runtime behavior
 
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
   --> ISC004.py:30:5
    |
 29 |   facts = (
@@ -78,6 +84,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 33 |   )
    |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 27 | }
 28 | 
 29 | facts = (
@@ -89,8 +96,9 @@ help: Wrap implicitly concatenated strings in parentheses
 33 | )
 34 | 
 35 | facts = [
+note: This is an unsafe fix and may change runtime behavior
 
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
   --> ISC004.py:36:5
    |
 35 |   facts = [
@@ -101,6 +109,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 39 |   ]
    |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 33 | )
 34 | 
 35 | facts = [
@@ -112,8 +121,9 @@ help: Wrap implicitly concatenated strings in parentheses
 39 | ]
 40 | 
 41 | facts = {
+note: This is an unsafe fix and may change runtime behavior
 
-ISC004 [*] Unparenthesized implicit string concatenation in collection; did you forget a comma?
+ISC004 [*] Unparenthesized implicit string concatenation in collection
   --> ISC004.py:42:5
    |
 41 |   facts = {
@@ -124,6 +134,7 @@ ISC004 [*] Unparenthesized implicit string concatenation in collection; did you 
 45 |   }
    |
 help: Wrap implicitly concatenated strings in parentheses
+help: Did you forget a comma?
 39 | ]
 40 | 
 41 | facts = {
@@ -135,3 +146,4 @@ help: Wrap implicitly concatenated strings in parentheses
 45 | }
 46 | 
 47 | facts = (
+note: This is an unsafe fix and may change runtime behavior

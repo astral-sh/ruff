@@ -45,6 +45,11 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     ),
 /// )
 /// ```
+///
+/// ## Fix safety
+/// The fix is safe in that it does not change the semantics of your code.
+/// However, the issue is that you may often want to change semantics
+/// by adding a missing comma.
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.9")]
 pub(crate) struct ImplicitStringConcatenationInCollectionLiteral;
@@ -54,7 +59,7 @@ impl Violation for ImplicitStringConcatenationInCollectionLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unparenthesized implicit string concatenation in collection; did you forget a comma?"
+        "Unparenthesized implicit string concatenation in collection"
             .to_string()
     }
 
@@ -90,7 +95,8 @@ pub(crate) fn implicit_string_concatenation_in_collection_literal(
             ImplicitStringConcatenationInCollectionLiteral,
             string_like.range(),
         );
-        diagnostic.set_fix(Fix::safe_edits(
+        diagnostic.help("Did you forget a comma?");
+        diagnostic.set_fix(Fix::unsafe_edits(
             Edit::insertion("(".to_string(), string_like.range().start()),
             [Edit::insertion(")".to_string(), string_like.range().end())],
         ));
