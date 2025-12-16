@@ -69,7 +69,7 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::Display;
-use std::ops::Range;
+use std::ops::{BitAnd, BitOr, Range};
 
 use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -207,7 +207,13 @@ impl<'db> ConstraintSet<'db> {
         upper: Type<'db>,
     ) -> Self {
         Self {
-            node: ConstrainedTypeVar::new_node(db, typevar, lower, upper),
+            node: ConstrainedTypeVar::new_node(
+                db,
+                typevar,
+                lower,
+                upper,
+                ExplicitConstraint::Explicit,
+            ),
         }
     }
 
@@ -511,6 +517,7 @@ pub(crate) struct ConstrainedTypeVar<'db> {
     pub(crate) typevar: BoundTypeVarInstance<'db>,
     pub(crate) lower: Type<'db>,
     pub(crate) upper: Type<'db>,
+    pub(crate) explicit: ExplicitConstraint,
 }
 
 // The Salsa heap is tracked separately.
@@ -519,13 +526,12 @@ impl get_size2::GetSize for ConstrainedTypeVar<'_> {}
 #[salsa::tracked]
 impl<'db> ConstrainedTypeVar<'db> {
     /// Returns a new range constraint.
-    ///
-    /// Panics if `lower` and `upper` are not both fully static.
     fn new_node(
         db: &'db dyn Db,
         typevar: BoundTypeVarInstance<'db>,
         mut lower: Type<'db>,
         mut upper: Type<'db>,
+        explicit: ExplicitConstraint,
     ) -> Node<'db> {
         // It's not useful for an upper bound to be an intersection type, or for a lower bound to
         // be a union type. Because the following equivalences hold, we can break these bounds
@@ -540,7 +546,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             for lower_element in lower_union.elements(db) {
                 result = result.and_with_offset(
                     db,
-                    ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper),
+                    ConstrainedTypeVar::new_node(db, typevar, *lower_element, upper, explicit),
                 );
             }
             return result;
@@ -555,13 +561,19 @@ impl<'db> ConstrainedTypeVar<'db> {
             for upper_element in upper_intersection.iter_positive(db) {
                 result = result.and_with_offset(
                     db,
-                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element),
+                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element, explicit),
                 );
             }
             for upper_element in upper_intersection.iter_negative(db) {
                 result = result.and_with_offset(
                     db,
-                    ConstrainedTypeVar::new_node(db, typevar, lower, upper_element.negate(db)),
+                    ConstrainedTypeVar::new_node(
+                        db,
+                        typevar,
+                        lower,
+                        upper_element.negate(db),
+                        explicit,
+                    ),
                 );
             }
             return result;
@@ -593,7 +605,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             {
                 return Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object()),
+                    ConstrainedTypeVar::new(db, typevar, Type::Never, Type::object(), explicit),
                     1,
                 )
                 .negate(db);
@@ -645,6 +657,7 @@ impl<'db> ConstrainedTypeVar<'db> {
                         typevar,
                         Type::TypeVar(bound),
                         Type::TypeVar(bound),
+                        explicit,
                     ),
                     1,
                 )
@@ -656,12 +669,24 @@ impl<'db> ConstrainedTypeVar<'db> {
             {
                 let lower = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower,
+                        Type::Never,
+                        Type::TypeVar(typevar),
+                        explicit,
+                    ),
                     1,
                 );
                 let upper = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                    ConstrainedTypeVar::new(
+                        db,
+                        upper,
+                        Type::TypeVar(typevar),
+                        Type::object(),
+                        explicit,
+                    ),
                     1,
                 );
                 lower.and(db, upper)
@@ -671,13 +696,19 @@ impl<'db> ConstrainedTypeVar<'db> {
             (Type::TypeVar(lower), _) if typevar.can_be_bound_for(db, lower) => {
                 let lower = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, lower, Type::Never, Type::TypeVar(typevar)),
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower,
+                        Type::Never,
+                        Type::TypeVar(typevar),
+                        explicit,
+                    ),
                     1,
                 );
                 let upper = if upper.is_object() {
                     Node::AlwaysTrue
                 } else {
-                    Self::new_node(db, typevar, Type::Never, upper)
+                    Self::new_node(db, typevar, Type::Never, upper, explicit)
                 };
                 lower.and(db, upper)
             }
@@ -687,17 +718,27 @@ impl<'db> ConstrainedTypeVar<'db> {
                 let lower = if lower.is_never() {
                     Node::AlwaysTrue
                 } else {
-                    Self::new_node(db, typevar, lower, Type::object())
+                    Self::new_node(db, typevar, lower, Type::object(), explicit)
                 };
                 let upper = Node::new_constraint(
                     db,
-                    ConstrainedTypeVar::new(db, upper, Type::TypeVar(typevar), Type::object()),
+                    ConstrainedTypeVar::new(
+                        db,
+                        upper,
+                        Type::TypeVar(typevar),
+                        Type::object(),
+                        explicit,
+                    ),
                     1,
                 );
                 lower.and(db, upper)
             }
 
-            _ => Node::new_constraint(db, ConstrainedTypeVar::new(db, typevar, lower, upper), 1),
+            _ => Node::new_constraint(
+                db,
+                ConstrainedTypeVar::new(db, typevar, lower, upper, explicit),
+                1,
+            ),
         }
     }
 
@@ -715,6 +756,7 @@ impl<'db> ConstrainedTypeVar<'db> {
             self.typevar(db),
             self.lower(db).normalized(db),
             self.upper(db).normalized(db),
+            self.explicit(db),
         )
     }
 
@@ -734,6 +776,7 @@ impl<'db> ConstrainedTypeVar<'db> {
         (
             self.typevar(db).binding_context(db),
             self.typevar(db).identity(db),
+            self.explicit(db),
             self.as_id(),
         )
     }
@@ -771,7 +814,13 @@ impl<'db> ConstrainedTypeVar<'db> {
             return IntersectionResult::CannotSimplify;
         }
 
-        IntersectionResult::Simplified(Self::new(db, self.typevar(db), lower, upper))
+        IntersectionResult::Simplified(Self::new(
+            db,
+            self.typevar(db),
+            lower,
+            upper,
+            self.explicit(db) & other.explicit(db),
+        ))
     }
 
     pub(crate) fn display(self, db: &'db dyn Db) -> impl Display {
@@ -1295,12 +1344,14 @@ impl<'db> Node<'db> {
                 bound_typevar,
                 Type::Never,
                 rhs.bottom_materialization(db),
+                ExplicitConstraint::Implicit,
             ),
             (_, Type::TypeVar(bound_typevar)) => ConstrainedTypeVar::new_node(
                 db,
                 bound_typevar,
                 lhs.top_materialization(db),
                 Type::object(),
+                ExplicitConstraint::Implicit,
             ),
             _ => panic!("at least one type should be a typevar"),
         };
@@ -1812,10 +1863,12 @@ impl<'db> Node<'db> {
                     Node::AlwaysTrue => write!(f, "always"),
                     Node::AlwaysFalse => write!(f, "never"),
                     Node::Interior(interior) => {
+                        let constraint = interior.constraint(self.db);
                         write!(
                             f,
-                            "{} {}/{}",
-                            interior.constraint(self.db).display(self.db),
+                            "{} {:?} {}/{}",
+                            constraint.display(self.db),
+                            constraint.explicit(self.db),
                             interior.source_order(self.db),
                             interior.max_source_order(self.db),
                         )?;
@@ -1868,6 +1921,42 @@ impl<'db> RepresentativeBounds<'db> {
             lower,
             upper,
             source_order,
+        }
+    }
+}
+
+#[derive(
+    Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, get_size2::GetSize, salsa::Update,
+)]
+pub(crate) enum ExplicitConstraint {
+    Implicit,
+    Explicit,
+}
+
+impl BitAnd for ExplicitConstraint {
+    type Output = Self;
+    fn bitand(self, other: Self) -> Self {
+        match (self, other) {
+            (ExplicitConstraint::Explicit, ExplicitConstraint::Explicit) => {
+                ExplicitConstraint::Explicit
+            }
+            (ExplicitConstraint::Implicit, _) | (_, ExplicitConstraint::Implicit) => {
+                ExplicitConstraint::Implicit
+            }
+        }
+    }
+}
+
+impl BitOr for ExplicitConstraint {
+    type Output = Self;
+    fn bitor(self, other: Self) -> Self {
+        match (self, other) {
+            (ExplicitConstraint::Implicit, ExplicitConstraint::Implicit) => {
+                ExplicitConstraint::Implicit
+            }
+            (ExplicitConstraint::Explicit, _) | (_, ExplicitConstraint::Explicit) => {
+                ExplicitConstraint::Explicit
+            }
         }
     }
 }
@@ -2079,13 +2168,7 @@ impl<'db> InteriorNode<'db> {
             //
             // We also have to check if there are any derived facts that depend on the constraint
             // we're about to remove. If so, we need to "remember" them by AND-ing them in with the
-            // corresponding branch. We currently reuse the `source_order` of the constraint being
-            // removed when we add these derived facts.
-            //
-            // TODO: This might not be stable enough, if we add more than one derived fact for this
-            // constraint. If we still see inconsistent test output, we might need a more complex
-            // way of tracking source order for derived facts.
-            let self_source_order = self.source_order(db);
+            // corresponding branch.
             let if_true = path
                 .walk_edge(
                     db,
@@ -2168,8 +2251,7 @@ impl<'db> InteriorNode<'db> {
             // NB: We cannot use `Node::new` here, because the recursive calls might introduce new
             // derived constraints into the result, and those constraints might appear before this
             // one in the BDD ordering.
-            Node::new_constraint(db, self_constraint, self.source_order(db))
-                .ite(db, if_true, if_false)
+            Node::new_constraint(db, self_constraint, self_source_order).ite(db, if_true, if_false)
         }
     }
 
@@ -2332,8 +2414,13 @@ impl<'db> InteriorNode<'db> {
                     _ => continue,
                 };
 
-                let new_constraint =
-                    ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+                let new_constraint = ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    new_lower,
+                    new_upper,
+                    ExplicitConstraint::Implicit,
+                );
                 if seen_constraints.contains(&new_constraint) {
                     continue;
                 }
@@ -2956,21 +3043,35 @@ impl<'db> SequentMap<'db> {
             // Case 1
             (Type::TypeVar(lower_typevar), Type::TypeVar(upper_typevar)) => {
                 if !lower_typevar.is_same_typevar_as(db, upper_typevar) {
-                    ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
+                    ConstrainedTypeVar::new(
+                        db,
+                        lower_typevar,
+                        Type::Never,
+                        upper,
+                        constraint.explicit(db),
+                    )
                 } else {
                     return;
                 }
             }
 
             // Case 2
-            (Type::TypeVar(lower_typevar), _) => {
-                ConstrainedTypeVar::new(db, lower_typevar, Type::Never, upper)
-            }
+            (Type::TypeVar(lower_typevar), _) => ConstrainedTypeVar::new(
+                db,
+                lower_typevar,
+                Type::Never,
+                upper,
+                constraint.explicit(db),
+            ),
 
             // Case 3
-            (_, Type::TypeVar(upper_typevar)) => {
-                ConstrainedTypeVar::new(db, upper_typevar, lower, Type::object())
-            }
+            (_, Type::TypeVar(upper_typevar)) => ConstrainedTypeVar::new(
+                db,
+                upper_typevar,
+                lower,
+                Type::object(),
+                constraint.explicit(db),
+            ),
 
             _ => return,
         };
@@ -3102,8 +3203,13 @@ impl<'db> SequentMap<'db> {
             _ => return,
         };
 
-        let post_constraint =
-            ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
+        let post_constraint = ConstrainedTypeVar::new(
+            db,
+            constrained_typevar,
+            new_lower,
+            new_upper,
+            left_constraint.explicit(db) & right_constraint.explicit(db),
+        );
         self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
         self.enqueue_constraint(post_constraint);
     }
@@ -3121,6 +3227,7 @@ impl<'db> SequentMap<'db> {
                 let left_upper = left_constraint.upper(db);
                 let right_lower = right_constraint.lower(db);
                 let right_upper = right_constraint.upper(db);
+                let explicit = left_constraint.explicit(db) & right_constraint.explicit(db);
                 let new_constraint = |bound_typevar: BoundTypeVarInstance<'db>,
                                       right_lower: Type<'db>,
                                       right_upper: Type<'db>| {
@@ -3138,7 +3245,7 @@ impl<'db> SequentMap<'db> {
                     } else {
                         right_upper
                     };
-                    ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper)
+                    ConstrainedTypeVar::new(db, bound_typevar, right_lower, right_upper, explicit)
                 };
                 let post_constraint = match (left_lower, left_upper) {
                     (Type::TypeVar(bound_typevar), Type::TypeVar(other_bound_typevar))
@@ -3733,7 +3840,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => Node::AlwaysTrue,
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.top_materialization(db);
-                ConstrainedTypeVar::new_node(db, self, Type::Never, bound)
+                ConstrainedTypeVar::new_node(
+                    db,
+                    self,
+                    Type::Never,
+                    bound,
+                    ExplicitConstraint::Implicit,
+                )
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = Node::AlwaysFalse;
@@ -3742,7 +3855,13 @@ impl<'db> BoundTypeVarInstance<'db> {
                     let constraint_upper = constraint.top_materialization(db);
                     specializations = specializations.or_with_offset(
                         db,
-                        ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper),
+                        ConstrainedTypeVar::new_node(
+                            db,
+                            self,
+                            constraint_lower,
+                            constraint_upper,
+                            ExplicitConstraint::Implicit,
+                        ),
                     );
                 }
                 specializations
@@ -3777,7 +3896,13 @@ impl<'db> BoundTypeVarInstance<'db> {
             Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                 let bound = bound.bottom_materialization(db);
                 (
-                    ConstrainedTypeVar::new_node(db, self, Type::Never, bound),
+                    ConstrainedTypeVar::new_node(
+                        db,
+                        self,
+                        Type::Never,
+                        bound,
+                        ExplicitConstraint::Implicit,
+                    ),
                     Vec::new(),
                 )
             }
@@ -3787,8 +3912,13 @@ impl<'db> BoundTypeVarInstance<'db> {
                 for constraint in constraints.elements(db) {
                     let constraint_lower = constraint.bottom_materialization(db);
                     let constraint_upper = constraint.top_materialization(db);
-                    let constraint =
-                        ConstrainedTypeVar::new_node(db, self, constraint_lower, constraint_upper);
+                    let constraint = ConstrainedTypeVar::new_node(
+                        db,
+                        self,
+                        constraint_lower,
+                        constraint_upper,
+                        ExplicitConstraint::Implicit,
+                    );
                     if constraint_lower == constraint_upper {
                         non_gradual_constraints =
                             non_gradual_constraints.or_with_offset(db, constraint);
@@ -3957,28 +4087,28 @@ mod tests {
     #[test]
     fn test_display_graph_output() {
         let expected = indoc! {r#"
-            (T = str) 3/4
-            ┡━₁ (T = bool) 4/4
-            │   ┡━₁ (U = str) 1/2
-            │   │   ┡━₁ (U = bool) 2/2
+            (T = str) Explicit 3/4
+            ┡━₁ (T = bool) Explicit 4/4
+            │   ┡━₁ (U = str) Explicit 1/2
+            │   │   ┡━₁ (U = bool) Explicit 2/2
             │   │   │   ┡━₁ always
             │   │   │   └─₀ always
-            │   │   └─₀ (U = bool) 2/2
+            │   │   └─₀ (U = bool) Explicit 2/2
             │   │       ┡━₁ always
             │   │       └─₀ never
-            │   └─₀ (U = str) 1/2
-            │       ┡━₁ (U = bool) 2/2
+            │   └─₀ (U = str) Explicit 1/2
+            │       ┡━₁ (U = bool) Explicit 2/2
             │       │   ┡━₁ always
             │       │   └─₀ always
-            │       └─₀ (U = bool) 2/2
+            │       └─₀ (U = bool) Explicit 2/2
             │           ┡━₁ always
             │           └─₀ never
-            └─₀ (T = bool) 4/4
-                ┡━₁ (U = str) 1/2
-                │   ┡━₁ (U = bool) 2/2
+            └─₀ (T = bool) Explicit 4/4
+                ┡━₁ (U = str) Explicit 1/2
+                │   ┡━₁ (U = bool) Explicit 2/2
                 │   │   ┡━₁ always
                 │   │   └─₀ always
-                │   └─₀ (U = bool) 2/2
+                │   └─₀ (U = bool) Explicit 2/2
                 │       ┡━₁ always
                 │       └─₀ never
                 └─₀ never
