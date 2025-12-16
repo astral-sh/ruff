@@ -729,7 +729,6 @@ impl<'a> FromTemplate<'a> for FormatString {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use insta::assert_debug_snapshot;
 
     #[test]
     fn test_fill_and_align() {
@@ -1043,16 +1042,45 @@ mod tests {
 
     #[test]
     fn test_format_unicode_escape() {
-        assert_debug_snapshot!(FormatString::from_str("I am a \\N{snowman}"));
+        let expected = Ok(FormatString {
+            format_parts: vec![FormatPart::Literal("I am a \\N{snowman}".to_owned())],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\N{snowman}"), expected);
     }
 
     #[test]
     fn test_format_unicode_escape_with_field() {
-        assert_debug_snapshot!(FormatString::from_str("I am a \\N{snowman}{snowman}"))
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\N{snowman}".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(
+            FormatString::from_str("I am a \\N{snowman}{snowman}"),
+            expected
+        );
     }
 
     #[test]
     fn test_format_multiple_escape_with_field() {
-        assert_debug_snapshot!(FormatString::from_str("I am a \\\\N{snowman}"));
+        let expected = Ok(FormatString {
+            format_parts: vec![
+                FormatPart::Literal("I am a \\\\N".to_owned()),
+                FormatPart::Field {
+                    field_name: "snowman".to_owned(),
+                    conversion_spec: None,
+                    format_spec: String::new(),
+                },
+            ],
+        });
+
+        assert_eq!(FormatString::from_str("I am a \\\\N{snowman}"), expected);
     }
 }
