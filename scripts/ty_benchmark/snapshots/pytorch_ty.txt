@@ -8230,10 +8230,10 @@ torch/_library/infer_schema.py:63:18: error[unresolved-attribute] Object of type
 torch/_library/infer_schema.py:132:37: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/infer_schema.py:185:50: error[unresolved-attribute] Module `torch` has no member `device`
 torch/_library/infer_schema.py:187:44: error[unresolved-attribute] Module `torch` has no member `dtype`
-torch/_library/infer_schema.py:222:80: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm | GenericAlias, str] | tuple[<types.UnionType special-form>, str]]` is not assignable to `list[tuple[type | _SpecialForm | GenericAlias, str]]`
-torch/_library/infer_schema.py:244:46: error[invalid-argument-type] Argument to function `derived_seq_types` is incorrect: Expected `type | _SpecialForm`, found `<types.UnionType special-form>`
-torch/_library/infer_schema.py:248:13: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[tuple[type | _SpecialForm | GenericAlias, str]]`, found `GeneratorType[tuple[<types.UnionType special-form 'Unknown | None'>, str], None, None]`
-torch/_library/infer_schema.py:256:82: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm, str, bool, bool, bool] | tuple[<types.UnionType special-form 'int | float'>, str, bool, bool, bool] | tuple[<NewType pseudo-class 'OpaqueType'>, str, bool, bool, bool]]` is not assignable to `list[tuple[type | _SpecialForm, str, bool, bool, bool]]`
+torch/_library/infer_schema.py:222:80: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm | GenericAlias, str] | tuple[<types.UnionType special form>, str]]` is not assignable to `list[tuple[type | _SpecialForm | GenericAlias, str]]`
+torch/_library/infer_schema.py:244:46: error[invalid-argument-type] Argument to function `derived_seq_types` is incorrect: Expected `type | _SpecialForm`, found `<types.UnionType special form>`
+torch/_library/infer_schema.py:248:13: error[invalid-argument-type] Argument to bound method `extend` is incorrect: Expected `Iterable[tuple[type | _SpecialForm | GenericAlias, str]]`, found `GeneratorType[tuple[<types.UnionType special form 'Unknown | None'>, str], None, None]`
+torch/_library/infer_schema.py:256:82: error[invalid-assignment] Object of type `list[tuple[type | _SpecialForm, str, bool, bool, bool] | tuple[<types.UnionType special form 'int | float'>, str, bool, bool, bool] | tuple[<NewType pseudo-class 'OpaqueType'>, str, bool, bool, bool]]` is not assignable to `list[tuple[type | _SpecialForm, str, bool, bool, bool]]`
 torch/_library/opaque_object.py:23:36: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/opaque_object.py:26:41: error[unresolved-attribute] Module `torch._C` has no member `ScriptObject`
 torch/_library/opaque_object.py:84:12: error[unresolved-attribute] Module `torch._C` has no member `_make_opaque_object`
@@ -24835,14 +24835,14 @@ torch/utils/_pytree.py:1119:30: error[unresolved-attribute] Special form `typing
 torch/utils/_pytree.py:1120:31: error[unresolved-attribute] Special form `typing.Self` has no attribute `num_leaves`
 torch/utils/_pytree.py:1131:62: error[too-many-positional-arguments] Too many positional arguments to bound method `__repr__`: expected 1, got 2
 torch/utils/_pytree.py:1135:58: error[too-many-positional-arguments] Too many positional arguments to bound method `__repr__`: expected 1, got 2
-torch/utils/_pytree.py:1167:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children_specs]`, found `list[<special-form 'typing.Self'>]`
-torch/utils/_pytree.py:1173:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children]`, found `list[<special-form 'typing.Self'>]`
-torch/utils/_pytree.py:1176:16: error[invalid-return-type] Return type does not match returned value: expected `Self@child`, found `<special-form 'typing.Self'>`
+torch/utils/_pytree.py:1167:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children_specs]`, found `list[<special form 'typing.Self'>]`
+torch/utils/_pytree.py:1173:16: error[invalid-return-type] Return type does not match returned value: expected `list[Self@children]`, found `list[<special form 'typing.Self'>]`
+torch/utils/_pytree.py:1176:16: error[invalid-return-type] Return type does not match returned value: expected `Self@child`, found `<special form 'typing.Self'>`
 torch/utils/_pytree.py:1280:20: error[unresolved-attribute] Special form `typing.Self` has no attribute `num_leaves`
 torch/utils/_pytree.py:1281:34: error[unresolved-attribute] Special form `typing.Self` has no attribute `unflatten`
 torch/utils/_pytree.py:1341:18: warning[deprecated] The class `LeafSpec` is deprecated: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
 torch/utils/_pytree.py:1344:24: warning[deprecated] The class `LeafSpec` is deprecated: `isinstance(treespec, LeafSpec)` is deprecated, use `isinstance(treespec, TreeSpec) and treespec.is_leaf()` instead.
-torch/utils/_pytree.py:1917:40: error[invalid-argument-type] Argument to function `_treespec_to_json` is incorrect: Expected `TreeSpec`, found `<special-form 'typing.Self'>`
+torch/utils/_pytree.py:1917:40: error[invalid-argument-type] Argument to function `_treespec_to_json` is incorrect: Expected `TreeSpec`, found `<special form 'typing.Self'>`
 torch/utils/_stats.py:26:12: error[unresolved-attribute] Object of type `(**_P@count) -> _R@count` has no attribute `__qualname__`
 torch/utils/_stats.py:27:33: error[unresolved-attribute] Object of type `(**_P@count) -> _R@count` has no attribute `__qualname__`
 torch/utils/_stats.py:28:29: error[unresolved-attribute] Object of type `(**_P@count) -> _R@count` has no attribute `__qualname__`

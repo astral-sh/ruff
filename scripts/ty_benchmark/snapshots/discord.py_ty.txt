@@ -123,8 +123,8 @@ discord/ext/commands/bot.py:330:50: error[invalid-type-arguments] Too many type 
 discord/ext/commands/bot.py:655:16: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, Any]` has no attribute `__name__`
 discord/ext/commands/bot.py:681:16: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, Any]` has no attribute `__name__`
 discord/ext/commands/bot.py:1546:13: error[invalid-parameter-default] Default value of type `_DefaultRepr` is not assignable to annotated parameter type `HelpCommand | None`
-discord/ext/commands/cog.py:288:36: error[invalid-type-arguments] Type `<special-form 'typing.Self'>` is not assignable to upper bound `Cog | None` of type variable `CogT@Command`
-discord/ext/commands/cog.py:289:79: error[invalid-type-arguments] Type `<special-form 'typing.Self'>` is not assignable to upper bound `Group | Cog` of type variable `GroupT@Command`
+discord/ext/commands/cog.py:288:36: error[invalid-type-arguments] Type `<special form 'typing.Self'>` is not assignable to upper bound `Cog | None` of type variable `CogT@Command`
+discord/ext/commands/cog.py:289:79: error[invalid-type-arguments] Type `<special form 'typing.Self'>` is not assignable to upper bound `Group | Cog` of type variable `GroupT@Command`
 discord/ext/commands/context.py:411:15: error[invalid-method-override] Invalid override of method `_get_channel`: Definition is incompatible with `Messageable._get_channel`
 discord/ext/commands/context.py:783:9: error[invalid-method-override] Invalid override of method `typing`: Definition is incompatible with `Messageable.typing`
 discord/ext/commands/converter.py:402:39: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `TextChannel | VoiceChannel | StageChannel | ... omitted 4 union elements`, found `(VoiceChannel & ~AlwaysFalsy) | (StageChannel & ~AlwaysFalsy) | (ForumChannel & Messageable & ~AlwaysFalsy) | ... omitted 5 union elements`
@@ -312,7 +312,7 @@ discord/sticker.py:434:16: warning[possibly-missing-attribute] Attribute `_get_g
 discord/sticker.py:489:43: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
 discord/sticker.py:490:29: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `ConnectionState[Client]`, found `Any | None | ConnectionState[Client]`
 discord/sticker.py:511:15: warning[possibly-missing-attribute] Attribute `http` may be missing on object of type `Any | None | ConnectionState[Client]`
-discord/ui/action_row.py:122:67: error[invalid-type-arguments] Type `<special-form 'typing.Self'>` is not assignable to upper bound `BaseView | ActionRow[Unknown] | Container[Unknown]` of type variable `C@ContainedItemCallbackType`
+discord/ui/action_row.py:122:67: error[invalid-type-arguments] Type `<special form 'typing.Self'>` is not assignable to upper bound `BaseView | ActionRow[Unknown] | Container[Unknown]` of type variable `C@ContainedItemCallbackType`
 discord/ui/action_row.py:163:26: error[unresolved-attribute] Object of type `(Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]` has no attribute `__discord_ui_model_type__`
 discord/ui/action_row.py:163:59: error[unresolved-attribute] Object of type `(Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]` has no attribute `__discord_ui_model_kwargs__`
 discord/ui/action_row.py:166:27: error[unresolved-attribute] Object of type `(Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]` has no attribute `__name__`
@@ -328,7 +328,7 @@ discord/ui/button.py:276:9: error[invalid-method-override] Invalid override of m
 discord/ui/button.py:287:9: error[invalid-method-override] Invalid override of method `_refresh_component`: Definition is incompatible with `Item._refresh_component`
 discord/ui/button.py:376:9: error[unresolved-attribute] Unresolved attribute `__discord_ui_model_type__` on type `(S@button, Interaction[Any], Button[V@button], /) -> Coroutine[Any, Any, Any]`.
 discord/ui/button.py:377:9: error[unresolved-attribute] Unresolved attribute `__discord_ui_model_kwargs__` on type `(S@button, Interaction[Any], Button[V@button], /) -> Coroutine[Any, Any, Any]`.
-discord/ui/container.py:109:77: error[invalid-type-arguments] Type `<special-form 'typing.Self'>` is not assignable to upper bound `BaseView | ActionRow[Unknown] | Container[Unknown]` of type variable `C@ContainedItemCallbackType`
+discord/ui/container.py:109:77: error[invalid-type-arguments] Type `<special form 'typing.Self'>` is not assignable to upper bound `BaseView | ActionRow[Unknown] | Container[Unknown]` of type variable `C@ContainedItemCallbackType`
 discord/ui/container.py:151:30: error[unresolved-attribute] Object of type `((Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]) & ~Item[object]` has no attribute `__discord_ui_model_type__`
 discord/ui/container.py:151:62: error[unresolved-attribute] Object of type `((Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]) & ~Item[object]` has no attribute `__discord_ui_model_kwargs__`
 discord/ui/container.py:153:31: error[unresolved-attribute] Object of type `((Unknown, Interaction[Any], Unknown, /) -> Coroutine[Any, Any, Any]) & ~Item[object]` has no attribute `__name__`
@@ -343,7 +343,7 @@ discord/ui/file_upload.py:184:9: error[invalid-method-override] Invalid override
 discord/ui/label.py:112:9: error[invalid-method-override] Invalid override of method `to_component_dict`: Definition is incompatible with `Item.to_component_dict`
 discord/ui/label.py:125:9: error[invalid-method-override] Invalid override of method `from_component`: Definition is incompatible with `Item.from_component`
 discord/ui/media_gallery.py:259:9: error[invalid-method-override] Invalid override of method `from_component`: Definition is incompatible with `Item.from_component`
-discord/ui/modal.py:109:55: error[invalid-type-arguments] Type `<special-form 'typing.Self'>` is not assignable to upper bound `BaseView` of type variable `V@Item`
+discord/ui/modal.py:109:55: error[invalid-type-arguments] Type `<special form 'typing.Self'>` is not assignable to upper bound `BaseView` of type variable `V@Item`
 discord/ui/modal.py:159:15: error[invalid-method-override] Invalid override of method `on_error`: Definition is incompatible with `BaseView.on_error`
 discord/ui/modal.py:176:9: error[invalid-method-override] Invalid override of method `_refresh`: Definition is incompatible with `BaseView._refresh`
 discord/ui/modal.py:202:15: error[invalid-method-override] Invalid override of method `_scheduled_task`: Definition is incompatible with `BaseView._scheduled_task`

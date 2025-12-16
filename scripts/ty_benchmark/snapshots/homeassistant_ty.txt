@@ -3060,8 +3060,8 @@ homeassistant/components/rfxtrx/switch.py:149:36: error[unresolved-attribute] Ob
 homeassistant/components/ring/camera.py:186:17: error[invalid-argument-type] Argument to function `async_aiohttp_proxy_stream` is incorrect: Expected `StreamReader`, found `StreamReader`
 homeassistant/components/ring/entity.py:79:54: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@exception_wrap]` has no attribute `__name__`
 homeassistant/components/ring/entity.py:190:16: error[invalid-return-type] Return type does not match returned value: expected `RingDevices`, found `Unknown | RingDevices | dict[str, Any]`
-homeassistant/components/ring/switch.py:103:38: error[invalid-argument-type] Argument is incorrect: Expected `<special-form 'typing.Self'>`, found `RingSwitchEntityDescription[Any]`
-homeassistant/components/ring/switch.py:124:57: error[invalid-argument-type] Argument is incorrect: Expected `<special-form 'typing.Self'>`, found `RingSwitchEntityDescription[RingDeviceT@RingSwitch]`
+homeassistant/components/ring/switch.py:103:38: error[invalid-argument-type] Argument is incorrect: Expected `<special form 'typing.Self'>`, found `RingSwitchEntityDescription[Any]`
+homeassistant/components/ring/switch.py:124:57: error[invalid-argument-type] Argument is incorrect: Expected `<special form 'typing.Self'>`, found `RingSwitchEntityDescription[RingDeviceT@RingSwitch]`
 homeassistant/components/ripple/sensor.py:7:6: error[unresolved-import] Cannot resolve imported module `pyripple`
 homeassistant/components/risco/config_flow.py:272:51: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 homeassistant/components/risco/config_flow.py:294:32: warning[possibly-missing-attribute] Attribute `values` may be missing on object of type `Unknown | int | dict[Unknown | str, Unknown | AlarmControlPanelState] | dict[Unknown | AlarmControlPanelState, Unknown | str]`
@@ -4122,8 +4122,8 @@ homeassistant/components/yeelight/device.py:200:9: error[invalid-assignment] Obj
 homeassistant/components/yeelight/light.py:256:47: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
 homeassistant/components/yeelight/light.py:264:43: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
 homeassistant/components/yeelight/light.py:270:43: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@_async_cmd]` has no attribute `__name__`
-homeassistant/components/yeelight/scanner.py:55:13: error[invalid-assignment] Object of type `Self@async_get` is not assignable to attribute `_scanner` of type `<special-form 'typing.Self'> | None`
-homeassistant/components/yeelight/scanner.py:56:16: error[invalid-return-type] Return type does not match returned value: expected `Self@async_get`, found `<special-form 'typing.Self'> | None`
+homeassistant/components/yeelight/scanner.py:55:13: error[invalid-assignment] Object of type `Self@async_get` is not assignable to attribute `_scanner` of type `<special form 'typing.Self'> | None`
+homeassistant/components/yeelight/scanner.py:56:16: error[invalid-return-type] Return type does not match returned value: expected `Self@async_get`, found `<special form 'typing.Self'> | None`
 homeassistant/components/yeelightsunflower/light.py:9:8: error[unresolved-import] Cannot resolve imported module `yeelightsunflower`
 homeassistant/components/yi/camera.py:7:6: error[unresolved-import] Cannot resolve imported module `aioftp`
 homeassistant/components/yi/camera.py:144:34: error[invalid-argument-type] Argument to bound method `open_camera` is incorrect: Expected `str`, found `Unknown | None`

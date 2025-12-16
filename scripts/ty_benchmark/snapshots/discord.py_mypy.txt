@@ -990,7 +990,7 @@ discord/ext/commands/converter.py:267: error: Incompatible types in assignment (
 discord/ext/commands/converter.py:379: error: Incompatible return value type (got "Tuple[Union[Guild, int, None], int, int]", expected "Tuple[Optional[int], int, int]")  [return-value]
 discord/ext/commands/converter.py:483: error: Name "result" already defined on line 476  [no-redef]
 discord/ext/commands/converter.py:517: error: Name "result" already defined on line 510  [no-redef]
-discord/ext/commands/converter.py:1280: error: Argument 2 to "issubclass" has incompatible type "<typing special-form>"; expected "_ClassInfo"  [arg-type]
+discord/ext/commands/converter.py:1280: error: Argument 2 to "issubclass" has incompatible type "<typing special form>"; expected "_ClassInfo"  [arg-type]
 discord/ext/commands/converter.py:1413: error: Need type annotation for "conversions" (hint: "conversions: Dict[<type>, <type>] = ...")  [var-annotated]
 discord/ext/commands/parameters.py:63: error: Parameter 1 of Literal[...] is invalid  [valid-type]
 discord/ext/commands/parameters.py:64: error: Parameter 1 of Literal[...] is invalid  [valid-type]
