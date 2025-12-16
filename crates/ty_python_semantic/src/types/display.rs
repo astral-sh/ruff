@@ -1679,15 +1679,13 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
 
         // If we're multiline printing and a name hasn't been emitted, try to
         // make one up to make things more pretty
-        if self.settings.multiline && !self.settings.disallow_signature_name {
+        if self.settings.multiline
+            && !self.settings.disallow_signature_name
+            && let Some(definition) = self.definition
+            && let Some(name) = definition.name(self.db)
+        {
             f.write_str("def ")?;
-            if let Some(definition) = self.definition
-                && let Some(name) = definition.name(self.db)
-            {
-                f.write_str(&name)?;
-            } else {
-                f.write_str("_")?;
-            }
+            f.write_str(&name)?;
         }
 
         // Parameters
@@ -2746,12 +2744,12 @@ mod tests {
         let db = setup_db();
 
         // Empty parameters with no return type.
-        assert_snapshot!(display_signature_multiline(&db, [], None), @"def _() -> Unknown");
+        assert_snapshot!(display_signature_multiline(&db, [], None), @"() -> Unknown");
 
         // Empty parameters with a return type.
         assert_snapshot!(
             display_signature_multiline(&db, [], Some(Type::none(&db))),
-            @"def _() -> None"
+            @"() -> None"
         );
 
         // Single parameter type (no name) with a return type.
@@ -2761,7 +2759,7 @@ mod tests {
                 [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
-            @"def _(None, /) -> None"
+            @"(None, /) -> None"
         );
 
         // Two parameters where one has annotation and the other doesn't.
@@ -2796,7 +2794,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        def _(
+        (
             x,
             y,
             /
@@ -2815,7 +2813,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        def _(
+        (
             x,
             /,
             y
@@ -2834,7 +2832,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        def _(
+        (
             *,
             x,
             y
@@ -2853,7 +2851,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        def _(
+        (
             x,
             *,
             y
@@ -2892,7 +2890,7 @@ mod tests {
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
             @r"
-        def _(
+        (
             a,
             b: int,
             c=1,

@@ -2151,10 +2151,10 @@ def function():
         // TODO: This should just be `**AB@Alias2 (<variance>)`
         // https://github.com/astral-sh/ty/issues/1581
         assert_snapshot!(test.hover(), @r"
-        def _(**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ---------------------------------------------
         ```python
-        def _(**AB@Alias2) -> tuple[AB@Alias2]
+        (**AB@Alias2) -> tuple[AB@Alias2]
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
