@@ -20,13 +20,7 @@ export default function Chrome() {
     if (settings == null || pythonSource == null) {
       return;
     }
-
-    try {
-      await persist(settings, pythonSource);
-    } catch (error) {
-      // eslint-disable-next-line no-console
-      console.error("Failed to share playground", error);
-    }
+    await persist(settings, pythonSource);
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {
