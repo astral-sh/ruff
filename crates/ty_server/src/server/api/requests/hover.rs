@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::document::{FileRangeExt, PositionExt};
+use crate::document::{FileRangeExt, PositionExt, ToRangeExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -8,7 +8,7 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
-use ty_ide::{MarkupKind, hover};
+use ty_ide::{MarkupKind, NavigationTarget, hover};
 use ty_project::ProjectDatabase;
 
 pub(crate) struct HoverRequestHandler;
@@ -61,7 +61,23 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             (MarkupKind::PlainText, lsp_types::MarkupKind::PlainText)
         };
 
-        let contents = range_info.display(db, markup_kind).to_string();
+        let to_lsp_link = |target: &NavigationTarget| -> Option<String> {
+            let file = target.file();
+            let location = target
+                .focus_range()
+                .to_lsp_range(db, file, snapshot.encoding())?
+                .to_location()?;
+            let uri = location.uri;
+            let line1 = location.range.start.line;
+            let char1 = location.range.start.character;
+            let line2 = location.range.end.line;
+            let char2 = location.range.end.character;
+            Some(format!("{uri}#L{line1}C{char1}-L{line2}C{char2}"))
+        };
+
+        let contents = range_info
+            .display(db, markup_kind, &to_lsp_link)
+            .to_string();
 
         Ok(Some(lsp_types::Hover {
             contents: HoverContents::Markup(MarkupContent {

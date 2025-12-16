@@ -1,12 +1,12 @@
 use crate::docstring::Docstring;
 use crate::goto::{GotoTarget, find_goto_target};
-use crate::{Db, MarkupKind, RangedValue};
+use crate::{Db, HasNavigationTargets, MarkupKind, NavigationTarget, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
+use ty_python_semantic::types::{KnownInstanceType, Type, TypeDetail, TypeVarVariance};
 use ty_python_semantic::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
@@ -59,13 +59,21 @@ pub struct Hover<'db> {
     contents: Vec<HoverContent<'db>>,
 }
 
+type Linkify<'a> = &'a dyn Fn(&NavigationTarget) -> Option<String>;
+
 impl<'db> Hover<'db> {
     /// Renders the hover to a string using the specified markup kind.
-    pub const fn display<'a>(&'a self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHover<'db, 'a> {
+    pub const fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        kind: MarkupKind,
+        linkify: Linkify<'a>,
+    ) -> DisplayHover<'db, 'a> {
         DisplayHover {
             db,
             hover: self,
             kind,
+            linkify,
         }
     }
 
@@ -96,6 +104,7 @@ pub struct DisplayHover<'db, 'a> {
     db: &'db dyn Db,
     hover: &'a Hover<'db>,
     kind: MarkupKind,
+    linkify: Linkify<'a>,
 }
 
 impl fmt::Display for DisplayHover<'_, '_> {
@@ -106,7 +115,7 @@ impl fmt::Display for DisplayHover<'_, '_> {
                 self.kind.horizontal_line().fmt(f)?;
             }
 
-            content.display(self.db, self.kind).fmt(f)?;
+            content.display(self.db, self.kind, self.linkify).fmt(f)?;
             first = false;
         }
 
@@ -122,11 +131,17 @@ pub enum HoverContent<'db> {
 }
 
 impl<'db> HoverContent<'db> {
-    fn display(&self, db: &'db dyn Db, kind: MarkupKind) -> DisplayHoverContent<'_, 'db> {
+    fn display<'a>(
+        &'a self,
+        db: &'db dyn Db,
+        kind: MarkupKind,
+        linkify: Linkify<'a>,
+    ) -> DisplayHoverContent<'a, 'db> {
         DisplayHoverContent {
             db,
             content: self,
             kind,
+            linkify,
         }
     }
 }
@@ -135,6 +150,7 @@ pub(crate) struct DisplayHoverContent<'a, 'db> {
     db: &'db dyn Db,
     content: &'a HoverContent<'db>,
     kind: MarkupKind,
+    linkify: Linkify<'a>,
 }
 
 impl fmt::Display for DisplayHoverContent<'_, '_> {
@@ -151,19 +167,82 @@ impl fmt::Display for DisplayHoverContent<'_, '_> {
                     Some(TypeVarVariance::Bivariant) => " (bivariant)",
                     None => "",
                 };
-                self.kind
-                    .fenced_code_block(
-                        format!(
-                            "{}{variance}",
-                            ty.display_with(self.db, DisplaySettings::default().multiline())
-                        ),
-                        "python",
-                    )
-                    .fmt(f)
+
+                if self.kind == MarkupKind::Markdown {
+                    let details = ty.display(self.db).to_string_parts();
+
+                    // Ok so the idea here is that we potentially have a random soup of spans here,
+                    // and each byte of the string can have at most one target associate with it.
+                    // Thankfully, they were generally pushed in print order, with the inner smaller types
+                    // appearing before the outer bigger ones.
+                    //
+                    // So we record where we are in the string, and every time we find a type, we
+                    // check if it's further along in the string. If it is, great, we give it the
+                    // span for its range, and then advance where we are.
+                    let mut offset = 0;
+                    for (target, detail) in details.targets.iter().zip(&details.details) {
+                        match detail {
+                            TypeDetail::Type(ty) => {
+                                let start = target.start().to_usize();
+                                let end = target.end().to_usize();
+                                // If we skipped over some bytes, push them with no target
+                                if start > offset {
+                                    write!(f, "{}", escape(&details.label[offset..start]))?;
+                                }
+                                // Ok, this is the first type that claimed these bytes, give it the target
+                                if start >= offset {
+                                    if let Some(target) =
+                                        ty.navigation_targets(self.db).into_iter().next()
+                                        && let Some(uri) = (self.linkify)(&target)
+                                    {
+                                        write!(
+                                            f,
+                                            "[{}]({})",
+                                            escape(&details.label[start..end]),
+                                            uri
+                                        )?;
+                                    } else {
+                                        write!(f, "{}", escape(&details.label[start..end]))?;
+                                    }
+                                    offset = end;
+                                }
+                            }
+                            TypeDetail::SignatureStart
+                            | TypeDetail::SignatureEnd
+                            | TypeDetail::Parameter(_) => {
+                                // Don't care about these
+                            }
+                        }
+                    }
+                    // "flush" the rest of the label without any target
+                    if offset < details.label.len() {
+                        write!(f, "{}", escape(&details.label[offset..details.label.len()]))?;
+                    }
+                    write!(f, "{}", escape(variance))
+                } else {
+                    self.kind
+                        .fenced_code_block(
+                            format!(
+                                "{}{variance}",
+                                ty.display_with(self.db, DisplaySettings::default().multiline())
+                            ),
+                            "python",
+                        )
+                        .fmt(f)
+                }
             }
             HoverContent::Docstring(docstring) => docstring.render(self.kind).fmt(f),
         }
     }
+}
+
+fn escape(x: &str) -> String {
+    x.replace('[', "\\[")
+        .replace(']', "\\]")
+        .replace('(', "\\(")
+        .replace(')', "\\)")
+        .replace('`', "\\`")
+        .replace('#', "\\#")
 }
 
 #[cfg(test)]
@@ -3670,9 +3749,9 @@ def function():
             write!(
                 &mut buf,
                 "{plaintext}{line}{markdown}{line}",
-                plaintext = hover.display(&self.db, MarkupKind::PlainText),
+                plaintext = hover.display(&self.db, MarkupKind::PlainText, &|_| None),
                 line = MarkupKind::PlainText.horizontal_line(),
-                markdown = hover.display(&self.db, MarkupKind::Markdown),
+                markdown = hover.display(&self.db, MarkupKind::Markdown, &|_| None),
             )
             .unwrap();
 

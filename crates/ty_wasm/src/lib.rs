@@ -399,7 +399,7 @@ impl Workspace {
 
         Ok(Some(Hover {
             markdown: range_info
-                .display(&self.db, MarkupKind::Markdown)
+                .display(&self.db, MarkupKind::Markdown, &|_| None)
                 .to_string(),
             range: source_range,
         }))
