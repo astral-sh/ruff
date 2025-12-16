@@ -1838,21 +1838,7 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 }
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_value) = self.param.default_value() {
-                if self.param.annotated_type().is_some() {
-                    f.write_str(" = ")?;
-                } else {
-                    f.write_str("=")?;
-                }
-                // Omit long default values or ones that contain newlines
-                if default_value.len() > 12 || default_value.contains('\n') {
-                    f.write_str("...")?;
-                } else {
-                    f.write_str(default_value)?;
-                }
-            } else if let Some(default_type) = self.param.default_type() {
-                // Ideally we'd never end up in here, but complex situations like dataclasses
-                // can result in us computing the type Literal[1] but not having the default_value set
+            if let Some(default_type) = self.param.default_type() {
                 if self.param.annotated_type().is_some() {
                     f.write_str(" = ")?;
                 } else {
@@ -1875,10 +1861,10 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
 
                         match (class, class.known(self.db)) {
                             (_, Some(KnownClass::NoneType)) => {
-                                f.with_type(default_type).write_str("None")?
+                                f.with_type(default_type).write_str("None")?;
                             }
                             (_, Some(KnownClass::NoDefaultType)) => {
-                                f.with_type(default_type).write_str("NoDefault")?
+                                f.with_type(default_type).write_str("NoDefault")?;
                             }
                             _ => f.write_str("...")?,
                         }
