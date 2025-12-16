@@ -134,14 +134,29 @@ impl<'db> Type<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
-            self_protocol.interface(db).has_relation_to_impl(
-                db,
-                protocol.interface(db),
-                inferable,
-                relation,
-                relation_visitor,
-                disjointness_visitor,
-            )
+            let self_as_nominal = self_protocol.to_nominal_instance();
+            let other_as_nominal = protocol.to_nominal_instance();
+            let nominal_match = match self_as_nominal.zip(other_as_nominal) {
+                Some((self_as_nominal, other_as_nominal)) => self_as_nominal.has_relation_to_impl(
+                    db,
+                    other_as_nominal,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+                _ => ConstraintSet::from(false),
+            };
+            nominal_match.or(db, || {
+                self_protocol.interface(db).has_relation_to_impl(
+                    db,
+                    protocol.interface(db),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            })
         } else {
             protocol
                 .inner
