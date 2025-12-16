@@ -2751,7 +2751,7 @@ mod tests {
         // Empty parameters with a return type.
         assert_snapshot!(
             display_signature_multiline(&db, [], Some(Type::none(&db))),
-            @"() -> None"
+            @"def _() -> None"
         );
 
         // Single parameter type (no name) with a return type.
@@ -2761,7 +2761,7 @@ mod tests {
                 [Parameter::positional_only(None).with_annotated_type(Type::none(&db))],
                 Some(Type::none(&db))
             ),
-            @"(None, /) -> None"
+            @"def _(None, /) -> None"
         );
 
         // Two parameters where one has annotation and the other doesn't.
@@ -2796,7 +2796,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             y,
             /
@@ -2815,7 +2815,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             /,
             y
@@ -2834,7 +2834,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             *,
             x,
             y
@@ -2853,7 +2853,7 @@ mod tests {
                 Some(Type::none(&db))
             ),
             @r"
-        (
+        def _(
             x,
             *,
             y
@@ -2892,7 +2892,7 @@ mod tests {
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
             @r"
-        (
+        def _(
             a,
             b: int,
             c=1,
