@@ -38,7 +38,7 @@ class Product(BaseModel):
     name: str = Field(..., kw_only=False, min_length=1)
     internal_price_cent: int = Field(..., gt=0, alias="price_cent")
 
-reveal_type(Product.__init__)  # revealed: (self: Product, name: str = Any, *, price_cent: int = Any) -> None
+reveal_type(Product.__init__)  # revealed: (self: Product, name: str = ..., *, price_cent: int = ...) -> None
 
 product = Product("Laptop", price_cent=999_00)
 

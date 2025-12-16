@@ -5,7 +5,7 @@ expression: signature_help
 {
   "signatures": [
     {
-      "label": "(pattern: str | Pattern[str], string: str, flags: int = Literal[0]) -> Match[str] | None",
+      "label": "(pattern: str | Pattern[str], string: str, flags: int = 0) -> Match[str] | None",
       "documentation": "Try to apply the pattern at the start of the string, returning/na Match object, or None if no match was found.\n",
       "parameters": [
         {
@@ -15,12 +15,12 @@ expression: signature_help
           "label": "string: str"
         },
         {
-          "label": "flags: int = Literal[0]"
+          "label": "flags: int = 0"
         }
       ]
     },
     {
-      "label": "(pattern: bytes | Pattern[bytes], string: Buffer, flags: int = Literal[0]) -> Match[bytes] | None",
+      "label": "(pattern: bytes | Pattern[bytes], string: Buffer, flags: int = 0) -> Match[bytes] | None",
       "parameters": [
         {
           "label": "pattern: bytes | Pattern[bytes]"
@@ -29,7 +29,7 @@ expression: signature_help
           "label": "string: Buffer"
         },
         {
-          "label": "flags: int = Literal[0]"
+          "label": "flags: int = 0"
         }
       ]
     }
