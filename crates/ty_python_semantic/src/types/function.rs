@@ -84,8 +84,8 @@ use crate::types::{
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeRelation, UnionBuilder, binding_type, definition_expression_type,
-    infer_definition_types, walk_signature,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
+    definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet, ModuleName, resolve_module};
 
@@ -1268,6 +1268,19 @@ fn is_instance_truthiness<'db>(
 
         Type::TypeAlias(alias) => is_instance_truthiness(db, alias.value_type(db), class),
 
+        Type::TypeVar(bound_typevar) => match bound_typevar.typevar(db).bound_or_constraints(db) {
+            None => is_instance_truthiness(db, Type::object(), class),
+            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                is_instance_truthiness(db, bound, class)
+            }
+            Some(TypeVarBoundOrConstraints::Constraints(constraints)) => always_true_if(
+                constraints
+                    .elements(db)
+                    .iter()
+                    .all(|c| is_instance_truthiness(db, *c, class).is_always_true()),
+            ),
+        },
+
         Type::BoundMethod(..)
         | Type::KnownBoundMethod(..)
         | Type::WrapperDescriptor(..)
@@ -1281,7 +1294,6 @@ fn is_instance_truthiness<'db>(
         | Type::PropertyInstance(..)
         | Type::AlwaysTruthy
         | Type::AlwaysFalsy
-        | Type::TypeVar(..)
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
         | Type::Callable(..)
