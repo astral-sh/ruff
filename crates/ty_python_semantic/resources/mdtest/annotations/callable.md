@@ -415,7 +415,8 @@ def f_okay(c: Callable[[], None]):
 from ty_extensions import into_callable
 
 class Base:
-    def __init__(self) -> None: pass
+    def __init__(self) -> None:
+        pass
 
 class A(Base):
     pass
