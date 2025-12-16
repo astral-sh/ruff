@@ -11,7 +11,7 @@ class Member:
     role: str = field(default="user")
     tag: str | None = field(default=None, init=False)
 
-# revealed: (self: Member, name: str, role: str = Literal["user"]) -> None
+# revealed: (self: Member, name: str, role: str = "user") -> None
 reveal_type(Member.__init__)
 
 alice = Member(name="Alice", role="admin")
@@ -63,7 +63,7 @@ class Person:
     age: int | None = field(default=None, kw_only=True)
     role: str = field(default="user", kw_only=True)
 
-# revealed: (self: Person, name: str, *, age: int | None = None, role: str = Literal["user"]) -> None
+# revealed: (self: Person, name: str, *, age: int | None = None, role: str = "user") -> None
 reveal_type(Person.__init__)
 
 alice = Person(role="admin", name="Alice")

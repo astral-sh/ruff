@@ -1838,13 +1838,20 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 }
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_ty) = self.param.default_type() {
+            if let Some(default_value) = self.param.default_value() {
                 if self.param.annotated_type().is_some() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
                 }
-                default_ty
+                write!(f, "{default_value}")?;
+            } else if let Some(default_type) = self.param.default_type() {
+                if self.param.annotated_type().is_some() {
+                    f.write_str(" = ")?;
+                } else {
+                    f.write_str("=")?;
+                }
+                default_type
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f)?;
             }
@@ -2683,9 +2690,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            @"(a, b: int, c=Literal[1], d: int = Literal[2], \
-                /, e=Literal[3], f: int = Literal[4], *args: object, \
-                *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
+            @"(a, b: int, c=Literal[1], d: int = Literal[2], /, e=Literal[3], f: int = Literal[4], *args: object, *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
         );
     }
 

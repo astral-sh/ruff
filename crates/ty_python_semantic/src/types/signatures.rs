@@ -917,10 +917,12 @@ impl<'db> Signature<'db> {
                     ParameterKind::PositionalOrKeyword {
                         name: self_name,
                         default_type: self_default,
+                        default_value: _,
                     },
                     ParameterKind::PositionalOrKeyword {
                         name: other_name,
                         default_type: other_default,
+                        default_value: _,
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -931,10 +933,12 @@ impl<'db> Signature<'db> {
                     ParameterKind::KeywordOnly {
                         name: self_name,
                         default_type: self_default,
+                        default_value: _,
                     },
                     ParameterKind::KeywordOnly {
                         name: other_name,
                         default_type: other_default,
+                        default_value: _,
                     },
                 ) if self_default.is_some() == other_default.is_some()
                     && self_name == other_name => {}
@@ -1218,10 +1222,12 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOrKeyword {
                                 name: self_name,
                                 default_type: self_default,
+                                default_value: _,
                             },
                             ParameterKind::PositionalOrKeyword {
                                 name: other_name,
                                 default_type: other_default,
+                                default_value: _,
                             },
                         ) => {
                             if self_name != other_name {
@@ -1359,10 +1365,12 @@ impl<'db> Signature<'db> {
                 ParameterKind::KeywordOnly {
                     name: other_name,
                     default_type: other_default,
+                    default_value: _,
                 }
                 | ParameterKind::PositionalOrKeyword {
                     name: other_name,
                     default_type: other_default,
+                    default_value: _,
                 } => {
                     if let Some(self_parameter) = self_keywords.remove(other_name.as_str()) {
                         match self_parameter.kind() {
@@ -1689,6 +1697,15 @@ impl<'db> Parameters<'db> {
         };
 
         let pos_only_param = |param: &ast::ParameterWithDefault| {
+            let mut default_value = None;
+            if let Some(default) = &param.default {
+                use ruff_text_size::Ranged;
+                let file = definition.file(db);
+                let source = ruff_db::source::source_text(db, file);
+                let text = source.as_str().get(default.range().to_std_range());
+                default_value = text.map(Box::from);
+            }
+
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1696,6 +1713,7 @@ impl<'db> Parameters<'db> {
                 ParameterKind::PositionalOnly {
                     name: Some(param.parameter.name.id.clone()),
                     default_type: default_type(param),
+                    default_value,
                 },
             )
         };
@@ -1721,6 +1739,15 @@ impl<'db> Parameters<'db> {
         }
 
         let positional_or_keyword = pos_or_keyword_iter.map(|arg| {
+            let mut default_value = None;
+            if let Some(default) = &arg.default {
+                use ruff_text_size::Ranged;
+                let file = definition.file(db);
+                let source = ruff_db::source::source_text(db, file);
+                let text = source.as_str().get(default.range().to_std_range());
+                default_value = text.map(Box::from);
+            }
+
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1728,6 +1755,7 @@ impl<'db> Parameters<'db> {
                 ParameterKind::PositionalOrKeyword {
                     name: arg.parameter.name.id.clone(),
                     default_type: default_type(arg),
+                    default_value,
                 },
             )
         });
@@ -1744,6 +1772,15 @@ impl<'db> Parameters<'db> {
         });
 
         let keyword_only = kwonlyargs.iter().map(|arg| {
+            let mut default_value = None;
+            if let Some(default) = &arg.default {
+                use ruff_text_size::Ranged;
+                let file = definition.file(db);
+                let source = ruff_db::source::source_text(db, file);
+                let text = source.as_str().get(default.range().to_std_range());
+                default_value = text.map(Box::from);
+            }
+
             Parameter::from_node_and_kind(
                 db,
                 definition,
@@ -1751,6 +1788,7 @@ impl<'db> Parameters<'db> {
                 ParameterKind::KeywordOnly {
                     name: arg.parameter.name.id.clone(),
                     default_type: default_type(arg),
+                    default_value,
                 },
             )
         });
@@ -1914,6 +1952,7 @@ impl<'db> Parameter<'db> {
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
+                default_value: None,
             },
             form: ParameterForm::Value,
         }
@@ -1926,6 +1965,7 @@ impl<'db> Parameter<'db> {
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
+                default_value: None,
             },
             form: ParameterForm::Value,
         }
@@ -1947,6 +1987,7 @@ impl<'db> Parameter<'db> {
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
+                default_value: None,
             },
             form: ParameterForm::Value,
         }
@@ -2033,19 +2074,29 @@ impl<'db> Parameter<'db> {
             ParameterKind::PositionalOnly {
                 name: _,
                 default_type,
+                default_value,
             } => ParameterKind::PositionalOnly {
                 name: None,
                 default_type: default_type.map(|_| Type::Never),
+                default_value: default_value.clone(),
             },
-            ParameterKind::PositionalOrKeyword { name, default_type } => {
-                ParameterKind::PositionalOrKeyword {
-                    name: name.clone(),
-                    default_type: default_type.map(|_| Type::Never),
-                }
-            }
-            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+            ParameterKind::PositionalOrKeyword {
+                name,
+                default_type,
+                default_value,
+            } => ParameterKind::PositionalOrKeyword {
                 name: name.clone(),
                 default_type: default_type.map(|_| Type::Never),
+                default_value: default_value.clone(),
+            },
+            ParameterKind::KeywordOnly {
+                name,
+                default_type,
+                default_value,
+            } => ParameterKind::KeywordOnly {
+                name: name.clone(),
+                default_type: default_type.map(|_| Type::Never),
+                default_value: default_value.clone(),
             },
             ParameterKind::Variadic { name: _ } => ParameterKind::Variadic {
                 name: Name::new_static("args"),
@@ -2086,7 +2137,11 @@ impl<'db> Parameter<'db> {
         };
 
         let kind = match kind {
-            ParameterKind::PositionalOnly { name, default_type } => ParameterKind::PositionalOnly {
+            ParameterKind::PositionalOnly {
+                name,
+                default_type,
+                default_value,
+            } => ParameterKind::PositionalOnly {
                 name: name.clone(),
                 default_type: match default_type {
                     Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
@@ -2096,23 +2151,13 @@ impl<'db> Parameter<'db> {
                     ),
                     None => None,
                 },
+                default_value: default_value.clone(),
             },
-            ParameterKind::PositionalOrKeyword { name, default_type } => {
-                ParameterKind::PositionalOrKeyword {
-                    name: name.clone(),
-                    default_type: match default_type {
-                        Some(ty) if nested => {
-                            Some(ty.recursive_type_normalized_impl(db, div, true)?)
-                        }
-                        Some(ty) => Some(
-                            ty.recursive_type_normalized_impl(db, div, true)
-                                .unwrap_or(div),
-                        ),
-                        None => None,
-                    },
-                }
-            }
-            ParameterKind::KeywordOnly { name, default_type } => ParameterKind::KeywordOnly {
+            ParameterKind::PositionalOrKeyword {
+                name,
+                default_type,
+                default_value,
+            } => ParameterKind::PositionalOrKeyword {
                 name: name.clone(),
                 default_type: match default_type {
                     Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
@@ -2122,6 +2167,23 @@ impl<'db> Parameter<'db> {
                     ),
                     None => None,
                 },
+                default_value: default_value.clone(),
+            },
+            ParameterKind::KeywordOnly {
+                name,
+                default_type,
+                default_value,
+            } => ParameterKind::KeywordOnly {
+                name: name.clone(),
+                default_type: match default_type {
+                    Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
+                    Some(ty) => Some(
+                        ty.recursive_type_normalized_impl(db, div, true)
+                            .unwrap_or(div),
+                    ),
+                    None => None,
+                },
+                default_value: default_value.clone(),
             },
             ParameterKind::Variadic { name } => ParameterKind::Variadic { name: name.clone() },
             ParameterKind::KeywordVariadic { name } => {
@@ -2238,9 +2300,19 @@ impl<'db> Parameter<'db> {
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
     }
+
+    /// Default-value of the parameter, if any.
+    pub(crate) fn default_value(&self) -> Option<&str> {
+        match &self.kind {
+            ParameterKind::PositionalOnly { default_value, .. }
+            | ParameterKind::PositionalOrKeyword { default_value, .. }
+            | ParameterKind::KeywordOnly { default_value, .. } => default_value.as_deref(),
+            ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
+        }
+    }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
+#[derive(Clone, Debug, salsa::Update, get_size2::GetSize)]
 pub enum ParameterKind<'db> {
     /// Positional-only parameter, e.g. `def f(x, /): ...`
     PositionalOnly {
@@ -2250,6 +2322,7 @@ pub enum ParameterKind<'db> {
         /// nameless (e.g. via `Callable` annotations).
         name: Option<Name>,
         default_type: Option<Type<'db>>,
+        default_value: Option<Box<str>>,
     },
 
     /// Positional-or-keyword parameter, e.g. `def f(x): ...`
@@ -2257,6 +2330,7 @@ pub enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
         default_type: Option<Type<'db>>,
+        default_value: Option<Box<str>>,
     },
 
     /// Variadic parameter, e.g. `def f(*args): ...`
@@ -2270,6 +2344,7 @@ pub enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
         default_type: Option<Type<'db>>,
+        default_value: Option<Box<str>>,
     },
 
     /// Variadic keywords parameter, e.g. `def f(**kwargs): ...`
@@ -2277,6 +2352,94 @@ pub enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
     },
+}
+
+impl PartialEq for ParameterKind<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (
+                Self::PositionalOnly {
+                    name: l_name,
+                    default_type: l_default_type,
+                    default_value: _,
+                },
+                Self::PositionalOnly {
+                    name: r_name,
+                    default_type: r_default_type,
+                    default_value: _,
+                },
+            ) => l_name == r_name && l_default_type == r_default_type,
+            (
+                Self::PositionalOrKeyword {
+                    name: l_name,
+                    default_type: l_default_type,
+                    default_value: _,
+                },
+                Self::PositionalOrKeyword {
+                    name: r_name,
+                    default_type: r_default_type,
+                    default_value: _,
+                },
+            ) => l_name == r_name && l_default_type == r_default_type,
+            (Self::Variadic { name: l_name }, Self::Variadic { name: r_name }) => l_name == r_name,
+            (
+                Self::KeywordOnly {
+                    name: l_name,
+                    default_type: l_default_type,
+                    default_value: _,
+                },
+                Self::KeywordOnly {
+                    name: r_name,
+                    default_type: r_default_type,
+                    default_value: _,
+                },
+            ) => l_name == r_name && l_default_type == r_default_type,
+            (Self::KeywordVariadic { name: l_name }, Self::KeywordVariadic { name: r_name }) => {
+                l_name == r_name
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Eq for ParameterKind<'_> {}
+
+impl std::hash::Hash for ParameterKind<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        core::mem::discriminant(self).hash(state);
+        match self {
+            ParameterKind::PositionalOnly {
+                name,
+                default_type,
+                default_value: _,
+            } => {
+                name.hash(state);
+                default_type.hash(state);
+            }
+            ParameterKind::PositionalOrKeyword {
+                name,
+                default_type,
+                default_value: _,
+            } => {
+                name.hash(state);
+                default_type.hash(state);
+            }
+            ParameterKind::Variadic { name } => {
+                name.hash(state);
+            }
+            ParameterKind::KeywordOnly {
+                name,
+                default_type,
+                default_value: _,
+            } => {
+                name.hash(state);
+                default_type.hash(state);
+            }
+            ParameterKind::KeywordVariadic { name } => {
+                name.hash(state);
+            }
+        }
+    }
 }
 
 impl<'db> ParameterKind<'db> {
@@ -2298,16 +2461,31 @@ impl<'db> ParameterKind<'db> {
         };
 
         match self {
-            Self::PositionalOnly { default_type, name } => Self::PositionalOnly {
+            Self::PositionalOnly {
+                default_type,
+                default_value,
+                name,
+            } => Self::PositionalOnly {
                 default_type: apply_to_default_type(default_type),
+                default_value: default_value.clone(),
                 name: name.clone(),
             },
-            Self::PositionalOrKeyword { default_type, name } => Self::PositionalOrKeyword {
+            Self::PositionalOrKeyword {
+                default_type,
+                default_value,
+                name,
+            } => Self::PositionalOrKeyword {
                 default_type: apply_to_default_type(default_type),
+                default_value: default_value.clone(),
                 name: name.clone(),
             },
-            Self::KeywordOnly { default_type, name } => Self::KeywordOnly {
+            Self::KeywordOnly {
+                default_type,
+                default_value,
+                name,
+            } => Self::KeywordOnly {
                 default_type: apply_to_default_type(default_type),
+                default_value: default_value.clone(),
                 name: name.clone(),
             },
             Self::Variadic { .. } | Self::KeywordVariadic { .. } => self.clone(),

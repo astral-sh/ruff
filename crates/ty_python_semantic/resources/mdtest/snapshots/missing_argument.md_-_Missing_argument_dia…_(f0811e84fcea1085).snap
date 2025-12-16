@@ -73,8 +73,8 @@ error[missing-argument]: No argument provided for required parameter `a` of func
 13 |
 14 | Foo().method()  # error: [missing-argument]
    |
-info: Union variant `def f(a, b=Literal[42]) -> Unknown` is incompatible with this call site
-info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: Union variant `def f(a, b=42) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 info: rule `missing-argument` is enabled by default
 
 ```
@@ -91,7 +91,7 @@ error[missing-argument]: No argument provided for required parameter `a` of func
 14 | Foo().method()  # error: [missing-argument]
    |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
-info: Attempted to call union type `(def f(a, b=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: Attempted to call union type `(def f(a, b=42) -> Unknown) | (def g(a, b) -> Unknown)`
 info: rule `missing-argument` is enabled by default
 
 ```
