@@ -316,7 +316,8 @@ mod tests {
                 Rule::InvalidRuleCode,
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
-            ]),
+            ])
+            .with_external_rules(&["TK421"]),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
@@ -325,6 +326,7 @@ mod tests {
                 Rule::InvalidSuppressionComment,
                 Rule::UnmatchedSuppressionComment,
             ])
+            .with_external_rules(&["TK421"])
             .with_preview_mode(),
         );
         Ok(())

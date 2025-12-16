@@ -95,3 +95,10 @@ def f():
     value = 0
     # ruff: enable[F841, RQW320]
     # ruff: enable[YF829]
+
+
+def f():
+    # External rule codes should be ignored
+    # ruff: disable[TK421]
+    print("hello")
+    # ruff: enable[TK421]
