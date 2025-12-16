@@ -1037,5 +1037,142 @@ PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
 138 |
 139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
+140 |
+141 | import sys
     |
 help: Replace with `Path(...).samefile()`
+
+PTH104 [*] `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:143:4
+    |
+141 | import sys
+142 |
+143 | if os.rename("pth1.py", "pth1.py.bak"):
+    |    ^^^^^^^^^
+144 |     print("rename: truthy")
+145 | else:
+    |
+help: Replace with `Path(...).rename(...)`
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+140 | 
+141 | import sys
+142 + import pathlib
+143 | 
+    - if os.rename("pth1.py", "pth1.py.bak"):
+144 + if pathlib.Path("pth1.py").rename("pth1.py.bak"):
+145 |     print("rename: truthy")
+146 | else:
+147 |     print("rename: falsey")
+note: This is an unsafe fix and may change runtime behavior
+
+PTH105 [*] `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:148:4
+    |
+146 |     print("rename: falsey")
+147 |
+148 | if os.replace("pth1.py.bak", "pth1.py"):
+    |    ^^^^^^^^^^
+149 |     print("replace: truthy")
+150 | else:
+    |
+help: Replace with `Path(...).replace(...)`
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+140 | 
+141 | import sys
+142 + import pathlib
+143 | 
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+145 |     print("rename: truthy")
+146 | else:
+147 |     print("rename: falsey")
+148 | 
+    - if os.replace("pth1.py.bak", "pth1.py"):
+149 + if pathlib.Path("pth1.py.bak").replace("pth1.py"):
+150 |     print("replace: truthy")
+151 | else:
+152 |     print("replace: falsey")
+note: This is an unsafe fix and may change runtime behavior
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:154:14
+    |
+153 | try:
+154 |     for _ in os.getcwd():
+    |              ^^^^^^^^^
+155 |         print("getcwd: iterable")
+156 |         break
+    |
+help: Replace with `Path.cwd()`
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+140 | 
+141 | import sys
+142 + import pathlib
+143 | 
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+145 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+152 |     print("replace: falsey")
+153 | 
+154 | try:
+    -     for _ in os.getcwd():
+155 +     for _ in pathlib.Path.cwd():
+156 |         print("getcwd: iterable")
+157 |         break
+158 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior
+
+PTH109 [*] `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:161:14
+    |
+160 | try:
+161 |     for _ in os.getcwdb():
+    |              ^^^^^^^^^^
+162 |         print("getcwdb: iterable")
+163 |         break
+    |
+help: Replace with `Path.cwd()`
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+140 | 
+141 | import sys
+142 + import pathlib
+143 | 
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+145 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+159 |     print("getcwd: not iterable")
+160 | 
+161 | try:
+    -     for _ in os.getcwdb():
+162 +     for _ in pathlib.Path.cwd():
+163 |         print("getcwdb: iterable")
+164 |         break
+165 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior
+
+PTH115 [*] `os.readlink()` should be replaced by `Path.readlink()`
+   --> full_name.py:168:14
+    |
+167 | try:
+168 |     for _ in os.readlink(sys.executable):
+    |              ^^^^^^^^^^^
+169 |         print("readlink: iterable")
+170 |         break
+    |
+help: Replace with `Path(...).readlink()`
+139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+140 | 
+141 | import sys
+142 + import pathlib
+143 | 
+144 | if os.rename("pth1.py", "pth1.py.bak"):
+145 |     print("rename: truthy")
+--------------------------------------------------------------------------------
+166 |     print("getcwdb: not iterable")
+167 | 
+168 | try:
+    -     for _ in os.readlink(sys.executable):
+169 +     for _ in pathlib.Path(sys.executable).readlink():
+170 |         print("readlink: iterable")
+171 |         break
+172 | except TypeError as e:
+note: This is an unsafe fix and may change runtime behavior

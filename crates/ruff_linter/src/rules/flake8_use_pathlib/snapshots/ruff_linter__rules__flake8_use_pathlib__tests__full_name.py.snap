@@ -567,5 +567,64 @@ PTH121 `os.path.samefile()` should be replaced by `Path.samefile()`
 138 |
 139 | os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
     | ^^^^^^^^^^^^^^^^
+140 |
+141 | import sys
     |
 help: Replace with `Path(...).samefile()`
+
+PTH104 `os.rename()` should be replaced by `Path.rename()`
+   --> full_name.py:143:4
+    |
+141 | import sys
+142 |
+143 | if os.rename("pth1.py", "pth1.py.bak"):
+    |    ^^^^^^^^^
+144 |     print("rename: truthy")
+145 | else:
+    |
+help: Replace with `Path(...).rename(...)`
+
+PTH105 `os.replace()` should be replaced by `Path.replace()`
+   --> full_name.py:148:4
+    |
+146 |     print("rename: falsey")
+147 |
+148 | if os.replace("pth1.py.bak", "pth1.py"):
+    |    ^^^^^^^^^^
+149 |     print("replace: truthy")
+150 | else:
+    |
+help: Replace with `Path(...).replace(...)`
+
+PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:154:14
+    |
+153 | try:
+154 |     for _ in os.getcwd():
+    |              ^^^^^^^^^
+155 |         print("getcwd: iterable")
+156 |         break
+    |
+help: Replace with `Path.cwd()`
+
+PTH109 `os.getcwd()` should be replaced by `Path.cwd()`
+   --> full_name.py:161:14
+    |
+160 | try:
+161 |     for _ in os.getcwdb():
+    |              ^^^^^^^^^^
+162 |         print("getcwdb: iterable")
+163 |         break
+    |
+help: Replace with `Path.cwd()`
+
+PTH115 `os.readlink()` should be replaced by `Path.readlink()`
+   --> full_name.py:168:14
+    |
+167 | try:
+168 |     for _ in os.readlink(sys.executable):
+    |              ^^^^^^^^^^^
+169 |         print("readlink: iterable")
+170 |         break
+    |
+help: Replace with `Path(...).readlink()`
