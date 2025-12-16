@@ -27,7 +27,7 @@ use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.9")]
 pub(crate) struct InvalidSuppressionComment {
-    pub kind: InvalidSuppressionCommentKind,
+    pub(crate) kind: InvalidSuppressionCommentKind,
 }
 
 impl AlwaysFixableViolation for InvalidSuppressionComment {
