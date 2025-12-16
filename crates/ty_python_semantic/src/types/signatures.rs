@@ -2167,7 +2167,7 @@ pub(crate) struct Parameter<'db> {
 
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
     /// the context, like `Self` for the `self` parameter of instance methods.
-    inferred_annotation: bool,
+    pub(crate) inferred_annotation: bool,
 
     kind: ParameterKind<'db>,
     pub(crate) form: ParameterForm,
