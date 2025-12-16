@@ -254,7 +254,9 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     fn is_constant_name(name: &str) -> bool {
-        name.chars().all(|c| c.is_uppercase() || c == '_') && name.len() > 1
+        name.chars()
+            .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
+            && name.len() > 1
     }
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
@@ -2228,6 +2230,49 @@ class MyClass:
         "dataclass" @ 75..84: Decorator
         "MyClass" @ 91..98: Class [definition]
         "###);
+    }
+
+    #[test]
+    fn test_constant_variations() {
+        let test = SemanticTokenTest::new(
+            r#"
+A = 1
+AB = 1
+ABC = 1
+A1 = 1
+AB1 = 1
+ABC1 = 1
+A_B = 1
+A1_B = 1
+A_B1 = 1
+A_1 = 1
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "A" @ 1..2: Variable [definition]
+        "1" @ 5..6: Number
+        "AB" @ 7..9: Variable [definition, readonly]
+        "1" @ 12..13: Number
+        "ABC" @ 14..17: Variable [definition, readonly]
+        "1" @ 20..21: Number
+        "A1" @ 22..24: Variable [definition, readonly]
+        "1" @ 27..28: Number
+        "AB1" @ 29..32: Variable [definition, readonly]
+        "1" @ 35..36: Number
+        "ABC1" @ 37..41: Variable [definition, readonly]
+        "1" @ 44..45: Number
+        "A_B" @ 46..49: Variable [definition, readonly]
+        "1" @ 52..53: Number
+        "A1_B" @ 54..58: Variable [definition, readonly]
+        "1" @ 61..62: Number
+        "A_B1" @ 63..67: Variable [definition, readonly]
+        "1" @ 70..71: Number
+        "A_1" @ 72..75: Variable [definition, readonly]
+        "1" @ 78..79: Number
+        "#);
     }
 
     #[test]
