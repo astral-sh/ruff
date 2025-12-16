@@ -1945,7 +1945,9 @@ impl<'db> SpecializationBuilder<'db> {
                 let when = actual
                     .when_constraint_set_assignable_to(self.db, formal, self.inferable)
                     .limit_to_valid_specializations(self.db);
-                if when.is_never_satisfied(self.db) {
+                if when.is_never_satisfied(self.db)
+                    && (formal.has_typevar(self.db) || actual.has_typevar(self.db))
+                {
                     return Err(SpecializationError::NoSolution {
                         parameter: formal,
                         argument: actual,
