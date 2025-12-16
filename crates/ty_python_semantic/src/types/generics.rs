@@ -19,11 +19,11 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionBuilder,
+    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
     IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
     NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionBuilder, UnionType,
-    declaration_type, walk_type_var_bounds,
+    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
+    walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -1584,18 +1584,10 @@ impl<'db> SpecializationBuilder<'db> {
         constraints: ConstraintSet<'db>,
         mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
+        #[derive(Default)]
         struct Bounds<'db> {
-            lower: UnionBuilder<'db>,
-            upper: IntersectionBuilder<'db>,
-        }
-
-        impl<'db> Bounds<'db> {
-            fn new(db: &'db dyn Db) -> Self {
-                Self {
-                    lower: UnionBuilder::new(db),
-                    upper: IntersectionBuilder::new(db),
-                }
-            }
+            lower: Vec<Type<'db>>,
+            upper: Vec<Type<'db>>,
         }
 
         let constraints = constraints.limit_to_valid_specializations(self.db);
@@ -1618,35 +1610,29 @@ impl<'db> SpecializationBuilder<'db> {
                 let typevar = constraint.typevar(self.db);
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
-                let bounds = mappings
-                    .entry(typevar)
-                    .or_insert_with(|| Bounds::new(self.db));
-                bounds.lower.add_in_place(lower);
-                bounds.upper.add_positive_in_place(upper);
+                let bounds = mappings.entry(typevar).or_default();
+                bounds.lower.push(lower);
+                bounds.upper.push(upper);
 
                 if let Type::TypeVar(lower_bound_typevar) = lower {
-                    let bounds = mappings
-                        .entry(lower_bound_typevar)
-                        .or_insert_with(|| Bounds::new(self.db));
-                    bounds.upper.add_positive_in_place(Type::TypeVar(typevar));
+                    let bounds = mappings.entry(lower_bound_typevar).or_default();
+                    bounds.upper.push(Type::TypeVar(typevar));
                 }
 
                 if let Type::TypeVar(upper_bound_typevar) = upper {
-                    let bounds = mappings
-                        .entry(upper_bound_typevar)
-                        .or_insert_with(|| Bounds::new(self.db));
-                    bounds.lower.add_in_place(Type::TypeVar(typevar));
+                    let bounds = mappings.entry(upper_bound_typevar).or_default();
+                    bounds.lower.push(Type::TypeVar(typevar));
                 }
             }
 
             for (bound_typevar, bounds) in mappings.drain() {
                 let variance = formal.variance_of(self.db, bound_typevar);
-                let upper = bounds.upper.build();
+                let upper = IntersectionType::from_elements(self.db, bounds.upper);
                 if !upper.is_object() {
                     self.add_type_mapping(bound_typevar, upper, variance, &mut f);
                     continue;
                 }
-                let lower = bounds.lower.build();
+                let lower = UnionType::from_elements(self.db, bounds.lower);
                 if !lower.is_never() {
                     self.add_type_mapping(bound_typevar, lower, variance, &mut f);
                 }

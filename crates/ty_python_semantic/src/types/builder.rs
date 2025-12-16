@@ -693,11 +693,6 @@ impl<'db> IntersectionBuilder<'db> {
         self.add_positive_impl(ty, &mut vec![])
     }
 
-    pub(crate) fn add_positive_in_place(&mut self, ty: Type<'db>) {
-        let this = std::mem::replace(self, Self::empty(self.db));
-        *self = this.add_positive(ty);
-    }
-
     pub(crate) fn add_positive_impl(
         mut self,
         ty: Type<'db>,
