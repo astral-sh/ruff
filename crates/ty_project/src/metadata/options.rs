@@ -1225,24 +1225,22 @@ pub struct TerminalOptions {
 ///
 /// An override allows you to apply different rule configurations to specific
 /// files or directories. Multiple overrides can match the same file, with
-/// later overrides take precedence.
+/// later overrides take precedence. Override rules take precedence over global
+/// rules for matching files.
 ///
-/// ### Precedence
-///
-/// - Later overrides in the array take precedence over earlier ones
-/// - Override rules take precedence over global rules for matching files
-///
-/// ### Examples
+/// For example, to relax enforcement of rules in test files:
 ///
 /// ```toml
-/// # Relax rules for test files
 /// [[tool.ty.overrides]]
 /// include = ["tests/**", "**/test_*.py"]
 ///
 /// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "warn"
+/// ```
 ///
-/// # Ignore generated files but still check important ones
+/// Or, to ignore a rule in generated files but retain enforcement in an important file:
+///
+/// ```toml
 /// [[tool.ty.overrides]]
 /// include = ["generated/**"]
 /// exclude = ["generated/important.py"]
