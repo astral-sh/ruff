@@ -1152,8 +1152,6 @@ d_int = DataWithDescription[int](1, "description")  # OK
 reveal_type(d_int.data)  # revealed: int
 reveal_type(d_int.description)  # revealed: str
 
-# TODO: only one error
-# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 DataWithDescription[int](None, "description")
 ```
