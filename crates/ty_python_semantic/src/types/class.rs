@@ -1257,6 +1257,7 @@ impl<'db> ClassType<'db> {
                     let self_annotation = signature
                         .parameters()
                         .get_positional(0)
+                        .filter(|parameter| !parameter.inferred_annotation)
                         .and_then(Parameter::annotated_type)
                         .filter(|ty| {
                             ty.as_typevar()
