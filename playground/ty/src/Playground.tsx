@@ -52,7 +52,7 @@ export default function Playground() {
     const serialized = serializeFiles(files);
 
     if (serialized != null) {
-      await persist(serialized)
+      await persist(serialized);
     }
   }, [files]);
 
