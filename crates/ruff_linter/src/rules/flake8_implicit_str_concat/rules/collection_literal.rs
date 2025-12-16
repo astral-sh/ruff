@@ -59,8 +59,7 @@ impl Violation for ImplicitStringConcatenationInCollectionLiteral {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unparenthesized implicit string concatenation in collection"
-            .to_string()
+        "Unparenthesized implicit string concatenation in collection".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
