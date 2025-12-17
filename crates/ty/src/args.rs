@@ -175,6 +175,13 @@ pub(crate) struct CheckCommand {
     /// For example, spinners or progress bars.
     #[arg(global = true, long, value_parser = clap::builder::BoolishValueParser::new(), help_heading = "Global options")]
     pub no_progress: bool,
+
+    /// Ignore the `VIRTUAL_ENV` environment variable when discovering the Python environment.
+    ///
+    /// This is useful when a tool wrapping ty activates a virtual environment but you would
+    /// prefer to discover the `.venv` in the working directory.
+    #[arg(long, hide = true)]
+    pub(crate) ignore_active_virtual_env: bool,
 }
 
 impl CheckCommand {

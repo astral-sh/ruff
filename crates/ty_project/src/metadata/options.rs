@@ -117,6 +117,7 @@ impl Options {
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
+        ignore_active_virtual_env: bool,
     ) -> anyhow::Result<ProgramSettings> {
         let environment = self.environment.or_default();
 
@@ -160,7 +161,7 @@ impl Options {
                 system,
             )?)
         } else {
-            PythonEnvironment::discover(project_root, system)
+            PythonEnvironment::discover(project_root, system, ignore_active_virtual_env)
                 .context("Failed to discover local Python environment")?
         };
 

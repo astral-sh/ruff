@@ -163,6 +163,7 @@ impl PythonEnvironment {
     pub fn discover(
         project_root: &SystemPath,
         system: &dyn System,
+        ignore_active_virtual_env: bool,
     ) -> Result<Option<Self>, SitePackagesDiscoveryError> {
         fn resolve_environment(
             system: &dyn System,
@@ -173,7 +174,7 @@ impl PythonEnvironment {
             PythonEnvironment::new(path, origin, system)
         }
 
-        if let Some(virtual_env) = virtual_environment_from_env(system) {
+        if let Some(virtual_env) = virtual_environment_from_env(system, ignore_active_virtual_env) {
             return resolve_environment(system, &virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
                 .map(Some);
         }
@@ -694,20 +695,19 @@ pub(crate) fn conda_environment_from_env(
 
 /// Read `VIRTUAL_ENV`.
 ///
-/// Returns `None` if `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set.
-pub(crate) fn virtual_environment_from_env(system: &dyn System) -> Option<SystemPathBuf> {
-    let dir = system.env_var(EnvVars::VIRTUAL_ENV).ok()?;
-
-    if system
-        .env_var(EnvVars::TY_IGNORE_ACTIVE_VIRTUAL_ENV)
-        .is_ok_and(|v| matches!(v.as_str(), "1" | "true"))
-    {
+/// Returns `None` if `ignore` is `true`.
+pub(crate) fn virtual_environment_from_env(
+    system: &dyn System,
+    ignore: bool,
+) -> Option<SystemPathBuf> {
+    if ignore {
         tracing::debug!(
-            "Ignoring active virtual environment (from `VIRTUAL_ENV`)  due to `TY_IGNORE_ACTIVE_VIRTUAL_ENV`"
+            "Ignoring active virtual environment (from `VIRTUAL_ENV`) due to `--ignore-active-virtual-env`"
         );
         return None;
     }
 
+    let dir = system.env_var(EnvVars::VIRTUAL_ENV).ok()?;
     Some(SystemPathBuf::from(dir))
 }
 

@@ -2704,7 +2704,7 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
     Ok(())
 }
 
-/// When `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set to `1` or `true`, ty should ignore the `VIRTUAL_ENV`
+/// When `--ignore-active-virtual-env` is passed, ty should ignore the `VIRTUAL_ENV`
 /// environment variable and fall back to other discovery mechanisms.
 #[test]
 fn ignore_active_virtual_env() -> anyhow::Result<()> {
@@ -2777,11 +2777,11 @@ home = ./
     ----- stderr -----
     "###);
 
-    // With `TY_IGNORE_ACTIVE_VIRTUAL_ENV=1`, we ignore `VIRTUAL_ENV` and find the `.venv` instead
+    // With `--ignore-active-virtual-env`, we ignore `VIRTUAL_ENV` and find the `.venv` instead
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("VIRTUAL_ENV", case.root().join("myvenv"))
-        .env("TY_IGNORE_ACTIVE_VIRTUAL_ENV", "1"), @r###"
+        .arg("--ignore-active-virtual-env"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2799,11 +2799,11 @@ home = ./
     ----- stderr -----
     "###);
 
-    // We still find `.venv` when activated and `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set
+    // We still find `.venv` when activated and `--ignore-active-virtual-env` is passed
     assert_cmd_snapshot!(case.command()
         .current_dir(case.root().join("project"))
         .env("VIRTUAL_ENV", case.root().join(".venv"))
-        .env("TY_IGNORE_ACTIVE_VIRTUAL_ENV", "1"), @r###"
+        .arg("--ignore-active-virtual-env"), @r###"
     success: false
     exit_code: 1
     ----- stdout -----

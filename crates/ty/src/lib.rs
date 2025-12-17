@@ -114,6 +114,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
+    let ignore_active_virtual_env = args.ignore_active_virtual_env;
     let config_file = args
         .config_file
         .as_ref()
@@ -125,6 +126,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     };
 
     project_metadata.apply_configuration_files(&system)?;
+    project_metadata.set_ignore_active_virtual_env(ignore_active_virtual_env);
 
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
     project_metadata.apply_overrides(&project_options_overrides);

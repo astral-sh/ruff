@@ -50,11 +50,6 @@ impl EnvVars {
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 
-    /// If set to `"1"` or `"true"`, ty will ignore the `VIRTUAL_ENV` environment variable when
-    /// discovering the Python environment. This is useful if a tool wrapping ty activates the
-    /// virtual environment but you would prefer to discover the `.venv` in the working directory.
-    pub const TY_IGNORE_ACTIVE_VIRTUAL_ENV: &'static str = "TY_IGNORE_ACTIVE_VIRTUAL_ENV";
-
     /// Adds additional directories to ty's search paths.
     /// The format is the same as the shell’s PATH:
     /// one or more directory pathnames separated by os appropriate pathsep

@@ -37,6 +37,11 @@ pub struct ProjectMetadata {
     /// The path ordering doesn't imply precedence.
     #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
     pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
+
+    /// If true, ignore the `VIRTUAL_ENV` environment variable when discovering
+    /// the Python environment.
+    #[cfg_attr(test, serde(skip_serializing_if = "std::ops::Not::not"))]
+    pub(super) ignore_active_virtual_env: bool,
 }
 
 impl ProjectMetadata {
@@ -47,6 +52,7 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
+            ignore_active_virtual_env: false,
         }
     }
 
@@ -70,6 +76,7 @@ impl ProjectMetadata {
             root: system.current_directory().to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
+            ignore_active_virtual_env: false,
         })
     }
 
@@ -117,6 +124,7 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
+            ignore_active_virtual_env: false,
         })
     }
 
@@ -268,13 +276,22 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
+    pub fn set_ignore_active_virtual_env(&mut self, ignore: bool) {
+        self.ignore_active_virtual_env = ignore;
+    }
+
     pub fn to_program_settings(
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> anyhow::Result<ProgramSettings> {
-        self.options
-            .to_program_settings(self.root(), self.name(), system, vendored)
+        self.options.to_program_settings(
+            self.root(),
+            self.name(),
+            system,
+            vendored,
+            self.ignore_active_virtual_env,
+        )
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {
