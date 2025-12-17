@@ -643,6 +643,91 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
 Person(name="Alice")
 ```
 
+### Field specifiers using `**kwargs`
+
+Some field specifiers may use `**kwargs` to pass through standard parameters like `default`,
+`default_factory`, `init`, `kw_only`, and `alias`. This section tests that all these parameters work
+correctly when passed via `**kwargs` for all three kinds of transformers.
+
+#### Function-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def create_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@create_model
+class Person:
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
+#### Metaclass-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Person(ModelBase):
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
+#### Base-class-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelBase: ...
+
+class Person(ModelBase):
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
 ### Support for `alias`
 
 The `alias` parameter in field specifiers allows providing an alternative name for the parameter in
