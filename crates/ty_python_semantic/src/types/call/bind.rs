@@ -675,21 +675,20 @@ impl<'db> Bindings<'db> {
                         // the parameter binding (for explicit parameters), and then fall back to checking the
                         // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
                         // instead of specifying `init`, `default` etc. explicitly).
-                        let get_argument_type =
-                            |name: &str, fallback_to_default: bool| -> Option<Type<'db>> {
-                                if let Ok(ty) =
-                                    overload.parameter_type_by_name(name, fallback_to_default)
-                                {
-                                    return ty;
-                                }
-                                argument_types.iter().find_map(|(arg, ty)| {
+                        let get_argument_type = |name, fallback_to_default| -> Option<Type<'db>> {
+                            if let Ok(ty) =
+                                overload.parameter_type_by_name(name, fallback_to_default)
+                            {
+                                return ty;
+                            }
+                            argument_types.iter().find_map(|(arg, ty)| {
                                 if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
                                     ty
                                 } else {
                                     None
                                 }
                             })
-                            };
+                        };
 
                         let has_default_value = get_argument_type("default", false).is_some()
                             || get_argument_type("default_factory", false).is_some()
