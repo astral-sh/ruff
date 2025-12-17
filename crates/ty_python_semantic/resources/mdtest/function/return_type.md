@@ -429,7 +429,7 @@ def list_int(x: int):
         return list1(x)
 
 # TODO: should be `list[int]`
-reveal_type(list_int(1))  # revealed: list[Divergent] | list[int]
+reveal_type(list_int(1))  # revealed: list[Divergent] | list[int] | list[Divergent]
 
 def tuple_obj(cond: bool):
     if cond:
@@ -454,7 +454,7 @@ def nested_scope():
         return nested_scope()
     return inner()
 
-reveal_type(nested_scope())  # revealed: Never
+reveal_type(nested_scope())  # revealed: Divergent
 
 def eager_nested_scope():
     class A:
@@ -469,7 +469,7 @@ class C:
         return D()
 
 class D(C):
-    # TODO invalid override error
+    # error: [invalid-method-override]
     def flip(self) -> "C":
         return C()
 
@@ -582,7 +582,7 @@ reveal_type(C().h(1))  # revealed: Literal[1]
 reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
 reveal_type(C().h(True))  # revealed: Literal[True]
 reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
-reveal_type(C().i(1))  # revealed: list[Literal[1]]
+reveal_type(C().i(1))  # revealed: list[int]
 # TODO: better type for list elements
 reveal_type(D().i(1))  # revealed: list[Unknown | int] | list[Unknown]
 

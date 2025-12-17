@@ -48,6 +48,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{SemanticIndex, semantic_index, use_def_map};
+use crate::types::builder::RecursivelyDefined;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
@@ -573,6 +574,23 @@ impl<'db> ScopeInference<'db> {
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
         }
 
+        if let Some(extra) = &mut self.extra {
+            for (i, return_ty) in extra.return_types.iter_mut().enumerate() {
+                match previous_inference.extra.as_ref() {
+                    Some(previous_extra) => {
+                        if let Some(previous_return_ty) = previous_extra.return_types.get(i) {
+                            *return_ty = return_ty.cycle_normalized(db, *previous_return_ty, cycle);
+                        } else {
+                            *return_ty = return_ty.recursive_type_normalized(db, cycle);
+                        }
+                    }
+                    None => {
+                        *return_ty = return_ty.recursive_type_normalized(db, cycle);
+                    }
+                }
+            }
+        }
+
         self
     }
 
@@ -627,6 +645,7 @@ impl<'db> ScopeInference<'db> {
 
         let mut union = UnionBuilder::new(db);
         if let Some(cycle_recovery) = self.fallback_type() {
+            union = union.recursively_defined(RecursivelyDefined::Yes);
             union = union.add(cycle_recovery);
         }
 

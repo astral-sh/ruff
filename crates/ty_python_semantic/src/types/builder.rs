@@ -649,8 +649,31 @@ impl<'db> UnionBuilder<'db> {
             types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
         }
         match types.len() {
-            0 => None,
-            1 => Some(types[0]),
+            0 => {
+                if self.recursively_defined.is_yes() {
+                    // See the comment below for why this is necessary.
+                    Some(Type::Union(UnionType::new(
+                        self.db,
+                        Box::from([Type::Never]),
+                        self.recursively_defined,
+                    )))
+                } else {
+                    None
+                }
+            }
+            1 => {
+                if self.recursively_defined.is_yes() {
+                    // We need to mark this type with a "recursively-defined" marker, so build it as a single-element recursively-defined union type.
+                    // This will only happen very early in the fixed-point iteration, and a single-element union type should never appear in the final converged type.
+                    Some(Type::Union(UnionType::new(
+                        self.db,
+                        Box::from([types[0]]),
+                        self.recursively_defined,
+                    )))
+                } else {
+                    Some(types[0])
+                }
+            }
             _ => Some(Type::Union(UnionType::new(
                 self.db,
                 types.into_boxed_slice(),
