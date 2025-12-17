@@ -131,6 +131,7 @@ bitflags! {
         const DEFINITION = 1 << 0;
         const READONLY = 1 << 1;
         const ASYNC = 1 << 2;
+        const DOCUMENTATION = 1 << 3;
     }
 }
 
@@ -143,7 +144,7 @@ impl SemanticTokenModifier {
     /// highlighting. For details, refer to this LSP specification:
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenModifiers>
     pub fn all_names() -> Vec<&'static str> {
-        vec!["definition", "readonly", "async"]
+        vec!["definition", "readonly", "async", "documentation"]
     }
 }
 
@@ -189,18 +190,21 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     let model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
+    visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
 }
 
 /// AST visitor that collects semantic tokens.
+#[allow(clippy::struct_excessive_bools)]
 struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
     in_target_creating_definition: bool,
+    expecting_docstring: bool,
     range_filter: Option<TextRange>,
 }
 
@@ -213,6 +217,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             in_target_creating_definition: false,
             in_type_annotation: false,
             range_filter,
+            expecting_docstring: false,
         }
     }
 
@@ -601,6 +606,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
+        let expecting_docstring = self.expecting_docstring;
+        self.expecting_docstring = false;
         match stmt {
             ast::Stmt::FunctionDef(func) => {
                 // Visit decorator expressions
@@ -642,7 +649,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 let prev_in_class = self.in_class_scope;
 
                 self.in_class_scope = false;
+                self.expecting_docstring = true;
                 self.visit_body(&func.body);
+                self.expecting_docstring = false;
                 self.in_class_scope = prev_in_class;
             }
             ast::Stmt::ClassDef(class) => {
@@ -672,7 +681,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 let prev_in_class = self.in_class_scope;
                 self.in_class_scope = true;
+                self.expecting_docstring = true;
                 self.visit_body(&class.body);
+                self.expecting_docstring = false;
                 self.in_class_scope = prev_in_class;
             }
             ast::Stmt::TypeAlias(type_alias) => {
@@ -809,7 +820,17 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_body(&try_stmt.orelse);
                 self.visit_body(&try_stmt.finalbody);
             }
-
+            ast::Stmt::Expr(expr) => {
+                if expecting_docstring && let Expr::StringLiteral(string_literal) = &*expr.value {
+                    self.add_token(
+                        string_literal.range(),
+                        SemanticTokenType::String,
+                        SemanticTokenModifier::DOCUMENTATION,
+                    );
+                } else {
+                    walk_stmt(self, stmt);
+                }
+            }
             _ => {
                 // For all other statement types, let the default visitor handle them
                 walk_stmt(self, stmt);
@@ -1853,11 +1874,11 @@ y: Optional[str] = None
     }
 
     #[test]
-    fn docstring_classification() {
+    fn function_docstring_classification() {
         let test = SemanticTokenTest::new(
             r#"
 def my_function(param1: int, param2: str) -> bool:
-    """Example function with PEP 484 type annotations.
+    """Example function
 
     Args:
         param1: The first parameter.
@@ -1867,6 +1888,11 @@ def my_function(param1: int, param2: str) -> bool:
         The return value. True for success, False otherwise.
 
     """
+
+    x = "hello"
+
+    """unrelated string"""
+
     return False
 "#,
         );
@@ -1880,8 +1906,146 @@ def my_function(param1: int, param2: str) -> bool:
         "param2" @ 30..36: Parameter [definition]
         "str" @ 38..41: Class
         "bool" @ 46..50: Class
-        "\"\"\"Example function with PEP 484 type annotations.\n\n    Args:\n        param1: The first parameter.\n        param2: The second parameter.\n\n    Returns:\n        The return value. True for success, False otherwise.\n\n    \"\"\"" @ 56..276: String
-        "False" @ 288..293: BuiltinConstant
+        "\"\"\"Example function\n\n    Args:\n        param1: The first parameter.\n        param2: The second parameter.\n\n    Returns:\n        The return value. True for success, False otherwise.\n\n    \"\"\"" @ 56..245: String [documentation]
+        "x" @ 251..252: Variable [definition]
+        "\"hello\"" @ 255..262: String
+        "\"\"\"unrelated string\"\"\"" @ 268..290: String
+        "False" @ 303..308: BuiltinConstant
+        "#);
+    }
+
+    #[test]
+    fn class_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """Example class
+
+    What a good class wowwee
+    """
+
+    def __init__(self): pass
+
+    """unrelated string"""
+    
+    x: str = "hello"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"Example class\n\n    What a good class wowwee\n    \"\"\"" @ 20..74: String [documentation]
+        "__init__" @ 84..92: Method [definition]
+        "self" @ 93..97: SelfParameter [definition]
+        "\"\"\"unrelated string\"\"\"" @ 110..132: String
+        "x" @ 138..139: Variable [definition]
+        "str" @ 141..144: Class
+        "\"hello\"" @ 147..154: String
+        "#);
+    }
+
+    #[test]
+    fn module_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+"""Example module
+
+What a good module wooo
+"""
+
+def my_func(): pass
+
+"""unrelated string"""
+    
+x: str = "hello"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "\"\"\"Example module\n\nWhat a good module wooo\n\"\"\"" @ 1..47: String [documentation]
+        "my_func" @ 53..60: Function [definition]
+        "\"\"\"unrelated string\"\"\"" @ 70..92: String
+        "x" @ 94..95: Variable [definition]
+        "str" @ 97..100: Class
+        "\"hello\"" @ 103..110: String
+        "#);
+    }
+
+    #[test]
+    fn attribute_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+important_value: str = "wow"
+"""This is the most important value
+
+Don't trust the other guy
+"""
+
+x = "unrelated string"
+
+other_value: int = 2
+"""This is such an import value omg
+
+Trust me
+"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "important_value" @ 1..16: Variable [definition]
+        "str" @ 18..21: Class
+        "\"wow\"" @ 24..29: String
+        "\"\"\"This is the most important value\n\nDon't trust the other guy\n\"\"\"" @ 30..96: String
+        "x" @ 98..99: Variable [definition]
+        "\"unrelated string\"" @ 102..120: String
+        "other_value" @ 122..133: Variable [definition]
+        "int" @ 135..138: Class
+        "2" @ 141..142: Number
+        "\"\"\"This is such an import value omg\n\nTrust me\n\"\"\"" @ 143..192: String
+        "#);
+    }
+
+    #[test]
+    fn class_attribute_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    important_value: str = "wow"
+    """This is the most important value
+
+    Don't trust the other guy
+    """
+
+    x = "unrelated string"
+
+    other_value: int = 2
+    """This is such an import value omg
+
+    Trust me
+    """
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "important_value" @ 20..35: Variable [definition]
+        "str" @ 37..40: Class
+        "\"wow\"" @ 43..48: String
+        "\"\"\"This is the most important value\n\n    Don't trust the other guy\n    \"\"\"" @ 53..127: String
+        "x" @ 133..134: Variable [definition]
+        "\"unrelated string\"" @ 137..155: String
+        "other_value" @ 161..172: Variable [definition]
+        "int" @ 174..177: Class
+        "2" @ 180..181: Number
+        "\"\"\"This is such an import value omg\n\n    Trust me\n    \"\"\"" @ 186..243: String
         "#);
     }
 
@@ -2888,6 +3052,12 @@ def foo(self, **key, value=10):
                     }
                     if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
                         mods.push("async");
+                    }
+                    if token
+                        .modifiers
+                        .contains(SemanticTokenModifier::DOCUMENTATION)
+                    {
+                        mods.push("documentation");
                     }
                     format!(" [{}]", mods.join(", "))
                 };
