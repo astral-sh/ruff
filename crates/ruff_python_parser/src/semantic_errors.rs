@@ -302,7 +302,7 @@ impl SemanticSyntaxChecker {
                 if let Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
                     if let Some(global_stmt) = ctx.global(id.as_str()) {
                         let global_start = global_stmt.start();
-                        if ctx.in_function_scope() || target.start() < global_start {
+                        if !ctx.in_module_scope() || target.start() < global_start {
                             Self::add_error(
                                 ctx,
                                 SemanticSyntaxErrorKind::AnnotatedGlobal(id.to_string()),

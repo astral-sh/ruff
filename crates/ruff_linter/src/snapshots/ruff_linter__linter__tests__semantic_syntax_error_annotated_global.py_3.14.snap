@@ -54,3 +54,21 @@ invalid-syntax: annotated name `g` can't be global
    | ^
 30 | global g  # error
    |
+
+invalid-syntax: annotated name `x` can't be global
+  --> resources/test/fixtures/semantic_errors/annotated_global.py:33:5
+   |
+32 | class C:
+33 |     x: str
+   |     ^
+34 |     global x  # error
+   |
+
+invalid-syntax: annotated name `x` can't be global
+  --> resources/test/fixtures/semantic_errors/annotated_global.py:38:5
+   |
+36 | class D:
+37 |     global x  # error
+38 |     x: str
+   |     ^
+   |

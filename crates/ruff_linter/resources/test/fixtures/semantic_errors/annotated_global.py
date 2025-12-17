@@ -28,3 +28,11 @@ f: int = 1  # okay
 
 g: int = 1
 global g  # error
+
+class C:
+    x: str
+    global x  # error
+
+class D:
+    global x  # error
+    x: str
