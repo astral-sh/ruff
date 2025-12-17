@@ -289,6 +289,14 @@ reveal_type(x)  # revealed: <class 'A'> | <class 'B'>
 class Foo(x): ...
 
 reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
+
+def f():
+    if returns_bool():
+        class C: ...
+    else:
+        class C: ...
+
+    class D(C): ...  # error: [unsupported-base]
 ```
 
 ## `UnionType` instances are now allowed as a base

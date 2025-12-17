@@ -615,6 +615,22 @@ def _(x: type[typing.Any], y: typing.Any):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
 ```
 
+### Diagnostic when the invalid type is rendered very verbosely
+
+<!-- snapshot-diagnostics -->
+
+```py
+def coinflip() -> bool:
+    return False
+
+def f():
+    if coinflip():
+        class A: ...
+    else:
+        class A: ...
+    super(A, A())  # error: [invalid-super-argument]
+```
+
 ### Instance Member Access via `super`
 
 Accessing instance members through `super()` is not allowed.
