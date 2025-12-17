@@ -42,27 +42,41 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `Path.read_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.read_text)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.1.2")]
-pub(crate) struct ReadWholeFile {
+pub(crate) struct ReadWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
+    argument: OpenArgument<'a>,
 }
 
-impl Violation for ReadWholeFile {
+impl Violation for ReadWholeFile<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
-        format!("`open` and `read` should be replaced by `Path({filename}).{suggestion}`")
+        match self.argument {
+            OpenArgument::Pathlib { .. } => {
+                format!(
+                    "`Path.open()` followed by `read()` can be replaced by `{filename}.{suggestion}`"
+                )
+            }
+            OpenArgument::Builtin { .. } => {
+                format!("`open` and `read` should be replaced by `Path({filename}).{suggestion}`")
+            }
+        }
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace with `Path({}).{}`",
-            self.filename.truncated_display(),
-            self.suggestion.truncated_display(),
-        ))
+        let filename = self.filename.truncated_display();
+        let suggestion = self.suggestion.truncated_display();
+
+        match self.argument {
+            OpenArgument::Pathlib { .. } => Some(format!("Replace with `{filename}.{suggestion}`")),
+            OpenArgument::Builtin { .. } => {
+                Some(format!("Replace with `Path({filename}).{suggestion}`"))
+            }
+        }
     }
 }
 
@@ -120,6 +134,7 @@ impl<'a> Visitor<'a> for ReadMatcher<'a, '_> {
                     ReadWholeFile {
                         filename: SourceCodeSnippet::from_str(filename_display),
                         suggestion: SourceCodeSnippet::from_str(&suggestion),
+                        argument: open.argument,
                     },
                     open.item.range(),
                 );
@@ -184,11 +199,8 @@ fn generate_fix(
     if with_stmt.items.len() != 1 {
         return None;
     }
-    let OpenArgument::Builtin { filename } = open.argument else {
-        return None;
-    };
+
     let locator = checker.locator();
-    let filename_code = locator.slice(filename.range());
 
     let (import_edit, binding) = checker
         .importer()
@@ -206,10 +218,15 @@ fn generate_fix(
         [Stmt::Assign(ast::StmtAssign { targets, value, .. })] if value.range() == expr.range() => {
             match targets.as_slice() {
                 [Expr::Name(name)] => {
-                    format!(
-                        "{name} = {binding}({filename_code}).{suggestion}",
-                        name = name.id
-                    )
+                    let target = match open.argument {
+                        OpenArgument::Builtin { filename } => {
+                            let filename_code = locator.slice(filename.range());
+                            format!("{binding}({filename_code})")
+                        }
+                        OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
+                    };
+
+                    format!("{name} = {target}.{suggestion}", name = name.id)
                 }
                 _ => return None,
             }
@@ -223,8 +240,16 @@ fn generate_fix(
             }),
         ] if value.range() == expr.range() => match target.as_ref() {
             Expr::Name(name) => {
+                let target = match open.argument {
+                    OpenArgument::Builtin { filename } => {
+                        let filename_code = locator.slice(filename.range());
+                        format!("{binding}({filename_code})")
+                    }
+                    OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
+                };
+
                 format!(
-                    "{var}: {ann} = {binding}({filename_code}).{suggestion}",
+                    "{var}: {ann} = {target}.{suggestion}",
                     var = name.id,
                     ann = locator.slice(annotation.range())
                 )

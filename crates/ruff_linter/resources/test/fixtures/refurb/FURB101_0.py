@@ -138,5 +138,6 @@ with open("file.txt", encoding="utf-8") as f:
 with open("file.txt", encoding="utf-8") as f:
     contents = process_contents(f.read())
 
-with open("file.txt", encoding="utf-8") as f:
+with open("file1.txt", encoding="utf-8") as f:
     contents: str = process_contents(f.read())
+
