@@ -901,6 +901,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     guarded_ty.negate_if(self.db, !is_positive),
                 )]))
             }
+            // for the expression `len(E)`, we narrow the type based on whether len(E) is truthy
+            // (i.e., whether E is non-empty)
+            Type::FunctionLiteral(function_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && function_type.known(self.db) == Some(KnownFunction::Len) =>
+            {
+                self.evaluate_simple_expr(&expr_call.arguments.args[0], is_positive)
+            }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {
                     return None;

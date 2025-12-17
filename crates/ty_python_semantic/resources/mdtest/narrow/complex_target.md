@@ -112,10 +112,9 @@ def foo(c: C):
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
     if c.value is None or not len(c.value):
-        reveal_type(c.value)  # revealed: str | None
+        reveal_type(c.value)  # revealed: (str & ~AlwaysTruthy) | None
     else:  # c.value is not None and len(c.value)
-        # TODO: should be # `str & ~AlwaysFalsy`
-        reveal_type(c.value)  # revealed: str
+        reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 ```
 
 ### Generic class
