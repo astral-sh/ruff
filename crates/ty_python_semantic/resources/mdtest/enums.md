@@ -451,6 +451,10 @@ class Answer(Enum):
 
 # revealed: tuple[Literal["YES"], Literal["NO"]]
 reveal_type(enum_members(Answer))
+
+# `nonmember` attributes are unwrapped to the inner value type when accessed.
+# revealed: Unknown | int
+reveal_type(Answer.OTHER)
 ```
 
 `member` can also be used as a decorator:

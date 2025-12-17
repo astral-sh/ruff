@@ -2333,7 +2333,7 @@ impl<'db> ClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            match (inherited_generic_context, ty, specialization, name) {
+            let ty = match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
                     Type::FunctionLiteral(function),
@@ -2343,7 +2343,22 @@ impl<'db> ClassLiteral<'db> {
                     function.with_inherited_generic_context(db, generic_context),
                 ),
                 _ => ty,
+            };
+
+            // For enum classes, `nonmember(value)` creates a non-member attribute.
+            // At runtime, accessing the attribute returns the unwrapped value, not the
+            // `nonmember` wrapper. So we unwrap `nonmember[T]` to `T` here.
+            // A class is an enum if it's a subclass of Enum or has EnumType as metaclass.
+            let is_enum_class = Type::ClassLiteral(self)
+                .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+                || self
+                    .metaclass(db)
+                    .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db));
+            if is_enum_class {
+                return unwrap_nonmember_type(db, ty);
             }
+
+            ty
         });
 
         if member.is_undefined() {
@@ -5978,6 +5993,31 @@ impl SlotsKind {
 
             _ => Self::Dynamic,
         }
+    }
+}
+
+/// Unwraps `nonmember[T]` to `T` for enum attribute access.
+///
+/// At runtime, accessing an attribute wrapped in `enum.nonmember()` returns
+/// the unwrapped value, not the `nonmember` wrapper. This function handles
+/// both direct `nonmember[T]` types and union types containing `nonmember`.
+fn unwrap_nonmember_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+    match ty {
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
+            ty.member(db, "value")
+                .place
+                .ignore_possibly_undefined()
+                .unwrap_or(Type::unknown())
+        }
+        Type::Union(union) => {
+            let transformed: Vec<_> = union
+                .elements(db)
+                .iter()
+                .map(|elem| unwrap_nonmember_type(db, *elem))
+                .collect();
+            UnionType::from_elements(db, transformed)
+        }
+        _ => ty,
     }
 }
 
