@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_readlink_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_single_arg_calls, is_keyword_only_argument_non_default,
-    is_top_level_expression_call, is_top_level_statement,
+    is_top_level_expression_in_statement,
 };
 use crate::{FixAvailability, Violation};
 
@@ -86,13 +86,12 @@ pub(crate) fn os_readlink(checker: &Checker, call: &ExprCall, segments: &[&str])
         return;
     }
 
-    let applicability =
-        if !is_top_level_expression_call(checker) || !is_top_level_statement(checker) {
-            // Unsafe because the return type changes (str/bytes -> Path)
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
+    let applicability = if !is_top_level_expression_in_statement(checker) {
+        // Unsafe because the return type changes (str/bytes -> Path)
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
     check_os_pathlib_single_arg_calls(
         checker,

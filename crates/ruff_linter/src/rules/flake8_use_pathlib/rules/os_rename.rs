@@ -6,7 +6,7 @@ use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_rename_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
-    is_keyword_only_argument_non_default, is_top_level_expression_call, is_top_level_statement,
+    is_keyword_only_argument_non_default, is_top_level_expression_in_statement,
 };
 use crate::{FixAvailability, Violation};
 
@@ -92,13 +92,12 @@ pub(crate) fn os_rename(checker: &Checker, call: &ExprCall, segments: &[&str]) {
         );
 
     // Unsafe when the fix would delete comments or change a used return value
-    let applicability =
-        if !is_top_level_expression_call(checker) || !is_top_level_statement(checker) {
-            // Unsafe because the return type changes (None -> Path)
-            Applicability::Unsafe
-        } else {
-            Applicability::Safe
-        };
+    let applicability = if !is_top_level_expression_in_statement(checker) {
+        // Unsafe because the return type changes (None -> Path)
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
 
     check_os_pathlib_two_arg_calls(
         checker,
