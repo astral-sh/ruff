@@ -1952,8 +1952,22 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_subtype_of_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_subtype_of_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            target: Type<'db>,
+        ) -> bool {
+            self_ty
+                .when_subtype_of(db, target, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        }
+
+        if self == target {
+            return true;
+        }
+
+        is_subtype_of_impl(db, self, target)
     }
 
     fn when_subtype_of(
@@ -8669,6 +8683,16 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
         );
         v
     }
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_subtype_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self_ty: Type<'db>,
+    _target: Type<'db>,
+) -> bool {
+    false
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
