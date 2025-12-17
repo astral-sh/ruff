@@ -52,6 +52,9 @@ def _(x: LiteralString):
 
 ## Tuples
 
+Ideally we'd narrow these types further, e.g. to `tuple[int, ...] & ~tuple[()]` in the positive case
+and `tuple[()]` in the negative case (see <https://github.com/astral-sh/ty/issues/560>).
+
 ```py
 def _(x: tuple[int, ...]):
     if len(x):
@@ -116,9 +119,9 @@ def _(lines: list[str]):
         if not line:
             continue
 
-        # `line` is `str & ~AlwaysFalsy` here
+        reveal_type(line)  # revealed: str & ~AlwaysFalsy
         value = line if len(line) < 3 else ""
-        # `value` is `(str & ~AlwaysFalsy) | Literal[""]`
+        reveal_type(value)  # revealed: (str & ~AlwaysFalsy) | Literal[""]
 
         if len(value):
             # `Literal[""]` is removed, `str & ~AlwaysFalsy` is unchanged
