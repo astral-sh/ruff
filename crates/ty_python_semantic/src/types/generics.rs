@@ -1586,8 +1586,8 @@ impl<'db> SpecializationBuilder<'db> {
     ) {
         #[derive(Default)]
         struct Bounds<'db> {
-            lower: Vec<Type<'db>>,
-            upper: Vec<Type<'db>>,
+            lower: FxOrderSet<Type<'db>>,
+            upper: FxOrderSet<Type<'db>>,
         }
 
         let constraints = constraints.limit_to_valid_specializations(self.db);
@@ -1611,17 +1611,17 @@ impl<'db> SpecializationBuilder<'db> {
                 let lower = constraint.lower(self.db);
                 let upper = constraint.upper(self.db);
                 let bounds = mappings.entry(typevar).or_default();
-                bounds.lower.push(lower);
-                bounds.upper.push(upper);
+                bounds.lower.insert(lower);
+                bounds.upper.insert(upper);
 
                 if let Type::TypeVar(lower_bound_typevar) = lower {
                     let bounds = mappings.entry(lower_bound_typevar).or_default();
-                    bounds.upper.push(Type::TypeVar(typevar));
+                    bounds.upper.insert(Type::TypeVar(typevar));
                 }
 
                 if let Type::TypeVar(upper_bound_typevar) = upper {
                     let bounds = mappings.entry(upper_bound_typevar).or_default();
-                    bounds.lower.push(Type::TypeVar(typevar));
+                    bounds.lower.insert(Type::TypeVar(typevar));
                 }
             }
 

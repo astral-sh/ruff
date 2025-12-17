@@ -738,6 +738,8 @@ def f[T](x: T, y: Not[T]) -> T:
 
 ## `Callable` parameters
 
+### Class constructors
+
 We can recurse into the parameters and return values of `Callable` parameters to infer
 specializations of a generic function.
 
@@ -890,4 +892,47 @@ def _(x: list[str]):
     # error: [invalid-argument-type]
     # error: [invalid-argument-type]
     reveal_type(accepts_callable(GenericClass)(x, x))
+```
+
+### Don't include identical lower/upper bounds in type mapping multiple times
+
+This is was a performance regression reported in
+[ty#1968](https://github.com/astral-sh/ty/issues/1968). Before fixing this, we would see the
+`U ≤ M1 | ... | M7` upper bound 7 times. Since we intersect upper bounds before recording a single
+type mapping, we would perform 7 intersections. Each intersection would require 7^2 comparisons of
+the `Mx` types. We now have a simple heuristics that avoids processing any identical lower or upper
+bound more than once, since we know the extra copies cannot affect the result.
+
+```py
+from typing import Callable, Generic, TypeVar, Union
+
+class M1: ...
+class M2: ...
+class M3: ...
+class M4: ...
+class M5: ...
+class M6: ...
+class M7: ...
+
+Msg = Union[M1, M2, M3, M4, M5, M6, M7]
+
+T = TypeVar("T")
+U_co = TypeVar("U_co", covariant=True)
+
+class Stream(Generic[T]):
+    def apply(self, func: Callable[["Stream[T]"], "Stream[U_co]"]) -> "Stream[U_co]":
+        return func(self)
+
+TMsg = TypeVar("TMsg", bound=Msg)
+
+class Builder(Generic[TMsg]):
+    def build(self) -> Stream[TMsg]:
+        stream: Stream[TMsg] = Stream()
+        # TODO: no error
+        # error: [invalid-assignment]
+        stream = stream.apply(self._handler)
+        return stream
+
+    def _handler(self, stream: Stream[Msg]) -> Stream[Msg]:
+        return stream
 ```
