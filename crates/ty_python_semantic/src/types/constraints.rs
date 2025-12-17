@@ -3050,29 +3050,41 @@ impl<'db> SequentMap<'db> {
         left_constraint: ConstrainedTypeVar<'db>,
         right_constraint: ConstrainedTypeVar<'db>,
     ) {
-        // We've structured our constraints so that a typevar's upper/lower bound can only
-        // be another typevar if the bound is "later" in our arbitrary ordering. That means
-        // we only have to check this pair of constraints in one direction — though we do
-        // have to figure out which of the two typevars is constrained, and which one is
-        // the upper/lower bound.
+        // Add sequents when the two typevars are mutually constrained directly — that is, when the
+        // lower/upper bound _is_ the typevar, not _contains_ the typevar. We've structured our
+        // constraints so that a typevar's upper/lower bound can only be another typevar if the
+        // bound is "later" in our arbitrary ordering. That means we only have to check this pair
+        // of constraints in one direction — though we do have to figure out which of the two
+        // typevars is constrained, and which one is the upper/lower bound.
         let left_typevar = left_constraint.typevar(db);
         let right_typevar = right_constraint.typevar(db);
-        let (bound_typevar, bound_constraint, constrained_typevar, constrained_constraint) =
-            if left_typevar.can_be_bound_for(db, right_typevar) {
-                (
-                    left_typevar,
-                    left_constraint,
-                    right_typevar,
-                    right_constraint,
-                )
-            } else {
-                (
-                    right_typevar,
-                    right_constraint,
-                    left_typevar,
-                    left_constraint,
-                )
-            };
+        if left_typevar.can_be_bound_for(db, right_typevar) {
+            self.add_direct_mutual_sequents_for_different_typevars(
+                db,
+                left_constraint,
+                left_typevar,
+                right_constraint,
+                right_typevar,
+            );
+        } else {
+            self.add_direct_mutual_sequents_for_different_typevars(
+                db,
+                right_constraint,
+                right_typevar,
+                left_constraint,
+                left_typevar,
+            );
+        }
+    }
+
+    fn add_direct_mutual_sequents_for_different_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        bound_constraint: ConstrainedTypeVar<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constrained_constraint: ConstrainedTypeVar<'db>,
+        constrained_typevar: BoundTypeVarInstance<'db>,
+    ) {
 
         // We then look for cases where the "constrained" typevar's upper and/or lower bound
         // matches the "bound" typevar. If so, we're going to add an implication sequent that
@@ -3127,7 +3139,12 @@ impl<'db> SequentMap<'db> {
 
         let post_constraint =
             ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
-        self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+        self.add_pair_implication(
+            db,
+            bound_constraint,
+            constrained_constraint,
+            post_constraint,
+        );
         self.enqueue_constraint(post_constraint);
     }
 
