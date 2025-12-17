@@ -716,6 +716,7 @@ impl<'db> ClassType<'db> {
     /// Return the [`DisjointBase`] that appears first in the MRO of this class.
     ///
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
             .filter_map(ClassBase::into_class)
@@ -4124,7 +4125,7 @@ impl InheritanceCycle {
 /// `TypeError`s resulting from class definitions.
 ///
 /// [PEP 800]: https://peps.python.org/pep-0800/
-#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone, get_size2::GetSize, salsa::Update)]
 pub(super) struct DisjointBase<'db> {
     pub(super) class: ClassLiteral<'db>,
     pub(super) kind: DisjointBaseKind,
@@ -4161,7 +4162,7 @@ impl<'db> DisjointBase<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(super) enum DisjointBaseKind {
     /// We know the class is a disjoint base because it's either hardcoded in ty
     /// or has the `@disjoint_base` decorator.
