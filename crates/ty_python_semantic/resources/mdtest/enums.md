@@ -453,7 +453,7 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 
 # `nonmember` attributes are unwrapped to the inner value type when accessed.
-# revealed: Unknown | int
+# revealed: int
 reveal_type(Answer.OTHER)
 ```
 

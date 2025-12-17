@@ -2321,6 +2321,24 @@ impl<'db> ClassLiteral<'db> {
         }
 
         let body_scope = self.body_scope(db);
+
+        // For enum classes, `nonmember(value)` creates a non-member attribute.
+        // At runtime, the enum metaclass unwraps the value, so accessing the attribute
+        // returns the inner value, not the `nonmember` wrapper.
+        // We handle this by looking up bindings directly (like enum_metadata does for `member`)
+        // to get the inferred type without the `Unknown` union from declared types.
+        let is_enum_class = Type::ClassLiteral(self)
+            .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+            || self
+                .metaclass(db)
+                .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db));
+
+        if is_enum_class {
+            if let Some(nonmember_value_ty) = extract_nonmember_value(db, body_scope, name) {
+                return Member::definitely_declared(nonmember_value_ty);
+            }
+        }
+
         let member = class_member(db, body_scope, name).map_type(|ty| {
             // The `__new__` and `__init__` members of a non-specialized generic class are handled
             // specially: they inherit the generic context of their class. That lets us treat them
@@ -2333,7 +2351,7 @@ impl<'db> ClassLiteral<'db> {
             // to any method with a `@classmethod` decorator. (`__init__` would remain a special
             // case, since it's an _instance_ method where we don't yet know the generic class's
             // specialization.)
-            let ty = match (inherited_generic_context, ty, specialization, name) {
+            match (inherited_generic_context, ty, specialization, name) {
                 (
                     Some(generic_context),
                     Type::FunctionLiteral(function),
@@ -2343,22 +2361,7 @@ impl<'db> ClassLiteral<'db> {
                     function.with_inherited_generic_context(db, generic_context),
                 ),
                 _ => ty,
-            };
-
-            // For enum classes, `nonmember(value)` creates a non-member attribute.
-            // At runtime, accessing the attribute returns the unwrapped value, not the
-            // `nonmember` wrapper. So we unwrap `nonmember[T]` to `T` here.
-            // A class is an enum if it's a subclass of Enum or has EnumType as metaclass.
-            let is_enum_class = Type::ClassLiteral(self)
-                .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-                || self
-                    .metaclass(db)
-                    .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db));
-            if is_enum_class {
-                return unwrap_nonmember_type(db, ty);
             }
-
-            ty
         });
 
         if member.is_undefined() {
@@ -5996,28 +5999,38 @@ impl SlotsKind {
     }
 }
 
-/// Unwraps `nonmember[T]` to `T` for enum attribute access.
+/// Extracts the value type from an `enum.nonmember()` wrapper if present.
 ///
-/// At runtime, accessing an attribute wrapped in `enum.nonmember()` returns
-/// the unwrapped value, not the `nonmember` wrapper. This function handles
-/// both direct `nonmember[T]` types and union types containing `nonmember`.
-fn unwrap_nonmember_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
-    match ty {
-        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
-            ty.member(db, "value")
-                .place
-                .ignore_possibly_undefined()
-                .unwrap_or(Type::unknown())
+/// This looks up the symbol's bindings directly (bypassing `place_by_id`) to get the
+/// inferred type without the `Unknown` union from declared types. This is consistent
+/// with how `enum.member()` is handled in `enum_metadata`.
+///
+/// Returns `Some(value_type)` if the symbol is bound to a `nonmember[T]`, otherwise `None`.
+fn extract_nonmember_value<'db>(
+    db: &'db dyn Db,
+    scope: ScopeId<'db>,
+    name: &str,
+) -> Option<Type<'db>> {
+    let table = place_table(db, scope);
+    let symbol_id = table.symbol_id(name)?;
+
+    let use_def = use_def_map(db, scope);
+    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+    let inferred = place_from_bindings(db, bindings).place;
+
+    match inferred {
+        Place::Defined(Type::NominalInstance(instance), _, _)
+            if instance.has_known_class(db, KnownClass::Nonmember) =>
+        {
+            Some(
+                Type::NominalInstance(instance)
+                    .member(db, "value")
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::unknown()),
+            )
         }
-        Type::Union(union) => {
-            let transformed: Vec<_> = union
-                .elements(db)
-                .iter()
-                .map(|elem| unwrap_nonmember_type(db, *elem))
-                .collect();
-            UnionType::from_elements(db, transformed)
-        }
-        _ => ty,
+        _ => None,
     }
 }
 
