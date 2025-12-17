@@ -868,4 +868,83 @@ reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
 ```
 
+## `__dataclass_fields__` and `DataclassInstance` protocol
+
+Classes created via `dataclass_transform` should have `__dataclass_fields__` and
+`__dataclass_params__` attributes, allowing them to satisfy the `DataclassInstance` protocol. This
+enables use of `dataclasses.fields`, `dataclasses.asdict`, `dataclasses.replace`, etc.
+
+### Function-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+def create_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@create_model
+class Person:
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
+```
+
+### Metaclass-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Person(ModelBase):
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
+```
+
+### Base-class-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+class ModelBase: ...
+
+class Person(ModelBase):
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
+```
+
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
