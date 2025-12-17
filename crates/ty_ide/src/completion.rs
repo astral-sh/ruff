@@ -23,6 +23,69 @@ use crate::importer::{ImportRequest, Importer};
 use crate::symbols::QueryPattern;
 use crate::{Db, all_symbols, signature_help};
 
+pub fn completion<'db>(
+    db: &'db dyn Db,
+    settings: &CompletionSettings,
+    file: File,
+    offset: TextSize,
+) -> Vec<Completion<'db>> {
+    let parsed = parsed_module(db, file).load(db);
+    let source = source_text(db, file);
+
+    let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
+        return vec![];
+    };
+    let query = context
+        .cursor
+        .typed
+        .map(QueryPattern::fuzzy)
+        .unwrap_or_else(QueryPattern::matches_all_symbols);
+    let mut completions = Completions::new(db, context.collection_context(db), query);
+    match context.kind {
+        ContextKind::Import(ref import) => {
+            import.add_completions(db, file, &mut completions);
+        }
+        ContextKind::NonImport(ref non_import) => {
+            let model = SemanticModel::new(db, file);
+            let (semantic_completions, scoped) = match non_import.target {
+                CompletionTargetAst::ObjectDot { expr } => {
+                    (model.attribute_completions(expr), None)
+                }
+                CompletionTargetAst::Scoped(scoped) => {
+                    (model.scoped_completions(scoped.node), Some(scoped))
+                }
+            };
+
+            completions.extend(semantic_completions);
+            if scoped.is_some() {
+                add_keyword_completions(db, &mut completions);
+            }
+            if settings.auto_import {
+                if let Some(scoped) = scoped {
+                    add_unimported_completions(
+                        db,
+                        file,
+                        &parsed,
+                        scoped,
+                        |module_name: &ModuleName, symbol: &str| {
+                            ImportRequest::import_from(module_name.as_str(), symbol)
+                        },
+                        &mut completions,
+                    );
+                }
+            }
+
+            if let Some(arg_completions) =
+                detect_function_arg_completions(db, file, &parsed, offset)
+            {
+                completions.extend(arg_completions);
+            }
+        }
+    }
+
+    completions.into_completions()
+}
+
 /// A collection of completions built up from various sources.
 struct Completions<'db> {
     db: &'db dyn Db,
@@ -871,69 +934,6 @@ enum Sort {
     /// Assign a smaller rank. The suggestion will appear lower
     /// in the completion results.
     Lower,
-}
-
-pub fn completion<'db>(
-    db: &'db dyn Db,
-    settings: &CompletionSettings,
-    file: File,
-    offset: TextSize,
-) -> Vec<Completion<'db>> {
-    let parsed = parsed_module(db, file).load(db);
-    let source = source_text(db, file);
-
-    let Some(context) = Context::new(db, file, &parsed, &source, offset) else {
-        return vec![];
-    };
-    let query = context
-        .cursor
-        .typed
-        .map(QueryPattern::fuzzy)
-        .unwrap_or_else(QueryPattern::matches_all_symbols);
-    let mut completions = Completions::new(db, context.collection_context(db), query);
-    match context.kind {
-        ContextKind::Import(ref import) => {
-            import.add_completions(db, file, &mut completions);
-        }
-        ContextKind::NonImport(ref non_import) => {
-            let model = SemanticModel::new(db, file);
-            let (semantic_completions, scoped) = match non_import.target {
-                CompletionTargetAst::ObjectDot { expr } => {
-                    (model.attribute_completions(expr), None)
-                }
-                CompletionTargetAst::Scoped(scoped) => {
-                    (model.scoped_completions(scoped.node), Some(scoped))
-                }
-            };
-
-            completions.extend(semantic_completions);
-            if scoped.is_some() {
-                add_keyword_completions(db, &mut completions);
-            }
-            if settings.auto_import {
-                if let Some(scoped) = scoped {
-                    add_unimported_completions(
-                        db,
-                        file,
-                        &parsed,
-                        scoped,
-                        |module_name: &ModuleName, symbol: &str| {
-                            ImportRequest::import_from(module_name.as_str(), symbol)
-                        },
-                        &mut completions,
-                    );
-                }
-            }
-
-            if let Some(arg_completions) =
-                detect_function_arg_completions(db, file, &parsed, offset)
-            {
-                completions.extend(arg_completions);
-            }
-        }
-    }
-
-    completions.into_completions()
 }
 
 /// Detect and construct completions for unset function arguments.
