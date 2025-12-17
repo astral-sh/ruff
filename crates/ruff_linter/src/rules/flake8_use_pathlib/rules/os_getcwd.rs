@@ -6,7 +6,7 @@ use ruff_text_size::Ranged;
 use crate::checkers::ast::Checker;
 use crate::importer::ImportRequest;
 use crate::preview::is_fix_os_getcwd_enabled;
-use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_call;
+use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_in_statement;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
@@ -89,7 +89,7 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
 
             // Unsafe when the fix would delete comments or change a used return value
             let applicability = if checker.comment_ranges().intersects(range)
-                || !is_top_level_expression_call(checker)
+                || !is_top_level_expression_in_statement(checker)
             {
                 Applicability::Unsafe
             } else {
