@@ -1203,7 +1203,7 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
         let scope = self.literal(db).last_definition(db).body_scope(db);
         let inference = infer_scope_types(db, scope);
-        inference.infer_return_type(db, scope, Type::FunctionLiteral(self))
+        inference.infer_return_type(db, scope)
     }
 }
 

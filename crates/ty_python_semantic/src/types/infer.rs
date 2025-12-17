@@ -631,12 +631,7 @@ impl<'db> ScopeInference<'db> {
     /// or `None` if the region is not a function body.
     /// In the case of methods, the return type of the superclass method is further unioned.
     /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
-    pub(crate) fn infer_return_type(
-        &self,
-        db: &'db dyn Db,
-        scope: ScopeId<'db>,
-        callee_ty: Type<'db>,
-    ) -> Type<'db> {
+    pub(crate) fn infer_return_type(&self, db: &'db dyn Db, scope: ScopeId<'db>) -> Type<'db> {
         // TODO: coroutine function type inference
         // TODO: generator function type inference
         if scope.is_coroutine_function(db) || scope.is_generator_function(db) {
@@ -660,14 +655,6 @@ impl<'db> ScopeInference<'db> {
         let use_def = use_def_map(db, scope);
         if use_def.can_implicitly_return_none(db) {
             union = union.add(Type::none(db));
-        }
-        if let Type::BoundMethod(method_ty) = callee_ty {
-            // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
-            // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
-            // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
-            if !method_ty.is_final(db) {
-                union = union.add(method_ty.base_return_type(db).unwrap_or(Type::unknown()));
-            }
         }
 
         union.build()

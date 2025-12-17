@@ -10704,7 +10704,6 @@ pub struct UnionTypeInstance<'db> {
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
     /// the elements as type expressions. Use `value_expression_types` to get the
     /// corresponding value expression types.
-    #[expect(clippy::ref_option)]
     #[returns(ref)]
     _value_expr_types: Option<Box<[Type<'db>]>>,
 
@@ -12158,15 +12157,22 @@ impl<'db> BoundMethodType<'db> {
     }
 
     /// Infers this method scope's types and returns the inferred return type.
-    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
     pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
-        let scope = self
-            .function(db)
-            .literal(db)
-            .last_definition(db)
-            .body_scope(db);
-        let inference = infer_scope_types(db, scope);
-        inference.infer_return_type(db, scope, Type::BoundMethod(self))
+        let inferred_return_type = self.function(db).infer_return_type(db);
+        // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+        // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
+        // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+        if !self.is_final(db) {
+            UnionType::from_elements(
+                db,
+                [
+                    inferred_return_type,
+                    self.base_return_type(db).unwrap_or(Type::unknown()),
+                ],
+            )
+        } else {
+            inferred_return_type
+        }
     }
 
     #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
@@ -12303,24 +12309,6 @@ impl<'db> BoundMethodType<'db> {
                 )
             })
     }
-}
-
-fn return_type_cycle_recover<'db>(
-    db: &'db dyn Db,
-    cycle: &salsa::Cycle,
-    previous_return_type: &Type<'db>,
-    return_type: Type<'db>,
-    _self: BoundMethodType<'db>,
-) -> Type<'db> {
-    return_type.cycle_normalized(db, *previous_return_type, cycle)
-}
-
-fn return_type_cycle_initial<'db>(
-    _db: &'db dyn Db,
-    id: salsa::Id,
-    _method: BoundMethodType<'db>,
-) -> Type<'db> {
-    Type::divergent(id)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
