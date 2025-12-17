@@ -289,9 +289,8 @@ impl Suppressions {
         suppression: &Suppression,
         comment: &SuppressionComment,
     ) -> (TextRange, Edit) {
-        let range: TextRange;
+        let mut range = comment.range;
         let edit = if comment.codes.len() == 1 {
-            range = comment.codes[0];
             delete_comment(comment.range, locator)
         } else {
             let code_index = comment
