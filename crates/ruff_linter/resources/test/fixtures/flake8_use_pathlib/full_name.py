@@ -137,3 +137,10 @@ os.rename("pth1_file", "pth1_file1", None, None, 1, *[1], **{"x": 1}, foo=1)
 os.replace("pth1_file1", "pth1_file", None, None, 1, *[1], **{"x": 1}, foo=1)
 
 os.path.samefile("pth1_file", "pth1_link", 1, *[1], **{"x": 1}, foo=1)
+
+# https://github.com/astral-sh/ruff/issues/21342
+# if `dir_fd=None` is explicitly set, should still trigger the diagnostic
+os.readlink(p, dir_fd=None)
+os.unlink(p, dir_fd=None)
+os.remove(p, dir_fd=None)
+os.rmdir(p, dir_fd=None)
