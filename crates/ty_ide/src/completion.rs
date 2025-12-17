@@ -4,7 +4,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
-use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::Name;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
@@ -75,11 +75,7 @@ pub fn completion<'db>(
                 }
             }
 
-            if let Some(arg_completions) =
-                detect_function_arg_completions(db, file, &parsed, offset)
-            {
-                completions.extend(arg_completions);
-            }
+            add_function_arg_completions(db, file, &context.cursor, &mut completions);
         }
     }
 
@@ -656,6 +652,11 @@ impl<'m> ContextCursor<'m> {
         Some(TextRange::new(last.start(), offset))
     }
 
+    /// Convenience method for `covering_node(cursor.parsed.syntax().into(), ...)`.
+    fn covering_node(&self, range: TextRange) -> CoveringNode<'m> {
+        covering_node(self.parsed.syntax().into(), range)
+    }
+
     /// Whether the last token is in a place where we should not provide completions.
     fn is_in_no_completions_place(&self) -> bool {
         self.is_in_comment() || self.is_in_string() || self.is_in_definition_place()
@@ -719,7 +720,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns true when the cursor sits on a binding statement.
     /// E.g. naming a parameter, type parameter, or `for` <name>).
     fn is_in_variable_binding(&self) -> bool {
-        let covering = covering_node(self.parsed.syntax().into(), self.range);
+        let covering = self.covering_node(self.range);
         covering.ancestors().any(|node| match node {
             ast::AnyNodeRef::Parameter(param) => param.name.range.contains_range(self.range),
             ast::AnyNodeRef::TypeParamTypeVar(type_param) => {
@@ -777,7 +778,7 @@ impl<'m> ContextCursor<'m> {
     /// Returns true when the cursor is after the `in` keyword in a
     /// `for x in <CURSOR>` statement.
     fn is_specifying_for_statement_iterable(&self) -> bool {
-        let covering = covering_node(self.parsed.syntax().into(), self.range);
+        let covering = self.covering_node(self.range);
         covering.parent().is_some_and(|node| {
             matches!(
                node,
@@ -941,40 +942,43 @@ enum Sort {
 /// Suggestions are only provided if the cursor is currently inside a
 /// function call and the function arguments have not 1) already been
 /// set and 2) been defined as positional-only.
-fn detect_function_arg_completions<'db>(
+fn add_function_arg_completions<'db>(
     db: &'db dyn Db,
     file: File,
-    parsed: &ParsedModuleRef,
-    offset: TextSize,
-) -> Option<Vec<Completion<'db>>> {
+    cursor: &ContextCursor<'_>,
+    completions: &mut Completions<'db>,
+) {
     // But be careful: this isn't as simple as just finding a call
     // expression. We also have to make sure we are in the "arguments"
     // portion of the call. Otherwise we risk incorrectly returning
     // something for `(<CURSOR>)(arg1, arg2)`-style expressions.
-    if !covering_node(parsed.syntax().into(), TextRange::empty(offset))
+    if !cursor
+        .covering_node(TextRange::empty(cursor.offset))
         .ancestors()
         .take_while(|node| !node.is_statement())
         .any(|node| node.is_arguments())
     {
-        return None;
+        return;
     }
 
-    let sig_help = signature_help(db, file, offset)?;
-    let set_function_args = detect_set_function_args(parsed, offset);
+    let Some(sig_help) = signature_help(db, file, cursor.offset) else {
+        return;
+    };
+    let set_function_args = detect_set_function_args(cursor);
 
-    let completions = sig_help
-        .signatures
-        .iter()
-        .flat_map(|sig| &sig.parameters)
-        .filter(|p| !p.is_positional_only && !set_function_args.contains(&p.name.as_str()))
-        .map(|p| {
+    for sig in &sig_help.signatures {
+        for p in &sig.parameters {
+            if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
+                continue;
+            }
+
             let name = Name::new(&p.name);
             let documentation = p
                 .documentation
                 .as_ref()
                 .map(|d| Docstring::new(d.to_owned()));
             let insert = Some(format!("{name}=").into_boxed_str());
-            Completion {
+            completions.add(Completion {
                 name,
                 qualified: None,
                 insert,
@@ -986,10 +990,9 @@ fn detect_function_arg_completions<'db>(
                 is_type_check_only: false,
                 is_definitively_raisable: false,
                 documentation,
-            }
-        })
-        .collect();
-    Some(completions)
+            });
+        }
+    }
 }
 
 /// Returns function arguments that have already been set.
@@ -1011,9 +1014,10 @@ fn detect_function_arg_completions<'db>(
 ///
 /// If the parent node is not an arguments node, the return value
 /// is an empty Vec.
-fn detect_set_function_args(parsed: &ParsedModuleRef, offset: TextSize) -> FxHashSet<&str> {
-    let range = TextRange::empty(offset);
-    covering_node(parsed.syntax().into(), range)
+fn detect_set_function_args<'m>(cursor: &ContextCursor<'m>) -> FxHashSet<&'m str> {
+    let range = TextRange::empty(cursor.offset);
+    cursor
+        .covering_node(range)
         .parent()
         .and_then(|node| match node {
             ast::AnyNodeRef::Arguments(args) => Some(args),
@@ -1272,7 +1276,8 @@ impl<'t> CompletionTargetTokens<'t> {
     fn ast(&self, cursor: &ContextCursor<'t>) -> Option<CompletionTargetAst<'t>> {
         match *self {
             CompletionTargetTokens::PossibleObjectDot { object, .. } => {
-                let covering_node = covering_node(cursor.parsed.syntax().into(), object.range())
+                let covering_node = cursor
+                    .covering_node(object.range())
                     .find_last(|node| {
                         // We require that the end of the node range not
                         // exceed the cursor offset. This avoids selecting
@@ -1301,12 +1306,12 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             }
             CompletionTargetTokens::Generic { token } => {
-                let node = covering_node(cursor.parsed.syntax().into(), token.range()).node();
+                let node = cursor.covering_node(token.range()).node();
                 Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
             CompletionTargetTokens::Unknown => {
                 let range = TextRange::empty(cursor.offset);
-                let covering_node = covering_node(cursor.parsed.syntax().into(), range);
+                let covering_node = cursor.covering_node(range);
                 Some(CompletionTargetAst::Scoped(ScopedTarget {
                     node: covering_node.node(),
                 }))
