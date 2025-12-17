@@ -50,10 +50,10 @@ reveal_type(custom_builtin)  # revealed: Custom
 reveal_type(str)  # revealed: Unknown
 ```
 
-## Unknown builtin (later defined)
+## Forward reference in builtins stub
 
-`foo` has a type of `Unknown` in this example, as it relies on `bar` which has not been defined at
-that point:
+In stub files, forward references are allowed in all expressions, so `foo` correctly resolves to the
+type of `bar` even though `bar` is defined later:
 
 ```toml
 [environment]
@@ -74,5 +74,5 @@ def reveal_type(obj, /): ...
 ```
 
 ```py
-reveal_type(foo)  # revealed: Unknown
+reveal_type(foo)  # revealed: Literal[1]
 ```
