@@ -21,7 +21,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
-use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::KnownModule;
@@ -52,6 +51,7 @@ use crate::types::{
     enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
+use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -4156,8 +4156,13 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let provided_ty_display = provided_ty.display(context.db());
-                let expected_ty_display = expected_ty.display(context.db());
+                let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                    context.db(),
+                    [provided_ty, expected_ty],
+                );
+                let provided_ty_display =
+                    provided_ty.display_with(context.db(), display_settings.clone());
+                let expected_ty_display = expected_ty.display_with(context.db(), display_settings);
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
