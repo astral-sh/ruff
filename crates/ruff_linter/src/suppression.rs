@@ -189,14 +189,15 @@ impl Suppressions {
                         }
                     };
 
-                    let mut diagnostic = context.report_diagnostic(
-                        UnusedNOQA {
-                            codes: Some(codes),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                        range,
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(edit));
+                    context
+                        .report_diagnostic(
+                            UnusedNOQA {
+                                codes: Some(codes),
+                                kind: UnusedNOQAKind::Suppression,
+                            },
+                            range,
+                        )
+                        .set_fix(Fix::safe_edit(edit));
                 }
             }
 
@@ -206,14 +207,15 @@ impl Suppressions {
                 .iter()
                 .filter(|error| error.kind == ParseErrorKind::MissingCodes)
             {
-                let mut diagnostic = context.report_diagnostic(
-                    UnusedNOQA {
-                        codes: Some(UnusedCodes::default()),
-                        kind: UnusedNOQAKind::Suppression,
-                    },
-                    error.range,
-                );
-                diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+                context
+                    .report_diagnostic(
+                        UnusedNOQA {
+                            codes: Some(UnusedCodes::default()),
+                            kind: UnusedNOQAKind::Suppression,
+                        },
+                        error.range,
+                    )
+                    .set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
             }
         }
 
@@ -226,14 +228,15 @@ impl Suppressions {
                 for comment in &suppression.comments {
                     let (range, edit) =
                         Suppressions::delete_code_or_comment(locator, suppression, comment);
-                    let mut diagnostic = context.report_diagnostic(
-                        InvalidRuleCode {
-                            rule_code: suppression.code.to_string(),
-                            kind: InvalidRuleCodeKind::Suppression,
-                        },
-                        range,
-                    );
-                    diagnostic.set_fix(Fix::safe_edit(edit));
+                    context
+                        .report_diagnostic(
+                            InvalidRuleCode {
+                                rule_code: suppression.code.to_string(),
+                                kind: InvalidRuleCodeKind::Suppression,
+                            },
+                            range,
+                        )
+                        .set_fix(Fix::safe_edit(edit));
                 }
             }
         }
@@ -245,26 +248,28 @@ impl Suppressions {
                 .iter()
                 .filter(|error| error.kind != ParseErrorKind::MissingCodes)
             {
-                let mut diagnostic = context.report_diagnostic(
-                    InvalidSuppressionComment {
-                        kind: InvalidSuppressionCommentKind::Error(error.kind),
-                    },
-                    error.range,
-                );
-                diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
+                context
+                    .report_diagnostic(
+                        InvalidSuppressionComment {
+                            kind: InvalidSuppressionCommentKind::Error(error.kind),
+                        },
+                        error.range,
+                    )
+                    .set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
             }
 
             for invalid in &self.invalid {
-                let mut diagnostic = context.report_diagnostic(
-                    InvalidSuppressionComment {
-                        kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
-                    },
-                    invalid.comment.range,
-                );
-                diagnostic.set_fix(Fix::unsafe_edit(delete_comment(
-                    invalid.comment.range,
-                    locator,
-                )));
+                context
+                    .report_diagnostic(
+                        InvalidSuppressionComment {
+                            kind: InvalidSuppressionCommentKind::Invalid(invalid.kind),
+                        },
+                        invalid.comment.range,
+                    )
+                    .set_fix(Fix::unsafe_edit(delete_comment(
+                        invalid.comment.range,
+                        locator,
+                    )));
             }
         }
 
