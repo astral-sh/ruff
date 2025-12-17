@@ -2277,7 +2277,11 @@ impl<'db> ClassLiteral<'db> {
         specialization: Option<Specialization<'db>>,
         name: &str,
     ) -> Member<'db> {
-        if self.dataclass_params(db).is_some() {
+        // Check if this class is dataclass-like (either via @dataclass or via dataclass_transform)
+        if matches!(
+            CodeGeneratorKind::from_class(db, self, specialization),
+            Some(CodeGeneratorKind::DataclassLike(_))
+        ) {
             if name == "__dataclass_fields__" {
                 // Make this class look like a subclass of the `DataClassInstance` protocol
                 return Member {
