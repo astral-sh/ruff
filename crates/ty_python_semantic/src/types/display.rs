@@ -1678,7 +1678,7 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
 
         // If we're multiline printing and a name hasn't been emitted, try to
-        // make one up to make things more pretty
+        // remember what the name was by checking if we have a definition
         if self.settings.multiline
             && !self.settings.disallow_signature_name
             && let Some(definition) = self.definition
