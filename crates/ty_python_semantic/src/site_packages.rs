@@ -173,13 +173,9 @@ impl PythonEnvironment {
             PythonEnvironment::new(path, origin, system)
         }
 
-        if let Ok(virtual_env) = system.env_var(EnvVars::VIRTUAL_ENV) {
-            return resolve_environment(
-                system,
-                SystemPath::new(&virtual_env),
-                SysPrefixPathOrigin::VirtualEnvVar,
-            )
-            .map(Some);
+        if let Some(virtual_env) = virtual_environment_from_env(system) {
+            return resolve_environment(system, &virtual_env, SysPrefixPathOrigin::VirtualEnvVar)
+                .map(Some);
         }
 
         if let Some(conda_env) = conda_environment_from_env(system, CondaEnvironmentKind::Child) {
@@ -694,6 +690,25 @@ pub(crate) fn conda_environment_from_env(
     }
 
     Some(path)
+}
+
+/// Read `VIRTUAL_ENV`.
+///
+/// Returns `None` if `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set.
+pub(crate) fn virtual_environment_from_env(system: &dyn System) -> Option<SystemPathBuf> {
+    let dir = system.env_var(EnvVars::VIRTUAL_ENV).ok()?;
+
+    if system
+        .env_var(EnvVars::TY_IGNORE_ACTIVE_VIRTUAL_ENV)
+        .is_ok_and(|v| matches!(v.as_str(), "1" | "true"))
+    {
+        tracing::debug!(
+            "Ignoring active virtual environment (from `VIRTUAL_ENV`)  due to `TY_IGNORE_ACTIVE_VIRTUAL_ENV`"
+        );
+        return None;
+    }
+
+    Some(SystemPathBuf::from(dir))
 }
 
 /// A parser for `pyvenv.cfg` files: metadata files for virtual environments.

@@ -2703,3 +2703,123 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// When `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set to `1` or `true`, ty should ignore the `VIRTUAL_ENV`
+/// environment variable and fall back to other discovery mechanisms.
+#[test]
+fn ignore_active_virtual_env() -> anyhow::Result<()> {
+    let active_venv_package1_path = if cfg!(windows) {
+        "myvenv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "myvenv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let working_venv_package1_path = if cfg!(windows) {
+        "project/.venv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "project/.venv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = CliTest::with_files([
+        (
+            "project/test.py",
+            r#"
+            from package1 import ActiveVenv
+            from package1 import WorkingVenv
+            "#,
+        ),
+        (
+            "project/.venv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            "myvenv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            active_venv_package1_path,
+            r#"
+            class WorkingVenv: ...
+            "#,
+        ),
+        (
+            working_venv_package1_path,
+            r#"
+            class ActiveVenv: ...
+            "#,
+        ),
+    ])?;
+
+    // With `VIRTUAL_ENV` set, the active environment is found
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("myvenv")), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `ActiveVenv`
+     --> test.py:2:22
+      |
+    2 | from package1 import ActiveVenv
+      |                      ^^^^^^^^^^
+    3 | from package1 import WorkingVenv
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "###);
+
+    // With `TY_IGNORE_ACTIVE_VIRTUAL_ENV=1`, we ignore `VIRTUAL_ENV` and find the `.venv` instead
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("myvenv"))
+        .env("TY_IGNORE_ACTIVE_VIRTUAL_ENV", "1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "###);
+
+    // We still find `.venv` when activated and `TY_IGNORE_ACTIVE_VIRTUAL_ENV` is set
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join(".venv"))
+        .env("TY_IGNORE_ACTIVE_VIRTUAL_ENV", "1"), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `package1` has no member `WorkingVenv`
+     --> test.py:3:22
+      |
+    2 | from package1 import ActiveVenv
+    3 | from package1 import WorkingVenv
+      |                      ^^^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
