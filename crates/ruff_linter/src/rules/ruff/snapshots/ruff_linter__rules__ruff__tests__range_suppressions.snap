@@ -576,7 +576,7 @@ help: Remove unused suppression
 90 | 
 
 
-RUF102 [*] Invalid rule code in `# noqa`: YF829
+RUF102 [*] Invalid rule code in suppression: YF829
   --> suppressions.py:93:21
    |
 91 | def f():
@@ -596,7 +596,7 @@ help: Remove the rule code
 95 |     # ruff: enable[F841, RQW320]
 
 
-RUF102 [*] Invalid rule code in `# noqa`: RQW320
+RUF102 [*] Invalid rule code in suppression: RQW320
   --> suppressions.py:94:27
    |
 92 |     # Unknown rule codes
@@ -617,7 +617,7 @@ help: Remove the rule code
 97 |     # ruff: enable[YF829]
 
 
-RUF102 [*] Invalid rule code in `# noqa`: RQW320
+RUF102 [*] Invalid rule code in suppression: RQW320
   --> suppressions.py:96:26
    |
 94 |     # ruff: disable[F841, RQW320]
@@ -637,7 +637,7 @@ help: Remove the rule code
 99 | 
 
 
-RUF102 [*] Invalid rule code in `# noqa`: YF829
+RUF102 [*] Invalid rule code in suppression: YF829
   --> suppressions.py:97:20
    |
 95 |     value = 0
@@ -655,7 +655,7 @@ help: Remove the rule code
 99 | def f():
 
 
-RUF102 [*] Invalid rule code in `# noqa`: TK421
+RUF102 [*] Invalid rule code in suppression: TK421
    --> suppressions.py:102:21
     |
 100 | def f():
@@ -674,7 +674,7 @@ help: Remove the rule code
 103 |     # ruff: enable[TK421]
 
 
-RUF102 [*] Invalid rule code in `# noqa`: TK421
+RUF102 [*] Invalid rule code in suppression: TK421
    --> suppressions.py:104:20
     |
 102 |     # ruff: disable[TK421]

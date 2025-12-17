@@ -19,7 +19,7 @@ use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
 use crate::rules::ruff::rules::{
-    InvalidRuleCode, InvalidSuppressionComment, InvalidSuppressionCommentKind,
+    InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
     UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
 };
 use crate::settings::LinterSettings;
@@ -229,6 +229,7 @@ impl Suppressions {
                     let mut diagnostic = context.report_diagnostic(
                         InvalidRuleCode {
                             rule_code: suppression.code.to_string(),
+                            kind: InvalidRuleCodeKind::Suppression,
                         },
                         range,
                     );
