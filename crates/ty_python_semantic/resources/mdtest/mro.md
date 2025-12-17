@@ -393,7 +393,7 @@ else:
 # revealed: (<class 'B'>, <class 'X'>, <class 'Y'>, <class 'O'>, <class 'object'>) | (<class 'B'>, <class 'Y'>, <class 'X'>, <class 'O'>, <class 'object'>)
 reveal_mro(B)
 
-# error: 12 [unsupported-base] "Unsupported class base with type `<class 'B'> | <class 'B'>`"
+# error: 12 [unsupported-base] "Unsupported class base with type `<class 'mdtest_snippet.B @ src/mdtest_snippet.py:25'> | <class 'mdtest_snippet.B @ src/mdtest_snippet.py:28'>`"
 class Z(A, B): ...
 
 reveal_mro(Z)  # revealed: (<class 'Z'>, Unknown, <class 'object'>)

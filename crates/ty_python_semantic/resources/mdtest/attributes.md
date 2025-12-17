@@ -1208,7 +1208,7 @@ def _(flag: bool):
     reveal_type(C1.y)  # revealed: int | str
 
     C1.y = 100
-    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'C1'> | <class 'C1'>`"
+    # error: [invalid-assignment] "Object of type `Literal["problematic"]` is not assignable to attribute `y` on type `<class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:3'> | <class 'mdtest_snippet.<locals of function '_'>.C1 @ src/mdtest_snippet.py:8'>`"
     C1.y = "problematic"
 
     class C2:

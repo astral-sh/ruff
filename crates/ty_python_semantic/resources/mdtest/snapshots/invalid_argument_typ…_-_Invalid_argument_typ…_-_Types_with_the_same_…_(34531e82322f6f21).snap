@@ -1,0 +1,51 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_argument_type.md - Invalid argument type diagnostics - Types with the same name but from different files
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_argument_type.md
+---
+
+# Python source files
+
+## module.py
+
+```
+1 | class Foo: ...
+2 | 
+3 | def needs_a_foo(x: Foo): ...
+```
+
+## main.py
+
+```
+1 | from module import needs_a_foo
+2 | 
+3 | class Foo: ...
+4 | 
+5 | needs_a_foo(Foo())  # error: [invalid-argument-type]
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Argument to function `needs_a_foo` is incorrect
+ --> src/main.py:5:13
+  |
+3 | class Foo: ...
+4 |
+5 | needs_a_foo(Foo())  # error: [invalid-argument-type]
+  |             ^^^^^ Expected `module.Foo`, found `main.Foo`
+  |
+info: Function defined here
+ --> src/module.py:3:5
+  |
+1 | class Foo: ...
+2 |
+3 | def needs_a_foo(x: Foo): ...
+  |     ^^^^^^^^^^^ ------ Parameter declared here
+  |
+info: rule `invalid-argument-type` is enabled by default
+
+```

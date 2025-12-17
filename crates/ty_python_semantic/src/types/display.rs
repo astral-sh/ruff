@@ -76,14 +76,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types(
-        db: &'db dyn Db,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
+    pub fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
         let collector = AmbiguousClassCollector::default();
 
         for ty in types {
-            collector.visit_type(db, ty);
+            collector.visit_type(db, ty.into());
         }
 
         Self {
@@ -422,6 +423,8 @@ impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
                 inner: Protocol::FromClass(class),
                 ..
             }) => return self.visit_type(db, Type::from(class)),
+            // no need to recurse into TypeVar bounds/constraints
+            Type::TypeVar(_) => return,
             _ => {}
         }
 
@@ -439,7 +442,7 @@ impl<'db> Type<'db> {
     pub fn display(self, db: &'db dyn Db) -> DisplayType<'db> {
         DisplayType {
             ty: self,
-            settings: DisplaySettings::default(),
+            settings: DisplaySettings::from_possibly_ambiguous_types(db, [self]),
             db,
         }
     }
