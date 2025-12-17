@@ -3238,8 +3238,22 @@ impl<'db> Type<'db> {
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_disjoint_from_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_disjoint_from_cached<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            self_ty
+                .when_disjoint_from(db, other, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        }
+
+        if self == other {
+            return false;
+        }
+
+        is_disjoint_from_cached(db, self, other)
     }
 
     fn when_disjoint_from(
@@ -8691,6 +8705,16 @@ fn is_subtype_of_cycle_initial<'db>(
     _id: salsa::Id,
     _self_ty: Type<'db>,
     _target: Type<'db>,
+) -> bool {
+    false
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_disjoint_from_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self_ty: Type<'db>,
+    _other: Type<'db>,
 ) -> bool {
     false
 }
