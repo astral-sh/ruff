@@ -3478,13 +3478,16 @@ fn report_unsupported_base(
     let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Unsupported class base");
+    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(context.db())
+        base_type.display(db)
     ));
     diagnostic.info(format_args!(
         "ty cannot resolve a consistent MRO for class `{}` due to this base",
-        class.name(context.db())
+        class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
 }

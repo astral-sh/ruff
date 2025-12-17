@@ -156,7 +156,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: <types.UnionType special form 'int | str'>
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
 def _(x: int | str | bytes | memoryview | range):
     if isinstance(x, IntOrStr):

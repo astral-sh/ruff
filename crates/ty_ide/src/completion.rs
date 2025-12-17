@@ -67,6 +67,7 @@ impl<'db> Completions<'db> {
         self.items
     }
 
+    // Convert this collection into a list of "import..." fixes
     fn into_imports(mut self) -> Vec<ImportEdit> {
         self.items.sort_by(compare_suggestions);
         self.items
@@ -77,6 +78,28 @@ impl<'db> Completions<'db> {
                 Some(ImportEdit {
                     label: format!("import {}", item.qualified?),
                     edit: item.import?,
+                })
+            })
+            .collect()
+    }
+
+    // Convert this collection into a list of "qualify..." fixes
+    fn into_qualifications(mut self, range: TextRange) -> Vec<ImportEdit> {
+        self.items.sort_by(compare_suggestions);
+        self.items
+            .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        self.items
+            .into_iter()
+            .filter_map(|item| {
+                // If we would have to actually import something, don't suggest the qualification
+                // (we could, maybe we should, but for now, we don't)
+                if item.import.is_some() {
+                    return None;
+                }
+
+                Some(ImportEdit {
+                    label: format!("qualify {}", item.insert.as_ref()?),
+                    edit: Edit::replacement(item.insert?.into_string(), range.start(), range.end()),
                 })
             })
             .collect()
@@ -467,6 +490,17 @@ pub fn completion<'db>(
             !ty.is_notimplemented(db)
         });
     }
+    if is_specifying_for_statement_iterable(&parsed, offset, typed.as_deref()) {
+        // Remove all keywords that doesn't make sense given the context,
+        // even if they are syntatically valid, e.g. `None`.
+        completions.retain(|item| {
+            let Some(kind) = item.kind else { return true };
+            if kind != CompletionKind::Keyword {
+                return true;
+            }
+            matches!(item.name.as_str(), "await" | "lambda" | "yield")
+        });
+    }
     completions.into_completions()
 }
 
@@ -481,6 +515,18 @@ fn detect_function_arg_completions<'db>(
     parsed: &ParsedModuleRef,
     offset: TextSize,
 ) -> Option<Vec<Completion<'db>>> {
+    // But be careful: this isn't as simple as just finding a call
+    // expression. We also have to make sure we are in the "arguments"
+    // portion of the call. Otherwise we risk incorrectly returning
+    // something for `(<CURSOR>)(arg1, arg2)`-style expressions.
+    if !covering_node(parsed.syntax().into(), TextRange::empty(offset))
+        .ancestors()
+        .take_while(|node| !node.is_statement())
+        .any(|node| node.is_arguments())
+    {
+        return None;
+    }
+
     let sig_help = signature_help(db, file, offset)?;
     let set_function_args = detect_set_function_args(parsed, offset);
 
@@ -555,15 +601,19 @@ pub(crate) struct ImportEdit {
     pub edit: Edit,
 }
 
-pub(crate) fn missing_imports(
+/// Get fixes that would resolve an unresolved reference
+pub(crate) fn unresolved_fixes(
     db: &dyn Db,
     file: File,
     parsed: &ParsedModuleRef,
     symbol: &str,
     node: AnyNodeRef,
 ) -> Vec<ImportEdit> {
-    let mut completions = Completions::exactly(db, symbol);
+    let mut results = Vec::new();
     let scoped = ScopedTarget { node };
+
+    // Request imports we could add to put the symbol in scope
+    let mut completions = Completions::exactly(db, symbol);
     add_unimported_completions(
         db,
         file,
@@ -574,8 +624,23 @@ pub(crate) fn missing_imports(
         },
         &mut completions,
     );
+    results.extend(completions.into_imports());
 
-    completions.into_imports()
+    // Request qualifications we could apply to the symbol to make it resolve
+    let mut completions = Completions::exactly(db, symbol);
+    add_unimported_completions(
+        db,
+        file,
+        parsed,
+        scoped,
+        |module_name: &ModuleName, symbol: &str| {
+            ImportRequest::import(module_name.as_str(), symbol).force()
+        },
+        &mut completions,
+    );
+    results.extend(completions.into_qualifications(node.range()));
+
+    results
 }
 
 /// Adds completions derived from keywords.
@@ -1565,12 +1630,7 @@ fn is_in_definition_place(
 /// Returns true when the cursor sits on a binding statement.
 /// E.g. naming a parameter, type parameter, or `for` <name>).
 fn is_in_variable_binding(parsed: &ParsedModuleRef, offset: TextSize, typed: Option<&str>) -> bool {
-    let range = if let Some(typed) = typed {
-        let start = offset.saturating_sub(typed.text_len());
-        TextRange::new(start, offset)
-    } else {
-        TextRange::empty(offset)
-    };
+    let range = typed_text_range(typed, offset);
 
     let covering = covering_node(parsed.syntax().into(), range);
     covering.ancestors().any(|node| match node {
@@ -1623,6 +1683,36 @@ fn is_raising_exception(tokens: &[Token]) -> bool {
         }
     }
     false
+}
+
+/// Returns true when the cursor is after the `in` keyword in a
+/// `for x in <CURSOR>` statement.
+fn is_specifying_for_statement_iterable(
+    parsed: &ParsedModuleRef,
+    offset: TextSize,
+    typed: Option<&str>,
+) -> bool {
+    let range = typed_text_range(typed, offset);
+
+    let covering = covering_node(parsed.syntax().into(), range);
+    covering.parent().is_some_and(|node| {
+        matches!(
+           node, ast::AnyNodeRef::StmtFor(stmt_for) if stmt_for.iter.range().contains_range(range)
+        )
+    })
+}
+
+/// Returns the `TextRange` of the `typed` text.
+///
+/// `typed` should be the text immediately before the
+/// provided cursor `offset`.
+fn typed_text_range(typed: Option<&str>, offset: TextSize) -> TextRange {
+    if let Some(typed) = typed {
+        let start = offset.saturating_sub(typed.text_len());
+        TextRange::new(start, offset)
+    } else {
+        TextRange::empty(offset)
+    }
 }
 
 /// Order completions according to the following rules:
@@ -2516,9 +2606,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"<No completions found after filtering out completions>",
         );
     }
 
@@ -2532,9 +2620,7 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"
-            foo
-            ",
+            @"<No completions found after filtering out completions>",
         );
     }
 
@@ -3126,7 +3212,7 @@ quux.<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
         count :: bound method Quux.count(value: Any, /) -> int
-        index :: bound method Quux.index(value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int
+        index :: bound method Quux.index(value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
         x :: int
         y :: str
         __add__ :: Overload[(value: tuple[int | str, ...], /) -> tuple[int | str, ...], (value: tuple[_T@__add__, ...], /) -> tuple[int | str | _T@__add__, ...]]
@@ -3191,7 +3277,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3212,7 +3298,7 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
+        okay=
         "
         );
     }
@@ -3230,9 +3316,9 @@ foo(b<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
-        bar
-        barbaz
-        baz
+        bar=
+        barbaz=
+        baz=
         "
         );
     }
@@ -3249,9 +3335,7 @@ foo(bar=1, b<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        baz
-        "
+            @"baz="
         );
     }
 
@@ -3269,9 +3353,7 @@ abc(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        okay
-        "
+            @"okay="
         );
     }
 
@@ -3287,9 +3369,7 @@ abc(okay=1, ba<CURSOR> baz=5
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-        bar
-        "
+            @"bar="
         );
     }
 
@@ -3333,9 +3413,9 @@ bar(o<CURSOR>
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @r"
         foo
-        okay
-        okay_abc
-        okay_okay
+        okay=
+        okay_abc=
+        okay_okay=
         "
         );
     }
@@ -3355,7 +3435,7 @@ bar(<CURSOR>
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         bar
         foo
-        okay
+        okay=
         ");
     }
 
@@ -4711,8 +4791,7 @@ from os.<CURSOR>
         let last_nonunderscore = test
             .completions()
             .iter()
-            .filter(|c| !c.name.starts_with('_'))
-            .next_back()
+            .rfind(|c| !c.name.starts_with('_'))
             .unwrap();
 
         assert_eq!(&last_nonunderscore.name, "type_check_only");
@@ -5825,6 +5904,62 @@ def foo(param: s<CURSOR>)
     }
 
     #[test]
+    fn no_statement_keywords_in_for_statement_simple1() {
+        completion_test_builder(
+            "\
+for x in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_simple2() {
+        completion_test_builder(
+            "\
+for x, y, _ in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_simple3() {
+        completion_test_builder(
+            "\
+for i, (x, y, z) in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
+    fn no_statement_keywords_in_for_statement_complex() {
+        completion_test_builder(
+            "\
+for i, (obj.x, (a[0], b['k']), _), *rest in a<CURSOR>
+",
+        )
+        .build()
+        .contains("lambda")
+        .contains("await")
+        .not_contains("raise")
+        .not_contains("False");
+    }
+
+    #[test]
     fn favour_symbols_currently_imported() {
         let snapshot = CursorTest::builder()
             .source("main.py", "long_nameb = 1\nlong_name<CURSOR>")
@@ -6582,6 +6717,27 @@ def f(zqzqzq: str):
         );
     }
 
+    #[test]
+    fn auto_import_prioritizes_reusing_import_from_statements() {
+        let builder = completion_test_builder(
+            "\
+import typing
+from typing import Callable
+TypedDi<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.imports().build().snapshot(),
+            @r"
+        TypedDict :: , TypedDict
+        is_typeddict :: , is_typeddict
+        _FilterConfigurationTypedDict :: from logging.config import _FilterConfigurationTypedDict
+
+        _FormatterConfigurationTypedDict :: from logging.config import _FormatterConfigurationTypedDict
+        ",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///
@@ -6607,6 +6763,7 @@ def f(zqzqzq: str):
         skip_builtins: bool,
         skip_keywords: bool,
         type_signatures: bool,
+        imports: bool,
         module_names: bool,
         // This doesn't seem like a "very complex" type to me... ---AG
         #[allow(clippy::type_complexity)]
@@ -6639,6 +6796,7 @@ def f(zqzqzq: str):
                 original,
                 filtered,
                 type_signatures: self.type_signatures,
+                imports: self.imports,
                 module_names: self.module_names,
             }
         }
@@ -6699,6 +6857,15 @@ def f(zqzqzq: str):
             self
         }
 
+        /// When set, include the import associated with the
+        /// completion.
+        ///
+        /// Not enabled by default.
+        fn imports(mut self) -> CompletionTestBuilder {
+            self.imports = true;
+            self
+        }
+
         /// When set, the module name for each symbol is included
         /// in the snapshot (if available).
         fn module_names(mut self) -> CompletionTestBuilder {
@@ -6731,6 +6898,9 @@ def f(zqzqzq: str):
         /// Whether type signatures should be included in the snapshot
         /// generated by `CompletionTest::snapshot`.
         type_signatures: bool,
+        /// Whether to show the import that will be inserted when this
+        /// completion is selected.
+        imports: bool,
         /// Whether module names should be included in the snapshot
         /// generated by `CompletionTest::snapshot`.
         module_names: bool,
@@ -6752,7 +6922,7 @@ def f(zqzqzq: str):
             self.filtered
                 .iter()
                 .map(|c| {
-                    let mut snapshot = c.name.as_str().to_string();
+                    let mut snapshot = c.insert.as_deref().unwrap_or(c.name.as_str()).to_string();
                     if self.type_signatures {
                         let ty =
                             c.ty.map(|ty| ty.display(self.db).to_string())
@@ -6765,6 +6935,17 @@ def f(zqzqzq: str):
                             .map(ModuleName::as_str)
                             .unwrap_or("<no import required>");
                         snapshot = format!("{snapshot} :: {module_name}");
+                    }
+                    if self.imports {
+                        if let Some(ref edit) = c.import {
+                            if let Some(import) = edit.content() {
+                                snapshot = format!("{snapshot} :: {import}");
+                            } else {
+                                snapshot = format!("{snapshot} :: <import deletion>");
+                            }
+                        } else {
+                            snapshot = format!("{snapshot} :: <no import edit>");
+                        }
                     }
                     snapshot
                 })
@@ -6814,6 +6995,7 @@ def f(zqzqzq: str):
                 skip_builtins: false,
                 skip_keywords: false,
                 type_signatures: false,
+                imports: false,
                 module_names: false,
                 predicate: None,
             }

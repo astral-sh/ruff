@@ -216,3 +216,69 @@ max_message_id = (
     .baz()
 )
 
+# Note in preview we split at `pl` which some
+# folks may dislike. (Similarly with common
+# `np` and `pd` invocations).
+#
+# This is because we cannot reliably predict,
+# just from syntax, whether a short identifier
+# is being used as a 'namespace' or as an 'object'.
+#
+# As of 2025.12.15, we do not indent methods in
+# fluent formatting. If we ever decide to do so,
+# it may make sense to special case call chain roots
+# that are shorter than the indent-width (like Prettier does).
+# This would have the benefit of handling these common
+# two-letter aliases for libraries.
+
+
+expr = (
+    pl.scan_parquet("/data/pypi-parquet/*.parquet")
+    .filter(
+        [
+            pl.col("path").str.contains(
+                r"\.(asm|c|cc|cpp|cxx|h|hpp|rs|[Ff][0-9]{0,2}(?:or)?|go)$"
+            ),
+            ~pl.col("path").str.contains(r"(^|/)test(|s|ing)"),
+            ~pl.col("path").str.contains("/site-packages/", literal=True),
+        ]
+    )
+    .with_columns(
+        month=pl.col("uploaded_on").dt.truncate("1mo"),
+        ext=pl.col("path")
+        .str.extract(pattern=r"\.([a-z0-9]+)$", group_index=1)
+        .str.replace_all(pattern=r"cxx|cpp|cc|c|hpp|h", value="C/C++")
+        .str.replace_all(pattern="^f.*$", value="Fortran")
+        .str.replace("rs", "Rust", literal=True)
+        .str.replace("go", "Go", literal=True)
+        .str.replace("asm", "Assembly", literal=True)
+        .replace({"": None}),
+    )
+    .group_by(["month", "ext"])
+    .agg(project_count=pl.col("project_name").n_unique())
+    .drop_nulls(["ext"])
+    .sort(["month", "project_count"], descending=True)
+)
+
+def indentation_matching_for_loop_in_preview():
+    if make_this:
+        if more_nested_because_line_length:
+            identical_hidden_layer_sizes = all(
+            current_hidden_layer_sizes == first_hidden_layer_sizes
+            for current_hidden_layer_sizes in self.component_config[
+                HIDDEN_LAYERS_SIZES
+            ].values().attr
+           )
+
+def indentation_matching_walrus_in_preview():
+    if make_this:
+        if more_nested_because_line_length:
+            with self.read_ctx(book_type) as cursor:
+                if (entry_count := len(names := cursor.execute(
+                    'SELECT name FROM address_book WHERE address=?',
+                    (address,),
+                ).fetchall().some_attr)) == 0 or len(set(names)) > 1:
+                    return
+
+# behavior with parenthesized roots
+x = (aaaaaaaaaaaaaaaaaaaaaa).bbbbbbbbbbbbbbbbbbb.cccccccccccccccccccccccc().dddddddddddddddddddddddd().eeeeeeeeeeee

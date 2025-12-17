@@ -477,7 +477,7 @@ def keyword_only_with_default_2(*, y: int = 42) -> int:
 # parameter list i.e., `()`
 # TODO: This shouldn't error
 # error: [invalid-argument-type]
-# revealed: (*, x: int = Literal[42]) -> bool
+# revealed: (*, x: int = 42) -> bool
 reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
 
 def keyword_only1(*, x: int) -> int:
@@ -503,7 +503,8 @@ class C[**P]:
     def __init__(self, f: Callable[P, int]) -> None:
         self.f = f
 
-def f(x: int, y: str) -> bool:
+# Note that the return type must match exactly, since C is invariant on the return type of C.f.
+def f(x: int, y: str) -> int:
     return True
 
 c = C(f)
@@ -618,6 +619,22 @@ reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int,
 reveal_type(foo.method(1, "a"))  # revealed: str
 ```
 
+### Gradual types propagate through `ParamSpec` inference
+
+```py
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@callable_identity
+def f(env: dict) -> None:
+    pass
+
+# revealed: (env: dict[Unknown, Unknown]) -> None
+reveal_type(f)
+```
+
 ### Overloads
 
 `overloaded.pyi`:
@@ -662,7 +679,7 @@ reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, 
 reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
 # error: [invalid-argument-type]
-reveal_type(change_return_type(str_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
 # TODO: Both of these shouldn't raise an error
 # error: [invalid-argument-type]

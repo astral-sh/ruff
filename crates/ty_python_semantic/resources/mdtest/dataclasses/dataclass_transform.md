@@ -643,6 +643,91 @@ reveal_type(Person.__init__)  # revealed: (self: Person, name: str) -> None
 Person(name="Alice")
 ```
 
+### Field specifiers using `**kwargs`
+
+Some field specifiers may use `**kwargs` to pass through standard parameters like `default`,
+`default_factory`, `init`, `kw_only`, and `alias`. This section tests that all these parameters work
+correctly when passed via `**kwargs` for all three kinds of transformers.
+
+#### Function-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+def create_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@create_model
+class Person:
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
+#### Metaclass-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Person(ModelBase):
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
+#### Base-class-based transformer
+
+```py
+from typing import Any
+from typing_extensions import dataclass_transform
+
+def field(**kwargs: Any) -> Any: ...
+@dataclass_transform(field_specifiers=(field,))
+class ModelBase: ...
+
+class Person(ModelBase):
+    id: int = field(init=False)
+    name: str
+    age: int = field(default=0)
+    tags: list[str] = field(default_factory=list)
+    email: str = field(kw_only=True)
+    internal_notes: str = field(alias="notes")
+
+# revealed: (self: Person, name: str, age: int = ..., tags: list[str] = ..., notes: str, *, email: str) -> None
+reveal_type(Person.__init__)
+
+Person("Alice", 30, [], "some notes", email="alice@example.com")
+Person("Bob", email="bob@example.com", notes="other notes")
+```
+
 ### Support for `alias`
 
 The `alias` parameter in field specifiers allows providing an alternative name for the parameter in
@@ -749,8 +834,8 @@ class Outer:
     outer_a: int = outer_field(init=False)
     outer_b: str = inner_field(init=False)
 
-reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = Any) -> None
-reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = Any) -> None
+reveal_type(Outer.__init__)  # revealed: (self: Outer, outer_b: str = ...) -> None
+reveal_type(Outer.Inner.__init__)  # revealed: (self: Inner, inner_b: str = ...) -> None
 ```
 
 ## Overloaded dataclass-like decorators
@@ -866,6 +951,85 @@ class TemperatureSensor(Sensor):
 t = TemperatureSensor(key=1, name="Temperature Sensor")
 reveal_type(t.key)  # revealed: int
 reveal_type(t.name)  # revealed: str
+```
+
+## `__dataclass_fields__` and `DataclassInstance` protocol
+
+Classes created via `dataclass_transform` should have `__dataclass_fields__` and
+`__dataclass_params__` attributes, allowing them to satisfy the `DataclassInstance` protocol. This
+enables use of `dataclasses.fields`, `dataclasses.asdict`, `dataclasses.replace`, etc.
+
+### Function-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+def create_model[T](cls: type[T]) -> type[T]:
+    return cls
+
+@create_model
+class Person:
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
+```
+
+### Metaclass-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+class ModelMeta(type): ...
+
+class ModelBase(metaclass=ModelMeta): ...
+
+class Person(ModelBase):
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
+```
+
+### Base-class-based transformer
+
+```py
+from dataclasses import fields, asdict, replace, Field
+from typing import dataclass_transform, Any
+
+@dataclass_transform()
+class ModelBase: ...
+
+class Person(ModelBase):
+    name: str
+    age: int
+
+p = Person("Alice", 30)
+
+reveal_type(Person.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+reveal_type(p.__dataclass_fields__)  # revealed: dict[str, Field[Any]]
+
+reveal_type(fields(Person))  # revealed: tuple[Field[Any], ...]
+reveal_type(asdict(p))  # revealed: dict[str, Any]
+reveal_type(replace(p, name="Bob"))  # revealed: Person
 ```
 
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform

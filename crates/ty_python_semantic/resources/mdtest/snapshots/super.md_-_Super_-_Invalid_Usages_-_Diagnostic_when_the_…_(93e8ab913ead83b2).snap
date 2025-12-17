@@ -1,0 +1,39 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: super.md - Super - Invalid Usages - Diagnostic when the invalid type is rendered very verbosely
+mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def coinflip() -> bool:
+2 |     return False
+3 | 
+4 | def f():
+5 |     if coinflip():
+6 |         class A: ...
+7 |     else:
+8 |         class A: ...
+9 |     super(A, A())  # error: [invalid-super-argument]
+```
+
+# Diagnostics
+
+```
+error[invalid-super-argument]: Argument is not a valid class
+ --> src/mdtest_snippet.py:9:5
+  |
+7 |     else:
+8 |         class A: ...
+9 |     super(A, A())  # error: [invalid-super-argument]
+  |     ^^^^^^^^^^^^^ Argument has type `<class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:6'> | <class 'mdtest_snippet.<locals of function 'f'>.A @ src/mdtest_snippet.py:8'>`
+  |
+info: rule `invalid-super-argument` is enabled by default
+
+```

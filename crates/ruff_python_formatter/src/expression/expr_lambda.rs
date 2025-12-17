@@ -397,7 +397,8 @@ impl Format<PyFormatContext<'_>> for FormatBody<'_> {
                 body.into(),
                 comments.ranges(),
                 f.context().source(),
-            ) == CallChainLayout::Fluent
+            )
+            .is_fluent()
             {
                 parenthesize_if_expands(&unparenthesized).fmt(f)
             } else {

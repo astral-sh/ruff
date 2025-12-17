@@ -76,14 +76,15 @@ impl<'db> DisplaySettings<'db> {
     }
 
     #[must_use]
-    pub fn from_possibly_ambiguous_types(
-        db: &'db dyn Db,
-        types: impl IntoIterator<Item = Type<'db>>,
-    ) -> Self {
+    pub fn from_possibly_ambiguous_types<I, T>(db: &'db dyn Db, types: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
         let collector = AmbiguousClassCollector::default();
 
         for ty in types {
-            collector.visit_type(db, ty);
+            collector.visit_type(db, ty.into());
         }
 
         Self {
@@ -422,6 +423,8 @@ impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
                 inner: Protocol::FromClass(class),
                 ..
             }) => return self.visit_type(db, Type::from(class)),
+            // no need to recurse into TypeVar bounds/constraints
+            Type::TypeVar(_) => return,
             _ => {}
         }
 
@@ -439,7 +442,7 @@ impl<'db> Type<'db> {
     pub fn display(self, db: &'db dyn Db) -> DisplayType<'db> {
         DisplayType {
             ty: self,
-            settings: DisplaySettings::default(),
+            settings: DisplaySettings::from_possibly_ambiguous_types(db, [self]),
             db,
         }
     }
@@ -709,7 +712,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             },
             Type::SpecialForm(special_form) => {
                 f.set_invalid_syntax();
-                write!(f.with_type(self.ty), "<special form '{special_form}'>")
+                write!(f.with_type(self.ty), "<special-form '{special_form}'>")
             }
             Type::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())
@@ -1838,15 +1841,39 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                 }
             }
             // Default value can only be specified if `name` is given.
-            if let Some(default_ty) = self.param.default_type() {
+            if let Some(default_type) = self.param.default_type() {
                 if self.param.annotated_type().is_some() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
                 }
-                default_ty
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(f)?;
+                match default_type {
+                    Type::IntLiteral(_)
+                    | Type::BooleanLiteral(_)
+                    | Type::StringLiteral(_)
+                    | Type::EnumLiteral(_)
+                    | Type::BytesLiteral(_) => {
+                        // For Literal types display the value without `Literal[..]` wrapping
+                        let representation =
+                            default_type.representation(self.db, self.settings.clone());
+                        representation.fmt_detailed(f)?;
+                    }
+                    Type::NominalInstance(instance) => {
+                        // Some key default types like `None` are worth showing
+                        let class = instance.class(self.db);
+
+                        match (class, class.known(self.db)) {
+                            (_, Some(KnownClass::NoneType)) => {
+                                f.with_type(default_type).write_str("None")?;
+                            }
+                            (_, Some(KnownClass::NoDefaultType)) => {
+                                f.with_type(default_type).write_str("NoDefault")?;
+                            }
+                            _ => f.write_str("...")?,
+                        }
+                    }
+                    _ => f.write_str("...")?,
+                }
             }
         } else if let Some(ty) = self.param.annotated_type() {
             // This case is specifically for the `Callable` signature where name and default value
@@ -2334,7 +2361,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
         match self.known_instance {
             KnownInstanceType::SubscriptedProtocol(generic_context) => {
                 f.set_invalid_syntax();
-                f.write_str("<special form '")?;
+                f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Protocol))
                     .write_str("typing.Protocol")?;
                 generic_context.display(self.db).fmt_detailed(f)?;
@@ -2342,7 +2369,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             }
             KnownInstanceType::SubscriptedGeneric(generic_context) => {
                 f.set_invalid_syntax();
-                f.write_str("<special form '")?;
+                f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Generic))
                     .write_str("typing.Generic")?;
                 generic_context.display(self.db).fmt_detailed(f)?;
@@ -2398,7 +2425,7 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_char('<')?;
                 f.with_type(KnownClass::UnionType.to_class_literal(self.db))
                     .write_str("types.UnionType")?;
-                f.write_str(" special form")?;
+                f.write_str(" special-form")?;
                 if let Ok(ty) = union.union_type(self.db) {
                     f.write_str(" '")?;
                     ty.display(self.db).fmt_detailed(f)?;
@@ -2408,13 +2435,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
             }
             KnownInstanceType::Literal(inner) => {
                 f.set_invalid_syntax();
-                f.write_str("<special form '")?;
+                f.write_str("<special-form '")?;
                 inner.inner(self.db).display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::Annotated(inner) => {
                 f.set_invalid_syntax();
-                f.write_str("<special form '")?;
+                f.write_str("<special-form '")?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Annotated))
                     .write_str("typing.Annotated")?;
                 f.write_char('[')?;
@@ -2426,13 +2453,13 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.write_char('<')?;
                 f.with_type(Type::SpecialForm(SpecialFormType::Callable))
                     .write_str("typing.Callable")?;
-                f.write_str(" special form '")?;
+                f.write_str(" special-form '")?;
                 callable.display(self.db).fmt_detailed(f)?;
                 f.write_str("'>")
             }
             KnownInstanceType::TypeGenericAlias(inner) => {
                 f.set_invalid_syntax();
-                f.write_str("<special form '")?;
+                f.write_str("<special-form '")?;
                 f.with_type(KnownClass::Type.to_class_literal(self.db))
                     .write_str("type")?;
                 f.write_char('[')?;
@@ -2598,7 +2625,7 @@ mod tests {
                 ],
                 Some(Type::none(&db))
             ),
-            @"(x=int, y: str = str) -> None"
+            @"(x=..., y: str = ...) -> None"
         );
 
         // All positional only parameters.
@@ -2683,9 +2710,7 @@ mod tests {
                 ],
                 Some(KnownClass::Bytes.to_instance(&db))
             ),
-            @"(a, b: int, c=Literal[1], d: int = Literal[2], \
-                /, e=Literal[3], f: int = Literal[4], *args: object, \
-                *, g=Literal[5], h: int = Literal[6], **kwargs: str) -> bytes"
+            @"(a, b: int, c=1, d: int = 2, /, e=3, f: int = 4, *args: object, *, g=5, h: int = 6, **kwargs: str) -> bytes"
         );
     }
 
@@ -2727,8 +2752,8 @@ mod tests {
             ),
             @r"
         (
-            x=int,
-            y: str = str
+            x=...,
+            y: str = ...
         ) -> None
         "
         );
@@ -2843,15 +2868,15 @@ mod tests {
         (
             a,
             b: int,
-            c=Literal[1],
-            d: int = Literal[2],
+            c=1,
+            d: int = 2,
             /,
-            e=Literal[3],
-            f: int = Literal[4],
+            e=3,
+            f: int = 4,
             *args: object,
             *,
-            g=Literal[5],
-            h: int = Literal[6],
+            g=5,
+            h: int = 6,
             **kwargs: str
         ) -> bytes
         "

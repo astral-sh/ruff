@@ -918,16 +918,33 @@ impl<'db> Type<'db> {
         previous: Self,
         cycle: &salsa::Cycle,
     ) -> Self {
-        // Avoid unioning two generic aliases of the same class together; this union will never
-        // simplify and is likely to cause downstream problems. This introduces the theoretical
-        // possibility of cycle oscillation involving such types (because we are not strictly
-        // widening the type on each iteration), but so far we have not seen an example of that.
+        // When we encounter a salsa cycle, we want to avoid oscillating between two or more types
+        // without converging on a fixed-point result. Most of the time, we union together the
+        // types from each cycle iteration to ensure that our result is monotonic, even if we
+        // encounter oscillation.
+        //
+        // However, there are a couple of cases where we don't want to do that, and want to use the
+        // later cycle iteration's result directly. This introduces the theoretical possibility of
+        // cycle oscillation involving such types (because we are not strictly widening the type on
+        // each iteration), but so far we have not seen an example of that.
         match (previous, self) {
+            // Avoid unioning two generic aliases of the same class together; this union will never
+            // simplify and is likely to cause downstream problems.
             (Type::GenericAlias(prev_alias), Type::GenericAlias(curr_alias))
                 if prev_alias.origin(db) == curr_alias.origin(db) =>
             {
                 self
             }
+
+            // Similarly, don't union together two function literals, since there are several parts
+            // of our type inference machinery that assume that we infer a single FunctionLiteral
+            // type for each overload of each function definition.
+            (Type::FunctionLiteral(prev_function), Type::FunctionLiteral(curr_function))
+                if prev_function.definition(db) == curr_function.definition(db) =>
+            {
+                self
+            }
+
             _ => {
                 // Also avoid unioning in a previous type which contains a Divergent from the
                 // current cycle, if the most-recent type does not. This cannot cause an
@@ -1843,7 +1860,7 @@ impl<'db> Type<'db> {
                 }
             }
             Type::ClassLiteral(class_literal) => {
-                Some(class_literal.default_specialization(db).into_callable(db))
+                Some(class_literal.identity_specialization(db).into_callable(db))
             }
 
             Type::GenericAlias(alias) => Some(ClassType::Generic(alias).into_callable(db)),
@@ -1975,6 +1992,16 @@ impl<'db> Type<'db> {
             .is_always_satisfied(db)
     }
 
+    /// Return true if this type is assignable to type `target` using constraint-set assignability.
+    ///
+    /// This uses `TypeRelation::ConstraintSetAssignability`, which encodes typevar relations into
+    /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
+    /// reasoning depending on inferable typevars.
+    pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
+        self.when_constraint_set_assignable_to(db, target, InferableTypeVars::None)
+            .is_always_satisfied(db)
+    }
+
     fn when_assignable_to(
         self,
         db: &'db dyn Db,
@@ -1984,13 +2011,40 @@ impl<'db> Type<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
     }
 
+    fn when_constraint_set_assignable_to(
+        self,
+        db: &'db dyn Db,
+        target: Type<'db>,
+        inferable: InferableTypeVars<'_, 'db>,
+    ) -> ConstraintSet<'db> {
+        self.has_relation_to(
+            db,
+            target,
+            inferable,
+            TypeRelation::ConstraintSetAssignability,
+        )
+    }
+
     /// Return `true` if it would be redundant to add `self` to a union that already contains `other`.
     ///
     /// See [`TypeRelation::Redundancy`] for more details.
-    #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
     pub(crate) fn is_redundant_with(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_redundant_with_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_redundant_with_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            other: Type<'db>,
+        ) -> bool {
+            self_ty
+                .has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
+                .is_always_satisfied(db)
+        }
+
+        if self == other {
+            return true;
+        }
+
+        is_redundant_with_impl(db, self, other)
     }
 
     fn has_relation_to(
@@ -2034,6 +2088,21 @@ impl<'db> Type<'db> {
             && (self.is_type_var() || target.is_type_var())
         {
             return constraints.implies_subtype_of(db, self, target);
+        }
+
+        // Handle the new constraint-set-based assignability relation next. Comparisons with a
+        // typevar are translated directly into a constraint set.
+        if relation.is_constraint_set_assignability() {
+            // A typevar satisfies a relation when...it satisfies the relation. Yes that's a
+            // tautology! We're moving the caller's subtyping/assignability requirement into a
+            // constraint set. If the typevar has an upper bound or constraints, then the relation
+            // only has to hold when the typevar has a valid specialization (i.e., one that
+            // satisfies the upper bound/constraints).
+            if let Type::TypeVar(bound_typevar) = self {
+                return ConstraintSet::constrain_typevar(db, bound_typevar, Type::Never, target);
+            } else if let Type::TypeVar(bound_typevar) = target {
+                return ConstraintSet::constrain_typevar(db, bound_typevar, self, Type::object());
+            }
         }
 
         match (self, target) {
@@ -2116,7 +2185,7 @@ impl<'db> Type<'db> {
                 );
                 ConstraintSet::from(match relation {
                     TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
-                    TypeRelation::Assignability => true,
+                    TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
                     TypeRelation::Redundancy => match target {
                         Type::Dynamic(_) => true,
                         Type::Union(union) => union.elements(db).iter().any(Type::is_dynamic),
@@ -2126,7 +2195,7 @@ impl<'db> Type<'db> {
             }
             (_, Type::Dynamic(_)) => ConstraintSet::from(match relation {
                 TypeRelation::Subtyping | TypeRelation::SubtypingAssuming(_) => false,
-                TypeRelation::Assignability => true,
+                TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => true,
                 TypeRelation::Redundancy => match self {
                     Type::Dynamic(_) => true,
                     Type::Intersection(intersection) => {
@@ -2390,14 +2459,19 @@ impl<'db> Type<'db> {
                         TypeRelation::Subtyping
                         | TypeRelation::Redundancy
                         | TypeRelation::SubtypingAssuming(_) => self,
-                        TypeRelation::Assignability => self.bottom_materialization(db),
+                        TypeRelation::Assignability | TypeRelation::ConstraintSetAssignability => {
+                            self.bottom_materialization(db)
+                        }
                     };
                     intersection.negative(db).iter().when_all(db, |&neg_ty| {
                         let neg_ty = match relation {
                             TypeRelation::Subtyping
                             | TypeRelation::Redundancy
                             | TypeRelation::SubtypingAssuming(_) => neg_ty,
-                            TypeRelation::Assignability => neg_ty.bottom_materialization(db),
+                            TypeRelation::Assignability
+                            | TypeRelation::ConstraintSetAssignability => {
+                                neg_ty.bottom_materialization(db)
+                            }
                         };
                         self_ty.is_disjoint_from_impl(
                             db,
@@ -4588,15 +4662,18 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         match self {
-            Type::Callable(callable) if callable.is_function_like(db) => {
-                // For "function-like" callables, model the behavior of `FunctionType.__get__`.
+            Type::Callable(callable)
+                if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
+            {
+                // For "function-like" or "classmethod-like" callables, model the behavior of
+                // `FunctionType.__get__` or `classmethod.__get__`.
                 //
                 // It is a shortcut to model this in `try_call_dunder_get`. If we want to be really precise,
                 // we should instead return a new method-wrapper type variant for the synthesized `__get__`
                 // method of these synthesized functions. The method-wrapper would then be returned from
                 // `find_name_in_mro` when called on function-like `Callable`s. This would allow us to
                 // correctly model the behavior of *explicit* `SomeDataclass.__init__.__get__` calls.
-                return if instance.is_none(db) {
+                return if instance.is_none(db) && callable.is_function_like(db) {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
@@ -9777,6 +9854,22 @@ impl<'db> TypeVarInstance<'db> {
         ))
     }
 
+    fn type_is_self_referential(self, db: &'db dyn Db, ty: Type<'db>) -> bool {
+        let identity = self.identity(db);
+        any_over_type(
+            db,
+            ty,
+            &|ty| match ty {
+                Type::TypeVar(bound_typevar) => identity == bound_typevar.typevar(db).identity(db),
+                Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) => {
+                    identity == typevar.identity(db)
+                }
+                _ => false,
+            },
+            false,
+        )
+    }
+
     #[salsa::tracked(
         cycle_fn=lazy_bound_or_constraints_cycle_recover,
         cycle_initial=lazy_bound_or_constraints_cycle_initial,
@@ -9799,6 +9892,11 @@ impl<'db> TypeVarInstance<'db> {
             }
             _ => return None,
         };
+
+        if self.type_is_self_referential(db, ty) {
+            return None;
+        }
+
         Some(TypeVarBoundOrConstraints::UpperBound(ty))
     }
 
@@ -9846,6 +9944,15 @@ impl<'db> TypeVarInstance<'db> {
             }
             _ => return None,
         };
+
+        if constraints
+            .elements(db)
+            .iter()
+            .any(|ty| self.type_is_self_referential(db, *ty))
+        {
+            return None;
+        }
+
         Some(TypeVarBoundOrConstraints::Constraints(constraints))
     }
 
@@ -9892,15 +9999,11 @@ impl<'db> TypeVarInstance<'db> {
 
         let definition = self.definition(db)?;
         let module = parsed_module(db, definition.file(db)).load(db);
-        match definition.kind(db) {
+        let ty = match definition.kind(db) {
             // PEP 695 typevar
             DefinitionKind::TypeVar(typevar) => {
                 let typevar_node = typevar.node(&module);
-                Some(definition_expression_type(
-                    db,
-                    definition,
-                    typevar_node.default.as_ref()?,
-                ))
+                definition_expression_type(db, definition, typevar_node.default.as_ref()?)
             }
             // legacy typevar / ParamSpec
             DefinitionKind::Assignment(assignment) => {
@@ -9910,9 +10013,9 @@ impl<'db> TypeVarInstance<'db> {
                 let expr = &call_expr.arguments.find_keyword("default")?.value;
                 let default_type = definition_expression_type(db, definition, expr);
                 if known_class == Some(KnownClass::ParamSpec) {
-                    Some(convert_type_to_paramspec_value(db, default_type))
+                    convert_type_to_paramspec_value(db, default_type)
                 } else {
-                    Some(default_type)
+                    default_type
                 }
             }
             // PEP 695 ParamSpec
@@ -9920,10 +10023,16 @@ impl<'db> TypeVarInstance<'db> {
                 let paramspec_node = paramspec.node(&module);
                 let default_ty =
                     definition_expression_type(db, definition, paramspec_node.default.as_ref()?);
-                Some(convert_type_to_paramspec_value(db, default_ty))
+                convert_type_to_paramspec_value(db, default_ty)
             }
-            _ => None,
+            _ => return None,
+        };
+
+        if self.type_is_self_referential(db, ty) {
+            return None;
         }
+
+        Some(ty)
     }
 
     pub fn bind_pep695(self, db: &'db dyn Db) -> Option<BoundTypeVarInstance<'db>> {
@@ -12000,11 +12109,20 @@ pub(crate) enum TypeRelation<'db> {
     ///   are not actually subtypes of each other. (That is, `implies_subtype_of(false, int, str)`
     ///   will return true!)
     SubtypingAssuming(ConstraintSet<'db>),
+
+    /// A placeholder for the new assignability relation that uses constraint sets to encode
+    /// relationships with a typevar. This will eventually replace `Assignability`, but allows us
+    /// to start using the new relation in a controlled manner in some places.
+    ConstraintSetAssignability,
 }
 
 impl TypeRelation<'_> {
     pub(crate) const fn is_assignability(self) -> bool {
         matches!(self, TypeRelation::Assignability)
+    }
+
+    pub(crate) const fn is_constraint_set_assignability(self) -> bool {
+        matches!(self, TypeRelation::ConstraintSetAssignability)
     }
 
     pub(crate) const fn is_subtyping(self) -> bool {
@@ -12321,6 +12439,10 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
+    /// A callable type that we believe represents a classmethod (i.e. it will unconditionally bind
+    /// the first argument on `__get__`).
+    ClassMethodLike,
+
     /// Represents the value bound to a `typing.ParamSpec` type variable.
     ParamSpecValue,
 }
@@ -12415,6 +12537,10 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_function_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::FunctionLike)
+    }
+
+    pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::ClassMethodLike)
     }
 
     pub(crate) fn bind_self(
@@ -12568,6 +12694,10 @@ impl<'db> CallableTypes<'db> {
             [single] => Some(*single),
             _ => None,
         }
+    }
+
+    fn as_slice(&self) -> &[CallableType<'db>] {
+        &self.0
     }
 
     fn into_inner(self) -> SmallVec<[CallableType<'db>; 1]> {

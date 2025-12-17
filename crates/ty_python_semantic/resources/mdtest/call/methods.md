@@ -444,20 +444,18 @@ When a `@classmethod` is additionally decorated with another decorator, it is st
 class method:
 
 ```py
-from __future__ import annotations
-
 def does_nothing[T](f: T) -> T:
     return f
 
 class C:
     @classmethod
     @does_nothing
-    def f1(cls: type[C], x: int) -> str:
+    def f1(cls, x: int) -> str:
         return "a"
 
     @does_nothing
     @classmethod
-    def f2(cls: type[C], x: int) -> str:
+    def f2(cls, x: int) -> str:
         return "a"
 
 reveal_type(C.f1(1))  # revealed: str
@@ -600,9 +598,9 @@ from typing_extensions import Self
 
 reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
 reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type(int.__new__)
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = Literal[0], /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type((42).__new__)
 
 class X:

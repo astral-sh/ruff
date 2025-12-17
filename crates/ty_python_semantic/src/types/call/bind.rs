@@ -21,7 +21,6 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
-use crate::Program;
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::module_resolver::KnownModule;
@@ -52,6 +51,7 @@ use crate::types::{
     enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
+use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
 
@@ -214,7 +214,7 @@ impl<'db> Bindings<'db> {
             }
         }
 
-        self.evaluate_known_cases(db, dataclass_field_specifiers);
+        self.evaluate_known_cases(db, argument_types, dataclass_field_specifiers);
 
         // In order of precedence:
         //
@@ -337,7 +337,12 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    fn evaluate_known_cases(&mut self, db: &'db dyn Db, dataclass_field_specifiers: &[Type<'db>]) {
+    fn evaluate_known_cases(
+        &mut self,
+        db: &'db dyn Db,
+        argument_types: &CallArguments<'_, 'db>,
+        dataclass_field_specifiers: &[Type<'db>],
+    ) {
         let to_bool = |ty: &Option<Type<'_>>, default: bool| -> bool {
             if let Some(Type::BooleanLiteral(value)) = ty {
                 *value
@@ -666,25 +671,32 @@ impl<'db> Bindings<'db> {
                         if dataclass_field_specifiers.contains(&function)
                             || function_type.is_known(db, KnownFunction::Field) =>
                     {
-                        let has_default_value = overload
-                            .parameter_type_by_name("default", false)
-                            .is_ok_and(|ty| ty.is_some())
-                            || overload
-                                .parameter_type_by_name("default_factory", false)
-                                .is_ok_and(|ty| ty.is_some())
-                            || overload
-                                .parameter_type_by_name("factory", false)
-                                .is_ok_and(|ty| ty.is_some());
+                        // Helper to get the type of a keyword argument by name. We first try to get it from
+                        // the parameter binding (for explicit parameters), and then fall back to checking the
+                        // call site arguments (for field-specifier functions that use a `**kwargs` parameter,
+                        // instead of specifying `init`, `default` etc. explicitly).
+                        let get_argument_type = |name, fallback_to_default| -> Option<Type<'db>> {
+                            if let Ok(ty) =
+                                overload.parameter_type_by_name(name, fallback_to_default)
+                            {
+                                return ty;
+                            }
+                            argument_types.iter().find_map(|(arg, ty)| {
+                                if matches!(arg, Argument::Keyword(arg_name) if arg_name == name) {
+                                    ty
+                                } else {
+                                    None
+                                }
+                            })
+                        };
 
-                        let init = overload
-                            .parameter_type_by_name("init", true)
-                            .unwrap_or(None);
-                        let kw_only = overload
-                            .parameter_type_by_name("kw_only", true)
-                            .unwrap_or(None);
-                        let alias = overload
-                            .parameter_type_by_name("alias", true)
-                            .unwrap_or(None);
+                        let has_default_value = get_argument_type("default", false).is_some()
+                            || get_argument_type("default_factory", false).is_some()
+                            || get_argument_type("factory", false).is_some();
+
+                        let init = get_argument_type("init", true);
+                        let kw_only = get_argument_type("kw_only", true);
+                        let alias = get_argument_type("alias", true);
 
                         // `dataclasses.field` and field-specifier functions of commonly used
                         // libraries like `pydantic`, `attrs`, and `SQLAlchemy` all return
@@ -4161,8 +4173,13 @@ impl<'db> BindingError<'db> {
                     return;
                 };
 
-                let provided_ty_display = provided_ty.display(context.db());
-                let expected_ty_display = expected_ty.display(context.db());
+                let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+                    context.db(),
+                    [provided_ty, expected_ty],
+                );
+                let provided_ty_display =
+                    provided_ty.display_with(context.db(), display_settings.clone());
+                let expected_ty_display = expected_ty.display_with(context.db(), display_settings);
 
                 let mut diag = builder.into_diagnostic(format_args!(
                     "Argument{} is incorrect",
