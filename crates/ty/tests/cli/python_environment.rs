@@ -2703,3 +2703,51 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+/// Test behavior when `VIRTUAL_ENV` is set but points to a non-existent path.
+#[test]
+fn missing_virtual_env() -> anyhow::Result<()> {
+    let working_venv_package1_path = if cfg!(windows) {
+        "project/.venv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "project/.venv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = CliTest::with_files([
+        (
+            "project/test.py",
+            r#"
+            from package1 import WorkingVenv
+            "#,
+        ),
+        (
+            "project/.venv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            working_venv_package1_path,
+            r#"
+            class WorkingVenv: ...
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("nonexistent-venv")), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Failed to discover local Python environment
+      Cause: Invalid `VIRTUAL_ENV` environment variable `<temp_dir>/nonexistent-venv`: does not point to a directory on disk
+      Cause: No such file or directory (os error 2)
+    ");
+
+    Ok(())
+}
