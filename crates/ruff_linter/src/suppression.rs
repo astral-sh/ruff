@@ -1,10 +1,10 @@
 use compact_str::CompactString;
 use core::fmt;
+use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
-use rustc_hash::FxHashSet;
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
@@ -282,7 +282,7 @@ impl Suppressions {
                         && suppression.comments[0].action == SuppressionAction::Disable
                 })
                 .map(|suppression| suppression.comments[0].range)
-                .collect::<FxHashSet<TextRange>>()
+                .unique()
             {
                 context.report_diagnostic(UnmatchedSuppressionComment {}, range);
             }
