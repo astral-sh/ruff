@@ -81,7 +81,9 @@ pub(crate) fn invalid_noqa_code(
             continue;
         };
 
-        let all_valid = directive.iter().all(|code| code_is_valid(code, external));
+        let all_valid = directive
+            .iter()
+            .all(|code| code_is_valid(code.as_str(), external));
 
         if all_valid {
             continue;
@@ -89,7 +91,7 @@ pub(crate) fn invalid_noqa_code(
 
         let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = directive
             .iter()
-            .partition(|&code| code_is_valid(code, external));
+            .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
             all_codes_invalid_diagnostic(directive, invalid_codes, context);
@@ -101,10 +103,9 @@ pub(crate) fn invalid_noqa_code(
     }
 }
 
-fn code_is_valid(code: &Code, external: &[String]) -> bool {
-    let code_str = code.as_str();
-    Rule::from_code(get_redirect_target(code_str).unwrap_or(code_str)).is_ok()
-        || external.iter().any(|ext| code_str.starts_with(ext))
+pub(crate) fn code_is_valid(code: &str, external: &[String]) -> bool {
+    Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
+        || external.iter().any(|ext| code.starts_with(ext))
 }
 
 fn all_codes_invalid_diagnostic(

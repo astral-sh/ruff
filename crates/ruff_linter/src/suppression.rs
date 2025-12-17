@@ -18,9 +18,10 @@ use crate::checkers::ast::LintContext;
 use crate::codes::Rule;
 use crate::fix::edits::delete_comment;
 use crate::preview::is_range_suppressions_enabled;
+use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{
     InvalidRuleCode, InvalidRuleCodeKind, InvalidSuppressionComment, InvalidSuppressionCommentKind,
-    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind,
+    UnmatchedSuppressionComment, UnusedCodes, UnusedNOQA, UnusedNOQAKind, code_is_valid,
 };
 use crate::settings::LinterSettings;
 
@@ -154,7 +155,9 @@ impl Suppressions {
         };
 
         for suppression in &self.valid {
-            if *code == suppression.code.as_str() && suppression.range.contains_range(range) {
+            let suppression_code =
+                get_redirect_target(suppression.code.as_str()).unwrap_or(suppression.code.as_str());
+            if *code == suppression_code && suppression.range.contains_range(range) {
                 suppression.used.set(true);
                 return true;
             }
@@ -220,11 +223,9 @@ impl Suppressions {
         }
 
         if context.is_rule_enabled(Rule::InvalidRuleCode) {
-            for suppression in self
-                .valid
-                .iter()
-                .filter(|suppression| Rule::from_code(&suppression.code).is_err())
-            {
+            for suppression in self.valid.iter().filter(|suppression| {
+                !code_is_valid(&suppression.code, &context.settings().external)
+            }) {
                 for comment in &suppression.comments {
                     let (range, edit) =
                         Suppressions::delete_code_or_comment(locator, suppression, comment);

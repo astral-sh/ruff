@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 25
+Added: 23
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -653,37 +653,3 @@ help: Remove the rule code
 97 | 
 98 | 
 99 | def f():
-
-
-RUF102 [*] Invalid rule code in suppression: TK421
-   --> suppressions.py:102:5
-    |
-100 | def f():
-101 |     # External rule codes should be ignored
-102 |     # ruff: disable[TK421]
-    |     ^^^^^^^^^^^^^^^^^^^^^^
-103 |     print("hello")
-104 |     # ruff: enable[TK421]
-    |
-help: Remove the rule code
-99  | 
-100 | def f():
-101 |     # External rule codes should be ignored
-    -     # ruff: disable[TK421]
-102 |     print("hello")
-103 |     # ruff: enable[TK421]
-
-
-RUF102 [*] Invalid rule code in suppression: TK421
-   --> suppressions.py:104:5
-    |
-102 |     # ruff: disable[TK421]
-103 |     print("hello")
-104 |     # ruff: enable[TK421]
-    |     ^^^^^^^^^^^^^^^^^^^^^
-    |
-help: Remove the rule code
-101 |     # External rule codes should be ignored
-102 |     # ruff: disable[TK421]
-103 |     print("hello")
-    -     # ruff: enable[TK421]
