@@ -1853,6 +1853,39 @@ y: Optional[str] = None
     }
 
     #[test]
+    fn docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+def my_function(param1: int, param2: str) -> bool:
+    """Example function with PEP 484 type annotations.
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        The return value. True for success, False otherwise.
+
+    """
+    return False
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "my_function" @ 5..16: Function [definition]
+        "param1" @ 17..23: Parameter [definition]
+        "int" @ 25..28: Class
+        "param2" @ 30..36: Parameter [definition]
+        "str" @ 38..41: Class
+        "bool" @ 46..50: Class
+        "\"\"\"Example function with PEP 484 type annotations.\n\n    Args:\n        param1: The first parameter.\n        param2: The second parameter.\n\n    Returns:\n        The return value. True for success, False otherwise.\n\n    \"\"\"" @ 56..276: String
+        "False" @ 288..293: BuiltinConstant
+        "#);
+    }
+
+    #[test]
     fn test_debug_int_classification() {
         let test = SemanticTokenTest::new(
             "
