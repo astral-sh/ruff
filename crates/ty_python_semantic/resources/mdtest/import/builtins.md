@@ -79,7 +79,8 @@ reveal_type(foo)  # revealed: Unknown
 
 ## Builtins imported from custom project-level stubs
 
-The project can add or replace builtins with the `__builtins__.pyi` stub. They will take precedence over the typeshed ones.
+The project can add or replace builtins with the `__builtins__.pyi` stub. They will take precedence
+over the typeshed ones.
 
 ```py
 reveal_type(foo)  # revealed: int
