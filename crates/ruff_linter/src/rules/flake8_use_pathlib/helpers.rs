@@ -1,4 +1,4 @@
-use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall, Stmt};
+use ruff_python_ast::{self as ast, Arguments, Expr, ExprCall};
 use ruff_python_semantic::{SemanticModel, analyze::typing};
 use ruff_text_size::Ranged;
 
@@ -93,9 +93,7 @@ pub(crate) fn check_os_pathlib_single_arg_calls(
 
         let applicability = match applicability {
             Applicability::DisplayOnly => Applicability::DisplayOnly,
-            _ if checker.comment_ranges().intersects(range) || is_statement(checker) => {
-                Applicability::Unsafe
-            }
+            _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
             _ => applicability,
         };
 
@@ -176,9 +174,7 @@ pub(crate) fn check_os_pathlib_two_arg_calls(
 
             let applicability = match applicability {
                 Applicability::DisplayOnly => Applicability::DisplayOnly,
-                _ if checker.comment_ranges().intersects(range) || is_statement(checker) => {
-                    Applicability::Unsafe
-                }
+                _ if checker.comment_ranges().intersects(range) => Applicability::Unsafe,
                 _ => applicability,
             };
 
@@ -218,9 +214,6 @@ pub(crate) fn is_top_level_expression_call(checker: &Checker) -> bool {
     checker.semantic().current_expression_parent().is_none()
 }
 
-pub(crate) fn is_statement(checker: &Checker) -> bool {
-    matches!(
-        checker.semantic().current_statement(),
-        Stmt::If(_) | Stmt::For(_) | Stmt::While(_)
-    )
+pub(crate) fn is_top_level_statement(checker: &Checker) -> bool {
+    checker.semantic().current_statement().is_expr_stmt()
 }
