@@ -1299,7 +1299,7 @@ impl TestContext {
         let mut settings = insta::Settings::clone_current();
         // Something accursed in the escaping pipeline produces `\/` in windows paths
         // and I just need to move on with my life and not debug this right now.
-        settings.add_filter("\\\\/", "/");
+        settings.add_filter("\\/", "/");
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(
             &tempdir_filter(
