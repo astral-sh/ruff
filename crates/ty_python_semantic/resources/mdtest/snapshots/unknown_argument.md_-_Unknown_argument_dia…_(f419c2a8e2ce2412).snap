@@ -73,8 +73,8 @@ error[unknown-argument]: Argument `d` does not match any known parameter of func
 13 |
 14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
    |
-info: Union variant `def f(a, b, c=Literal[42]) -> Unknown` is incompatible with this call site
-info: Attempted to call union type `(def f(a, b, c=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: Union variant `def f(a, b, c=42) -> Unknown` is incompatible with this call site
+info: Attempted to call union type `(def f(a, b, c=42) -> Unknown) | (def g(a, b) -> Unknown)`
 info: rule `unknown-argument` is enabled by default
 
 ```
@@ -91,7 +91,7 @@ error[unknown-argument]: Argument `d` does not match any known parameter of func
 14 | Foo().method(a=1, b=2, c=3)  # error: [unknown-argument]
    |
 info: Union variant `def g(a, b) -> Unknown` is incompatible with this call site
-info: Attempted to call union type `(def f(a, b, c=Literal[42]) -> Unknown) | (def g(a, b) -> Unknown)`
+info: Attempted to call union type `(def f(a, b, c=42) -> Unknown) | (def g(a, b) -> Unknown)`
 info: rule `unknown-argument` is enabled by default
 
 ```

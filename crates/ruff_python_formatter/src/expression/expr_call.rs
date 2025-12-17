@@ -47,7 +47,10 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
                 func.format().with_options(Parentheses::Always).fmt(f)
             } else {
                 match func.as_ref() {
-                    Expr::Attribute(expr) => expr.format().with_options(call_chain_layout).fmt(f),
+                    Expr::Attribute(expr) => expr
+                        .format()
+                        .with_options(call_chain_layout.decrement_call_like_count())
+                        .fmt(f),
                     Expr::Call(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     Expr::Subscript(expr) => expr.format().with_options(call_chain_layout).fmt(f),
                     _ => func.format().with_options(Parentheses::Never).fmt(f),
@@ -67,9 +70,7 @@ impl FormatNodeRule<ExprCall> for FormatExprCall {
         //     queryset.distinct().order_by(field.name).values_list(field_name_flat_long_long=True)
         // )
         // ```
-        if call_chain_layout == CallChainLayout::Fluent
-            && self.call_chain_layout == CallChainLayout::Default
-        {
+        if call_chain_layout.is_fluent() && self.call_chain_layout == CallChainLayout::Default {
             group(&fmt_func).fmt(f)
         } else {
             fmt_func.fmt(f)
@@ -87,7 +88,8 @@ impl NeedsParentheses for ExprCall {
             self.into(),
             context.comments().ranges(),
             context.source(),
-        ) == CallChainLayout::Fluent
+        )
+        .is_fluent()
         {
             OptionalParentheses::Multiline
         } else if context.comments().has_dangling(self) {

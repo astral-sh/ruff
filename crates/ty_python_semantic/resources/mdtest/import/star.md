@@ -1437,7 +1437,7 @@ are present due to `*` imports.
 import collections.abc
 
 reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
-reveal_type(collections.abc.Callable)  # revealed: <special form 'typing.Callable'>
+reveal_type(collections.abc.Callable)  # revealed: <special-form 'typing.Callable'>
 reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 ```
 

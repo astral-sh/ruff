@@ -69,7 +69,7 @@ class D:
     y: str = "default"
     z: int | None = 1 + 2
 
-reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = Literal["default"], z: int | None = Literal[3]) -> None
+reveal_type(D.__init__)  # revealed: (self: D, x: int, y: str = "default", z: int | None = 3) -> None
 ```
 
 This also works if the declaration and binding are split:
@@ -221,7 +221,7 @@ class D:
     (x): int = 1
 
 # TODO: should ideally not include a `x` parameter
-reveal_type(D.__init__)  # revealed: (self: D, x: int = Literal[1]) -> None
+reveal_type(D.__init__)  # revealed:(self: D, x: int = 1) -> None
 ```
 
 ## `@dataclass` calls with arguments
@@ -521,6 +521,73 @@ frozen = MyFrozenChildClass()
 del frozen.x  # TODO this should emit an [invalid-assignment]
 ```
 
+### frozen/non-frozen inheritance
+
+If a non-frozen dataclass inherits from a frozen dataclass, an exception is raised at runtime. We
+catch this error:
+
+<!-- snapshot-diagnostics -->
+
+`a.py`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class FrozenBase:
+    x: int
+
+@dataclass
+# error: [invalid-frozen-dataclass-subclass] "Non-frozen dataclass `Child` cannot inherit from frozen dataclass `FrozenBase`"
+class Child(FrozenBase):
+    y: int
+```
+
+Frozen dataclasses inheriting from non-frozen dataclasses are also illegal:
+
+`b.py`:
+
+```py
+from dataclasses import dataclass
+
+@dataclass
+class Base:
+    x: int
+
+@dataclass(frozen=True)
+# error: [invalid-frozen-dataclass-subclass] "Frozen dataclass `FrozenChild` cannot inherit from non-frozen dataclass `Base`"
+class FrozenChild(Base):
+    y: int
+```
+
+Example of diagnostics when there are multiple files involved:
+
+`module.py`:
+
+```py
+import dataclasses
+
+@dataclasses.dataclass(frozen=False)
+class NotFrozenBase:
+    x: int
+```
+
+`main.py`:
+
+```py
+from functools import total_ordering
+from typing import final
+from dataclasses import dataclass
+
+from module import NotFrozenBase
+
+@final
+@dataclass(frozen=True)
+@total_ordering
+class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
+    y: str
+```
+
 ### `match_args`
 
 If `match_args` is set to `True` (the default), the `__match_args__` attribute is a tuple created
@@ -603,7 +670,7 @@ class A:
     a: str = field(kw_only=False)
     b: int = 0
 
-reveal_type(A.__init__)  # revealed: (self: A, a: str, *, b: int = Literal[0]) -> None
+reveal_type(A.__init__)  # revealed:(self: A, a: str, *, b: int = 0) -> None
 
 A("hi")
 ```
@@ -924,7 +991,7 @@ class C:
     class_variable1: ClassVar[Final[int]] = 1
     class_variable2: ClassVar[Final[int]] = 1
 
-reveal_type(C.__init__)  # revealed: (self: C, instance_variable_no_default: int, instance_variable: int = Literal[1]) -> None
+reveal_type(C.__init__)  # revealed:(self: C, instance_variable_no_default: int, instance_variable: int = 1) -> None
 
 c = C(1)
 # error: [invalid-assignment] "Cannot assign to final attribute `instance_variable` on type `C`"
@@ -1015,7 +1082,7 @@ class C(Base):
     z: int = 10
     x: int = 15
 
-reveal_type(C.__init__)  # revealed: (self: C, x: int = Literal[15], y: int = Literal[0], z: int = Literal[10]) -> None
+reveal_type(C.__init__)  # revealed:(self: C, x: int = 15, y: int = 0, z: int = 10) -> None
 ```
 
 ## Conditionally defined fields
@@ -1176,7 +1243,7 @@ class UppercaseString:
 class C:
     upper: UppercaseString = UppercaseString()
 
-reveal_type(C.__init__)  # revealed: (self: C, upper: str = str) -> None
+reveal_type(C.__init__)  # revealed: (self: C, upper: str = ...) -> None
 
 c = C("abc")
 reveal_type(c.upper)  # revealed: str
@@ -1222,7 +1289,7 @@ class ConvertToLength:
 class C:
     converter: ConvertToLength = ConvertToLength()
 
-reveal_type(C.__init__)  # revealed: (self: C, converter: str = Literal[""]) -> None
+reveal_type(C.__init__)  # revealed: (self: C, converter: str = "") -> None
 
 c = C("abc")
 reveal_type(c.converter)  # revealed: int
@@ -1261,7 +1328,7 @@ class AcceptsStrAndInt:
 class C:
     field: AcceptsStrAndInt = AcceptsStrAndInt()
 
-reveal_type(C.__init__)  # revealed: (self: C, field: str | int = int) -> None
+reveal_type(C.__init__)  # revealed: (self: C, field: str | int = ...) -> None
 ```
 
 ## `dataclasses.field`

@@ -57,7 +57,7 @@ We can access attributes on objects of all kinds:
 import sys
 
 reveal_type(inspect.getattr_static(sys, "dont_write_bytecode"))  # revealed: bool
-# revealed: def getattr_static(obj: object, attr: str, default: Any | None = EllipsisType) -> Any
+# revealed: def getattr_static(obj: object, attr: str, default: Any | None = ...) -> Any
 reveal_type(inspect.getattr_static(inspect, "getattr_static"))
 
 reveal_type(inspect.getattr_static(1, "real"))  # revealed: property
@@ -144,7 +144,7 @@ from typing import Any
 def _(a: Any, tuple_of_any: tuple[Any]):
     reveal_type(inspect.getattr_static(a, "x", "default"))  # revealed: Any | Literal["default"]
 
-    # revealed: def index(self, value: Any, start: SupportsIndex = Literal[0], stop: SupportsIndex = int, /) -> int
+    # revealed: def index(self, value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
     reveal_type(inspect.getattr_static(tuple_of_any, "index", "default"))
 ```
 

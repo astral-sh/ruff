@@ -8,9 +8,7 @@ Client capabilities: ResolvedClientCapabilities(
 Position encoding: UTF16
 Global settings: GlobalSettings {
     diagnostic_mode: OpenFilesOnly,
-    experimental: ExperimentalSettings {
-        rename: false,
-    },
+    experimental: ExperimentalSettings,
 }
 Open text documents: 0
 
@@ -57,6 +55,7 @@ Settings: Settings {
         "invalid-declaration": Error (Default),
         "invalid-exception-caught": Error (Default),
         "invalid-explicit-override": Error (Default),
+        "invalid-frozen-dataclass-subclass": Error (Default),
         "invalid-generic-class": Error (Default),
         "invalid-ignore-comment": Warning (Default),
         "invalid-key": Error (Default),

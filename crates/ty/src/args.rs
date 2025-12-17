@@ -9,6 +9,7 @@ use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
+use ty_static::EnvVars;
 
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
@@ -121,7 +122,7 @@ pub(crate) struct CheckCommand {
     /// The path to a `ty.toml` file to use for configuration.
     ///
     /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
-    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.

@@ -144,8 +144,8 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
 
     if let Some(deprecated) = &field.deprecated {
-        output.push_str("> [!WARN] \"Deprecated\"\n");
-        output.push_str("> This option has been deprecated");
+        output.push_str("!!! warning \"Deprecated\"\n");
+        output.push_str("    This option has been deprecated");
 
         if let Some(since) = deprecated.since {
             write!(output, " in {since}").unwrap();
@@ -166,8 +166,9 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
-    output.push_str("**Example usage** (`pyproject.toml`):\n\n");
+    output.push_str("**Example usage**:\n\n");
     output.push_str(&format_example(
+        "pyproject.toml",
         &format_header(
             field.scope,
             field.example,
@@ -179,11 +180,11 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     output.push('\n');
 }
 
-fn format_example(header: &str, content: &str) -> String {
+fn format_example(title: &str, header: &str, content: &str) -> String {
     if header.is_empty() {
-        format!("```toml\n{content}\n```\n",)
+        format!("```toml title=\"{title}\"\n{content}\n```\n",)
     } else {
-        format!("```toml\n{header}\n{content}\n```\n",)
+        format!("```toml title=\"{title}\"\n{header}\n{content}\n```\n",)
     }
 }
 

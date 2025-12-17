@@ -412,7 +412,7 @@ class A:
     def __init__(self):
         self.__add__ = add_impl
 
-# error: [unsupported-operator] "Operator `+` is not supported between objects of type `A` and `A`"
+# error: [unsupported-operator] "Operator `+` is not supported between two objects of type `A`"
 # revealed: Unknown
 reveal_type(A() + A())
 ```

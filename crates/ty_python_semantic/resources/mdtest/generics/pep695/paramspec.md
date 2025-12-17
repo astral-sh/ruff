@@ -12,7 +12,7 @@ python-version = "3.13"
 
 ```py
 def foo1[**P]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 ```
 
 ## Bounds and constraints
@@ -45,14 +45,14 @@ The default value for a `ParamSpec` can be either a list of types, `...`, or ano
 
 ```py
 def foo2[**P = ...]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 
 def foo3[**P = [int, str]]() -> None:
-    reveal_type(P)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
 
 def foo4[**P, **Q = P]():
-    reveal_type(P)  # revealed: typing.ParamSpec
-    reveal_type(Q)  # revealed: typing.ParamSpec
+    reveal_type(P)  # revealed: ParamSpec
+    reveal_type(Q)  # revealed: ParamSpec
 ```
 
 Other values are invalid.
@@ -477,7 +477,7 @@ def keyword_only_with_default_2(*, y: int = 42) -> int:
 # parameter list i.e., `()`
 # TODO: This shouldn't error
 # error: [invalid-argument-type]
-# revealed: (*, x: int = Literal[42]) -> bool
+# revealed: (*, x: int = 42) -> bool
 reveal_type(multiple(keyword_only_with_default_1, keyword_only_with_default_2))
 
 def keyword_only1(*, x: int) -> int:
@@ -503,7 +503,8 @@ class C[**P]:
     def __init__(self, f: Callable[P, int]) -> None:
         self.f = f
 
-def f(x: int, y: str) -> bool:
+# Note that the return type must match exactly, since C is invariant on the return type of C.f.
+def f(x: int, y: str) -> int:
     return True
 
 c = C(f)
@@ -618,6 +619,22 @@ reveal_type(foo.method)  # revealed: bound method Foo[(int, str, /)].method(int,
 reveal_type(foo.method(1, "a"))  # revealed: str
 ```
 
+### Gradual types propagate through `ParamSpec` inference
+
+```py
+from typing import Callable
+
+def callable_identity[**P, R](func: Callable[P, R]) -> Callable[P, R]:
+    return func
+
+@callable_identity
+def f(env: dict) -> None:
+    pass
+
+# revealed: (env: dict[Unknown, Unknown]) -> None
+reveal_type(f)
+```
+
 ### Overloads
 
 `overloaded.pyi`:
@@ -662,11 +679,67 @@ reveal_type(change_return_type(int_int))  # revealed: Overload[(x: int) -> str, 
 reveal_type(change_return_type(int_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 
 # error: [invalid-argument-type]
-reveal_type(change_return_type(str_str))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+reveal_type(change_return_type(str_str))  # revealed: (...) -> str
 
 # TODO: Both of these shouldn't raise an error
 # error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, 1))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
 # error: [invalid-argument-type]
 reveal_type(with_parameters(int_int, "a"))  # revealed: Overload[(x: int) -> str, (x: str) -> str]
+```
+
+## ParamSpec attribute assignability
+
+When comparing signatures with `ParamSpec` attributes (`P.args` and `P.kwargs`), two different
+inferable `ParamSpec` attributes with the same kind are assignable to each other. This enables
+method overrides where both methods have their own `ParamSpec`.
+
+### Same attribute kind, both inferable
+
+```py
+from typing import Callable
+
+class Parent:
+    def method[**P](self, callback: Callable[P, None]) -> Callable[P, None]:
+        return callback
+
+class Child1(Parent):
+    # This is a valid override: Q.args matches P.args, Q.kwargs matches P.kwargs
+    def method[**Q](self, callback: Callable[Q, None]) -> Callable[Q, None]:
+        return callback
+
+# Both signatures use ParamSpec, so they should be compatible
+def outer[**P](f: Callable[P, int]) -> Callable[P, int]:
+    def inner[**Q](g: Callable[Q, int]) -> Callable[Q, int]:
+        return g
+    return inner(f)
+```
+
+We can explicitly mark it as an override using the `@override` decorator.
+
+```py
+from typing import override
+
+class Child2(Parent):
+    @override
+    def method[**Q](self, callback: Callable[Q, None]) -> Callable[Q, None]:
+        return callback
+```
+
+### One `ParamSpec` not inferable
+
+Here, `P` is in a non-inferable position while `Q` is inferable. So, they are not considered
+assignable.
+
+```py
+from typing import Callable
+
+class Container[**P]:
+    def method(self, f: Callable[P, None]) -> Callable[P, None]:
+        return f
+
+    def try_assign[**Q](self, f: Callable[Q, None]) -> Callable[Q, None]:
+        # error: [invalid-return-type] "Return type does not match returned value: expected `(**Q@try_assign) -> None`, found `(**P@Container) -> None`"
+        # error: [invalid-argument-type] "Argument to bound method `method` is incorrect: Expected `(**P@Container) -> None`, found `(**Q@try_assign) -> None`"
+        return self.method(f)
 ```

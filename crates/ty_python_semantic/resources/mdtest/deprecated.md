@@ -11,9 +11,9 @@ classes. Uses of these items should subsequently produce a warning.
 from typing_extensions import deprecated
 
 @deprecated("use OtherClass")
-def myfunc(): ...
+def myfunc(x: int): ...
 
-myfunc()  # error: [deprecated] "use OtherClass"
+myfunc(1)  # error: [deprecated] "use OtherClass"
 ```
 
 ```py

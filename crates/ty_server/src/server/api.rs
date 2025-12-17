@@ -299,7 +299,9 @@ where
             }
 
             if let Err(error) = ruff_db::panic::catch_unwind(|| {
-                R::handle_request(&id, &db, document, client, params);
+                salsa::attach(&db, || {
+                    R::handle_request(&id, &db, document, client, params);
+                });
             }) {
                 panic_response::<R>(&id, client, &error, retry);
             }

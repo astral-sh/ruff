@@ -11,21 +11,13 @@ pub(crate) struct GlobalSettings {
 }
 
 impl GlobalSettings {
-    pub(crate) fn is_rename_enabled(&self) -> bool {
-        self.experimental.rename
-    }
-}
-
-impl GlobalSettings {
     pub(crate) fn diagnostic_mode(&self) -> DiagnosticMode {
         self.diagnostic_mode
     }
 }
 
 #[derive(Clone, Default, Debug, PartialEq)]
-pub(crate) struct ExperimentalSettings {
-    pub(super) rename: bool,
-}
+pub(crate) struct ExperimentalSettings;
 
 /// Resolved client settings for a specific workspace.
 ///

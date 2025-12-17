@@ -152,6 +152,20 @@ The expressions in these string annotations aren't valid expressions in this con
 shouldn't panic.
 
 ```py
+# Regression test for https://github.com/astral-sh/ty/issues/1865
+# error: [fstring-type-annotation]
+stringified_fstring_with_conditional: "f'{1 if 1 else 1}'"
+# error: [fstring-type-annotation]
+stringified_fstring_with_boolean_expression: "f'{1 or 2}'"
+# error: [fstring-type-annotation]
+stringified_fstring_with_generator_expression: "f'{(i for i in range(5))}'"
+# error: [fstring-type-annotation]
+stringified_fstring_with_list_comprehension: "f'{[i for i in range(5)]}'"
+# error: [fstring-type-annotation]
+stringified_fstring_with_dict_comprehension: "f'{ {i: i for i in range(5)} }'"
+# error: [fstring-type-annotation]
+stringified_fstring_with_set_comprehension: "f'{ {i for i in range(5)} }'"
+
 a: "1 or 2"
 b: "(x := 1)"
 # error: [invalid-type-form]

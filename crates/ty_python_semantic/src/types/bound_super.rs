@@ -76,15 +76,25 @@ impl<'db> BoundSuperError<'db> {
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     match pivot_class {
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                            "`types.GenericAlias` instance `{}` is not a valid class",
-                            alias.display_with(context.db(), DisplaySettings::default()),
-                        )),
-                        _ => builder.into_diagnostic(format_args!(
-                            "`{pivot_class}` is not a valid class",
-                            pivot_class = pivot_class.display(context.db()),
-                        )),
-                    };
+                        Type::GenericAlias(alias) => {
+                            builder.into_diagnostic(format_args!(
+                                "`types.GenericAlias` instance `{}` is not a valid class",
+                                alias.display_with(context.db(), DisplaySettings::default()),
+                            ));
+                        }
+                        _ => {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Argument is not a valid class");
+                            diagnostic.set_primary_message(format_args!(
+                                "Argument has type `{}`",
+                                pivot_class.display(context.db())
+                            ));
+                            diagnostic.set_concise_message(format_args!(
+                                "`{}` is not a valid class",
+                                pivot_class.display(context.db()),
+                            ));
+                        }
+                    }
                 }
             }
             BoundSuperError::FailingConditionCheck {

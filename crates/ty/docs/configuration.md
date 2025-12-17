@@ -18,9 +18,9 @@ Valid severities are:
 
 **Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.rules]
 possibly-unresolved-reference = "warn"
 division-by-zero = "ignore"
@@ -45,9 +45,9 @@ configuration setting.
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 extra-paths = ["./shared/my-search-path"]
 ```
@@ -76,9 +76,9 @@ This option can be used to point to virtual or system Python environments.
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 python = "./custom-venv-location/.venv"
 ```
@@ -103,9 +103,9 @@ If no platform is specified, ty will use the current platform:
 
 **Type**: `"win32" | "darwin" | "android" | "ios" | "linux" | "all" | str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 # Tailor type stubs and conditionalized type definitions to windows.
 python-platform = "win32"
@@ -137,9 +137,9 @@ to reflect the differing contents of the standard library across Python versions
 
 **Type**: `"3.7" | "3.8" | "3.9" | "3.10" | "3.11" | "3.12" | "3.13" | "3.14" | <major>.<minor>`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 python-version = "3.12"
 ```
@@ -158,16 +158,16 @@ If left unspecified, ty will try to detect common project layouts and initialize
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
 * otherwise, default to `.` (flat layout)
 
-Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
+Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
 it will also be included in the first party search path.
 
 **Default value**: `null`
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 # Multiple directories (priority order)
 root = ["./src", "./lib", "./vendor"]
@@ -185,9 +185,9 @@ bundled as a zip file in the binary
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.environment]
 typeshed = "/path/to/custom/typeshed"
 ```
@@ -200,24 +200,22 @@ Configuration override that applies to specific files based on glob patterns.
 
 An override allows you to apply different rule configurations to specific
 files or directories. Multiple overrides can match the same file, with
-later overrides take precedence.
+later overrides take precedence. Override rules take precedence over global
+rules for matching files.
 
-### Precedence
-
-- Later overrides in the array take precedence over earlier ones
-- Override rules take precedence over global rules for matching files
-
-### Examples
+For example, to relax enforcement of rules in test files:
 
 ```toml
-# Relax rules for test files
 [[tool.ty.overrides]]
 include = ["tests/**", "**/test_*.py"]
 
 [tool.ty.overrides.rules]
 possibly-unresolved-reference = "warn"
+```
 
-# Ignore generated files but still check important ones
+Or, to ignore a rule in generated files but retain enforcement in an important file:
+
+```toml
 [[tool.ty.overrides]]
 include = ["generated/**"]
 exclude = ["generated/important.py"]
@@ -240,9 +238,9 @@ If not specified, defaults to `[]` (excludes no files).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [[tool.ty.overrides]]
 exclude = [
     "generated",
@@ -268,9 +266,9 @@ If not specified, defaults to `["**"]` (matches all files).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [[tool.ty.overrides]]
 include = [
     "src",
@@ -292,9 +290,9 @@ severity levels or disable them entirely.
 
 **Type**: `dict[RuleName, "ignore" | "warn" | "error"]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [[tool.ty.overrides]]
 include = ["src"]
 
@@ -358,9 +356,9 @@ to re-include `dist` use `exclude = ["!dist"]`
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.src]
 exclude = [
     "generated",
@@ -399,9 +397,9 @@ matches `<project_root>/src` and not `<project_root>/test/src`).
 
 **Type**: `list[str]`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.src]
 include = [
     "src",
@@ -421,9 +419,9 @@ Enabled by default.
 
 **Type**: `bool`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.src]
 respect-ignore-files = false
 ```
@@ -432,8 +430,8 @@ respect-ignore-files = false
 
 ### `root`
 
-> [!WARN] "Deprecated"
-> This option has been deprecated. Use `environment.root` instead.
+!!! warning "Deprecated"
+    This option has been deprecated. Use `environment.root` instead.
 
 The root of the project, used for finding first-party modules.
 
@@ -443,16 +441,16 @@ If left unspecified, ty will try to detect common project layouts and initialize
 * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
 * otherwise, default to `.` (flat layout)
 
-Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
 it will also be included in the first party search path.
 
 **Default value**: `null`
 
 **Type**: `str`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.src]
 root = "./app"
 ```
@@ -471,9 +469,9 @@ Defaults to `false`.
 
 **Type**: `bool`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.terminal]
 # Error if ty emits any warning-level diagnostics.
 error-on-warning = true
@@ -491,9 +489,9 @@ Defaults to `full`.
 
 **Type**: `full | concise`
 
-**Example usage** (`pyproject.toml`):
+**Example usage**:
 
-```toml
+```toml title="pyproject.toml"
 [tool.ty.terminal]
 output-format = "concise"
 ```

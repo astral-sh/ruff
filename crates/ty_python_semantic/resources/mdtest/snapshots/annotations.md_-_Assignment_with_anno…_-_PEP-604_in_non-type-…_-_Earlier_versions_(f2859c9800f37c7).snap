@@ -19,12 +19,15 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.m
 # Diagnostics
 
 ```
-error[unsupported-operator]: Operator `|` is not supported between objects of type `<class 'int'>` and `<class 'str'>`
+error[unsupported-operator]: Unsupported `|` operation
  --> src/mdtest_snippet.py:2:12
   |
 1 | # error: [unsupported-operator]
 2 | IntOrStr = int | str
-  |            ^^^^^^^^^
+  |            ---^^^---
+  |            |     |
+  |            |     Has type `<class 'str'>`
+  |            Has type `<class 'int'>`
   |
 info: Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later
 info: Python 3.9 was assumed when resolving types because it was specified on the command line

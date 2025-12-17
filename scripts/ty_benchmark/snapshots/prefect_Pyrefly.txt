@@ -1,5 +1,7 @@
 ERROR src/prefect/concurrency/_leases.py:116:10-28: Cannot use `AsyncCancelScope` as a context manager [bad-context-manager]
 ERROR src/prefect/concurrency/_leases.py:116:10-28: Cannot use `AsyncCancelScope` as a context manager [bad-context-manager]
+ERROR src/prefect/concurrency/v1/sync.py:58:74-81: Unexpected keyword argument `_sync` in function `prefect.concurrency.v1._asyncio.acquire_concurrency_slots` [unexpected-keyword]
+ERROR src/prefect/concurrency/v1/sync.py:70:67-74: Unexpected keyword argument `_sync` in function `prefect.concurrency.v1._asyncio.release_concurrency_slots` [unexpected-keyword]
 ERROR src/prefect/events/actions.py:27:5-9: Class member `DoNothing.type` overrides parent class `Action` in an inconsistent manner [bad-override]
 ERROR src/prefect/events/actions.py:63:5-9: Class member `RunDeployment.type` overrides parent class `DeploymentAction` in an inconsistent manner [bad-override]
 ERROR src/prefect/events/actions.py:91:5-9: Class member `PauseDeployment.type` overrides parent class `DeploymentAction` in an inconsistent manner [bad-override]
@@ -110,6 +112,7 @@ ERROR src/prefect/server/models/deployments.py:1146:34-45: Argument `datetime` i
 ERROR src/prefect/server/models/deployments.py:1192:24-51: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
 ERROR src/prefect/server/models/deployments.py:1199:38-48: Argument `datetime` is not assignable to parameter `occurred` with type `DateTime` in function `prefect.server.models.events.deployment_status_event` [bad-argument-type]
 ERROR src/prefect/server/models/events.py:23:30-75: Could not import `PREFECT_API_EVENTS_RELATED_RESOURCE_CACHE_TTL` from `prefect.settings` [missing-module-attribute]
+ERROR src/prefect/server/models/events.py:82:12-30: Argument `UUID | None` is not assignable to parameter `id` with type `UUID | str` in function `prefect.server.events.schemas.events.Event.__init__` [bad-argument-type]
 ERROR src/prefect/server/models/flow_run_input.py:91:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/flow_run_states.py:79:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/flow_runs.py:47:5-45: Could not import `PREFECT_API_MAX_FLOW_RUN_GRAPH_ARTIFACTS` from `prefect.settings` [missing-module-attribute]
@@ -154,9 +157,9 @@ ERROR src/prefect/server/models/workers.py:328:26-42: Argument `datetime | None`
 ERROR src/prefect/server/models/workers.py:329:25-40: Argument `datetime | None` is not assignable to parameter `scheduled_after` with type `DateTime | None` in function `prefect.server.database.query_components.BaseQueryComponents.get_scheduled_flow_runs_from_work_pool` [bad-argument-type]
 ERROR src/prefect/server/models/workers.py:626:15-30: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:672:12-18: Module `sqlalchemy.exc` exists, but was not imported explicitly. You are relying on other modules to load it. [implicit-import]
-ERROR src/prefect/server/models/workers.py:755:55-81: Cannot set item in `dict[str, WorkerStatus | datetime]` [unsupported-operation]
+ERROR src/prefect/server/models/workers.py:755:55-81: `int` is not assignable to TypedDict key `heartbeat_interval_seconds` with type `WorkerStatus | datetime` [bad-typed-dict-key]
 ERROR src/prefect/server/models/workers.py:770:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:799:12-27: Object of class `Result` has no attribute `rowcount` [missing-attribute]
 ERROR src/prefect/server/models/workers.py:811:16-43: Cannot use `PrefectServerEventsClient` as a context manager [bad-context-manager]
  INFO Checking project configured at `<CWD>/pyrefly.toml`
- INFO 159 errors (12 suppressed)
+ INFO 162 errors (12 suppressed)

@@ -194,7 +194,7 @@ reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
 # TODO: This should deally be `B`
-reveal_type(B().decorated_method())  # revealed: Unknown
+reveal_type(B().decorated_method())  # revealed: Self@decorated_method
 
 reveal_type(B().a_property)  # revealed: B
 
