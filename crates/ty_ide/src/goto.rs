@@ -5,9 +5,9 @@ pub use crate::goto_type_definition::goto_type_definition;
 
 use std::borrow::Cow;
 
-use crate::find_node::covering_node;
 use crate::stub_mapping::StubMapper;
 use ruff_db::parsed::ParsedModuleRef;
+use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
@@ -665,7 +665,7 @@ impl GotoTarget<'_> {
     /// Creates a `GotoTarget` from a `CoveringNode` and an offset within the node
     pub(crate) fn from_covering_node<'a>(
         model: &SemanticModel,
-        covering_node: &crate::find_node::CoveringNode<'a>,
+        covering_node: &CoveringNode<'a>,
         offset: TextSize,
         tokens: &Tokens,
     ) -> Option<GotoTarget<'a>> {

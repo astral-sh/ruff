@@ -2,7 +2,8 @@ use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -101,7 +102,7 @@ impl<'db> Definition<'db> {
     }
 
     /// Extract a docstring from this definition, if applicable.
-    /// This method returns a docstring for function and class definitions.
+    /// This method returns a docstring for function, class, and attribute definitions.
     /// The docstring is extracted from the first statement in the body if it's a string literal.
     pub fn docstring(self, db: &'db dyn Db) -> Option<String> {
         let file = self.file(db);
@@ -109,6 +110,16 @@ impl<'db> Definition<'db> {
         let kind = self.kind(db);
 
         match kind {
+            DefinitionKind::Assignment(assign_def) => {
+                let assign_node = assign_def.target(&module);
+                attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
+            DefinitionKind::AnnotatedAssignment(assign_def) => {
+                let assign_node = assign_def.target(&module);
+                attribute_docstring(&module, assign_node)
+                    .map(|docstring_expr| docstring_expr.value.to_str().to_owned())
+            }
             DefinitionKind::Function(function_def) => {
                 let function_node = function_def.node(&module);
                 docstring_from_body(&function_node.body)
@@ -124,7 +135,7 @@ impl<'db> Definition<'db> {
     }
 }
 
-/// Get the module-level docstring for the given file
+/// Get the module-level docstring for the given file.
 pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
     let module = parsed_module(db, file).load(db);
     docstring_from_body(module.suite())
@@ -143,6 +154,59 @@ fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     else {
         return None;
     };
+    // Only match string literals.
+    value.as_string_literal_expr()
+}
+
+/// Extract a docstring from an attribute.
+///
+/// This is a non-standardized but popular-and-supported-by-sphinx kind of docstring
+/// where you just place the docstring underneath an assignment to an attribute and
+/// that counts as docs.
+///
+/// This is annoying to extract because we have a reference to (part of) an assignment statement
+/// and we need to find the statement *after it*, which is easy to say but not something the
+/// AST wants to encourage.
+fn attribute_docstring<'a>(
+    module: &'a ParsedModuleRef,
+    assign_lvalue: &Expr,
+) -> Option<&'a ast::ExprStringLiteral> {
+    // Find all the ancestors of the assign lvalue
+    let covering_node = covering_node(module.syntax().into(), assign_lvalue.range());
+    // The assignment is the closest parent statement
+    let assign = covering_node.find_first(AnyNodeRef::is_statement).ok()?;
+    let parent = assign.parent()?;
+    let assign_node = assign.node();
+
+    // The parent should be something with a body (list of Statements)
+    let parent_body = if let Some(module) = parent.as_mod_module() {
+        &module.body
+    } else if let Some(function) = parent.as_stmt_function_def() {
+        // This is important for `self.a = ...` in e.g. an initializer
+        &function.body
+    } else if let Some(class) = parent.as_stmt_class_def() {
+        &class.body
+    } else {
+        return None;
+    };
+
+    // Find the assignment statement in the parent
+    let assign_stmt_idx = parent_body
+        .iter()
+        .position(|stmt| AnyNodeRef::from(stmt) == assign_node)?;
+    // The docs must be the next statement
+    let next_stmt = parent_body.get(assign_stmt_idx + 1)?;
+
+    // Require the docstring to be a standalone expression.
+    let ast::Stmt::Expr(ast::StmtExpr {
+        value,
+        range: _,
+        node_index: _,
+    }) = next_stmt
+    else {
+        return None;
+    };
+
     // Only match string literals.
     value.as_string_literal_expr()
 }

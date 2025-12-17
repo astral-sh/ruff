@@ -12,6 +12,7 @@ pub use python_version::*;
 pub mod comparable;
 pub mod docstrings;
 mod expression;
+pub mod find_node;
 mod generated;
 pub mod helpers;
 pub mod identifier;
