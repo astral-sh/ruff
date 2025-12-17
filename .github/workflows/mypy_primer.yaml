@@ -114,6 +114,8 @@ jobs:
     name: Run mypy_primer on same revision
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
+    # TODO: Enable once we fixed the non-deterministic diagnostics
+    if: false
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
