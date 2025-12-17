@@ -197,7 +197,7 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
 }
 
 /// AST visitor that collects semantic tokens.
-#[allow(clippy::struct_excessive_bools)]
+#[expect(clippy::struct_excessive_bools)]
 struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
