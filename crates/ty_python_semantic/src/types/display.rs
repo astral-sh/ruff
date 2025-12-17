@@ -841,6 +841,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
                         return f.write_str("bound method `ConstraintSet.implies_subtype_of`");
                     }
+                    KnownBoundMethodType::ConstraintSetRetainOne(_) => {
+                        return f.write_str("bound method `ConstraintSet.retain_one`");
+                    }
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                         return f.write_str("bound method `ConstraintSet.satisfies`");
                     }

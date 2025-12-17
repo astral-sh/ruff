@@ -67,6 +67,12 @@ class ConstraintSet:
         .. _subtype: https://typing.python.org/en/latest/spec/concepts.html#subtype-supertype-and-type-equivalence
         """
 
+    def retain_one(self, typevar: Any) -> Self:
+        """
+        Quantifies over this constraint set so that it only contains constraints
+        that mention `typevar`. All other typevars are quantified away.
+        """
+
     def satisfies(self, other: Self) -> Self:
         """
         Returns whether this constraint set satisfies another — that is, whether

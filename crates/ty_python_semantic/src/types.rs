@@ -5035,6 +5035,14 @@ impl<'db> Type<'db> {
                 .into()
             }
             Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
+                if name == "retain_one" =>
+            {
+                Place::bound(Type::KnownBoundMethod(
+                    KnownBoundMethodType::ConstraintSetRetainOne(tracked),
+                ))
+                .into()
+            }
+            Type::KnownInstance(KnownInstanceType::ConstraintSet(tracked))
                 if name == "satisfies" =>
             {
                 Place::bound(Type::KnownBoundMethod(
@@ -8036,6 +8044,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_)
@@ -8255,6 +8264,7 @@ impl<'db> Type<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
@@ -12675,6 +12685,7 @@ pub enum KnownBoundMethodType<'db> {
     ConstraintSetAlways,
     ConstraintSetNever,
     ConstraintSetImpliesSubtypeOf(TrackedConstraintSet<'db>),
+    ConstraintSetRetainOne(TrackedConstraintSet<'db>),
     ConstraintSetSatisfies(TrackedConstraintSet<'db>),
     ConstraintSetSatisfiedByAllTypeVars(TrackedConstraintSet<'db>),
 
@@ -12707,6 +12718,7 @@ pub(super) fn walk_method_wrapper_type<'db, V: visitor::TypeVisitor<'db> + ?Size
         | KnownBoundMethodType::ConstraintSetAlways
         | KnownBoundMethodType::ConstraintSetNever
         | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+        | KnownBoundMethodType::ConstraintSetRetainOne(_)
         | KnownBoundMethodType::ConstraintSetSatisfies(_)
         | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
         | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {}
@@ -12778,6 +12790,10 @@ impl<'db> KnownBoundMethodType<'db> {
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_),
             )
             | (
+                KnownBoundMethodType::ConstraintSetRetainOne(_),
+                KnownBoundMethodType::ConstraintSetRetainOne(_),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetSatisfies(_),
                 KnownBoundMethodType::ConstraintSetSatisfies(_),
             )
@@ -12800,6 +12816,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
@@ -12812,6 +12829,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
@@ -12868,6 +12886,10 @@ impl<'db> KnownBoundMethodType<'db> {
                 KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(right_constraints),
             )
             | (
+                KnownBoundMethodType::ConstraintSetRetainOne(left_constraints),
+                KnownBoundMethodType::ConstraintSetRetainOne(right_constraints),
+            )
+            | (
                 KnownBoundMethodType::ConstraintSetSatisfies(left_constraints),
                 KnownBoundMethodType::ConstraintSetSatisfies(right_constraints),
             )
@@ -12893,6 +12915,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
@@ -12905,6 +12928,7 @@ impl<'db> KnownBoundMethodType<'db> {
                 | KnownBoundMethodType::ConstraintSetAlways
                 | KnownBoundMethodType::ConstraintSetNever
                 | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+                | KnownBoundMethodType::ConstraintSetRetainOne(_)
                 | KnownBoundMethodType::ConstraintSetSatisfies(_)
                 | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
                 | KnownBoundMethodType::GenericContextSpecializeConstrained(_),
@@ -12931,6 +12955,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetRetainOne(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => self,
@@ -12969,6 +12994,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetRetainOne(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => Some(self),
@@ -12987,6 +13013,7 @@ impl<'db> KnownBoundMethodType<'db> {
             | KnownBoundMethodType::ConstraintSetAlways
             | KnownBoundMethodType::ConstraintSetNever
             | KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_)
+            | KnownBoundMethodType::ConstraintSetRetainOne(_)
             | KnownBoundMethodType::ConstraintSetSatisfies(_)
             | KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_)
             | KnownBoundMethodType::GenericContextSpecializeConstrained(_) => {
@@ -13141,6 +13168,20 @@ impl<'db> KnownBoundMethodType<'db> {
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                             Parameter::positional_only(Some(Name::new_static("of")))
+                                .type_form()
+                                .with_annotated_type(Type::any()),
+                        ],
+                    ),
+                    Some(KnownClass::ConstraintSet.to_instance(db)),
+                )))
+            }
+
+            KnownBoundMethodType::ConstraintSetRetainOne(_) => {
+                Either::Right(std::iter::once(Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_only(Some(Name::new_static("typevar")))
                                 .type_form()
                                 .with_annotated_type(Type::any()),
                         ],

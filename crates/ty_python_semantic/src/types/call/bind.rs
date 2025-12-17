@@ -1274,6 +1274,20 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRetainOne(
+                        tracked,
+                    )) => {
+                        let [Some(Type::TypeVar(typevar))] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).retain_one(db, typevar.identity(db));
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
                     Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetSatisfies(
                         tracked,
                     )) => {

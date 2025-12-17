@@ -432,6 +432,17 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Quantifies over this constraint set so that it only contains constraints that mention the
+    /// given typevar. All other typevars are quantified away.
+    pub(crate) fn retain_one(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> Self {
+        let node = self.node.retain_one(db, bound_typevar);
+        Self { node }
+    }
+
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
     /// the typevars that were inferable when this constraint set was created, and which should be
     /// abstracted away. Those typevars will be removed from the constraint set, and the constraint
