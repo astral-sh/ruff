@@ -76,3 +76,42 @@ def reveal_type(obj, /): ...
 ```py
 reveal_type(foo)  # revealed: Unknown
 ```
+
+## Builtins imported from custom project-level stubs
+
+The project can add or replace builtins with the `__builtins__.pyi` stub. They will take precedence over the typeshed ones.
+
+```py
+reveal_type(foo)  # revealed: int
+reveal_type(bar)  # revealed: str
+reveal_type(quux(1))  # revealed: int
+b = baz  # error: [unresolved-reference]
+
+reveal_type(ord(100))  # revealed: bool
+a = ord("a")  # error: [invalid-argument-type]
+
+bar = int(123)
+reveal_type(bar)  # revealed: int
+```
+
+`__builtins__.pyi`:
+
+```pyi
+foo: int = ...
+bar: str = ...
+
+def quux(value: int) -> int: ...
+
+unused: str = ...
+
+def ord(x: int) -> bool: ...
+```
+
+Builtins stubs are searched relative to the project root, not the file using them.
+
+`under/some/folder.py`:
+
+```py
+reveal_type(foo)  # revealed: int
+reveal_type(bar)  # revealed: str
+```
