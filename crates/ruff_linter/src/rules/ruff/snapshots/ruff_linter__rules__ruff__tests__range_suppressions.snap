@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 23
+Added: 25
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -256,12 +256,13 @@ help: Remove assignment to unused variable `value`
 95 +     pass
 96 |     # ruff: enable[F841, RQW320]
 97 |     # ruff: enable[YF829]
+98 | 
 note: This is an unsafe fix and may change runtime behavior
 
 
 
 --- Added ---
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:11:5
    |
  9 |     # These should both be ignored by the implicit range suppression.
@@ -288,6 +289,7 @@ help: Remove invalid suppression comment
 19 | 
 20 | 
 21 | def f():
+note: This is an unsafe fix and may change runtime behavior
 
 
 RUF100 [*] Unused suppression (non-enabled: `E501`)
@@ -348,7 +350,7 @@ help: Remove unused `noqa` directive
 58 | 
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:61:5
    |
 59 | def f():
@@ -379,7 +381,7 @@ help: Remove unused suppression
 64 | 
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:68:5
    |
 66 |     # Overlapping range suppressions, one should be marked as used,
@@ -391,7 +393,7 @@ RUF104 Unmatched suppression comment
    |
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:69:5
    |
 67 |     # and the other should trigger an unused suppression diagnostic
@@ -421,7 +423,7 @@ help: Remove unused suppression
 71 | 
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:75:5
    |
 73 | def f():
@@ -472,7 +474,7 @@ help: Remove unused suppression
 78 | 
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:81:5
    |
 79 | def f():
@@ -503,7 +505,7 @@ help: Remove unused suppression
 84 | 
 
 
-RUF104 Unmatched suppression comment
+RUF104 Suppression comment without matching `#ruff:enable` comment
   --> suppressions.py:87:5
    |
 85 | def f():
@@ -631,6 +633,8 @@ help: Remove the rule code
    -     # ruff: enable[F841, RQW320]
 96 +     # ruff: enable[F841]
 97 |     # ruff: enable[YF829]
+98 | 
+99 | 
 
 
 RUF102 [*] Invalid rule code in `# noqa`: YF829
@@ -646,3 +650,40 @@ help: Remove the rule code
 95 |     value = 0
 96 |     # ruff: enable[F841, RQW320]
    -     # ruff: enable[YF829]
+97 | 
+98 | 
+99 | def f():
+
+
+RUF102 [*] Invalid rule code in `# noqa`: TK421
+   --> suppressions.py:102:21
+    |
+100 | def f():
+101 |     # External rule codes should be ignored
+102 |     # ruff: disable[TK421]
+    |                     ^^^^^
+103 |     print("hello")
+104 |     # ruff: enable[TK421]
+    |
+help: Remove the rule code
+99  | 
+100 | def f():
+101 |     # External rule codes should be ignored
+    -     # ruff: disable[TK421]
+102 |     print("hello")
+103 |     # ruff: enable[TK421]
+
+
+RUF102 [*] Invalid rule code in `# noqa`: TK421
+   --> suppressions.py:104:20
+    |
+102 |     # ruff: disable[TK421]
+103 |     print("hello")
+104 |     # ruff: enable[TK421]
+    |                    ^^^^^
+    |
+help: Remove the rule code
+101 |     # External rule codes should be ignored
+102 |     # ruff: disable[TK421]
+103 |     print("hello")
+    -     # ruff: enable[TK421]
