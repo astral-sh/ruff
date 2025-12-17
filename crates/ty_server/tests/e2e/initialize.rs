@@ -484,11 +484,20 @@ fn missing_virtual_env_does_not_panic() -> Result<()> {
     let workspace_root = SystemPath::new("project");
 
     // This should not panic even though VIRTUAL_ENV points to a non-existent path
-    let _server = TestServerBuilder::new()?
+    let mut server = TestServerBuilder::new()?
         .with_workspace(workspace_root, None)?
         .with_env_var("VIRTUAL_ENV", "/nonexistent/virtual/env/path")
         .build()
         .wait_until_workspaces_are_initialized();
+
+    let show_message_params = server.await_notification::<ShowMessage>();
+
+    insta::assert_json_snapshot!(show_message_params, @r#"
+    {
+      "type": 1,
+      "message": "Failed to load project rooted at <temp_dir>/project. Please refer to the logs for more details."
+    }
+    "#);
 
     Ok(())
 }

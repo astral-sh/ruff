@@ -56,10 +56,7 @@ impl TestSystem {
 
     /// Removes an environment variable override, making it appear as not set.
     pub fn remove_env_var(&self, name: impl Into<String>) {
-        self.env_overrides
-            .lock()
-            .unwrap()
-            .insert(name.into(), None);
+        self.env_overrides.lock().unwrap().insert(name.into(), None);
     }
 
     /// Returns the [`InMemorySystem`].
