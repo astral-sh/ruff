@@ -7650,7 +7650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation.filter_disjoint_elements(
                 self.db(),
                 Type::homogeneous_tuple(self.db(), Type::unknown()),
-                inferable,
+                &inferable,
             )
         });
 
@@ -7835,7 +7835,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // `collection_ty` is `list`.
         let tcx = tcx.map(|annotation| {
             let collection_ty = collection_class.to_instance(self.db());
-            annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
+            annotation.filter_disjoint_elements(self.db(), collection_ty, &inferable)
         });
 
         // Extract the annotated type of `T`, if provided.
@@ -7986,7 +7986,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation.filter_disjoint_elements(
                 self.db(),
                 collection_class.to_instance(self.db()),
-                InferableTypeVars::None,
+                &InferableTypeVars::None,
             )
         });
 
@@ -11851,7 +11851,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     match typevar.typevar(db).bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                             if provided_type
-                                .when_assignable_to(db, bound, InferableTypeVars::None)
+                                .when_assignable_to(db, bound, &InferableTypeVars::None)
                                 .is_never_satisfied(db)
                             {
                                 let node = get_node(index);
@@ -11882,7 +11882,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 .when_assignable_to(
                                     db,
                                     constraints.as_type(db),
-                                    InferableTypeVars::None,
+                                    &InferableTypeVars::None,
                                 )
                                 .is_never_satisfied(db)
                             {

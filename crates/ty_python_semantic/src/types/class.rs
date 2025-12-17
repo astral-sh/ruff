@@ -600,7 +600,7 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, InferableTypeVars::None)
+        self.when_subclass_of(db, other, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -608,7 +608,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to_impl(
             db,
@@ -624,7 +624,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -676,7 +676,7 @@ impl<'db> ClassType<'db> {
         self,
         db: &'db dyn Db,
         other: ClassType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -736,7 +736,7 @@ impl<'db> ClassType<'db> {
                             .is_disjoint_from(
                                 db,
                                 other_alias.specialization(db),
-                                InferableTypeVars::None,
+                                &InferableTypeVars::None,
                             )
                             .is_always_satisfied(db)
                 }

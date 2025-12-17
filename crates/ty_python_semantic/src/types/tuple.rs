@@ -273,7 +273,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -292,7 +292,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -309,7 +309,7 @@ impl<'db> TupleType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.tuple(db)
@@ -502,7 +502,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -589,7 +589,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         ConstraintSet::from(self.0.len() == other.0.len()).and(db, || {
@@ -908,7 +908,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Tuple<Type<'db>>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1111,7 +1111,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.variable
@@ -1340,7 +1340,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1369,7 +1369,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
@@ -1389,7 +1389,7 @@ impl<'db> Tuple<Type<'db>> {
         &self,
         db: &'db dyn Db,
         other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1409,7 +1409,7 @@ impl<'db> Tuple<Type<'db>> {
             db: &'db dyn Db,
             a: impl IntoIterator<Item = &'s Type<'db>>,
             b: impl IntoIterator<Item = &'s Type<'db>>,
-            inferable: InferableTypeVars<'_, 'db>,
+            inferable: &InferableTypeVars<'db>,
             disjointness_visitor: &IsDisjointVisitor<'db>,
             relation_visitor: &HasRelationToVisitor<'db>,
         ) -> ConstraintSet<'db>

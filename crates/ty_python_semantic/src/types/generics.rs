@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::fmt::Display;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_python_ast as ast;
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -119,50 +119,90 @@ pub(crate) fn typing_self<'db>(
     )
 }
 
-#[derive(Clone, Copy, Debug)]
-pub(crate) enum InferableTypeVars<'a, 'db> {
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum InferableTypeVars<'db> {
     None,
-    One(&'a FxHashSet<BoundTypeVarIdentity<'db>>),
+    One(std::sync::Arc<FxHashSet<BoundTypeVarIdentity<'db>>>),
     Two(
-        &'a InferableTypeVars<'a, 'db>,
-        &'a InferableTypeVars<'a, 'db>,
+        std::sync::Arc<InferableTypeVars<'db>>,
+        std::sync::Arc<InferableTypeVars<'db>>,
     ),
+}
+
+impl<'db> std::hash::Hash for InferableTypeVars<'db> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            InferableTypeVars::None => {
+                0u8.hash(state);
+            }
+            InferableTypeVars::One(set) => {
+                1u8.hash(state);
+                // Sort the identities for deterministic hashing.
+                let mut items: Vec<_> = set.iter().copied().collect();
+                items.sort_unstable();
+                for item in items {
+                    item.hash(state);
+                }
+            }
+            InferableTypeVars::Two(left, right) => {
+                2u8.hash(state);
+                left.hash(state);
+                right.hash(state);
+            }
+        }
+    }
 }
 
 impl<'db> BoundTypeVarInstance<'db> {
     pub(crate) fn is_inferable(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> bool {
         match inferable {
             InferableTypeVars::None => false,
             InferableTypeVars::One(typevars) => typevars.contains(&self.identity(db)),
             InferableTypeVars::Two(left, right) => {
-                self.is_inferable(db, *left) || self.is_inferable(db, *right)
+                self.is_inferable(db, left) || self.is_inferable(db, right)
             }
         }
     }
 }
 
-impl<'a, 'db> InferableTypeVars<'a, 'db> {
-    pub(crate) fn merge(&'a self, other: &'a InferableTypeVars<'a, 'db>) -> Self {
+impl<'db> InferableTypeVars<'db> {
+    pub(crate) fn merge(self, other: InferableTypeVars<'db>) -> Self {
         match (self, other) {
-            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => *other,
-            _ => InferableTypeVars::Two(self, other),
+            (InferableTypeVars::None, other) | (other, InferableTypeVars::None) => other,
+            (left, right) => InferableTypeVars::Two(std::sync::Arc::new(left), std::sync::Arc::new(right)),
         }
     }
 
     // This is not an IntoIterator implementation because I have no desire to try to name the
     // iterator type.
-    pub(crate) fn iter(self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = BoundTypeVarIdentity<'db>> + '_ {
+        enum Iter<'a, 'db> {
+            Empty,
+            One(std::collections::hash_set::Iter<'a, BoundTypeVarIdentity<'db>>),
+            Two(Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>> + 'a>),
+        }
+
+        impl<'db> Iterator for Iter<'_, 'db> {
+            type Item = BoundTypeVarIdentity<'db>;
+
+            fn next(&mut self) -> Option<Self::Item> {
+                match self {
+                    Iter::Empty => None,
+                    Iter::One(iter) => iter.next().copied(),
+                    Iter::Two(iter) => iter.next(),
+                }
+            }
+        }
+
         match self {
-            InferableTypeVars::None => Either::Left(Either::Left(std::iter::empty())),
-            InferableTypeVars::One(typevars) => Either::Right(typevars.iter().copied()),
+            InferableTypeVars::None => Iter::Empty,
+            InferableTypeVars::One(typevars) => Iter::One(typevars.iter()),
             InferableTypeVars::Two(left, right) => {
-                let chained: Box<dyn Iterator<Item = BoundTypeVarIdentity<'db>>> =
-                    Box::new(left.iter().chain(right.iter()));
-                Either::Left(Either::Right(chained))
+                Iter::Two(Box::new(left.iter().chain(right.iter())))
             }
         }
     }
@@ -172,7 +212,7 @@ impl<'a, 'db> InferableTypeVars<'a, 'db> {
     pub(crate) fn display(&self, db: &'db dyn Db) -> impl Display {
         fn find_typevars<'db>(
             result: &mut FxHashSet<BoundTypeVarIdentity<'db>>,
-            inferable: &InferableTypeVars<'_, 'db>,
+            inferable: &InferableTypeVars<'db>,
         ) {
             match inferable {
                 InferableTypeVars::None => {}
@@ -302,7 +342,7 @@ impl<'db> GenericContext<'db> {
     /// In this example, `method`'s generic context binds `Self` and `T`, but its inferable set
     /// also includes `A@C`. This is needed because at each call site, we need to infer the
     /// specialized class instance type whose method is being invoked.
-    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db, 'db> {
+    pub(crate) fn inferable_typevars(self, db: &'db dyn Db) -> InferableTypeVars<'db> {
         #[derive(Default)]
         struct CollectTypeVars<'db> {
             typevars: RefCell<FxHashSet<BoundTypeVarIdentity<'db>>>,
@@ -349,10 +389,8 @@ impl<'db> GenericContext<'db> {
             visitor.typevars.into_inner()
         }
 
-        // This ensures that salsa caches the FxHashSet, not the InferableTypeVars that wraps it.
-        // (That way InferableTypeVars can contain references, and doesn't need to impl
-        // salsa::Update.)
-        InferableTypeVars::One(inferable_typevars_inner(db, self))
+        // Wrap the Salsa-cached FxHashSet in an Arc.
+        InferableTypeVars::One(std::sync::Arc::new(inferable_typevars_inner(db, self).clone()))
     }
 
     pub(crate) fn variables(
@@ -769,7 +807,7 @@ fn is_subtype_in_invariant_position<'db>(
     derived_materialization: MaterializationKind,
     base_type: &Type<'db>,
     base_materialization: MaterializationKind,
-    inferable: InferableTypeVars<'_, 'db>,
+    inferable: &InferableTypeVars<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
 ) -> ConstraintSet<'db> {
@@ -847,7 +885,7 @@ fn has_relation_in_invariant_position<'db>(
     derived_materialization: Option<MaterializationKind>,
     base_type: &Type<'db>,
     base_materialization: Option<MaterializationKind>,
-    inferable: InferableTypeVars<'_, 'db>,
+    inferable: &InferableTypeVars<'db>,
     relation: TypeRelation<'db>,
     relation_visitor: &HasRelationToVisitor<'db>,
     disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1233,7 +1271,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -1308,7 +1346,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_disjoint_from_impl(
             db,
@@ -1323,7 +1361,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -1382,7 +1420,7 @@ impl<'db> Specialization<'db> {
         self,
         db: &'db dyn Db,
         other: Specialization<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self.materialization_kind(db) != other.materialization_kind(db) {
@@ -1483,7 +1521,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
 /// specialization of a generic function.
 pub(crate) struct SpecializationBuilder<'db> {
     db: &'db dyn Db,
-    inferable: InferableTypeVars<'db, 'db>,
+    inferable: InferableTypeVars<'db>,
     types: FxHashMap<BoundTypeVarIdentity<'db>, Type<'db>>,
 }
 
@@ -1492,7 +1530,7 @@ pub(crate) struct SpecializationBuilder<'db> {
 pub(crate) type TypeVarAssignment<'db> = (BoundTypeVarIdentity<'db>, TypeVarVariance, Type<'db>);
 
 impl<'db> SpecializationBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db, 'db>) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, inferable: InferableTypeVars<'db>) -> Self {
         Self {
             db,
             inferable,
@@ -1520,7 +1558,7 @@ impl<'db> SpecializationBuilder<'db> {
 
         Self {
             db: self.db,
-            inferable: self.inferable,
+            inferable: self.inferable.clone(),
             types,
         }
     }
@@ -1687,8 +1725,8 @@ impl<'db> SpecializationBuilder<'db> {
         //
         // For example, if `formal` is `list[T]` and `actual` is `list[int] | None`, we want to
         // specialize `T` to `int`, and so ignore the `None`.
-        let actual = actual.filter_disjoint_elements(self.db, formal, self.inferable);
-        let formal = formal.filter_disjoint_elements(self.db, actual, self.inferable);
+        let actual = actual.filter_disjoint_elements(self.db, formal, &self.inferable);
+        let formal = formal.filter_disjoint_elements(self.db, actual, &self.inferable);
 
         match (formal, actual) {
             // TODO: We haven't implemented a full unification solver yet. If typevars appear in
@@ -1751,7 +1789,7 @@ impl<'db> SpecializationBuilder<'db> {
                     let assignable_elements =
                         (union_formal.elements(self.db).iter()).filter(|ty| {
                             actual
-                                .when_subtype_of(self.db, **ty, self.inferable)
+                                .when_subtype_of(self.db, **ty, &self.inferable)
                                 .is_always_satisfied(self.db)
                         });
                     if assignable_elements.exactly_one().is_ok() {
@@ -1786,7 +1824,7 @@ impl<'db> SpecializationBuilder<'db> {
                         // The recursive call to `infer_map_impl` may succeed even if the actual type is
                         // not assignable to the formal element.
                         if !actual
-                            .when_assignable_to(self.db, *formal_element, self.inferable)
+                            .when_assignable_to(self.db, *formal_element, &self.inferable)
                             .is_never_satisfied(self.db)
                         {
                             found_matching_element = true;
@@ -1810,12 +1848,12 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (Type::TypeVar(bound_typevar), ty) | (ty, Type::TypeVar(bound_typevar))
-                if bound_typevar.is_inferable(self.db, self.inferable) =>
+                if bound_typevar.is_inferable(self.db, &self.inferable) =>
             {
                 match bound_typevar.typevar(self.db).bound_or_constraints(self.db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
                         if !ty
-                            .when_assignable_to(self.db, bound, self.inferable)
+                            .when_assignable_to(self.db, bound, &self.inferable)
                             .is_always_satisfied(self.db)
                         {
                             return Err(SpecializationError::MismatchedBound {
@@ -1836,7 +1874,7 @@ impl<'db> SpecializationBuilder<'db> {
 
                         for constraint in constraints.elements(self.db) {
                             if ty
-                                .when_assignable_to(self.db, *constraint, self.inferable)
+                                .when_assignable_to(self.db, *constraint, &self.inferable)
                                 .is_always_satisfied(self.db)
                             {
                                 self.add_type_mapping(bound_typevar, *constraint, polarity, f);
@@ -1947,7 +1985,7 @@ impl<'db> SpecializationBuilder<'db> {
                             .when_constraint_set_assignable_to(
                                 self.db,
                                 formal_callable,
-                                self.inferable,
+                                &self.inferable,
                             );
                         self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                     } else {
@@ -1956,7 +1994,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 .when_constraint_set_assignable_to_signatures(
                                     self.db,
                                     formal_callable,
-                                    self.inferable,
+                                    &self.inferable,
                                 );
                             self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                         }

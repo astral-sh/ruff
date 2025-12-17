@@ -205,7 +205,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: SubclassOfType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -247,7 +247,7 @@ impl<'db> SubclassOfType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
+        _inferable: &InferableTypeVars<'db>,
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {

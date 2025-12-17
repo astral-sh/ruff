@@ -129,7 +129,7 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         target: TypedDictType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -314,7 +314,7 @@ impl<'db> TypedDictType<'db> {
         self,
         db: &'db dyn Db,
         other: TypedDictType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         // TODO: `closed` and `extra_items` support will go here. Until then we don't look at the

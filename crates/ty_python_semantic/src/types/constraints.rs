@@ -346,7 +346,7 @@ impl<'db> ConstraintSet<'db> {
     pub(crate) fn satisfied_by_all_typevars(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> bool {
         self.node.satisfied_by_all_typevars(db, inferable)
     }
@@ -1311,7 +1311,7 @@ impl<'db> Node<'db> {
     fn satisfied_by_all_typevars(
         self,
         db: &'db dyn Db,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> bool {
         match self {
             Node::AlwaysTrue => return true,

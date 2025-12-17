@@ -615,7 +615,7 @@ impl<'db> PropertyInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
     }
@@ -624,7 +624,7 @@ impl<'db> PropertyInstanceType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let getter_equivalence = if let Some(getter) = self.getter(db) {
@@ -1486,7 +1486,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> Type<'db> {
         self.filter_union(db, |elem| {
             !elem
@@ -1952,7 +1952,7 @@ impl<'db> Type<'db> {
     ///
     /// See [`TypeRelation::Subtyping`] for more details.
     pub(crate) fn is_subtype_of(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_subtype_of(db, target, InferableTypeVars::None)
+        self.when_subtype_of(db, target, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -1960,7 +1960,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Subtyping)
     }
@@ -1974,7 +1974,7 @@ impl<'db> Type<'db> {
         db: &'db dyn Db,
         target: Type<'db>,
         assuming: ConstraintSet<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(
             db,
@@ -1988,7 +1988,7 @@ impl<'db> Type<'db> {
     ///
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target, InferableTypeVars::None)
+        self.when_assignable_to(db, target, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -1998,7 +1998,7 @@ impl<'db> Type<'db> {
     /// a constraint set and lets `satisfied_by_all_typevars` perform existential vs universal
     /// reasoning depending on inferable typevars.
     pub fn is_constraint_set_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_constraint_set_assignable_to(db, target, InferableTypeVars::None)
+        self.when_constraint_set_assignable_to(db, target, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -2006,7 +2006,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(db, target, inferable, TypeRelation::Assignability)
     }
@@ -2015,7 +2015,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.has_relation_to(
             db,
@@ -2036,7 +2036,7 @@ impl<'db> Type<'db> {
             other: Type<'db>,
         ) -> bool {
             self_ty
-                .has_relation_to(db, other, InferableTypeVars::None, TypeRelation::Redundancy)
+                .has_relation_to(db, other, &InferableTypeVars::None, TypeRelation::Redundancy)
                 .is_always_satisfied(db)
         }
 
@@ -2051,24 +2051,35 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
     ) -> ConstraintSet<'db> {
-        self.has_relation_to_impl(
-            db,
-            target,
-            inferable,
-            relation,
-            &HasRelationToVisitor::default(),
-            &IsDisjointVisitor::default(),
-        )
+        #[salsa::tracked(cycle_initial=has_relation_to_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn has_relation_to_tracked<'db>(
+            db: &'db dyn Db,
+            source: Type<'db>,
+            target: Type<'db>,
+            inferable: InferableTypeVars<'db>,
+            relation: TypeRelation<'db>,
+        ) -> ConstraintSet<'db> {
+            source.has_relation_to_impl(
+                db,
+                target,
+                &inferable,
+                relation,
+                &HasRelationToVisitor::default(),
+                &IsDisjointVisitor::default(),
+            )
+        }
+
+        has_relation_to_tracked(db, self, target, inferable.clone(), relation)
     }
 
     fn has_relation_to_impl(
         self,
         db: &'db dyn Db,
         target: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -3093,7 +3104,7 @@ impl<'db> Type<'db> {
     ///
     /// [equivalent to]: https://typing.python.org/en/latest/spec/glossary.html#term-equivalent
     pub(crate) fn is_equivalent_to(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_equivalent_to(db, other, InferableTypeVars::None)
+        self.when_equivalent_to(db, other, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -3101,7 +3112,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_equivalent_to_impl(db, other, inferable, &IsEquivalentVisitor::default())
     }
@@ -3110,7 +3121,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -3224,7 +3235,7 @@ impl<'db> Type<'db> {
     /// This function aims to have no false positives, but might return wrong
     /// `false` answers in some cases.
     pub(crate) fn is_disjoint_from(self, db: &'db dyn Db, other: Type<'db>) -> bool {
-        self.when_disjoint_from(db, other, InferableTypeVars::None)
+        self.when_disjoint_from(db, other, &InferableTypeVars::None)
             .is_always_satisfied(db)
     }
 
@@ -3232,7 +3243,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
     ) -> ConstraintSet<'db> {
         self.is_disjoint_from_impl(
             db,
@@ -3247,7 +3258,7 @@ impl<'db> Type<'db> {
         self,
         db: &'db dyn Db,
         other: Type<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
@@ -3255,7 +3266,7 @@ impl<'db> Type<'db> {
             db: &'db dyn Db,
             protocol: ProtocolInstanceType<'db>,
             other: Type<'db>,
-            inferable: InferableTypeVars<'_, 'db>,
+            inferable: &InferableTypeVars<'db>,
             disjointness_visitor: &IsDisjointVisitor<'db>,
             relation_visitor: &HasRelationToVisitor<'db>,
         ) -> ConstraintSet<'db> {
@@ -8658,6 +8669,19 @@ fn is_redundant_with_cycle_initial<'db>(
     true
 }
 
+fn has_relation_to_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _source: Type<'db>,
+    _target: Type<'db>,
+    _inferable: InferableTypeVars<'db>,
+    _relation: TypeRelation<'db>,
+) -> ConstraintSet<'db> {
+    // For recursive types, optimistically assume the relation holds.
+    // This matches the fallback behavior of HasRelationToVisitor::default().
+    ConstraintSet::from(true)
+}
+
 fn apply_specialization_cycle_recover<'db>(
     db: &'db dyn Db,
     cycle: &salsa::Cycle,
@@ -12288,7 +12312,7 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -12322,7 +12346,7 @@ impl<'db> BoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         self.function(db)
@@ -12538,7 +12562,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -12563,7 +12587,7 @@ impl<'db> CallableType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -12629,7 +12653,7 @@ impl<'db> CallableTypes<'db> {
         self,
         db: &'db dyn Db,
         other: CallableType<'db>,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -12718,7 +12742,7 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         relation: TypeRelation<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
@@ -12823,7 +12847,7 @@ impl<'db> KnownBoundMethodType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        inferable: InferableTypeVars<'_, 'db>,
+        inferable: &InferableTypeVars<'db>,
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self, other) {
@@ -14072,7 +14096,7 @@ impl<'db> UnionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
+        _inferable: &InferableTypeVars<'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {
@@ -14276,7 +14300,7 @@ impl<'db> IntersectionType<'db> {
         self,
         db: &'db dyn Db,
         other: Self,
-        _inferable: InferableTypeVars<'_, 'db>,
+        _inferable: &InferableTypeVars<'db>,
         _visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         if self == other {

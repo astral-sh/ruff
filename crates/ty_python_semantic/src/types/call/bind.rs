@@ -737,7 +737,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsEquivalentTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_equivalent_to(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_equivalent_to(db, *ty_b, &InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -748,7 +748,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsSubtypeOf) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_subtype_of(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_subtype_of(db, *ty_b, &InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -759,7 +759,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsAssignableTo) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_assignable_to(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_assignable_to(db, *ty_b, &InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -770,7 +770,7 @@ impl<'db> Bindings<'db> {
                         Some(KnownFunction::IsDisjointFrom) => {
                             if let [Some(ty_a), Some(ty_b)] = overload.parameter_types() {
                                 let constraints =
-                                    ty_a.when_disjoint_from(db, *ty_b, InferableTypeVars::None);
+                                    ty_a.when_disjoint_from(db, *ty_b, &InferableTypeVars::None);
                                 let tracked = TrackedConstraintSet::new(db, constraints);
                                 overload.set_return_type(Type::KnownInstance(
                                     KnownInstanceType::ConstraintSet(tracked),
@@ -1254,7 +1254,7 @@ impl<'db> Bindings<'db> {
                             db,
                             *ty_b,
                             tracked.constraints(db),
-                            InferableTypeVars::None,
+                            &InferableTypeVars::None,
                         );
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
@@ -1314,7 +1314,7 @@ impl<'db> Bindings<'db> {
 
                         let result = tracked
                             .constraints(db)
-                            .satisfied_by_all_typevars(db, InferableTypeVars::One(&inferable));
+                            .satisfied_by_all_typevars(db, &InferableTypeVars::One(std::sync::Arc::new(inferable.clone())));
                         overload.set_return_type(Type::BooleanLiteral(result));
                     }
 
@@ -1732,7 +1732,7 @@ impl<'db> CallableBinding<'db> {
                         .annotated_type()
                         .unwrap_or(Type::unknown());
                     if argument_type
-                        .when_assignable_to(db, parameter_type, overload.inferable_typevars)
+                        .when_assignable_to(db, parameter_type, &overload.inferable_typevars)
                         .is_always_satisfied(db)
                     {
                         is_argument_assignable_to_any_overload = true;
@@ -1986,7 +1986,7 @@ impl<'db> CallableBinding<'db> {
                             .when_equivalent_to(
                                 db,
                                 current_parameter_type,
-                                overload.inferable_typevars,
+                                &overload.inferable_typevars,
                             )
                             .is_always_satisfied(db)
                         {
@@ -2134,7 +2134,7 @@ impl<'db> CallableBinding<'db> {
                         .when_equivalent_to(
                             db,
                             first_overload_return_type,
-                            overload.inferable_typevars,
+                            &overload.inferable_typevars,
                         )
                         .is_always_satisfied(db)
                 })
@@ -2925,7 +2925,7 @@ struct ArgumentTypeChecker<'a, 'db> {
     return_ty: Type<'db>,
     errors: &'a mut Vec<BindingError<'db>>,
 
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
 }
 
@@ -2997,7 +2997,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
-        let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars);
+        let mut builder = SpecializationBuilder::new(self.db, self.inferable_typevars.clone());
 
         // Prefer the declared type of generic classes.
         let preferred_type_mappings = return_with_tcx.and_then(|(return_ty, tcx)| {
@@ -3169,7 +3169,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             // constraint set that we get from this assignability check, instead of inferring and
             // building them in an earlier separate step.
             if argument_type
-                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+                .when_assignable_to(self.db, expected_ty, &self.inferable_typevars)
                 .is_never_satisfied(self.db)
             {
                 let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
@@ -3442,7 +3442,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     .when_assignable_to(
                         self.db,
                         KnownClass::Str.to_instance(self.db),
-                        self.inferable_typevars,
+                        &self.inferable_typevars,
                     )
                     .is_always_satisfied(self.db)
                 {
@@ -3507,7 +3507,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     fn finish(
         self,
     ) -> (
-        InferableTypeVars<'db, 'db>,
+        InferableTypeVars<'db>,
         Option<Specialization<'db>>,
         Type<'db>,
     ) {
@@ -3580,7 +3580,7 @@ pub(crate) struct Binding<'db> {
     return_ty: Type<'db>,
 
     /// The inferable typevars in this signature.
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
 
     /// The specialization that was inferred from the argument types, if the callable is generic.
     specialization: Option<Specialization<'db>>,
@@ -3784,7 +3784,7 @@ impl<'db> Binding<'db> {
     fn snapshot(&self) -> BindingSnapshot<'db> {
         BindingSnapshot {
             return_ty: self.return_ty,
-            inferable_typevars: self.inferable_typevars,
+            inferable_typevars: self.inferable_typevars.clone(),
             specialization: self.specialization,
             argument_matches: self.argument_matches.clone(),
             parameter_tys: self.parameter_tys.clone(),
@@ -3834,7 +3834,7 @@ impl<'db> Binding<'db> {
 #[derive(Clone, Debug)]
 struct BindingSnapshot<'db> {
     return_ty: Type<'db>,
-    inferable_typevars: InferableTypeVars<'db, 'db>,
+    inferable_typevars: InferableTypeVars<'db>,
     specialization: Option<Specialization<'db>>,
     argument_matches: Box<[MatchedArgument<'db>]>,
     parameter_tys: Box<[Option<Type<'db>>]>,
@@ -3874,7 +3874,7 @@ impl<'db> CallableBindingSnapshot<'db> {
 
                 // ... and update the snapshot with the current state of the binding.
                 snapshot.return_ty = binding.return_ty;
-                snapshot.inferable_typevars = binding.inferable_typevars;
+                snapshot.inferable_typevars = binding.inferable_typevars.clone();
                 snapshot.specialization = binding.specialization;
                 snapshot
                     .argument_matches
