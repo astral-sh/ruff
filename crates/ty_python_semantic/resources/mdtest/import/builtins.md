@@ -115,3 +115,23 @@ Builtins stubs are searched relative to the project root, not the file using the
 reveal_type(foo)  # revealed: int
 reveal_type(bar)  # revealed: str
 ```
+
+## Assigning custom builtins
+
+```py
+import builtins
+
+builtins.foo = 123
+builtins.bar = 456  # error: [unresolved-attribute]
+builtins.baz = 789  # error: [invalid-assignment]
+builtins.chr = lambda x: str(x)  # error: [invalid-assignment]
+builtins.chr = 10
+```
+
+`__builtins__.pyi`:
+
+```pyi
+foo: int
+baz: str
+chr: int
+```
