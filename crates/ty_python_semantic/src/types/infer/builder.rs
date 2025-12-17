@@ -2358,12 +2358,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             decorator_types_and_nodes.push((decorator_type, decorator));
         }
 
+        // In stub files, default values may reference names that are defined later in the file.
+        let in_stub = self.in_stub();
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
         for default in parameters
             .iter_non_variadic_params()
             .filter_map(|param| param.default.as_deref())
         {
             self.infer_expression(default, TypeContext::default());
         }
+        self.deferred_state = previous_deferred_state;
 
         // If there are type params, parameters and returns are evaluated in that scope. Otherwise,
         // we always defer the inference of the parameters and returns. That ensures that we do not
@@ -2998,9 +3002,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // if there are type parameters, then the keywords and bases are within that scope
         // and we don't need to run inference here
         if type_params.is_none() {
+            // In stub files, keyword values may reference names that are defined later in the file.
+            let in_stub = self.in_stub();
+            let previous_deferred_state =
+                std::mem::replace(&mut self.deferred_state, in_stub.into());
             for keyword in class_node.keywords() {
                 self.infer_expression(&keyword.value, TypeContext::default());
             }
+            self.deferred_state = previous_deferred_state;
 
             // Inference of bases deferred in stubs, or if any are string literals.
             if self.in_stub() || class_node.bases().iter().any(contains_string_literal) {
@@ -8322,6 +8331,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             body: _,
         } = lambda_expression;
 
+        // In stub files, default values may reference names that are defined later in the file.
+        let in_stub = self.in_stub();
+        let previous_deferred_state = std::mem::replace(&mut self.deferred_state, in_stub.into());
+
         let parameters = if let Some(parameters) = parameters {
             let positional_only = parameters
                 .posonlyargs
@@ -8386,6 +8399,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         } else {
             Parameters::empty()
         };
+
+        self.deferred_state = previous_deferred_state;
 
         // TODO: Useful inference of a lambda's return type will require a different approach,
         // which does the inference of the body expression based on arguments at each call site,
