@@ -13,15 +13,24 @@ use crate::Violation;
 /// ```python
 /// def foo():
 ///     ruff: disable[E501]  # unmatched
-///     ...
+///     REALLY_LONG_VALUES = [
+///         ...
+///     ]
+///
+///     print(REALLY_LONG_VALUE)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def foo():
-///     # ruff: disable[E501]
 ///     ...
+///     # ruff: disable[E501]
+///     REALLY_LONG_VALUES = [
+///         ...
+///     ]
 ///     # ruff: enable[E501]
+///
+///     print(REALLY_LONG_VALUE)
 /// ```
 ///
 /// ## References
@@ -33,6 +42,6 @@ pub(crate) struct UnmatchedSuppressionComment;
 impl Violation for UnmatchedSuppressionComment {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Unmatched suppression comment".to_string()
+        "Suppression comment without matching `#ruff:enable` comment".to_string()
     }
 }
