@@ -250,7 +250,7 @@ impl Suppressions {
                     },
                     error.range,
                 );
-                diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+                diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
             }
 
             for invalid in &self.invalid {
@@ -260,7 +260,7 @@ impl Suppressions {
                     },
                     invalid.comment.range,
                 );
-                diagnostic.set_fix(Fix::safe_edit(delete_comment(
+                diagnostic.set_fix(Fix::unsafe_edit(delete_comment(
                     invalid.comment.range,
                     locator,
                 )));
