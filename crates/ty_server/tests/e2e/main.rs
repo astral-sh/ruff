@@ -209,6 +209,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
+        env_vars: Vec<(String, String)>,
     ) -> Self {
         setup_tracing();
 
@@ -219,11 +220,16 @@ impl TestServer {
         // Create OS system with the test directory as cwd
         let os_system = OsSystem::new(test_context.root());
 
+        // Create test system and set environment variable overrides
+        let test_system = Arc::new(TestSystem::new(os_system));
+        for (name, value) in env_vars {
+            test_system.set_env_var(name, value);
+        }
+
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
-            let test_system = Arc::new(TestSystem::new(os_system));
 
             match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
@@ -1052,6 +1058,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
+    env_vars: Vec<(String, String)>,
 }
 
 impl TestServerBuilder {
@@ -1082,12 +1089,23 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            env_vars: Vec::new(),
         })
     }
 
     /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Set an environment variable for the test server's system.
+    pub(crate) fn with_env_var(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.env_vars.push((name.into(), value.into()));
         self
     }
 
@@ -1237,6 +1255,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.env_vars,
         )
     }
 }
