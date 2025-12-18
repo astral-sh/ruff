@@ -25,7 +25,7 @@ use crate::suppression::{InvalidSuppressionKind, ParseErrorKind};
 /// ## References
 /// - [Ruff error suppression](https://docs.astral.sh/ruff/linter/#error-suppression)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.9")]
+#[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct InvalidSuppressionComment {
     pub(crate) kind: InvalidSuppressionCommentKind,
 }
