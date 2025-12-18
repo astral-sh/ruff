@@ -27,9 +27,11 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
+use ty_python_semantic::{
+    FailStrategy, MisconfigurationStrategy, add_inferred_python_version_hint_to_diagnostic,
+};
 
 mod db;
 mod files;
@@ -166,8 +168,15 @@ impl ProgressReporter for CollectReporter {
 
 #[salsa::tracked]
 impl Project {
-    pub fn from_metadata(db: &dyn Db, metadata: ProjectMetadata) -> Result<Self, ToSettingsError> {
-        let (settings, diagnostics) = metadata.options().to_settings(db, metadata.root())?;
+    pub fn from_metadata<Strategy: MisconfigurationStrategy>(
+        db: &dyn Db,
+        metadata: ProjectMetadata,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<ToSettingsError>> {
+        let (settings, diagnostics) =
+            metadata
+                .options()
+                .to_settings(db, metadata.root(), strategy)?;
 
         // This adds a file root for the project itself. This enables
         // tracking of when changes are made to the files in a project
@@ -226,7 +235,10 @@ impl Project {
         assert_eq!(self.root(db), metadata.root());
 
         if &metadata != self.metadata(db) {
-            match metadata.options().to_settings(db, metadata.root()) {
+            match metadata
+                .options()
+                .to_settings(db, metadata.root(), &FailStrategy)
+            {
                 Ok((settings, settings_diagnostics)) => {
                     if self.settings(db) != &settings {
                         self.set_settings(db).to(Box::new(settings));

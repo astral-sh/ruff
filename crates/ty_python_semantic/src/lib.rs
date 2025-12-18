@@ -17,8 +17,8 @@ pub use module_resolver::{
     resolve_real_module_confident, resolve_real_shadowable_module, system_module_search_paths,
 };
 pub use program::{
-    MisconfigurationMode, Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings,
+    FailStrategy, MisconfigurationStrategy, Program, ProgramSettings, PythonVersionFileSource,
+    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, UseDefaultStrategy,
 };
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;

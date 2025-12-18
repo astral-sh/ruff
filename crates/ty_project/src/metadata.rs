@@ -5,7 +5,7 @@ use ruff_python_ast::name::Name;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_python_semantic::{MisconfigurationMode, ProgramSettings};
+use ty_python_semantic::{FailStrategy, MisconfigurationStrategy, ProgramSettings};
 
 use crate::metadata::options::ProjectOptionsOverrides;
 use crate::metadata::pyproject::{Project, PyProject, PyProjectError, ResolveRequiresPythonError};
@@ -37,9 +37,6 @@ pub struct ProjectMetadata {
     /// The path ordering doesn't imply precedence.
     #[cfg_attr(test, serde(skip_serializing_if = "Vec::is_empty"))]
     pub(super) extra_configuration_paths: Vec<SystemPathBuf>,
-
-    #[cfg_attr(test, serde(skip))]
-    pub(super) misconfiguration_mode: MisconfigurationMode,
 }
 
 impl ProjectMetadata {
@@ -50,7 +47,6 @@ impl ProjectMetadata {
             root,
             extra_configuration_paths: Vec::default(),
             options: Options::default(),
-            misconfiguration_mode: MisconfigurationMode::Fail,
         }
     }
 
@@ -74,7 +70,6 @@ impl ProjectMetadata {
             root: system.current_directory().to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
-            misconfiguration_mode: MisconfigurationMode::Fail,
         })
     }
 
@@ -87,17 +82,17 @@ impl ProjectMetadata {
             pyproject.tool.and_then(|tool| tool.ty).unwrap_or_default(),
             root,
             pyproject.project.as_ref(),
-            MisconfigurationMode::Fail,
+            &FailStrategy,
         )
     }
 
     /// Loads a project from a set of options with an optional pyproject-project table.
-    pub fn from_options(
+    pub fn from_options<Strategy: MisconfigurationStrategy>(
         mut options: Options,
         root: SystemPathBuf,
         project: Option<&Project>,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<Self, ResolveRequiresPythonError> {
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<ResolveRequiresPythonError>> {
         let name = project
             .and_then(|project| project.name.as_deref())
             .map(|name| Name::new(&**name))
@@ -111,7 +106,13 @@ impl ProjectMetadata {
                 .as_ref()
                 .is_none_or(|env| env.python_version.is_none())
             {
-                if let Some(requires_python) = project.resolve_requires_python_lower_bound()? {
+                let requires_python = strategy.fallback_opt(
+                    project.resolve_requires_python_lower_bound(),
+                    |err| {
+                        tracing::debug!("skipping invalid requires_python lower bound: {err}");
+                    },
+                )?;
+                if let Some(requires_python) = requires_python.flatten() {
                     let mut environment = options.environment.unwrap_or_default();
                     environment.python_version = Some(requires_python);
                     options.environment = Some(environment);
@@ -124,7 +125,6 @@ impl ProjectMetadata {
             root,
             options,
             extra_configuration_paths: Vec::new(),
-            misconfiguration_mode,
         })
     }
 
@@ -202,7 +202,7 @@ impl ProjectMetadata {
                     pyproject
                         .as_ref()
                         .and_then(|pyproject| pyproject.project.as_ref()),
-                    MisconfigurationMode::Fail,
+                    &FailStrategy,
                 )
                 .map_err(|err| {
                     ProjectMetadataError::InvalidRequiresPythonConstraint {
@@ -277,18 +277,14 @@ impl ProjectMetadata {
         &self.extra_configuration_paths
     }
 
-    pub fn to_program_settings(
+    pub fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> anyhow::Result<ProgramSettings> {
-        self.options.to_program_settings(
-            self.root(),
-            self.name(),
-            system,
-            vendored,
-            self.misconfiguration_mode,
-        )
+        strategy: &Strategy,
+    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
+        self.options
+            .to_program_settings(self.root(), self.name(), system, vendored, strategy)
     }
 
     pub fn apply_overrides(&mut self, overrides: &ProjectOptionsOverrides) {

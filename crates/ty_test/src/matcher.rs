@@ -404,7 +404,8 @@ mod tests {
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+        FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     struct ExpectedDiagnostic {
@@ -453,7 +454,7 @@ mod tests {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search paths settings"),
         };
         Program::init_or_update(&mut db, settings);

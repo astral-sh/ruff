@@ -503,7 +503,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+        FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
@@ -513,7 +514,7 @@ mod tests {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .unwrap(),
         };
         Program::init_or_update(&mut db, settings);

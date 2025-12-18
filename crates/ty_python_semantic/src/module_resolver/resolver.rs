@@ -50,7 +50,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::program::MisconfigurationMode;
+use crate::program::MisconfigurationStrategy;
 use crate::{Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -554,11 +554,12 @@ impl SearchPaths {
     /// This method also implements the typing spec's [module resolution order].
     ///
     /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
-    pub(crate) fn from_settings(
+    pub(crate) fn from_settings<Strategy: MisconfigurationStrategy>(
         settings: &SearchPathSettings,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> Result<Self, SearchPathValidationError> {
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<SearchPathValidationError>> {
         fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
             system
                 .canonicalize_path(path)
@@ -571,7 +572,6 @@ impl SearchPaths {
             custom_typeshed: typeshed,
             site_packages_paths,
             real_stdlib_path,
-            misconfiguration_mode,
         } = settings;
 
         let mut static_paths = vec![];
@@ -580,30 +580,21 @@ impl SearchPaths {
             let path = canonicalize(path, system);
             tracing::debug!("Adding extra search-path `{path}`");
 
-            match SearchPath::extra(system, path) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid extra search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
+            let path = strategy.fallback_opt(SearchPath::extra(system, path), |err| {
+                tracing::debug!("Skipping invalid extra search-path: {err}");
+            })?;
+            static_paths.extend(path);
         }
 
         for src_root in src_roots {
             tracing::debug!("Adding first-party search path `{src_root}`");
-            match SearchPath::first_party(system, src_root.to_path_buf()) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid first-party search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
+            let path = strategy.fallback_opt(
+                SearchPath::first_party(system, src_root.to_path_buf()),
+                |err| {
+                    tracing::debug!("Skipping invalid first-party search-path: {err}");
+                },
+            )?;
+            static_paths.extend(path);
         }
 
         let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
@@ -623,20 +614,13 @@ impl SearchPaths {
                 .and_then(|versions_content| Ok(versions_content.parse()?))
                 .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
 
-            match results {
-                Ok(results) => results,
-                Err(err) => {
-                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
-                        (
-                            vendored_typeshed_versions(vendored),
-                            SearchPath::vendored_stdlib(),
-                        )
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
+            strategy.fallback(results, |err| {
+                tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                (
+                    vendored_typeshed_versions(vendored),
+                    SearchPath::vendored_stdlib(),
+                )
+            })?
         } else {
             tracing::debug!("Using vendored stdlib");
             (
@@ -646,17 +630,9 @@ impl SearchPaths {
         };
 
         let real_stdlib_path = if let Some(path) = real_stdlib_path {
-            match SearchPath::real_stdlib(system, path.clone()) {
-                Ok(path) => Some(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                        None
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
+            strategy.fallback_opt(SearchPath::real_stdlib(system, path.clone()), |err| {
+                tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+            })?
         } else {
             None
         };
@@ -665,16 +641,11 @@ impl SearchPaths {
 
         for path in site_packages_paths {
             tracing::debug!("Adding site-packages search path `{path}`");
-            match SearchPath::site_packages(system, path.clone()) {
-                Ok(path) => site_packages.push(path),
-                Err(err) => {
-                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
+            let path =
+                strategy.fallback_opt(SearchPath::site_packages(system, path.clone()), |err| {
+                    tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                })?;
+            site_packages.extend(path);
         }
 
         // TODO vendor typeshed's third-party stubs as well as the stdlib and
@@ -1743,7 +1714,7 @@ mod tests {
     use crate::module_name::ModuleName;
     use crate::module_resolver::module::ModuleKind;
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use crate::{FailStrategy, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     use super::*;
 
@@ -2269,7 +2240,8 @@ mod tests {
         use anyhow::Context;
 
         use crate::{
-            PythonPlatform, PythonVersionSource, PythonVersionWithSource, program::Program,
+            FailStrategy, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+            program::Program,
         };
         use ruff_db::system::{OsSystem, SystemPath};
 
@@ -2313,7 +2285,7 @@ mod tests {
                     site_packages_paths: vec![site_packages],
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
             },
         );
@@ -2857,7 +2829,7 @@ not_a_directory
                     site_packages_paths: vec![venv_site_packages, system_site_packages],
                     ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
             },
         );
@@ -2930,7 +2902,7 @@ not_a_directory
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![src])
-                    .to_search_paths(db.system(), db.vendored())
+                    .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                     .expect("valid search path settings"),
             },
         );
@@ -2973,7 +2945,7 @@ not_a_directory
                     site_packages_paths: vec![site_packages.clone()],
                     ..SearchPathSettings::new(vec![project_directory])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .unwrap(),
             },
         );

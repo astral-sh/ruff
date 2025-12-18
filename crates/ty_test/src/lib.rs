@@ -19,7 +19,7 @@ use std::fmt::{Display, Write};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    MisconfigurationMode, Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    FailStrategy, Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
     PythonVersionSource, PythonVersionWithSource, SearchPath, SearchPathSettings,
     SysPrefixPathOrigin, list_modules, resolve_module_confident,
 };
@@ -441,9 +441,8 @@ fn run_test(
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
-            misconfiguration_mode: MisconfigurationMode::Fail,
         }
-        .to_search_paths(db.system(), db.vendored())
+        .to_search_paths(db.system(), db.vendored(), &FailStrategy)
         .expect("Failed to resolve search path settings"),
     };
 

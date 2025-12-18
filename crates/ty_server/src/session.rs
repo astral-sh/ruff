@@ -28,7 +28,7 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 
 use index::DocumentError;
 use options::GlobalOptions;
-use ty_python_semantic::MisconfigurationMode;
+use ty_python_semantic::{FailStrategy, UseDefaultStrategy};
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
@@ -497,7 +497,7 @@ impl Session {
                         metadata.apply_overrides(overrides);
                     }
 
-                    ProjectDatabase::new(metadata, system.clone())
+                    ProjectDatabase::new(metadata, system.clone(), &FailStrategy)
                 });
 
             let (root, db) = match project {
@@ -513,15 +513,15 @@ impl Session {
                         Please refer to the logs for more details.",
                     ));
 
-                    let db_with_default_settings = ProjectMetadata::from_options(
+                    let Ok(metadata) = ProjectMetadata::from_options(
                         Options::default(),
                         root,
                         None,
-                        MisconfigurationMode::UseDefault,
-                    )
-                    .context("Failed to convert default options to metadata")
-                    .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                    .expect("Default configuration to be valid");
+                        &UseDefaultStrategy,
+                    );
+                    // FIXME(Gankra): make this infallible
+                    let Ok(db_with_default_settings) =
+                        ProjectDatabase::new(metadata, system, &UseDefaultStrategy);
                     let default_root = db_with_default_settings
                         .project()
                         .root(&db_with_default_settings)
@@ -1231,16 +1231,16 @@ impl DefaultProject {
 
             let index = index.unwrap();
             let system = LSPSystem::new(index.clone(), fallback_system.clone());
-            let metadata = ProjectMetadata::from_options(
+            let Ok(metadata) = ProjectMetadata::from_options(
                 Options::default(),
                 system.current_directory().to_path_buf(),
                 None,
-                MisconfigurationMode::UseDefault,
-            )
-            .unwrap();
+                &UseDefaultStrategy,
+            );
 
+            let Ok(db) = ProjectDatabase::new(metadata, system, &UseDefaultStrategy);
             ProjectState {
-                db: ProjectDatabase::new(metadata, system).unwrap(),
+                db,
                 untracked_files_with_pushed_diagnostics: Vec::new(),
             }
         })

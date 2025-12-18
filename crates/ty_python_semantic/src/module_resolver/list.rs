@@ -395,7 +395,7 @@ mod tests {
     };
     use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
     use crate::program::{Program, ProgramSettings, SearchPathSettings};
-    use crate::{PythonPlatform, PythonVersionSource, PythonVersionWithSource};
+    use crate::{FailStrategy, PythonPlatform, PythonVersionSource, PythonVersionWithSource};
 
     use super::list_modules;
 
@@ -940,6 +940,8 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
+        use crate::FailStrategy;
+
         let mut db = TestDb::new();
 
         let temp_dir = tempfile::TempDir::with_prefix("PREFIX-SENTINEL")?;
@@ -980,7 +982,7 @@ mod tests {
                     site_packages_paths: vec![site_packages],
                     ..SearchPathSettings::new(vec![src])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
             },
         );
@@ -1488,7 +1490,7 @@ not_a_directory
                     site_packages_paths: vec![venv_site_packages],
                     ..SearchPathSettings::new(vec![src.to_path_buf()])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
             },
         );
@@ -1542,7 +1544,7 @@ not_a_directory
                     site_packages_paths: vec![venv_site_packages, system_site_packages],
                     ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("Valid search path settings"),
             },
         );
@@ -1627,7 +1629,7 @@ not_a_directory
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![src])
-                    .to_search_paths(db.system(), db.vendored())
+                    .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                     .expect("valid search path settings"),
             },
         );
@@ -1671,7 +1673,7 @@ not_a_directory
                     site_packages_paths: vec![site_packages],
                     ..SearchPathSettings::new(vec![project_directory])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .unwrap(),
             },
         );
@@ -1826,7 +1828,7 @@ not_a_directory
                 python_version: PythonVersionWithSource::default(),
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![project_directory])
-                    .to_search_paths(db.system(), db.vendored())
+                    .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                     .unwrap(),
             },
         );

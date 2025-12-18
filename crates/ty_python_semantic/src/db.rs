@@ -23,8 +23,8 @@ pub(crate) mod tests {
 
     use crate::program::{Program, SearchPathSettings};
     use crate::{
-        ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-        default_lint_registry,
+        FailStrategy, ProgramSettings, PythonPlatform, PythonVersionSource,
+        PythonVersionWithSource, default_lint_registry,
     };
 
     use super::Db;
@@ -188,7 +188,7 @@ pub(crate) mod tests {
                     },
                     python_platform: self.python_platform,
                     search_paths: SearchPathSettings::new(vec![src_root])
-                        .to_search_paths(db.system(), db.vendored())
+                        .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                         .context("Invalid search path settings")?,
                 },
             );

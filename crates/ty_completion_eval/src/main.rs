@@ -19,7 +19,7 @@ use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::ModuleName;
+use ty_python_semantic::{FailStrategy, ModuleName};
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -290,7 +290,7 @@ impl Task {
             ..Options::default()
         });
         project_metadata.apply_configuration_files(&system)?;
-        let db = ProjectDatabase::new(project_metadata, system)?;
+        let db = ProjectDatabase::new(project_metadata, system, &FailStrategy)?;
         Ok(Task {
             db,
             dir: project_path.to_path_buf(),
