@@ -44,7 +44,7 @@ use crate::types::{
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashSet, FxHasher};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -691,16 +691,22 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
+    /// Stores hash values ​​of `intersections` to prevent adding identical `InnerIntersectionBuilder`s.
+    intersection_hashes: FxHashSet<u64>,
     order_elements: bool,
     db: &'db dyn Db,
 }
 
 impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
+        let inner = InnerIntersectionBuilder::default();
+        let mut intersection_hashes = FxHashSet::default();
+        intersection_hashes.insert(inner.hash_value());
         Self {
             db,
             order_elements: false,
-            intersections: vec![InnerIntersectionBuilder::default()],
+            intersections: vec![inner],
+            intersection_hashes,
         }
     }
 
@@ -709,6 +715,22 @@ impl<'db> IntersectionBuilder<'db> {
             db,
             order_elements: false,
             intersections: vec![],
+            intersection_hashes: FxHashSet::default(),
+        }
+    }
+
+    fn update_hashes(&mut self) {
+        self.intersection_hashes.clear();
+        for intersection in &self.intersections {
+            self.intersection_hashes.insert(intersection.hash_value());
+        }
+    }
+
+    fn extend(&mut self, other: IntersectionBuilder<'db>) {
+        for intersection in other.intersections {
+            if self.intersection_hashes.insert(intersection.hash_value()) {
+                self.intersections.push(intersection);
+            }
         }
     }
 
@@ -728,6 +750,7 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
+                    self.update_hashes();
                     return self;
                 }
                 seen_aliases.push(ty);
@@ -748,7 +771,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     })
             }
@@ -800,6 +823,7 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.add_positive(self.db, ty);
                     }
+                    self.update_hashes();
                     self
                 }
             }
@@ -809,6 +833,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for inner in &mut self.intersections {
                     inner.add_positive(self.db, ty);
                 }
+                self.update_hashes();
                 self
             }
         }
@@ -838,6 +863,7 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
+                    self.update_hashes();
                     return self;
                 }
                 seen_aliases.push(ty);
@@ -879,7 +905,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     },
                 )
@@ -905,6 +931,7 @@ impl<'db> IntersectionBuilder<'db> {
                 for inner in &mut self.intersections {
                     inner.add_negative(self.db, ty);
                 }
+                self.update_hashes();
                 self
             }
         }
@@ -1317,6 +1344,30 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }
+    }
+
+    /// An element-order-independent hash value, unrelated to the hash value of the actual `IntersectionType`.
+    fn hash_value(&self) -> u64 {
+        use std::hash::{Hash, Hasher};
+
+        let mut sum = 0u64;
+        for ty in &self.positive {
+            sum = sum.wrapping_add({
+                let mut hasher = FxHasher::default();
+                ty.hash(&mut hasher);
+                hasher.finish()
+            });
+        }
+        for ty in &self.negative {
+            sum = sum.wrapping_add({
+                let mut hasher = FxHasher::default();
+                ty.hash(&mut hasher);
+                // We add a constant to the negative types to differentiate them from positive types.
+                1.hash(&mut hasher);
+                hasher.finish()
+            });
+        }
+        sum
     }
 }
 
