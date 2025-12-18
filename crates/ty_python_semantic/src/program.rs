@@ -202,7 +202,7 @@ pub enum Never {}
 /// ```
 ///
 /// The key trick is instead of returning `Result<T, E>` your function should
-/// return `Result<T, Strategy::Error<E>`. Which simplifies to:
+/// return `Result<T, Strategy::Error<E>>`. Which simplifies to:
 ///
 /// * [`FailStrategy`]: `Result<T, E>`
 /// * [`UseDefaultStrategy`]: `Result<T, Never>` ~= `T`
@@ -211,14 +211,14 @@ pub enum Never {}
 /// be *statically prevented* from returning an `Err` without going through
 /// [`MisconfigurationStrategy::fallback`][] or [`MisconfigurationStrategy::fallback_opt`][]
 /// which ensure you're handling both approaches (or you wrote an `unwrap` but
-/// those standout far more than adding a new `?` to a function that must be able to Not Fail.
+/// those standout far more than adding a new `?` to a function that must be able to Not Fail).
 ///
 /// Also, for any caller that passes in [`UseDefaultStrategy`], they will be able
 /// to write `let Ok(val) = do_thing(&UseDefaultStrategy);` instead of having to
 /// write an `unwrap()`.
 pub trait MisconfigurationStrategy {
-    /// * [`FailStrategy`]: `E`
-    /// * [`UseDefaultStrategy`]: `Never`
+    /// * [`FailStrategy`][]: `E`
+    /// * [`UseDefaultStrategy`][]: `Never`
     type Error<E>;
 
     /// Try to get the value out of a Result that we need to proceed.
