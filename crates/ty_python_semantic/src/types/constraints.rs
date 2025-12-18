@@ -3219,7 +3219,7 @@ impl<'db> SequentMap<'db> {
 
             // TODO
             TypeVarVariance::Contravariant | TypeVarVariance::Invariant => {}
-        };
+        }
 
         // (Covariant[BU] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[B] ≤ C ≤ CU)
         if let Type::TypeVar(bound_upper_typevar) = bound_upper {
