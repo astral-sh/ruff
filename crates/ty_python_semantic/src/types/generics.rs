@@ -1460,6 +1460,10 @@ pub enum PartialSpecialization<'a, 'db> {
         /// avoid recursively substituting a type inside of itself.
         skip: Option<usize>,
     },
+    Single {
+        bound_typevar: BoundTypeVarInstance<'db>,
+        ty: Type<'db>,
+    },
 }
 
 impl<'db> PartialSpecialization<'_, 'db> {
@@ -1468,7 +1472,7 @@ impl<'db> PartialSpecialization<'_, 'db> {
     pub(crate) fn get(
         &self,
         db: &'db dyn Db,
-        bound_typevar: BoundTypeVarInstance<'db>,
+        needle_bound_typevar: BoundTypeVarInstance<'db>,
     ) -> Option<Type<'db>> {
         match self {
             PartialSpecialization::FromGenericContext {
@@ -1478,11 +1482,18 @@ impl<'db> PartialSpecialization<'_, 'db> {
             } => {
                 let index = generic_context
                     .variables_inner(db)
-                    .get_index_of(&bound_typevar.identity(db))?;
+                    .get_index_of(&needle_bound_typevar.identity(db))?;
                 if skip.is_some_and(|skip| skip == index) {
                     return Some(Type::Never);
                 }
                 types.get(index).copied()
+            }
+            PartialSpecialization::Single { bound_typevar, ty } => {
+                if bound_typevar.is_same_typevar_as(db, needle_bound_typevar) {
+                    Some(*ty)
+                } else {
+                    None
+                }
             }
         }
     }
