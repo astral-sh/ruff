@@ -526,7 +526,10 @@ def test_seq(x: Sequence[T]) -> Sequence[T]:
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
     reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
-    reveal_type(test_seq(t3))  # revealed: Sequence[Never]
+    # TODO: The return type here is wrong, because we end up creating a constraint (Never ≤ T),
+    # which we confuse with "T has no lower bound".
+    # TODO: revealed: Sequence[Never]
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```
 
 ### `__init__` is itself generic
@@ -561,7 +564,7 @@ from typing_extensions import overload, Generic, TypeVar
 from ty_extensions import generic_context, into_callable
 
 T = TypeVar("T")
-U = TypeVar("U")
+U = TypeVar("U", covariant=True)
 
 class C(Generic[T]):
     @overload
@@ -611,9 +614,9 @@ reveal_type(generic_context(D))
 # revealed: ty_extensions.GenericContext[T@D, U@D]
 reveal_type(generic_context(into_callable(D)))
 
-reveal_type(D("string"))  # revealed: D[str, str]
-reveal_type(D(1))  # revealed: D[str, int]
-reveal_type(D(1, "string"))  # revealed: D[int, str]
+reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
+reveal_type(D(1))  # revealed: D[str, Literal[1]]
+reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses

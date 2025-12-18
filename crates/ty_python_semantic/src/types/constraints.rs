@@ -72,6 +72,7 @@ use std::fmt::Display;
 use std::ops::Range;
 
 use itertools::Itertools;
+use ordermap::map::Entry;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
@@ -3415,9 +3416,11 @@ impl<'db> PathAssignments<'db> {
             );
             return Err(PathAssignmentConflict);
         }
-        if self.assignments.insert(assignment, source_order).is_some() {
-            return Ok(());
-        }
+
+        match self.assignments.entry(assignment) {
+            Entry::Vacant(entry) => entry.insert(source_order),
+            Entry::Occupied(_) => return Ok(()),
+        };
 
         // Then use our sequents to add additional facts that we know to be true. We currently
         // reuse the `source_order` of the "real" constraint passed into `walk_edge` when we add

@@ -84,13 +84,11 @@ def takes_in_protocol[T](x: CanIndex[T]) -> T:
 
 def deep_list(x: list[str]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[str]
-    # TODO: revealed: str
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_list(x: list[set[str]]) -> None:
     reveal_type(takes_in_list(x))  # revealed: list[set[str]]
-    # TODO: revealed: set[str]
-    reveal_type(takes_in_protocol(x))  # revealed: Unknown
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
@@ -111,12 +109,10 @@ class Sub(list[int]): ...
 class GenericSub[T](list[T]): ...
 
 reveal_type(takes_in_list(Sub()))  # revealed: list[int]
-# TODO: revealed: int
-reveal_type(takes_in_protocol(Sub()))  # revealed: Unknown
+reveal_type(takes_in_protocol(Sub()))  # revealed: int
 
 reveal_type(takes_in_list(GenericSub[str]()))  # revealed: list[str]
-# TODO: revealed: str
-reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: Unknown
+reveal_type(takes_in_protocol(GenericSub[str]()))  # revealed: str
 
 class ExplicitSub(ExplicitlyImplements[int]): ...
 class ExplicitGenericSub[T](ExplicitlyImplements[T]): ...
@@ -362,6 +358,10 @@ reveal_type(extract_t(Q[str]()))  # revealed: str
 Passing anything else results in an error:
 
 ```py
+# TODO: We currently get an error for the specialization failure, and then another because the
+# argument is not assignable to the (default-specialized) parameter annotation. We really only need
+# one of them.
+# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(extract_t([1, 2]))  # revealed: Unknown
 ```
@@ -421,6 +421,10 @@ reveal_type(extract_optional_t(P[int]()))  # revealed: int
 Passing anything else results in an error:
 
 ```py
+# TODO: We currently get an error for the specialization failure, and then another because the
+# argument is not assignable to the (default-specialized) parameter annotation. We really only need
+# one of them.
+# error: [invalid-argument-type]
 # error: [invalid-argument-type]
 reveal_type(extract_optional_t(Q[str]()))  # revealed: Unknown
 ```

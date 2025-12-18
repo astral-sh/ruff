@@ -464,7 +464,10 @@ def test_seq[T](x: Sequence[T]) -> Sequence[T]:
 def func8(t1: tuple[complex, list[int]], t2: tuple[int, *tuple[str, ...]], t3: tuple[()]):
     reveal_type(test_seq(t1))  # revealed: Sequence[int | float | complex | list[int]]
     reveal_type(test_seq(t2))  # revealed: Sequence[int | str]
-    reveal_type(test_seq(t3))  # revealed: Sequence[Never]
+    # TODO: The return type here is wrong, because we end up creating a constraint (Never ≤ T),
+    # which we confuse with "T has no lower bound".
+    # TODO: revealed: Sequence[Never]
+    reveal_type(test_seq(t3))  # revealed: Sequence[Unknown]
 ```
 
 ### `__init__` is itself generic
@@ -538,6 +541,10 @@ C[None](b"bytes")  # error: [no-matching-overload]
 C[None](12)
 
 class D[T, U]:
+    # we need to use the type variable or else the class is bivariant in T, and
+    # specializations become meaningless
+    x: T
+
     @overload
     def __init__(self: "D[str, U]", u: U) -> None: ...
     @overload
@@ -551,7 +558,7 @@ reveal_type(generic_context(into_callable(D)))
 
 reveal_type(D("string"))  # revealed: D[str, Literal["string"]]
 reveal_type(D(1))  # revealed: D[str, Literal[1]]
-reveal_type(D(1, "string"))  # revealed: D[Literal[1], Literal["string"]]
+reveal_type(D(1, "string"))  # revealed: D[int, Literal["string"]]
 ```
 
 ### Synthesized methods with dataclasses
