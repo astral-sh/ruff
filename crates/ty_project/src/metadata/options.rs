@@ -30,9 +30,9 @@ use thiserror::Error;
 use ty_combine::Combine;
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
-    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
-    SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
+    MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
+    SearchPathValidationError, SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
 };
 use ty_static::EnvVars;
 
@@ -94,23 +94,9 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub overrides: Option<OverridesOptions>,
-
-    /// Settings Failure Is Not An Error.
-    ///
-    /// This is used by the default database, which we are incentivized to make infallible,
-    /// while still trying to "do our best" to set things up properly where we can.
-    #[serde(default, skip)]
-    pub safe_mode: bool,
 }
 
 impl Options {
-    pub fn safe() -> Self {
-        Self {
-            safe_mode: true,
-            ..Self::default()
-        }
-    }
-
     pub fn from_toml_str(content: &str, source: ValueSource) -> Result<Self, TyTomlError> {
         let _guard = ValueSourceGuard::new(source, true);
         let options = toml::from_str(content)?;
@@ -131,6 +117,7 @@ impl Options {
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
+        misconfiguration_mode: MisconfigurationMode,
     ) -> anyhow::Result<ProgramSettings> {
         let environment = self.environment.or_default();
 
@@ -180,7 +167,7 @@ impl Options {
         let python_environment = match python_environment {
             Ok(python_environment) => python_environment,
             Err(err) => {
-                if self.safe_mode {
+                if misconfiguration_mode == MisconfigurationMode::UseDefault {
                     tracing::debug!("Default settings failed to discover local Python environment");
                     None
                 } else {
@@ -205,7 +192,7 @@ impl Options {
             let site_packages_paths = match site_packages_paths {
                 Ok(paths) => paths,
                 Err(err) => {
-                    if self.safe_mode {
+                    if misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!(
                             "Default settings failed to discover site-packages directory"
                         );
@@ -246,6 +233,7 @@ impl Options {
             real_stdlib_path,
             system,
             vendored,
+            misconfiguration_mode,
         )?;
 
         tracing::info!(
@@ -260,6 +248,7 @@ impl Options {
         })
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn to_search_paths(
         &self,
         project_root: &SystemPath,
@@ -268,6 +257,7 @@ impl Options {
         real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
+        misconfiguration_mode: MisconfigurationMode,
     ) -> Result<SearchPaths, SearchPathValidationError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
@@ -382,7 +372,7 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
-            safe_mode: self.safe_mode,
+            misconfiguration_mode,
         };
 
         settings.to_search_paths(system, vendored)

@@ -163,6 +163,17 @@ impl Default for PythonVersionWithSource {
     }
 }
 
+#[derive(PartialEq, Eq, Debug, Copy, Clone, get_size2::GetSize)]
+pub enum MisconfigurationMode {
+    /// Settings Failure Is Not An Error.
+    ///
+    /// This is used by the default database, which we are incentivized to make infallible,
+    /// while still trying to "do our best" to set things up properly where we can.
+    UseDefault,
+    /// Settings Failure Is An Error.
+    Fail,
+}
+
 /// Configures the search paths for module resolution.
 #[derive(Eq, PartialEq, Debug, Clone)]
 pub struct SearchPathSettings {
@@ -188,11 +199,8 @@ pub struct SearchPathSettings {
     /// where typeshed isn't the right answer.
     pub real_stdlib_path: Option<SystemPathBuf>,
 
-    /// Settings Failure Is Not An Error.
-    ///
-    /// This is used by the default database, which we are incentivized to make infallible,
-    /// while still trying to "do our best" to set things up properly where we can.
-    pub safe_mode: bool,
+    /// How to handle apparent misconfiguration
+    pub misconfiguration_mode: MisconfigurationMode,
 }
 
 impl SearchPathSettings {
@@ -210,7 +218,7 @@ impl SearchPathSettings {
             custom_typeshed: None,
             site_packages_paths: vec![],
             real_stdlib_path: None,
-            safe_mode: false,
+            misconfiguration_mode: MisconfigurationMode::Fail,
         }
     }
 

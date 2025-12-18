@@ -50,6 +50,7 @@ use ruff_python_ast::{
 use crate::db::Db;
 use crate::module_name::ModuleName;
 use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
+use crate::program::MisconfigurationMode;
 use crate::{Program, SearchPathSettings};
 
 use super::module::{Module, ModuleKind};
@@ -570,7 +571,7 @@ impl SearchPaths {
             custom_typeshed: typeshed,
             site_packages_paths,
             real_stdlib_path,
-            safe_mode,
+            misconfiguration_mode,
         } = settings;
 
         let mut static_paths = vec![];
@@ -582,7 +583,7 @@ impl SearchPaths {
             match SearchPath::extra(system, path) {
                 Ok(path) => static_paths.push(path),
                 Err(err) => {
-                    if *safe_mode {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!("Skipping invalid extra search-path: {err}");
                     } else {
                         return Err(err);
@@ -596,7 +597,7 @@ impl SearchPaths {
             match SearchPath::first_party(system, src_root.to_path_buf()) {
                 Ok(path) => static_paths.push(path),
                 Err(err) => {
-                    if *safe_mode {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!("Skipping invalid first-party search-path: {err}");
                     } else {
                         return Err(err);
@@ -625,7 +626,7 @@ impl SearchPaths {
             match results {
                 Ok(results) => results,
                 Err(err) => {
-                    if settings.safe_mode {
+                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!("Skipping custom-stdlib search-path: {err}");
                         (
                             vendored_typeshed_versions(vendored),
@@ -648,7 +649,7 @@ impl SearchPaths {
             match SearchPath::real_stdlib(system, path.clone()) {
                 Ok(path) => Some(path),
                 Err(err) => {
-                    if *safe_mode {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
                         None
                     } else {
@@ -667,7 +668,7 @@ impl SearchPaths {
             match SearchPath::site_packages(system, path.clone()) {
                 Ok(path) => site_packages.push(path),
                 Err(err) => {
-                    if settings.safe_mode {
+                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
                         tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
                     } else {
                         return Err(err);

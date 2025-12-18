@@ -28,6 +28,7 @@ use ty_project::{ChangeResult, CheckMode, Db as _, ProjectDatabase, ProjectMetad
 
 use index::DocumentError;
 use options::GlobalOptions;
+use ty_python_semantic::MisconfigurationMode;
 
 pub(crate) use self::options::InitializationOptions;
 pub use self::options::{ClientOptions, DiagnosticMode};
@@ -512,11 +513,15 @@ impl Session {
                         Please refer to the logs for more details.",
                     ));
 
-                    let db_with_default_settings =
-                        ProjectMetadata::from_options(Options::safe(), root, None)
-                            .context("Failed to convert default options to metadata")
-                            .and_then(|metadata| ProjectDatabase::new(metadata, system))
-                            .expect("Default configuration to be valid");
+                    let db_with_default_settings = ProjectMetadata::from_options(
+                        Options::default(),
+                        root,
+                        None,
+                        MisconfigurationMode::UseDefault,
+                    )
+                    .context("Failed to convert default options to metadata")
+                    .and_then(|metadata| ProjectDatabase::new(metadata, system))
+                    .expect("Default configuration to be valid");
                     let default_root = db_with_default_settings
                         .project()
                         .root(&db_with_default_settings)
@@ -1230,6 +1235,7 @@ impl DefaultProject {
                 Options::default(),
                 system.current_directory().to_path_buf(),
                 None,
+                MisconfigurationMode::UseDefault,
             )
             .unwrap();
 
