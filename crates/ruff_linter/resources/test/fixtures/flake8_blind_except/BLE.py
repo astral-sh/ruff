@@ -130,6 +130,96 @@ except Exception as e:
     logging.debug("...", exc_info=e)
 
 
+try:
+    pass
+except Exception:
+    logging.info("...")
+
+
+try:
+    pass
+except Exception:
+    logging.info("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    logging.info("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    logging.info("...", exc_info=True)
+
+
+try:
+    pass
+except Exception as e:
+    logging.info("...", exc_info=e)
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...")
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...", exc_info=True)
+
+
+try:
+    pass
+except Exception as e:
+    logging.warning("...", exc_info=e)
+
+
+try:
+    pass
+except Exception:
+    logging.log(logging.INFO, "...")
+
+
+try:
+    pass
+except Exception:
+    logging.log(logging.INFO, "...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    logging.log(logging.INFO, "...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    logging.log(logging.INFO, "...", exc_info=True)
+
+
+try:
+    pass
+except Exception as e:
+    logging.log(logging.INFO, "...", exc_info=e)
+
+
 from logging import critical, error, exception
 
 try:
