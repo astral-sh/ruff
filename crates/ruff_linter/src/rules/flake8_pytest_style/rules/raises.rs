@@ -125,9 +125,9 @@ impl Violation for PytestRaisesTooBroad {
 /// ## Why is this bad?
 /// `pytest.raises` expects to receive an expected exception as its first
 /// argument. If omitted, the `pytest.raises` call will fail at runtime.
-///
-/// Note: As of pytest 8.4.0, calls with only `match` or `check` keyword
-/// arguments (without an exception class) are also valid.
+/// The rule will also accept calls without an expected exception but with
+/// `match` and/or `check` keyword arguments, which are also valid after
+/// pytest version 8.4.0.
 ///
 /// ## Example
 /// ```python
