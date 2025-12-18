@@ -4,6 +4,6 @@
 # Enable off-by-default rules.
 [rules]
 possibly-unresolved-reference = "warn"
-possibly-unresolved-import = "warn"
+possibly-missing-import = "warn"
 unused-ignore-comment = "warn"
 division-by-zero = "warn"
