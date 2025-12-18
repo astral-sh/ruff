@@ -720,7 +720,7 @@ impl<'db> ProtocolInstanceType<'db> {
             _value: ProtocolInstanceType<'db>,
             _: (),
         ) -> bool {
-            true
+            false
         }
 
         is_equivalent_to_object_inner(db, self, ())
