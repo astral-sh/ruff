@@ -17,7 +17,7 @@ pub use module_resolver::{
     resolve_real_module_confident, resolve_real_shadowable_module, system_module_search_paths,
 };
 pub use program::{
-    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
+    MisconfigurationMode, Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
     PythonVersionWithSource, SearchPathSettings,
 };
 pub use python_platform::PythonPlatform;

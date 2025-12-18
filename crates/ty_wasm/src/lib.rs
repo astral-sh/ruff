@@ -26,7 +26,7 @@ use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::Program;
+use ty_python_semantic::{MisconfigurationMode, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -99,8 +99,13 @@ impl Workspace {
 
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
-            .map_err(into_error)?;
+        let project = ProjectMetadata::from_options(
+            options,
+            SystemPathBuf::from(root),
+            None,
+            MisconfigurationMode::Fail,
+        )
+        .map_err(into_error)?;
 
         let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
@@ -127,6 +132,7 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
+            MisconfigurationMode::Fail,
         )
         .map_err(into_error)?;
 
