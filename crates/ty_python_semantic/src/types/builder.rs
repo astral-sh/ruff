@@ -232,6 +232,7 @@ pub(crate) struct UnionBuilder<'db> {
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
+    contains_literals: bool,
     // This is enabled when joining types in a `cycle_recovery` function.
     // Since a cycle cannot be created within a `cycle_recovery` function, execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
@@ -245,6 +246,7 @@ impl<'db> UnionBuilder<'db> {
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
+            contains_literals: false,
             cycle_recovery: false,
             recursively_defined: RecursivelyDefined::No,
         }
@@ -362,7 +364,7 @@ impl<'db> UnionBuilder<'db> {
             // add it to, or an existing element that is a super-type of string literals, which
             // means we shouldn't add it. Otherwise, add a new `UnionElement::StringLiterals`
             // containing it.
-            Type::StringLiteral(literal) => {
+            Type::StringLiteral(literal) if self.contains_literals || self.elements.is_empty() => {
                 let mut found = None;
                 let mut to_remove = None;
                 let mut ty_negated = None;
@@ -399,6 +401,7 @@ impl<'db> UnionBuilder<'db> {
                 if let Some(found) = found {
                     found.insert(literal);
                 } else {
+                    self.contains_literals = true;
                     self.elements
                         .push(UnionElement::StringLiterals(FxOrderSet::from_iter([
                             literal,
@@ -409,7 +412,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // Same for bytes literals as for string literals, above.
-            Type::BytesLiteral(literal) => {
+            Type::BytesLiteral(literal) if self.contains_literals || self.elements.is_empty() => {
                 let mut found = None;
                 let mut to_remove = None;
                 let mut ty_negated = None;
@@ -447,6 +450,7 @@ impl<'db> UnionBuilder<'db> {
                 if let Some(found) = found {
                     found.insert(literal);
                 } else {
+                    self.contains_literals = true;
                     self.elements
                         .push(UnionElement::BytesLiterals(FxOrderSet::from_iter([
                             literal,
@@ -457,7 +461,7 @@ impl<'db> UnionBuilder<'db> {
                 }
             }
             // And same for int literals as well.
-            Type::IntLiteral(literal) => {
+            Type::IntLiteral(literal) if self.contains_literals || self.elements.is_empty() => {
                 let mut found = None;
                 let mut to_remove = None;
                 let mut ty_negated = None;
@@ -495,6 +499,7 @@ impl<'db> UnionBuilder<'db> {
                 if let Some(found) = found {
                     found.insert(literal);
                 } else {
+                    self.contains_literals = true;
                     self.elements
                         .push(UnionElement::IntLiterals(FxOrderSet::from_iter([literal])));
                 }

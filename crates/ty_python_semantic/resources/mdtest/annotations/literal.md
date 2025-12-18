@@ -304,7 +304,7 @@ def union_example(
         None,
     ],
 ):
-    reveal_type(x)  # revealed: Unknown | Literal[-1, 0, 1, "A", "B", "foo", "bar", b"A", b"\x00", b"\x07", True] | None
+    reveal_type(x)  # revealed: Unknown | Literal[-1, "A", b"A", b"\x00", b"\x07", 0, 1, "B", "foo", "bar", True] | None
 ```
 
 ## Detecting Literal outside typing and typing_extensions
