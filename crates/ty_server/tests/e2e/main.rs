@@ -36,6 +36,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod semantic_tokens;
 mod signature_help;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -66,11 +67,12 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
     InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, SignatureHelp, SignatureHelpParams,
-    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Url,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceFolder,
+    PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult, SignatureHelp,
+    SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceEdit, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -964,6 +966,19 @@ impl TestServer {
         });
         self.await_response::<SignatureHelpRequest>(&signature_help_id)
     }
+
+    pub(crate) fn semantic_tokens_full_request(
+        &mut self,
+        uri: &Url,
+    ) -> Option<SemanticTokensResult> {
+        self.send_request_await::<lsp_types::request::SemanticTokensFullRequest>(
+            lsp_types::SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        )
+    }
 }
 
 impl fmt::Debug for TestServer {
@@ -1191,6 +1206,16 @@ impl TestServerBuilder {
             .publish_diagnostics
             .get_or_insert_default()
             .related_information = Some(enabled);
+        self
+    }
+
+    pub(crate) fn enable_multiline_token_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .semantic_tokens
+            .get_or_insert_default()
+            .multiline_token_support = Some(enabled);
         self
     }
 
