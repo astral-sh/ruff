@@ -229,27 +229,16 @@ impl Suppressions {
             }
         }
 
-        for error in &self.errors {
-            // treat comments with no codes as unused suppression
-            if error.kind == ParseErrorKind::MissingCodes {
-                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                    UnusedNOQA {
-                        codes: Some(UnusedCodes::default()),
-                        kind: UnusedNOQAKind::Suppression,
-                    },
-                    error.range,
-                ) {
-                    diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
-                }
-            } else {
-                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
-                    InvalidSuppressionComment {
-                        kind: InvalidSuppressionCommentKind::Error(error.kind),
-                    },
-                    error.range,
-                ) {
-                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
-                }
+        if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
+            for error in &self.errors {
+                context
+                    .report_diagnostic(
+                        InvalidSuppressionComment {
+                            kind: InvalidSuppressionCommentKind::Error(error.kind),
+                        },
+                        error.range,
+                    )
+                    .set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
             }
         }
 
@@ -472,7 +461,7 @@ pub(crate) enum ParseErrorKind {
     #[error("unknown ruff directive")]
     UnknownAction,
 
-    #[error("missing suppression codes")]
+    #[error("missing suppression codes, add one or more codes like `[E501, ...]`")]
     MissingCodes,
 
     #[error("missing closing bracket")]
