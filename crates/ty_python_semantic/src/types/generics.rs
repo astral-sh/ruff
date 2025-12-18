@@ -23,7 +23,7 @@ use crate::types::{
     IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
     NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
-    walk_type_var_bounds,
+    structural_type_ordering, walk_type_var_bounds,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -685,6 +685,26 @@ impl<'db> GenericContext<'db> {
         (variables,): &(FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,),
     ) -> usize {
         ruff_memory_usage::order_map_heap_size(variables)
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        let left = self.variables_inner(db);
+        let right = other.variables_inner(db);
+        let variables_count = left.len().cmp(&right.len());
+        if variables_count != std::cmp::Ordering::Equal {
+            return variables_count;
+        }
+        for (left_key, left_value) in left {
+            if let Some(right_value) = right.get(left_key) {
+                let ord = left_value.structural_ordering(db, *right_value);
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            } else {
+                return std::cmp::Ordering::Greater;
+            }
+        }
+        std::cmp::Ordering::Equal
     }
 }
 
@@ -1444,6 +1464,20 @@ impl<'db> Specialization<'db> {
         }
         // A tuple's specialization will include all of its element types, so we don't need to also
         // look in `self.tuple`.
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        let types_count = self.types(db).len().cmp(&other.types(db).len());
+        if types_count != std::cmp::Ordering::Equal {
+            return types_count;
+        }
+        for (left, right) in self.types(db).iter().zip(other.types(db)) {
+            let ord = structural_type_ordering(db, left, right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+        std::cmp::Ordering::Equal
     }
 }
 

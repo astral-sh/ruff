@@ -19,7 +19,7 @@ use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
 
-use type_ordering::union_or_intersection_elements_ordering;
+use type_ordering::{structural_type_ordering, union_or_intersection_elements_ordering};
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
 pub use self::cyclic::CycleDetector;
@@ -655,6 +655,26 @@ impl<'db> PropertyInstanceType<'db> {
 
         getter_equivalence.and(db, setter_equivalence)
     }
+
+    fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        let getter_ord = match (self.getter(db), other.getter(db)) {
+            (Some(left), Some(right)) => structural_type_ordering(db, &left, &right),
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (None, None) => std::cmp::Ordering::Equal,
+        };
+
+        if getter_ord != std::cmp::Ordering::Equal {
+            return getter_ord;
+        }
+
+        match (self.setter(db), other.setter(db)) {
+            (Some(left), Some(right)) => structural_type_ordering(db, &left, &right),
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    }
 }
 
 bitflags! {
@@ -763,6 +783,30 @@ impl<'db> DataclassParams<'db> {
             DataclassFlags::from(params.flags(db)),
             params.field_specifiers(db),
         )
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        let flag_ord = self.flags(db).bits().cmp(&other.flags(db).bits());
+        if flag_ord != std::cmp::Ordering::Equal {
+            return flag_ord;
+        }
+
+        let self_fields = self.field_specifiers(db);
+        let other_fields = other.field_specifiers(db);
+
+        let fields_count = self_fields.len().cmp(&other_fields.len());
+        if fields_count != std::cmp::Ordering::Equal {
+            return fields_count;
+        }
+
+        for (self_field, other_field) in self_fields.iter().zip(other_fields.iter()) {
+            let field_ord = structural_type_ordering(db, self_field, other_field);
+            if field_ord != std::cmp::Ordering::Equal {
+                return field_ord;
+            }
+        }
+
+        std::cmp::Ordering::Equal
     }
 }
 
@@ -9084,6 +9128,61 @@ impl<'db> KnownInstanceType<'db> {
     fn repr(self, db: &'db dyn Db) -> impl std::fmt::Display + 'db {
         self.display_with(db, DisplaySettings::default())
     }
+
+    fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (Self::SubscriptedProtocol(left), Self::SubscriptedProtocol(right))
+            | (Self::SubscriptedGeneric(left), Self::SubscriptedGeneric(right))
+            | (Self::GenericContext(left), Self::GenericContext(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (Self::TypeVar(left), Self::TypeVar(right)) => left
+                .identity(db)
+                .structural_ordering(db, right.identity(db)),
+            (Self::TypeAliasType(left), Self::TypeAliasType(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (Self::Deprecated(left), Self::Deprecated(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (Self::Field(left), Self::Field(right)) => left.structural_ordering(db, right),
+            // No need to compare structurally, they are used only in debugging contexts
+            (Self::ConstraintSet(left), Self::ConstraintSet(right)) => left.cmp(&right),
+            (Self::Specialization(left), Self::Specialization(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (Self::UnionType(left), Self::UnionType(right)) => left.structural_ordering(db, right),
+            (Self::Literal(left), Self::Literal(right))
+            | (Self::Annotated(left), Self::Annotated(right))
+            | (Self::TypeGenericAlias(left), Self::TypeGenericAlias(right))
+            | (Self::LiteralStringAlias(left), Self::LiteralStringAlias(right)) => {
+                structural_type_ordering(db, &left.inner(db), &right.inner(db))
+            }
+            (Self::Callable(left), Self::Callable(right)) => left.structural_ordering(db, right),
+            (Self::NewType(left), Self::NewType(right)) => left.structural_ordering(db, right),
+            (left, right) => {
+                let index = |instance| match instance {
+                    Self::SubscriptedProtocol(_) => 0,
+                    Self::SubscriptedGeneric(_) => 1,
+                    Self::TypeVar(_) => 2,
+                    Self::TypeAliasType(_) => 3,
+                    Self::Deprecated(_) => 4,
+                    Self::Field(_) => 5,
+                    Self::ConstraintSet(_) => 6,
+                    Self::GenericContext(_) => 7,
+                    Self::Specialization(_) => 8,
+                    Self::UnionType(_) => 9,
+                    Self::Literal(_) => 10,
+                    Self::Annotated(_) => 11,
+                    Self::TypeGenericAlias(_) => 12,
+                    Self::Callable(_) => 13,
+                    Self::LiteralStringAlias(_) => 14,
+                    Self::NewType(_) => 15,
+                };
+                index(left).cmp(&index(right))
+            }
+        }
+    }
 }
 
 /// A type that is determined to be divergent during recursive type inference.
@@ -9166,7 +9265,7 @@ impl std::fmt::Display for DynamicType<'_> {
 
 bitflags! {
     /// Type qualifiers that appear in an annotation expression.
-    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash)]
+    #[derive(Copy, Clone, Debug, Eq, PartialEq, Default, salsa::Update, Hash, PartialOrd, Ord)]
     pub(crate) struct TypeQualifiers: u8 {
         /// `typing.ClassVar`
         const CLASS_VAR = 1 << 0;
@@ -9482,6 +9581,17 @@ pub struct DeprecatedInstance<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for DeprecatedInstance<'_> {}
 
+impl DeprecatedInstance<'_> {
+    fn structural_ordering(self, db: &dyn Db, other: DeprecatedInstance<'_>) -> std::cmp::Ordering {
+        match (self.message(db), other.message(db)) {
+            (Some(left), Some(right)) => left.structural_ordering(db, right),
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    }
+}
+
 /// Contains information about instances of `dataclasses.Field`, typically created using
 /// `dataclasses.field()`.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -9539,6 +9649,24 @@ impl<'db> FieldInstance<'db> {
             self.alias(db),
         ))
     }
+
+    fn structural_ordering(self, db: &dyn Db, other: FieldInstance<'_>) -> std::cmp::Ordering {
+        match (self.default_type(db), other.default_type(db)) {
+            (Some(left), Some(right)) => {
+                let ord = structural_type_ordering(db, &left, &right);
+                if ord != std::cmp::Ordering::Equal {
+                    return ord;
+                }
+            }
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+            (None, None) => {}
+        }
+        self.init(db)
+            .cmp(&other.init(db))
+            .then_with(|| self.kw_only(db).cmp(&other.kw_only(db)))
+            .then_with(|| self.alias(db).cmp(&other.alias(db)))
+    }
 }
 
 /// Whether this typevar was created via the legacy `TypeVar` constructor, using PEP 695 syntax,
@@ -9593,6 +9721,19 @@ pub struct TypeVarIdentity<'db> {
 }
 
 impl get_size2::GetSize for TypeVarIdentity<'_> {}
+
+impl TypeVarIdentity<'_> {
+    fn structural_ordering(self, db: &dyn Db, other: TypeVarIdentity<'_>) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            match (self.definition(db), other.definition(db)) {
+                (Some(left), Some(right)) => left.structural_ordering(db, right),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        })
+    }
+}
 
 /// A specific instance of a type variable that has not been bound to a generic context yet.
 ///
@@ -10432,6 +10573,17 @@ impl<'db> BoundTypeVarInstance<'db> {
             }
         }
     }
+
+    fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.typevar(db)
+            .identity(db)
+            .structural_ordering(db, other.typevar(db).identity(db))
+            .then_with(|| {
+                self.binding_context(db)
+                    .definition()
+                    .cmp(&other.binding_context(db).definition())
+            })
+    }
 }
 
 fn walk_bound_type_var_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -10921,6 +11073,27 @@ impl<'db> UnionTypeInstance<'db> {
         };
 
         Some(Self::new(db, value_expr_types, union_type))
+    }
+
+    fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self._value_expr_types(db), other._value_expr_types(db)) {
+            (Some(left_tys), Some(right_tys)) => {
+                let len_count = left_tys.len().cmp(&right_tys.len());
+                if len_count != std::cmp::Ordering::Equal {
+                    return len_count;
+                }
+                for (left, right) in left_tys.iter().zip(right_tys.iter()) {
+                    let ord = structural_type_ordering(db, left, right);
+                    if ord != std::cmp::Ordering::Equal {
+                        return ord;
+                    }
+                }
+                std::cmp::Ordering::Equal
+            }
+            (Some(_), None) => std::cmp::Ordering::Less,
+            (None, Some(_)) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
     }
 }
 
@@ -12336,6 +12509,14 @@ impl<'db> BoundMethodType<'db> {
                 )
             })
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.function(db)
+            .structural_ordering(db, other.function(db))
+            .then_with(|| {
+                structural_type_ordering(db, &self.self_instance(db), &other.self_instance(db))
+            })
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
@@ -12574,6 +12755,15 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .is_equivalent_to_impl(db, other.signatures(db), inferable, visitor)
         })
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        self.is_function_like(db)
+            .cmp(&other.is_function_like(db))
+            .then_with(|| {
+                self.signatures(db)
+                    .structural_ordering(db, other.signatures(db))
+            })
     }
 }
 
@@ -13193,6 +13383,48 @@ impl<'db> KnownBoundMethodType<'db> {
             }
         }
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (
+                KnownBoundMethodType::FunctionTypeDunderGet(self_function),
+                KnownBoundMethodType::FunctionTypeDunderGet(other_function),
+            ) => self_function.structural_ordering(db, other_function),
+
+            (
+                KnownBoundMethodType::FunctionTypeDunderCall(self_function),
+                KnownBoundMethodType::FunctionTypeDunderCall(other_function),
+            ) => self_function.structural_ordering(db, other_function),
+
+            (
+                KnownBoundMethodType::PropertyDunderGet(self_property),
+                KnownBoundMethodType::PropertyDunderGet(other_property),
+            ) => self_property.structural_ordering(db, other_property),
+
+            (
+                KnownBoundMethodType::PropertyDunderSet(self_property),
+                KnownBoundMethodType::PropertyDunderSet(other_property),
+            ) => self_property.structural_ordering(db, other_property),
+
+            (left, right) => {
+                let index = |known| match known {
+                    KnownBoundMethodType::FunctionTypeDunderGet(_) => 0,
+                    KnownBoundMethodType::FunctionTypeDunderCall(_) => 1,
+                    KnownBoundMethodType::PropertyDunderGet(_) => 2,
+                    KnownBoundMethodType::PropertyDunderSet(_) => 3,
+                    KnownBoundMethodType::StrStartswith(_) => 4,
+                    KnownBoundMethodType::ConstraintSetRange => 5,
+                    KnownBoundMethodType::ConstraintSetAlways => 6,
+                    KnownBoundMethodType::ConstraintSetNever => 7,
+                    KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => 8,
+                    KnownBoundMethodType::ConstraintSetSatisfies(_) => 9,
+                    KnownBoundMethodType::ConstraintSetSatisfiedByAllTypeVars(_) => 10,
+                    KnownBoundMethodType::GenericContextSpecializeConstrained(_) => 11,
+                };
+                index(left).cmp(&index(right))
+            }
+        }
+    }
 }
 
 /// Represents a specific instance of `types.WrapperDescriptorType`
@@ -13448,6 +13680,14 @@ impl<'db> ModuleLiteralType<'db> {
 
         place_and_qualifiers
     }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: ModuleLiteralType<'db>,
+    ) -> std::cmp::Ordering {
+        self.module(db).structural_ordering(db, other.module(db))
+    }
 }
 
 /// # Ordering
@@ -13561,6 +13801,17 @@ impl<'db> PEP695TypeAliasType<'db> {
     fn normalized_impl(self, _db: &'db dyn Db, _visitor: &NormalizedVisitor<'db>) -> Self {
         self
     }
+
+    fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: PEP695TypeAliasType<'db>,
+    ) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            self.rhs_scope(db)
+                .structural_ordering(db, other.rhs_scope(db))
+        })
+    }
 }
 
 fn generic_context_cycle_initial<'db>(
@@ -13633,6 +13884,21 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.value(db)
                 .recursive_type_normalized_impl(db, div, true)?,
         ))
+    }
+
+    fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: ManualPEP695TypeAliasType<'db>,
+    ) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            match (self.definition(db), other.definition(db)) {
+                (Some(left), Some(right)) => left.structural_ordering(db, right),
+                (None, None) => std::cmp::Ordering::Equal,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, Some(_)) => std::cmp::Ordering::Less,
+            }
+        })
     }
 }
 
@@ -13752,6 +14018,21 @@ impl<'db> TypeAliasType<'db> {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
             TypeAliasType::ManualPEP695(_) => self,
+        }
+    }
+
+    fn structural_ordering(self, db: &'db dyn Db, other: TypeAliasType<'db>) -> std::cmp::Ordering {
+        match (self, other) {
+            (TypeAliasType::PEP695(left), TypeAliasType::PEP695(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (TypeAliasType::ManualPEP695(left), TypeAliasType::ManualPEP695(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (TypeAliasType::PEP695(_), TypeAliasType::ManualPEP695(_)) => std::cmp::Ordering::Less,
+            (TypeAliasType::ManualPEP695(_), TypeAliasType::PEP695(_)) => {
+                std::cmp::Ordering::Greater
+            }
         }
     }
 }
@@ -14463,6 +14744,14 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
     }
+
+    fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: StringLiteralType<'db>,
+    ) -> std::cmp::Ordering {
+        self.value(db).cmp(other.value(db))
+    }
 }
 
 /// # Ordering
@@ -14481,6 +14770,14 @@ impl get_size2::GetSize for BytesLiteralType<'_> {}
 impl<'db> BytesLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).len()
+    }
+
+    fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: BytesLiteralType<'db>,
+    ) -> std::cmp::Ordering {
+        self.value(db).cmp(other.value(db))
     }
 }
 
@@ -14509,6 +14806,17 @@ impl get_size2::GetSize for EnumLiteralType<'_> {}
 impl<'db> EnumLiteralType<'db> {
     pub(crate) fn enum_class_instance(self, db: &'db dyn Db) -> Type<'db> {
         self.enum_class(db).to_non_generic_instance(db)
+    }
+
+    fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: EnumLiteralType<'db>,
+    ) -> std::cmp::Ordering {
+        self.name(db).cmp(other.name(db)).then_with(|| {
+            self.enum_class(db)
+                .structural_ordering(db, other.enum_class(db))
+        })
     }
 }
 
@@ -14569,6 +14877,23 @@ impl<'db> TypeIsType<'db> {
 
     pub(crate) fn is_bound(self, db: &'db dyn Db) -> bool {
         self.place_info(db).is_some()
+    }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: TypeIsType<'db>,
+    ) -> std::cmp::Ordering {
+        structural_type_ordering(db, &self.return_type(db), &other.return_type(db)).then_with(
+            || match (self.place_info(db), other.place_info(db)) {
+                (Some((left_scope, left_place)), Some((right_scope, right_place))) => left_scope
+                    .structural_ordering(db, right_scope)
+                    .then_with(|| left_place.cmp(&right_place)),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            },
+        )
     }
 }
 

@@ -492,6 +492,10 @@ impl File {
                 .map_or(PySourceType::Python, PySourceType::from_extension),
         }
     }
+
+    pub fn structural_ordering(self, db: &dyn Db, other: Self) -> std::cmp::Ordering {
+        self.path(db).cmp(other.path(db))
+    }
 }
 
 impl fmt::Debug for File {

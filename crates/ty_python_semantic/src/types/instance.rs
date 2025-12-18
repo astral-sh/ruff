@@ -555,6 +555,25 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::Object => {}
         }
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self.0, other.0) {
+            (NominalInstanceInner::Object, NominalInstanceInner::Object) => {
+                std::cmp::Ordering::Equal
+            }
+            (NominalInstanceInner::Object, _) => std::cmp::Ordering::Less,
+            (_, NominalInstanceInner::Object) => std::cmp::Ordering::Greater,
+            (
+                NominalInstanceInner::ExactTuple(tuple1),
+                NominalInstanceInner::ExactTuple(tuple2),
+            ) => tuple1.structural_ordering(db, tuple2),
+            (NominalInstanceInner::ExactTuple(_), _) => std::cmp::Ordering::Less,
+            (_, NominalInstanceInner::ExactTuple(_)) => std::cmp::Ordering::Greater,
+            (NominalInstanceInner::NonTuple(class1), NominalInstanceInner::NonTuple(class2)) => {
+                class1.structural_ordering(db, class2)
+            }
+        }
+    }
 }
 
 impl<'db> From<NominalInstanceType<'db>> for Type<'db> {
@@ -843,6 +862,19 @@ impl<'db> ProtocolInstanceType<'db> {
     pub(super) fn interface(self, db: &'db dyn Db) -> ProtocolInterface<'db> {
         self.inner.interface(db)
     }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self.inner, other.inner) {
+            (Protocol::FromClass(left), Protocol::FromClass(right)) => {
+                left.structural_ordering(db, *right)
+            }
+            (Protocol::Synthesized(left), Protocol::Synthesized(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (Protocol::FromClass(_), Protocol::Synthesized(_)) => std::cmp::Ordering::Less,
+            (Protocol::Synthesized(_), Protocol::FromClass(_)) => std::cmp::Ordering::Greater,
+        }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for ProtocolInstanceType<'db> {
@@ -970,6 +1002,14 @@ mod synthesized_protocol {
             Some(Self(
                 self.0.recursive_type_normalized_impl(db, div, nested)?,
             ))
+        }
+
+        pub(in crate::types) fn structural_ordering(
+            self,
+            db: &'db dyn Db,
+            other: Self,
+        ) -> std::cmp::Ordering {
+            self.0.structural_ordering(db, other.0)
         }
     }
 

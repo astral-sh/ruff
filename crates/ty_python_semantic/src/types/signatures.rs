@@ -27,7 +27,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
     KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    TypeMapping, TypeRelation, VarianceInferable, structural_type_ordering, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -568,6 +568,23 @@ impl<'db> CallableSignature<'db> {
                     .and(db, || other.is_subtype_of_impl(db, self, inferable))
             }
         }
+    }
+
+    pub(super) fn structural_ordering(
+        &self,
+        db: &'db dyn Db,
+        other: &CallableSignature<'db>,
+    ) -> std::cmp::Ordering {
+        if self.overloads.len() != other.overloads.len() {
+            return self.overloads.len().cmp(&other.overloads.len());
+        }
+        for (left_sig, right_sig) in self.overloads.iter().zip(&other.overloads) {
+            let ord = left_sig.structural_ordering(db, right_sig);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+        std::cmp::Ordering::Equal
     }
 }
 
@@ -1691,6 +1708,26 @@ impl<'db> Signature<'db> {
     pub(crate) fn with_definition(self, definition: Option<Definition<'db>>) -> Self {
         Self { definition, ..self }
     }
+
+    fn structural_ordering(&self, db: &'db dyn Db, other: &Signature<'db>) -> std::cmp::Ordering {
+        let parameters_count = self.parameters.len().cmp(&other.parameters.len());
+        if parameters_count != std::cmp::Ordering::Equal {
+            return parameters_count;
+        }
+        for (left, right) in self.parameters.iter().zip(&other.parameters) {
+            let ord = left.structural_ordering(db, right);
+            if ord != std::cmp::Ordering::Equal {
+                return ord;
+            }
+        }
+
+        match (self.return_ty.as_ref(), other.return_ty.as_ref()) {
+            (Some(left_ty), Some(right_ty)) => structural_type_ordering(db, left_ty, right_ty),
+            (None, Some(_)) => std::cmp::Ordering::Less,
+            (Some(_), None) => std::cmp::Ordering::Greater,
+            (None, None) => std::cmp::Ordering::Equal,
+        }
+    }
 }
 
 impl<'db> VarianceInferable<'db> for &Signature<'db> {
@@ -2505,6 +2542,17 @@ impl<'db> Parameter<'db> {
             ParameterKind::Variadic { .. } | ParameterKind::KeywordVariadic { .. } => None,
         }
     }
+
+    fn structural_ordering(&self, db: &'db dyn Db, other: &Parameter<'db>) -> std::cmp::Ordering {
+        self.kind.cmp(&other.kind).then_with(|| {
+            match (self.annotated_type.as_ref(), other.annotated_type.as_ref()) {
+                (Some(left_ty), Some(right_ty)) => structural_type_ordering(db, left_ty, right_ty),
+                (None, Some(_)) => std::cmp::Ordering::Less,
+                (Some(_), None) => std::cmp::Ordering::Greater,
+                (None, None) => std::cmp::Ordering::Equal,
+            }
+        })
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
@@ -2544,6 +2592,46 @@ pub enum ParameterKind<'db> {
         /// Parameter name.
         name: Name,
     },
+}
+
+impl Ord for ParameterKind<'_> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (
+                Self::PositionalOnly { name: l_name, .. },
+                Self::PositionalOnly { name: r_name, .. },
+            ) => l_name.cmp(r_name),
+            (
+                Self::PositionalOrKeyword { name: l_name, .. },
+                Self::PositionalOrKeyword { name: r_name, .. },
+            ) => l_name.cmp(r_name),
+            (Self::Variadic { name: l_name }, Self::Variadic { name: r_name }) => {
+                l_name.cmp(r_name)
+            }
+            (Self::KeywordOnly { name: l_name, .. }, Self::KeywordOnly { name: r_name, .. }) => {
+                l_name.cmp(r_name)
+            }
+            (Self::KeywordVariadic { name: l_name }, Self::KeywordVariadic { name: r_name }) => {
+                l_name.cmp(r_name)
+            }
+            (left, right) => {
+                let index = |param: &_| match param {
+                    Self::PositionalOnly { .. } => 0,
+                    Self::PositionalOrKeyword { .. } => 1,
+                    Self::Variadic { .. } => 2,
+                    Self::KeywordOnly { .. } => 3,
+                    Self::KeywordVariadic { .. } => 4,
+                };
+                index(left).cmp(&index(right))
+            }
+        }
+    }
+}
+
+impl PartialOrd for ParameterKind<'_> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
 }
 
 impl<'db> ParameterKind<'db> {

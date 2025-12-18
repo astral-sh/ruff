@@ -134,6 +134,17 @@ impl<'db> Definition<'db> {
             _ => None,
         }
     }
+
+    pub(crate) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: Definition<'db>,
+    ) -> std::cmp::Ordering {
+        self.file(db)
+            .cmp(&other.file(db))
+            .then_with(|| self.file_scope(db).cmp(&other.file_scope(db)))
+            .then_with(|| self.place(db).cmp(&other.place(db)))
+    }
 }
 
 /// Get the module-level docstring for the given file.

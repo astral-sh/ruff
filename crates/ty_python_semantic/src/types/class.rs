@@ -335,6 +335,19 @@ impl<'db> GenericAlias<'db> {
     pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.origin(db).is_typed_dict(db)
     }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: GenericAlias<'db>,
+    ) -> std::cmp::Ordering {
+        self.origin(db)
+            .structural_ordering(db, other.origin(db))
+            .then_with(|| {
+                self.specialization(db)
+                    .structural_ordering(db, other.specialization(db))
+            })
+    }
 }
 
 impl<'db> From<GenericAlias<'db>> for Type<'db> {
@@ -1349,6 +1362,19 @@ impl<'db> ClassType<'db> {
 
     pub(super) fn header_span(self, db: &'db dyn Db) -> Span {
         self.class_literal(db).0.header_span(db)
+    }
+
+    pub(super) fn structural_ordering(self, db: &'db dyn Db, other: Self) -> std::cmp::Ordering {
+        match (self, other) {
+            (ClassType::NonGeneric(left), ClassType::NonGeneric(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (ClassType::Generic(left), ClassType::Generic(right)) => {
+                left.structural_ordering(db, right)
+            }
+            (ClassType::NonGeneric(_), ClassType::Generic(_)) => std::cmp::Ordering::Less,
+            (ClassType::Generic(_), ClassType::NonGeneric(_)) => std::cmp::Ordering::Greater,
+        }
     }
 }
 
@@ -3879,6 +3905,20 @@ impl<'db> ClassLiteral<'db> {
     pub(super) fn qualified_name(self, db: &'db dyn Db) -> QualifiedClassName<'db> {
         QualifiedClassName { db, class: self }
     }
+
+    pub(super) fn structural_ordering(
+        self,
+        db: &'db dyn Db,
+        other: ClassLiteral<'db>,
+    ) -> std::cmp::Ordering {
+        self.name(db)
+            .cmp(other.name(db))
+            .then_with(|| self.known(db).cmp(&other.known(db)))
+            .then_with(|| {
+                self.body_scope(db)
+                    .structural_ordering(db, other.body_scope(db))
+            })
+    }
 }
 
 impl<'db> From<ClassLiteral<'db>> for Type<'db> {
@@ -4162,7 +4202,7 @@ pub(super) enum DisjointBaseKind {
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
 /// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
     // To figure out where an stdlib symbol is defined, you can go into `crates/ty_vendored`
