@@ -10,10 +10,10 @@
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
-use crate::find_node::CoveringNode;
 use crate::goto::GotoTarget;
 use crate::{Db, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::find_node::CoveringNode;
 use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
@@ -334,10 +334,7 @@ impl LocalReferencesFinder<'_> {
 
     /// Determines whether the given covering node is a reference to
     /// the symbol we are searching for
-    fn check_reference_from_covering_node(
-        &mut self,
-        covering_node: &crate::find_node::CoveringNode<'_>,
-    ) {
+    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.

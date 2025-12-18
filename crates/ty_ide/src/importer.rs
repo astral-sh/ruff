@@ -869,7 +869,6 @@ mod tests {
     use insta::assert_snapshot;
     use insta::internals::SettingsBindDropGuard;
 
-    use crate::find_node::covering_node;
     use crate::tests::{CursorTest, CursorTestBuilder, cursor_test};
     use ruff_db::diagnostic::{Diagnostic, DiagnosticFormat, DisplayDiagnosticConfig};
     use ruff_db::files::{File, FileRootKind, system_path_to_file};
@@ -877,6 +876,7 @@ mod tests {
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::{Db, system};
+    use ruff_python_ast::find_node::covering_node;
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
