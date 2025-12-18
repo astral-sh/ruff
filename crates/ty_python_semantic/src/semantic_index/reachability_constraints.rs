@@ -375,7 +375,7 @@ fn type_excluded_by_previous_patterns<'db>(
 /// statement with N cases where each case references the subject (e.g., `self`), we would
 /// re-analyze each pattern O(N) times (once per reference), leading to O(N²) total work.
 /// With memoization, each pattern is analyzed exactly once.
-#[salsa::tracked(cycle_initial = analyze_pattern_predicate_cycle_initial)]
+#[salsa::tracked(cycle_initial = analyze_pattern_predicate_cycle_initial, heap_size = get_size2::GetSize::get_heap_size)]
 fn analyze_pattern_predicate<'db>(db: &'db dyn Db, predicate: PatternPredicate<'db>) -> Truthiness {
     let subject_ty = infer_expression_type(db, predicate.subject(db), TypeContext::default());
 
