@@ -4046,10 +4046,21 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement disjointness for TypedDict with other types.
-                ConstraintSet::from(false)
-            }
+            // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
+            // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
+            // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
+            // approximation, and some false negatives are acceptable.
+            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => KnownClass::Dict
+                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                .has_relation_to_impl(
+                    db,
+                    other,
+                    inferable,
+                    TypeRelation::Assignability,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .negate(db),
         }
     }
 
