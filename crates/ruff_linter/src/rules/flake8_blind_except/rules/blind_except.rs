@@ -232,11 +232,11 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                     "exception" => true,
                                     attr if is_exc_info_compatible_log_method(attr) => {
                                         arguments.find_keyword("exc_info").is_some_and(|keyword| {
-                                            let truthiness =
-                                                Truthiness::from_expr(&keyword.value, |id| {
-                                                    self.semantic.has_builtin_binding(id)
-                                                });
-                                            truthiness.into_bool().unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+                                            Truthiness::from_expr(&keyword.value, |id| {
+                                                self.semantic.has_builtin_binding(id)
+                                            })
+                                            .into_bool()
+                                            .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
                                         })
                                     }
                                     _ => false,
@@ -253,11 +253,11 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                         if is_exc_info_compatible_log_method(method) =>
                                     {
                                         arguments.find_keyword("exc_info").is_some_and(|keyword| {
-                                            let truthiness =
-                                                Truthiness::from_expr(&keyword.value, |id| {
-                                                    self.semantic.has_builtin_binding(id)
-                                                });
-                                            truthiness.into_bool().unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+                                            Truthiness::from_expr(&keyword.value, |id| {
+                                                self.semantic.has_builtin_binding(id)
+                                            })
+                                            .into_bool()
+                                            .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
                                         })
                                     }
                                     _ => false,
