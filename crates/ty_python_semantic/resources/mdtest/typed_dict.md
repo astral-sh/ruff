@@ -1782,18 +1782,18 @@ static_assert(is_assignable_to(CommonSub, NonFinal2))
 
 class NonDisjointTD1(TypedDict):
     non_disjoint: ReadOnly[NonFinal1]
-    # While we're here: It doesn't matter how many "extra" fields there are. Only common fields can
-    # establish disjointness.
+    # While we're here: It doesn't matter how many "extra" fields there are, or what order the
+    # fields are in. Only shared field names can establish disjointness.
     extra1: int
 
 class NonDisjointTD2(TypedDict):
-    non_disjoint: ReadOnly[NonFinal2]
     extra2: str
+    non_disjoint: ReadOnly[NonFinal2]
 
 class CommonSubTD(TypedDict):
-    non_disjoint: ReadOnly[CommonSub]
-    extra1: int
     extra2: str
+    extra1: int
+    non_disjoint: ReadOnly[CommonSub]
 
 # The first two TDs above are not assignable in either direction...
 static_assert(not is_assignable_to(NonDisjointTD1, NonDisjointTD2))
@@ -1803,6 +1803,8 @@ static_assert(not is_disjoint_from(NonDisjointTD1, NonDisjointTD2))
 # ...because the third TD above is assignable to both of them.
 static_assert(is_assignable_to(CommonSubTD, NonDisjointTD1))
 static_assert(is_assignable_to(CommonSubTD, NonDisjointTD2))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD1))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD2))
 ```
 
 We made the important fields `ReadOnly` above, because those only establish disjointness when
