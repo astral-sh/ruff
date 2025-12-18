@@ -1726,7 +1726,7 @@ reveal_type(actual_td)  # revealed: ActualTypedDict
 reveal_type(actual_td["name"])  # revealed: str
 ```
 
-## Disjointness
+## Disjointness with other `TypedDict`s
 
 Two `TypedDict` types are disjoint if it's impossible to come up with a third (fully-static)
 `TypedDict` that's assignable to both. The simplest way to establish this is if both sides have
@@ -1987,6 +1987,24 @@ static_assert(not is_disjoint_from(ReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
 static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredBoolTD))
 static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredReadOnlyBoolTD))
 static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
+```
+
+## Disjointness with other types
+
+```py
+from typing import TypedDict, Mapping
+from ty_extensions import static_assert, is_disjoint_from
+
+class TD(TypedDict):
+    x: int
+
+class RegularNonTD: ...
+
+static_assert(not is_disjoint_from(TD, object))
+static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+# TODO: We should be able to assert that these are disjoint.
+static_assert(not is_disjoint_from(TD, Mapping[int, object]))
+static_assert(not is_disjoint_from(TD, RegularNonTD))
 ```
 
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
