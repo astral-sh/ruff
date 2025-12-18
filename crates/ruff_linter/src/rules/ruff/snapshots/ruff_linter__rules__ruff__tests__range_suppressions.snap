@@ -555,12 +555,12 @@ help: Remove unused suppression
 
 
 RUF102 [*] Invalid rule code in suppression: YF829
-  --> suppressions.py:93:5
+  --> suppressions.py:93:21
    |
 91 | def f():
 92 |     # Unknown rule codes
 93 |     # ruff: disable[YF829]
-   |     ^^^^^^^^^^^^^^^^^^^^^^
+   |                     ^^^^^
 94 |     # ruff: disable[F841, RQW320]
 95 |     value = 0
    |
@@ -616,12 +616,12 @@ help: Remove the rule code
 
 
 RUF102 [*] Invalid rule code in suppression: YF829
-  --> suppressions.py:97:5
+  --> suppressions.py:97:20
    |
 95 |     value = 0
 96 |     # ruff: enable[F841, RQW320]
 97 |     # ruff: enable[YF829]
-   |     ^^^^^^^^^^^^^^^^^^^^^
+   |                    ^^^^^
    |
 help: Remove the rule code
 94 |     # ruff: disable[F841, RQW320]
