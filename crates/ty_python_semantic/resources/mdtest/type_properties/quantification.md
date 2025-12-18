@@ -140,29 +140,21 @@ def covariant_transitivity[T, U]():
     # (Base ≤ T) ∧ (Covariant[T] ≤ U) → (Covariant[Base] ≤ U)
     constraints = ConstraintSet.range(Base, T, object) & ConstraintSet.range(Covariant[T], U, object)
     quantified = ConstraintSet.range(Covariant[Base], U, object)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 
     # (Base ≤ T ≤ Super) ∧ (Covariant[T] ≤ U) → (Covariant[Base] ≤ U)
     constraints = ConstraintSet.range(Base, T, Super) & ConstraintSet.range(Covariant[T], U, object)
     quantified = ConstraintSet.range(Covariant[Base], U, object)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 
     # (T ≤ Base) ∧ (U ≤ Covariant[T]) → (U ≤ Covariant[Base])
     constraints = ConstraintSet.range(Never, T, Base) & ConstraintSet.range(Never, U, Covariant[T])
     quantified = ConstraintSet.range(Never, U, Covariant[Base])
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 
     # (Sub ≤ T ≤ Base) ∧ (U ≤ Covariant[T]) → (U ≤ Covariant[Base])
     constraints = ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Never, U, Covariant[T])
     quantified = ConstraintSet.range(Never, U, Covariant[Base])
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 ```
 

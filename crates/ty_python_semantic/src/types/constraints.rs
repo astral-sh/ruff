@@ -75,13 +75,16 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
-use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, PartialSpecialization, Specialization,
+};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
-    UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap};
 
@@ -3075,6 +3078,24 @@ impl<'db> SequentMap<'db> {
                 left_typevar,
             );
         }
+
+        // Add sequents when one of the typevars is mentioned deeply inside the bounds of the
+        // other. Because the "bound" typevar appears deeply inside of the "constrained" typevar,
+        // our constraint ordering doesn't apply, and we have to try each direction.
+        self.add_deep_mutual_sequents(
+            db,
+            left_constraint,
+            left_typevar,
+            right_constraint,
+            right_typevar,
+        );
+        self.add_deep_mutual_sequents(
+            db,
+            right_constraint,
+            right_typevar,
+            left_constraint,
+            left_typevar,
+        );
     }
 
     fn add_direct_mutual_sequents_for_different_typevars(
@@ -3085,7 +3106,6 @@ impl<'db> SequentMap<'db> {
         constrained_constraint: ConstrainedTypeVar<'db>,
         constrained_typevar: BoundTypeVarInstance<'db>,
     ) {
-
         // We then look for cases where the "constrained" typevar's upper and/or lower bound
         // matches the "bound" typevar. If so, we're going to add an implication sequent that
         // replaces the upper/lower bound that matched with the bound constraint's corresponding
@@ -3146,6 +3166,102 @@ impl<'db> SequentMap<'db> {
             post_constraint,
         );
         self.enqueue_constraint(post_constraint);
+    }
+
+    fn add_deep_mutual_sequents(
+        &mut self,
+        db: &'db dyn Db,
+        bound_constraint: ConstrainedTypeVar<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constrained_constraint: ConstrainedTypeVar<'db>,
+        constrained_typevar: BoundTypeVarInstance<'db>,
+    ) {
+        let bound_lower = bound_constraint.lower(db);
+        let bound_upper = bound_constraint.upper(db);
+        let constrained_lower = constrained_constraint.lower(db);
+        let constrained_upper = constrained_constraint.upper(db);
+
+        let post_constraint = match constrained_lower.variance_of(db, bound_typevar) {
+            // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
+            // do not affect the valid specializations of C.
+            TypeVarVariance::Bivariant => None,
+
+            // (Covariant[B] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[BL] ≤ C ≤ CU)
+            TypeVarVariance::Covariant => {
+                if !bound_lower.is_never() && !bound_lower.is_object() {
+                    let partial = PartialSpecialization::Single {
+                        bound_typevar,
+                        ty: bound_lower,
+                    };
+                    let new_lower = constrained_lower.apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    Some(ConstrainedTypeVar::new(
+                        db,
+                        constrained_typevar,
+                        new_lower,
+                        constrained_upper,
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            // TODO
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => None,
+        };
+        if let Some(post_constraint) = post_constraint {
+            self.add_pair_implication(
+                db,
+                bound_constraint,
+                constrained_constraint,
+                post_constraint,
+            );
+            self.enqueue_constraint(post_constraint);
+        }
+
+        let post_constraint = match constrained_upper.variance_of(db, bound_typevar) {
+            // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
+            // do not affect the valid specializations of C.
+            TypeVarVariance::Bivariant => None,
+
+            // (CL ≤ C ≤ Covariant[B]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[BU])
+            TypeVarVariance::Covariant => {
+                if !bound_upper.is_never() && !bound_upper.is_object() {
+                    let partial = PartialSpecialization::Single {
+                        bound_typevar,
+                        ty: bound_upper,
+                    };
+                    let new_upper = constrained_upper.apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    Some(ConstrainedTypeVar::new(
+                        db,
+                        constrained_typevar,
+                        constrained_lower,
+                        new_upper,
+                    ))
+                } else {
+                    None
+                }
+            }
+
+            // TODO
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => None,
+        };
+        if let Some(post_constraint) = post_constraint {
+            self.add_pair_implication(
+                db,
+                bound_constraint,
+                constrained_constraint,
+                post_constraint,
+            );
+            self.enqueue_constraint(post_constraint);
+        }
     }
 
     fn add_mutual_sequents_for_same_typevars(

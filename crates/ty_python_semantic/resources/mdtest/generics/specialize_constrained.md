@@ -437,8 +437,7 @@ class Invariant[T]:
 def mentions_covariant[T, U]():
     # (T@mentions_covariant ≤ int) ∧ (U@mentions_covariant ≤ Covariant[T@mentions_covariant])
     constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Never, U, Covariant[T])
-    # TODO: revealed: ty_extensions.Specialization[T@mentions_covariant = int, U@mentions_covariant = Covariant[int]]
-    # revealed: ty_extensions.Specialization[T@mentions_covariant = int, U@mentions_covariant = Unknown]
+    # revealed: ty_extensions.Specialization[T@mentions_covariant = int, U@mentions_covariant = Covariant[int]]
     reveal_type(generic_context(mentions_covariant).specialize_constrained(constraints))
 
 def mentions_contravariant[T, U]():
