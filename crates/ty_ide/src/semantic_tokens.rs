@@ -37,10 +37,10 @@ use bitflags::bitflags;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, TraversalSignal, walk_expr, walk_stmt,
 };
+use ruff_python_ast::{self as ast, ArgOrKeyword};
 use ruff_python_ast::{
     AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral,
     TypeParam,
@@ -668,13 +668,11 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Handle base classes and type annotations in inheritance
                 if let Some(arguments) = &class.arguments {
-                    // Visit base class arguments
-                    for arg in &arguments.args {
-                        self.visit_expr(arg);
-                    }
-                    // Visit keyword arguments (for metaclass, etc.)
-                    for keyword in &arguments.keywords {
-                        self.visit_expr(&keyword.value);
+                    for arg_or_keyword in arguments.arguments_source_order() {
+                        match arg_or_keyword {
+                            ArgOrKeyword::Arg(arg) => self.visit_expr(arg),
+                            ArgOrKeyword::Keyword(keyword) => self.visit_expr(&keyword.value),
+                        }
                     }
                 }
 
@@ -1135,6 +1133,22 @@ mod tests {
 
         assert_snapshot!(test.to_snapshot(&tokens), @r###"
         "MyClass" @ 6..13: Class [definition]
+        "###);
+    }
+
+    #[test]
+    fn test_semantic_tokens_class_args() {
+        // This used to cause a panic because of an incorrect
+        // insertion-order when visiting arguments inside
+        // class definitions.
+        let test = SemanticTokenTest::new("class Foo(m=x, m)");
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        "Foo" @ 6..9: Class [definition]
+        "x" @ 12..13: Variable
+        "m" @ 15..16: Variable
         "###);
     }
 
