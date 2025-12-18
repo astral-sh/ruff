@@ -615,4 +615,7 @@ pub enum LintSource {
 
     /// The rule was enabled in a configuration file.
     File,
+
+    /// The rule was enabled from the configuration in the editor.
+    Editor,
 }

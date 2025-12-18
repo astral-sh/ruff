@@ -157,7 +157,7 @@ Memory report:
 =======SALSA STRUCTS=======
 `Program`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
 `Project`                                          metadata=[X.XXMB]   fields=[X.XXMB]   count=1
-`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=1
+`FileRoot`                                         metadata=[X.XXMB]   fields=[X.XXMB]   count=2
 =======SALSA QUERIES=======
 =======SALSA SUMMARY=======
 TOTAL MEMORY USAGE: [X.XXMB]

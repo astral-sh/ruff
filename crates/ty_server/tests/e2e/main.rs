@@ -30,6 +30,7 @@
 mod code_actions;
 mod commands;
 mod completions;
+mod configuration;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -1244,13 +1245,17 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
+    }
+
     /// Write a file to the test directory
     pub(crate) fn with_file(
         self,
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let file_path = self.test_context.root().join(path.as_ref());
+        let file_path = self.file_path(path);
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent.as_std_path())?;

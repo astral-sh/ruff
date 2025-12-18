@@ -31,7 +31,7 @@ use options::GlobalOptions;
 use ty_python_semantic::MisconfigurationMode;
 
 pub(crate) use self::options::InitializationOptions;
-pub use self::options::{ClientOptions, DiagnosticMode};
+pub use self::options::{ClientOptions, DiagnosticMode, WorkspaceOptions};
 pub(crate) use self::settings::{GlobalSettings, WorkspaceSettings};
 use crate::capabilities::{ResolvedClientCapabilities, server_diagnostic_options};
 use crate::document::{DocumentKey, DocumentVersion, NotebookDocument};
@@ -453,8 +453,6 @@ impl Session {
         let mut combined_global_options: Option<GlobalOptions> = None;
 
         for (url, options) in workspace_settings {
-            tracing::debug!("Initializing workspace `{url}`");
-
             // Combine the global options specified during initialization with the
             // workspace-specific options to create the final workspace options.
             let ClientOptions {
@@ -465,6 +463,8 @@ impl Session {
                 .clone()
                 .combine(options.clone());
 
+            tracing::debug!("Initializing workspace `{url}: {workspace:#?}`");
+
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {
                 warn_about_unknown_options(client, Some(&url), unknown_options);
@@ -472,9 +472,25 @@ impl Session {
 
             combined_global_options.combine_with(Some(global));
 
-            let workspace_settings = workspace.into_settings();
-            let Some((root, workspace)) = self.workspaces.initialize(&url, workspace_settings)
-            else {
+            let Ok(root) = url.to_file_path() else {
+                tracing::debug!("Ignoring workspace with non-path root: {url}");
+                continue;
+            };
+
+            // Realistically I don't think this can fail because we got the path from a Url
+            let root = match SystemPathBuf::from_path_buf(root) {
+                Ok(root) => root,
+                Err(root) => {
+                    tracing::debug!(
+                        "Ignoring workspace with non-UTF8 root: {root}",
+                        root = root.display()
+                    );
+                    continue;
+                }
+            };
+
+            let workspace_settings = workspace.into_settings(&root, client);
+            let Some(workspace) = self.workspaces.initialize(&root, workspace_settings) else {
                 continue;
             };
 
@@ -486,7 +502,18 @@ impl Session {
                 self.native_system.clone(),
             );
 
-            let project = ProjectMetadata::discover(&root, &system)
+            let configuration_file = workspace
+                .settings
+                .project_options_overrides()
+                .and_then(|settings| settings.config_file_override.as_ref());
+
+            let metadata = if let Some(configuration_file) = configuration_file {
+                ProjectMetadata::from_config_file(configuration_file.clone(), &root, &system)
+            } else {
+                ProjectMetadata::discover(&root, &system)
+            };
+
+            let project = metadata
                 .context("Failed to discover project configuration")
                 .and_then(|mut metadata| {
                     metadata
@@ -1128,18 +1155,13 @@ impl Workspaces {
     /// `None` if URL doesn't map to a valid path or if the workspace is not registered.
     pub(crate) fn initialize(
         &mut self,
-        url: &Url,
+        path: &SystemPath,
         settings: WorkspaceSettings,
-    ) -> Option<(SystemPathBuf, &mut Workspace)> {
-        let path = url.to_file_path().ok()?;
-
-        // Realistically I don't think this can fail because we got the path from a Url
-        let system_path = SystemPathBuf::from_path_buf(path).ok()?;
-
-        if let Some(workspace) = self.workspaces.get_mut(&system_path) {
+    ) -> Option<&mut Workspace> {
+        if let Some(workspace) = self.workspaces.get_mut(path) {
             workspace.settings = Arc::new(settings);
             self.uninitialized -= 1;
-            Some((system_path, workspace))
+            Some(workspace)
         } else {
             None
         }

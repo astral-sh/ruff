@@ -374,7 +374,7 @@ def foo() -> str:
 }
 
 // Redact result_id values since they are hash-based and non-deterministic
-fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
+pub(crate) fn filter_result_id() -> insta::internals::SettingsBindDropGuard {
     let mut settings = insta::Settings::clone_current();
     settings.add_filter(r#""[a-f0-9]{16}""#, r#""[RESULT_ID]""#);
     settings.bind_to_scope()

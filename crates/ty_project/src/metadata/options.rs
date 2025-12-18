@@ -876,10 +876,7 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
-
-                        ValueSource::Editor => {
-                            unreachable!("Can't configure rules from the user's editor")
-                        }
+                        ValueSource::Editor => LintSource::Editor,
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -1015,7 +1012,12 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
+                        ValueSource::Editor => {
+                            diagnostic.sub(SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "The pattern was specified in the editor settings.",
+                            ))
+                        }
                     }
                 })?;
         }
@@ -1098,9 +1100,10 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!(
-                            "Can't configure excludes from the user's editor"
-                        )
+                        ValueSource::Editor => diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "The pattern was specified in the editor settings",
+                        ))
                     }
                 })?;
         }

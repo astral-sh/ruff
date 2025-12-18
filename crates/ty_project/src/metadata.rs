@@ -56,6 +56,7 @@ impl ProjectMetadata {
 
     pub fn from_config_file(
         path: SystemPathBuf,
+        root: &SystemPath,
         system: &dyn System,
     ) -> Result<Self, ProjectMetadataError> {
         tracing::debug!("Using overridden configuration file at '{path}'");
@@ -70,8 +71,8 @@ impl ProjectMetadata {
         let options = config_file.into_options();
 
         Ok(Self {
-            name: Name::new(system.current_directory().file_name().unwrap_or("root")),
-            root: system.current_directory().to_path_buf(),
+            name: Name::new(root.file_name().unwrap_or("root")),
+            root: root.to_path_buf(),
             options,
             extra_configuration_paths: vec![path],
             misconfiguration_mode: MisconfigurationMode::Fail,
