@@ -173,7 +173,7 @@ impl Suppressions {
                 if context.is_rule_enabled(Rule::InvalidRuleCode) {
                     for comment in &suppression.comments {
                         let (range, edit) =
-                            Suppressions::delete_code_or_comment(locator, suppression, comment);
+                            Suppressions::delete_code(locator, suppression, comment);
                         context
                             .report_diagnostic(
                                 InvalidRuleCode {
@@ -270,35 +270,41 @@ impl Suppressions {
         }
     }
 
+    fn delete_code(
+        locator: &Locator<'_>,
+        suppression: &Suppression,
+        comment: &SuppressionComment,
+    ) -> (TextRange, Edit) {
+        let code_index = comment
+            .codes
+            .iter()
+            .position(|range| locator.slice(range) == suppression.code)
+            .unwrap();
+        let range = comment.codes[code_index];
+        let edit_range = if code_index < (comment.codes.len() - 1) {
+            TextRange::new(
+                comment.codes[code_index].start(),
+                comment.codes[code_index + 1].start(),
+            )
+        } else {
+            TextRange::new(
+                comment.codes[code_index - 1].end(),
+                comment.codes[code_index].end(),
+            )
+        };
+        (range, Edit::range_deletion(edit_range))
+    }
+
     fn delete_code_or_comment(
         locator: &Locator<'_>,
         suppression: &Suppression,
         comment: &SuppressionComment,
     ) -> (TextRange, Edit) {
-        let mut range = comment.range;
-        let edit = if comment.codes.len() == 1 {
-            delete_comment(comment.range, locator)
+        if comment.codes.len() == 1 {
+            (comment.range, delete_comment(comment.range, locator))
         } else {
-            let code_index = comment
-                .codes
-                .iter()
-                .position(|range| locator.slice(range) == suppression.code)
-                .unwrap();
-            range = comment.codes[code_index];
-            let code_range = if code_index < (comment.codes.len() - 1) {
-                TextRange::new(
-                    comment.codes[code_index].start(),
-                    comment.codes[code_index + 1].start(),
-                )
-            } else {
-                TextRange::new(
-                    comment.codes[code_index - 1].end(),
-                    comment.codes[code_index].end(),
-                )
-            };
-            Edit::range_deletion(code_range)
-        };
-        (range, edit)
+            Suppressions::delete_code(locator, suppression, comment)
+        }
     }
 }
 
