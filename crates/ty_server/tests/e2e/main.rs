@@ -212,7 +212,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-        env_vars: Vec<(String, String)>,
+        env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
 
@@ -226,7 +226,12 @@ impl TestServer {
         // Create test system and set environment variable overrides
         let test_system = Arc::new(TestSystem::new(os_system));
         for (name, value) in env_vars {
-            test_system.set_env_var(name, value);
+            match value {
+                Some(value) => {
+                    test_system.set_env_var(name, value);
+                }
+                None => test_system.remove_env_var(name),
+            }
         }
 
         // Start the server in a separate thread
@@ -1074,7 +1079,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
-    env_vars: Vec<(String, String)>,
+    env_vars: Vec<(String, Option<String>)>,
 }
 
 impl TestServerBuilder {
@@ -1105,7 +1110,7 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: Vec::new(),
+            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
         })
     }
 
@@ -1121,7 +1126,7 @@ impl TestServerBuilder {
         name: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        self.env_vars.push((name.into(), value.into()));
+        self.env_vars.push((name.into(), Some(value.into())));
         self
     }
 
