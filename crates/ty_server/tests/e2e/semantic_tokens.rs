@@ -1,6 +1,5 @@
 use anyhow::Result;
 use ruff_db::system::SystemPath;
-use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
