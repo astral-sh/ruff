@@ -143,7 +143,7 @@ static FREQTRADE: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    600,
+    626,
 );
 
 static PANDAS: Benchmark = Benchmark::new(
@@ -195,7 +195,7 @@ static SYMPY: Benchmark = Benchmark::new(
         python_version: PythonVersion::PY312,
     },
     // TODO: With better decorator support, `__slots__` support, etc., it should be possible to reduce the number of errors considerably.
-    70000,
+    58000,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
