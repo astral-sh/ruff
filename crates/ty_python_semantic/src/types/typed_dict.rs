@@ -343,67 +343,67 @@ impl<'db> TypedDictType<'db> {
         )
     }
 
-    /// Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
-    /// `TypedDict` `C` that's fully-static and assignable to both of them.
-    ///
-    /// `TypedDict` assignability is determined field-by-field, so we determine disjointness
-    /// similarly. For any field that's only in `A`, it's always possible for our hypothetical `C`
-    /// to copy/paste that field without losing assignability to `B` (and vice versa), so we only
-    /// need to consider fields that are present in both `A` and `B`.
-    ///
-    /// There are three properties of each field to consider: the declared type, whether it's
-    /// mutable ("mut" vs "imm" below), and whether it's required ("req" vs "opt" below). Here's a
-    /// table summary of the restrictions on the declared type of a source field (for us that means
-    /// in `C`, which we want to be assignable to both `A` and `B`) given a destination field (for
-    /// us that means in either `A` or `B`). For completeness we'll also include the possibility
-    /// that the source field is missing entirely, though we'll soon see that we can ignore that
-    /// case. This table is essentially what `has_relation_to_impl` implements above. Here
-    /// "equivalent" means the source and destination types must be equivalent/compatible,
-    /// "assignable" means the source must be assignable to the destination, and "-" means the
-    /// assignment is never allowed:
-    ///
-    ///    source→ | mut + req  | mut + opt  | imm + req  | imm + opt  |   [missing]   |
-    /// ↓dest      |            |            |            |            |               |
-    /// -----------|------------|------------|------------|------------|---------------|
-    /// mut + req  | equivalent |     -      |     -      |     -      |       -       |
-    /// mut + opt  |     -      | equivalent |     -      |     -      |       -       |
-    /// imm + req  | assignable |     -      | assignable |     -      |       -       |
-    /// imm + opt  | assignable | assignable | assignable | assignable | [dest is obj] |
-    ///
-    /// We can cut that table down substantially by noticing two things:
-    ///
-    /// - We don't need to consider the cases where the source field (in `C`) is `ReadOnly`/"imm",
-    ///   because the mutable version of the same field is always "strictly more assignable". In
-    ///   other words, nothing in the `TypedDict` assignability rules ever requires a source field
-    ///   to be immutable.
-    /// - We don't need to consider the special case where the source field is missing, because
-    ///   that's only allowed when the destination is `ReadOnly[NotRequired[object]]`, which is
-    ///   compatible with *any* choice of source field.
-    ///
-    /// The cases we actually need to reason about are this smaller table:
-    ///
-    ///    source→ | mut + req  | mut + opt  |
-    /// ↓dest      |            |            |
-    /// -----------|------------|------------|
-    /// mut + req  | equivalent |     -      |
-    /// mut + opt  |     -      | equivalent |
-    /// imm + req  | assignable |     -      |
-    /// imm + opt  | assignable | assignable |
-    ///
-    /// So, given a field name that's in both `A` and `B`, here are the conditions where it's
-    /// *impossible* to choose a source field for `C` that's compatible with both destinations,
-    /// which tells us that `A` and `B` are disjoint:
-    ///
-    ///      1. If one side is "mut+opt" (which forces the field in `C` to be "opt") and the other
-    ///         side is "req" (which forces the field in `C` to be "req").
-    ///     2a. If both sides are mutable, and their types are not equivalent/compatible. (Because
-    ///         the type in `C` must be compatible with both of them.)
-    ///     2b. If one sides is mutable, and its type is not assignable to the immutable side's type.
-    ///         (Because the type in `C` must be compatible with the mutable side.)
-    ///     2c. If both sides are immutable, and their types are disjoint. (Because the type in `C`
-    ///         must be assignable to both.)
-    ///
-    /// TODO: Adding support for `closed` and `extra_items` will complicate this.
+    // Two `TypedDict`s `A` and `B` are disjoint if it's impossible to come up with a third
+    // `TypedDict` `C` that's fully-static and assignable to both of them.
+    //
+    // `TypedDict` assignability is determined field-by-field, so we determine disjointness
+    // similarly. For any field that's only in `A`, it's always possible for our hypothetical `C`
+    // to copy/paste that field without losing assignability to `B` (and vice versa), so we only
+    // need to consider fields that are present in both `A` and `B`.
+    //
+    // There are three properties of each field to consider: the declared type, whether it's
+    // mutable ("mut" vs "imm" below), and whether it's required ("req" vs "opt" below). Here's a
+    // table summary of the restrictions on the declared type of a source field (for us that means
+    // in `C`, which we want to be assignable to both `A` and `B`) given a destination field (for
+    // us that means in either `A` or `B`). For completeness we'll also include the possibility
+    // that the source field is missing entirely, though we'll soon see that we can ignore that
+    // case. This table is essentially what `has_relation_to_impl` implements above. Here
+    // "equivalent" means the source and destination types must be equivalent/compatible,
+    // "assignable" means the source must be assignable to the destination, and "-" means the
+    // assignment is never allowed:
+    //
+    //    source→ | mut + req  | mut + opt  | imm + req  | imm + opt  |   [missing]   |
+    // ↓dest      |            |            |            |            |               |
+    // -----------|------------|------------|------------|------------|---------------|
+    // mut + req  | equivalent |     -      |     -      |     -      |       -       |
+    // mut + opt  |     -      | equivalent |     -      |     -      |       -       |
+    // imm + req  | assignable |     -      | assignable |     -      |       -       |
+    // imm + opt  | assignable | assignable | assignable | assignable | [dest is obj] |
+    //
+    // We can cut that table down substantially by noticing two things:
+    //
+    // - We don't need to consider the cases where the source field (in `C`) is `ReadOnly`/"imm",
+    //   because the mutable version of the same field is always "strictly more assignable". In
+    //   other words, nothing in the `TypedDict` assignability rules ever requires a source field
+    //   to be immutable.
+    // - We don't need to consider the special case where the source field is missing, because
+    //   that's only allowed when the destination is `ReadOnly[NotRequired[object]]`, which is
+    //   compatible with *any* choice of source field.
+    //
+    // The cases we actually need to reason about are this smaller table:
+    //
+    //    source→ | mut + req  | mut + opt  |
+    // ↓dest      |            |            |
+    // -----------|------------|------------|
+    // mut + req  | equivalent |     -      |
+    // mut + opt  |     -      | equivalent |
+    // imm + req  | assignable |     -      |
+    // imm + opt  | assignable | assignable |
+    //
+    // So, given a field name that's in both `A` and `B`, here are the conditions where it's
+    // *impossible* to choose a source field for `C` that's compatible with both destinations,
+    // which tells us that `A` and `B` are disjoint:
+    //
+    //  1. If one side is "mut+opt" (which forces the field in `C` to be "opt") and the other
+    //     side is "req" (which forces the field in `C` to be "req").
+    // 2a. If both sides are mutable, and their types are not equivalent/compatible. (Because
+    //     the type in `C` must be compatible with both of them.)
+    // 2b. If one sides is mutable, and its type is not assignable to the immutable side's type.
+    //     (Because the type in `C` must be compatible with the mutable side.)
+    // 2c. If both sides are immutable, and their types are disjoint. (Because the type in `C`
+    //      must be assignable to both.)
+    //
+    // TODO: Adding support for `closed` and `extra_items` will complicate this.
     pub(crate) fn is_disjoint_from_impl(
         self,
         db: &'db dyn Db,
