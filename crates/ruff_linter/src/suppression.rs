@@ -5,6 +5,7 @@ use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::whitespace::indentation;
+use rustc_hash::FxHashSet;
 use std::cell::Cell;
 use std::{error::Error, fmt::Formatter};
 use thiserror::Error;
@@ -166,99 +167,94 @@ impl Suppressions {
     }
 
     pub(crate) fn check_suppressions(&self, context: &LintContext, locator: &Locator) {
-        if context.is_rule_enabled(Rule::UnusedNOQA) {
-            let unused = self
-                .valid
-                .iter()
-                .filter(|suppression| !suppression.used.get());
-
-            for suppression in unused {
-                let Ok(rule) = Rule::from_code(&suppression.code) else {
-                    continue; // TODO: invalid code
-                };
-                for comment in &suppression.comments {
-                    let (range, edit) =
-                        Suppressions::delete_code_or_comment(locator, suppression, comment);
-
-                    let codes = if context.is_rule_enabled(rule) {
-                        UnusedCodes {
-                            unmatched: vec![suppression.code.to_string()],
-                            ..Default::default()
-                        }
-                    } else {
-                        UnusedCodes {
-                            disabled: vec![suppression.code.to_string()],
-                            ..Default::default()
-                        }
-                    };
-
-                    context
-                        .report_diagnostic(
-                            UnusedNOQA {
-                                codes: Some(codes),
-                                kind: UnusedNOQAKind::Suppression,
-                            },
-                            range,
-                        )
-                        .set_fix(Fix::safe_edit(edit));
+        let mut unmatched_ranges = FxHashSet::default();
+        for suppression in &self.valid {
+            if !code_is_valid(&suppression.code, &context.settings().external) {
+                // InvalidRuleCode
+                if context.is_rule_enabled(Rule::InvalidRuleCode) {
+                    for comment in &suppression.comments {
+                        let (range, edit) =
+                            Suppressions::delete_code_or_comment(locator, suppression, comment);
+                        context
+                            .report_diagnostic(
+                                InvalidRuleCode {
+                                    rule_code: suppression.code.to_string(),
+                                    kind: InvalidRuleCodeKind::Suppression,
+                                },
+                                range,
+                            )
+                            .set_fix(Fix::safe_edit(edit));
+                    }
                 }
-            }
+            } else if !suppression.used.get() {
+                // UnusedNOQA
+                if context.is_rule_enabled(Rule::UnusedNOQA) {
+                    let Ok(rule) = Rule::from_code(
+                        get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
+                    ) else {
+                        continue; // should trigger InvalidRuleCode above
+                    };
+                    for comment in &suppression.comments {
+                        let (range, edit) =
+                            Suppressions::delete_code_or_comment(locator, suppression, comment);
 
-            // treat comments with no codes as unused suppression
-            for error in self
-                .errors
-                .iter()
-                .filter(|error| error.kind == ParseErrorKind::MissingCodes)
-            {
-                context
-                    .report_diagnostic(
-                        UnusedNOQA {
-                            codes: Some(UnusedCodes::default()),
-                            kind: UnusedNOQAKind::Suppression,
-                        },
-                        error.range,
-                    )
-                    .set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+                        let codes = if context.is_rule_enabled(rule) {
+                            UnusedCodes {
+                                unmatched: vec![suppression.code.to_string()],
+                                ..Default::default()
+                            }
+                        } else {
+                            UnusedCodes {
+                                disabled: vec![suppression.code.to_string()],
+                                ..Default::default()
+                            }
+                        };
+
+                        context
+                            .report_diagnostic(
+                                UnusedNOQA {
+                                    codes: Some(codes),
+                                    kind: UnusedNOQAKind::Suppression,
+                                },
+                                range,
+                            )
+                            .set_fix(Fix::safe_edit(edit));
+                    }
+                }
+            } else if suppression.comments.len() == 1 {
+                // UnmatchedSuppressionComment
+                let range = suppression.comments[0].range;
+                if unmatched_ranges.insert(range) {
+                    context.report_diagnostic_if_enabled(UnmatchedSuppressionComment {}, range);
+                }
             }
         }
 
-        if context.is_rule_enabled(Rule::InvalidRuleCode) {
-            for suppression in self.valid.iter().filter(|suppression| {
-                !code_is_valid(&suppression.code, &context.settings().external)
-            }) {
-                for comment in &suppression.comments {
-                    let (range, edit) =
-                        Suppressions::delete_code_or_comment(locator, suppression, comment);
-                    context
-                        .report_diagnostic(
-                            InvalidRuleCode {
-                                rule_code: suppression.code.to_string(),
-                                kind: InvalidRuleCodeKind::Suppression,
-                            },
-                            range,
-                        )
-                        .set_fix(Fix::safe_edit(edit));
+        for error in &self.errors {
+            // treat comments with no codes as unused suppression
+            if error.kind == ParseErrorKind::MissingCodes {
+                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                    UnusedNOQA {
+                        codes: Some(UnusedCodes::default()),
+                        kind: UnusedNOQAKind::Suppression,
+                    },
+                    error.range,
+                ) {
+                    diagnostic.set_fix(Fix::safe_edit(delete_comment(error.range, locator)));
+                }
+            } else {
+                if let Some(mut diagnostic) = context.report_diagnostic_if_enabled(
+                    InvalidSuppressionComment {
+                        kind: InvalidSuppressionCommentKind::Error(error.kind),
+                    },
+                    error.range,
+                ) {
+                    diagnostic.set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
                 }
             }
         }
 
         if context.is_rule_enabled(Rule::InvalidSuppressionComment) {
-            // missing codes already handled above, report the rest as invalid comments
-            for error in self
-                .errors
-                .iter()
-                .filter(|error| error.kind != ParseErrorKind::MissingCodes)
-            {
-                context
-                    .report_diagnostic(
-                        InvalidSuppressionComment {
-                            kind: InvalidSuppressionCommentKind::Error(error.kind),
-                        },
-                        error.range,
-                    )
-                    .set_fix(Fix::unsafe_edit(delete_comment(error.range, locator)));
-            }
-
             for invalid in &self.invalid {
                 context
                     .report_diagnostic(
@@ -271,21 +267,6 @@ impl Suppressions {
                         invalid.comment.range,
                         locator,
                     )));
-            }
-        }
-
-        if context.is_rule_enabled(Rule::UnmatchedSuppressionComment) {
-            for range in self
-                .valid
-                .iter()
-                .filter(|suppression| {
-                    suppression.comments.len() == 1
-                        && suppression.comments[0].action == SuppressionAction::Disable
-                })
-                .map(|suppression| suppression.comments[0].range)
-                .unique()
-            {
-                context.report_diagnostic(UnmatchedSuppressionComment {}, range);
             }
         }
     }

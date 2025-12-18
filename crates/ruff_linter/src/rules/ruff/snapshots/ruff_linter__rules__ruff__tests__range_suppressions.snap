@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 23
+Added: 21
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -393,17 +393,6 @@ RUF104 Suppression comment without matching `#ruff:enable` comment
    |
 
 
-RUF104 Suppression comment without matching `#ruff:enable` comment
-  --> suppressions.py:69:5
-   |
-67 |     # and the other should trigger an unused suppression diagnostic
-68 |     # ruff: disable[F841]
-69 |     # ruff: disable[F841]
-   |     ^^^^^^^^^^^^^^^^^^^^^
-70 |     foo = 0
-   |
-
-
 RUF100 [*] Unused suppression (unused: `F841`)
   --> suppressions.py:69:5
    |
@@ -503,17 +492,6 @@ help: Remove unused suppression
 82 |     I = 0
 83 | 
 84 | 
-
-
-RUF104 Suppression comment without matching `#ruff:enable` comment
-  --> suppressions.py:87:5
-   |
-85 | def f():
-86 |     # Multiple codes but none are used
-87 |     # ruff: disable[E741, F401, F841]
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-88 |     print("hello")
-   |
 
 
 RUF100 [*] Unused suppression (unused: `E741`)
