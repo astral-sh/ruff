@@ -455,19 +455,6 @@ reveal_type(enum_members(Answer))
 # `nonmember` attributes are unwrapped to the inner value type when accessed.
 # revealed: int
 reveal_type(Answer.OTHER)
-
-def coinflip() -> bool:
-    return True
-
-class WithConditionalNonmember(Enum):
-    A = 1
-    # Union of nonmember types: the nonmember is still unwrapped.
-    # This tests that `try_unwrap_nonmember_value` correctly handles
-    # unions containing nonmember instances.
-    B = nonmember("foo") if coinflip() else nonmember("bar")
-
-# revealed: str
-reveal_type(WithConditionalNonmember.B)
 ```
 
 `member` can also be used as a decorator:

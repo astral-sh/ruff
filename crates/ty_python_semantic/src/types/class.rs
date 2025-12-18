@@ -2361,10 +2361,18 @@ impl<'db> ClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.ignore_possibly_undefined() {
-            if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
-                if is_enum_class_by_inheritance(db, self) {
-                    return Member::definitely_declared(value_ty);
+        //
+        // We check bindings directly (not combined with declarations) to match the
+        // behavior in `enum_metadata`, which also uses only bindings.
+        if is_enum_class_by_inheritance(db, self) {
+            if let Some(symbol_id) = place_table(db, body_scope).symbol_id(name) {
+                let use_def = use_def_map(db, body_scope);
+                let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
+                let inferred = place_from_bindings(db, bindings).place;
+                if let Place::Defined(ty, _, _) = inferred {
+                    if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
+                        return Member::definitely_declared(value_ty);
+                    }
                 }
             }
         }
