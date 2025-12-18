@@ -1940,7 +1940,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
             return known.is_typed_dict_subclass();
         }
