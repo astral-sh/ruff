@@ -12,25 +12,20 @@ use crate::Violation;
 /// ## Example
 /// ```python
 /// def foo():
-///     ruff: disable[E501]  # unmatched
-///     REALLY_LONG_VALUES = [
-///         ...
-///     ]
+///     # ruff: disable[E501]  # unmatched
+///     REALLY_LONG_VALUES = [...]
 ///
-///     print(REALLY_LONG_VALUE)
+///     print(REALLY_LONG_VALUES)
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def foo():
-///     ...
 ///     # ruff: disable[E501]
-///     REALLY_LONG_VALUES = [
-///         ...
-///     ]
+///     REALLY_LONG_VALUES = [...]
 ///     # ruff: enable[E501]
 ///
-///     print(REALLY_LONG_VALUE)
+///     print(REALLY_LONG_VALUES)
 /// ```
 ///
 /// ## References
