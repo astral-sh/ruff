@@ -1726,5 +1726,298 @@ reveal_type(actual_td)  # revealed: ActualTypedDict
 reveal_type(actual_td["name"])  # revealed: str
 ```
 
+## Disjointness with other `TypedDict`s
+
+Two `TypedDict` types are disjoint if it's impossible to come up with a third (fully-static)
+`TypedDict` that's assignable to both. The simplest way to establish this is if both sides have
+fields with the same name but disjoint types:
+
+```py
+from typing import TypedDict, final
+from typing_extensions import ReadOnly
+from ty_extensions import static_assert, is_disjoint_from
+
+# Two simple disjoint types, to avoid relying on `@disjoint_base` special cases for built-ins like
+# `int` and `str`.
+@final
+class Final1: ...
+
+@final
+class Final2: ...
+
+static_assert(is_disjoint_from(Final1, Final2))
+
+class DisjointTD1(TypedDict):
+    # Make this example `ReadOnly` because that actually ends up checking the field types for
+    # disjointness in practice. Mutable fields are stricter. We'll get to that below.
+    disjoint: ReadOnly[Final1]
+    # While we're here: It doesn't matter how many other compatible fields there are. Just the one
+    # incompatible field above establishes disjointness.
+    common1: object
+    common2: object
+
+class DisjointTD2(TypedDict):
+    disjoint: ReadOnly[Final2]
+    common1: object
+    common2: object
+
+static_assert(is_disjoint_from(DisjointTD1, DisjointTD2))
+```
+
+However, note that most pairs of non-final classes are *not* disjoint from each other, even if
+neither inherits from the other, because we could define a third class that multiply-inherits from
+both. `TypedDict` disjointness takes this into account. For example:
+
+```py
+from ty_extensions import is_assignable_to
+
+class NonFinal1: ...
+class NonFinal2: ...
+class CommonSub(NonFinal1, NonFinal2): ...
+
+static_assert(not is_disjoint_from(NonFinal1, NonFinal2))
+static_assert(not is_assignable_to(NonFinal1, NonFinal2))
+static_assert(is_assignable_to(CommonSub, NonFinal1))
+static_assert(is_assignable_to(CommonSub, NonFinal2))
+
+class NonDisjointTD1(TypedDict):
+    non_disjoint: ReadOnly[NonFinal1]
+    # While we're here: It doesn't matter how many "extra" fields there are, or what order the
+    # fields are in. Only shared field names can establish disjointness.
+    extra1: int
+
+class NonDisjointTD2(TypedDict):
+    extra2: str
+    non_disjoint: ReadOnly[NonFinal2]
+
+class CommonSubTD(TypedDict):
+    extra2: str
+    extra1: int
+    non_disjoint: ReadOnly[CommonSub]
+
+# The first two TDs above are not assignable in either direction...
+static_assert(not is_assignable_to(NonDisjointTD1, NonDisjointTD2))
+static_assert(not is_assignable_to(NonDisjointTD2, NonDisjointTD1))
+# ...but they're still not disjoint...
+static_assert(not is_disjoint_from(NonDisjointTD1, NonDisjointTD2))
+# ...because the third TD above is assignable to both of them.
+static_assert(is_assignable_to(CommonSubTD, NonDisjointTD1))
+static_assert(is_assignable_to(CommonSubTD, NonDisjointTD2))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD1))
+static_assert(not is_disjoint_from(CommonSubTD, NonDisjointTD2))
+```
+
+We made the important fields `ReadOnly` above, because those only establish disjointness when
+they're disjoint themselves. However, the rules for mutable fields are stricter. Mutable fields in
+common need to have *compatible* types (in the fully-static case, equivalent types):
+
+```py
+from typing import Any, Generic, TypeVar
+
+class IntTD(TypedDict):
+    x: int
+
+class BoolTD(TypedDict):
+    x: bool
+
+# `bool` is assignable to `int`, but `int` is not assignable to `bool`. If `x` was `ReadOnly` (even,
+# as we'll see below, only on the `int` side), then these two TDs would not be disjoint, but in this
+# mutable case they are.
+
+static_assert(is_disjoint_from(IntTD, BoolTD))
+static_assert(is_disjoint_from(BoolTD, IntTD))
+
+# Gradual types: `int` is compatible with `bool | Any`, because that could materialize to
+# `bool | int`, which is just `int`. (And `int | Any` and `bool | Any` are compatible with each
+# other for the same reason.) However, `bool` is *not* compatible with `int | Any`, because there's
+# no materialization that's equivalent to `bool`.
+
+class IntOrAnyTD(TypedDict):
+    x: int | Any
+
+class BoolOrAnyTD(TypedDict):
+    x: bool | Any
+
+static_assert(not is_disjoint_from(IntTD, IntOrAnyTD))
+static_assert(not is_disjoint_from(IntOrAnyTD, IntTD))
+static_assert(not is_disjoint_from(IntTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, IntTD))
+
+static_assert(not is_disjoint_from(IntOrAnyTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, IntOrAnyTD))
+
+static_assert(is_disjoint_from(BoolTD, IntOrAnyTD))
+static_assert(is_disjoint_from(IntOrAnyTD, BoolTD))
+static_assert(not is_disjoint_from(BoolTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, BoolTD))
+
+# `Any` is compatible with everything.
+
+class AnyTD(TypedDict):
+    x: Any
+
+static_assert(not is_disjoint_from(IntTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, IntTD))
+static_assert(not is_disjoint_from(BoolTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, BoolTD))
+static_assert(not is_disjoint_from(IntOrAnyTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, IntOrAnyTD))
+static_assert(not is_disjoint_from(BoolOrAnyTD, AnyTD))
+static_assert(not is_disjoint_from(AnyTD, BoolOrAnyTD))
+static_assert(not is_disjoint_from(AnyTD, AnyTD))
+
+# This works with generic `TypedDict`s too.
+
+class TwoIntsTD(TypedDict):
+    x: int
+    y: int
+
+class TwoBoolsTD(TypedDict):
+    x: bool
+    y: bool
+
+class IntBoolTD(TypedDict):
+    x: int
+    y: bool
+
+T = TypeVar("T")
+
+class TwoGenericTD(TypedDict, Generic[T]):
+    x: T
+    y: T
+
+static_assert(not is_disjoint_from(TwoGenericTD[Any], TwoIntsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[int], TwoIntsTD))
+static_assert(is_disjoint_from(TwoGenericTD[bool], TwoIntsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[Any], TwoBoolsTD))
+static_assert(is_disjoint_from(TwoGenericTD[int], TwoBoolsTD))
+static_assert(not is_disjoint_from(TwoGenericTD[bool], TwoBoolsTD))
+# TODO: T can't be compatible with both `int` and `bool` at the same time, so these types should be
+# disjoint, regardless of the materialization of `T`.
+static_assert(not is_disjoint_from(TwoGenericTD[Any], IntBoolTD))
+```
+
+If one side is mutable but the other is not, then a "third `TypedDict` that's assignable to both"
+would have to have the same type as the mutable side, so we establish disjointness if that type
+isn't assignable to the immutable side:
+
+```py
+class ReadOnlyIntTD(TypedDict):
+    x: ReadOnly[int]
+
+class ReadOnlyBoolTD(TypedDict):
+    x: ReadOnly[bool]
+
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(BoolTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, BoolTD))
+static_assert(is_disjoint_from(IntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyBoolTD, IntTD))
+```
+
+With mutability above we were able to make the simplifying assumption that the "third `TypedDict`
+that's assignable to both" has only mutable fields, because a mutable field is always assignable to
+its immutable counterpart. However, `Required` vs `NotRequired` are more complicated, because a a
+`Required` field is *not* necessarily assignable to its `NotRequired` counterpart. In particular, if
+a `NotRequired` field is also mutable (intuitively, if we're allowed to `del` it), then no
+`Required` field is ever assignable to it. So, if either side is `NotRequired` and mutable, and the
+other side is `Required` (regardless of mutability), then that's sufficient to establish
+disjointness:
+
+```py
+from typing_extensions import NotRequired
+
+class NotRequiredIntTD(TypedDict):
+    x: NotRequired[int]
+
+class NotRequiredReadOnlyIntTD(TypedDict):
+    x: NotRequired[ReadOnly[int]]
+
+static_assert(is_disjoint_from(NotRequiredIntTD, IntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, ReadOnlyIntTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredIntTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredIntTD))
+```
+
+All those rules put together give us the "full disjointness table". We've pretty well tested above
+that disjointness is symmetrical, so here we won't worry about asserting both directions for each
+check:
+
+```py
+class NotRequiredBoolTD(TypedDict):
+    x: NotRequired[bool]
+
+class NotRequiredReadOnlyBoolTD(TypedDict):
+    x: NotRequired[ReadOnly[bool]]
+
+static_assert(not is_disjoint_from(IntTD, IntTD))
+static_assert(is_disjoint_from(IntTD, BoolTD))
+static_assert(not is_disjoint_from(IntTD, ReadOnlyIntTD))
+static_assert(is_disjoint_from(IntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(IntTD, NotRequiredReadOnlyIntTD))
+static_assert(is_disjoint_from(IntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, BoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(ReadOnlyIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(ReadOnlyIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, BoolTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyIntTD))
+static_assert(is_disjoint_from(NotRequiredIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, BoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, ReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredReadOnlyIntTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyIntTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(BoolTD, BoolTD))
+static_assert(not is_disjoint_from(BoolTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(BoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(BoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, ReadOnlyBoolTD))
+static_assert(is_disjoint_from(ReadOnlyBoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(ReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredBoolTD))
+static_assert(not is_disjoint_from(NotRequiredBoolTD, NotRequiredReadOnlyBoolTD))
+static_assert(not is_disjoint_from(NotRequiredReadOnlyBoolTD, NotRequiredReadOnlyBoolTD))
+```
+
+## Disjointness with other types
+
+```py
+from typing import TypedDict, Mapping
+from ty_extensions import static_assert, is_disjoint_from
+
+class TD(TypedDict):
+    x: int
+
+class RegularNonTD: ...
+
+static_assert(not is_disjoint_from(TD, object))
+static_assert(not is_disjoint_from(TD, Mapping[str, object]))
+static_assert(is_disjoint_from(TD, Mapping[int, object]))
+static_assert(is_disjoint_from(TD, RegularNonTD))
+
+# TODO: We approximate disjointness with other types `T` by asking whether `dict[str, Any]` is
+# assignable to `T`. That covers common cases like the ones above, but does it have some false
+# negatives with `dict` types. A `TypedDict` is almost never assignable to a `dict` (or vice versa),
+# even when all of the `TypedDict`'s field types match the `dict`'s value type (and are mutable).
+# The problem is that the `TypedDict` could have been assigned to from *another* `TypedDict` with
+# additional fields, and we don't usually know anything about the types or mutability of those. On
+# the other hand, the assignment to `dict` can be allowed if the `TypedDict` has mutable
+# `extra_items` of a compatible type. See: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-with-dict
+static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-error]
+static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
+```
+
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

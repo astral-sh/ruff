@@ -3307,11 +3307,6 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::TypedDict(_), _) | (_, Type::TypedDict(_)) => {
-                // TODO: Implement disjointness for TypedDict
-                ConstraintSet::from(false)
-            }
-
             // `type[T]` is disjoint from a callable or protocol instance if its upper bound or constraints are.
             (Type::SubclassOf(subclass_of), Type::Callable(_) | Type::ProtocolInstance(_))
             | (Type::Callable(_) | Type::ProtocolInstance(_), Type::SubclassOf(subclass_of))
@@ -4038,6 +4033,34 @@ impl<'db> Type<'db> {
             }
 
             (Type::GenericAlias(_), _) | (_, Type::GenericAlias(_)) => ConstraintSet::from(true),
+
+            (Type::TypedDict(self_typeddict), Type::TypedDict(other_typeddict)) => {
+                disjointness_visitor.visit((self, other), || {
+                    self_typeddict.is_disjoint_from_impl(
+                        db,
+                        other_typeddict,
+                        inferable,
+                        disjointness_visitor,
+                        relation_visitor,
+                    )
+                })
+            }
+
+            // For any type `T`, if `dict[str, Any]` is not assignable to `T`, then all `TypedDict`
+            // types will always be disjoint from `T`. This doesn't cover all cases -- in fact
+            // `dict` *itself* is almost always disjoint from `TypedDict` -- but it's a good
+            // approximation, and some false negatives are acceptable.
+            (Type::TypedDict(_), other) | (other, Type::TypedDict(_)) => KnownClass::Dict
+                .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::any()])
+                .has_relation_to_impl(
+                    db,
+                    other,
+                    inferable,
+                    TypeRelation::Assignability,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+                .negate(db),
         }
     }
 
