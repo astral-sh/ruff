@@ -912,18 +912,6 @@ impl<'db> Type<'db> {
         matches!(self, Type::Callable(..))
     }
 
-    /// Returns `true` if this type is or contains an `enum.nonmember` instance.
-    pub(crate) fn contains_nonmember(&self, db: &'db dyn Db) -> bool {
-        match self {
-            Type::NominalInstance(instance) => instance.has_known_class(db, KnownClass::Nonmember),
-            Type::Union(union) => union
-                .elements(db)
-                .iter()
-                .any(|elem| elem.contains_nonmember(db)),
-            _ => false,
-        }
-    }
-
     pub(crate) fn cycle_normalized(
         self,
         db: &'db dyn Db,

@@ -60,11 +60,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-        && !class
-            .metaclass(db)
-            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
-    {
+    if !is_enum_class_by_inheritance(db, class) {
         return None;
     }
 
@@ -292,5 +288,57 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
         _ => false,
+    }
+}
+
+/// Checks if a class is an enum class by inheritance (either a subtype of `Enum`
+/// or has a metaclass that is a subtype of `EnumType`).
+///
+/// This is a lighter-weight check than `enum_metadata`, which additionally
+/// verifies that the class has members.
+pub(crate) fn is_enum_class_by_inheritance<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+        || class
+            .metaclass(db)
+            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+}
+
+/// Extracts the inner value type from an `enum.nonmember()` wrapper.
+///
+/// At runtime, the enum metaclass unwraps `nonmember(value)`, so accessing the attribute
+/// returns the inner value, not the `nonmember` wrapper.
+///
+/// If the type is a union containing a `nonmember[T]`, the nonmember is unwrapped and
+/// the other union elements (like `Unknown` from declarations) are filtered out.
+///
+/// Returns `Some(value_type)` if the type is or contains a `nonmember[T]`, otherwise `None`.
+pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    match ty {
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
+            Some(
+                ty.member(db, "value")
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::unknown()),
+            )
+        }
+        Type::Union(union) => {
+            // If the union contains a nonmember, extract its value.
+            // Filter out other elements (like Unknown from declarations).
+            for elem in union.elements(db) {
+                if let Type::NominalInstance(instance) = elem {
+                    if instance.has_known_class(db, KnownClass::Nonmember) {
+                        return Some(
+                            elem.member(db, "value")
+                                .place
+                                .ignore_possibly_undefined()
+                                .unwrap_or(Type::unknown()),
+                        );
+                    }
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }

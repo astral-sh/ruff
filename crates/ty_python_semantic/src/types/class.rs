@@ -20,7 +20,9 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{
+    enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
+};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
 };
@@ -2359,24 +2361,10 @@ impl<'db> ClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        // We only do the expensive enum class check if the type contains a `nonmember`,
-        // then look up bindings directly (like enum_metadata does for `member`) to get
-        // the inferred type without the `Unknown` union from declared types.
-        if member
-            .inner
-            .place
-            .ignore_possibly_undefined()
-            .is_some_and(|ty| ty.contains_nonmember(db))
-        {
-            let is_enum_class = Type::ClassLiteral(self)
-                .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-                || self
-                    .metaclass(db)
-                    .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db));
-
-            if is_enum_class {
-                if let Some(nonmember_value_ty) = extract_nonmember_value(db, body_scope, name) {
-                    return Member::definitely_declared(nonmember_value_ty);
+        if let Some(ty) = member.inner.place.ignore_possibly_undefined() {
+            if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
+                if is_enum_class_by_inheritance(db, self) {
+                    return Member::definitely_declared(value_ty);
                 }
             }
         }
@@ -6004,41 +5992,6 @@ impl SlotsKind {
 
             _ => Self::Dynamic,
         }
-    }
-}
-
-/// Extracts the value type from an `enum.nonmember()` wrapper if present.
-///
-/// This looks up the symbol's bindings directly (bypassing `place_by_id`) to get the
-/// inferred type without the `Unknown` union from declared types. This is consistent
-/// with how `enum.member()` is handled in `enum_metadata`.
-///
-/// Returns `Some(value_type)` if the symbol is bound to a `nonmember[T]`, otherwise `None`.
-fn extract_nonmember_value<'db>(
-    db: &'db dyn Db,
-    scope: ScopeId<'db>,
-    name: &str,
-) -> Option<Type<'db>> {
-    let table = place_table(db, scope);
-    let symbol_id = table.symbol_id(name)?;
-
-    let use_def = use_def_map(db, scope);
-    let bindings = use_def.end_of_scope_symbol_bindings(symbol_id);
-    let inferred = place_from_bindings(db, bindings).place;
-
-    match inferred {
-        Place::Defined(Type::NominalInstance(instance), _, _)
-            if instance.has_known_class(db, KnownClass::Nonmember) =>
-        {
-            Some(
-                Type::NominalInstance(instance)
-                    .member(db, "value")
-                    .place
-                    .ignore_possibly_undefined()
-                    .unwrap_or(Type::unknown()),
-            )
-        }
-        _ => None,
     }
 }
 
