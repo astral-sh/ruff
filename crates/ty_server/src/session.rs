@@ -519,7 +519,6 @@ impl Session {
                         None,
                         &UseDefaultStrategy,
                     );
-                    // FIXME(Gankra): make this infallible
                     let Ok(db_with_default_settings) =
                         ProjectDatabase::new(metadata, system, &UseDefaultStrategy);
                     let default_root = db_with_default_settings
