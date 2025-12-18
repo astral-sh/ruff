@@ -1646,16 +1646,20 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             for (bound_typevar, bounds) in mappings.drain() {
-                let variance = formal.variance_of(self.db, bound_typevar);
-                let upper = IntersectionType::from_elements(self.db, bounds.upper);
-                if !upper.is_object() {
-                    self.add_type_mapping(bound_typevar, upper, variance, f);
+                let try_upper = || {
+                    let upper = IntersectionType::from_elements(self.db, bounds.upper);
+                    (!upper.is_object()).then_some(upper)
+                };
+                let try_lower = || {
+                    let lower = UnionType::from_elements(self.db, bounds.lower);
+                    (!lower.is_never()).then_some(lower)
+                };
+                let Some(mapped_type) = try_upper().or_else(try_lower) else {
                     continue;
-                }
-                let lower = UnionType::from_elements(self.db, bounds.lower);
-                if !lower.is_never() {
-                    self.add_type_mapping(bound_typevar, lower, variance, f);
-                }
+                };
+
+                let variance = formal.variance_of(self.db, bound_typevar);
+                self.add_type_mapping(bound_typevar, mapped_type, variance, f);
             }
         }
     }
