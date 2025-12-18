@@ -166,15 +166,11 @@ def covariant_typevar_transitivity[B, T, U]():
     # (B ≤ T) ∧ (Covariant[T] ≤ U) → (Covariant[B] ≤ U)
     constraints = ConstraintSet.range(B, T, object) & ConstraintSet.range(Covariant[T], U, object)
     quantified = ConstraintSet.range(Covariant[B], U, object)
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 
     # (T ≤ B) ∧ (U ≤ Covariant[T]) → (U ≤ Covariant[B])
     constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Never, U, Covariant[T])
     quantified = ConstraintSet.range(Never, U, Covariant[B])
-    # TODO: no error
-    # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
 
 def covariant_typevar_transitivity_reversed[T, B, U]():

@@ -3181,10 +3181,20 @@ impl<'db> SequentMap<'db> {
         let constrained_lower = constrained_constraint.lower(db);
         let constrained_upper = constrained_constraint.upper(db);
 
-        let post_constraint = match constrained_lower.variance_of(db, bound_typevar) {
+        let mut add_constraint = |post_constraint| {
+            self.add_pair_implication(
+                db,
+                bound_constraint,
+                constrained_constraint,
+                post_constraint,
+            );
+            self.enqueue_constraint(post_constraint);
+        };
+
+        match constrained_lower.variance_of(db, bound_typevar) {
             // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
             // do not affect the valid specializations of C.
-            TypeVarVariance::Bivariant => None,
+            TypeVarVariance::Bivariant => {}
 
             // (Covariant[B] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[BL] ≤ C ≤ CU)
             TypeVarVariance::Covariant => {
@@ -3198,34 +3208,45 @@ impl<'db> SequentMap<'db> {
                         &TypeMapping::PartialSpecialization(partial),
                         TypeContext::default(),
                     );
-                    Some(ConstrainedTypeVar::new(
+                    add_constraint(ConstrainedTypeVar::new(
                         db,
                         constrained_typevar,
                         new_lower,
                         constrained_upper,
-                    ))
-                } else {
-                    None
+                    ));
                 }
             }
 
             // TODO
-            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => None,
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => {}
         };
-        if let Some(post_constraint) = post_constraint {
-            self.add_pair_implication(
-                db,
-                bound_constraint,
-                constrained_constraint,
-                post_constraint,
-            );
-            self.enqueue_constraint(post_constraint);
+
+        // (Covariant[BU] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[B] ≤ C ≤ CU)
+        if let Type::TypeVar(bound_upper_typevar) = bound_upper {
+            if constrained_lower.variance_of(db, bound_upper_typevar) == TypeVarVariance::Covariant
+            {
+                let partial = PartialSpecialization::Single {
+                    bound_typevar: bound_upper_typevar,
+                    ty: Type::TypeVar(bound_typevar),
+                };
+                let new_lower = constrained_lower.apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                add_constraint(ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    new_lower,
+                    constrained_upper,
+                ));
+            }
         }
 
-        let post_constraint = match constrained_upper.variance_of(db, bound_typevar) {
+        match constrained_upper.variance_of(db, bound_typevar) {
             // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
             // do not affect the valid specializations of C.
-            TypeVarVariance::Bivariant => None,
+            TypeVarVariance::Bivariant => {}
 
             // (CL ≤ C ≤ Covariant[B]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[BU])
             TypeVarVariance::Covariant => {
@@ -3239,28 +3260,39 @@ impl<'db> SequentMap<'db> {
                         &TypeMapping::PartialSpecialization(partial),
                         TypeContext::default(),
                     );
-                    Some(ConstrainedTypeVar::new(
+                    add_constraint(ConstrainedTypeVar::new(
                         db,
                         constrained_typevar,
                         constrained_lower,
                         new_upper,
-                    ))
-                } else {
-                    None
+                    ));
                 }
             }
 
             // TODO
-            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => None,
-        };
-        if let Some(post_constraint) = post_constraint {
-            self.add_pair_implication(
-                db,
-                bound_constraint,
-                constrained_constraint,
-                post_constraint,
-            );
-            self.enqueue_constraint(post_constraint);
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => {}
+        }
+
+        // (CL ≤ C ≤ Covariant[BL]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[B])
+        if let Type::TypeVar(bound_lower_typevar) = bound_lower {
+            if constrained_upper.variance_of(db, bound_lower_typevar) == TypeVarVariance::Covariant
+            {
+                let partial = PartialSpecialization::Single {
+                    bound_typevar: bound_lower_typevar,
+                    ty: Type::TypeVar(bound_typevar),
+                };
+                let new_upper = constrained_upper.apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                add_constraint(ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    constrained_lower,
+                    new_upper,
+                ));
+            }
         }
     }
 
