@@ -362,13 +362,12 @@ impl<'db> TypedDictType<'db> {
     /// "assignable" means the source must be assignable to the destination, and "-" means the
     /// assignment is never allowed:
     ///
-    ///    source→ | mut + req  | mut + opt  | imm + req  | imm + opt  |   [missing]   |
-    /// ↓dest      |            |            |            |            |               |
-    /// -----------|------------|------------|------------|------------|---------------|
-    /// mut + req  | equivalent |     -      |     -      |     -      |       -       |
-    /// mut + opt  |     -      | equivalent |     -      |     -      |       -       |
-    /// imm + req  | assignable |     -      | assignable |     -      |       -       |
-    /// imm + opt  | assignable | assignable | assignable | assignable | [dest is obj] |
+    /// | dest ↓ source →  | mut + req  | mut + opt  | imm + req  | imm + opt  |   \[missing]  |
+    /// |------------------|------------|------------|------------|------------|---------------|
+    /// |    mut + req     | equivalent |     -      |     -      |     -      |       -       |
+    /// |    mut + opt     |     -      | equivalent |     -      |     -      |       -       |
+    /// |    imm + req     | assignable |     -      | assignable |     -      |       -       |
+    /// |    imm + opt     | assignable | assignable | assignable | assignable | \[dest is obj]|
     ///
     /// We can cut that table down substantially by noticing two things:
     ///
@@ -382,13 +381,12 @@ impl<'db> TypedDictType<'db> {
     ///
     /// The cases we actually need to reason about are this smaller table:
     ///
-    ///    source→ | mut + req  | mut + opt  |
-    /// ↓dest      |            |            |
-    /// -----------|------------|------------|
-    /// mut + req  | equivalent |     -      |
-    /// mut + opt  |     -      | equivalent |
-    /// imm + req  | assignable |     -      |
-    /// imm + opt  | assignable | assignable |
+    /// | dest ↓ source →  | mut + req  | mut + opt  |
+    /// |------------------|------------|------------|
+    /// |    mut + req     | equivalent |     -      |
+    /// |    mut + opt     |     -      | equivalent |
+    /// |    imm + req     | assignable |     -      |
+    /// |    imm + opt     | assignable | assignable |
     ///
     /// So, given a field name that's in both `A` and `B`, here are the conditions where it's
     /// *impossible* to choose a source field for `C` that's compatible with both destinations,
