@@ -549,18 +549,30 @@ impl<'db> UnionBuilder<'db> {
         // unpacking them.
         let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
 
-        let mut to_remove = SmallVec::<[usize; 2]>::new();
-        let ty_negated = if should_simplify_full {
-            ty.negate(self.db)
-        } else {
-            Type::Never // won't be used
+        let mut ty_negated: Option<Type> = None;
+
+        let mut i = 0;
+        let mut inserted = false;
+
+        let mut remove_element = |i: &mut usize, elements: &mut Vec<UnionElement<'db>>| {
+            if inserted {
+                elements.swap_remove(*i);
+            } else {
+                elements[*i] = UnionElement::Type(ty);
+                *i += 1;
+            }
+            inserted = true;
         };
 
-        for (index, element) in self.elements.iter_mut().enumerate() {
+        while i < self.elements.len() {
+            let element = &mut self.elements[i];
+
             let element_type = match element.try_reduce(self.db, ty) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
-                        to_remove.push(index);
+                        remove_element(&mut i, &mut self.elements);
+                    } else {
+                        i += 1;
                     }
                     continue;
                 }
@@ -587,19 +599,23 @@ impl<'db> UnionBuilder<'db> {
             // problematic if some of those fields point to recursive `Union`s. To avoid cycles,
             // compare `TypedDict`s by name/identity instead of using the `has_relation_to`
             // machinery.
-            if let (Type::TypedDict(element_td), Type::TypedDict(ty_td)) = (element_type, ty) {
-                if element_td == ty_td {
-                    return;
-                }
+            if element_type.is_typed_dict() && ty.is_typed_dict() {
+                i += 1;
                 continue;
             }
 
             if should_simplify_full && !matches!(element_type, Type::TypeAlias(_)) {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
-                } else if element_type.is_redundant_with(self.db, ty) {
-                    to_remove.push(index);
-                } else if ty_negated.is_subtype_of(self.db, element_type) {
+                }
+
+                if element_type.is_redundant_with(self.db, ty) {
+                    remove_element(&mut i, &mut self.elements);
+                    continue;
+                }
+
+                let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                if negated.is_subtype_of(self.db, element_type) {
                     // We add `ty` to the union. We just checked that `~ty` is a subtype of an
                     // existing `element`. This also means that `~ty | ty` is a subtype of
                     // `element | ty`, because both elements in the first union are subtypes of
@@ -613,14 +629,11 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             }
+
+            i += 1;
         }
-        if let Some((&first, rest)) = to_remove.split_first() {
-            self.elements[first] = UnionElement::Type(ty);
-            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
-            for &index in rest.iter().rev() {
-                self.elements.swap_remove(index);
-            }
-        } else {
+
+        if !inserted {
             self.elements.push(UnionElement::Type(ty));
         }
     }
