@@ -116,25 +116,25 @@ pub(super) fn request(req: server::Request) -> Task {
             return Task::immediate(id, result);
         }
     }
-        .unwrap_or_else(|err| {
-            tracing::error!("Encountered error when routing request with ID {id}: {err}");
+    .unwrap_or_else(|err| {
+        tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
-            Task::sync(move |_session, client| {
-                if matches!(err.code, ErrorCode::InternalError) {
-                    client.show_error_message("ty failed to handle a request from the editor. Check the logs for more details.");
-                }
+        Task::sync(move |_session, client| {
+            if matches!(err.code, ErrorCode::InternalError) {
+                client.show_error_message("ty failed to handle a request from the editor. Check the logs for more details.");
+            }
 
-                respond_silent_error(
-                    id,
-                    client,
-                    lsp_server::ResponseError {
-                        code: err.code as i32,
-                        message: err.to_string(),
-                        data: None,
-                    },
-                );
-            })
+            respond_silent_error(
+                id,
+                client,
+                lsp_server::ResponseError {
+                    code: err.code as i32,
+                    message: err.to_string(),
+                    data: None,
+                },
+            );
         })
+    })
 }
 
 pub(super) fn notification(notif: server::Notification) -> Task {
