@@ -412,8 +412,8 @@ impl<'db> TypedDictType<'db> {
         disjointness_visitor: &IsDisjointVisitor<'db>,
         relation_visitor: &HasRelationToVisitor<'db>,
     ) -> ConstraintSet<'db> {
-        let fields_in_common = btreemap_overlapping_items(self.items(db), other.items(db));
-        fields_in_common.when_any(db, |(_name, (self_field, other_field))| {
+        let fields_in_common = btreemap_values_with_same_key(self.items(db), other.items(db));
+        fields_in_common.when_any(db, |(self_field, other_field)| {
             // Condition 1 above.
             if self_field.is_required() || other_field.is_required() {
                 if (!self_field.is_required() && !self_field.is_read_only())
@@ -1055,10 +1055,10 @@ impl get_size2::GetSize for TypedDictFieldFlags {}
 /// of the fact that keys are sorted to walk through each map once without doing any lookups. It
 /// would be nice if `BTreeMap` had something like `BTreeSet::intersection` that did this for us,
 /// but as far as I know we have to do it ourselves. Life is hard.
-fn btreemap_overlapping_items<'a, K, V1, V2>(
+fn btreemap_values_with_same_key<'a, K, V1, V2>(
     left: &'a BTreeMap<K, V1>,
     right: &'a BTreeMap<K, V2>,
-) -> impl Iterator<Item = (&'a K, (&'a V1, &'a V2))>
+) -> impl Iterator<Item = (&'a V1, &'a V2)>
 where
     K: Ord,
 {
@@ -1073,7 +1073,7 @@ where
                     // Matching keys. Yield this pair of values and advance both iterators.
                     left_items.next();
                     right_items.next();
-                    return Some((left_key, (left_val, right_val)));
+                    return Some((left_val, right_val));
                 }
                 Ordering::Less => {
                     // `left_items` is behind `right_items` in key order. Advance `left_items`.
@@ -1096,17 +1096,25 @@ fn test_btreemap_overlapping_items() {
     let left = BTreeMap::from_iter([("a", 1), ("b", 2), ("c", 3), ("d", 4), ("e", 5)]);
     let right = BTreeMap::from_iter([("b", 2.0), ("d", 4.0), ("f", 6.0)]);
     assert_eq!(
-        btreemap_overlapping_items(&left, &right).collect::<Vec<_>>(),
-        vec![(&"b", (&2, &2.0)), (&"d", (&4, &4.0))],
+        btreemap_values_with_same_key(&left, &right).collect::<Vec<_>>(),
+        vec![(&2, &2.0), (&4, &4.0)],
     );
     assert_eq!(
-        btreemap_overlapping_items(&right, &left).collect::<Vec<_>>(),
-        vec![(&"b", (&2.0, &2)), (&"d", (&4.0, &4))],
+        btreemap_values_with_same_key(&right, &left).collect::<Vec<_>>(),
+        vec![(&2.0, &2), (&4.0, &4)],
     );
 
     // A case where one side is empty.
     let left = BTreeMap::<i32, i32>::new();
     let right = BTreeMap::<i32, i32>::from_iter([(1, 1), (2, 2)]);
-    assert!(btreemap_overlapping_items(&left, &right).next().is_none());
-    assert!(btreemap_overlapping_items(&right, &left).next().is_none());
+    assert!(
+        btreemap_values_with_same_key(&left, &right)
+            .next()
+            .is_none()
+    );
+    assert!(
+        btreemap_values_with_same_key(&right, &left)
+            .next()
+            .is_none()
+    );
 }
