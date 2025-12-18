@@ -1,5 +1,5 @@
 use crate::AnyNodeRef;
-use crate::visitor::source_order::{SourceOrderVisitor, TraversalSignal};
+use crate::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_node};
 use ruff_text_size::{Ranged, TextRange};
 use std::fmt;
 use std::fmt::Formatter;
@@ -42,23 +42,13 @@ pub fn covering_node(root: AnyNodeRef, range: TextRange) -> CoveringNode {
         "Range is not contained within root"
     );
 
-    // When we visit the root it won't `enter_node` so do that manually.
-    // Can this check fail? I don't know. It's fine.
-    let ancestors = if root.range().contains_range(range) {
-        vec![root]
-    } else {
-        Vec::new()
-    };
     let mut visitor = Visitor {
         range,
         found: false,
-        ancestors,
+        ancestors: Vec::new(),
     };
 
-    root.visit_source_order(&mut visitor);
-    if visitor.ancestors.is_empty() {
-        visitor.ancestors.push(root);
-    }
+    walk_node(&mut visitor, root);
     CoveringNode::from_ancestors(visitor.ancestors)
 }
 

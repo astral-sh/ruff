@@ -3,6 +3,7 @@ use std::ops::Deref;
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::find_node::covering_node;
+use ruff_python_ast::traversal::suite;
 use ruff_python_ast::{self as ast, AnyNodeRef, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
@@ -178,24 +179,9 @@ fn attribute_docstring<'a>(
     let parent = assign.parent()?;
     let assign_node = assign.node();
 
-    // The parent should be something with a body (list of Statements)
-    let parent_body = if let Some(module) = parent.as_mod_module() {
-        &module.body
-    } else if let Some(function) = parent.as_stmt_function_def() {
-        // This is important for `self.a = ...` in e.g. an initializer
-        &function.body
-    } else if let Some(class) = parent.as_stmt_class_def() {
-        &class.body
-    } else {
-        return None;
-    };
-
-    // Find the assignment statement in the parent
-    let assign_stmt_idx = parent_body
-        .iter()
-        .position(|stmt| AnyNodeRef::from(stmt) == assign_node)?;
     // The docs must be the next statement
-    let next_stmt = parent_body.get(assign_stmt_idx + 1)?;
+    let parent_body = suite(assign_node, parent)?;
+    let next_stmt = parent_body.next_sibling()?;
 
     // Require the docstring to be a standalone expression.
     let ast::Stmt::Expr(ast::StmtExpr {
