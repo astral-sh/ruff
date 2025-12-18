@@ -70,3 +70,24 @@ def descent(x: int, y: int):
 
 def count_set_bits(n):
     return 1 + count_set_bits(n & n - 1) if n else 0
+
+class Literal:
+    def __invert__(self):
+        return Literal()
+
+class OR:
+    def __invert__(self):
+        return AND()
+
+class AND:
+    def __invert__(self):
+        return OR()
+
+def to_NNF(cond):
+    if cond:
+        return ~to_NNF(cond)
+    if cond:
+        return OR()
+    if cond:
+        return AND()
+    return Literal()

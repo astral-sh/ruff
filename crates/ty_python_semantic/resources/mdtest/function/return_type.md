@@ -429,7 +429,7 @@ def list_int(x: int):
         return list1(x)
 
 # TODO: should be `list[int]`
-reveal_type(list_int(1))  # revealed: list[Divergent] | list[int] | list[Divergent]
+reveal_type(list_int(1))  # revealed: list[Divergent] | list[Divergent] | list[int]
 
 def tuple_obj(cond: bool):
     if cond:

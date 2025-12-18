@@ -966,7 +966,8 @@ impl<'db> Type<'db> {
                 if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
                     self
                 } else {
-                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
+                    UnionType::from_elements_cycle_recovery(db, [previous, self])
                 }
             }
         }
