@@ -365,7 +365,7 @@ impl<'db> UnionBuilder<'db> {
             Type::StringLiteral(literal) => {
                 let mut found = None;
                 let mut to_remove = None;
-                let ty_negated = ty.negate(self.db);
+                let mut ty_negated = None;
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::StringLiterals(literals) => {
@@ -383,8 +383,10 @@ impl<'db> UnionBuilder<'db> {
                             }
                             if existing.is_subtype_of(self.db, ty) {
                                 to_remove = Some(index);
+                                continue;
                             }
-                            if ty_negated.is_subtype_of(self.db, *existing) {
+                            let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                            if negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
                                 self.collapse_to_object();
@@ -410,7 +412,7 @@ impl<'db> UnionBuilder<'db> {
             Type::BytesLiteral(literal) => {
                 let mut found = None;
                 let mut to_remove = None;
-                let ty_negated = ty.negate(self.db);
+                let mut ty_negated = None;
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
@@ -428,8 +430,11 @@ impl<'db> UnionBuilder<'db> {
                             }
                             if existing.is_subtype_of(self.db, ty) {
                                 to_remove = Some(index);
+                                continue;
                             }
-                            if ty_negated.is_subtype_of(self.db, *existing) {
+
+                            let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                            if negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
                                 self.collapse_to_object();
@@ -455,7 +460,7 @@ impl<'db> UnionBuilder<'db> {
             Type::IntLiteral(literal) => {
                 let mut found = None;
                 let mut to_remove = None;
-                let ty_negated = ty.negate(self.db);
+                let mut ty_negated = None;
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::IntLiterals(literals) => {
@@ -473,8 +478,11 @@ impl<'db> UnionBuilder<'db> {
                             }
                             if existing.is_subtype_of(self.db, ty) {
                                 to_remove = Some(index);
+                                continue;
                             }
-                            if ty_negated.is_subtype_of(self.db, *existing) {
+
+                            let negated = ty_negated.get_or_insert_with(|| ty.negate(self.db));
+                            if negated.is_subtype_of(self.db, *existing) {
                                 // The type that includes both this new element, and its negation
                                 // (or a supertype of its negation), must be simply `object`.
                                 self.collapse_to_object();
