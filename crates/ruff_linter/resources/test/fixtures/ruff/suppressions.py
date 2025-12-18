@@ -86,3 +86,26 @@ def f():
     # Multiple codes but none are used
     # ruff: disable[E741, F401, F841]
     print("hello")
+
+
+def f():
+    # Unknown rule codes
+    # ruff: disable[YF829]
+    # ruff: disable[F841, RQW320]
+    value = 0
+    # ruff: enable[F841, RQW320]
+    # ruff: enable[YF829]
+
+
+def f():
+    # External rule codes should be ignored
+    # ruff: disable[TK421]
+    print("hello")
+    # ruff: enable[TK421]
+
+
+def f():
+    # Empty or missing rule codes
+    # ruff: disable
+    # ruff: disable[]
+    print("hello")
