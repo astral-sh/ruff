@@ -1,5 +1,58 @@
 # Changelog
 
+## 0.14.10
+
+Released on 2025-12-18.
+
+### Preview features
+
+- Fluent formatting of method chains ([#21369](https://github.com/astral-sh/ruff/pull/21369))
+- Keep lambda parameters on one line and parenthesize the body if it expands ([#21385](https://github.com/astral-sh/ruff/pull/21385))
+- New rule to prevent implicit string concatenation in collections ([#21972](https://github.com/astral-sh/ruff/pull/21972))
+- \[`flake8-use-pathlib`\] Make fixes unsafe when types change in compound statements (`PTH104`, `PTH105`, `PTH109`, `PTH115`) ([#22009](https://github.com/astral-sh/ruff/pull/22009))
+- \[`refurb`\] Extend support for `Path.open` (`FURB101`, `FURB103`) ([#21080](https://github.com/astral-sh/ruff/pull/21080))
+
+### Bug fixes
+
+- \[`pyupgrade`\] Fix parsing named Unicode escape sequences (`UP032`) ([#21901](https://github.com/astral-sh/ruff/pull/21901))
+
+### Rule changes
+
+- \[`eradicate`\] ignore ruff:disable and ruff:enable comments in `ERA001` ([#22038](https://github.com/astral-sh/ruff/pull/22038))
+- \[`flake8-pytest-style`\] Allow `match` and `check` keyword arguments without an expected exception type (`PT010`) ([#21964](https://github.com/astral-sh/ruff/pull/21964))
+- [syntax-errors] Annotated name cannot be global ([#20868](https://github.com/astral-sh/ruff/pull/20868))
+
+### Documentation
+
+- Add uv and ty to the Ruff README ([#21996](https://github.com/astral-sh/ruff/pull/21996))
+- Document known lambda formatting deviations from Black ([#21954](https://github.com/astral-sh/ruff/pull/21954))
+- Update setup.md ([#22024](https://github.com/astral-sh/ruff/pull/22024))
+- \[`flake8-bandit`\] Fix broken link (`S704`) ([#22039](https://github.com/astral-sh/ruff/pull/22039))
+- [ty] Use `title` for configuration code fences in ty reference documentation ([#21992](https://github.com/astral-sh/ruff/pull/21992))
+
+### Other changes
+
+- Fix playground Share button showing "Copied!" before clipboard copy completes ([#21942](https://github.com/astral-sh/ruff/pull/21942))
+- Make `analyze_single_pattern_predicate` a `#[salsa::tracked]` function ([#22045](https://github.com/astral-sh/ruff/pull/22045))
+- Update MSRV to 1.90 ([#21987](https://github.com/astral-sh/ruff/pull/21987))
+- Update debug_assert which pointed at missing method ([#21969](https://github.com/astral-sh/ruff/pull/21969))
+
+### Contributors
+
+- [@dylwil3](https://github.com/dylwil3)
+- [@charliecloudberry](https://github.com/charliecloudberry)
+- [@charliermarsh](https://github.com/charliermarsh)
+- [@chirizxc](https://github.com/chirizxc)
+- [@ntBre](https://github.com/ntBre)
+- [@zanieb](https://github.com/zanieb)
+- [@amyreese](https://github.com/amyreese)
+- [@hauntsaninja](https://github.com/hauntsaninja)
+- [@11happy](https://github.com/11happy)
+- [@mahiro72](https://github.com/mahiro72)
+- [@MichaReiser](https://github.com/MichaReiser)
+- [@phongddo](https://github.com/phongddo)
+- [@PeterJCLaw](https://github.com/PeterJCLaw)
+
 ## 0.14.9
 
 Released on 2025-12-11.
