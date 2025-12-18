@@ -1560,7 +1560,7 @@ impl<'db> SpecializationBuilder<'db> {
         bound_typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
         variance: TypeVarVariance,
-        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
         let identity = bound_typevar.identity(self.db);
         let Some(ty) = f((identity, variance, ty)) else {
@@ -1602,7 +1602,7 @@ impl<'db> SpecializationBuilder<'db> {
         &mut self,
         formal: Type<'db>,
         constraints: ConstraintSet<'db>,
-        mut f: impl FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) {
         #[derive(Default)]
         struct Bounds<'db> {
@@ -1649,12 +1649,12 @@ impl<'db> SpecializationBuilder<'db> {
                 let variance = formal.variance_of(self.db, bound_typevar);
                 let upper = IntersectionType::from_elements(self.db, bounds.upper);
                 if !upper.is_object() {
-                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
+                    self.add_type_mapping(bound_typevar, upper, variance, f);
                     continue;
                 }
                 let lower = UnionType::from_elements(self.db, bounds.lower);
                 if !lower.is_never() {
-                    self.add_type_mapping(bound_typevar, lower, variance, &mut f);
+                    self.add_type_mapping(bound_typevar, lower, variance, f);
                 }
             }
         }
@@ -1687,7 +1687,7 @@ impl<'db> SpecializationBuilder<'db> {
         formal: Type<'db>,
         actual: Type<'db>,
         polarity: TypeVarVariance,
-        mut f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
+        f: &mut dyn FnMut(TypeVarAssignment<'db>) -> Option<Type<'db>>,
     ) -> Result<(), SpecializationError<'db>> {
         // TODO: Eventually, the builder will maintain a constraint set, instead of a hash-map of
         // type mappings, to represent the specialization that we are building up. At that point,
@@ -1799,7 +1799,7 @@ impl<'db> SpecializationBuilder<'db> {
                 let mut first_error = None;
                 let mut found_matching_element = false;
                 for formal_element in union_formal.elements(self.db) {
-                    let result = self.infer_map_impl(*formal_element, actual, polarity, &mut f);
+                    let result = self.infer_map_impl(*formal_element, actual, polarity, f);
                     if let Err(err) = result {
                         first_error.get_or_insert(err);
                     } else {
@@ -1902,7 +1902,7 @@ impl<'db> SpecializationBuilder<'db> {
                         formal_tuple.all_elements().zip(actual_tuple.all_elements())
                     {
                         let variance = TypeVarVariance::Covariant.compose(polarity);
-                        self.infer_map_impl(*formal_element, *actual_element, variance, &mut f)?;
+                        self.infer_map_impl(*formal_element, *actual_element, variance, f)?;
                     }
                     return Ok(());
                 }
@@ -1945,7 +1945,7 @@ impl<'db> SpecializationBuilder<'db> {
                             base_specialization
                         ) {
                             let variance = typevar.variance_with_polarity(self.db, polarity);
-                            self.infer_map_impl(*formal_ty, *base_ty, variance, &mut f)?;
+                            self.infer_map_impl(*formal_ty, *base_ty, variance, f)?;
                         }
                         return Ok(());
                     }
@@ -1969,7 +1969,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 formal_callable,
                                 self.inferable,
                             );
-                        self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                        self.add_type_mappings_from_constraint_set(formal, when, f);
                     } else {
                         for actual_signature in &actual_callable.signatures(self.db).overloads {
                             let when = actual_signature
@@ -1978,7 +1978,7 @@ impl<'db> SpecializationBuilder<'db> {
                                     formal_callable,
                                     self.inferable,
                                 );
-                            self.add_type_mappings_from_constraint_set(formal, when, &mut f);
+                            self.add_type_mappings_from_constraint_set(formal, when, f);
                         }
                     }
                 }
