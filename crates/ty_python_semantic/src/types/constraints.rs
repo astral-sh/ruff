@@ -83,7 +83,7 @@ use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
     UnionType, walk_bound_type_var_type,
 };
-use crate::{Db, FxOrderMap};
+use crate::{Db, FxOrderMap, FxOrderSet};
 
 /// An extension trait for building constraint sets from [`Option`] values.
 pub(crate) trait OptionConstraintsExtension<T> {
@@ -2792,10 +2792,10 @@ struct SequentMap<'db> {
     /// Sequents of the form `C₁ ∧ C₂ → D`
     pair_implications: FxHashMap<
         (ConstrainedTypeVar<'db>, ConstrainedTypeVar<'db>),
-        FxHashSet<ConstrainedTypeVar<'db>>,
+        FxOrderSet<ConstrainedTypeVar<'db>>,
     >,
     /// Sequents of the form `C → D`
-    single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxHashSet<ConstrainedTypeVar<'db>>>,
+    single_implications: FxHashMap<ConstrainedTypeVar<'db>, FxOrderSet<ConstrainedTypeVar<'db>>>,
     /// Constraints that we have already processed
     processed: FxHashSet<ConstrainedTypeVar<'db>>,
     /// Constraints that enqueued to be processed
