@@ -195,7 +195,7 @@ impl Suppressions {
                     let Ok(rule) = Rule::from_code(
                         get_redirect_target(&suppression.code).unwrap_or(&suppression.code),
                     ) else {
-                        continue; // should trigger InvalidRuleCode above
+                        continue; // "external" lint code, don't treat it as unused
                     };
                     for comment in &suppression.comments {
                         let (range, edit) = Suppressions::delete_code_or_comment(
