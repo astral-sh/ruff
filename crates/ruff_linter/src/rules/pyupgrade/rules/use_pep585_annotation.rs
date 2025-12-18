@@ -55,7 +55,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [PEP 585]: https://peps.python.org/pep-0585/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.155")]
+#[violation_metadata(stable_since = "v0.0.155", safety = "unsafe")]
 pub(crate) struct NonPEP585Annotation {
     from: String,
     to: String,

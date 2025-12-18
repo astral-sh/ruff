@@ -44,7 +44,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
 /// - [Python documentation: `all`](https://docs.python.org/3/library/functions.html#all)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.211")]
+#[violation_metadata(stable_since = "v0.0.211", safety = "unsafe")]
 pub(crate) struct ReimplementedBuiltin {
     replacement: String,
 }

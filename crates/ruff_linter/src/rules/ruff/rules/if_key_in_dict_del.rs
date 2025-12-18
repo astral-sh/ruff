@@ -30,7 +30,7 @@ type Dict = ExprName;
 /// ## Fix safety
 /// This rule's fix is marked as safe, unless the if statement contains comments.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", safety = "unsafe")]
 pub(crate) struct IfKeyInDictDel;
 
 impl AlwaysFixableViolation for IfKeyInDictDel {

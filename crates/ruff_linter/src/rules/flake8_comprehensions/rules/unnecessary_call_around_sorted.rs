@@ -42,7 +42,7 @@ use crate::rules::flake8_comprehensions::fixes;
 /// The fix is marked as safe for `list()` cases, as removing `list()` around
 /// `sorted()` does not change the behavior.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", safety = "unsafe")]
 pub(crate) struct UnnecessaryCallAroundSorted {
     func: UnnecessaryFunction,
 }

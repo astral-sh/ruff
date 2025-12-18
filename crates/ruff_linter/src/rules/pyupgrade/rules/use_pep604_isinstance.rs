@@ -72,7 +72,7 @@ impl CallKind {
 /// [PEP 604]: https://peps.python.org/pep-0604/
 /// [PEP 695]: https://peps.python.org/pep-0695/
 #[derive(ViolationMetadata)]
-#[violation_metadata(removed_since = "0.13.0")]
+#[violation_metadata(removed_since = "0.13.0", safety = "unsafe")]
 pub(crate) struct NonPEP604Isinstance {
     kind: CallKind,
 }

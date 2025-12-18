@@ -241,7 +241,7 @@ impl Violation for MissingTypeCls {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeUndocumentedPublicFunction {
     name: String,
     annotation: Option<String>,
@@ -295,7 +295,7 @@ impl Violation for MissingReturnTypeUndocumentedPublicFunction {
 ///
 /// - `lint.typing-extensions`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypePrivateFunction {
     name: String,
     annotation: Option<String>,
@@ -352,7 +352,7 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///         self.x = x
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeSpecialMethod {
     name: String,
     annotation: Option<String>,
@@ -400,7 +400,7 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///         return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeStaticMethod {
     name: String,
     annotation: Option<String>,
@@ -448,7 +448,7 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///         return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.105")]
+#[violation_metadata(stable_since = "v0.0.105", safety = "unsafe")]
 pub(crate) struct MissingReturnTypeClassMethod {
     name: String,
     annotation: Option<String>,

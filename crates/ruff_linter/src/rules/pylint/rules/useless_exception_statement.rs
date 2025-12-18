@@ -39,7 +39,7 @@ use ruff_python_ast::PythonVersion;
 ///
 /// [preview]: https://docs.astral.sh/ruff/preview/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.5.0")]
+#[violation_metadata(stable_since = "0.5.0", safety = "unsafe")]
 pub(crate) struct UselessExceptionStatement;
 
 impl Violation for UselessExceptionStatement {

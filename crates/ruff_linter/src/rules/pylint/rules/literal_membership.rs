@@ -34,7 +34,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [What’s New In Python 3.2](https://docs.python.org/3/whatsnew/3.2.html#optimizations)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.1.1")]
+#[violation_metadata(preview_since = "v0.1.1", safety = "unsafe")]
 pub(crate) struct LiteralMembership;
 
 impl AlwaysFixableViolation for LiteralMembership {

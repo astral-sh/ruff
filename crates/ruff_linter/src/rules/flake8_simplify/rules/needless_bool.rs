@@ -56,7 +56,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Truth Value Testing](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.214")]
+#[violation_metadata(stable_since = "v0.0.214", safety = "unsafe")]
 pub(crate) struct NeedlessBool {
     condition: Option<SourceCodeSnippet>,
     negate: bool,

@@ -35,7 +35,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.84")]
+#[violation_metadata(stable_since = "v0.0.84", safety = "unsafe")]
 pub(crate) struct UnusedLoopControlVariable {
     /// The name of the loop control variable.
     name: String,

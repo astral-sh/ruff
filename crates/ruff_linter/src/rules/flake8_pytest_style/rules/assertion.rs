@@ -61,7 +61,7 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", safety = "unsafe")]
 pub(crate) struct PytestCompositeAssertion;
 
 impl Violation for PytestCompositeAssertion {
@@ -191,7 +191,7 @@ impl Violation for PytestAssertAlwaysFalse {
 /// ## References
 /// - [`pytest` documentation: Assertion introspection details](https://docs.pytest.org/en/7.1.x/how-to/assert.html#assertion-introspection-details)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.208")]
+#[violation_metadata(stable_since = "v0.0.208", safety = "unsafe")]
 pub(crate) struct PytestUnittestAssertion {
     assertion: String,
 }
@@ -346,7 +346,7 @@ pub(crate) fn unittest_assertion(
 /// ## References
 /// - [`pytest` documentation: Assertions about expected exceptions](https://docs.pytest.org/en/latest/how-to/assert.html#assertions-about-expected-exceptions)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.285")]
+#[violation_metadata(stable_since = "v0.0.285", safety = "unsafe")]
 pub(crate) struct PytestUnittestRaisesAssertion {
     assertion: String,
 }

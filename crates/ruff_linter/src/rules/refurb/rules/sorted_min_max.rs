@@ -47,7 +47,7 @@ use crate::checkers::ast::Checker;
 /// - [Python documentation: `min`](https://docs.python.org/3/library/functions.html#min)
 /// - [Python documentation: `max`](https://docs.python.org/3/library/functions.html#max)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.4.2")]
+#[violation_metadata(preview_since = "v0.4.2", safety = "unsafe")]
 pub(crate) struct SortedMinMax {
     min_max: MinMax,
 }

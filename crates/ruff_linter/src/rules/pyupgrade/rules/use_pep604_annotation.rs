@@ -111,7 +111,7 @@ impl Violation for NonPEP604AnnotationUnion {
 ///
 /// [PEP 604]: https://peps.python.org/pep-0604/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.12.0")]
+#[violation_metadata(stable_since = "0.12.0", safety = "unsafe")]
 pub(crate) struct NonPEP604AnnotationOptional;
 
 impl Violation for NonPEP604AnnotationOptional {
