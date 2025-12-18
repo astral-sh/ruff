@@ -125,6 +125,9 @@ impl Violation for PytestRaisesTooBroad {
 /// ## Why is this bad?
 /// `pytest.raises` expects to receive an expected exception as its first
 /// argument. If omitted, the `pytest.raises` call will fail at runtime.
+/// The rule will also accept calls without an expected exception but with
+/// `match` and/or `check` keyword arguments, which are also valid after
+/// pytest version 8.4.0.
 ///
 /// ## Example
 /// ```python
@@ -181,6 +184,8 @@ pub(crate) fn raises_call(checker: &Checker, call: &ast::ExprCall) {
                 .arguments
                 .find_argument("expected_exception", 0)
                 .is_none()
+                && call.arguments.find_keyword("match").is_none()
+                && call.arguments.find_keyword("check").is_none()
             {
                 checker.report_diagnostic(PytestRaisesWithoutException, call.func.range());
             }
