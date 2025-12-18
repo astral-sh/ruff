@@ -111,7 +111,7 @@ BLE001 Do not catch blind exception: `Exception`
 104 |     pass
 105 | except Exception:
     |        ^^^^^^^^^
-106 |     logging.debug("...")
+106 |     logging.critical("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
@@ -121,7 +121,7 @@ BLE001 Do not catch blind exception: `Exception`
 110 |     pass
 111 | except Exception:
     |        ^^^^^^^^^
-112 |     logging.debug("...", exc_info=False)
+112 |     logging.critical("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
@@ -131,255 +131,405 @@ BLE001 Do not catch blind exception: `Exception`
 116 |     pass
 117 | except Exception:
     |        ^^^^^^^^^
-118 |     logging.debug("...", exc_info=None)
+118 |     logging.critical("...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:135:8
+   --> BLE.py:134:8
     |
-133 | try:
-134 |     pass
-135 | except Exception:
+132 | try:
+133 |     pass
+134 | except Exception:
     |        ^^^^^^^^^
-136 |     logging.info("...")
+135 |     logging.debug("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:141:8
+   --> BLE.py:140:8
     |
-139 | try:
-140 |     pass
-141 | except Exception:
+138 | try:
+139 |     pass
+140 | except Exception:
     |        ^^^^^^^^^
-142 |     logging.info("...", exc_info=False)
+141 |     logging.debug("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:147:8
+   --> BLE.py:146:8
     |
-145 | try:
-146 |     pass
-147 | except Exception:
+144 | try:
+145 |     pass
+146 | except Exception:
     |        ^^^^^^^^^
-148 |     logging.info("...", exc_info=None)
+147 |     logging.debug("...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:165:8
+   --> BLE.py:164:8
     |
-163 | try:
-164 |     pass
-165 | except Exception:
+162 | try:
+163 |     pass
+164 | except Exception:
     |        ^^^^^^^^^
-166 |     logging.warning("...")
+165 |     logging.info("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:171:8
+   --> BLE.py:170:8
     |
-169 | try:
-170 |     pass
-171 | except Exception:
+168 | try:
+169 |     pass
+170 | except Exception:
     |        ^^^^^^^^^
-172 |     logging.warning("...", exc_info=False)
+171 |     logging.info("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:177:8
+   --> BLE.py:176:8
     |
-175 | try:
-176 |     pass
-177 | except Exception:
+174 | try:
+175 |     pass
+176 | except Exception:
     |        ^^^^^^^^^
-178 |     logging.warning("...", exc_info=None)
+177 |     logging.info("...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:195:8
+   --> BLE.py:194:8
     |
-193 | try:
-194 |     pass
-195 | except Exception:
+192 | try:
+193 |     pass
+194 | except Exception:
     |        ^^^^^^^^^
-196 |     logging.log(logging.INFO, "...")
+195 |     logging.warning("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:201:8
+   --> BLE.py:200:8
     |
-199 | try:
-200 |     pass
-201 | except Exception:
+198 | try:
+199 |     pass
+200 | except Exception:
     |        ^^^^^^^^^
-202 |     logging.log(logging.INFO, "...", exc_info=False)
+201 |     logging.warning("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:207:8
+   --> BLE.py:206:8
     |
-205 | try:
-206 |     pass
-207 | except Exception:
+204 | try:
+205 |     pass
+206 | except Exception:
     |        ^^^^^^^^^
-208 |     logging.log(logging.INFO, "...", exc_info=None)
+207 |     logging.warning("...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:227:8
+   --> BLE.py:224:8
     |
-225 | try:
-226 |     pass
-227 | except Exception:
+222 | try:
+223 |     pass
+224 | except Exception:
     |        ^^^^^^^^^
-228 |     error("...")
+225 |     logging.log(logging.INFO, "...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:233:8
+   --> BLE.py:230:8
     |
-231 | try:
-232 |     pass
-233 | except Exception:
+228 | try:
+229 |     pass
+230 | except Exception:
     |        ^^^^^^^^^
-234 |     error("...", exc_info=False)
+231 |     logging.log(logging.INFO, "...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:239:8
+   --> BLE.py:236:8
     |
-237 | try:
-238 |     pass
-239 | except Exception:
+234 | try:
+235 |     pass
+236 | except Exception:
     |        ^^^^^^^^^
-240 |     error("...", exc_info=None)
+237 |     logging.log(logging.INFO, "...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:245:8
+   --> BLE.py:256:8
     |
-243 | try:
-244 |     pass
-245 | except Exception:
+254 | try:
+255 |     pass
+256 | except Exception:
     |        ^^^^^^^^^
-246 |     critical("...")
+257 |     error("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:251:8
+   --> BLE.py:262:8
     |
-249 | try:
-250 |     pass
-251 | except Exception:
+260 | try:
+261 |     pass
+262 | except Exception:
     |        ^^^^^^^^^
-252 |     critical("...", exc_info=False)
+263 |     error("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:257:8
+   --> BLE.py:268:8
     |
-255 | try:
-256 |     pass
-257 | except Exception:
+266 | try:
+267 |     pass
+268 | except Exception:
     |        ^^^^^^^^^
-258 |     critical("...", exc_info=None)
+269 |     error("...", exc_info=None)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:300:9
+   --> BLE.py:274:8
     |
-298 | try:
-299 |     pass
-300 | except (Exception,):
-    |         ^^^^^^^^^
-301 |     pass
-    |
-
-BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:305:9
-    |
-303 | try:
-304 |     pass
-305 | except (Exception, ValueError):
-    |         ^^^^^^^^^
-306 |     pass
+272 | try:
+273 |     pass
+274 | except Exception:
+    |        ^^^^^^^^^
+275 |     critical("...")
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:310:21
+   --> BLE.py:280:8
     |
-308 | try:
-309 |     pass
-310 | except (ValueError, Exception):
-    |                     ^^^^^^^^^
-311 |     pass
+278 | try:
+279 |     pass
+280 | except Exception:
+    |        ^^^^^^^^^
+281 |     critical("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:315:21
+   --> BLE.py:286:8
+    |
+284 | try:
+285 |     pass
+286 | except Exception:
+    |        ^^^^^^^^^
+287 |     critical("...", exc_info=None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:309:8
+    |
+307 | try:
+308 |     pass
+309 | except Exception:
+    |        ^^^^^^^^^
+310 |     debug("...")
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:315:8
     |
 313 | try:
 314 |     pass
-315 | except (ValueError, Exception) as e:
-    |                     ^^^^^^^^^
-316 |     print(e)
-    |
-
-BLE001 Do not catch blind exception: `BaseException`
-   --> BLE.py:320:9
-    |
-318 | try:
-319 |     pass
-320 | except (BaseException, TypeError):
-    |         ^^^^^^^^^^^^^
-321 |     pass
-    |
-
-BLE001 Do not catch blind exception: `BaseException`
-   --> BLE.py:325:20
-    |
-323 | try:
-324 |     pass
-325 | except (TypeError, BaseException):
-    |                    ^^^^^^^^^^^^^
-326 |     pass
+315 | except Exception:
+    |        ^^^^^^^^^
+316 |     debug("...", exc_info=False)
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:330:9
+   --> BLE.py:321:8
     |
-328 | try:
-329 |     pass
-330 | except (Exception, BaseException):
+319 | try:
+320 |     pass
+321 | except Exception:
+    |        ^^^^^^^^^
+322 |     debug("...", exc_info=None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:333:8
+    |
+331 | try:
+332 |     pass
+333 | except Exception:
+    |        ^^^^^^^^^
+334 |     info("...")
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:339:8
+    |
+337 | try:
+338 |     pass
+339 | except Exception:
+    |        ^^^^^^^^^
+340 |     info("...", exc_info=False)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:345:8
+    |
+343 | try:
+344 |     pass
+345 | except Exception:
+    |        ^^^^^^^^^
+346 |     info("...", exc_info=None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:357:8
+    |
+355 | try:
+356 |     pass
+357 | except Exception:
+    |        ^^^^^^^^^
+358 |     warning("...")
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:363:8
+    |
+361 | try:
+362 |     pass
+363 | except Exception:
+    |        ^^^^^^^^^
+364 |     warning("...", exc_info=False)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:369:8
+    |
+367 | try:
+368 |     pass
+369 | except Exception:
+    |        ^^^^^^^^^
+370 |     warning("...", exc_info=None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:381:8
+    |
+379 | try:
+380 |     pass
+381 | except Exception:
+    |        ^^^^^^^^^
+382 |     log(logging.INFO, "...")
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:387:8
+    |
+385 | try:
+386 |     pass
+387 | except Exception:
+    |        ^^^^^^^^^
+388 |     log(logging.INFO, "...", exc_info=False)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:393:8
+    |
+391 | try:
+392 |     pass
+393 | except Exception:
+    |        ^^^^^^^^^
+394 |     log(logging.INFO, "...", exc_info=None)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:461:9
+    |
+459 | try:
+460 |     pass
+461 | except (Exception,):
     |         ^^^^^^^^^
-331 |     pass
-    |
-
-BLE001 Do not catch blind exception: `BaseException`
-   --> BLE.py:335:9
-    |
-333 | try:
-334 |     pass
-335 | except (BaseException, Exception):
-    |         ^^^^^^^^^^^^^
-336 |     pass
+462 |     pass
     |
 
 BLE001 Do not catch blind exception: `Exception`
-   --> BLE.py:341:10
+   --> BLE.py:466:9
     |
-339 | try:
-340 |     pass
-341 | except ((Exception, ValueError), TypeError):
-    |          ^^^^^^^^^
-342 |     pass
+464 | try:
+465 |     pass
+466 | except (Exception, ValueError):
+    |         ^^^^^^^^^
+467 |     pass
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:471:21
+    |
+469 | try:
+470 |     pass
+471 | except (ValueError, Exception):
+    |                     ^^^^^^^^^
+472 |     pass
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:476:21
+    |
+474 | try:
+475 |     pass
+476 | except (ValueError, Exception) as e:
+    |                     ^^^^^^^^^
+477 |     print(e)
     |
 
 BLE001 Do not catch blind exception: `BaseException`
-   --> BLE.py:346:22
+   --> BLE.py:481:9
     |
-344 | try:
-345 |     pass
-346 | except (ValueError, (BaseException, TypeError)):
+479 | try:
+480 |     pass
+481 | except (BaseException, TypeError):
+    |         ^^^^^^^^^^^^^
+482 |     pass
+    |
+
+BLE001 Do not catch blind exception: `BaseException`
+   --> BLE.py:486:20
+    |
+484 | try:
+485 |     pass
+486 | except (TypeError, BaseException):
+    |                    ^^^^^^^^^^^^^
+487 |     pass
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:491:9
+    |
+489 | try:
+490 |     pass
+491 | except (Exception, BaseException):
+    |         ^^^^^^^^^
+492 |     pass
+    |
+
+BLE001 Do not catch blind exception: `BaseException`
+   --> BLE.py:496:9
+    |
+494 | try:
+495 |     pass
+496 | except (BaseException, Exception):
+    |         ^^^^^^^^^^^^^
+497 |     pass
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:502:10
+    |
+500 | try:
+501 |     pass
+502 | except ((Exception, ValueError), TypeError):
+    |          ^^^^^^^^^
+503 |     pass
+    |
+
+BLE001 Do not catch blind exception: `BaseException`
+   --> BLE.py:507:22
+    |
+505 | try:
+506 |     pass
+507 | except (ValueError, (BaseException, TypeError)):
     |                      ^^^^^^^^^^^^^
-347 |     pass
+508 |     pass
     |
