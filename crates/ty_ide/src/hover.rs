@@ -2740,6 +2740,86 @@ def function():
     }
 
     #[test]
+    fn hover_dunder_doc() {
+        let test = cursor_test(
+            r#"
+            class My<CURSOR>Class:
+                __doc__ = "hello there"
+            "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        <class 'MyClass'>
+        ---------------------------------------------
+        hello there
+
+        ---------------------------------------------
+        ```xml
+        <class 'MyClass'>
+        ```
+        ---
+        hello there
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^-^^^^
+          |       | |
+          |       | Cursor offset
+          |       source
+        3 |     __doc__ = "hello there"
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_dunder_doc_complex() {
+        let test = cursor_test(
+            r#"
+            class My<CURSOR>Class:
+                __doc__ = (
+                    r"""This is some extremely complex docstring
+
+                Designed to make
+                """
+                    + r"""
+
+                A typechecker
+            """
+                    """
+                Fall to its knees and sob
+            """
+                    r"""
+                Witness my works and 
+                weep before them
+                """
+                )
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        <class 'MyClass'>
+        ---------------------------------------------
+        ```xml
+        <class 'MyClass'>
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:7
+          |
+        2 | class MyClass:
+          |       ^^-^^^^
+          |       | |
+          |       | Cursor offset
+          |       source
+        3 |     __doc__ = (
+        4 |         r"""This is some extremely complex docstring
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_class_typevar_variance() {
         let test = cursor_test(
             r#"

@@ -2,7 +2,7 @@ use std::ops::Deref;
 
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, Expr};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Db;
@@ -133,6 +133,10 @@ pub(crate) fn module_docstring(db: &dyn Db, file: File) -> Option<String> {
 
 /// Extract a docstring from a function, module, or class body.
 fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+    docstring_from_body_normal(body).or_else(|| docstring_from_body_dunder_doc(body))
+}
+
+fn docstring_from_body_normal(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     let stmt = body.first()?;
     // Require the docstring to be a standalone expression.
     let ast::Stmt::Expr(ast::StmtExpr {
@@ -145,6 +149,27 @@ fn docstring_from_body(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
     };
     // Only match string literals.
     value.as_string_literal_expr()
+}
+
+fn docstring_from_body_dunder_doc(body: &[ast::Stmt]) -> Option<&ast::ExprStringLiteral> {
+    for stmt in body {
+        let Some(stmt) = stmt.as_assign_stmt() else {
+            continue;
+        };
+        let [Expr::Name(name)] = &stmt.targets[..] else {
+            continue;
+        };
+        if name.id.as_str() != "__doc__" {
+            continue;
+        }
+        let Expr::StringLiteral(literal) = &*stmt.value else {
+            continue;
+        };
+
+        return Some(literal);
+    }
+
+    None
 }
 
 /// One or more [`Definition`]s.
