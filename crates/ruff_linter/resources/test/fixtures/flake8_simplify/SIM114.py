@@ -4,11 +4,6 @@ if a:
 elif c:
     b
 
-if a:  # we preserve comments, too!
-    b
-elif c:  # but not on the second branch
-    b
-
 if x == 1:
     for _ in range(20):
         print("hello")
@@ -135,6 +130,8 @@ def func():
         return 3
 
 
+# https://github.com/astral-sh/ruff/pull/19759
+# The autofix for this is unsafe due to the comments.
 if a:  # we preserve comments, too!
     b
 elif c:  # but not on the second branch
