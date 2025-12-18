@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::helpers::is_const_true;
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::SemanticModel;
@@ -47,8 +47,7 @@ use crate::checkers::ast::Checker;
 ///     raise
 /// ```
 ///
-/// Exceptions that are logged via `logging.exception()` or are logged via
-/// `logging.error()` or `logging.critical()` with `exc_info` enabled will
+/// Exceptions that are logged with `exc_info` enabled will
 /// _not_ be flagged, as this is a common pattern for propagating exception
 /// traces:
 /// ```python
@@ -128,6 +127,14 @@ pub(crate) fn blind_except(
         },
         range,
     );
+}
+
+/// Returns true if the logging method accepts an `exc_info` parameter.
+fn is_exc_info_compatible_log_method(method_name: &str) -> bool {
+    matches!(
+        method_name,
+        "debug" | "info" | "warning" | "error" | "exception" | "critical" | "log"
+    )
 }
 
 /// A visitor to detect whether the exception with the given name was re-raised.
@@ -223,9 +230,15 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             ) {
                                 if match attr.as_str() {
                                     "exception" => true,
-                                    "error" | "critical" => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
+                                    attr if is_exc_info_compatible_log_method(attr) => {
+                                        arguments.find_keyword("exc_info").is_some_and(|keyword| {
+                                            let truthiness =
+                                                Truthiness::from_expr(&keyword.value, |id| {
+                                                    self.semantic.has_builtin_binding(id)
+                                                });
+                                            truthiness.into_bool().unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+                                        })
+                                    }
                                     _ => false,
                                 } {
                                     self.seen = true;
@@ -236,9 +249,17 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                             if self.semantic.resolve_qualified_name(func).is_some_and(
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
-                                    ["logging", "error" | "critical"] => arguments
-                                        .find_keyword("exc_info")
-                                        .is_some_and(|keyword| is_const_true(&keyword.value)),
+                                    ["logging", method]
+                                        if is_exc_info_compatible_log_method(method) =>
+                                    {
+                                        arguments.find_keyword("exc_info").is_some_and(|keyword| {
+                                            let truthiness =
+                                                Truthiness::from_expr(&keyword.value, |id| {
+                                                    self.semantic.has_builtin_binding(id)
+                                                });
+                                            truthiness.into_bool().unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+                                        })
+                                    }
                                     _ => false,
                                 },
                             ) {
