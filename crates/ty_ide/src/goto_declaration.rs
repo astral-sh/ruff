@@ -387,6 +387,29 @@ FOO = 0
     }
 
     #[test]
+    fn goto_declaration_from_import_rhs_is_module() {
+        let test = CursorTest::builder()
+            .source("lib/__init__.py", r#""#)
+            .source("lib/module.py", r#""#)
+            .source("main.py", r#"from lib import module<CURSOR>"#)
+            .build();
+
+        // Should resolve to the actual function definition, not the import statement
+        assert_snapshot!(test.goto_declaration(), @r"
+        info[goto-declaration]: Go to declaration
+         --> main.py:1:17
+          |
+        1 | from lib import module
+          |                 ^^^^^^ Clicking here
+          |
+        info: Found 1 declaration
+        --> lib/module.py:1:1
+         |
+         |
+        ");
+    }
+
+    #[test]
     fn goto_declaration_from_import_as() {
         let test = CursorTest::builder()
             .source(
