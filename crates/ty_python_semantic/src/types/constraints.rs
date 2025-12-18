@@ -2222,10 +2222,21 @@ impl<'db> InteriorNode<'db> {
             constraints = %Node::Interior(self).display(db),
             "create sequent map",
         );
-        let mut map = SequentMap::default();
-        Node::Interior(self).for_each_constraint(db, &mut |constraint, _| {
-            map.add(db, constraint);
+
+        // Sort the constraints in this BDD by their `source_order`s before adding them to the
+        // sequent map. This ensures that constraints appear in the sequent map in a stable order.
+        // The constraints mentioned in a BDD should all have distinct `source_order`s, so an
+        // unstable sort is fine.
+        let mut constraints = Vec::new();
+        Node::Interior(self).for_each_constraint(db, &mut |constraint, source_order| {
+            constraints.push((constraint, source_order));
         });
+        constraints.sort_unstable_by_key(|(_, source_order)| *source_order);
+
+        let mut map = SequentMap::default();
+        for (constraint, _) in constraints {
+            map.add(db, constraint);
+        }
         map
     }
 
