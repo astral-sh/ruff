@@ -509,7 +509,9 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ty_module_resolver::SearchPathSettings;
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_python_semantic::{
+        FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    };
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();
@@ -518,7 +520,7 @@ mod tests {
             python_version: PythonVersionWithSource::default(),
             python_platform: PythonPlatform::default(),
             search_paths: SearchPathSettings::new(Vec::new())
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .unwrap(),
         };
         Program::init_or_update(&mut db, settings);

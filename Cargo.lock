@@ -3124,6 +3124,7 @@ dependencies = [
  "tikv-jemallocator",
  "tracing",
  "ty_project",
+ "ty_python_semantic",
 ]
 
 [[package]]

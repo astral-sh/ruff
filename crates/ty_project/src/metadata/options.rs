@@ -33,7 +33,7 @@ use ty_module_resolver::{
 };
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    AnalysisSettings, MisconfigurationStrategy, ProgramSettings, PythonEnvironment, PythonPlatform,
     PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
     SysPrefixPathOrigin,
 };
@@ -119,14 +119,14 @@ impl Options {
         Self::deserialize(deserializer)
     }
 
-    pub(crate) fn to_program_settings(
+    pub(crate) fn to_program_settings<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> anyhow::Result<ProgramSettings> {
+        strategy: &Strategy,
+    ) -> Result<ProgramSettings, Strategy::Error<anyhow::Error>> {
         let environment = self.environment.or_default();
 
         let options_python_version =
@@ -172,17 +172,11 @@ impl Options {
         };
 
         // If in safe-mode, fallback to None if this fails instead of erroring.
-        let python_environment = match python_environment {
-            Ok(python_environment) => python_environment,
-            Err(err) => {
-                if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Default settings failed to discover local Python environment");
-                    None
-                } else {
-                    return Err(err);
-                }
-            }
-        };
+        let python_environment = strategy
+            .fallback_opt(python_environment, |_| {
+                tracing::debug!("Default settings failed to discover local Python environment");
+            })?
+            .flatten();
 
         let self_environment = self_environment_search_paths(
             python_environment
@@ -196,19 +190,10 @@ impl Options {
             let site_packages_paths = python_environment
                 .site_packages_paths(system)
                 .context("Failed to discover the site-packages directory");
-            let site_packages_paths = match site_packages_paths {
-                Ok(paths) => paths,
-                Err(err) => {
-                    if misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!(
-                            "Default settings failed to discover site-packages directory"
-                        );
-                        SitePackagesPaths::default()
-                    } else {
-                        return Err(err);
-                    }
-                }
-            };
+            let site_packages_paths = strategy.fallback(site_packages_paths, |_| {
+                tracing::debug!("Default settings failed to discover site-packages directory");
+                SitePackagesPaths::default()
+            })?;
             match self_environment {
                 // When ty is installed in a virtual environment (e.g., `uvx --with ...`),
                 // the self-environment takes priority over the discovered environment.
@@ -242,15 +227,15 @@ impl Options {
             .unwrap_or_default();
 
         // Safe mode is handled inside this function, so we just assume this can't fail
-        let search_paths = self.to_search_paths(
+        let search_paths = strategy.to_anyhow(self.to_search_paths(
             project_root,
             project_name,
             site_packages_paths,
             real_stdlib_path,
             system,
             vendored,
-            misconfiguration_mode,
-        )?;
+            strategy,
+        ))?;
 
         tracing::info!(
             "Python version: Python {python_version}, platform: {python_platform}",
@@ -265,7 +250,7 @@ impl Options {
     }
 
     #[expect(clippy::too_many_arguments)]
-    fn to_search_paths(
+    fn to_search_paths<Strategy: MisconfigurationStrategy>(
         &self,
         project_root: &SystemPath,
         project_name: &str,
@@ -273,8 +258,8 @@ impl Options {
         real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-        misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<SearchPaths, Strategy::Error<SearchPathSettingsError>> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -386,17 +371,17 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
-            misconfiguration_mode,
         };
 
-        settings.to_search_paths(system, vendored)
+        settings.to_search_paths(system, vendored, strategy)
     }
 
-    pub(crate) fn to_settings(
+    pub(crate) fn to_settings<Strategy: MisconfigurationStrategy>(
         &self,
         db: &dyn Db,
         project_root: &SystemPath,
-    ) -> Result<(Settings, Vec<OptionDiagnostic>), ToSettingsError> {
+        strategy: &Strategy,
+    ) -> Result<(Settings, Vec<OptionDiagnostic>), Strategy::Error<ToSettingsError>> {
         let mut diagnostics = Vec::new();
         let rules = self.to_rule_selection(db, &mut diagnostics);
 
@@ -446,7 +431,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let src = strategy.fallback(src, |_| SrcSettings::default())?;
 
         let mut analysis_diagnostics = Vec::new();
         let analysis = self
@@ -468,7 +454,8 @@ impl Options {
                 diagnostic: err,
                 output_format: terminal.output_format,
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
-            })?;
+            });
+        let overrides = strategy.fallback(overrides, |_| Vec::new())?;
 
         let settings = Settings {
             rules: Arc::new(rules),
@@ -970,7 +957,7 @@ impl Rules {
 }
 
 /// Default exclude patterns for src options.
-const DEFAULT_SRC_EXCLUDES: &[&str] = &[
+pub(crate) const DEFAULT_SRC_EXCLUDES: &[&str] = &[
     "**/.bzr/",
     "**/.direnv/",
     "**/.eggs/",

@@ -24,6 +24,7 @@ ruff_python_formatter = { workspace = true, optional = true }
 ruff_python_parser = { workspace = true, optional = true }
 ruff_python_trivia = { workspace = true, optional = true }
 ty_project = { workspace = true, optional = true }
+ty_python_semantic = { workspace = true, optional = true }
 
 anyhow = { workspace = true }
 codspeed-criterion-compat = { workspace = true, default-features = false, optional = true }
@@ -59,7 +60,7 @@ ruff_instrumented = [
 ty_instrumented = ["criterion", "ty_project", "ruff_python_trivia"]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
-ty_walltime = ["ruff_db/os", "ty_project", "divan"]
+ty_walltime = ["ruff_db/os", "ty_project", "ty_python_semantic", "divan"]
 
 [[bench]]
 name = "linter"

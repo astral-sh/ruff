@@ -10,7 +10,9 @@ use crate::suppression::{
 };
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
-pub use program::{Program, ProgramSettings};
+pub use program::{
+    FailStrategy, MisconfigurationStrategy, Program, ProgramSettings, UseDefaultStrategy,
+};
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
 pub use semantic_model::{
