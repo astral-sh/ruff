@@ -59,6 +59,14 @@ class ConstraintSet:
     def never() -> Self:
         """Returns a constraint set that is never satisfied"""
 
+    def exists(self, *typevars: Any) -> Self:
+        """
+        Returns a new constraint set that is the _existential abstraction_ of
+        `self` for a set of typevars. The result will return true whenever
+        `self` returns true for _any_ assignment of those typevars. The result
+        will not contain any constraints that mention those typevars.
+        """
+
     def implies_subtype_of(self, ty: Any, of: Any) -> Self:
         """
         Returns a constraint set that is satisfied when `ty` is a `subtype`_ of

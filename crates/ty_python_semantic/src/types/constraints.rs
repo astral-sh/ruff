@@ -432,6 +432,18 @@ impl<'db> ConstraintSet<'db> {
         }
     }
 
+    /// Returns a new constraint set that is the _existential abstraction_ of `self` for a set of
+    /// typevars. The result will return true whenever `self` returns true for _any_ assignment of
+    /// those typevars. The result will not contain any constraints that mention those typevars.
+    pub(crate) fn exists(
+        self,
+        db: &'db dyn Db,
+        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        let node = self.node.exists(db, bound_typevars);
+        Self { node }
+    }
+
     /// Quantifies over this constraint set so that it only contains constraints that mention the
     /// given typevar. All other typevars are quantified away.
     pub(crate) fn retain_one(
