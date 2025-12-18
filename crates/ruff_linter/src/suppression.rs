@@ -1,6 +1,5 @@
 use compact_str::CompactString;
 use core::fmt;
-use itertools::Itertools;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::{TokenKind, Tokens};
