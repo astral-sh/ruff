@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 15
-Added: 21
+Added: 23
 
 --- Removed ---
 E741 Ambiguous variable name: `I`
@@ -281,7 +281,7 @@ RUF103 [*] Invalid suppression comment: no matching 'disable' comment
 19 |     # ruff: enable[E741, F841]
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^
    |
-help: Remove invalid suppression comment
+help: Remove suppression comment
 16 |     # Neither warning is ignored, and an "unmatched suppression"
 17 |     # should be generated.
 18 |     I = 1
@@ -631,3 +631,41 @@ help: Remove the rule code
 97 | 
 98 | 
 99 | def f():
+
+
+RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
+   --> suppressions.py:109:5
+    |
+107 | def f():
+108 |     # Empty or missing rule codes
+109 |     # ruff: disable
+    |     ^^^^^^^^^^^^^^^
+110 |     # ruff: disable[]
+111 |     print("hello")
+    |
+help: Remove suppression comment
+106 | 
+107 | def f():
+108 |     # Empty or missing rule codes
+    -     # ruff: disable
+109 |     # ruff: disable[]
+110 |     print("hello")
+note: This is an unsafe fix and may change runtime behavior
+
+
+RUF103 [*] Invalid suppression comment: missing suppression codes like `[E501, ...]`
+   --> suppressions.py:110:5
+    |
+108 |     # Empty or missing rule codes
+109 |     # ruff: disable
+110 |     # ruff: disable[]
+    |     ^^^^^^^^^^^^^^^^^
+111 |     print("hello")
+    |
+help: Remove suppression comment
+107 | def f():
+108 |     # Empty or missing rule codes
+109 |     # ruff: disable
+    -     # ruff: disable[]
+110 |     print("hello")
+note: This is an unsafe fix and may change runtime behavior

@@ -49,7 +49,7 @@ impl AlwaysFixableViolation for InvalidSuppressionComment {
     }
 
     fn fix_title(&self) -> String {
-        "Remove invalid suppression comment".to_string()
+        "Remove suppression comment".to_string()
     }
 }
 

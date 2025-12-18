@@ -102,3 +102,10 @@ def f():
     # ruff: disable[TK421]
     print("hello")
     # ruff: enable[TK421]
+
+
+def f():
+    # Empty or missing rule codes
+    # ruff: disable
+    # ruff: disable[]
+    print("hello")

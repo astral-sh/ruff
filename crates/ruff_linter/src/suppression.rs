@@ -467,7 +467,7 @@ pub(crate) enum ParseErrorKind {
     #[error("unknown ruff directive")]
     UnknownAction,
 
-    #[error("missing suppression codes, add one or more codes like `[E501, ...]`")]
+    #[error("missing suppression codes like `[E501, ...]`")]
     MissingCodes,
 
     #[error("missing closing bracket")]
