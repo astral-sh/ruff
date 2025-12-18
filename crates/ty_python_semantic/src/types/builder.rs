@@ -552,16 +552,14 @@ impl<'db> UnionBuilder<'db> {
         let mut ty_negated: Option<Type> = None;
 
         let mut i = 0;
-        let mut inserted = false;
+        let mut insertion_point: Option<usize> = None;
 
-        let mut remove_element = |i: &mut usize, elements: &mut Vec<UnionElement<'db>>| {
-            if inserted {
-                elements.swap_remove(*i);
+        let mut remove_or_replace = |i: usize, elements: &mut Vec<UnionElement<'db>>| {
+            if insertion_point.is_none() {
+                insertion_point = Some(i);
             } else {
-                elements[*i] = UnionElement::Type(ty);
-                *i += 1;
+                elements.swap_remove(i);
             }
-            inserted = true;
         };
 
         while i < self.elements.len() {
@@ -570,10 +568,9 @@ impl<'db> UnionBuilder<'db> {
             let element_type = match element.try_reduce(self.db, ty) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
-                        remove_element(&mut i, &mut self.elements);
-                    } else {
-                        i += 1;
+                        remove_or_replace(i, &mut self.elements);
                     }
+                    i += 1;
                     continue;
                 }
                 ReduceResult::Type(ty) => ty,
@@ -610,7 +607,8 @@ impl<'db> UnionBuilder<'db> {
                 }
 
                 if element_type.is_redundant_with(self.db, ty) {
-                    remove_element(&mut i, &mut self.elements);
+                    remove_or_replace(i, &mut self.elements);
+                    i += 1;
                     continue;
                 }
 
@@ -633,7 +631,9 @@ impl<'db> UnionBuilder<'db> {
             i += 1;
         }
 
-        if !inserted {
+        if let Some(insertion_point) = insertion_point {
+            self.elements[insertion_point] = UnionElement::Type(ty);
+        } else {
             self.elements.push(UnionElement::Type(ty));
         }
     }
