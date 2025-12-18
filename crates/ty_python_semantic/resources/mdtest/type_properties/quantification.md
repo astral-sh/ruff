@@ -158,6 +158,37 @@ def covariant_transitivity[T, U]():
     static_assert(constraints.exists(T) == quantified)
 ```
 
+Same as above, but when propagating a third typevar instead of a concrete type. We make sure to test
+with both variable orderings for the constraint that involves two typevars.
+
+```py
+def covariant_typevar_transitivity[B, T, U]():
+    # (B ≤ T) ∧ (Covariant[T] ≤ U) → (Covariant[B] ≤ U)
+    constraints = ConstraintSet.range(B, T, object) & ConstraintSet.range(Covariant[T], U, object)
+    quantified = ConstraintSet.range(Covariant[B], U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (U ≤ Covariant[T]) → (U ≤ Covariant[B])
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Never, U, Covariant[T])
+    quantified = ConstraintSet.range(Never, U, Covariant[B])
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+def covariant_typevar_transitivity_reversed[T, B, U]():
+    # (B ≤ T) ∧ (Covariant[T] ≤ U) → (Covariant[B] ≤ U)
+    constraints = ConstraintSet.range(B, T, object) & ConstraintSet.range(Covariant[T], U, object)
+    quantified = ConstraintSet.range(Covariant[B], U, object)
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (U ≤ Covariant[T]) → (U ≤ Covariant[B])
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Never, U, Covariant[T])
+    quantified = ConstraintSet.range(Never, U, Covariant[B])
+    static_assert(constraints.exists(T) == quantified)
+```
+
 ## Contravariant transitivity
 
 Similar rules apply, but in reverse, when one of the typevars is used contravariantly in a bound of
@@ -204,6 +235,41 @@ def contravariant_transitivity[T, U]():
     static_assert(constraints.exists(T) == quantified)
 ```
 
+Same as above, but when propagating a third typevar instead of a concrete type. We make sure to test
+with both variable orderings for the constraint that involves two typevars.
+
+```py
+def contravariant_typevar_transitivity[B, T, U]():
+    # (B ≤ T) ∧ (U ≤ Contravariant[T]) → (U ≤ Contravariant[B])
+    constraints = ConstraintSet.range(B, T, object) & ConstraintSet.range(Never, U, Contravariant[T])
+    quantified = ConstraintSet.range(Never, U, Contravariant[B])
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (Contravariant[T] ≤ U) → (Contravariant[B] ≤ U)
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Contravariant[T], U, object)
+    quantified = ConstraintSet.range(Contravariant[B], U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+def contravariant_typevar_transitivity_reversed[T, B, U]():
+    # (B ≤ T) ∧ (U ≤ Contravariant[T]) → (U ≤ Contravariant[B])
+    constraints = ConstraintSet.range(B, T, object) & ConstraintSet.range(Never, U, Contravariant[T])
+    quantified = ConstraintSet.range(Never, U, Contravariant[B])
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (Contravariant[T] ≤ U) → (Contravariant[B] ≤ U)
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Contravariant[T], U, object)
+    quantified = ConstraintSet.range(Contravariant[B], U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+```
+
 ## Invariant transitivity involving equality constraints
 
 Invariant uses of a typevar are more subtle. The simplest case is when there is an _equality_
@@ -230,6 +296,41 @@ def invariant_equality_transitivity[T, U]():
     # (T = Base) ∧ (Invariant[T] ≤ U) → (Invariant[Base] ≤ U)
     constraints = ConstraintSet.range(Base, T, Base) & ConstraintSet.range(Invariant[T], U, object)
     quantified = ConstraintSet.range(Invariant[Base], U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+```
+
+Same as above, but when propagating a third typevar instead of a concrete type. We make sure to test
+with both variable orderings for the constraint that involves two typevars.
+
+```py
+def invariant_equality_typevar_transitivity[B, T, U]():
+    # (T = B) ∧ (U ≤ Invariant[T]) → (U ≤ Invariant[B])
+    constraints = ConstraintSet.range(B, T, B) & ConstraintSet.range(Never, U, Invariant[T])
+    quantified = ConstraintSet.range(Never, U, Invariant[B])
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T = B) ∧ (Invariant[T] ≤ U) → (Invariant[B] ≤ U)
+    constraints = ConstraintSet.range(B, T, B) & ConstraintSet.range(Invariant[T], U, object)
+    quantified = ConstraintSet.range(Invariant[B], U, object)
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+def invariant_equality_typevar_transitivity_reverse[T, B, U]():
+    # (T = B) ∧ (U ≤ Invariant[T]) → (U ≤ Invariant[B])
+    constraints = ConstraintSet.range(B, T, B) & ConstraintSet.range(Never, U, Invariant[T])
+    quantified = ConstraintSet.range(Never, U, Invariant[B])
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T = B) ∧ (Invariant[T] ≤ U) → (Invariant[B] ≤ U)
+    constraints = ConstraintSet.range(B, T, B) & ConstraintSet.range(Invariant[T], U, object)
+    quantified = ConstraintSet.range(Invariant[B], U, object)
     # TODO: no error
     # error: [static-assert-error]
     static_assert(constraints.exists(T) == quantified)
@@ -263,6 +364,45 @@ def invariant_range_transitivity[T, U]():
 
     # (Sub ≤ T ≤ Base) ∧ (Invariant[T] ≤ U) → (Invariant[Exists[Sub, Base]] ≤ U)
     constraints = ConstraintSet.range(Sub, T, Base) & ConstraintSet.range(Invariant[T], U, object)
+    # TODO: The existential that we need doesn't exist yet.
+    quantified = ConstraintSet.never()
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+```
+
+Same as above, but when propagating a third typevar instead of a concrete type. We make sure to test
+with both variable orderings for the constraint that involves two typevars.
+
+```py
+def invariant_range_typevar_transitivity[B, T, U]():
+    # (T ≤ B) ∧ (U ≤ Invariant[T]) → (U ≤ Invariant[Exists[Never, B]])
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Never, U, Invariant[T])
+    # TODO: The existential that we need doesn't exist yet.
+    quantified = ConstraintSet.never()
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (Invariant[T] ≤ U) → (Invariant[Exists[Never, B]] ≤ U)
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Invariant[T], U, object)
+    # TODO: The existential that we need doesn't exist yet.
+    quantified = ConstraintSet.never()
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+def invariant_range_typevar_transitivity_reverse[T, B, U]():
+    # (T ≤ B) ∧ (U ≤ Invariant[T]) → (U ≤ Invariant[Exists[Never, B]])
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Never, U, Invariant[T])
+    # TODO: The existential that we need doesn't exist yet.
+    quantified = ConstraintSet.never()
+    # TODO: no error
+    # error: [static-assert-error]
+    static_assert(constraints.exists(T) == quantified)
+
+    # (T ≤ B) ∧ (Invariant[T] ≤ U) → (Invariant[Exists[Never, B]] ≤ U)
+    constraints = ConstraintSet.range(Never, T, B) & ConstraintSet.range(Invariant[T], U, object)
     # TODO: The existential that we need doesn't exist yet.
     quantified = ConstraintSet.never()
     # TODO: no error
