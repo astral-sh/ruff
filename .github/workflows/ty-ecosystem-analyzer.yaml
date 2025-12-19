@@ -131,6 +131,14 @@ jobs:
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
+      - name: "Upload full report"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: full-report
+          path: dist/
+
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload comment
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
