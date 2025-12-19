@@ -256,7 +256,7 @@ impl Suppressions {
         }
     }
 
-    fn report_suppression<'a, T: Violation>(
+    fn report_suppression<T: Violation>(
         context: &LintContext,
         locator: &Locator,
         suppression: &Suppression,
