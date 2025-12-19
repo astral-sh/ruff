@@ -6718,6 +6718,25 @@ impl<'db> Type<'db> {
                         None
                     }
                 }
+                Type::Intersection(intersection) => {
+                    // For intersections, we iterate over each positive element and intersect
+                    // the resulting element types. Negative elements don't affect iteration.
+                    // We only fail if all elements fail to iterate; as long as at least one
+                    // element can be iterated over, we can produce a result.
+                    let mut specs_iter = intersection
+                        .positive_elements_or_object(db)
+                        .filter_map(|element| {
+                            element
+                                .try_iterate_with_mode(db, EvaluationMode::Sync)
+                                .ok()
+                        });
+                    let first_spec = specs_iter.next()?;
+                    let mut builder = TupleSpecBuilder::from(&*first_spec);
+                    for spec in specs_iter {
+                        builder = builder.intersect(db, &spec);
+                    }
+                    Some(Cow::Owned(builder.build()))
+                }
                 // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
                 Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
@@ -6740,7 +6759,6 @@ impl<'db> Type<'db> {
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
-                | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::IntLiteral(_)
