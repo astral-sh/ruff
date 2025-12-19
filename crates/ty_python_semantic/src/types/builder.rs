@@ -37,8 +37,6 @@
 //! are subtypes of each other (unless exactly the same literal type), we can avoid many
 //! unnecessary `is_subtype_of` checks.
 
-use std::hash::DefaultHasher;
-
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
@@ -670,22 +668,16 @@ pub(crate) struct IntersectionBuilder<'db> {
     // but if a union is added to the intersection, we'll distribute ourselves over that union and
     // create a union of intersections.
     intersections: Vec<InnerIntersectionBuilder<'db>>,
-    /// Stores hash values ​​of `intersections` to prevent adding identical `InnerIntersectionBuilder`s.
-    intersection_hashes: FxHashSet<u64>,
     order_elements: bool,
     db: &'db dyn Db,
 }
 
 impl<'db> IntersectionBuilder<'db> {
     pub(crate) fn new(db: &'db dyn Db) -> Self {
-        let inner = InnerIntersectionBuilder::default();
-        let mut intersection_hashes = FxHashSet::default();
-        intersection_hashes.insert(inner.hash_value());
         Self {
             db,
             order_elements: false,
-            intersections: vec![inner],
-            intersection_hashes,
+            intersections: vec![InnerIntersectionBuilder::default()],
         }
     }
 
@@ -694,22 +686,6 @@ impl<'db> IntersectionBuilder<'db> {
             db,
             order_elements: false,
             intersections: vec![],
-            intersection_hashes: FxHashSet::default(),
-        }
-    }
-
-    fn update_hashes(&mut self) {
-        self.intersection_hashes.clear();
-        for intersection in &self.intersections {
-            self.intersection_hashes.insert(intersection.hash_value());
-        }
-    }
-
-    fn extend(&mut self, other: IntersectionBuilder<'db>) {
-        for intersection in other.intersections {
-            if self.intersection_hashes.insert(intersection.hash_value()) {
-                self.intersections.push(intersection);
-            }
         }
     }
 
@@ -729,7 +705,6 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.positive.insert(ty);
                     }
-                    self.update_hashes();
                     return self;
                 }
                 seen_aliases.push(ty);
@@ -750,7 +725,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.extend(sub);
+                        builder.intersections.extend(sub.intersections);
                         builder
                     })
             }
@@ -800,9 +775,7 @@ impl<'db> IntersectionBuilder<'db> {
                     )
                 } else {
                     for inner in &mut self.intersections {
-                        if inner.add_positive(self.db, ty) {
-                            self.intersection_hashes.insert(inner.hash_value());
-                        }
+                        inner.add_positive(self.db, ty);
                     }
                     self
                 }
@@ -811,9 +784,7 @@ impl<'db> IntersectionBuilder<'db> {
                 // If we are already a union-of-intersections, distribute the new intersected element
                 // across all of those intersections.
                 for inner in &mut self.intersections {
-                    if inner.add_positive(self.db, ty) {
-                        self.intersection_hashes.insert(inner.hash_value());
-                    }
+                    inner.add_positive(self.db, ty);
                 }
                 self
             }
@@ -844,7 +815,6 @@ impl<'db> IntersectionBuilder<'db> {
                     for inner in &mut self.intersections {
                         inner.negative.insert(ty);
                     }
-                    self.update_hashes();
                     return self;
                 }
                 seen_aliases.push(ty);
@@ -886,7 +856,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.extend(sub);
+                        builder.intersections.extend(sub.intersections);
                         builder
                     },
                 )
@@ -910,9 +880,7 @@ impl<'db> IntersectionBuilder<'db> {
             }
             _ => {
                 for inner in &mut self.intersections {
-                    if inner.add_negative(self.db, ty) {
-                        self.intersection_hashes.insert(inner.hash_value());
-                    }
+                    inner.add_negative(self.db, ty);
                 }
                 self
             }
@@ -956,50 +924,43 @@ struct InnerIntersectionBuilder<'db> {
 
 impl<'db> InnerIntersectionBuilder<'db> {
     /// Adds a positive type to this intersection.
-    /// Returns `true` if the intersection was modified, `false` if the addition was redundant.
-    fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) -> bool {
+    fn add_positive(&mut self, db: &'db dyn Db, mut new_positive: Type<'db>) {
         match new_positive {
             // `LiteralString & AlwaysTruthy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
-                self.add_negative(db, Type::string_literal(db, ""))
+                self.add_negative(db, Type::string_literal(db, ""));
             }
             // `LiteralString & AlwaysFalsy` -> `Literal[""]`
             Type::AlwaysFalsy if self.positive.swap_remove(&Type::LiteralString) => {
                 self.add_positive(db, Type::string_literal(db, ""));
-                true
             }
             // `AlwaysTruthy & LiteralString` -> `LiteralString & ~Literal[""]`
             Type::LiteralString if self.positive.swap_remove(&Type::AlwaysTruthy) => {
                 self.add_positive(db, Type::LiteralString);
                 self.add_negative(db, Type::string_literal(db, ""));
-                true
             }
             // `AlwaysFalsy & LiteralString` -> `Literal[""]`
             Type::LiteralString if self.positive.swap_remove(&Type::AlwaysFalsy) => {
                 self.add_positive(db, Type::string_literal(db, ""));
-                true
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & AlwaysFalsy` -> `Literal[""]`
             Type::LiteralString if self.negative.swap_remove(&Type::AlwaysTruthy) => {
                 self.add_positive(db, Type::string_literal(db, ""));
-                true
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::LiteralString if self.negative.swap_remove(&Type::AlwaysFalsy) => {
                 self.add_positive(db, Type::LiteralString);
                 self.add_negative(db, Type::string_literal(db, ""));
-                true
             }
 
             _ => {
-                let mut modified = false;
                 let known_instance = new_positive
                     .as_nominal_instance()
                     .and_then(|instance| instance.known_class(db));
 
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
-                    return modified;
+                    return;
                 }
 
                 let addition_is_bool_instance = known_instance == Some(KnownClass::Bool);
@@ -1032,7 +993,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                         _ => continue,
                     }
                     self.positive.swap_remove_index(index);
-                    modified = true;
                     break;
                 }
 
@@ -1055,7 +1015,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                             _ => continue,
                         }
                         self.negative.swap_remove_index(index);
-                        modified = true;
                         break;
                     }
                 }
@@ -1064,7 +1023,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 for (index, existing_positive) in self.positive.iter().enumerate() {
                     // S & T = S    if S <: T
                     if existing_positive.is_redundant_with(db, new_positive) {
-                        return modified;
+                        return;
                     }
                     // same rule, reverse order
                     if new_positive.is_redundant_with(db, *existing_positive) {
@@ -1074,7 +1033,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     if new_positive.is_disjoint_from(db, *existing_positive) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
-                        return true;
+                        return;
                     }
                 }
                 for index in to_remove.into_iter().rev() {
@@ -1087,7 +1046,7 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     if new_positive.is_subtype_of(db, *existing_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
-                        return true;
+                        return;
                     }
                     // A & ~B = A    if A and B are disjoint
                     if existing_negative.is_disjoint_from(db, new_positive) {
@@ -1099,14 +1058,12 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 }
 
                 self.positive.insert(new_positive);
-                true
             }
         }
     }
 
     /// Adds a negative type to this intersection.
-    /// Returns `true` if the intersection was modified, `false` if the addition was redundant.
-    fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) -> bool {
+    fn add_negative(&mut self, db: &'db dyn Db, new_negative: Type<'db>) {
         let contains_bool = || {
             self.positive
                 .iter()
@@ -1115,51 +1072,46 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 .any(KnownClass::is_bool)
         };
 
-        let mut modified = false;
-
         match new_negative {
             Type::Intersection(inter) => {
                 for pos in inter.positive(db) {
-                    modified |= self.add_negative(db, *pos);
+                    self.add_negative(db, *pos);
                 }
                 for neg in inter.negative(db) {
-                    modified |= self.add_positive(db, *neg);
+                    self.add_positive(db, *neg);
                 }
-                modified
             }
             Type::Never => {
                 // Adding ~Never to an intersection is a no-op.
-                false
             }
             Type::NominalInstance(instance) if instance.is_object() => {
                 // Adding ~object to an intersection results in Never.
                 *self = Self::default();
                 self.positive.insert(Type::Never);
-                true
             }
             ty @ Type::Dynamic(_) => {
                 // Adding any of these types to the negative side of an intersection
                 // is equivalent to adding it to the positive side. We do this to
                 // simplify the representation.
-                self.add_positive(db, ty)
+                self.add_positive(db, ty);
             }
             // `bool & ~AlwaysTruthy` -> `bool & Literal[False]`
             // `bool & ~Literal[True]` -> `bool & Literal[False]`
             Type::AlwaysTruthy | Type::BooleanLiteral(true) if contains_bool() => {
-                self.add_positive(db, Type::BooleanLiteral(false))
+                self.add_positive(db, Type::BooleanLiteral(false));
             }
             // `LiteralString & ~AlwaysTruthy` -> `LiteralString & Literal[""]`
             Type::AlwaysTruthy if self.positive.contains(&Type::LiteralString) => {
-                self.add_positive(db, Type::string_literal(db, ""))
+                self.add_positive(db, Type::string_literal(db, ""));
             }
             // `bool & ~AlwaysFalsy` -> `bool & Literal[True]`
             // `bool & ~Literal[False]` -> `bool & Literal[True]`
             Type::AlwaysFalsy | Type::BooleanLiteral(false) if contains_bool() => {
-                self.add_positive(db, Type::BooleanLiteral(true))
+                self.add_positive(db, Type::BooleanLiteral(true));
             }
             // `LiteralString & ~AlwaysFalsy` -> `LiteralString & ~Literal[""]`
             Type::AlwaysFalsy if self.positive.contains(&Type::LiteralString) => {
-                self.add_negative(db, Type::string_literal(db, ""))
+                self.add_negative(db, Type::string_literal(db, ""));
             }
             _ => {
                 let mut to_remove = SmallVec::<[usize; 1]>::new();
@@ -1170,12 +1122,11 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     }
                     // same rule, reverse order
                     if new_negative.is_subtype_of(db, *existing_negative) {
-                        return modified;
+                        return;
                     }
                 }
                 for index in to_remove.into_iter().rev() {
                     self.negative.swap_remove_index(index);
-                    modified = true;
                 }
 
                 for existing_positive in &self.positive {
@@ -1183,16 +1134,15 @@ impl<'db> InnerIntersectionBuilder<'db> {
                     if existing_positive.is_subtype_of(db, new_negative) {
                         *self = Self::default();
                         self.positive.insert(Type::Never);
-                        return true;
+                        return;
                     }
                     // A & ~B = A    if A and B are disjoint
                     if existing_positive.is_disjoint_from(db, new_negative) {
-                        return modified;
+                        return;
                     }
                 }
 
                 self.negative.insert(new_negative);
-                true
             }
         }
     }
@@ -1344,31 +1294,6 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
             }
         }
-    }
-
-    /// An element-order-independent hash value, unrelated to the hash value of the actual `IntersectionType`.
-    fn hash_value(&self) -> u64 {
-        use std::hash::{Hash, Hasher};
-
-        let mut sum = 0u64;
-        for ty in &self.positive {
-            sum = sum.wrapping_add({
-                // Use a cryptographic hash function. If the number of elements in the entire intersection is around 10^2, the chance of collisions is almost negligible.
-                let mut hasher = DefaultHasher::default();
-                ty.hash(&mut hasher);
-                hasher.finish()
-            });
-        }
-        for ty in &self.negative {
-            sum = sum.wrapping_add({
-                let mut hasher = DefaultHasher::default();
-                ty.hash(&mut hasher);
-                // We add a constant to the negative types to differentiate them from positive types.
-                1.hash(&mut hasher);
-                hasher.finish()
-            });
-        }
-        sum
     }
 }
 
