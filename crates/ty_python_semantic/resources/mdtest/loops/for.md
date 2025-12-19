@@ -401,6 +401,66 @@ def _(x: Intersection[NotIterable1, NotIterable2]):
         reveal_type(item)  # revealed: Unknown
 ```
 
+## Intersection of fixed-length tuples
+
+When iterating over an intersection of two fixed-length tuples with the same length, we should
+intersect the element types position-by-position.
+
+```py
+from ty_extensions import Intersection
+
+def _(x: Intersection[tuple[int, str], tuple[object, object]]):
+    # `tuple[int, str]` yields `int | str` when iterated.
+    # `tuple[object, object]` yields `object` when iterated.
+    # The intersection should yield `(int & object) | (str & object)` = `int | str`.
+    for item in x:
+        reveal_type(item)  # revealed: int | str
+```
+
+## Intersection of fixed-length tuple with homogeneous iterable
+
+When iterating over an intersection of a fixed-length tuple with a class that implements `__iter__`
+returning a homogeneous iterator, we should preserve the fixed-length structure and intersect each
+element type with the iterator's element type.
+
+```py
+from collections.abc import Iterator
+
+class Foo:
+    def __iter__(self) -> Iterator[object]:
+        raise NotImplementedError
+
+def _(x: tuple[int, str, bytes]):
+    if isinstance(x, Foo):
+        # The intersection `tuple[int, str, bytes] & Foo` should iterate as
+        # `tuple[int & object, str & object, bytes & object]` = `tuple[int, str, bytes]`
+        a, b, c = x
+        reveal_type(a)  # revealed: int
+        reveal_type(b)  # revealed: str
+        reveal_type(c)  # revealed: bytes
+        reveal_type(tuple(x))  # revealed: tuple[int, str, bytes]
+```
+
+## Intersection of homogeneous iterables
+
+When iterating over an intersection of two types that both yield homogeneous variable-length tuple
+specs, we should intersect their element types.
+
+```py
+from collections.abc import Iterator
+
+class Foo:
+    def __iter__(self) -> Iterator[object]:
+        raise NotImplementedError
+
+def _(x: list[int]):
+    if isinstance(x, Foo):
+        # `list[int]` yields `int`, `Foo` yields `object`.
+        # The intersection should yield `int & object` = `int`.
+        for item in x:
+            reveal_type(item)  # revealed: int
+```
+
 ## Possibly-not-callable `__iter__` method
 
 ```py

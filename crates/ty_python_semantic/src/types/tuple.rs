@@ -1793,18 +1793,54 @@ impl<'db> TupleSpecBuilder<'db> {
     /// tuple-spec for `tuple[object, object]`, the result will be a tuple-spec builder for
     /// `tuple[int, str]` (since `int & object` simplifies to `int`, and `str & object` to `str`).
     ///
-    /// To keep things simple, we currently only attempt to preserve the "fixed-length-ness" of
-    /// a tuple spec if both `self` and `other` have the exact same length. For example,
-    /// if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a tuple-spec for
-    /// `tuple[int, str, bytes]`, the result will be a tuple-spec builder for
-    /// `tuple[int & str & bytes, ...]`.
+    /// We preserve "fixed-length-ness" in the following cases:
+    /// - Both `self` and `other` are fixed-length with the same length: element-wise intersection
+    /// - `self` is fixed-length and `other` is a homogeneous variable-length tuple: intersect each
+    ///   element of `self` with `other`'s variable type
+    ///
+    /// For other cases (e.g., different fixed lengths, or complex variable-length tuples with
+    /// prefixes or suffixes), we fall back to a homogeneous variable-length tuple.
     pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {
+            // Both fixed-length with the same length: element-wise intersection.
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
                 if our_elements.len() == new_elements.len() =>
             {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
                     *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                }
+                self
+            }
+
+            // Fixed-length intersected with a homogeneous variable-length tuple:
+            // intersect each element with the variable type.
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var))
+                if var.prefix.is_empty() && var.suffix.is_empty() =>
+            {
+                for existing in our_elements.iter_mut() {
+                    *existing = IntersectionType::from_elements(db, [*existing, var.variable]);
+                }
+                self
+            }
+
+            // Variable-length intersected with a homogeneous variable-length tuple:
+            // intersect prefix, variable, and suffix with the variable type
+            (
+                TupleSpecBuilder::Variable {
+                    prefix,
+                    variable,
+                    suffix,
+                },
+                TupleSpec::Variable(other_var),
+            ) if other_var.prefix.is_empty() && other_var.suffix.is_empty() => {
+                for existing in prefix.iter_mut() {
+                    *existing =
+                        IntersectionType::from_elements(db, [*existing, other_var.variable]);
+                }
+                *variable = IntersectionType::from_elements(db, [*variable, other_var.variable]);
+                for existing in suffix.iter_mut() {
+                    *existing =
+                        IntersectionType::from_elements(db, [*existing, other_var.variable]);
                 }
                 self
             }
