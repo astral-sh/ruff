@@ -22,7 +22,7 @@ def _(flag: bool):
 ```py
 def _(flag: bool):
     if (x := 1) or flag:
-        reveal_type(x)  # revealed: Literal[1]
+        reveal_type(x)  # revealed: Literal[2]
 
     if (x := 1) and flag:
         reveal_type(x)  # revealed: Literal[1]
@@ -36,7 +36,7 @@ if True or (x := 1):
     reveal_type(x)  # revealed: Unknown
 
 if True and (x := 1):
-    reveal_type(x)  # revealed: Literal[1]
+    reveal_type(x)  # revealed: Literal[2]
 ```
 
 ## Later expressions can always use variables from earlier expressions

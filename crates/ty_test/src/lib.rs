@@ -147,10 +147,10 @@ pub fn run(
                 "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
                 EnvVars::MDTEST_TEST_FILTER,
             );
+
+            println!("\n{}\n", "-".repeat(50));
         }
     }
-
-    println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
 
