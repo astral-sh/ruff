@@ -11,7 +11,7 @@ SIM114 [*] Combine `if` branches using logical `or` operator
 5 | |     b
   | |_____^
 6 |
-7 |   if x == 1:
+7 |   if a:  # we preserve comments, too!
   |
 help: Combine `if` branches
 1 | # Errors
@@ -21,94 +21,120 @@ help: Combine `if` branches
 2 + if a or c:
 3 |     b
 4 | 
-5 | if x == 1:
+5 | if a:  # we preserve comments, too!
 
 SIM114 [*] Combine `if` branches using logical `or` operator
   --> SIM114.py:7:1
    |
  5 |       b
  6 |
- 7 | / if x == 1:
- 8 | |     for _ in range(20):
- 9 | |         print("hello")
-10 | | elif x == 2:
-11 | |     for _ in range(20):
-12 | |         print("hello")
-   | |______________________^
-13 |
-14 |   if x == 1:
+ 7 | / if a:  # we preserve comments, too!
+ 8 | |     b
+ 9 | | elif c:  # but not on the second branch
+10 | |     b
+   | |_____^
+11 |
+12 |   if x == 1:
    |
 help: Combine `if` branches
 4  | elif c:
 5  |     b
 6  | 
+   - if a:  # we preserve comments, too!
+   -     b
+   - elif c:  # but not on the second branch
+7  + if a or c:  # we preserve comments, too!
+8  |     b
+9  | 
+10 | if x == 1:
+note: This is an unsafe fix and may change runtime behavior
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+  --> SIM114.py:12:1
+   |
+10 |       b
+11 |
+12 | / if x == 1:
+13 | |     for _ in range(20):
+14 | |         print("hello")
+15 | | elif x == 2:
+16 | |     for _ in range(20):
+17 | |         print("hello")
+   | |______________________^
+18 |
+19 |   if x == 1:
+   |
+help: Combine `if` branches
+9  | elif c:  # but not on the second branch
+10 |     b
+11 | 
    - if x == 1:
    -     for _ in range(20):
    -         print("hello")
    - elif x == 2:
-7  + if x == 1 or x == 2:
-8  |     for _ in range(20):
-9  |         print("hello")
-10 | 
+12 + if x == 1 or x == 2:
+13 |     for _ in range(20):
+14 |         print("hello")
+15 | 
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:14:1
+  --> SIM114.py:19:1
    |
-12 |           print("hello")
-13 |
-14 | / if x == 1:
-15 | |     if True:
-16 | |         for _ in range(20):
-17 | |             print("hello")
-18 | | elif x == 2:
-19 | |     if True:
-20 | |         for _ in range(20):
-21 | |             print("hello")
-   | |__________________________^
-22 |
-23 |   if x == 1:
-   |
-help: Combine `if` branches
-11 |     for _ in range(20):
-12 |         print("hello")
-13 | 
-   - if x == 1:
-   -     if True:
-   -         for _ in range(20):
-   -             print("hello")
-   - elif x == 2:
-14 + if x == 1 or x == 2:
-15 |     if True:
-16 |         for _ in range(20):
-17 |             print("hello")
-
-SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:23:1
-   |
-21 |               print("hello")
-22 |
-23 | / if x == 1:
+17 |           print("hello")
+18 |
+19 | / if x == 1:
+20 | |     if True:
+21 | |         for _ in range(20):
+22 | |             print("hello")
+23 | | elif x == 2:
 24 | |     if True:
 25 | |         for _ in range(20):
 26 | |             print("hello")
-27 | |     elif False:
-28 | |         for _ in range(20):
-29 | |             print("hello")
-30 | | elif x == 2:
-31 | |     if True:
-32 | |         for _ in range(20):
-33 | |             print("hello")
-34 | |     elif False:
-35 | |         for _ in range(20):
-36 | |             print("hello")
    | |__________________________^
-37 |
-38 |   if (
+27 |
+28 |   if x == 1:
    |
 help: Combine `if` branches
-20 |         for _ in range(20):
-21 |             print("hello")
-22 | 
+16 |     for _ in range(20):
+17 |         print("hello")
+18 | 
+   - if x == 1:
+   -     if True:
+   -         for _ in range(20):
+   -             print("hello")
+   - elif x == 2:
+19 + if x == 1 or x == 2:
+20 |     if True:
+21 |         for _ in range(20):
+22 |             print("hello")
+
+SIM114 [*] Combine `if` branches using logical `or` operator
+  --> SIM114.py:28:1
+   |
+26 |               print("hello")
+27 |
+28 | / if x == 1:
+29 | |     if True:
+30 | |         for _ in range(20):
+31 | |             print("hello")
+32 | |     elif False:
+33 | |         for _ in range(20):
+34 | |             print("hello")
+35 | | elif x == 2:
+36 | |     if True:
+37 | |         for _ in range(20):
+38 | |             print("hello")
+39 | |     elif False:
+40 | |         for _ in range(20):
+41 | |             print("hello")
+   | |__________________________^
+42 |
+43 |   if (
+   |
+help: Combine `if` branches
+25 |         for _ in range(20):
+26 |             print("hello")
+27 | 
    - if x == 1:
    -     if True:
    -         for _ in range(20):
@@ -117,364 +143,362 @@ help: Combine `if` branches
    -         for _ in range(20):
    -             print("hello")
    - elif x == 2:
-23 + if x == 1 or x == 2:
-24 |     if True:
-25 |         for _ in range(20):
-26 |             print("hello")
+28 + if x == 1 or x == 2:
+29 |     if True:
+30 |         for _ in range(20):
+31 |             print("hello")
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:24:5
+  --> SIM114.py:29:5
    |
-23 |   if x == 1:
-24 | /     if True:
-25 | |         for _ in range(20):
-26 | |             print("hello")
-27 | |     elif False:
-28 | |         for _ in range(20):
-29 | |             print("hello")
+28 |   if x == 1:
+29 | /     if True:
+30 | |         for _ in range(20):
+31 | |             print("hello")
+32 | |     elif False:
+33 | |         for _ in range(20):
+34 | |             print("hello")
    | |__________________________^
-30 |   elif x == 2:
-31 |       if True:
+35 |   elif x == 2:
+36 |       if True:
    |
 help: Combine `if` branches
-21 |             print("hello")
-22 | 
-23 | if x == 1:
+26 |             print("hello")
+27 | 
+28 | if x == 1:
    -     if True:
    -         for _ in range(20):
    -             print("hello")
    -     elif False:
-24 +     if True or False:
-25 |         for _ in range(20):
-26 |             print("hello")
-27 | elif x == 2:
+29 +     if True or False:
+30 |         for _ in range(20):
+31 |             print("hello")
+32 | elif x == 2:
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:31:5
+  --> SIM114.py:36:5
    |
-29 |               print("hello")
-30 |   elif x == 2:
-31 | /     if True:
-32 | |         for _ in range(20):
-33 | |             print("hello")
-34 | |     elif False:
-35 | |         for _ in range(20):
-36 | |             print("hello")
+34 |               print("hello")
+35 |   elif x == 2:
+36 | /     if True:
+37 | |         for _ in range(20):
+38 | |             print("hello")
+39 | |     elif False:
+40 | |         for _ in range(20):
+41 | |             print("hello")
    | |__________________________^
-37 |
-38 |   if (
+42 |
+43 |   if (
    |
 help: Combine `if` branches
-28 |         for _ in range(20):
-29 |             print("hello")
-30 | elif x == 2:
+33 |         for _ in range(20):
+34 |             print("hello")
+35 | elif x == 2:
    -     if True:
    -         for _ in range(20):
    -             print("hello")
    -     elif False:
-31 +     if True or False:
-32 |         for _ in range(20):
-33 |             print("hello")
-34 | 
+36 +     if True or False:
+37 |         for _ in range(20):
+38 |             print("hello")
+39 | 
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:38:1
+  --> SIM114.py:43:1
    |
-36 |               print("hello")
-37 |
-38 | / if (
-39 | |     x == 1
-40 | |     and y == 2
-41 | |     and z == 3
-42 | |     and a == 4
-43 | |     and b == 5
-44 | |     and c == 6
-45 | |     and d == 7
-46 | |     and e == 8
-47 | |     and f == 9
-48 | |     and g == 10
-49 | |     and h == 11
-50 | |     and i == 12
-51 | |     and j == 13
-52 | |     and k == 14
-53 | | ):
-54 | |     pass
-55 | | elif 1 == 2:
-56 | |     pass
+41 |               print("hello")
+42 |
+43 | / if (
+44 | |     x == 1
+45 | |     and y == 2
+46 | |     and z == 3
+47 | |     and a == 4
+48 | |     and b == 5
+49 | |     and c == 6
+50 | |     and d == 7
+51 | |     and e == 8
+52 | |     and f == 9
+53 | |     and g == 10
+54 | |     and h == 11
+55 | |     and i == 12
+56 | |     and j == 13
+57 | |     and k == 14
+58 | | ):
+59 | |     pass
+60 | | elif 1 == 2:
+61 | |     pass
    | |________^
-57 |
-58 |   if result.eofs == "O":
+62 |
+63 |   if result.eofs == "O":
    |
 help: Combine `if` branches
-50 |     and i == 12
-51 |     and j == 13
-52 |     and k == 14
+55 |     and i == 12
+56 |     and j == 13
+57 |     and k == 14
    - ):
    -     pass
    - elif 1 == 2:
-53 + ) or 1 == 2:
-54 |     pass
-55 | 
-56 | if result.eofs == "O":
+58 + ) or 1 == 2:
+59 |     pass
+60 | 
+61 | if result.eofs == "O":
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:62:1
+  --> SIM114.py:67:1
    |
-60 |   elif result.eofs == "S":
-61 |       skipped = 1
-62 | / elif result.eofs == "F":
-63 | |     errors = 1
-64 | | elif result.eofs == "E":
-65 | |     errors = 1
+65 |   elif result.eofs == "S":
+66 |       skipped = 1
+67 | / elif result.eofs == "F":
+68 | |     errors = 1
+69 | | elif result.eofs == "E":
+70 | |     errors = 1
    | |______________^
-66 |   elif result.eofs == "X":
-67 |       errors = 1
+71 |   elif result.eofs == "X":
+72 |       errors = 1
    |
 help: Combine `if` branches
-59 |     pass
-60 | elif result.eofs == "S":
-61 |     skipped = 1
+64 |     pass
+65 | elif result.eofs == "S":
+66 |     skipped = 1
    - elif result.eofs == "F":
    -     errors = 1
    - elif result.eofs == "E":
-62 + elif result.eofs == "F" or result.eofs == "E":
-63 |     errors = 1
-64 | elif result.eofs == "X":
-65 |     errors = 1
+67 + elif result.eofs == "F" or result.eofs == "E":
+68 |     errors = 1
+69 | elif result.eofs == "X":
+70 |     errors = 1
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:64:1
+  --> SIM114.py:69:1
    |
-62 |   elif result.eofs == "F":
-63 |       errors = 1
-64 | / elif result.eofs == "E":
-65 | |     errors = 1
-66 | | elif result.eofs == "X":
-67 | |     errors = 1
+67 |   elif result.eofs == "F":
+68 |       errors = 1
+69 | / elif result.eofs == "E":
+70 | |     errors = 1
+71 | | elif result.eofs == "X":
+72 | |     errors = 1
    | |______________^
-68 |   elif result.eofs == "C":
-69 |       errors = 1
+73 |   elif result.eofs == "C":
+74 |       errors = 1
    |
 help: Combine `if` branches
-61 |     skipped = 1
-62 | elif result.eofs == "F":
-63 |     errors = 1
+66 |     skipped = 1
+67 | elif result.eofs == "F":
+68 |     errors = 1
    - elif result.eofs == "E":
    -     errors = 1
    - elif result.eofs == "X":
-64 + elif result.eofs == "E" or result.eofs == "X":
-65 |     errors = 1
-66 | elif result.eofs == "C":
-67 |     errors = 1
+69 + elif result.eofs == "E" or result.eofs == "X":
+70 |     errors = 1
+71 | elif result.eofs == "C":
+72 |     errors = 1
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-  --> SIM114.py:66:1
+  --> SIM114.py:71:1
    |
-64 |   elif result.eofs == "E":
-65 |       errors = 1
-66 | / elif result.eofs == "X":
-67 | |     errors = 1
-68 | | elif result.eofs == "C":
-69 | |     errors = 1
+69 |   elif result.eofs == "E":
+70 |       errors = 1
+71 | / elif result.eofs == "X":
+72 | |     errors = 1
+73 | | elif result.eofs == "C":
+74 | |     errors = 1
    | |______________^
    |
 help: Combine `if` branches
-63 |     errors = 1
-64 | elif result.eofs == "E":
-65 |     errors = 1
+68 |     errors = 1
+69 | elif result.eofs == "E":
+70 |     errors = 1
    - elif result.eofs == "X":
    -     errors = 1
    - elif result.eofs == "C":
-66 + elif result.eofs == "X" or result.eofs == "C":
-67 |     errors = 1
-68 | 
-69 | 
+71 + elif result.eofs == "X" or result.eofs == "C":
+72 |     errors = 1
+73 | 
+74 | 
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:102:1
+   --> SIM114.py:107:1
     |
-100 |       errors = 1
-101 |
-102 | / if a:
-103 | |     # Ignore branches with diverging comments because it means we're repeating
-104 | |     # the bodies because we have different reasons for each branch
-105 | |     x = 1
-106 | | elif c:
-107 | |     x = 1
+105 |       errors = 1
+106 |
+107 | / if a:
+108 | |     # Ignore branches with diverging comments because it means we're repeating
+109 | |     # the bodies because we have different reasons for each branch
+110 | |     x = 1
+111 | | elif c:
+112 | |     x = 1
     | |_________^
     |
 help: Combine `if` branches
-99  | else:
-100 |     errors = 1
-101 | 
+104 | else:
+105 |     errors = 1
+106 | 
     - if a:
-102 + if a or c:
-103 |     # Ignore branches with diverging comments because it means we're repeating
-104 |     # the bodies because we have different reasons for each branch
+107 + if a or c:
+108 |     # Ignore branches with diverging comments because it means we're repeating
+109 |     # the bodies because we have different reasons for each branch
     -     x = 1
     - elif c:
-105 |     x = 1
-106 | 
-107 | 
+110 |     x = 1
+111 | 
+112 | 
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:113:5
+   --> SIM114.py:118:5
     |
-111 |       a = True
-112 |       b = False
-113 | /     if a > b:  # end-of-line
-114 | |         return 3
-115 | |     elif a == b:
-116 | |         return 3
+116 |       a = True
+117 |       b = False
+118 | /     if a > b:  # end-of-line
+119 | |         return 3
+120 | |     elif a == b:
+121 | |         return 3
     | |________________^
-117 |       elif a < b:  # end-of-line
-118 |           return 4
+122 |       elif a < b:  # end-of-line
+123 |           return 4
     |
 help: Combine `if` branches
-110 | def func():
-111 |     a = True
-112 |     b = False
+115 | def func():
+116 |     a = True
+117 |     b = False
     -     if a > b:  # end-of-line
     -         return 3
     -     elif a == b:
-113 +     if a > b or a == b:  # end-of-line
-114 |         return 3
-115 |     elif a < b:  # end-of-line
-116 |         return 4
+118 +     if a > b or a == b:  # end-of-line
+119 |         return 3
+120 |     elif a < b:  # end-of-line
+121 |         return 4
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:117:5
+   --> SIM114.py:122:5
     |
-115 |       elif a == b:
-116 |           return 3
-117 | /     elif a < b:  # end-of-line
-118 | |         return 4
-119 | |     elif b is None:
-120 | |         return 4
+120 |       elif a == b:
+121 |           return 3
+122 | /     elif a < b:  # end-of-line
+123 | |         return 4
+124 | |     elif b is None:
+125 | |         return 4
     | |________________^
     |
 help: Combine `if` branches
-114 |         return 3
-115 |     elif a == b:
-116 |         return 3
+119 |         return 3
+120 |     elif a == b:
+121 |         return 3
     -     elif a < b:  # end-of-line
     -         return 4
     -     elif b is None:
-117 +     elif a < b or b is None:  # end-of-line
-118 |         return 4
-119 | 
-120 | 
+122 +     elif a < b or b is None:  # end-of-line
+123 |         return 4
+124 | 
+125 | 
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:127:5
+   --> SIM114.py:132:5
     |
-125 |       a = True
-126 |       b = False
-127 | /     if a > b:  # end-of-line
-128 | |         return 3
-129 | |     elif a := 1:
-130 | |         return 3
+130 |       a = True
+131 |       b = False
+132 | /     if a > b:  # end-of-line
+133 | |         return 3
+134 | |     elif a := 1:
+135 | |         return 3
     | |________________^
     |
 help: Combine `if` branches
-124 |     """Ensure that the named expression is parenthesized when merged."""
-125 |     a = True
-126 |     b = False
+129 |     """Ensure that the named expression is parenthesized when merged."""
+130 |     a = True
+131 |     b = False
     -     if a > b:  # end-of-line
     -         return 3
     -     elif a := 1:
-127 +     if a > b or (a := 1):  # end-of-line
-128 |         return 3
-129 | 
-130 | 
+132 +     if a > b or (a := 1):  # end-of-line
+133 |         return 3
+134 | 
+135 | 
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:135:1
+   --> SIM114.py:138:1
     |
-133 |   # https://github.com/astral-sh/ruff/pull/19759
-134 |   # The autofix for this is unsafe due to the comments.
-135 | / if a:  # we preserve comments, too!
-136 | |     b
-137 | | elif c:  # but not on the second branch
-138 | |     b
+138 | / if a:  # we preserve comments, too!
+139 | |     b
+140 | | elif c:  # but not on the second branch
+141 | |     b
     | |_____^
     |
 help: Combine `if` branches
-132 | 
-133 | # https://github.com/astral-sh/ruff/pull/19759
-134 | # The autofix for this is unsafe due to the comments.
+135 |         return 3
+136 | 
+137 | 
     - if a:  # we preserve comments, too!
     -     b
     - elif c:  # but not on the second branch
-135 + if a or c:  # we preserve comments, too!
-136 |     b
-137 | 
-138 | 
+138 + if a or c:  # we preserve comments, too!
+139 |     b
+140 | 
+141 | 
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:141:1
+   --> SIM114.py:144:1
     |
-141 | / if a: b  # here's a comment
-142 | | elif c: b
+144 | / if a: b  # here's a comment
+145 | | elif c: b
     | |_________^
     |
 help: Combine `if` branches
-138 |     b
-139 | 
-140 | 
-    - if a: b  # here's a comment
-    - elif c: b
-141 + if a or c: b  # here's a comment
+141 |     b
 142 | 
 143 | 
-144 | if(x > 200): pass
+    - if a: b  # here's a comment
+    - elif c: b
+144 + if a or c: b  # here's a comment
+145 | 
+146 | 
+147 | if(x > 200): pass
 note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:145:1
+   --> SIM114.py:148:1
     |
-145 | / if(x > 200): pass
-146 | | elif(100 < x and x < 200 and 300 < y and y < 800):
-147 | |     pass
+148 | / if(x > 200): pass
+149 | | elif(100 < x and x < 200 and 300 < y and y < 800):
+150 | |     pass
     | |________^
     |
 help: Combine `if` branches
-142 | elif c: b
-143 | 
-144 | 
+145 | elif c: b
+146 | 
+147 | 
     - if(x > 200): pass
     - elif(100 < x and x < 200 and 300 < y and y < 800):
     - 	pass
-145 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
-146 | 
-147 | 
-148 | # See: https://github.com/astral-sh/ruff/issues/12732
+148 + if(x > 200) or (100 < x and x < 200 and 300 < y and y < 800): pass
+149 | 
+150 | 
+151 | # See: https://github.com/astral-sh/ruff/issues/12732
 
 SIM114 [*] Combine `if` branches using logical `or` operator
-   --> SIM114.py:151:1
+   --> SIM114.py:154:1
     |
-150 |   # See: https://github.com/astral-sh/ruff/issues/12732
-151 | / if False if True else False:
-152 | |     print(1)
-153 | | elif True:
-154 | |     print(1)
+153 |   # See: https://github.com/astral-sh/ruff/issues/12732
+154 | / if False if True else False:
+155 | |     print(1)
+156 | | elif True:
+157 | |     print(1)
     | |____________^
-155 |   else:
-156 |       print(2)
+158 |   else:
+159 |       print(2)
     |
 help: Combine `if` branches
-148 | 
-149 | 
-150 | # See: https://github.com/astral-sh/ruff/issues/12732
+151 | 
+152 | 
+153 | # See: https://github.com/astral-sh/ruff/issues/12732
     - if False if True else False:
     -     print(1)
     - elif True:
-151 + if (False if True else False) or True:
-152 |     print(1)
-153 | else:
-154 |     print(2)
+154 + if (False if True else False) or True:
+155 |     print(1)
+156 | else:
+157 |     print(2)
