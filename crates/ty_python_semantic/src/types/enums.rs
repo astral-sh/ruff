@@ -325,10 +325,7 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
             //
             // For now, we filter out Unknown and expect exactly one nonmember type
             // to remain. If there are other non-Unknown types mixed in, we bail out.
-            let mut non_unknown = union
-                .elements(db)
-                .iter()
-                .filter(|elem| !elem.is_unknown());
+            let mut non_unknown = union.elements(db).iter().filter(|elem| !elem.is_unknown());
 
             let first = non_unknown.next()?;
 
