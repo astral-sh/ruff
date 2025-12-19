@@ -38,8 +38,14 @@ class MDTestRunner:
     console: Console
     filters: list[str]
     enable_external: bool
+    upgrade_lockfiles: bool
 
-    def __init__(self, filters: list[str] | None, enable_external: bool) -> None:
+    def __init__(
+        self,
+        filters: list[str] | None,
+        enable_external: bool,
+        upgrade_lockfiles: bool,
+    ) -> None:
         self.mdtest_executable = None
         self.console = Console()
         self.filters = [
@@ -47,6 +53,7 @@ class MDTestRunner:
             for f in (filters or [])
         ]
         self.enable_external = enable_external
+        self.upgrade_lockfiles = upgrade_lockfiles
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -123,6 +130,7 @@ class MDTestRunner:
                 INSTA_FORCE_PASS="1",
                 INSTA_OUTPUT="none",
                 MDTEST_EXTERNAL="1" if self.enable_external else "0",
+                MDTEST_UPGRADE_LOCKFILES="1" if self.upgrade_lockfiles else "0",
             ),
             capture_output=capture_output,
             text=True,
@@ -275,12 +283,19 @@ def main() -> None:
         action="store_true",
         help="Enable tests with external dependencies",
     )
+    parser.add_argument(
+        "--no-lockfile-upgrades",
+        action="store_true",
+        help="Do not regenerate lockfiles for external dependency tests",
+    )
 
     args = parser.parse_args()
 
     try:
         runner = MDTestRunner(
-            filters=args.filters, enable_external=args.enable_external
+            filters=args.filters,
+            enable_external=args.enable_external,
+            upgrade_lockfiles=not args.no_lockfile_upgrades,
         )
         runner.watch()
     except KeyboardInterrupt:
