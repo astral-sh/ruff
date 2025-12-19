@@ -524,6 +524,20 @@ When the either the parameter or the return type is a generic alias referring to
 should still be able to propagate the specializations through. This should work regardless of the
 typevar's variance in the generic alias.
 
+TODO: This currently only works for the `lift` functions (TODO: and only currently for the covariant
+case). For the `lift` functions, the parameter type is a bare typevar, resulting in us inferring a
+type mapping of `A = int, B = Class[A]`. When specializing, we can substitute the mapping of `A`
+into the mapping of `B`, giving the correct return type.
+
+For the `head` functions, the parameter type is a generic alias, resulting in us inferring a type
+mapping of `A = Class[int], A = Class[B]`. At this point, the old solver is not able to unify the
+two mappings for `A`, and we have no mapping for `B`. As a result, we infer `Unknown` for the return
+type.
+
+As part of migrating to the new solver, we will generate a single constraint set combining all of
+the facts that we learn while checking the arguments. And the constraint set implementation should
+be able to unify the two assignments to `A`.
+
 `covariant.py`:
 
 ```py
