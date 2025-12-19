@@ -204,6 +204,7 @@ struct SemanticTokenVisitor<'db> {
     in_class_scope: bool,
     in_type_annotation: bool,
     in_target_creating_definition: bool,
+    in_docstring: bool,
     expecting_docstring: bool,
     range_filter: Option<TextRange>,
 }
@@ -216,6 +217,7 @@ impl<'db> SemanticTokenVisitor<'db> {
             in_class_scope: false,
             in_target_creating_definition: false,
             in_type_annotation: false,
+            in_docstring: false,
             range_filter,
             expecting_docstring: false,
         }
@@ -823,17 +825,11 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_body(&try_stmt.finalbody);
             }
             ast::Stmt::Expr(expr) => {
-                if expecting_docstring && let Expr::StringLiteral(string_expr) = &*expr.value {
-                    for string_literal in &string_expr.value {
-                        self.add_token(
-                            string_literal.range(),
-                            SemanticTokenType::String,
-                            SemanticTokenModifier::DOCUMENTATION,
-                        );
-                    }
-                } else {
-                    walk_stmt(self, stmt);
+                if expecting_docstring && expr.value.is_string_literal_expr() {
+                    self.in_docstring = true;
                 }
+                walk_stmt(self, stmt);
+                self.in_docstring = false;
             }
             _ => {
                 // For all other statement types, let the default visitor handle them
@@ -928,11 +924,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
     fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
         // Emit a semantic token for this string literal part
-        self.add_token(
-            string_literal.range(),
-            SemanticTokenType::String,
-            SemanticTokenModifier::empty(),
-        );
+        let modifiers = if self.in_docstring {
+            SemanticTokenModifier::DOCUMENTATION
+        } else {
+            SemanticTokenModifier::empty()
+        };
+        self.add_token(string_literal.range(), SemanticTokenType::String, modifiers);
     }
 
     fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
