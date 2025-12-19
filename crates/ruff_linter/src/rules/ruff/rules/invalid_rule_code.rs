@@ -52,6 +52,7 @@ impl InvalidRuleCodeKind {
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
     pub(crate) kind: InvalidRuleCodeKind,
+    pub(crate) whole_comment: bool,
 }
 
 impl AlwaysFixableViolation for InvalidRuleCode {
@@ -65,7 +66,11 @@ impl AlwaysFixableViolation for InvalidRuleCode {
     }
 
     fn fix_title(&self) -> String {
-        "Remove the rule code".to_string()
+        if self.whole_comment {
+            format!("Remove the {} comment", self.kind.as_str())
+        } else {
+            format!("Remove rule code {}", self.rule_code)
+        }
     }
 }
 
@@ -122,6 +127,7 @@ fn all_codes_invalid_diagnostic(
                     .collect::<Vec<_>>()
                     .join(", "),
                 kind: InvalidRuleCodeKind::Noqa,
+                whole_comment: true,
             },
             directive.range(),
         )
@@ -139,6 +145,7 @@ fn some_codes_are_invalid_diagnostic(
             InvalidRuleCode {
                 rule_code: invalid_code.to_string(),
                 kind: InvalidRuleCodeKind::Noqa,
+                whole_comment: false,
             },
             invalid_code.range(),
         )
