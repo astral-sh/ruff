@@ -926,7 +926,7 @@
         "possibly-missing-import": {
           "title": "detects possibly missing imports",
           "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
-          "default": "warn",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"

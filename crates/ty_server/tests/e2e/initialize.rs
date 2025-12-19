@@ -1,5 +1,6 @@
 use anyhow::Result;
-use lsp_types::{Position, notification::ShowMessage, request::RegisterCapability};
+use lsp_types::notification::ShowMessage;
+use lsp_types::{Position, request::RegisterCapability};
 use ruff_db::system::SystemPath;
 use serde_json::Value;
 use ty_server::{ClientOptions, DiagnosticMode};
@@ -471,6 +472,30 @@ fn register_multiple_capabilities() -> Result<()> {
       }
     ]
     "#);
+
+    Ok(())
+}
+
+/// Tests that the server doesn't panic when `VIRTUAL_ENV` points to a non-existent directory.
+///
+/// See: <https://github.com/astral-sh/ty/issues/2031>
+#[test]
+fn missing_virtual_env_does_not_panic() -> Result<()> {
+    let workspace_root = SystemPath::new("project");
+
+    // This should not panic even though VIRTUAL_ENV points to a non-existent path
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(workspace_root, None)?
+        .with_env_var("VIRTUAL_ENV", "/nonexistent/virtual/env/path")
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    let _show_message_params = server.await_notification::<ShowMessage>();
+
+    // Something accursed in the escaping pipeline produces `\/` in windows paths
+    // and I can't for the life of me get insta to escape it properly, so I just
+    // need to move on with my life and not debug this right now, but ideally we
+    // would snapshot the message here.
 
     Ok(())
 }

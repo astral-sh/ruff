@@ -210,6 +210,7 @@ pub(crate) fn is_argument_non_default(arguments: &Arguments, name: &str, positio
 
 /// Returns `true` if the given call is a top-level expression in its statement.
 /// This means the call's return value is not used, so return type changes don't matter.
-pub(crate) fn is_top_level_expression_call(checker: &Checker) -> bool {
+pub(crate) fn is_top_level_expression_in_statement(checker: &Checker) -> bool {
     checker.semantic().current_expression_parent().is_none()
+        && checker.semantic().current_statement().is_expr_stmt()
 }

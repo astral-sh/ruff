@@ -2,7 +2,7 @@ use crate::server::schedule::Task;
 use crate::session::Session;
 use anyhow::anyhow;
 use lsp_server as server;
-use lsp_server::RequestId;
+use lsp_server::{ErrorCode, RequestId};
 use lsp_types::notification::Notification;
 use lsp_types::request::Request;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
@@ -120,9 +120,10 @@ pub(super) fn request(req: server::Request) -> Task {
         tracing::error!("Encountered error when routing request with ID {id}: {err}");
 
         Task::sync(move |_session, client| {
-            client.show_error_message(
-                "ty failed to handle a request from the editor. Check the logs for more details.",
-            );
+            if matches!(err.code, ErrorCode::InternalError) {
+                client.show_error_message("ty failed to handle a request from the editor. Check the logs for more details.");
+            }
+
             respond_silent_error(
                 id,
                 client,
@@ -172,14 +173,16 @@ pub(super) fn notification(notif: server::Notification) -> Task {
             return Task::nothing();
         }
     }
-        .unwrap_or_else(|err| {
-            tracing::error!("Encountered error when routing notification: {err}");
-            Task::sync(|_session, client| {
+    .unwrap_or_else(|err| {
+        tracing::error!("Encountered error when routing notification: {err}");
+        Task::sync(move |_session, client| {
+            if matches!(err.code, ErrorCode::InternalError) {
                 client.show_error_message(
                     "ty failed to handle a notification from the editor. Check the logs for more details."
                 );
-            })
+            }
         })
+    })
 }
 
 fn sync_request_task<R: traits::SyncRequestHandler>(req: server::Request) -> Result<Task>
@@ -438,7 +441,7 @@ where
                     than the one whose method name was matched against earlier.")
             }
         })
-        .with_failure_code(server::ErrorCode::InternalError)
+        .with_failure_code(server::ErrorCode::InvalidParams)
 }
 
 /// Sends back a response to the client, but only if the request wasn't cancelled.
@@ -486,7 +489,7 @@ where
                         than the one whose method name was matched against earlier.")
                 }
             })
-            .with_failure_code(server::ErrorCode::InternalError)?,
+            .with_failure_code(server::ErrorCode::InvalidParams)?,
     ))
 }
 

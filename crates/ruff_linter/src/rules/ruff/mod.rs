@@ -313,12 +313,20 @@ mod tests {
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
-            ]),
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
+            ])
+            .with_external_rules(&["TK421"]),
             &settings::LinterSettings::for_rules(vec![
                 Rule::UnusedVariable,
                 Rule::AmbiguousVariableName,
                 Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
             ])
+            .with_external_rules(&["TK421"])
             .with_preview_mode(),
         );
         Ok(())

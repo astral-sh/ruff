@@ -2,18 +2,25 @@
 use crate::{self as ast, AnyNodeRef, ExceptHandler, Stmt};
 
 /// Given a [`Stmt`] and its parent, return the [`ast::Suite`] that contains the [`Stmt`].
-pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<EnclosingSuite<'a>> {
+pub fn suite<'a>(
+    stmt: impl Into<AnyNodeRef<'a>>,
+    parent: impl Into<AnyNodeRef<'a>>,
+) -> Option<EnclosingSuite<'a>> {
     // TODO: refactor this to work without a parent, ie when `stmt` is at the top level
-    match parent {
-        Stmt::FunctionDef(ast::StmtFunctionDef { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::ClassDef(ast::StmtClassDef { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::For(ast::StmtFor { body, orelse, .. }) => [body, orelse]
+    let stmt = stmt.into();
+    match parent.into() {
+        AnyNodeRef::ModModule(ast::ModModule { body, .. }) => EnclosingSuite::new(body, stmt),
+        AnyNodeRef::StmtFunctionDef(ast::StmtFunctionDef { body, .. }) => {
+            EnclosingSuite::new(body, stmt)
+        }
+        AnyNodeRef::StmtClassDef(ast::StmtClassDef { body, .. }) => EnclosingSuite::new(body, stmt),
+        AnyNodeRef::StmtFor(ast::StmtFor { body, orelse, .. }) => [body, orelse]
             .iter()
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::While(ast::StmtWhile { body, orelse, .. }) => [body, orelse]
+        AnyNodeRef::StmtWhile(ast::StmtWhile { body, orelse, .. }) => [body, orelse]
             .iter()
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::If(ast::StmtIf {
+        AnyNodeRef::StmtIf(ast::StmtIf {
             body,
             elif_else_clauses,
             ..
@@ -21,12 +28,12 @@ pub fn suite<'a>(stmt: &'a Stmt, parent: &'a Stmt) -> Option<EnclosingSuite<'a>>
             .into_iter()
             .chain(elif_else_clauses.iter().map(|clause| &clause.body))
             .find_map(|suite| EnclosingSuite::new(suite, stmt)),
-        Stmt::With(ast::StmtWith { body, .. }) => EnclosingSuite::new(body, stmt),
-        Stmt::Match(ast::StmtMatch { cases, .. }) => cases
+        AnyNodeRef::StmtWith(ast::StmtWith { body, .. }) => EnclosingSuite::new(body, stmt),
+        AnyNodeRef::StmtMatch(ast::StmtMatch { cases, .. }) => cases
             .iter()
             .map(|case| &case.body)
             .find_map(|body| EnclosingSuite::new(body, stmt)),
-        Stmt::Try(ast::StmtTry {
+        AnyNodeRef::StmtTry(ast::StmtTry {
             body,
             handlers,
             orelse,
@@ -51,10 +58,10 @@ pub struct EnclosingSuite<'a> {
 }
 
 impl<'a> EnclosingSuite<'a> {
-    pub fn new(suite: &'a [Stmt], stmt: &'a Stmt) -> Option<Self> {
+    pub fn new(suite: &'a [Stmt], stmt: AnyNodeRef<'a>) -> Option<Self> {
         let position = suite
             .iter()
-            .position(|sibling| AnyNodeRef::ptr_eq(sibling.into(), stmt.into()))?;
+            .position(|sibling| AnyNodeRef::ptr_eq(sibling.into(), stmt))?;
 
         Some(EnclosingSuite { suite, position })
     }

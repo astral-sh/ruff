@@ -1,6 +1,7 @@
 use crate::config::Log;
 use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
+use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
@@ -19,9 +20,9 @@ use std::fmt::{Display, Write};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
-    resolve_module_confident,
+    MisconfigurationMode, Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SearchPath, SearchPathSettings,
+    SysPrefixPathOrigin, list_modules, resolve_module_confident,
 };
 
 mod assertion;
@@ -41,18 +42,14 @@ use ty_static::EnvVars;
 pub fn run(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
+    source: &str,
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
     output_format: OutputFormat,
-) {
-    let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
-    let suite = match test_parser::parse(short_title, &source) {
-        Ok(suite) => suite,
-        Err(err) => {
-            panic!("Error parsing `{absolute_fixture_path}`: {err:?}")
-        }
-    };
+) -> anyhow::Result<()> {
+    let suite = test_parser::parse(short_title, source)
+        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
 
@@ -86,7 +83,7 @@ pub fn run(
         }
 
         if let Err(failures) = result {
-            let md_index = LineIndex::from_source_text(&source);
+            let md_index = LineIndex::from_source_text(source);
 
             for test_failures in failures {
                 let source_map =
@@ -156,6 +153,8 @@ pub fn run(
     println!("\n{}\n", "-".repeat(50));
 
     assert!(!any_failures, "Some tests failed.");
+
+    Ok(())
 }
 
 /// Defines the format in which mdtest should print an error to the terminal
@@ -441,6 +440,7 @@ fn run_test(
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
+            misconfiguration_mode: MisconfigurationMode::Fail,
         }
         .to_search_paths(db.system(), db.vendored())
         .expect("Failed to resolve search path settings"),

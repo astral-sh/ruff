@@ -89,7 +89,6 @@ Settings: Settings {
         "positional-only-parameter-as-kwarg": Error (Default),
         "possibly-missing-attribute": Warning (Default),
         "possibly-missing-implicit-call": Warning (Default),
-        "possibly-missing-import": Warning (Default),
         "raw-string-type-annotation": Error (Default),
         "redundant-cast": Warning (Default),
         "static-assert-error": Error (Default),

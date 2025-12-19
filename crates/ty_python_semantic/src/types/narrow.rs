@@ -459,6 +459,82 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .expect("We should always have a place for every `PlaceExpr`")
     }
 
+    /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
+    ///
+    /// These are types where we know `__bool__` and `__len__` are consistent and the type
+    /// cannot be subclassed with a `__bool__` that disagrees.
+    fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
+            Type::NominalInstance(instance) => instance.tuple_spec(db).is_some(),
+            _ => false,
+        }
+    }
+
+    /// Narrow a type based on `len()`, only narrowing the parts that are safe to narrow.
+    ///
+    /// For narrowable types (literals, tuples), we apply `~AlwaysFalsy` (positive) or
+    /// `~AlwaysTruthy` (negative). For non-narrowable types, we return them unchanged.
+    ///
+    /// Returns `None` if no part of the type is narrowable.
+    fn narrow_type_by_len(db: &'db dyn Db, ty: Type<'db>, is_positive: bool) -> Option<Type<'db>> {
+        match ty {
+            Type::Union(union) => {
+                let mut has_narrowable = false;
+                let narrowed_elements: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| {
+                        if let Some(narrowed) = Self::narrow_type_by_len(db, *element, is_positive)
+                        {
+                            has_narrowable = true;
+                            narrowed
+                        } else {
+                            // Non-narrowable elements are kept unchanged.
+                            *element
+                        }
+                    })
+                    .collect();
+
+                if has_narrowable {
+                    Some(UnionType::from_elements(db, narrowed_elements))
+                } else {
+                    None
+                }
+            }
+            Type::Intersection(intersection) => {
+                // For intersections, check if any positive element is narrowable.
+                let positive = intersection.positive(db);
+                let has_narrowable = positive
+                    .iter()
+                    .any(|element| Self::is_base_type_narrowable_by_len(db, *element));
+
+                if has_narrowable {
+                    // Apply the narrowing constraint to the whole intersection.
+                    let mut builder = IntersectionBuilder::new(db).add_positive(ty);
+                    if is_positive {
+                        builder = builder.add_negative(Type::AlwaysFalsy);
+                    } else {
+                        builder = builder.add_negative(Type::AlwaysTruthy);
+                    }
+                    Some(builder.build())
+                } else {
+                    None
+                }
+            }
+            _ if Self::is_base_type_narrowable_by_len(db, ty) => {
+                let mut builder = IntersectionBuilder::new(db).add_positive(ty);
+                if is_positive {
+                    builder = builder.add_negative(Type::AlwaysFalsy);
+                } else {
+                    builder = builder.add_negative(Type::AlwaysTruthy);
+                }
+                Some(builder.build())
+            }
+            _ => None,
+        }
+    }
+
     fn evaluate_simple_expr(
         &mut self,
         expr: &ast::Expr,
@@ -900,6 +976,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     place,
                     guarded_ty.negate_if(self.db, !is_positive),
                 )]))
+            }
+            // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
+            // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
+            // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
+            // (str, list, etc.) are kept unchanged.
+            Type::FunctionLiteral(function_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && function_type.known(self.db) == Some(KnownFunction::Len) =>
+            {
+                let arg = &expr_call.arguments.args[0];
+                let arg_ty = inference.expression_type(arg);
+
+                // Narrow only the parts of the type that are safe to narrow based on len().
+                if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
+                    let target = place_expr(arg)?;
+                    let place = self.expect_place(&target);
+                    Some(NarrowingConstraints::from_iter([(place, narrowed_ty)]))
+                } else {
+                    None
+                }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {

@@ -471,6 +471,13 @@ impl LinterSettings {
         self
     }
 
+    #[must_use]
+    pub fn with_external_rules(mut self, rules: &[&str]) -> Self {
+        self.external
+            .extend(rules.iter().map(std::string::ToString::to_string));
+        self
+    }
+
     /// Resolve the [`TargetVersion`] to use for linting.
     ///
     /// This method respects the per-file version overrides in

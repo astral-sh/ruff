@@ -36,6 +36,7 @@ mod notebook;
 mod publish_diagnostics;
 mod pull_diagnostics;
 mod rename;
+mod semantic_tokens;
 mod signature_help;
 
 use std::collections::{BTreeMap, HashMap, VecDeque};
@@ -66,11 +67,12 @@ use lsp_types::{
     DocumentDiagnosticParams, DocumentDiagnosticReportResult, FileEvent, Hover, HoverParams,
     InitializeParams, InitializeResult, InitializedParams, InlayHint, InlayHintClientCapabilities,
     InlayHintParams, NumberOrString, PartialResultParams, Position, PreviousResultId,
-    PublishDiagnosticsClientCapabilities, Range, SignatureHelp, SignatureHelpParams,
-    SignatureHelpTriggerKind, TextDocumentClientCapabilities, TextDocumentContentChangeEvent,
-    TextDocumentIdentifier, TextDocumentItem, TextDocumentPositionParams, Url,
-    VersionedTextDocumentIdentifier, WorkDoneProgressParams, WorkspaceClientCapabilities,
-    WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult, WorkspaceEdit, WorkspaceFolder,
+    PublishDiagnosticsClientCapabilities, Range, SemanticTokensResult, SignatureHelp,
+    SignatureHelpParams, SignatureHelpTriggerKind, TextDocumentClientCapabilities,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentItem,
+    TextDocumentPositionParams, Url, VersionedTextDocumentIdentifier, WorkDoneProgressParams,
+    WorkspaceClientCapabilities, WorkspaceDiagnosticParams, WorkspaceDiagnosticReportResult,
+    WorkspaceEdit, WorkspaceFolder,
 };
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf, TestSystem};
 use rustc_hash::FxHashMap;
@@ -209,6 +211,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
+        env_vars: Vec<(String, String)>,
     ) -> Self {
         setup_tracing();
 
@@ -219,11 +222,16 @@ impl TestServer {
         // Create OS system with the test directory as cwd
         let os_system = OsSystem::new(test_context.root());
 
+        // Create test system and set environment variable overrides
+        let test_system = Arc::new(TestSystem::new(os_system));
+        for (name, value) in env_vars {
+            test_system.set_env_var(name, value);
+        }
+
         // Start the server in a separate thread
         let server_thread = std::thread::spawn(move || {
             // TODO: This should probably be configurable to test concurrency issues
             let worker_threads = NonZeroUsize::new(1).unwrap();
-            let test_system = Arc::new(TestSystem::new(os_system));
 
             match Server::new(worker_threads, server_connection, test_system, true) {
                 Ok(server) => {
@@ -964,6 +972,19 @@ impl TestServer {
         });
         self.await_response::<SignatureHelpRequest>(&signature_help_id)
     }
+
+    pub(crate) fn semantic_tokens_full_request(
+        &mut self,
+        uri: &Url,
+    ) -> Option<SemanticTokensResult> {
+        self.send_request_await::<lsp_types::request::SemanticTokensFullRequest>(
+            lsp_types::SemanticTokensParams {
+                text_document: TextDocumentIdentifier { uri: uri.clone() },
+                work_done_progress_params: lsp_types::WorkDoneProgressParams::default(),
+                partial_result_params: PartialResultParams::default(),
+            },
+        )
+    }
 }
 
 impl fmt::Debug for TestServer {
@@ -1052,6 +1073,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
+    env_vars: Vec<(String, String)>,
 }
 
 impl TestServerBuilder {
@@ -1082,12 +1104,23 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
+            env_vars: Vec::new(),
         })
     }
 
     /// Set the initial client options for the test server
     pub(crate) fn with_initialization_options(mut self, options: ClientOptions) -> Self {
         self.initialization_options = Some(options);
+        self
+    }
+
+    /// Set an environment variable for the test server's system.
+    pub(crate) fn with_env_var(
+        mut self,
+        name: impl Into<String>,
+        value: impl Into<String>,
+    ) -> Self {
+        self.env_vars.push((name.into(), value.into()));
         self
     }
 
@@ -1194,6 +1227,16 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn enable_multiline_token_support(mut self, enabled: bool) -> Self {
+        self.client_capabilities
+            .text_document
+            .get_or_insert_default()
+            .semantic_tokens
+            .get_or_insert_default()
+            .multiline_token_support = Some(enabled);
+        self
+    }
+
     /// Set custom client capabilities (overrides any previously set capabilities)
     #[expect(dead_code)]
     pub(crate) fn with_client_capabilities(mut self, capabilities: ClientCapabilities) -> Self {
@@ -1237,6 +1280,7 @@ impl TestServerBuilder {
             self.test_context,
             self.client_capabilities,
             self.initialization_options,
+            self.env_vars,
         )
     }
 }

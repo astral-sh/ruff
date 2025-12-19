@@ -454,6 +454,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8ImplicitStrConcat, "001") => rules::flake8_implicit_str_concat::rules::SingleLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "002") => rules::flake8_implicit_str_concat::rules::MultiLineImplicitStringConcatenation,
         (Flake8ImplicitStrConcat, "003") => rules::flake8_implicit_str_concat::rules::ExplicitStringConcatenation,
+        (Flake8ImplicitStrConcat, "004") => rules::flake8_implicit_str_concat::rules::ImplicitStringConcatenationInCollectionLiteral,
 
         // flake8-print
         (Flake8Print, "1") => rules::flake8_print::rules::Print,
@@ -1063,6 +1064,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
         (Ruff, "102") => rules::ruff::rules::InvalidRuleCode,
+        (Ruff, "103") => rules::ruff::rules::InvalidSuppressionComment,
+        (Ruff, "104") => rules::ruff::rules::UnmatchedSuppressionComment,
 
         (Ruff, "200") => rules::ruff::rules::InvalidPyprojectToml,
         #[cfg(any(feature = "test-rules", test))]

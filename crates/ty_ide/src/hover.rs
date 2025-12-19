@@ -187,29 +187,42 @@ mod tests {
         let test = cursor_test(
             r#"
         a = 10
+        """This is the docs for this value
+
+        Wow these are good docs!
+        """
 
         a<CURSOR>
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Literal[10]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Literal[10]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:4:1
+         --> main.py:8:1
           |
-        2 | a = 10
-        3 |
-        4 | a
+        6 | """
+        7 |
+        8 | a
           | ^- Cursor offset
           | |
           | source
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -703,6 +716,10 @@ mod tests {
 
             def __init__(a: int, b: str):
                 self.a = a
+                """This is the docs for this value
+
+                Wow these are good docs!
+                """
                 self.b: str = b
 
         foo = Foo()
@@ -718,10 +735,10 @@ mod tests {
         ```
         ---------------------------------------------
         info[hover]: Hovered content is
-          --> main.py:10:5
+          --> main.py:14:5
            |
-         9 | foo = Foo()
-        10 | foo.a
+        13 | foo = Foo()
+        14 | foo.a
            |     -
            |     |
            |     source
@@ -1183,13 +1200,13 @@ def ab(a: str): ...
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
+        def ab(a: int) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
+        def ab(a: int) -> Unknown
         ```
         ---
         the int overload
@@ -1243,13 +1260,13 @@ def ab(a: str):
             .build();
 
         assert_snapshot!(test.hover(), @r#"
-        (a: str) -> Unknown
+        def ab(a: str) -> Unknown
         ---------------------------------------------
         the int overload
 
         ---------------------------------------------
         ```python
-        (a: str) -> Unknown
+        def ab(a: str) -> Unknown
         ```
         ---
         the int overload
@@ -1303,7 +1320,7 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             b: int
         ) -> Unknown
@@ -1312,7 +1329,7 @@ def ab(a: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             b: int
         ) -> Unknown
@@ -1369,13 +1386,13 @@ def ab(a: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (a: int) -> Unknown
+        def ab(a: int) -> Unknown
         ---------------------------------------------
         the two arg overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
+        def ab(a: int) -> Unknown
         ```
         ---
         the two arg overload
@@ -1433,7 +1450,7 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             *,
             b: int
@@ -1443,7 +1460,7 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             *,
             b: int
@@ -1505,7 +1522,7 @@ def ab(a: int, *, c: int):
             .build();
 
         assert_snapshot!(test.hover(), @r"
-        (
+        def ab(
             a: int,
             *,
             c: int
@@ -1515,7 +1532,7 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def ab(
             a: int,
             *,
             c: int
@@ -1564,11 +1581,11 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (
+        def foo(
             a: int,
             b
         ) -> Unknown
-        (
+        def foo(
             a: str,
             b
         ) -> Unknown
@@ -1577,11 +1594,11 @@ def ab(a: int, *, c: int):
 
         ---------------------------------------------
         ```python
-        (
+        def foo(
             a: int,
             b
         ) -> Unknown
-        (
+        def foo(
             a: str,
             b
         ) -> Unknown
@@ -1628,15 +1645,15 @@ def ab(a: int, *, c: int):
         );
 
         assert_snapshot!(test.hover(), @r#"
-        (a: int) -> Unknown
-        (a: str) -> Unknown
+        def foo(a: int) -> Unknown
+        def foo(a: str) -> Unknown
         ---------------------------------------------
         The first overload
 
         ---------------------------------------------
         ```python
-        (a: int) -> Unknown
-        (a: str) -> Unknown
+        def foo(a: int) -> Unknown
+        def foo(a: str) -> Unknown
         ```
         ---
         The first overload
@@ -2345,15 +2362,28 @@ def function():
         let test = cursor_test(
             r#"
             value<CURSOR> = 1
+            """This is the docs for this value
+
+            Wow these are good docs!
+            """
             "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Literal[1]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Literal[1]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:2:1
@@ -2362,8 +2392,9 @@ def function():
           | ^^^^^- Cursor offset
           | |
           | source
+        3 | """This is the docs for this value
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -2371,7 +2402,15 @@ def function():
         let test = cursor_test(
             r#"
             value = 1
+            """This is the docs for this value
+
+            Wow these are good docs!
+            """
             value<CURSOR> += 2
+            """Other docs???
+
+            Is this allowed???
+            """
             "#,
         );
 
@@ -2379,23 +2418,34 @@ def function():
         // Showing the new value might be more intuitive for some users, but the actual 'use'
         // of the `value` symbol here in read-context is `1`. This comment mainly exists to
         // signal that it might be okay to revisit this in the future and reveal 3 instead.
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Literal[1]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Literal[1]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:3:1
+         --> main.py:7:1
           |
-        2 | value = 1
-        3 | value += 2
+        5 | Wow these are good docs!
+        6 | """
+        7 | value += 2
           | ^^^^^- Cursor offset
           | |
           | source
+        8 | """Other docs???
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -2404,29 +2454,47 @@ def function():
             r#"
             class C:
                 attr: int = 1
+                """This is the docs for this value
+
+                Wow these are good docs!
+                """
 
             C.attr<CURSOR> = 2
+            """Other docs???
+
+            Is this allowed???
+            """
             "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Literal[2]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Literal[2]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:5:3
-          |
-        3 |     attr: int = 1
-        4 |
-        5 | C.attr = 2
-          |   ^^^^- Cursor offset
-          |   |
-          |   source
-          |
-        ");
+          --> main.py:9:3
+           |
+         7 |     """
+         8 |
+         9 | C.attr = 2
+           |   ^^^^- Cursor offset
+           |   |
+           |   source
+        10 | """Other docs???
+           |
+        "#);
     }
 
     #[test]
@@ -2435,31 +2503,49 @@ def function():
             r#"
             class C:
                 attr = 1
+                """This is the docs for this value
+
+                Wow these are good docs!
+                """
 
             C.attr<CURSOR> += 2
+            """Other docs???
+
+            Is this allowed???
+            """
             "#,
         );
 
         // See the comment in the `hover_augmented_assignment` test above. The same
         // reasoning applies here.
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Unknown | Literal[1]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Unknown | Literal[1]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
-         --> main.py:5:3
-          |
-        3 |     attr = 1
-        4 |
-        5 | C.attr += 2
-          |   ^^^^- Cursor offset
-          |   |
-          |   source
-          |
-        ");
+          --> main.py:9:3
+           |
+         7 |     """
+         8 |
+         9 | C.attr += 2
+           |   ^^^^- Cursor offset
+           |   |
+           |   source
+        10 | """Other docs???
+           |
+        "#);
     }
 
     #[test]
@@ -2468,15 +2554,28 @@ def function():
             r#"
         class Foo:
             a<CURSOR>: int
+            """This is the docs for this value
+
+            Wow these are good docs!
+            """
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         int
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         int
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:5
@@ -2486,8 +2585,9 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
+        4 |     """This is the docs for this value
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -2496,15 +2596,28 @@ def function():
             r#"
         class Foo:
             a<CURSOR>: int = 1
+            """This is the docs for this value
+
+            Wow these are good docs!
+            """
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         Literal[1]
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         Literal[1]
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:3:5
@@ -2514,7 +2627,52 @@ def function():
           |     ^- Cursor offset
           |     |
           |     source
+        4 |     """This is the docs for this value
           |
+        "#);
+    }
+
+    #[test]
+    fn hover_annotated_assignment_with_rhs_use() {
+        let test = cursor_test(
+            r#"
+        class Foo:
+            a: int = 1
+            """This is the docs for this value
+
+            Wow these are good docs!
+            """
+        
+        x = Foo()
+        x.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:10:3
+           |
+         9 | x = Foo()
+        10 | x.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
         ");
     }
 
@@ -2525,15 +2683,28 @@ def function():
         class Foo:
             def __init__(self, a: int):
                 self.a<CURSOR>: int = a
+                """This is the docs for this value
+
+                Wow these are good docs!
+                """
         "#,
         );
 
-        assert_snapshot!(test.hover(), @r"
+        assert_snapshot!(test.hover(), @r#"
         int
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
         ---------------------------------------------
         ```python
         int
         ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
         ---------------------------------------------
         info[hover]: Hovered content is
          --> main.py:4:14
@@ -2544,7 +2715,53 @@ def function():
           |              ^- Cursor offset
           |              |
           |              source
+        5 |         """This is the docs for this value
           |
+        "#);
+    }
+
+    #[test]
+    fn hover_annotated_attribute_assignment_use() {
+        let test = cursor_test(
+            r#"
+        class Foo:
+            def __init__(self, a: int):
+                self.a: int = a
+                """This is the docs for this value
+
+                Wow these are good docs!
+                """
+
+        x = Foo(1)
+        x.a<CURSOR>
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r"
+        int
+        ---------------------------------------------
+        This is the docs for this value
+
+        Wow these are good docs!
+
+        ---------------------------------------------
+        ```python
+        int
+        ```
+        ---
+        This is the docs for this value  
+          
+        Wow these are good docs!
+        ---------------------------------------------
+        info[hover]: Hovered content is
+          --> main.py:11:3
+           |
+        10 | x = Foo(1)
+        11 | x.a
+           |   ^- Cursor offset
+           |   |
+           |   source
+           |
         ");
     }
 
@@ -3233,12 +3450,12 @@ def function():
         // TODO: We should only show the matching overload here.
         // https://github.com/astral-sh/ty/issues/73
         assert_snapshot!(test.hover(), @r"
-        (other: Test, /) -> Test
-        (other: Other, /) -> Test
+        def __add__(other: Test, /) -> Test
+        def __add__(other: Other, /) -> Test
         ---------------------------------------------
         ```python
-        (other: Test, /) -> Test
-        (other: Other, /) -> Test
+        def __add__(other: Test, /) -> Test
+        def __add__(other: Other, /) -> Test
         ```
         ---------------------------------------------
         info[hover]: Hovered content is

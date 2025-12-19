@@ -1594,7 +1594,7 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_IMPORT = {
         summary: "detects possibly missing imports",
         status: LintStatus::stable("0.0.1-alpha.22"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 

@@ -6,11 +6,12 @@
 //! types, and documentation. It supports multiple signatures for union types
 //! and overloads.
 
+use crate::Db;
 use crate::docstring::Docstring;
 use crate::goto::Definitions;
-use crate::{Db, find_node::covering_node};
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
+use ruff_python_ast::find_node::covering_node;
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};

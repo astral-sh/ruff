@@ -33,7 +33,7 @@ camino = { workspace = true }
 colored = { workspace = true }
 compact_str = { workspace = true }
 drop_bomb = { workspace = true }
-get-size2 = { workspace = true, features = ["indexmap", "ordermap"]}
+get-size2 = { workspace = true, features = ["indexmap", "ordermap"] }
 indexmap = { workspace = true }
 itertools = { workspace = true }
 ordermap = { workspace = true }
@@ -62,7 +62,7 @@ ty_test = { workspace = true }
 ty_vendored = { workspace = true }
 
 anyhow = { workspace = true }
-dir-test = { workspace = true }
+datatest-stable = { workspace = true }
 glob = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true }
@@ -75,6 +75,10 @@ quickcheck_macros = { version = "1.0.0" }
 schemars = ["dep:schemars", "dep:serde_json"]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
 testing = []
+
+[[test]]
+name = "mdtest"
+harness = false
 
 [lints]
 workspace = true
