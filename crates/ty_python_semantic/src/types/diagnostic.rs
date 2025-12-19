@@ -308,6 +308,10 @@ declare_lint! {
     /// ## Why is this bad?
     /// Dividing by zero raises a `ZeroDivisionError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// 5 / 0
@@ -1580,6 +1584,10 @@ declare_lint! {
     /// Importing a missing module or name will raise a `ModuleNotFoundError`
     /// or `ImportError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// # module.py
@@ -1604,6 +1612,10 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Using an undefined variable will raise a `NameError` at runtime.
+    ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
     ///
     /// ## Example
     ///
