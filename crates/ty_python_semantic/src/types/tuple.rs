@@ -1649,6 +1649,7 @@ pub(crate) enum ResizeTupleError {
 }
 
 /// A builder for creating a new [`TupleSpec`]
+#[derive(Clone)]
 pub(crate) enum TupleSpecBuilder<'db> {
     Fixed(Vec<Type<'db>>),
     Variable {
@@ -1792,14 +1793,6 @@ impl<'db> TupleSpecBuilder<'db> {
     /// For example, if `self` is a tuple-spec builder for `tuple[int, str]` and `other` is a
     /// tuple-spec for `tuple[object, object]`, the result will be a tuple-spec builder for
     /// `tuple[int, str]` (since `int & object` simplifies to `int`, and `str & object` to `str`).
-    ///
-    /// We preserve "fixed-length-ness" in the following cases:
-    /// - Both `self` and `other` are fixed-length with the same length: element-wise intersection
-    /// - `self` is fixed-length and `other` is a homogeneous variable-length tuple: intersect each
-    ///   element of `self` with `other`'s variable type
-    ///
-    /// For other cases (e.g., different fixed lengths, or complex variable-length tuples with
-    /// prefixes or suffixes), we fall back to a homogeneous variable-length tuple.
     pub(crate) fn intersect(mut self, db: &'db dyn Db, other: &TupleSpec<'db>) -> Self {
         match (&mut self, other) {
             // Both fixed-length with the same length: element-wise intersection.
@@ -1809,53 +1802,64 @@ impl<'db> TupleSpecBuilder<'db> {
                 for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
                     *existing = IntersectionType::from_elements(db, [*existing, *new]);
                 }
-                self
+                return self;
             }
 
-            // Fixed-length intersected with a homogeneous variable-length tuple:
-            // intersect each element with the variable type.
-            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var))
-                if var.prefix.is_empty() && var.suffix.is_empty() =>
-            {
-                for existing in our_elements.iter_mut() {
-                    *existing = IntersectionType::from_elements(db, [*existing, var.variable]);
+            (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Variable(var)) => {
+                if let Ok(tuple) = var.resize(db, TupleLength::Fixed(our_elements.len())) {
+                    return self.intersect(db, &tuple);
                 }
-                self
             }
 
-            // Variable-length intersected with a homogeneous variable-length tuple:
-            // intersect prefix, variable, and suffix with the variable type
+            (TupleSpecBuilder::Variable { .. }, TupleSpec::Fixed(fixed)) => {
+                if let Ok(tuple) = self
+                    .clone()
+                    .build()
+                    .resize(db, TupleLength::Fixed(fixed.len()))
+                {
+                    return TupleSpecBuilder::from(&tuple).intersect(db, other);
+                }
+            }
+
             (
                 TupleSpecBuilder::Variable {
                     prefix,
                     variable,
                     suffix,
                 },
-                TupleSpec::Variable(other_var),
-            ) if other_var.prefix.is_empty() && other_var.suffix.is_empty() => {
-                for existing in prefix.iter_mut() {
-                    *existing =
-                        IntersectionType::from_elements(db, [*existing, other_var.variable]);
+                TupleSpec::Variable(var),
+            ) => {
+                if prefix.len() == var.prefix.len() && suffix.len() == var.suffix.len() {
+                    for (existing, new) in prefix.iter_mut().zip(var.prefix_elements()) {
+                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                    }
+                    *variable = IntersectionType::from_elements(db, [*variable, var.variable]);
+                    for (existing, new) in suffix.iter_mut().zip(var.suffix_elements()) {
+                        *existing = IntersectionType::from_elements(db, [*existing, *new]);
+                    }
+                    return self;
                 }
-                *variable = IntersectionType::from_elements(db, [*variable, other_var.variable]);
-                for existing in suffix.iter_mut() {
-                    *existing =
-                        IntersectionType::from_elements(db, [*existing, other_var.variable]);
+
+                let self_built = self.clone().build();
+                let self_len = self_built.len();
+                if let Ok(resized) = var.resize(db, self_len) {
+                    return self.intersect(db, &resized);
+                } else if let Ok(resized) = self_built.resize(db, var.len()) {
+                    return TupleSpecBuilder::from(&resized).intersect(db, other);
                 }
-                self
             }
 
-            _ => {
-                let intersected = IntersectionType::from_elements(
-                    db,
-                    self.all_elements().chain(other.all_elements()),
-                );
-                TupleSpecBuilder::Variable {
-                    prefix: vec![],
-                    variable: intersected,
-                    suffix: vec![],
-                }
-            }
+            _ => {}
+        }
+
+        // TODO: probably incorrect? `tuple[int, str] & tuple[int, str, bytes]` should resolve to `Never`.
+        // So maybe this function should be fallible (return an `Option`)?
+        let intersected =
+            IntersectionType::from_elements(db, self.all_elements().chain(other.all_elements()));
+        TupleSpecBuilder::Variable {
+            prefix: vec![],
+            variable: intersected,
+            suffix: vec![],
         }
     }
 
