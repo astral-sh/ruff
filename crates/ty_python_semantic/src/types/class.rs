@@ -4563,10 +4563,25 @@ impl<'db> StaticClassLiteral<'db> {
                     if has_binding {
                         // The attribute is declared and bound in the class body.
 
-                        if let Some(implicit_ty) =
-                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None)
-                                .ignore_possibly_undefined()
+                        let implicit_member =
+                            Self::implicit_attribute(db, body_scope, name, MethodDecorator::None);
+
+                        // If the implicit attribute has its own declaration (e.g.,
+                        // `self.state: int`), that declaration takes precedence for
+                        // instance member lookup, even if the class has a declared type.
+                        if let PlaceAndQualifiers {
+                            place:
+                                Place::Defined(DefinedPlace {
+                                    origin: TypeOrigin::Declared,
+                                    ..
+                                }),
+                            ..
+                        } = implicit_member.inner
                         {
+                            return implicit_member;
+                        }
+
+                        if let Some(implicit_ty) = implicit_member.ignore_possibly_undefined() {
                             if declaredness == Definedness::AlwaysDefined {
                                 // If a symbol is definitely declared, and we see
                                 // attribute assignments in methods of the class,
