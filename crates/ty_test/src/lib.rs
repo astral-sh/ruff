@@ -68,7 +68,13 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let result = run_test(
+            &mut db,
+            absolute_fixture_path,
+            relative_fixture_path,
+            snapshot_path,
+            &test,
+        );
         let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
             Ok(())
         } else {
@@ -231,6 +237,7 @@ impl TestOutcome {
 
 fn run_test(
     db: &mut db::Db,
+    absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
@@ -276,12 +283,15 @@ fn run_test(
             "Tests with external dependencies must specify `python-platform` in the configuration",
         );
 
+        let lockfile_path = absolute_fixture_path.with_extension("lock");
+
         external_dependencies::setup_venv(
             db,
             dependencies,
             python_version,
             &python_platform,
             &venv_for_external_dependencies,
+            &lockfile_path,
         )
         .expect("Failed to setup in-memory virtual environment with dependencies");
     }

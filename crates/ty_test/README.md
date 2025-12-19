@@ -332,7 +332,8 @@ import pydantic
 When a test has dependencies:
 
 1. The test framework creates a `pyproject.toml` in a temporary directory.
-1. Runs `uv sync` to install the dependencies.
+1. The lockfile (e.g., `pydantic.lock`) is copied to the temporary directory.
+1. Runs `uv sync --locked` to install the dependencies.
 1. Copies the installed packages from the virtual environment's `site-packages` directory into the test's
     in-memory filesystem.
 1. Configures the type checker to use these packages.
@@ -340,6 +341,24 @@ When a test has dependencies:
 **Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
 are installed fresh for each test that specifies them, so tests with many dependencies may be slower
 to run.
+
+#### Lockfiles
+
+Each `.md` file with external dependencies has a corresponding `.lock` file of the same name.
+This ensures reproducible test results across different environments and CI runs.
+
+When adding new tests or if you need to update dependency versions, regenerate the lockfiles
+with either of the following commands:
+
+```bash
+# Using the Python runner:
+uv run crates/ty_python_semantic/mdtest.py -e external/
+
+# Using `cargo`:
+MDTEST_EXTERNAL=1 MDTEST_UPGRADE_LOCKFILES=1 cargo test -p ty_python_semantic --test mdtest mdtest__external
+```
+
+After regenerating, commit the updated lockfiles to the repository.
 
 ### Specifying a custom typeshed
 
