@@ -7,8 +7,12 @@ if sys.platform == "win32":
     __all__ += ["DupSocket"]
 
     class DupSocket:
+        """Picklable wrapper for a socket.
+"""
         def __init__(self, sock: socket) -> None: ...
-        def detach(self) -> socket: ...
+        def detach(self) -> socket:
+            """Get the socket.  This should only be called once.
+"""
 
 else:
     __all__ += ["DupFd"]
