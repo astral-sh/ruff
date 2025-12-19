@@ -46,6 +46,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
             let symbol = table.symbol(symbol_id);
             let member = Member {
                 name: symbol.name().clone(),
+                first_reachable_definition: Some(first_reachable_definition),
                 ty,
             };
             Some(MemberWithDefinition {
@@ -66,6 +67,7 @@ pub(crate) fn all_end_of_scope_members<'db>(
                 let symbol = table.symbol(symbol_id);
                 let member = Member {
                     name: symbol.name().clone(),
+                    first_reachable_definition: Some(first_reachable_definition),
                     ty,
                 };
                 Some(MemberWithDefinition {
@@ -101,6 +103,7 @@ pub(crate) fn all_reachable_members<'db>(
                             .ignore_possibly_undefined()?;
                         let member = Member {
                             name: symbol.name().clone(),
+                            first_reachable_definition: Some(first_reachable_definition),
                             ty,
                         };
                         Some(MemberWithDefinition {
@@ -117,6 +120,7 @@ pub(crate) fn all_reachable_members<'db>(
                         let ty = place_with_definition.place.ignore_possibly_undefined()?;
                         let member = Member {
                             name: symbol.name().clone(),
+                            first_reachable_definition: Some(first_reachable_definition),
                             ty,
                         };
                         Some(MemberWithDefinition {
@@ -322,10 +326,16 @@ impl<'db> AllMembers<'db> {
                 let use_def_map = use_def_map(db, module_scope);
                 let place_table = place_table(db, module_scope);
 
-                for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
+                for (symbol_id, declarations) in use_def_map.all_end_of_scope_symbol_declarations()
+                {
                     let symbol_name = place_table.symbol(symbol_id).name();
                     let Place::Defined(ty, _, _) =
                         imported_symbol(db, file, symbol_name, None).place
+                    else {
+                        continue;
+                    };
+                    let Some(first_reachable_definition) =
+                        place_from_declarations(db, declarations).first_declaration
                     else {
                         continue;
                     };
@@ -365,6 +375,7 @@ impl<'db> AllMembers<'db> {
 
                     self.members.insert(Member {
                         name: symbol_name.clone(),
+                        first_reachable_definition: Some(first_reachable_definition),
                         ty,
                     });
                 }
@@ -374,7 +385,11 @@ impl<'db> AllMembers<'db> {
                         |submodule_name| {
                             let ty = literal.resolve_submodule(db, &submodule_name)?;
                             let name = submodule_name.clone();
-                            Some(Member { name, ty })
+                            Some(Member {
+                                name,
+                                first_reachable_definition: None,
+                                ty,
+                            })
                         },
                     ));
             }
@@ -421,6 +436,7 @@ impl<'db> AllMembers<'db> {
                 };
                 self.members.insert(Member {
                     name: memberdef.member.name,
+                    first_reachable_definition: Some(memberdef.first_reachable_definition),
                     ty,
                 });
             }
@@ -452,6 +468,7 @@ impl<'db> AllMembers<'db> {
                     };
                     self.members.insert(Member {
                         name: Name::new(name),
+                        first_reachable_definition: None,
                         ty,
                     });
                 }
@@ -469,6 +486,7 @@ impl<'db> AllMembers<'db> {
                 };
                 self.members.insert(Member {
                     name: memberdef.member.name,
+                    first_reachable_definition: Some(memberdef.first_reachable_definition),
                     ty,
                 });
             }
@@ -496,6 +514,7 @@ impl<'db> AllMembers<'db> {
                     if let Place::Defined(synthetic_member, _, _) = ty.member(db, attr).place {
                         self.members.insert(Member {
                             name: Name::from(*attr),
+                            first_reachable_definition: None,
                             ty: synthetic_member,
                         });
                     }
@@ -529,6 +548,7 @@ pub struct MemberWithDefinition<'db> {
 #[derive(Clone, Debug)]
 pub struct Member<'db> {
     pub name: Name,
+    pub first_reachable_definition: Option<Definition<'db>>,
     pub ty: Type<'db>,
 }
 

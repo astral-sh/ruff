@@ -118,6 +118,7 @@ impl<'db> SemanticModel<'db> {
                 let ty = Type::module_literal(self.db, self.file, module);
                 Completion {
                     name: Name::new(module.name(self.db).as_str()),
+                    first_reachable_definition: None,
                     ty: Some(ty),
                     builtin,
                 }
@@ -164,9 +165,15 @@ impl<'db> SemanticModel<'db> {
         let builtin = module.is_known(self.db, KnownModule::Builtins);
 
         let mut completions = vec![];
-        for Member { name, ty } in all_members(self.db, ty) {
+        for Member {
+            name,
+            first_reachable_definition,
+            ty,
+        } in all_members(self.db, ty)
+        {
             completions.push(Completion {
                 name,
+                first_reachable_definition,
                 ty: Some(ty),
                 builtin,
             });
@@ -187,6 +194,7 @@ impl<'db> SemanticModel<'db> {
             };
             completions.push(Completion {
                 name: Name::new(base),
+                first_reachable_definition: None,
                 ty: Some(ty),
                 builtin,
             });
@@ -204,6 +212,7 @@ impl<'db> SemanticModel<'db> {
             .into_iter()
             .map(|member| Completion {
                 name: member.name,
+                first_reachable_definition: member.first_reachable_definition,
                 ty: Some(member.ty),
                 builtin: false,
             })
@@ -227,6 +236,7 @@ impl<'db> SemanticModel<'db> {
                 all_reachable_members(self.db, file_scope.to_scope_id(self.db, self.file)).map(
                     |memberdef| Completion {
                         name: memberdef.member.name,
+                        first_reachable_definition: Some(memberdef.first_reachable_definition),
                         ty: Some(memberdef.member.ty),
                         builtin: false,
                     },
@@ -410,6 +420,8 @@ impl NameKind {
 pub struct Completion<'db> {
     /// The label shown to the user for this suggestion.
     pub name: Name,
+    /// The definition from which this symbol was extracted.
+    pub first_reachable_definition: Option<Definition<'db>>,
     /// The type of this completion, if available.
     ///
     /// Generally speaking, this is always available
