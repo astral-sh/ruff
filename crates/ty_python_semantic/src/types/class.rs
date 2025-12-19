@@ -600,8 +600,22 @@ impl<'db> ClassType<'db> {
 
     /// Return `true` if `other` is present in this class's MRO.
     pub(super) fn is_subclass_of(self, db: &'db dyn Db, other: ClassType<'db>) -> bool {
-        self.when_subclass_of(db, other, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_subclass_of_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_subclass_of_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: ClassType<'db>,
+            other: ClassType<'db>,
+        ) -> bool {
+            self_ty
+                .when_subclass_of(db, other, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        }
+
+        if self == other {
+            return true;
+        }
+
+        is_subclass_of_impl(db, self, other)
     }
 
     pub(super) fn when_subclass_of(
@@ -1359,6 +1373,16 @@ fn into_callable_cycle_initial<'db>(
     _self: ClassType<'db>,
 ) -> CallableTypes<'db> {
     CallableTypes::one(CallableType::bottom(db))
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_subclass_of_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self_ty: ClassType<'db>,
+    _other: ClassType<'db>,
+) -> bool {
+    false
 }
 
 impl<'db> From<GenericAlias<'db>> for ClassType<'db> {
