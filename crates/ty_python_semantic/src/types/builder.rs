@@ -394,9 +394,12 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                             found = Some(literals);
-                            continue;
                         }
                         UnionElement::Type(existing) => {
+                            // Skip redundancy checks against elements from the same union batch.
+                            if skip_checks_after.is_some_and(|batch_start| index >= batch_start) {
+                                continue;
+                            }
                             // e.g. `existing` could be `Literal[""] & Any`,
                             // and `ty` could be `Literal[""]`
                             if ty.is_subtype_of(self.db, *existing) {
@@ -443,9 +446,12 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                             found = Some(literals);
-                            continue;
                         }
                         UnionElement::Type(existing) => {
+                            // Skip redundancy checks against elements from the same union batch.
+                            if skip_checks_after.is_some_and(|batch_start| index >= batch_start) {
+                                continue;
+                            }
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
@@ -491,9 +497,12 @@ impl<'db> UnionBuilder<'db> {
                                 return;
                             }
                             found = Some(literals);
-                            continue;
                         }
                         UnionElement::Type(existing) => {
+                            // Skip redundancy checks against elements from the same union batch.
+                            if skip_checks_after.is_some_and(|batch_start| index >= batch_start) {
+                                continue;
+                            }
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
@@ -556,7 +565,11 @@ impl<'db> UnionBuilder<'db> {
                     .filter_map(UnionElement::to_type_element)
                     .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
                 {
-                    self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases, skip_checks_after);
+                    self.push_type(
+                        Type::EnumLiteral(enum_member_to_add),
+                        seen_aliases,
+                        skip_checks_after,
+                    );
                 }
             }
             // Adding `object` to a union results in `object`.
@@ -619,7 +632,8 @@ impl<'db> UnionBuilder<'db> {
             // Skip redundancy checks when comparing elements from the same union batch.
             // The union has already been simplified, so its elements don't need to be checked
             // against each other.
-            let skip_redundancy_checks = skip_checks_after.is_some_and(|batch_start| i >= batch_start);
+            let skip_redundancy_checks =
+                skip_checks_after.is_some_and(|batch_start| i >= batch_start);
 
             // Comparing `TypedDict`s for redundancy requires iterating over their fields, which is
             // problematic if some of those fields point to recursive `Union`s. To avoid cycles,
@@ -629,7 +643,10 @@ impl<'db> UnionBuilder<'db> {
                 continue;
             }
 
-            if should_simplify_full && !skip_redundancy_checks && !matches!(element_type, Type::TypeAlias(_)) {
+            if should_simplify_full
+                && !skip_redundancy_checks
+                && !matches!(element_type, Type::TypeAlias(_))
+            {
                 if ty.is_redundant_with(self.db, element_type) {
                     return;
                 }
