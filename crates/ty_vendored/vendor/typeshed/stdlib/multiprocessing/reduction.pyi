@@ -18,63 +18,39 @@ else:
 HAVE_SEND_HANDLE: Final[bool]
 
 class ForkingPickler(pickle.Pickler):
-    """Pickler subclass used by multiprocessing."""
-
     dispatch_table: _DispatchTableType
     def __init__(self, file: SupportsWrite[bytes], protocol: int | None = ...) -> None: ...
     @classmethod
-    def register(cls, type: Type, reduce: Callable[[Any], _ReducedType]) -> None:
-        """Register a reduce function for a type."""
-
+    def register(cls, type: Type, reduce: Callable[[Any], _ReducedType]) -> None: ...
     @classmethod
     def dumps(cls, obj: Any, protocol: int | None = None) -> memoryview: ...
     loads = pickle.loads
 
 register = ForkingPickler.register
 
-def dump(obj: Any, file: SupportsWrite[bytes], protocol: int | None = None) -> None:
-    """Replacement for pickle.dump() using ForkingPickler."""
+def dump(obj: Any, file: SupportsWrite[bytes], protocol: int | None = None) -> None: ...
 
 if sys.platform == "win32":
     def duplicate(
         handle: int, target_process: int | None = None, inheritable: bool = False, *, source_process: int | None = None
-    ) -> int:
-        """Duplicate a handle.  (target_process is a handle not a pid!)"""
-
-    def steal_handle(source_pid: int, handle: int) -> int:
-        """Steal a handle from process identified by source_pid."""
-
-    def send_handle(conn: connection.PipeConnection[DupHandle, Any], handle: int, destination_pid: int) -> None:
-        """Send a handle over a local connection."""
-
-    def recv_handle(conn: connection.PipeConnection[Any, DupHandle]) -> int:
-        """Receive a handle over a local connection."""
+    ) -> int: ...
+    def steal_handle(source_pid: int, handle: int) -> int: ...
+    def send_handle(conn: connection.PipeConnection[DupHandle, Any], handle: int, destination_pid: int) -> None: ...
+    def recv_handle(conn: connection.PipeConnection[Any, DupHandle]) -> int: ...
 
     class DupHandle:
-        """Picklable wrapper for a handle."""
-
         def __init__(self, handle: int, access: int, pid: int | None = None) -> None: ...
-        def detach(self) -> int:
-            """Get the handle.  This should only be called once."""
+        def detach(self) -> int: ...
 
 else:
     if sys.version_info < (3, 14):
         ACKNOWLEDGE: Final[bool]
 
-    def recvfds(sock: socket, size: int) -> list[int]:
-        """Receive an array of fds over an AF_UNIX socket."""
-
-    def send_handle(conn: HasFileno, handle: int, destination_pid: Unused) -> None:
-        """Send a handle over a local connection."""
-
-    def recv_handle(conn: HasFileno) -> int:
-        """Receive a handle over a local connection."""
-
-    def sendfds(sock: socket, fds: list[int]) -> None:
-        """Send an array of fds over an AF_UNIX socket."""
-
-    def DupFd(fd: int) -> Any:  # Return type is really hard to get right
-        """Return a wrapper for an fd."""
+    def recvfds(sock: socket, size: int) -> list[int]: ...
+    def send_handle(conn: HasFileno, handle: int, destination_pid: Unused) -> None: ...
+    def recv_handle(conn: HasFileno) -> int: ...
+    def sendfds(sock: socket, fds: list[int]) -> None: ...
+    def DupFd(fd: int) -> Any: ...  # Return type is really hard to get right
 
 # These aliases are to work around pyright complaints.
 # Pyright doesn't like it when a class object is defined as an alias
@@ -95,11 +71,6 @@ else:
     _DupFd = DupFd
 
 class AbstractReducer(metaclass=ABCMeta):
-    """Abstract base class for use in implementing a Reduction class
-    suitable for use in replacing the standard reduction mechanism
-    used in multiprocessing.
-    """
-
     ForkingPickler = _ForkingPickler
     register = _register
     dump = _dump
