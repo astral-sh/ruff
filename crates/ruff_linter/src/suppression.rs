@@ -92,6 +92,12 @@ pub(crate) struct Suppression {
     enable_comment: Option<SuppressionComment>,
 }
 
+impl Suppression {
+    fn codes(&self) -> &[TextRange] {
+        &self.disable_comment.as_ref().unwrap().codes
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum InvalidSuppressionKind {
     /// Trailing suppression not supported
@@ -180,6 +186,7 @@ impl Suppressions {
                         InvalidRuleCode {
                             rule_code: suppression.code.to_string(),
                             kind: InvalidRuleCodeKind::Suppression,
+                            whole_comment: suppression.codes().len() == 1,
                         },
                     );
                 }
