@@ -2656,7 +2656,7 @@ fn sequent_map_cycle_initial<'db>(
 
 /// An assignment of one BDD variable to either `true` or `false`. (When evaluating a BDD, we
 /// must provide an assignment for each variable present in the BDD.)
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, salsa::Update)]
 pub(crate) enum ConstraintAssignment<'db> {
     Positive(ConstrainedTypeVar<'db>),
     Negative(ConstrainedTypeVar<'db>),
