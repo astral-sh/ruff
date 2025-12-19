@@ -60,10 +60,6 @@ impl Violation for Airflow3Removal {
             Replacement::None
             | Replacement::AttrName(_)
             | Replacement::Message(_)
-            | Replacement::AttrNameWithMessage {
-                attr_name: _,
-                message: _,
-            }
             | Replacement::Rename { module: _, name: _ }
             | Replacement::SourceModuleMoved { module: _, name: _ } => {
                 format!("`{deprecated}` is removed in Airflow 3.0")
@@ -76,9 +72,6 @@ impl Violation for Airflow3Removal {
         match replacement {
             Replacement::None => None,
             Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
-            Replacement::AttrNameWithMessage { attr_name, message } => {
-                Some(format!("Use `{attr_name}` instead; {message}"))
-            }
             Replacement::Message(message) => Some((*message).to_string()),
             Replacement::Rename { module, name } => {
                 Some(format!("Use `{name}` from `{module}` instead."))
