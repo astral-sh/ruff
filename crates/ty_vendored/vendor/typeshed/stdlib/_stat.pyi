@@ -68,6 +68,7 @@ ST_CTIME
 FILE_ATTRIBUTE_*: Windows file attribute constants
                    (only present on Windows)
 """
+
 import sys
 from typing import Final
 
@@ -135,64 +136,73 @@ UF_NOUNLINK: Final = 0x00000010
 UF_OPAQUE: Final = 0x00000008
 
 def S_IMODE(mode: int, /) -> int:
-    """Return the portion of the file's mode that can be set by os.chmod().
-"""
+    """Return the portion of the file's mode that can be set by os.chmod()."""
+
 def S_IFMT(mode: int, /) -> int:
-    """Return the portion of the file's mode that describes the file type.
-"""
+    """Return the portion of the file's mode that describes the file type."""
+
 def S_ISBLK(mode: int, /) -> bool:
     """S_ISBLK(mode) -> bool
 
-Return True if mode is from a block special device file.
-"""
+    Return True if mode is from a block special device file.
+    """
+
 def S_ISCHR(mode: int, /) -> bool:
     """S_ISCHR(mode) -> bool
 
-Return True if mode is from a character special device file.
-"""
+    Return True if mode is from a character special device file.
+    """
+
 def S_ISDIR(mode: int, /) -> bool:
     """S_ISDIR(mode) -> bool
 
-Return True if mode is from a directory.
-"""
+    Return True if mode is from a directory.
+    """
+
 def S_ISDOOR(mode: int, /) -> bool:
     """S_ISDOOR(mode) -> bool
 
-Return True if mode is from a door.
-"""
+    Return True if mode is from a door.
+    """
+
 def S_ISFIFO(mode: int, /) -> bool:
     """S_ISFIFO(mode) -> bool
 
-Return True if mode is from a FIFO (named pipe).
-"""
+    Return True if mode is from a FIFO (named pipe).
+    """
+
 def S_ISLNK(mode: int, /) -> bool:
     """S_ISLNK(mode) -> bool
 
-Return True if mode is from a symbolic link.
-"""
+    Return True if mode is from a symbolic link.
+    """
+
 def S_ISPORT(mode: int, /) -> bool:
     """S_ISPORT(mode) -> bool
 
-Return True if mode is from an event port.
-"""
+    Return True if mode is from an event port.
+    """
+
 def S_ISREG(mode: int, /) -> bool:
     """S_ISREG(mode) -> bool
 
-Return True if mode is from a regular file.
-"""
+    Return True if mode is from a regular file.
+    """
+
 def S_ISSOCK(mode: int, /) -> bool:
     """S_ISSOCK(mode) -> bool
 
-Return True if mode is from a socket.
-"""
+    Return True if mode is from a socket.
+    """
+
 def S_ISWHT(mode: int, /) -> bool:
     """S_ISWHT(mode) -> bool
 
-Return True if mode is from a whiteout.
-"""
+    Return True if mode is from a whiteout.
+    """
+
 def filemode(mode: int, /) -> str:
-    """Convert a file's mode to a string of the form '-rwxrwxrwx'
-"""
+    """Convert a file's mode to a string of the form '-rwxrwxrwx'"""
 
 if sys.platform == "win32":
     IO_REPARSE_TAG_SYMLINK: Final = 0xA000000C

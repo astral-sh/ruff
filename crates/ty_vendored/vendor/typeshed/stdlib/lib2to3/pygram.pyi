@@ -1,5 +1,5 @@
-"""Export the Python grammar and symbols.
-"""
+"""Export the Python grammar and symbols."""
+
 from .pgen2.grammar import Grammar
 
 class Symbols:

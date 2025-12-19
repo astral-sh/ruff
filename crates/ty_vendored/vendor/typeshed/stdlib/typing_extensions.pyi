@@ -217,22 +217,22 @@ Protocol: _SpecialForm
 def runtime_checkable(cls: _TC) -> _TC:
     """Mark a protocol class as a runtime protocol.
 
-Such protocol can be used with isinstance() and issubclass().
-Raise TypeError if applied to a non-protocol class.
-This allows a simple-minded structural check very similar to
-one trick ponies in collections.abc such as Iterable.
+    Such protocol can be used with isinstance() and issubclass().
+    Raise TypeError if applied to a non-protocol class.
+    This allows a simple-minded structural check very similar to
+    one trick ponies in collections.abc such as Iterable.
 
-For example::
+    For example::
 
-    @runtime_checkable
-    class Closable(Protocol):
-        def close(self): ...
+        @runtime_checkable
+        class Closable(Protocol):
+            def close(self): ...
 
-    assert isinstance(open('/some/file'), Closable)
+        assert isinstance(open('/some/file'), Closable)
 
-Warning: this will check only the presence of the required methods,
-not their type signatures!
-"""
+    Warning: this will check only the presence of the required methods,
+    not their type signatures!
+    """
 
 # This alias for above is kept here for backwards compatibility.
 runtime = runtime_checkable
@@ -241,50 +241,51 @@ Final: _SpecialForm
 def final(f: _F) -> _F:
     """Decorator to indicate final methods and final classes.
 
-Use this decorator to indicate to type checkers that the decorated
-method cannot be overridden, and decorated class cannot be subclassed.
+    Use this decorator to indicate to type checkers that the decorated
+    method cannot be overridden, and decorated class cannot be subclassed.
 
-For example::
+    For example::
 
-    class Base:
+        class Base:
+            @final
+            def done(self) -> None:
+                ...
+        class Sub(Base):
+            def done(self) -> None:  # Error reported by type checker
+                ...
+
         @final
-        def done(self) -> None:
+        class Leaf:
             ...
-    class Sub(Base):
-        def done(self) -> None:  # Error reported by type checker
+        class Other(Leaf):  # Error reported by type checker
             ...
 
-    @final
-    class Leaf:
-        ...
-    class Other(Leaf):  # Error reported by type checker
-        ...
+    There is no runtime checking of these properties. The decorator
+    attempts to set the ``__final__`` attribute to ``True`` on the decorated
+    object to allow runtime introspection.
+    """
 
-There is no runtime checking of these properties. The decorator
-attempts to set the ``__final__`` attribute to ``True`` on the decorated
-object to allow runtime introspection.
-"""
 def disjoint_base(cls: _TC) -> _TC:
     """This decorator marks a class as a disjoint base.
 
-Child classes of a disjoint base cannot inherit from other disjoint bases that are
-not parent classes of the disjoint base.
+    Child classes of a disjoint base cannot inherit from other disjoint bases that are
+    not parent classes of the disjoint base.
 
-For example:
+    For example:
 
-    @disjoint_base
-    class Disjoint1: pass
+        @disjoint_base
+        class Disjoint1: pass
 
-    @disjoint_base
-    class Disjoint2: pass
+        @disjoint_base
+        class Disjoint2: pass
 
-    class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
+        class Disjoint3(Disjoint1, Disjoint2): pass  # Type checker error
 
-Type checkers can use knowledge of disjoint bases to detect unreachable code
-and determine when two types can overlap.
+    Type checkers can use knowledge of disjoint bases to detect unreachable code
+    and determine when two types can overlap.
 
-See PEP 800.
-"""
+    See PEP 800.
+    """
 
 Literal: _SpecialForm
 
@@ -317,14 +318,14 @@ class _TypedDict(Mapping[str, object], metaclass=abc.ABCMeta):
     def __delitem__(self, k: Never) -> None: ...
     @overload
     def __or__(self, value: Self, /) -> Self:
-        """Return self|value.
-"""
+        """Return self|value."""
+
     @overload
     def __or__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     @overload
     def __ror__(self, value: Self, /) -> Self:
-        """Return value|self.
-"""
+        """Return value|self."""
+
     @overload
     def __ror__(self, value: dict[str, Any], /) -> dict[str, object]: ...
     # supposedly incompatible definitions of `__ior__` and `__or__`:
@@ -374,58 +375,59 @@ else:
 def get_args(tp: AnnotationForm) -> tuple[AnnotationForm, ...]:
     """Get type arguments with all substitutions performed.
 
-For unions, basic simplifications used by Union constructor are performed.
+    For unions, basic simplifications used by Union constructor are performed.
 
-Examples::
+    Examples::
 
-    >>> T = TypeVar('T')
-    >>> assert get_args(Dict[str, int]) == (str, int)
-    >>> assert get_args(int) == ()
-    >>> assert get_args(Union[int, Union[T, int], str][int]) == (int, str)
-    >>> assert get_args(Union[int, Tuple[T, int]][str]) == (int, Tuple[str, int])
-    >>> assert get_args(Callable[[], T][int]) == ([], int)
-"""
+        >>> T = TypeVar('T')
+        >>> assert get_args(Dict[str, int]) == (str, int)
+        >>> assert get_args(int) == ()
+        >>> assert get_args(Union[int, Union[T, int], str][int]) == (int, str)
+        >>> assert get_args(Union[int, Tuple[T, int]][str]) == (int, Tuple[str, int])
+        >>> assert get_args(Callable[[], T][int]) == ([], int)
+    """
 
 if sys.version_info >= (3, 10):
     @overload
     def get_origin(tp: UnionType) -> type[UnionType]:
         """Get the unsubscripted version of a type.
 
-This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
-Annotated, and others. Return None for unsupported types.
+        This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
+        Annotated, and others. Return None for unsupported types.
 
-Examples::
+        Examples::
 
-    >>> P = ParamSpec('P')
-    >>> assert get_origin(Literal[42]) is Literal
-    >>> assert get_origin(int) is None
-    >>> assert get_origin(ClassVar[int]) is ClassVar
-    >>> assert get_origin(Generic) is Generic
-    >>> assert get_origin(Generic[T]) is Generic
-    >>> assert get_origin(Union[T, int]) is Union
-    >>> assert get_origin(List[Tuple[T, T]][int]) is list
-    >>> assert get_origin(P.args) is P
-"""
+            >>> P = ParamSpec('P')
+            >>> assert get_origin(Literal[42]) is Literal
+            >>> assert get_origin(int) is None
+            >>> assert get_origin(ClassVar[int]) is ClassVar
+            >>> assert get_origin(Generic) is Generic
+            >>> assert get_origin(Generic[T]) is Generic
+            >>> assert get_origin(Union[T, int]) is Union
+            >>> assert get_origin(List[Tuple[T, T]][int]) is list
+            >>> assert get_origin(P.args) is P
+        """
 
 @overload
 def get_origin(tp: GenericAlias) -> type:
     """Get the unsubscripted version of a type.
 
-This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
-Annotated, and others. Return None for unsupported types.
+    This supports generic types, Callable, Tuple, Union, Literal, Final, ClassVar,
+    Annotated, and others. Return None for unsupported types.
 
-Examples::
+    Examples::
 
-    >>> P = ParamSpec('P')
-    >>> assert get_origin(Literal[42]) is Literal
-    >>> assert get_origin(int) is None
-    >>> assert get_origin(ClassVar[int]) is ClassVar
-    >>> assert get_origin(Generic) is Generic
-    >>> assert get_origin(Generic[T]) is Generic
-    >>> assert get_origin(Union[T, int]) is Union
-    >>> assert get_origin(List[Tuple[T, T]][int]) is list
-    >>> assert get_origin(P.args) is P
-"""
+        >>> P = ParamSpec('P')
+        >>> assert get_origin(Literal[42]) is Literal
+        >>> assert get_origin(int) is None
+        >>> assert get_origin(ClassVar[int]) is ClassVar
+        >>> assert get_origin(Generic) is Generic
+        >>> assert get_origin(Generic[T]) is Generic
+        >>> assert get_origin(Union[T, int]) is Union
+        >>> assert get_origin(List[Tuple[T, T]][int]) is list
+        >>> assert get_origin(P.args) is P
+    """
+
 @overload
 def get_origin(tp: ParamSpecArgs | ParamSpecKwargs) -> ParamSpec: ...
 @overload
@@ -458,6 +460,7 @@ else:
         This type is meant for runtime introspection and has no special meaning to
         static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         def __init__(self, origin: ParamSpec) -> None: ...
@@ -475,6 +478,7 @@ else:
         This type is meant for runtime introspection and has no special meaning to
         static type checkers.
         """
+
         @property
         def __origin__(self) -> ParamSpec: ...
         def __init__(self, origin: ParamSpec) -> None: ...
@@ -531,6 +535,7 @@ else:
         argument and returns it unchanged.
 
         """
+
     def assert_never(arg: Never, /) -> Never:
         """Assert to the type checker that a line of code is unreachable.
 
@@ -551,6 +556,7 @@ else:
         At runtime, this throws an exception when called.
 
         """
+
     def assert_type(val: _T, typ: AnnotationForm, /) -> _T:
         """Assert (to the type checker) that the value is of the given type.
 
@@ -564,13 +570,12 @@ else:
         At runtime this returns the first argument unchanged and otherwise
         does nothing.
         """
-    def clear_overloads() -> None:
-        """Clear all overloads in the registry.
-"""
-    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
-        """Return all defined overloads for *func* as a sequence.
-"""
 
+    def clear_overloads() -> None:
+        """Clear all overloads in the registry."""
+
+    def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
+        """Return all defined overloads for *func* as a sequence."""
     Required: _SpecialForm
     NotRequired: _SpecialForm
     LiteralString: _SpecialForm
@@ -667,6 +672,7 @@ else:
 
             Employee = NamedTuple('Employee', [('name', str), ('id', int)])
         """
+
         _field_defaults: ClassVar[dict[str, Any]]
         _fields: ClassVar[tuple[str, ...]]
         __orig_bases__: ClassVar[tuple[Any, ...]]
@@ -692,6 +698,7 @@ else:
             name_by_id(UserId(42))  # OK
             num = UserId(5) + 1     # type: int
         """
+
         def __init__(self, name: str, tp: AnnotationForm) -> None: ...
         def __call__(self, obj: _T, /) -> _T: ...
         __supertype__: type | NewType
@@ -740,6 +747,7 @@ else:
         See PEP 698 for details.
 
         """
+
     def get_original_bases(cls: type, /) -> tuple[Any, ...]:
         """Return the class's "original" bases prior to modification by `__mro_entries__`.
 
@@ -761,7 +769,6 @@ else:
             assert get_original_bases(Spam) == (TypedDict,)
             assert get_original_bases(int) == (object,)
         """
-
     # mypy and pyright object to this being both ABC and Protocol.
     # At runtime it inherits from ABC and is not a Protocol, but it is on the
     # allowlist for use as a Protocol.
@@ -785,38 +792,39 @@ else:
         classes. It is useful primarily for static checks.
 
         """
+
         # Not actually a Protocol at runtime; see
         # https://github.com/python/typeshed/issues/10224 for why we're defining it this way
         def __buffer__(self, flags: int, /) -> memoryview: ...
 
     @runtime_checkable
     class SupportsInt(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __int__.
-"""
+        """An ABC with one abstract method __int__."""
+
         __slots__ = ()
         @abc.abstractmethod
         def __int__(self) -> int: ...
 
     @runtime_checkable
     class SupportsFloat(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __float__.
-"""
+        """An ABC with one abstract method __float__."""
+
         __slots__ = ()
         @abc.abstractmethod
         def __float__(self) -> float: ...
 
     @runtime_checkable
     class SupportsComplex(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __complex__.
-"""
+        """An ABC with one abstract method __complex__."""
+
         __slots__ = ()
         @abc.abstractmethod
         def __complex__(self) -> complex: ...
 
     @runtime_checkable
     class SupportsBytes(Protocol, metaclass=abc.ABCMeta):
-        """An ABC with one abstract method __bytes__.
-"""
+        """An ABC with one abstract method __bytes__."""
+
         __slots__ = ()
         @abc.abstractmethod
         def __bytes__(self) -> bytes: ...
@@ -832,6 +840,7 @@ else:
         """
         An ABC with one abstract method __abs__ that is covariant in its return type.
         """
+
         __slots__ = ()
         @abc.abstractmethod
         def __abs__(self) -> _T_co: ...
@@ -841,6 +850,7 @@ else:
         """
         An ABC with one abstract method __round__ that is covariant in its return type.
         """
+
         __slots__ = ()
         @overload
         @abc.abstractmethod
@@ -856,28 +866,29 @@ else:
     class Reader(Protocol[_T_co]):
         """Protocol for simple I/O reader instances.
 
-This protocol only supports blocking I/O.
-"""
+        This protocol only supports blocking I/O.
+        """
+
         __slots__ = ()
         @abc.abstractmethod
         def read(self, size: int = ..., /) -> _T_co:
             """Read data from the input stream and return it.
 
-If *size* is specified, at most *size* items (bytes/characters) will be
-read.
-"""
+            If *size* is specified, at most *size* items (bytes/characters) will be
+            read.
+            """
 
     @runtime_checkable
     class Writer(Protocol[_T_contra]):
         """Protocol for simple I/O writer instances.
 
-This protocol only supports blocking I/O.
-"""
+        This protocol only supports blocking I/O.
+        """
+
         __slots__ = ()
         @abc.abstractmethod
         def write(self, data: _T_contra, /) -> int:
-            """Write *data* to the output stream and return the number of items written.
-"""
+            """Write *data* to the output stream and return the number of items written."""
 
 if sys.version_info >= (3, 13):
     from types import CapsuleType as CapsuleType
@@ -907,6 +918,7 @@ else:
             >>> is_protocol(int)
             False
         """
+
     def get_protocol_members(tp: type, /) -> frozenset[str]:
         """Return the set of members defined in a Protocol.
 
@@ -921,6 +933,7 @@ else:
 
         Raise a TypeError for arguments that are not Protocols.
         """
+
     @final
     @type_check_only
     class _NoDefaultType: ...
@@ -929,14 +942,14 @@ else:
     @final
     class CapsuleType:
         """Capsule objects let you wrap a C "void *" pointer in a Python
-object.  They're a way of passing data through the Python interpreter
-without creating your own custom type.
+        object.  They're a way of passing data through the Python interpreter
+        without creating your own custom type.
 
-Capsules are used for communication between extension modules.
-They provide a way for an extension module to export a C interface
-to other extension modules, so that extension modules can use the
-Python import mechanism to link to one another.
-"""
+        Capsules are used for communication between extension modules.
+        They provide a way for an extension module to export a C interface
+        to other extension modules, so that extension modules can use the
+        Python import mechanism to link to one another.
+        """
 
     class deprecated:
         """Indicate that a class, function or overload is deprecated.
@@ -980,6 +993,7 @@ Python import mechanism to link to one another.
         See PEP 702 for details.
 
         """
+
         message: LiteralString
         category: type[Warning] | None
         stacklevel: int
@@ -988,8 +1002,8 @@ Python import mechanism to link to one another.
 
     @final
     class TypeVar:
-        """Type variable.
-"""
+        """Type variable."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -1018,18 +1032,17 @@ Python import mechanism to link to one another.
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value.
-"""
+                """Return self|value."""
+
             def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self.
-"""
+                """Return value|self."""
         if sys.version_info >= (3, 11):
             def __typing_subst__(self, arg: Any) -> Any: ...
 
     @final
     class ParamSpec:
-        """Parameter specification.
-"""
+        """Parameter specification."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -1059,16 +1072,15 @@ Python import mechanism to link to one another.
         def __typing_prepare_subst__(self, alias: Any, args: Any) -> tuple[Any, ...]: ...
         if sys.version_info >= (3, 10):
             def __or__(self, right: Any) -> _SpecialForm:
-                """Return self|value.
-"""
+                """Return self|value."""
+
             def __ror__(self, left: Any) -> _SpecialForm:
-                """Return value|self.
-"""
+                """Return value|self."""
 
     @final
     class TypeVarTuple:
-        """Type variable tuple.
-"""
+        """Type variable tuple."""
+
         @property
         def __name__(self) -> str: ...
         @property
@@ -1089,30 +1101,31 @@ else:
     class TypeAliasType:
         """Create named, parameterized type aliases.
 
-This provides a backport of the new `type` statement in Python 3.12:
+        This provides a backport of the new `type` statement in Python 3.12:
 
-    type ListOrSet[T] = list[T] | set[T]
+            type ListOrSet[T] = list[T] | set[T]
 
-is equivalent to:
+        is equivalent to:
 
-    T = TypeVar("T")
-    ListOrSet = TypeAliasType("ListOrSet", list[T] | set[T], type_params=(T,))
+            T = TypeVar("T")
+            ListOrSet = TypeAliasType("ListOrSet", list[T] | set[T], type_params=(T,))
 
-The name ListOrSet can then be used as an alias for the type it refers to.
+        The name ListOrSet can then be used as an alias for the type it refers to.
 
-The type_params argument should contain all the type parameters used
-in the value of the type alias. If the alias is not generic, this
-argument is omitted.
+        The type_params argument should contain all the type parameters used
+        in the value of the type alias. If the alias is not generic, this
+        argument is omitted.
 
-Static type checkers should only support type aliases declared using
-TypeAliasType that follow these rules:
+        Static type checkers should only support type aliases declared using
+        TypeAliasType that follow these rules:
 
-- The first argument (the name) must be a string literal.
-- The TypeAliasType instance must be immediately assigned to a variable
-  of the same name. (For example, 'X = TypeAliasType("Y", int)' is invalid,
-  as is 'X, Y = TypeAliasType("X", int), TypeAliasType("Y", int)').
+        - The first argument (the name) must be a string literal.
+        - The TypeAliasType instance must be immediately assigned to a variable
+          of the same name. (For example, 'X = TypeAliasType("Y", int)' is invalid,
+          as is 'X, Y = TypeAliasType("X", int), TypeAliasType("Y", int)').
 
-"""
+        """
+
         def __init__(
             self, name: str, value: AnnotationForm, *, type_params: tuple[TypeVar | ParamSpec | TypeVarTuple, ...] = ()
         ) -> None: ...
@@ -1130,16 +1143,16 @@ TypeAliasType that follow these rules:
         @property
         def __module__(self) -> str | None:  # type: ignore[override]
             """str(object='') -> str
-str(bytes_or_buffer[, encoding[, errors]]) -> str
+            str(bytes_or_buffer[, encoding[, errors]]) -> str
 
-Create a new string object from the given object. If encoding or
-errors is specified, then the object must expose a data buffer
-that will be decoded using the given encoding and error handler.
-Otherwise, returns the result of object.__str__() (if defined)
-or repr(object).
-encoding defaults to 'utf-8'.
-errors defaults to 'strict'.
-"""
+            Create a new string object from the given object. If encoding or
+            errors is specified, then the object must expose a data buffer
+            that will be decoded using the given encoding and error handler.
+            Otherwise, returns the result of object.__str__() (if defined)
+            or repr(object).
+            encoding defaults to 'utf-8'.
+            errors defaults to 'strict'.
+            """
         # Returns typing._GenericAlias, which isn't stubbed.
         def __getitem__(self, parameters: Incomplete | tuple[Incomplete, ...]) -> AnnotationForm: ...
         def __init_subclass__(cls, *args: Unused, **kwargs: Unused) -> NoReturn: ...
@@ -1150,21 +1163,22 @@ errors defaults to 'strict'.
 # PEP 727
 class Doc:
     """Define the documentation of a type annotation using ``Annotated``, to be
- used in class attributes, function and method parameters, return values,
- and variables.
+     used in class attributes, function and method parameters, return values,
+     and variables.
 
-The value should be a positional-only string literal to allow static tools
-like editors and documentation generators to use it.
+    The value should be a positional-only string literal to allow static tools
+    like editors and documentation generators to use it.
 
-This complements docstrings.
+    This complements docstrings.
 
-The string value passed is available in the attribute ``documentation``.
+    The string value passed is available in the attribute ``documentation``.
 
-Example::
+    Example::
 
-    >>> from typing_extensions import Annotated, Doc
-    >>> def hi(to: Annotated[str, Doc("Who to say hi to")]) -> None: ...
-"""
+        >>> from typing_extensions import Annotated, Doc
+        >>> def hi(to: Annotated[str, Doc("Who to say hi to")]) -> None: ...
+    """
+
     documentation: str
     def __init__(self, documentation: str, /) -> None: ...
     def __hash__(self) -> int: ...
@@ -1186,8 +1200,8 @@ if sys.version_info >= (3, 14):
     from annotationlib import Format as Format, get_annotations as get_annotations, type_repr as type_repr
 else:
     class Format(enum.IntEnum):
-        """An enumeration.
-"""
+        """An enumeration."""
+
         VALUE = 1
         VALUE_WITH_FAKE_GLOBALS = 2
         FORWARDREF = 3
@@ -1204,39 +1218,40 @@ else:
     ) -> dict[str, str]:
         """Compute the annotations dict for an object.
 
-obj may be a callable, class, or module.
-Passing in an object of any other type raises TypeError.
+        obj may be a callable, class, or module.
+        Passing in an object of any other type raises TypeError.
 
-Returns a dict.  get_annotations() returns a new dict every time
-it's called; calling it twice on the same object will return two
-different but equivalent dicts.
+        Returns a dict.  get_annotations() returns a new dict every time
+        it's called; calling it twice on the same object will return two
+        different but equivalent dicts.
 
-This is a backport of `inspect.get_annotations`, which has been
-in the standard library since Python 3.10. See the standard library
-documentation for more:
+        This is a backport of `inspect.get_annotations`, which has been
+        in the standard library since Python 3.10. See the standard library
+        documentation for more:
 
-    https://docs.python.org/3/library/inspect.html#inspect.get_annotations
+            https://docs.python.org/3/library/inspect.html#inspect.get_annotations
 
-This backport adds the *format* argument introduced by PEP 649. The
-three formats supported are:
-* VALUE: the annotations are returned as-is. This is the default and
-  it is compatible with the behavior on previous Python versions.
-* FORWARDREF: return annotations as-is if possible, but replace any
-  undefined names with ForwardRef objects. The implementation proposed by
-  PEP 649 relies on language changes that cannot be backported; the
-  typing-extensions implementation simply returns the same result as VALUE.
-* STRING: return annotations as strings, in a format close to the original
-  source. Again, this behavior cannot be replicated directly in a backport.
-  As an approximation, typing-extensions retrieves the annotations under
-  VALUE semantics and then stringifies them.
+        This backport adds the *format* argument introduced by PEP 649. The
+        three formats supported are:
+        * VALUE: the annotations are returned as-is. This is the default and
+          it is compatible with the behavior on previous Python versions.
+        * FORWARDREF: return annotations as-is if possible, but replace any
+          undefined names with ForwardRef objects. The implementation proposed by
+          PEP 649 relies on language changes that cannot be backported; the
+          typing-extensions implementation simply returns the same result as VALUE.
+        * STRING: return annotations as strings, in a format close to the original
+          source. Again, this behavior cannot be replicated directly in a backport.
+          As an approximation, typing-extensions retrieves the annotations under
+          VALUE semantics and then stringifies them.
 
-The purpose of this backport is to allow users who would like to use
-FORWARDREF or STRING semantics once PEP 649 is implemented, but who also
-want to support earlier Python versions, to simply write:
+        The purpose of this backport is to allow users who would like to use
+        FORWARDREF or STRING semantics once PEP 649 is implemented, but who also
+        want to support earlier Python versions, to simply write:
 
-    typing_extensions.get_annotations(obj, format=Format.FORWARDREF)
+            typing_extensions.get_annotations(obj, format=Format.FORWARDREF)
 
-"""
+        """
+
     @overload
     def get_annotations(
         obj: Any,  # any object with __annotations__ or __annotate__
@@ -1268,26 +1283,27 @@ want to support earlier Python versions, to simply write:
     ) -> str:
         """Evaluate a forward reference as a type hint.
 
-This is similar to calling the ForwardRef.evaluate() method,
-but unlike that method, evaluate_forward_ref() also:
+        This is similar to calling the ForwardRef.evaluate() method,
+        but unlike that method, evaluate_forward_ref() also:
 
-* Recursively evaluates forward references nested within the type hint.
-* Rejects certain objects that are not valid type hints.
-* Replaces type hints that evaluate to None with types.NoneType.
-* Supports the *FORWARDREF* and *STRING* formats.
+        * Recursively evaluates forward references nested within the type hint.
+        * Rejects certain objects that are not valid type hints.
+        * Replaces type hints that evaluate to None with types.NoneType.
+        * Supports the *FORWARDREF* and *STRING* formats.
 
-*forward_ref* must be an instance of ForwardRef. *owner*, if given,
-should be the object that holds the annotations that the forward reference
-derived from, such as a module, class object, or function. It is used to
-infer the namespaces to use for looking up names. *globals* and *locals*
-can also be explicitly given to provide the global and local namespaces.
-*type_params* is a tuple of type parameters that are in scope when
-evaluating the forward reference. This parameter must be provided (though
-it may be an empty tuple) if *owner* is not given and the forward reference
-does not already have an owner set. *format* specifies the format of the
-annotation and is a member of the annotationlib.Format enum.
+        *forward_ref* must be an instance of ForwardRef. *owner*, if given,
+        should be the object that holds the annotations that the forward reference
+        derived from, such as a module, class object, or function. It is used to
+        infer the namespaces to use for looking up names. *globals* and *locals*
+        can also be explicitly given to provide the global and local namespaces.
+        *type_params* is a tuple of type parameters that are in scope when
+        evaluating the forward reference. This parameter must be provided (though
+        it may be an empty tuple) if *owner* is not given and the forward reference
+        does not already have an owner set. *format* specifies the format of the
+        annotation and is a member of the annotationlib.Format enum.
 
-"""
+        """
+
     @overload
     def evaluate_forward_ref(
         forward_ref: ForwardRef,
@@ -1313,21 +1329,22 @@ annotation and is a member of the annotationlib.Format enum.
     def type_repr(value: object) -> str:
         """Convert a Python value to a format suitable for use with the STRING format.
 
-This is intended as a helper for tools that support the STRING format but do
-not have access to the code that originally produced the annotations. It uses
-repr() for most objects.
+        This is intended as a helper for tools that support the STRING format but do
+        not have access to the code that originally produced the annotations. It uses
+        repr() for most objects.
 
-"""
+        """
 
 # PEP 661
 class Sentinel:
     """Create a unique sentinel object.
 
-*name* should be the name of the variable to which the return value shall be assigned.
+    *name* should be the name of the variable to which the return value shall be assigned.
 
-*repr*, if supplied, will be used for the repr of the sentinel object.
-If not provided, "<name>" will be used.
-"""
+    *repr*, if supplied, will be used for the repr of the sentinel object.
+    If not provided, "<name>" will be used.
+    """
+
     def __init__(self, name: str, repr: str | None = None) -> None: ...
     if sys.version_info >= (3, 14):
         def __or__(self, other: Any) -> UnionType: ...  # other can be any type form legal for unions

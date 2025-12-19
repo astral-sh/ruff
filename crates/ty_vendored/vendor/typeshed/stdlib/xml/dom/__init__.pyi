@@ -13,13 +13,14 @@ pulldom -- DOM builder supporting on-demand tree-building for selected
            subtrees of the document.
 
 """
+
 from typing import Any, Final, Literal
 
 from .domreg import getDOMImplementation as getDOMImplementation, registerDOMImplementation as registerDOMImplementation
 
 class Node:
-    """Class giving the NodeType constants.
-"""
+    """Class giving the NodeType constants."""
+
     __slots__ = ()
     ELEMENT_NODE: Final = 1
     ATTRIBUTE_NODE: Final = 2
@@ -54,8 +55,9 @@ VALIDATION_ERR: Final = 16
 
 class DOMException(Exception):
     """Abstract base class for DOM exceptions.
-Exceptions with specific codes are specializations of this class.
-"""
+    Exceptions with specific codes are specializations of this class.
+    """
+
     code: int
     def __init__(self, *args: Any, **kw: Any) -> None: ...
     def _get_code(self) -> int: ...
@@ -109,8 +111,8 @@ class ValidationErr(DOMException):
     code: Literal[16]
 
 class UserDataHandler:
-    """Class giving the operation constants for UserDataHandler.handle().
-"""
+    """Class giving the operation constants for UserDataHandler.handle()."""
+
     NODE_CLONED: Final = 1
     NODE_IMPORTED: Final = 2
     NODE_DELETED: Final = 3

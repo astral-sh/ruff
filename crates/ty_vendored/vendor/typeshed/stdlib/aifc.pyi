@@ -133,6 +133,7 @@ written, otherwise an AIFF-C file is written.  This default can be
 changed by calling aiff() or aifc() before the first writeframes or
 writeframesraw.
 """
+
 from types import TracebackType
 from typing import IO, Any, Literal, NamedTuple, overload
 from typing_extensions import Self, TypeAlias
@@ -142,8 +143,8 @@ __all__ = ["Error", "open"]
 class Error(Exception): ...
 
 class _aifc_params(NamedTuple):
-    """_aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)
-"""
+    """_aifc_params(nchannels, sampwidth, framerate, nframes, comptype, compname)"""
+
     nchannels: int
     sampwidth: int
     framerate: int
