@@ -1024,7 +1024,6 @@ impl DocumentSnapshot {
     }
 
     /// Returns the client settings for all workspaces.
-    #[expect(unused)]
     pub(crate) fn global_settings(&self) -> &GlobalSettings {
         &self.global_settings
     }
