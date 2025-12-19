@@ -7,6 +7,12 @@ pub struct CancellationTokenSource {
     cancelled: Arc<AtomicBool>,
 }
 
+impl Default for CancellationTokenSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CancellationTokenSource {
     pub fn new() -> Self {
         Self {
@@ -32,7 +38,7 @@ impl CancellationTokenSource {
     }
 }
 
-/// Token signals whether an operatio should be canceled.
+/// Token signals whether an operation should be canceled.
 #[derive(Debug, Clone)]
 pub struct CancellationToken {
     cancelled: Arc<AtomicBool>,
