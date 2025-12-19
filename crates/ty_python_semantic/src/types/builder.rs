@@ -378,6 +378,8 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
+                            // e.g. `existing` could be `Literal[""] & Any`,
+                            // and `ty` could be `Literal[""]`
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
@@ -558,27 +560,14 @@ impl<'db> UnionBuilder<'db> {
         let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
 
         let mut ty_negated: Option<Type> = None;
+        let mut to_remove = SmallVec::<[usize; 2]>::new();
 
-        let mut i = 0;
-        let mut insertion_point: Option<usize> = None;
-
-        let mut remove_or_replace = |i: usize, elements: &mut Vec<UnionElement<'db>>| {
-            if insertion_point.is_none() {
-                insertion_point = Some(i);
-            } else {
-                elements.swap_remove(i);
-            }
-        };
-
-        while i < self.elements.len() {
-            let element = &mut self.elements[i];
-
+        for (i, element) in self.elements.iter_mut().enumerate() {
             let element_type = match element.try_reduce(self.db, ty) {
                 ReduceResult::KeepIf(keep) => {
                     if !keep {
-                        remove_or_replace(i, &mut self.elements);
+                        to_remove.push(i);
                     }
-                    i += 1;
                     continue;
                 }
                 ReduceResult::Type(ty) => ty,
@@ -605,7 +594,6 @@ impl<'db> UnionBuilder<'db> {
             // compare `TypedDict`s by name/identity instead of using the `has_relation_to`
             // machinery.
             if element_type.is_typed_dict() && ty.is_typed_dict() {
-                i += 1;
                 continue;
             }
 
@@ -615,8 +603,7 @@ impl<'db> UnionBuilder<'db> {
                 }
 
                 if element_type.is_redundant_with(self.db, ty) {
-                    remove_or_replace(i, &mut self.elements);
-                    i += 1;
+                    to_remove.push(i);
                     continue;
                 }
 
@@ -635,12 +622,15 @@ impl<'db> UnionBuilder<'db> {
                     return;
                 }
             }
-
-            i += 1;
         }
 
-        if let Some(insertion_point) = insertion_point {
-            self.elements[insertion_point] = UnionElement::Type(ty);
+        let mut to_remove = to_remove.into_iter();
+        if let Some(first) = to_remove.next() {
+            self.elements[first] = UnionElement::Type(ty);
+            // We iterate in descending order to keep remaining indices valid after `swap_remove`.
+            for index in to_remove.rev() {
+                self.elements.swap_remove(index);
+            }
         } else {
             self.elements.push(UnionElement::Type(ty));
         }
