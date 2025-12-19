@@ -712,6 +712,14 @@ impl<'db> IntersectionBuilder<'db> {
         }
     }
 
+    fn extend(&mut self, sub: Self) {
+        for inner in sub.intersections {
+            if !self.intersections.contains(&inner) {
+                self.intersections.push(inner);
+            }
+        }
+    }
+
     pub(crate) fn add_positive(self, ty: Type<'db>) -> Self {
         self.add_positive_impl(ty, &mut vec![])
     }
@@ -748,7 +756,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     })
             }
@@ -879,7 +887,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     },
                 )
@@ -939,7 +947,7 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: FxOrderSet<Type<'db>>,
