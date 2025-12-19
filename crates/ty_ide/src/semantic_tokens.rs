@@ -823,12 +823,14 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_body(&try_stmt.finalbody);
             }
             ast::Stmt::Expr(expr) => {
-                if expecting_docstring && let Expr::StringLiteral(string_literal) = &*expr.value {
-                    self.add_token(
-                        string_literal.range(),
-                        SemanticTokenType::String,
-                        SemanticTokenModifier::DOCUMENTATION,
-                    );
+                if expecting_docstring && let Expr::StringLiteral(string_expr) = &*expr.value {
+                    for string_literal in &string_expr.value {
+                        self.add_token(
+                            string_literal.range(),
+                            SemanticTokenType::String,
+                            SemanticTokenModifier::DOCUMENTATION,
+                        );
+                    }
                 } else {
                     walk_stmt(self, stmt);
                 }
@@ -2056,12 +2058,15 @@ x = 1
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 20..54: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 40..54: String [documentation]
         "my_func" @ 60..67: Function [definition]
-        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 75..109: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 75..94: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 95..109: String [documentation]
         "x" @ 111..112: Variable [definition]
         "1" @ 115..116: Number
-        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 117..151: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 117..136: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 137..151: String [documentation]
         "#);
     }
 
@@ -2093,12 +2098,15 @@ x = 1
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "\"\"\"wow cool docs\"\"\"\n        \"\"\"and docs\"\"\"" @ 30..72: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 30..49: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 58..72: String [documentation]
         "my_func" @ 84..91: Function [definition]
-        "\"\"\"wow cool docs\"\"\"\n        \"\"\"and docs\"\"\"" @ 109..151: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 109..128: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 137..151: String [documentation]
         "x" @ 159..160: Variable [definition]
         "1" @ 163..164: Number
-        "\"\"\"wow cool docs\"\"\"\n    \"\"\"and docs\"\"\"" @ 171..209: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 171..190: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 195..209: String [documentation]
         "#);
     }
 
@@ -2133,12 +2141,15 @@ x = 1
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "\"\"\"wow cool docs\"\"\"\n        # and a comment that shouldn't be included\n        \"\"\"and docs\"\"\"" @ 30..123: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 30..49: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 109..123: String [documentation]
         "my_func" @ 135..142: Function [definition]
-        "\"\"\"wow cool docs\"\"\"\n        # and a comment that shouldn't be included\n        \"\"\"and docs\"\"\"" @ 160..253: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 160..179: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 239..253: String [documentation]
         "x" @ 261..262: Variable [definition]
         "1" @ 265..266: Number
-        "\"\"\"wow cool docs\"\"\"\n    # and a comment that shouldn't be included\n    \"\"\"and docs\"\"\"" @ 273..358: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 273..292: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 344..358: String [documentation]
         "#);
     }
 
@@ -2235,12 +2246,15 @@ x = 1
 
         assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "MyClass" @ 7..14: Class [definition]
-        "\"\"\"wow cool docs\"\"\" \\\n    \"\"\"and docs\"\"\"" @ 20..60: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 46..60: String [documentation]
         "my_func" @ 66..73: Function [definition]
-        "\"\"\"wow cool docs\"\"\" \\\n    \"\"\"and docs\"\"\"" @ 81..121: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 81..100: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 107..121: String [documentation]
         "x" @ 123..124: Variable [definition]
         "1" @ 127..128: Number
-        "\"\"\"wow cool docs\"\"\" \\\n\"\"\"and docs\"\"\"" @ 129..165: String [documentation]
+        "\"\"\"wow cool docs\"\"\"" @ 129..148: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 151..165: String [documentation]
         "#);
     }
 
