@@ -2431,6 +2431,9 @@ impl<'db> Type<'db> {
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
+            // Short-circuit: if both sides are the same union, they trivially satisfy the relation.
+            (Type::Union(left), Type::Union(right)) if left == right => ConstraintSet::from(true),
+
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(
                     db,
@@ -2442,16 +2445,22 @@ impl<'db> Type<'db> {
                 )
             }),
 
-            (_, Type::Union(union)) => union.elements(db).iter().when_any(db, |&elem_ty| {
-                self.has_relation_to_impl(
-                    db,
-                    elem_ty,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }),
+            (_, Type::Union(union)) => {
+                // Fast path: if self is directly a member of the union, no need to check relations
+                if union.elements(db).contains(&self) {
+                    return ConstraintSet::from(true);
+                }
+                union.elements(db).iter().when_any(db, |&elem_ty| {
+                    self.has_relation_to_impl(
+                        db,
+                        elem_ty,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+                })
+            }
 
             // If both sides are intersections we need to handle the right side first
             // (A & B & C) is a subtype of (A & B) because the left is a subtype of both A and B,
