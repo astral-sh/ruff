@@ -11,6 +11,7 @@ pub use self::render::{
     ceil_char_boundary,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
+use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
 mod render;
@@ -1312,6 +1313,8 @@ pub struct DisplayDiagnosticConfig {
     show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
+
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1385,6 +1388,20 @@ impl DisplayDiagnosticConfig {
     pub fn fix_applicability(&self) -> Applicability {
         self.fix_applicability
     }
+
+    pub fn with_cancellation_token(
+        mut self,
+        token: Option<CancellationToken>,
+    ) -> DisplayDiagnosticConfig {
+        self.cancellation_token = token;
+        self
+    }
+
+    pub fn is_canceled(&self) -> bool {
+        self.cancellation_token
+            .as_ref()
+            .is_some_and(|token| token.is_cancelled())
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1398,6 +1415,7 @@ impl Default for DisplayDiagnosticConfig {
             show_fix_status: false,
             show_fix_diff: false,
             fix_applicability: Applicability::Safe,
+            cancellation_token: None,
         }
     }
 }

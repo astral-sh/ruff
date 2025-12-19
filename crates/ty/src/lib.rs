@@ -10,9 +10,9 @@ use ty_static::EnvVars;
 
 use std::fmt::Write;
 use std::process::{ExitCode, Termination};
+use std::sync::Mutex;
 
 use anyhow::Result;
-use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
@@ -22,6 +22,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
+use ruff_db::cancellation::{CancellationToken, CancellationTokenSource};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
@@ -227,6 +228,11 @@ struct MainLoop {
     printer: Printer,
 
     project_options_overrides: ProjectOptionsOverrides,
+
+    /// Cancellation token that gets set by Ctrl+C.
+    /// Used for long-running operations on the main thread. Operations on background threads
+    /// use Salsa's cancellation mechanism.
+    cancellation_token: CancellationToken,
 }
 
 impl MainLoop {
@@ -236,6 +242,9 @@ impl MainLoop {
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
+        let cancellation_token_source = CancellationTokenSource::new();
+        let cancellation_token = cancellation_token_source.token();
+
         (
             Self {
                 sender: sender.clone(),
@@ -243,8 +252,12 @@ impl MainLoop {
                 watcher: None,
                 project_options_overrides,
                 printer,
+                cancellation_token,
             },
-            MainLoopCancellationToken { sender },
+            MainLoopCancellationToken {
+                sender,
+                source: cancellation_token_source,
+            },
         )
     }
 
@@ -316,6 +329,7 @@ impl MainLoop {
                     let display_config = DisplayDiagnosticConfig::default()
                         .format(terminal_settings.output_format.into())
                         .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .show_fix_diff(true);
 
                     if check_revision == revision {
@@ -498,10 +512,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 #[derive(Debug)]
 struct MainLoopCancellationToken {
     sender: crossbeam_channel::Sender<MainLoopMessage>,
+    source: CancellationTokenSource,
 }
 
 impl MainLoopCancellationToken {
     fn stop(self) {
+        self.source.cancel();
         self.sender.send(MainLoopMessage::Exit).unwrap();
     }
 }
