@@ -7282,6 +7282,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let inferred_ty =
                         self.infer_expression(ast_argument, TypeContext::new(Some(parameter_type)));
 
+                    // Ensure the inferred type is assignable to the declared type.
+                    //
+                    // If not, we want to avoid storing the "failed" inference attempt.
+                    if !inferred_ty.is_assignable_to(db, parameter_type) {
+                        continue;
+                    }
+
                     // Each type is a valid independent inference of the given argument, and we may require different
                     // permutations of argument types to correctly perform argument expansion during overload evaluation,
                     // so we take the intersection of all the types we inferred for each argument.
