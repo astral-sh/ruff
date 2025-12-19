@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
-use crate::rules::airflow::helpers::Replacement;
-use crate::{Edit, Fix, FixAvailability, Violation};
+use crate::rules::airflow::helpers::FunctionSignatureChangeType;
+use crate::{FixAvailability, Violation};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{Arguments, Expr, ExprAttribute, ExprCall};
 use ruff_python_semantic::Modules;
@@ -37,42 +37,30 @@ use ruff_text_size::Ranged;
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.14.11")]
 pub(crate) struct Airflow3FunctionSignatureChange {
-    function_def: String,
-    replacement: Replacement,
+    function_name: String,
+    change_type: FunctionSignatureChangeType,
 }
 
 impl Violation for Airflow3FunctionSignatureChange {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         let Airflow3FunctionSignatureChange {
-            function_def,
-            replacement,
+            function_name,
+            change_type,
         } = self;
-        match replacement {
-            Replacement::None
-            | Replacement::AttrName(_)
-            | Replacement::Message(_)
-            | Replacement::Rename { module: _, name: _ }
-            | Replacement::SourceModuleMoved { module: _, name: _ } => {
-                format!("`{function_def}` only accepts keyword arguments in Airflow 3.0")
+        match change_type {
+            FunctionSignatureChangeType::KeywordOnly { .. } => {
+                format!("`{function_name}` only accepts keyword arguments in Airflow 3.0")
             }
         }
     }
 
     fn fix_title(&self) -> Option<String> {
-        let Airflow3FunctionSignatureChange { replacement, .. } = self;
-        match replacement {
-            Replacement::None => None,
-            Replacement::AttrName(name) => Some(format!("Use `{name}` instead")),
-            Replacement::Message(message) => Some((*message).to_string()),
-            Replacement::Rename { module, name } => {
-                Some(format!("Use `{name}` from `{module}` instead."))
-            }
-            Replacement::SourceModuleMoved { module, name } => {
-                Some(format!("Use `{name}` from `{module}` instead."))
-            }
+        let Airflow3FunctionSignatureChange { change_type, .. } = self;
+        match change_type {
+            FunctionSignatureChangeType::KeywordOnly { message } => Some(message.to_string()),
         }
     }
 }
@@ -102,13 +90,13 @@ fn check_keyword_only_method(checker: &Checker, call_expr: &ExprCall, arguments:
         return;
     };
 
-    let replacement = match qualname.segments() {
+    let change_type = match qualname.segments() {
         ["airflow", "lineage", "hook", "HookLineageCollector"] => match attr.as_str() {
             "create_asset" => {
                 if arguments.find_positional(0).is_some() {
-                    Replacement::Message(
-                        "Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)",
-                    )
+                    FunctionSignatureChangeType::KeywordOnly {
+                        message: "Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)",
+                    }
                 } else {
                     // No positional args, no violation
                     return;
@@ -118,24 +106,12 @@ fn check_keyword_only_method(checker: &Checker, call_expr: &ExprCall, arguments:
         },
         _ => return,
     };
-    // Create the `Fix` first to avoid cloning `Replacement`.
-    let fix = if let Replacement::AttrName(name) = replacement {
-        Some(Fix::safe_edit(Edit::range_replacement(
-            name.to_string(),
-            attr.range(),
-        )))
-    } else {
-        None
-    };
 
-    let mut diagnostic = checker.report_diagnostic(
+    checker.report_diagnostic(
         Airflow3FunctionSignatureChange {
-            function_def: attr.to_string(),
-            replacement,
+            function_name: attr.to_string(),
+            change_type,
         },
         attr.range(),
     );
-    if let Some(fix) = fix {
-        diagnostic.set_fix(fix);
-    }
 }

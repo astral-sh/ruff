@@ -36,6 +36,12 @@ pub(crate) enum Replacement {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum FunctionSignatureChangeType {
+    /// Function signature changed to only accept keyword arguments.
+    KeywordOnly { message: &'static str },
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub(crate) enum ProviderReplacement {
     Rename {
         module: &'static str,
