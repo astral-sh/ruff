@@ -119,7 +119,7 @@ fn generate_markdown() -> String {
         let _ = writeln!(
             &mut output,
             r#"<small>
-Default level: <a href="../rules.md#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of '{level}'."><code>{level}</code></a> ·
 {status_text} ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20{encoded_name}" target="_blank">Related issues</a> ·
 <a href="https://github.com/astral-sh/ruff/blob/main/{file}#L{line}" target="_blank">View source</a>
