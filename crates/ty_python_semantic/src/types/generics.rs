@@ -1590,14 +1590,19 @@ impl<'db> SpecializationBuilder<'db> {
             upper: FxOrderSet<Type<'db>>,
         }
 
+        // Sort the constraints in each path by their `source_order`s, to ensure that we construct
+        // any unions or intersections in our type mappings in a stable order. Constraints might
+        // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
+        // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
+        // retain that stable per-tie ordering.
         let constraints = constraints.limit_to_valid_specializations(self.db);
         let mut sorted_paths = Vec::new();
         constraints.for_each_path(self.db, |path| {
             let mut path: Vec<_> = path.positive_constraints().collect();
-            path.sort_unstable_by_key(|(_, source_order)| *source_order);
+            path.sort_by_key(|(_, source_order)| *source_order);
             sorted_paths.push(path);
         });
-        sorted_paths.sort_unstable_by(|path1, path2| {
+        sorted_paths.sort_by(|path1, path2| {
             let source_orders1 = path1.iter().map(|(_, source_order)| *source_order);
             let source_orders2 = path2.iter().map(|(_, source_order)| *source_order);
             source_orders1.cmp(source_orders2)
