@@ -2066,7 +2066,121 @@ x = 1
     }
 
     #[test]
-    fn docstring_classification_concat_commented() {
+    fn docstring_classification_concat_parens() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    (
+        """wow cool docs"""
+        """and docs"""
+    )
+
+def my_func():
+    (
+        """wow cool docs"""
+        """and docs"""
+    )
+
+x = 1
+(
+    """wow cool docs"""
+    """and docs"""
+)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"\n        \"\"\"and docs\"\"\"" @ 30..72: String [documentation]
+        "my_func" @ 84..91: Function [definition]
+        "\"\"\"wow cool docs\"\"\"\n        \"\"\"and docs\"\"\"" @ 109..151: String [documentation]
+        "x" @ 159..160: Variable [definition]
+        "1" @ 163..164: Number
+        "\"\"\"wow cool docs\"\"\"\n    \"\"\"and docs\"\"\"" @ 171..209: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_parens_commented_nextline() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    (
+        """wow cool docs"""
+        # and a comment that shouldn't be included
+        """and docs"""
+    )
+
+def my_func():
+    (
+        """wow cool docs"""
+        # and a comment that shouldn't be included
+        """and docs"""
+    )
+
+x = 1
+(
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"\n        # and a comment that shouldn't be included\n        \"\"\"and docs\"\"\"" @ 30..123: String [documentation]
+        "my_func" @ 135..142: Function [definition]
+        "\"\"\"wow cool docs\"\"\"\n        # and a comment that shouldn't be included\n        \"\"\"and docs\"\"\"" @ 160..253: String [documentation]
+        "x" @ 261..262: Variable [definition]
+        "1" @ 265..266: Number
+        "\"\"\"wow cool docs\"\"\"\n    # and a comment that shouldn't be included\n    \"\"\"and docs\"\"\"" @ 273..358: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_commented_nextline() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+
+def my_func():
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+
+x = 1
+"""wow cool docs"""
+# and a comment that shouldn't be included
+"""and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 91..105: String
+        "my_func" @ 111..118: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 126..145: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 197..211: String
+        "x" @ 213..214: Variable [definition]
+        "1" @ 217..218: Number
+        "\"\"\"wow cool docs\"\"\"" @ 219..238: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 282..296: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_commented_sameline() {
         let test = SemanticTokenTest::new(
             r#"
 class MyClass:
@@ -2096,6 +2210,37 @@ x = 1
         "1" @ 223..224: Number
         "\"\"\"wow cool docs\"\"\"" @ 225..244: String [documentation]
         "\"\"\"and docs\"\"\"" @ 261..275: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_slashed() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" \
+    """and docs"""
+
+def my_func():
+    """wow cool docs""" \
+    """and docs"""
+
+x = 1
+"""wow cool docs""" \
+"""and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\" \\\n    \"\"\"and docs\"\"\"" @ 20..60: String [documentation]
+        "my_func" @ 66..73: Function [definition]
+        "\"\"\"wow cool docs\"\"\" \\\n    \"\"\"and docs\"\"\"" @ 81..121: String [documentation]
+        "x" @ 123..124: Variable [definition]
+        "1" @ 127..128: Number
+        "\"\"\"wow cool docs\"\"\" \\\n\"\"\"and docs\"\"\"" @ 129..165: String [documentation]
         "#);
     }
 
