@@ -2002,8 +2002,22 @@ impl<'db> Type<'db> {
     ///
     /// See `TypeRelation::Assignability` for more details.
     pub fn is_assignable_to(self, db: &'db dyn Db, target: Type<'db>) -> bool {
-        self.when_assignable_to(db, target, InferableTypeVars::None)
-            .is_always_satisfied(db)
+        #[salsa::tracked(cycle_initial=is_assignable_to_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
+        fn is_assignable_to_impl<'db>(
+            db: &'db dyn Db,
+            self_ty: Type<'db>,
+            target: Type<'db>,
+        ) -> bool {
+            self_ty
+                .when_assignable_to(db, target, InferableTypeVars::None)
+                .is_always_satisfied(db)
+        }
+
+        if self == target {
+            return true;
+        }
+
+        is_assignable_to_impl(db, self, target)
     }
 
     /// Return true if this type is assignable to type `target` using constraint-set assignability.
@@ -8707,6 +8721,17 @@ fn is_subtype_of_cycle_initial<'db>(
     _target: Type<'db>,
 ) -> bool {
     false
+}
+
+#[allow(clippy::trivially_copy_pass_by_ref)]
+fn is_assignable_to_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _self_ty: Type<'db>,
+    _target: Type<'db>,
+) -> bool {
+    // In case of a cycle, conservatively assume assignable to avoid false positives
+    true
 }
 
 #[allow(clippy::trivially_copy_pass_by_ref)]
