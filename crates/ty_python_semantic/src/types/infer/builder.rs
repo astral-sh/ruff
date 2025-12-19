@@ -12,6 +12,8 @@ use ruff_python_ast::{
 use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+
+use crate::FxOrderMap;
 use smallvec::SmallVec;
 
 use super::{
@@ -319,7 +321,7 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// this would lead to exponential blowup. By tracking which unions we're already narrowing
     /// against and what element we're narrowing to, nested calls can use the narrowed element
     /// directly instead of re-narrowing.
-    narrowing_unions: FxHashMap<UnionType<'db>, Type<'db>>,
+    narrowing_unions: FxOrderMap<UnionType<'db>, Type<'db>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -358,7 +360,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
-            narrowing_unions: FxHashMap::default(),
+            narrowing_unions: FxOrderMap::default(),
         }
     }
 
@@ -7020,15 +7022,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // If we're already narrowing against this union in an ancestor call, propagate
         // the narrowed element instead of re-narrowing (which would cause exponential blowup).
-        let call_expression_tcx = match call_expression_tcx.annotation {
-            Some(Type::Union(union)) => {
-                if let Some(&narrowed_ty) = self.narrowing_unions.get(&union) {
-                    TypeContext::new(Some(narrowed_ty))
-                } else {
-                    call_expression_tcx
-                }
-            }
-            _ => call_expression_tcx,
+        let call_expression_tcx = if let Some(Type::Union(union)) = call_expression_tcx.annotation
+            && let Some(&narrowed_ty) = self.narrowing_unions.get(&union)
+        {
+            TypeContext::new(Some(narrowed_ty))
+        } else {
+            call_expression_tcx
         };
 
         // If the type context is a union we haven't seen, attempt to narrow to a specific element.
@@ -7142,9 +7141,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
-        // Clean up: remove the union from the tracking set.
-        if let Some(union) = narrow_union {
-            self.narrowing_unions.remove(&union);
+        // Clean up: pop the union from the tracking map.
+        if narrow_union.is_some() {
+            self.narrowing_unions.pop();
         }
 
         // If narrowing succeeded, return the result.
