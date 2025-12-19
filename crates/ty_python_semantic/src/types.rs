@@ -12324,7 +12324,7 @@ impl<'db> BoundMethodType<'db> {
         Some(index.expect_single_definition(definition_scope.node(db).as_class()?))
     }
 
-    pub(crate) fn is_final(self, db: &'db dyn Db) -> bool {
+    fn is_final(self, db: &'db dyn Db) -> bool {
         if self
             .function(db)
             .has_known_decorator(db, FunctionDecorators::FINAL)
@@ -12342,7 +12342,7 @@ impl<'db> BoundMethodType<'db> {
             .any(|deco| deco == KnownFunction::Final)
     }
 
-    pub(super) fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+    fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
         let name = self.function(db).name(db);
 

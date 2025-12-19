@@ -639,9 +639,11 @@ impl<'db> ScopeInference<'db> {
         }
 
         let mut union = UnionBuilder::new(db);
-        if let Some(cycle_recovery) = self.fallback_type() {
+        // If this method is called early in the query cycle of `infer_scope_types`, `extra.return_types` will be empty.
+        // To properly propagate divergence, we must add `Divergent` to the union type.
+        if let Some(divergent) = self.fallback_type() {
             union = union.recursively_defined(RecursivelyDefined::Yes);
-            union = union.add(cycle_recovery);
+            union = union.add(divergent);
         }
 
         let Some(extra) = &self.extra else {
