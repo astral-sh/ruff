@@ -342,6 +342,7 @@ help: Combine `if` branches
 114 |         return 3
 115 |     elif a < b:  # end-of-line
 116 |         return 4
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:117:5
@@ -365,6 +366,7 @@ help: Combine `if` branches
 118 |         return 4
 119 | 
 120 | 
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:127:5
@@ -388,6 +390,7 @@ help: Combine `if` branches
 128 |         return 3
 129 | 
 130 | 
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:135:1
@@ -411,6 +414,7 @@ help: Combine `if` branches
 136 |     b
 137 | 
 138 | 
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:141:1
@@ -429,6 +433,7 @@ help: Combine `if` branches
 142 | 
 143 | 
 144 | if(x > 200): pass
+note: This is an unsafe fix and may change runtime behavior
 
 SIM114 [*] Combine `if` branches using logical `or` operator
    --> SIM114.py:145:1
