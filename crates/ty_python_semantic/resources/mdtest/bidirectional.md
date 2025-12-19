@@ -362,3 +362,48 @@ def _(x: X, flag: bool):
     # error: [possibly-unresolved-reference] "Name `y` used when possibly not defined"
     x.td = {"y": y}
 ```
+
+## Nested calls with union parameter types
+
+When inferring nested function calls where the parameter type is a union, the narrowed type context
+should be propagated through nested calls rather than re-narrowing at each level. This avoids
+exponential blowup while preserving type precision.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+`nested_union_inference.py`:
+
+```py
+def f(x: list[int | None]): ...
+def g[T](x: T) -> list[T]:
+    return [x]
+
+# Bidirectional inference uses the type context to solve generics.
+# The type context list[int | None] guides the inference of g(1).
+f(reveal_type(g(1)))  # revealed: list[int | None]
+```
+
+`nested_same_union.py`:
+
+When a function's parameter type is the same union as the outer type context, the narrowed element
+should be propagated instead of re-narrowing (which would cause exponential blowup).
+
+```py
+type CoreSchema = A | B | C | D
+
+class A: ...
+class B: ...
+class C: ...
+class D: ...
+
+def outer(x: CoreSchema) -> None: ...
+def inner(x: CoreSchema) -> D:
+    return D()
+
+# The outer call narrows CoreSchema to D. The inner call's parameter is also CoreSchema,
+# so the narrowed type D is propagated instead of trying all 4 elements again.
+outer(reveal_type(inner(inner(inner(D())))))  # revealed: D
+```
