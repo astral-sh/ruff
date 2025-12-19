@@ -7450,13 +7450,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.store_expression_type(expression, ty);
+        self.store_expression_type_impl(expression, ty, tcx);
 
         ty
     }
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+        self.store_expression_type_impl(expression, ty, TypeContext::default());
+    }
+
+    #[track_caller]
+    fn store_expression_type_impl(
+        &mut self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) {
         if self.deferred_state.in_string_annotation()
             || self.inner_expression_inference_state.is_get()
         {
@@ -7485,7 +7495,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.expressions
                     .entry(expression.into())
                     .and_modify(|current| {
-                        *current = IntersectionType::from_elements(db, [*current, ty]);
+                        // Avoid storing "failed" multi-inference attempts, which can lead to
+                        // unnecessary union simplification overhead.
+                        if tcx
+                            .annotation
+                            .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
+                        {
+                            *current = IntersectionType::from_elements(db, [*current, ty]);
+                        }
                     })
                     .or_insert(ty);
             }
