@@ -1,9 +1,9 @@
 use crate::db::Db;
 
 use anyhow::{Context, Result, anyhow, bail};
+use camino::Utf8Path;
 use ruff_db::system::{DbWithWritableSystem as _, OsSystem, SystemPath};
 use ruff_python_ast::PythonVersion;
-use std::path::Path;
 use ty_python_semantic::{PythonEnvironment, PythonPlatform, SysPrefixPathOrigin};
 
 /// Setup a virtual environment in the in-memory filesystem of `db` with
@@ -14,7 +14,7 @@ pub(crate) fn setup_venv(
     python_version: PythonVersion,
     python_platform: &PythonPlatform,
     dest_venv_path: &SystemPath,
-    lockfile_path: &Path,
+    lockfile_path: &Utf8Path,
 ) -> Result<()> {
     // Create a temporary directory for the project
     let temp_dir = tempfile::Builder::new()
@@ -79,15 +79,13 @@ dependencies = [
     } else if lockfile_path.exists() {
         // Copy existing lockfile to temp directory
         let temp_lockfile = temp_path.join("uv.lock");
-        std::fs::copy(lockfile_path, temp_lockfile.as_std_path()).with_context(|| {
-            format!("Failed to copy lockfile from '{}'", lockfile_path.display())
-        })?;
+        std::fs::copy(lockfile_path, temp_lockfile.as_std_path())
+            .with_context(|| format!("Failed to copy lockfile from '{lockfile_path}'"))?;
         true
     } else {
         // No existing lockfile - error in normal mode
         bail!(
-            "Lockfile not found at '{}'. Run with `MDTEST_UPGRADE_LOCKFILES=1` to generate it.",
-            lockfile_path.display()
+            "Lockfile not found at '{lockfile_path}'. Run with `MDTEST_UPGRADE_LOCKFILES=1` to generate it.",
         );
     };
 
@@ -131,10 +129,15 @@ dependencies = [
     // In upgrade mode, copy the generated lockfile back to the source location
     if upgrade_lockfile {
         let temp_lockfile = temp_path.join("uv.lock");
-        if temp_lockfile.as_std_path().exists() {
-            std::fs::copy(temp_lockfile.as_std_path(), lockfile_path).with_context(|| {
-                format!("Failed to write lockfile to '{}'", lockfile_path.display())
-            })?;
+        let temp_lockfile = temp_lockfile.as_std_path();
+        if temp_lockfile.exists() {
+            std::fs::copy(temp_lockfile, lockfile_path)
+                .with_context(|| format!("Failed to write lockfile to '{lockfile_path}'"))?;
+        } else {
+            bail!(
+                "Expected uv to create a lockfile at '{}'",
+                temp_lockfile.display()
+            );
         }
     }
 

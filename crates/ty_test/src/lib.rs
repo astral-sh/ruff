@@ -292,7 +292,7 @@ fn run_test(
             python_version,
             &python_platform,
             &venv_for_external_dependencies,
-            lockfile_path.as_std_path(),
+            &lockfile_path,
         )
         .expect("Failed to setup in-memory virtual environment with dependencies");
     }
