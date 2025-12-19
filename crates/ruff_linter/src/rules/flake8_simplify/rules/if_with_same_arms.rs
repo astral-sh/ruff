@@ -188,8 +188,5 @@ fn merge_branches(
 /// Return the [`TextRange`] of an [`IfElifBranch`]'s body (from the end of the test to the end of
 /// the body).
 fn body_range(branch: &IfElifBranch, locator: &Locator) -> TextRange {
-    TextRange::new(
-        locator.line_end(branch.test.end()),
-        locator.line_end(branch.end()),
-    )
+    TextRange::new(branch.test.end(), locator.line_end(branch.end()))
 }
