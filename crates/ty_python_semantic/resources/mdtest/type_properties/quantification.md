@@ -37,9 +37,9 @@ def keep_single[T]():
 
 ## Removing a single typevar
 
-If a constraint set only mentions a single typevar, and we remove that typevar when quantifying,
-the result is usually "always". The only exception is if the original constraint set has no
-solution. In that case, the result is also unsatisfiable.
+If a constraint set only mentions a single typevar, and we remove that typevar when quantifying, the
+result is usually "always". The only exception is if the original constraint set has no solution. In
+that case, the result is also unsatisfiable.
 
 ```py
 from ty_extensions import ConstraintSet, static_assert
