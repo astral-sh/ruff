@@ -859,7 +859,8 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.with_type(KnownClass::MethodWrapperType.to_class_literal(self.db))
                     .write_str("method-wrapper")?;
                 f.write_str(" '")?;
-                if let Place::Defined(member_ty, _, _) = class_ty.member(self.db, member_name).place
+                if let Place::Defined(member_ty, _, _, _) =
+                    class_ty.member(self.db, member_name).place
                 {
                     f.with_type(member_ty).write_str(member_name)?;
                 } else {
