@@ -310,6 +310,14 @@ pub(super) struct TypeInferenceBuilder<'db, 'ast> {
     /// A list of `dataclass_transform` field specifiers that are "active" (when inferring
     /// the right hand side of an annotated assignment in a class that is a dataclass).
     dataclass_field_specifiers: SmallVec<[Type<'db>; NUM_FIELD_SPECIFIERS_INLINE]>,
+
+    /// Unions we're currently narrowing against in ancestor calls.
+    ///
+    /// When inferring a call expression with a union type context, we try narrowing to each
+    /// element of the union. If nested calls have the same union as their parameter type,
+    /// this would lead to exponential blowup. By tracking which unions we're already narrowing
+    /// against, we skip redundant nested narrowing.
+    narrowing_unions: FxHashSet<UnionType<'db>>,
 }
 
 impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
@@ -348,6 +356,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             cycle_recovery: None,
             all_definitely_bound: true,
             dataclass_field_specifiers: SmallVec::new(),
+            narrowing_unions: FxHashSet::default(),
         }
     }
 
@@ -7008,13 +7017,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let db = self.db();
 
         // If the type context is a union, attempt to narrow to a specific element.
-        let narrow_targets: &[_] = match call_expression_tcx.annotation {
-            // TODO: We could theoretically attempt to narrow to every element of
-            // the power set of this union. However, this leads to an exponential
-            // explosion of inference attempts, and is rarely needed in practice.
-            Some(Type::Union(union)) => union.elements(db),
-            _ => &[],
-        };
+        // However, skip narrowing if we're already narrowing against the same union
+        // in an ancestor call to avoid exponential blowup with deeply nested calls.
+        let (narrow_union, narrow_targets): (Option<UnionType<'db>>, &[_]) =
+            match call_expression_tcx.annotation {
+                Some(Type::Union(union)) if !self.narrowing_unions.contains(&union) => {
+                    // TODO: We could theoretically attempt to narrow to every element of
+                    // the power set of this union. However, this leads to an exponential
+                    // explosion of inference attempts, and is rarely needed in practice.
+                    (Some(union), union.elements(db))
+                }
+                _ => (None, &[]),
+            };
+
+        // Track that we're narrowing against this union to prevent nested calls
+        // from redundantly narrowing against the same union.
+        if let Some(union) = narrow_union {
+            self.narrowing_unions.insert(union);
+        }
 
         // We silence diagnostics until we successfully narrow to a specific type.
         let mut speculated_bindings = bindings.clone();
@@ -7082,12 +7102,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         // Prefer the declared type of generic classes.
+        let mut narrowing_result = None;
         for narrowed_ty in narrow_targets
             .iter()
             .filter(|ty| ty.class_specialization(db).is_some())
         {
             if let Some(result) = try_narrow(*narrowed_ty) {
-                return result;
+                narrowing_result = Some(result);
+                break;
             }
         }
 
@@ -7095,13 +7117,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         //
         // TODO: We could also attempt an inference without type context, but this
         // leads to similar performance issues.
-        for narrowed_ty in narrow_targets
-            .iter()
-            .filter(|ty| ty.class_specialization(db).is_none())
-        {
-            if let Some(result) = try_narrow(*narrowed_ty) {
-                return result;
+        if narrowing_result.is_none() {
+            for narrowed_ty in narrow_targets
+                .iter()
+                .filter(|ty| ty.class_specialization(db).is_none())
+            {
+                if let Some(result) = try_narrow(*narrowed_ty) {
+                    narrowing_result = Some(result);
+                    break;
+                }
             }
+        }
+
+        // Clean up: remove the union from the tracking set.
+        if let Some(union) = narrow_union {
+            self.narrowing_unions.remove(&union);
+        }
+
+        // If narrowing succeeded, return the result.
+        if let Some(result) = narrowing_result {
+            return result;
         }
 
         // Re-enable diagnostics, and infer against the entire union as a fallback.
@@ -12592,6 +12627,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            narrowing_unions: _,
         } = self;
 
         let diagnostics = context.finish();
@@ -12659,6 +12695,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            narrowing_unions: _,
         } = self;
 
         let _ = scope;
@@ -12736,6 +12773,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             index: _,
             region: _,
             return_types_and_ranges: _,
+            narrowing_unions: _,
         } = self;
 
         let _ = scope;
