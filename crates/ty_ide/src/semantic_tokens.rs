@@ -765,6 +765,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.in_target_creating_definition = false;
 
                 self.visit_expr(&assignment.value);
+                self.expecting_docstring = true;
             }
             ast::Stmt::AnnAssign(assignment) => {
                 self.in_target_creating_definition = true;
@@ -776,6 +777,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(value) = &assignment.value {
                     self.visit_expr(value);
                 }
+                self.expecting_docstring = true;
             }
             ast::Stmt::For(for_stmt) => {
                 self.in_target_creating_definition = true;
@@ -1890,6 +1892,7 @@ def my_function(param1: int, param2: str) -> bool:
     """
 
     x = "hello"
+    def other_func(): pass
 
     """unrelated string"""
 
@@ -1909,8 +1912,9 @@ def my_function(param1: int, param2: str) -> bool:
         "\"\"\"Example function\n\n    Args:\n        param1: The first parameter.\n        param2: The second parameter.\n\n    Returns:\n        The return value. True for success, False otherwise.\n\n    \"\"\"" @ 56..245: String [documentation]
         "x" @ 251..252: Variable [definition]
         "\"hello\"" @ 255..262: String
-        "\"\"\"unrelated string\"\"\"" @ 268..290: String
-        "False" @ 303..308: BuiltinConstant
+        "other_func" @ 271..281: Function [definition]
+        "\"\"\"unrelated string\"\"\"" @ 295..317: String
+        "False" @ 330..335: BuiltinConstant
         "#);
     }
 
@@ -2001,13 +2005,128 @@ Trust me
         "important_value" @ 1..16: Variable [definition]
         "str" @ 18..21: Class
         "\"wow\"" @ 24..29: String
-        "\"\"\"This is the most important value\n\nDon't trust the other guy\n\"\"\"" @ 30..96: String
+        "\"\"\"This is the most important value\n\nDon't trust the other guy\n\"\"\"" @ 30..96: String [documentation]
         "x" @ 98..99: Variable [definition]
         "\"unrelated string\"" @ 102..120: String
         "other_value" @ 122..133: Variable [definition]
         "int" @ 135..138: Class
         "2" @ 141..142: Number
-        "\"\"\"This is such an import value omg\n\nTrust me\n\"\"\"" @ 143..192: String
+        "\"\"\"This is such an import value omg\n\nTrust me\n\"\"\"" @ 143..192: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn attribute_docstring_classification_spill() {
+        let test = SemanticTokenTest::new(
+            r#"
+if True:
+    x = 1
+"this shouldn't be a docstring but also it doesn't matter much"
+"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "True" @ 4..8: BuiltinConstant
+        "x" @ 14..15: Variable [definition]
+        "1" @ 18..19: Number
+        "\"this shouldn't be a docstring but also it doesn't matter much\"" @ 20..83: String [documentation]
+        "\"\"\"\n" @ 84..88: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" """and docs"""
+
+def my_func():
+    """wow cool docs""" """and docs"""
+
+x = 1
+"""wow cool docs""" """and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 20..54: String [documentation]
+        "my_func" @ 60..67: Function [definition]
+        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 75..109: String [documentation]
+        "x" @ 111..112: Variable [definition]
+        "1" @ 115..116: Number
+        "\"\"\"wow cool docs\"\"\" \"\"\"and docs\"\"\"" @ 117..151: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_commented() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" # and a comment
+    """and docs"""      # that shouldn't be included
+
+def my_func():
+    """wow cool docs""" # and a comment
+    """and docs"""      # that shouldn't be included
+
+x = 1
+"""wow cool docs""" # and a comment
+"""and docs"""      # that shouldn't be included
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 60..74: String
+        "my_func" @ 114..121: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 129..148: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 169..183: String
+        "x" @ 219..220: Variable [definition]
+        "1" @ 223..224: Number
+        "\"\"\"wow cool docs\"\"\"" @ 225..244: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 261..275: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_plus() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    "wow cool docs" + "and docs"
+
+def my_func():
+    "wow cool docs" + "and docs"
+
+x = 1
+"wow cool docs" + "and docs"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"wow cool docs\"" @ 20..35: String
+        "\"and docs\"" @ 38..48: String
+        "my_func" @ 54..61: Function [definition]
+        "\"wow cool docs\"" @ 69..84: String
+        "\"and docs\"" @ 87..97: String
+        "x" @ 99..100: Variable [definition]
+        "1" @ 103..104: Number
+        "\"wow cool docs\"" @ 105..120: String
+        "\"and docs\"" @ 123..133: String
         "#);
     }
 
@@ -2039,13 +2158,13 @@ class MyClass:
         "important_value" @ 20..35: Variable [definition]
         "str" @ 37..40: Class
         "\"wow\"" @ 43..48: String
-        "\"\"\"This is the most important value\n\n    Don't trust the other guy\n    \"\"\"" @ 53..127: String
+        "\"\"\"This is the most important value\n\n    Don't trust the other guy\n    \"\"\"" @ 53..127: String [documentation]
         "x" @ 133..134: Variable [definition]
         "\"unrelated string\"" @ 137..155: String
         "other_value" @ 161..172: Variable [definition]
         "int" @ 174..177: Class
         "2" @ 180..181: Number
-        "\"\"\"This is such an import value omg\n\n    Trust me\n    \"\"\"" @ 186..243: String
+        "\"\"\"This is such an import value omg\n\n    Trust me\n    \"\"\"" @ 186..243: String [documentation]
         "#);
     }
 
