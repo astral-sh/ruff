@@ -11,7 +11,7 @@ AIR303 `create_asset` only accepts keyword arguments in Airflow 3.0
 8 | hlc.create_asset("should", "be", "no", "posarg")
 9 | hlc.create_asset(name="but", uri="kwargs are ok")
   |
-help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
 
 AIR303 `create_asset` only accepts keyword arguments in Airflow 3.0
   --> AIR303_args.py:8:5
@@ -23,4 +23,4 @@ AIR303 `create_asset` only accepts keyword arguments in Airflow 3.0
  9 | hlc.create_asset(name="but", uri="kwargs are ok")
 10 | hlc.create_asset()
    |
-help: Calling ``HookLineageCollector.create_asset`` with positional argument should raise an error
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
