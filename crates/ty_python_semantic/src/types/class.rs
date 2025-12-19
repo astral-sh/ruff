@@ -20,7 +20,9 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
-use crate::types::enums::enum_metadata;
+use crate::types::enums::{
+    enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
+};
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
 };
@@ -2355,6 +2357,18 @@ impl<'db> ClassLiteral<'db> {
             // The symbol was not found in the class scope. It might still be implicitly defined in `@classmethod`s.
             return Self::implicit_attribute(db, body_scope, name, MethodDecorator::ClassMethod);
         }
+
+        // For enum classes, `nonmember(value)` creates a non-member attribute.
+        // At runtime, the enum metaclass unwraps the value, so accessing the attribute
+        // returns the inner value, not the `nonmember` wrapper.
+        if let Some(ty) = member.inner.place.ignore_possibly_undefined() {
+            if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
+                if is_enum_class_by_inheritance(db, self) {
+                    return Member::definitely_declared(value_ty);
+                }
+            }
+        }
+
         member
     }
 
