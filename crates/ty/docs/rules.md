@@ -2,6 +2,47 @@
 
 # Rules
 
+## `ambiguous-protocol-member`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0.0.1-alpha.20</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20ambiguous-protocol-member" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L511" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for protocol classes with members that will lead to ambiguous interfaces.
+
+**Why is this bad?**
+
+Assigning to an undeclared variable in a protocol class leads to an ambiguous
+interface which may lead to the type checker inferring unexpected things. It's
+recommended to ensure that all members of a protocol class are explicitly declared.
+
+**Examples**
+
+
+```py
+from typing import Protocol
+
+class BaseProto(Protocol):
+    a: int                               # fine (explicitly declared as `int`)
+    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
+    c = "some variable"                  # error: no explicit declaration, leading to ambiguity
+    b = method_member                    # error: no explicit declaration, leading to ambiguity
+
+    # error: this creates implicit assignments of `d` and `e` in the protocol class body.
+    # Were they really meant to be considered protocol members?
+    for d, e in enumerate(range(42)):
+        pass
+
+class SubProto(BaseProto, Protocol):
+    a = 42  # fine (declared in superclass)
+```
+
 ## `byte-string-type-annotation`
 
 <small>
@@ -212,6 +253,62 @@ type A = B
 type B = A
 ```
 
+## `deprecated`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.16">0.0.1-alpha.16</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20deprecated" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L326" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for uses of deprecated items
+
+**Why is this bad?**
+
+Deprecated items should no longer be used.
+
+**Examples**
+
+```python
+@warnings.deprecated("use new_func instead")
+def old_func(): ...
+
+old_func()  # emits [deprecated] diagnostic
+```
+
+## `division-by-zero`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a>) ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20division-by-zero" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L304" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+It detects division by zero.
+
+**Why is this bad?**
+
+Dividing by zero raises a `ZeroDivisionError` at runtime.
+
+**Rule status**
+
+This rule is currently disabled by default because of the number of
+false positives it can produce.
+
+**Examples**
+
+```python
+5 / 0
+```
+
 ## `duplicate-base`
 
 <small>
@@ -318,6 +415,37 @@ Use instead:
 ```python
 def test(): -> "int":
     ...
+```
+
+## `ignore-comment-unknown-rule`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20ignore-comment-unknown-rule" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L47" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for `ty: ignore[code]` where `code` isn't a known lint rule.
+
+**Why is this bad?**
+
+A `ty: ignore[code]` directive with a `code` that doesn't match
+any known rule will not suppress any type errors, and is probably a mistake.
+
+**Examples**
+
+```py
+a = 20 / 0  # ty: ignore[division-by-zer]
+```
+
+Use instead:
+
+```py
+a = 20 / 0  # ty: ignore[division-by-zero]
 ```
 
 ## `implicit-concatenated-string-type-annotation`
@@ -868,6 +996,36 @@ class D(Generic[U, T]): ...
 **References**
 
 - [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)
+
+## `invalid-ignore-comment`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-ignore-comment" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L72" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.
+
+**Why is this bad?**
+
+A syntactically incorrect ignore comment is probably a mistake and is useless.
+
+**Examples**
+
+```py
+a = 20 / 0  # type: ignoree
+```
+
+Use instead:
+
+```py
+a = 20 / 0  # type: ignore
+```
 
 ## `invalid-key`
 
@@ -1902,6 +2060,136 @@ def f(x: int, /) -> int: ...
 f(x=1)  # Error raised here
 ```
 
+## `possibly-missing-attribute`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-attribute" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1557" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for possibly missing attributes.
+
+**Why is this bad?**
+
+Attempting to access a missing attribute will raise an `AttributeError` at runtime.
+
+**Examples**
+
+```python
+class A:
+    if b:
+        c = 0
+
+A.c  # AttributeError: type object 'A' has no attribute 'c'
+```
+
+## `possibly-missing-implicit-call`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-implicit-call" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L153" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for implicit calls to possibly missing methods.
+
+**Why is this bad?**
+
+Expressions such as `x[y]` and `x * y` call methods
+under the hood (`__getitem__` and `__mul__` respectively).
+Calling a missing method will raise an `AttributeError` at runtime.
+
+**Examples**
+
+```python
+import datetime
+
+class A:
+    if datetime.date.today().weekday() != 6:
+        def __getitem__(self, v): ...
+
+A()[0]  # TypeError: 'A' object is not subscriptable
+```
+
+## `possibly-missing-import`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-import" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1579" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for imports of symbols that may be missing.
+
+**Why is this bad?**
+
+Importing a missing module or name will raise a `ModuleNotFoundError`
+or `ImportError` at runtime.
+
+**Rule status**
+
+This rule is currently disabled by default because of the number of
+false positives it can produce.
+
+**Examples**
+
+```python
+# module.py
+import datetime
+
+if datetime.date.today().weekday() != 6:
+    a = 1
+
+# main.py
+from module import a  # ImportError: cannot import name 'a' from 'module'
+```
+
+## `possibly-unresolved-reference`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1609" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for references to names that are possibly not defined.
+
+**Why is this bad?**
+
+Using an undefined variable will raise a `NameError` at runtime.
+
+**Rule status**
+
+This rule is currently disabled by default because of the number of
+false positives it can produce.
+
+**Example**
+
+
+```python
+for i in range(0):
+    x = i
+
+print(x)  # NameError: name 'x' is not defined
+```
+
 ## `raw-string-type-annotation`
 
 <small>
@@ -1931,6 +2219,33 @@ Use instead:
 ```python
 def test(): -> "int":
     ...
+```
+
+## `redundant-cast`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20redundant-cast" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2043" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Detects redundant `cast` calls where the value already has the target type.
+
+**Why is this bad?**
+
+These casts have no effect and can be removed.
+
+**Example**
+
+```python
+def f() -> int:
+    return 10
+
+cast(int, f())  # Redundant
 ```
 
 ## `static-assert-error`
@@ -2127,6 +2442,30 @@ class A:
 
 - [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)
 
+## `undefined-reveal`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20undefined-reveal" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1830" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for calls to `reveal_type` without importing it.
+
+**Why is this bad?**
+
+Using `reveal_type` without importing it will raise a `NameError` at runtime.
+
+**Examples**
+
+```python
+reveal_type(1)  # NameError: name 'reveal_type' is not defined
+```
+
 ## `unknown-argument`
 
 <small>
@@ -2182,6 +2521,64 @@ class A: ...
 A().foo  # AttributeError: 'A' object has no attribute 'foo'
 ```
 
+## `unresolved-global`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.15">0.0.1-alpha.15</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-global" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2064" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Detects variables declared as `global` in an inner scope that have no explicit
+bindings or declarations in the global scope.
+
+**Why is this bad?**
+
+Function bodies with `global` statements can run in any order (or not at all), which makes
+it hard for static analysis tools to infer the types of globals without
+explicit definitions or declarations.
+
+**Example**
+
+```python
+def f():
+    global x  # unresolved global
+    x = 42
+
+def g():
+    print(x)  # unresolved reference
+```
+
+Use instead:
+
+```python
+x: int
+
+def f():
+    global x
+    x = 42
+
+def g():
+    print(x)
+```
+
+Or:
+
+```python
+x: int | None = None
+
+def f():
+    global x
+    x = 42
+
+def g():
+    print(x)
+```
+
 ## `unresolved-import`
 
 <small>
@@ -2231,6 +2628,45 @@ Using an undefined variable will raise a `NameError` at runtime.
 ```python
 print(x)  # NameError: name 'x' is not defined
 ```
+
+## `unsupported-base`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.7">0.0.1-alpha.7</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-base" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L782" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for class definitions that have bases which are unsupported by ty.
+
+**Why is this bad?**
+
+If a class has a base that is an instance of a complex type such as a union type,
+ty will not be able to resolve the [method resolution order] (MRO) for the class.
+This will lead to an inferior understanding of your codebase and unpredictable
+type-checking behavior.
+
+**Examples**
+
+```python
+import datetime
+
+class A: ...
+class B: ...
+
+if datetime.date.today().weekday() != 6:
+    C = A
+else:
+    C = B
+
+class D(C): ...  # error: [unsupported-base]
+```
+
+[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 
 ## `unsupported-bool-conversion`
 
@@ -2297,367 +2733,36 @@ class A: ...
 A() + A()  # TypeError: unsupported operand type(s) for +: 'A' and 'A'
 ```
 
-## `zero-stepsize-in-slice`
+## `unused-ignore-comment`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20zero-stepsize-in-slice" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1972" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unused-ignore-comment" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L22" target="_blank">View source</a>
 </small>
 
 
 **What it does**
 
-Checks for step size 0 in slices.
+Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
 
 **Why is this bad?**
 
-A slice with a step size of zero will raise a `ValueError` at runtime.
-
-**Examples**
-
-```python
-l = list(range(10))
-l[1:10:0]  # ValueError: slice step cannot be zero
-```
-
-## `ambiguous-protocol-member`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0.0.1-alpha.20</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20ambiguous-protocol-member" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L511" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for protocol classes with members that will lead to ambiguous interfaces.
-
-**Why is this bad?**
-
-Assigning to an undeclared variable in a protocol class leads to an ambiguous
-interface which may lead to the type checker inferring unexpected things. It's
-recommended to ensure that all members of a protocol class are explicitly declared.
-
-**Examples**
-
-
-```py
-from typing import Protocol
-
-class BaseProto(Protocol):
-    a: int                               # fine (explicitly declared as `int`)
-    def method_member(self) -> int: ...  # fine: a method definition using `def` is considered a declaration
-    c = "some variable"                  # error: no explicit declaration, leading to ambiguity
-    b = method_member                    # error: no explicit declaration, leading to ambiguity
-
-    # error: this creates implicit assignments of `d` and `e` in the protocol class body.
-    # Were they really meant to be considered protocol members?
-    for d, e in enumerate(range(42)):
-        pass
-
-class SubProto(BaseProto, Protocol):
-    a = 42  # fine (declared in superclass)
-```
-
-## `deprecated`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.16">0.0.1-alpha.16</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20deprecated" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L326" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for uses of deprecated items
-
-**Why is this bad?**
-
-Deprecated items should no longer be used.
-
-**Examples**
-
-```python
-@warnings.deprecated("use new_func instead")
-def old_func(): ...
-
-old_func()  # emits [deprecated] diagnostic
-```
-
-## `ignore-comment-unknown-rule`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20ignore-comment-unknown-rule" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L47" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for `ty: ignore[code]` where `code` isn't a known lint rule.
-
-**Why is this bad?**
-
-A `ty: ignore[code]` directive with a `code` that doesn't match
-any known rule will not suppress any type errors, and is probably a mistake.
+A `type: ignore` directive that no longer matches any diagnostic violations is likely
+included by mistake, and should be removed to avoid confusion.
 
 **Examples**
 
 ```py
-a = 20 / 0  # ty: ignore[division-by-zer]
+a = 20 / 2  # ty: ignore[division-by-zero]
 ```
 
 Use instead:
 
 ```py
-a = 20 / 0  # ty: ignore[division-by-zero]
+a = 20 / 2
 ```
-
-## `invalid-ignore-comment`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-ignore-comment" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L72" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for `type: ignore` and `ty: ignore` comments that are syntactically incorrect.
-
-**Why is this bad?**
-
-A syntactically incorrect ignore comment is probably a mistake and is useless.
-
-**Examples**
-
-```py
-a = 20 / 0  # type: ignoree
-```
-
-Use instead:
-
-```py
-a = 20 / 0  # type: ignore
-```
-
-## `possibly-missing-attribute`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-attribute" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1557" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for possibly missing attributes.
-
-**Why is this bad?**
-
-Attempting to access a missing attribute will raise an `AttributeError` at runtime.
-
-**Examples**
-
-```python
-class A:
-    if b:
-        c = 0
-
-A.c  # AttributeError: type object 'A' has no attribute 'c'
-```
-
-## `possibly-missing-implicit-call`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-implicit-call" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L153" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for implicit calls to possibly missing methods.
-
-**Why is this bad?**
-
-Expressions such as `x[y]` and `x * y` call methods
-under the hood (`__getitem__` and `__mul__` respectively).
-Calling a missing method will raise an `AttributeError` at runtime.
-
-**Examples**
-
-```python
-import datetime
-
-class A:
-    if datetime.date.today().weekday() != 6:
-        def __getitem__(self, v): ...
-
-A()[0]  # TypeError: 'A' object is not subscriptable
-```
-
-## `redundant-cast`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20redundant-cast" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2043" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Detects redundant `cast` calls where the value already has the target type.
-
-**Why is this bad?**
-
-These casts have no effect and can be removed.
-
-**Example**
-
-```python
-def f() -> int:
-    return 10
-
-cast(int, f())  # Redundant
-```
-
-## `undefined-reveal`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20undefined-reveal" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1830" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for calls to `reveal_type` without importing it.
-
-**Why is this bad?**
-
-Using `reveal_type` without importing it will raise a `NameError` at runtime.
-
-**Examples**
-
-```python
-reveal_type(1)  # NameError: name 'reveal_type' is not defined
-```
-
-## `unresolved-global`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.15">0.0.1-alpha.15</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unresolved-global" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2064" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Detects variables declared as `global` in an inner scope that have no explicit
-bindings or declarations in the global scope.
-
-**Why is this bad?**
-
-Function bodies with `global` statements can run in any order (or not at all), which makes
-it hard for static analysis tools to infer the types of globals without
-explicit definitions or declarations.
-
-**Example**
-
-```python
-def f():
-    global x  # unresolved global
-    x = 42
-
-def g():
-    print(x)  # unresolved reference
-```
-
-Use instead:
-
-```python
-x: int
-
-def f():
-    global x
-    x = 42
-
-def g():
-    print(x)
-```
-
-Or:
-
-```python
-x: int | None = None
-
-def f():
-    global x
-    x = 42
-
-def g():
-    print(x)
-```
-
-## `unsupported-base`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'warn'."><code>warn</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.7">0.0.1-alpha.7</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsupported-base" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L782" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for class definitions that have bases which are unsupported by ty.
-
-**Why is this bad?**
-
-If a class has a base that is an instance of a complex type such as a union type,
-ty will not be able to resolve the [method resolution order] (MRO) for the class.
-This will lead to an inferior understanding of your codebase and unpredictable
-type-checking behavior.
-
-**Examples**
-
-```python
-import datetime
-
-class A: ...
-class B: ...
-
-if datetime.date.today().weekday() != 6:
-    C = A
-else:
-    C = B
-
-class D(C): ...  # error: [unsupported-base]
-```
-
-[method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
 
 ## `useless-overload-body`
 
@@ -2722,133 +2827,28 @@ def foo(x: int | str) -> int | str:
 
 - [Python documentation: `@overload`](https://docs.python.org/3/library/typing.html#typing.overload)
 
-## `division-by-zero`
+## `zero-stepsize-in-slice`
 
 <small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a>) ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20division-by-zero" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L304" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-It detects division by zero.
-
-**Why is this bad?**
-
-Dividing by zero raises a `ZeroDivisionError` at runtime.
-
-**Rule status**
-
-This rule is currently disabled by default because of the number of
-false positives it can produce.
-
-**Examples**
-
-```python
-5 / 0
-```
-
-## `possibly-missing-import`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.22">0.0.1-alpha.22</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-missing-import" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1579" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for imports of symbols that may be missing.
-
-**Why is this bad?**
-
-Importing a missing module or name will raise a `ModuleNotFoundError`
-or `ImportError` at runtime.
-
-**Rule status**
-
-This rule is currently disabled by default because of the number of
-false positives it can produce.
-
-**Examples**
-
-```python
-# module.py
-import datetime
-
-if datetime.date.today().weekday() != 6:
-    a = 1
-
-# main.py
-from module import a  # ImportError: cannot import name 'a' from 'module'
-```
-
-## `possibly-unresolved-reference`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20possibly-unresolved-reference" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1609" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20zero-stepsize-in-slice" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1972" target="_blank">View source</a>
 </small>
 
 
 **What it does**
 
-Checks for references to names that are possibly not defined.
+Checks for step size 0 in slices.
 
 **Why is this bad?**
 
-Using an undefined variable will raise a `NameError` at runtime.
-
-**Rule status**
-
-This rule is currently disabled by default because of the number of
-false positives it can produce.
-
-**Example**
-
-
-```python
-for i in range(0):
-    x = i
-
-print(x)  # NameError: name 'x' is not defined
-```
-
-## `unused-ignore-comment`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'ignore'."><code>ignore</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unused-ignore-comment" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Fsuppression.rs#L22" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for `type: ignore` or `ty: ignore` directives that are no longer applicable.
-
-**Why is this bad?**
-
-A `type: ignore` directive that no longer matches any diagnostic violations is likely
-included by mistake, and should be removed to avoid confusion.
+A slice with a step size of zero will raise a `ValueError` at runtime.
 
 **Examples**
 
-```py
-a = 20 / 2  # ty: ignore[division-by-zero]
-```
-
-Use instead:
-
-```py
-a = 20 / 2
+```python
+l = list(range(10))
+l[1:10:0]  # ValueError: slice step cannot be zero
 ```
 
