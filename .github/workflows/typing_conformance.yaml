@@ -9,7 +9,7 @@ on:
       - "!crates/ty_ide/**"
       - "!crates/ty_server/**"
       - "!crates/ty_test/**"
-      - "!crates/ty_server/**"
+      - "!crates/ty_completion_eval/**"
       - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
