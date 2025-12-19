@@ -1016,6 +1016,21 @@ if sys.platform != "linux":
 if sys.platform != "darwin" and sys.platform != "linux":
     __all__ += ["AF_BLUETOOTH"]
 
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+    from _socket import BTPROTO_HCI as BTPROTO_HCI, BTPROTO_L2CAP as BTPROTO_L2CAP, BTPROTO_SCO as BTPROTO_SCO
+
+    __all__ += ["BTPROTO_HCI", "BTPROTO_L2CAP", "BTPROTO_SCO"]
+
+if sys.platform != "win32" and sys.platform != "darwin" and sys.platform != "linux":
+    from _socket import HCI_DATA_DIR as HCI_DATA_DIR, HCI_FILTER as HCI_FILTER, HCI_TIME_STAMP as HCI_TIME_STAMP
+
+    __all__ += ["HCI_FILTER", "HCI_TIME_STAMP", "HCI_DATA_DIR"]
+
+if sys.version_info >= (3, 11) and sys.platform != "linux" and sys.platform != "win32" and sys.platform != "darwin":
+    from _socket import LOCAL_CREDS as LOCAL_CREDS, LOCAL_CREDS_PERSISTENT as LOCAL_CREDS_PERSISTENT, SCM_CREDS2 as SCM_CREDS2
+
+    __all__ += ["SCM_CREDS2", "LOCAL_CREDS", "LOCAL_CREDS_PERSISTENT"]
+
 if sys.platform == "win32" and sys.version_info >= (3, 12):
     __all__ += ["AF_HYPERV"]
 

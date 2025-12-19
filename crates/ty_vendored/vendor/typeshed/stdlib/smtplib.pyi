@@ -531,7 +531,7 @@ empty dictionary.
         The arguments are as for sendmail, except that msg is an
         email.message.Message object.  If from_addr is None or to_addrs is
         None, these arguments are taken from the headers of the Message as
-        described in RFC 2822 (a ValueError is raised if there is more than
+        described in RFC 5322 (a ValueError is raised if there is more than
         one set of 'Resent-' headers).  Regardless of the values of from_addr and
         to_addr, any Bcc field (or Resent-Bcc field, when the Message is a
         resent) of the Message object won't be transmitted.  The Message

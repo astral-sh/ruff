@@ -202,7 +202,7 @@ class HTTPMessage(email.message.Message[str, str]):
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes], _class: Callable[[], _MessageT]) -> _MessageT:
-    """Parses only RFC2822 headers from a file pointer."""
+    """Parses only RFC 5322 headers from a file pointer."""
 
 @overload
 def parse_headers(fp: SupportsReadline[bytes]) -> HTTPMessage: ...
