@@ -80,7 +80,8 @@ expression: initialization_result
         "tokenModifiers": [
           "definition",
           "readonly",
-          "async"
+          "async",
+          "documentation"
         ]
       },
       "range": true,
