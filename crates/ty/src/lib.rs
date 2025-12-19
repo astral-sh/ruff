@@ -273,9 +273,6 @@ impl MainLoop {
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
-            if self.watcher.is_some() {
-                Printer::clear_screen()?;
-            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -384,12 +381,15 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
+                    Printer::clear_screen()?;
+
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
+
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
