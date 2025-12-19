@@ -3198,7 +3198,12 @@ impl<'db> SequentMap<'db> {
 
             // (Covariant[B] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[BL] ≤ C ≤ CU)
             TypeVarVariance::Covariant => {
-                if !bound_lower.is_never() && !bound_lower.is_object() {
+                // Only substitute to create a new sequent if the substitution is interesting, and
+                // doesn't recursively contain the typevar we are substituting for.
+                if !bound_lower.is_never()
+                    && !bound_lower.is_object()
+                    && bound_lower.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                {
                     let partial = PartialSpecialization::Single {
                         bound_typevar,
                         ty: bound_lower,
@@ -3222,7 +3227,9 @@ impl<'db> SequentMap<'db> {
         }
 
         // (Covariant[BU] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[B] ≤ C ≤ CU)
-        if let Type::TypeVar(bound_upper_typevar) = bound_upper {
+        if let Type::TypeVar(bound_upper_typevar) = bound_upper
+            && !bound_upper_typevar.is_same_typevar_as(db, constrained_typevar)
+        {
             if constrained_lower.variance_of(db, bound_upper_typevar) == TypeVarVariance::Covariant
             {
                 let partial = PartialSpecialization::Single {
@@ -3250,7 +3257,12 @@ impl<'db> SequentMap<'db> {
 
             // (CL ≤ C ≤ Covariant[B]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[BU])
             TypeVarVariance::Covariant => {
-                if !bound_upper.is_never() && !bound_upper.is_object() {
+                // Only substitute to create a new sequent if the substitution is interesting, and
+                // doesn't recursively contain the typevar we are substituting for.
+                if !bound_upper.is_never()
+                    && !bound_upper.is_object()
+                    && bound_upper.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                {
                     let partial = PartialSpecialization::Single {
                         bound_typevar,
                         ty: bound_upper,
@@ -3274,7 +3286,9 @@ impl<'db> SequentMap<'db> {
         }
 
         // (CL ≤ C ≤ Covariant[BL]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[B])
-        if let Type::TypeVar(bound_lower_typevar) = bound_lower {
+        if let Type::TypeVar(bound_lower_typevar) = bound_lower
+            && !bound_lower_typevar.is_same_typevar_as(db, constrained_typevar)
+        {
             if constrained_upper.variance_of(db, bound_lower_typevar) == TypeVarVariance::Covariant
             {
                 let partial = PartialSpecialization::Single {
