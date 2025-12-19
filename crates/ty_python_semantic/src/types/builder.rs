@@ -337,10 +337,12 @@ impl<'db> UnionBuilder<'db> {
                 // Capture the current element count to avoid comparing union elements against each other.
                 // The union has already been simplified, so its elements don't need redundancy checks
                 // between themselves, only against pre-existing elements. However, we only apply this
-                // optimization when not in cycle recovery AND the union's recursively_defined status
-                // matches the builder's, ensuring we're in a consistent context.
+                // optimization when not in cycle recovery AND both the builder and union have
+                // recursively_defined=No (indicating neither is involved in recursive type definitions
+                // where simplification might be incomplete).
                 let batch_start = if !self.cycle_recovery
-                    && self.recursively_defined == union.recursively_defined(self.db)
+                    && self.recursively_defined == RecursivelyDefined::No
+                    && union.recursively_defined(self.db) == RecursivelyDefined::No
                 {
                     Some(self.elements.len())
                 } else {
