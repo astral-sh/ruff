@@ -373,19 +373,21 @@ impl MainLoop {
                                 )?;
                             }
 
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_failure_summary(),
-                                    "Found {} diagnostic{}",
-                                    diagnostics_count,
-                                    if diagnostics_count > 1 { "s" } else { "" }
-                                )?;
-                            }
+                            if !self.cancellation_token.is_cancelled() {
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_failure_summary(),
+                                        "Found {} diagnostic{}",
+                                        diagnostics_count,
+                                        if diagnostics_count > 1 { "s" } else { "" }
+                                    )?;
+                                }
 
-                            if exit_status.is_internal_error() {
-                                tracing::warn!(
-                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
-                                );
+                                if exit_status.is_internal_error() {
+                                    tracing::warn!(
+                                        "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                                    );
+                                }
                             }
 
                             if self.watcher.is_none() {
