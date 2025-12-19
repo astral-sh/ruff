@@ -11801,7 +11801,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result()
+                    .into_lookup_result(context.db())
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -11829,7 +11829,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result()
+                    .into_lookup_result(context.db())
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))

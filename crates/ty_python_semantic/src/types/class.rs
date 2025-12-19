@@ -2360,7 +2360,7 @@ impl<'db> ClassLiteral<'db> {
         // For enum classes, `nonmember(value)` creates a non-member attribute.
         // At runtime, the enum metaclass unwraps the value, so accessing the attribute
         // returns the inner value, not the `nonmember` wrapper.
-        if let Some(ty) = member.inner.place.ignore_possibly_undefined() {
+        if let Some(ty) = member.inner.place.unwidened_type() {
             if let Some(value_ty) = try_unwrap_nonmember_value(db, ty) {
                 if is_enum_class_by_inheritance(db, self) {
                     return Member::definitely_declared(value_ty);

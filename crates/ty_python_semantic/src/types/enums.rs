@@ -319,34 +319,6 @@ pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) ->
                     .unwrap_or(Type::unknown()),
             )
         }
-        Type::Union(union) => {
-            // TODO: This is a hack. The proper fix is to avoid unioning Unknown from
-            // declarations into Place when we have concrete bindings.
-            //
-            // For now, we filter out Unknown and expect exactly one nonmember type
-            // to remain. If there are other non-Unknown types mixed in, we bail out.
-            let mut non_unknown = union.elements(db).iter().filter(|elem| !elem.is_unknown());
-
-            let first = non_unknown.next()?;
-
-            // Ensure there's exactly one non-Unknown element.
-            if non_unknown.next().is_some() {
-                return None;
-            }
-
-            if let Type::NominalInstance(instance) = first {
-                if instance.has_known_class(db, KnownClass::Nonmember) {
-                    return Some(
-                        first
-                            .member(db, "value")
-                            .place
-                            .ignore_possibly_undefined()
-                            .unwrap_or(Type::unknown()),
-                    );
-                }
-            }
-            None
-        }
         _ => None,
     }
 }

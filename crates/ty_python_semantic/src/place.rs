@@ -78,6 +78,16 @@ pub(crate) enum Widening {
     WithUnknown,
 }
 
+impl Widening {
+    /// Apply widening to the type if this is `WithUnknown`.
+    pub(crate) fn apply_if_needed<'db>(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        match self {
+            Self::None => ty,
+            Self::WithUnknown => UnionType::from_elements(db, [Type::unknown(), ty]),
+        }
+    }
+}
+
 /// The result of a place lookup, which can either be a (possibly undefined) type
 /// or a completely undefined place.
 ///
@@ -154,10 +164,18 @@ impl<'db> Place<'db> {
     ///
     /// If the place is *definitely* undefined, this function will return `None`. Otherwise,
     /// if there is at least one control-flow path where the place is defined, return the type.
-    ///
-    /// Note: This returns the raw type without applying widening. Use `widened_type()` if you
-    /// need the type with the Unknown union applied for undeclared public symbols.
     pub(crate) fn ignore_possibly_undefined(&self) -> Option<Type<'db>> {
+        match self {
+            Place::Defined(ty, _, _, _) => Some(*ty),
+            Place::Undefined => None,
+        }
+    }
+
+    /// Returns the type of the place without widening applied.
+    ///
+    /// The stored type is always the unwidened type. Widening (union with `Unknown`)
+    /// is applied lazily when converting to `LookupResult`.
+    pub(crate) fn unwidened_type(&self) -> Option<Type<'db>> {
         match self {
             Place::Defined(ty, _, _, _) => Some(*ty),
             Place::Undefined => None,
@@ -268,7 +286,7 @@ impl<'db> LookupError<'db> {
         db: &'db dyn Db,
         fallback: PlaceAndQualifiers<'db>,
     ) -> LookupResult<'db> {
-        let fallback = fallback.into_lookup_result();
+        let fallback = fallback.into_lookup_result(db);
         match (&self, &fallback) {
             (LookupError::Undefined(_), _) => fallback,
             (LookupError::PossiblyUndefined { .. }, Err(LookupError::Undefined(_))) => Err(self),
@@ -693,18 +711,27 @@ impl<'db> PlaceAndQualifiers<'db> {
     /// Transform place and qualifiers into a [`LookupResult`],
     /// a [`Result`] type in which the `Ok` variant represents a definitely defined place
     /// and the `Err` variant represents a place that is either definitely or possibly undefined.
-    pub(crate) fn into_lookup_result(self) -> LookupResult<'db> {
+    ///
+    /// For places marked with `Widening::WithUnknown`, this applies the gradual typing guarantee
+    /// by creating a union with `Unknown`.
+    pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
-                place: Place::Defined(ty, origin, Definedness::AlwaysDefined, _),
+                place: Place::Defined(ty, origin, Definedness::AlwaysDefined, widening),
                 qualifiers,
-            } => Ok(TypeAndQualifiers::new(ty, origin, qualifiers)),
+            } => {
+                let ty = widening.apply_if_needed(db, ty);
+                Ok(TypeAndQualifiers::new(ty, origin, qualifiers))
+            }
             PlaceAndQualifiers {
-                place: Place::Defined(ty, origin, Definedness::PossiblyUndefined, _),
+                place: Place::Defined(ty, origin, Definedness::PossiblyUndefined, widening),
                 qualifiers,
-            } => Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                ty, origin, qualifiers,
-            ))),
+            } => {
+                let ty = widening.apply_if_needed(db, ty);
+                Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
+                    ty, origin, qualifiers,
+                )))
+            }
             PlaceAndQualifiers {
                 place: Place::Undefined,
                 qualifiers,
@@ -712,17 +739,18 @@ impl<'db> PlaceAndQualifiers<'db> {
         }
     }
 
-    /// Safely unwrap the place and the qualifiers into a [`TypeQualifiers`].
+    /// Safely unwrap the place and the qualifiers into a [`TypeAndQualifiers`].
     ///
     /// If the place is definitely unbound or possibly unbound, it will be transformed into a
     /// [`LookupError`] and `diagnostic_fn` will be applied to the error value before returning
-    /// the result of `diagnostic_fn` (which will be a [`TypeQualifiers`]). This allows the caller
+    /// the result of `diagnostic_fn` (which will be a [`TypeAndQualifiers`]). This allows the caller
     /// to ensure that a diagnostic is emitted if the place is possibly or definitely unbound.
     pub(crate) fn unwrap_with_diagnostic(
         self,
+        db: &'db dyn Db,
         diagnostic_fn: impl FnOnce(LookupError<'db>) -> TypeAndQualifiers<'db>,
     ) -> TypeAndQualifiers<'db> {
-        self.into_lookup_result().unwrap_or_else(diagnostic_fn)
+        self.into_lookup_result(db).unwrap_or_else(diagnostic_fn)
     }
 
     /// Fallback (partially or fully) to another place if `self` is partially or fully unbound.
@@ -741,7 +769,7 @@ impl<'db> PlaceAndQualifiers<'db> {
         db: &'db dyn Db,
         fallback_fn: impl FnOnce() -> PlaceAndQualifiers<'db>,
     ) -> Self {
-        self.into_lookup_result()
+        self.into_lookup_result(db)
             .or_else(|lookup_error| lookup_error.or_fall_back_to(db, fallback_fn()))
             .into()
     }
@@ -994,13 +1022,10 @@ pub(crate) fn place_by_id<'db>(
             {
                 inferred.into()
             } else {
-                // Gradual typing guarantee: Union with `Unknown` for undeclared public symbols.
-                // This allows external code to assign any type to these symbols.
-                // We also mark the widening flag to identify this type as widened.
-                inferred
-                    .map_type(|ty| UnionType::from_elements(db, [Type::unknown(), ty]))
-                    .with_widening(Widening::WithUnknown)
-                    .into()
+                // Gradual typing guarantee: Mark undeclared public symbols for widening.
+                // The actual union with `Unknown` is applied lazily when converting to
+                // LookupResult via `into_lookup_result`.
+                inferred.with_widening(Widening::WithUnknown).into()
             }
         }
     }
