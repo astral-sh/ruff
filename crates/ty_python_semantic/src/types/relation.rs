@@ -662,6 +662,14 @@ impl<'db> Type<'db> {
                 ConstraintSet::from(true)
             }
 
+            // Fast path: `object` is not a subtype of any nominal instance type other than itself.
+            // This is important for performance when checking intersections with no positive
+            // elements (pure negations like `~str`), which are treated as having `object` as
+            // the implicit positive element.
+            (Type::NominalInstance(source), Type::NominalInstance(_)) if source.is_object() => {
+                ConstraintSet::from(false)
+            }
+
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
@@ -808,16 +816,22 @@ impl<'db> Type<'db> {
                 }),
 
             (Type::Intersection(intersection), _) => {
-                intersection.positive(db).iter().when_any(db, |&elem_ty| {
-                    elem_ty.has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
-                })
+                // An intersection type is a subtype of another type if at least one of its
+                // positive elements is a subtype of that type. If there are no positive elements,
+                // we treat `object` as the implicit positive element (e.g., `~str` is semantically
+                // `object & ~str`).
+                intersection
+                    .positive_elements_or_object(db)
+                    .when_any(db, |elem_ty| {
+                        elem_ty.has_relation_to_impl(
+                            db,
+                            target,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // Other than the special cases checked above, no other types are a subtype of a
