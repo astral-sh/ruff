@@ -286,7 +286,8 @@ def main() -> None:
     parser.add_argument(
         "--no-lockfile-upgrades",
         action="store_true",
-        help="Do not regenerate lockfiles for external dependency tests",
+        help="By default, lockfiles will be upgraded when dependency requirements in the Markdown test change."
+        + " Set this flag to never upgrade any lockfiles.",
     )
 
     args = parser.parse_args()
