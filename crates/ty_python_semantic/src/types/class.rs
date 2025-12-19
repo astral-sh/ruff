@@ -3479,16 +3479,27 @@ impl<'db> ClassLiteral<'db> {
         let is_valid_scope = |method_scope: &Scope| {
             if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
-                if let Some(Type::FunctionLiteral(method_type)) =
-                    class_member(db, class_body_scope, method_name)
-                        .inner
-                        .place
-                        .ignore_possibly_undefined()
+                match class_member(db, class_body_scope, method_name)
+                    .inner
+                    .place
+                    .ignore_possibly_undefined()
                 {
-                    let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
-                    if method_decorator != Ok(target_method_decorator) {
-                        return false;
+                    Some(Type::FunctionLiteral(method_type)) => {
+                        let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
+                        if method_decorator != Ok(target_method_decorator) {
+                            return false;
+                        }
                     }
+                    Some(Type::PropertyInstance(_)) => {
+                        // Property getters and setters have their own scopes. They take `self`
+                        // as the first parameter (like regular instance methods), so they're
+                        // included when looking for `MethodDecorator::None`. However, they're
+                        // not classmethods or staticmethods, so exclude them for those cases.
+                        if target_method_decorator != MethodDecorator::None {
+                            return false;
+                        }
+                    }
+                    _ => {}
                 }
             }
             true
