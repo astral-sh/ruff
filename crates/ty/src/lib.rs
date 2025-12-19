@@ -118,6 +118,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .config_file
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
+    let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
         Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
@@ -130,11 +131,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let project = db.project();
 
-    db.project()
-        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_force_exclude(&mut db, force_exclude);
+
     if !check_paths.is_empty() {
-        db.project().set_included_paths(&mut db, check_paths);
+        project.set_included_paths(&mut db, check_paths);
     }
 
     let (main_loop, main_loop_cancellation_token) =
