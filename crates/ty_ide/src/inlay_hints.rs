@@ -768,6 +768,14 @@ mod tests {
             self.inlay_hints_with_settings(&InlayHintSettings::default())
         }
 
+        fn inlay_hints_no_auto_import(&mut self) -> String {
+            self.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                auto_import: false,
+            })
+        }
+
         fn with_extra_file(&mut self, file_name: &str, content: &str) {
             self.db.write_file(file_name, content).unwrap();
         }
@@ -2543,12 +2551,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(
-            test.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-                auto_import: false,
-            }), @r#"
+        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
         a[: list[Unknown | int]] = [1, 2]
         b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
@@ -3278,12 +3281,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(
-            test.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-                auto_import: false,
-            }), @r#"
+        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3449,12 +3447,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(
-            test.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-                auto_import: false,
-            }), @r#"
+        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -4627,7 +4620,7 @@ mod tests {
             foo(y[0])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
+        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
 
         def foo(x: int): pass
         x[: list[Unknown | int]] = [1]
@@ -7672,12 +7665,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:4:16
@@ -7883,12 +7876,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:4:16
