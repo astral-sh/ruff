@@ -1339,13 +1339,13 @@ f(**kwargs<CURSOR>)
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-            --> stdlib/builtins.pyi:2920:7
+            --> stdlib/builtins.pyi:2947:7
              |
-        2919 | @disjoint_base
-        2920 | class dict(MutableMapping[_KT, _VT]):
+        2946 | @disjoint_base
+        2947 | class dict(MutableMapping[_KT, _VT]):
              |       ----
-        2921 |     """dict() -> new empty dictionary
-        2922 |     dict(mapping) -> new dictionary initialized from a mapping object's
+        2948 |     """dict() -> new empty dictionary
+        2949 |     dict(mapping) -> new dictionary initialized from a mapping object's
              |
         "#);
     }

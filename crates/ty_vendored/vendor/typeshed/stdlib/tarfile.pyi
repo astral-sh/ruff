@@ -276,7 +276,7 @@ class TarFile:
             errorlevel: int | None = ...,
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -457,7 +457,7 @@ class TarFile:
             debug: int | None = ...,
             errorlevel: int | None = ...,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self:
             """Open a tar archive for reading, writing or appending. Return
             an appropriate TarFile class.
@@ -519,7 +519,7 @@ class TarFile:
             debug: int | None = ...,
             errorlevel: int | None = ...,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
         ) -> Self: ...
 
     @overload
@@ -767,7 +767,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,
@@ -791,7 +791,7 @@ class TarFile:
             fileobj: IO[bytes] | None = None,
             level: int | None = None,
             options: Mapping[int, int] | None = None,
-            zstd_dict: ZstdDict | None = None,
+            zstd_dict: ZstdDict | tuple[ZstdDict, int] | None = None,
             *,
             format: int | None = ...,
             tarinfo: type[TarInfo] | None = ...,

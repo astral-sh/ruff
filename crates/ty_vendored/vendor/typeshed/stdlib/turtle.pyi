@@ -560,16 +560,32 @@ class TurtleScreen(TurtleScreenBase):
     def bgcolor(self) -> _AnyColor:
         """Set or return backgroundcolor of the TurtleScreen.
 
-        Arguments (if given): a color string or three numbers
-        in the range 0..colormode or a 3-tuple of such numbers.
+        Four input formats are allowed:
+          - bgcolor()
+            Return the current background color as color specification
+            string or as a tuple (see example).  May be used as input
+            to another color/pencolor/fillcolor/bgcolor call.
+          - bgcolor(colorstring)
+            Set the background color to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
+          - bgcolor((r, g, b))
+            Set the background color to the RGB color represented by
+            the tuple of r, g, and b.  Each of r, g, and b must be in
+            the range 0..colormode, where colormode is either 1.0 or 255
+            (see colormode()).
+          - bgcolor(r, g, b)
+            Set the background color to the RGB color represented by
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode.
 
         Example (for a TurtleScreen instance named screen):
         >>> screen.bgcolor("orange")
         >>> screen.bgcolor()
         'orange'
-        >>> screen.bgcolor(0.5,0,0.5)
+        >>> colormode(255)
+        >>> screen.bgcolor('#800080')
         >>> screen.bgcolor()
-        '#800080'
+        (128.0, 0.0, 128.0)
         """
 
     @overload
@@ -897,7 +913,7 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.position()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.forward(25)
         >>> turtle.position()
         (25.00,0.00)
@@ -919,10 +935,10 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.position()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.backward(30)
         >>> turtle.position()
-        (-30.00, 0.00)
+        (-30.00,0.00)
         """
 
     def right(self, angle: float) -> None:
@@ -1023,7 +1039,7 @@ class TNavigator:
         Example (for a Turtle instance named turtle):
         >>> tp = turtle.pos()
         >>> tp
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.setpos(60,30)
         >>> turtle.pos()
         (60.00,30.00)
@@ -1098,7 +1114,7 @@ class TNavigator:
 
         Example (for a Turtle instance named turtle):
         >>> turtle.pos()
-        (0.00, 0.00)
+        (0.00,0.00)
         >>> turtle.distance(30,40)
         50.0
         >>> pen = Turtle()
@@ -1341,28 +1357,32 @@ class TPen:
         Arguments:
         Four input formats are allowed:
           - pencolor()
-            Return the current pencolor as color specification string,
-            possibly in hex-number format (see example).
-            May be used as input to another color/pencolor/fillcolor call.
+            Return the current pencolor as color specification string or
+            as a tuple (see example).  May be used as input to another
+            color/pencolor/fillcolor/bgcolor call.
           - pencolor(colorstring)
-            s is a Tk color specification string, such as "red" or "yellow"
+            Set pencolor to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
           - pencolor((r, g, b))
-            *a tuple* of r, g, and b, which represent, an RGB color,
-            and each of r, g, and b are in the range 0..colormode,
-            where colormode is either 1.0 or 255
+            Set pencolor to the RGB color represented by the tuple of
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode, where colormode is either 1.0 or 255 (see
+            colormode()).
           - pencolor(r, g, b)
-            r, g, and b represent an RGB color, and each of r, g, and b
-            are in the range 0..colormode
+            Set pencolor to the RGB color represented by r, g, and b.
+            Each of r, g, and b must be in the range 0..colormode.
 
         If turtleshape is a polygon, the outline of that polygon is drawn
         with the newly set pencolor.
 
         Example (for a Turtle instance named turtle):
         >>> turtle.pencolor('brown')
-        >>> tup = (0.2, 0.8, 0.55)
-        >>> turtle.pencolor(tup)
         >>> turtle.pencolor()
-        '#33cc8c'
+        'brown'
+        >>> colormode(255)
+        >>> turtle.pencolor('#32c18f')
+        >>> turtle.pencolor()
+        (50.0, 193.0, 143.0)
         """
 
     @overload
@@ -1377,26 +1397,31 @@ class TPen:
         Four input formats are allowed:
           - fillcolor()
             Return the current fillcolor as color specification string,
-            possibly in hex-number format (see example).
-            May be used as input to another color/pencolor/fillcolor call.
+            possibly in tuple format (see example).  May be used as
+            input to another color/pencolor/fillcolor/bgcolor call.
           - fillcolor(colorstring)
-            s is a Tk color specification string, such as "red" or "yellow"
+            Set fillcolor to colorstring, which is a Tk color
+            specification string, such as "red", "yellow", or "#33cc8c".
           - fillcolor((r, g, b))
-            *a tuple* of r, g, and b, which represent, an RGB color,
-            and each of r, g, and b are in the range 0..colormode,
-            where colormode is either 1.0 or 255
+            Set fillcolor to the RGB color represented by the tuple of
+            r, g, and b.  Each of r, g, and b must be in the range
+            0..colormode, where colormode is either 1.0 or 255 (see
+            colormode()).
           - fillcolor(r, g, b)
-            r, g, and b represent an RGB color, and each of r, g, and b
-            are in the range 0..colormode
+            Set fillcolor to the RGB color represented by r, g, and b.
+            Each of r, g, and b must be in the range 0..colormode.
 
         If turtleshape is a polygon, the interior of that polygon is drawn
         with the newly set fillcolor.
 
         Example (for a Turtle instance named turtle):
         >>> turtle.fillcolor('violet')
-        >>> col = turtle.pencolor()
-        >>> turtle.fillcolor(col)
-        >>> turtle.fillcolor(0, .5, 0)
+        >>> turtle.fillcolor()
+        'violet'
+        >>> colormode(255)
+        >>> turtle.fillcolor('#ffffff')
+        >>> turtle.fillcolor()
+        (255.0, 255.0, 255.0)
         """
 
     @overload
@@ -1409,19 +1434,17 @@ class TPen:
 
         Arguments:
         Several input formats are allowed.
-        They use 0, 1, 2, or 3 arguments as follows:
-
-        color()
-            Return the current pencolor and the current fillcolor
-            as a pair of color specification strings as are returned
-            by pencolor and fillcolor.
-        color(colorstring), color((r,g,b)), color(r,g,b)
-            inputs as in pencolor, set both, fillcolor and pencolor,
+        They use 0 to 3 arguments as follows:
+          - color()
+            Return the current pencolor and the current fillcolor as
+            a pair of color specification strings or tuples as returned
+            by pencolor() and fillcolor().
+          - color(colorstring), color((r,g,b)), color(r,g,b)
+            Inputs as in pencolor(), set both, fillcolor and pencolor,
             to the given value.
-        color(colorstring1, colorstring2),
-        color((r1,g1,b1), (r2,g2,b2))
-            equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
-            and analogously, if the other input format is used.
+          - color(colorstring1, colorstring2), color((r1,g1,b1), (r2,g2,b2))
+            Equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
+            and analogously if the other input format is used.
 
         If turtleshape is a polygon, outline and interior of that polygon
         is drawn with the newly set colors.
@@ -1432,9 +1455,9 @@ class TPen:
         >>> turtle.color()
         ('red', 'green')
         >>> colormode(255)
-        >>> color((40, 80, 120), (160, 200, 240))
+        >>> color(('#285078', '#a0c8f0'))
         >>> color()
-        ('#285078', '#a0c8f0')
+        ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
         """
 
     @overload
@@ -2430,16 +2453,32 @@ def turtles() -> list[Turtle]:
 def bgcolor() -> _AnyColor:
     """Set or return backgroundcolor of the TurtleScreen.
 
-    Arguments (if given): a color string or three numbers
-    in the range 0..colormode or a 3-tuple of such numbers.
+    Four input formats are allowed:
+      - bgcolor()
+        Return the current background color as color specification
+        string or as a tuple (see example).  May be used as input
+        to another color/pencolor/fillcolor/bgcolor call.
+      - bgcolor(colorstring)
+        Set the background color to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
+      - bgcolor((r, g, b))
+        Set the background color to the RGB color represented by
+        the tuple of r, g, and b.  Each of r, g, and b must be in
+        the range 0..colormode, where colormode is either 1.0 or 255
+        (see colormode()).
+      - bgcolor(r, g, b)
+        Set the background color to the RGB color represented by
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode.
 
     Example:
     >>> bgcolor("orange")
     >>> bgcolor()
     'orange'
-    >>> bgcolor(0.5,0,0.5)
+    >>> colormode(255)
+    >>> bgcolor('#800080')
     >>> bgcolor()
-    '#800080'
+    (128.0, 0.0, 128.0)
     """
 
 @overload
@@ -2830,7 +2869,7 @@ def forward(distance: float) -> None:
 
     Example:
     >>> position()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> forward(25)
     >>> position()
     (25.00,0.00)
@@ -2852,10 +2891,10 @@ def back(distance: float) -> None:
 
     Example:
     >>> position()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> backward(30)
     >>> position()
-    (-30.00, 0.00)
+    (-30.00,0.00)
     """
 
 def right(angle: float) -> None:
@@ -2956,7 +2995,7 @@ def goto(x: tuple[float, float], y: None = None) -> None:
     Example:
     >>> tp = pos()
     >>> tp
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> setpos(60,30)
     >>> pos()
     (60.00,30.00)
@@ -3031,7 +3070,7 @@ def distance(x: TNavigator | tuple[float, float], y: None = None) -> float:
 
     Example:
     >>> pos()
-    (0.00, 0.00)
+    (0.00,0.00)
     >>> distance(30,40)
     50.0
     >>> pen = Turtle()
@@ -3267,28 +3306,32 @@ def pencolor() -> _AnyColor:
     Arguments:
     Four input formats are allowed:
       - pencolor()
-        Return the current pencolor as color specification string,
-        possibly in hex-number format (see example).
-        May be used as input to another color/pencolor/fillcolor call.
+        Return the current pencolor as color specification string or
+        as a tuple (see example).  May be used as input to another
+        color/pencolor/fillcolor/bgcolor call.
       - pencolor(colorstring)
-        s is a Tk color specification string, such as "red" or "yellow"
+        Set pencolor to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
       - pencolor((r, g, b))
-        *a tuple* of r, g, and b, which represent, an RGB color,
-        and each of r, g, and b are in the range 0..colormode,
-        where colormode is either 1.0 or 255
+        Set pencolor to the RGB color represented by the tuple of
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode, where colormode is either 1.0 or 255 (see
+        colormode()).
       - pencolor(r, g, b)
-        r, g, and b represent an RGB color, and each of r, g, and b
-        are in the range 0..colormode
+        Set pencolor to the RGB color represented by r, g, and b.
+        Each of r, g, and b must be in the range 0..colormode.
 
     If turtleshape is a polygon, the outline of that polygon is drawn
     with the newly set pencolor.
 
     Example:
     >>> pencolor('brown')
-    >>> tup = (0.2, 0.8, 0.55)
-    >>> pencolor(tup)
     >>> pencolor()
-    '#33cc8c'
+    'brown'
+    >>> colormode(255)
+    >>> pencolor('#32c18f')
+    >>> pencolor()
+    (50.0, 193.0, 143.0)
     """
 
 @overload
@@ -3303,26 +3346,31 @@ def fillcolor() -> _AnyColor:
     Four input formats are allowed:
       - fillcolor()
         Return the current fillcolor as color specification string,
-        possibly in hex-number format (see example).
-        May be used as input to another color/pencolor/fillcolor call.
+        possibly in tuple format (see example).  May be used as
+        input to another color/pencolor/fillcolor/bgcolor call.
       - fillcolor(colorstring)
-        s is a Tk color specification string, such as "red" or "yellow"
+        Set fillcolor to colorstring, which is a Tk color
+        specification string, such as "red", "yellow", or "#33cc8c".
       - fillcolor((r, g, b))
-        *a tuple* of r, g, and b, which represent, an RGB color,
-        and each of r, g, and b are in the range 0..colormode,
-        where colormode is either 1.0 or 255
+        Set fillcolor to the RGB color represented by the tuple of
+        r, g, and b.  Each of r, g, and b must be in the range
+        0..colormode, where colormode is either 1.0 or 255 (see
+        colormode()).
       - fillcolor(r, g, b)
-        r, g, and b represent an RGB color, and each of r, g, and b
-        are in the range 0..colormode
+        Set fillcolor to the RGB color represented by r, g, and b.
+        Each of r, g, and b must be in the range 0..colormode.
 
     If turtleshape is a polygon, the interior of that polygon is drawn
     with the newly set fillcolor.
 
     Example:
     >>> fillcolor('violet')
-    >>> col = pencolor()
-    >>> fillcolor(col)
-    >>> fillcolor(0, .5, 0)
+    >>> fillcolor()
+    'violet'
+    >>> colormode(255)
+    >>> fillcolor('#ffffff')
+    >>> fillcolor()
+    (255.0, 255.0, 255.0)
     """
 
 @overload
@@ -3335,19 +3383,17 @@ def color() -> tuple[_AnyColor, _AnyColor]:
 
     Arguments:
     Several input formats are allowed.
-    They use 0, 1, 2, or 3 arguments as follows:
-
-    color()
-        Return the current pencolor and the current fillcolor
-        as a pair of color specification strings as are returned
-        by pencolor and fillcolor.
-    color(colorstring), color((r,g,b)), color(r,g,b)
-        inputs as in pencolor, set both, fillcolor and pencolor,
+    They use 0 to 3 arguments as follows:
+      - color()
+        Return the current pencolor and the current fillcolor as
+        a pair of color specification strings or tuples as returned
+        by pencolor() and fillcolor().
+      - color(colorstring), color((r,g,b)), color(r,g,b)
+        Inputs as in pencolor(), set both, fillcolor and pencolor,
         to the given value.
-    color(colorstring1, colorstring2),
-    color((r1,g1,b1), (r2,g2,b2))
-        equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
-        and analogously, if the other input format is used.
+      - color(colorstring1, colorstring2), color((r1,g1,b1), (r2,g2,b2))
+        Equivalent to pencolor(colorstring1) and fillcolor(colorstring2)
+        and analogously if the other input format is used.
 
     If turtleshape is a polygon, outline and interior of that polygon
     is drawn with the newly set colors.
@@ -3358,9 +3404,9 @@ def color() -> tuple[_AnyColor, _AnyColor]:
     >>> color()
     ('red', 'green')
     >>> colormode(255)
-    >>> color((40, 80, 120), (160, 200, 240))
+    >>> color(('#285078', '#a0c8f0'))
     >>> color()
-    ('#285078', '#a0c8f0')
+    ((40.0, 80.0, 120.0), (160.0, 200.0, 240.0))
     """
 
 @overload

@@ -7,7 +7,7 @@ from abc import abstractmethod
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from ctypes import CDLL, ArgumentError as ArgumentError, c_void_p
 from types import GenericAlias
-from typing import Any, ClassVar, Final, Generic, TypeVar, final, overload, type_check_only
+from typing import Any, ClassVar, Final, Generic, Literal, TypeVar, final, overload, type_check_only
 from typing_extensions import Self, TypeAlias
 
 _T = TypeVar("_T")
@@ -325,6 +325,10 @@ class Structure(_CData, metaclass=_PyCStructType):
     _anonymous_: ClassVar[Sequence[str]]
     if sys.version_info >= (3, 13):
         _align_: ClassVar[int]
+
+    if sys.version_info >= (3, 14):
+        # _layout_ can be defined by the user, but is not always present.
+        _layout_: ClassVar[Literal["ms", "gcc-sysv"]]
 
     def __init__(self, *args: Any, **kw: Any) -> None: ...
     def __getattr__(self, name: str) -> Any: ...

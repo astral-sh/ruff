@@ -942,7 +942,7 @@ class window:  # undocumented
         """Remove attribute attr from the "background" set."""
 
     def attron(self, attr: int, /) -> None:
-        """Add attribute attr from the "background" set."""
+        """Add attribute attr to the "background" set."""
 
     def attrset(self, attr: int, /) -> None:
         """Set the "background" set of attributes."""

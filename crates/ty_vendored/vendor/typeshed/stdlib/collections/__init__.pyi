@@ -663,7 +663,7 @@ class OrderedDict(dict[_KT, _VT]):
         """
 
     def copy(self) -> Self:
-        """od.copy() -> a shallow copy of od"""
+        """A shallow copy of ordered dict."""
 
     def __reversed__(self) -> Iterator[_KT]:
         """od.__reversed__() <==> reversed(od)"""

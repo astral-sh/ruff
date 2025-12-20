@@ -37,7 +37,7 @@ class _SupportsDecodeToPayload(Protocol):
 class Message(Generic[_HeaderT_co, _HeaderParamT_contra]):
     """Basic message object.
 
-    A message object is defined as something that has a bunch of RFC 2822
+    A message object is defined as something that has a bunch of RFC 5322
     headers and a payload.  It may optionally have an envelope header
     (a.k.a. Unix-From or From_ header).  If the message is a container (i.e. a
     multipart or a message/rfc822), then the payload is a list of Message

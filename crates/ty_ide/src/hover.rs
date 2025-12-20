@@ -2957,6 +2957,295 @@ def function():
     }
 
     #[test]
+    fn hover_func_with_concat_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            """wow cool docs""" """and docs"""
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docsand docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docsand docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     """wow cool docs""" """and docs"""
+        4 |     return
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_plus_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            """wow cool docs""" + """and docs"""
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     """wow cool docs""" + """and docs"""
+        4 |     return
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_slash_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            """wow cool docs""" \
+            """and docs"""
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docsand docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docsand docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     """wow cool docs""" \
+        4 |     """and docs"""
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_sameline_commented_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            """wow cool docs""" # and a comment
+            """and docs"""      # that shouldn't be included
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     """wow cool docs""" # and a comment
+        4 |     """and docs"""      # that shouldn't be included
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_nextline_commented_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            """wow cool docs""" 
+            # and a comment that shouldn't be included
+            """and docs"""
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     """wow cool docs""" 
+        4 |     # and a comment that shouldn't be included
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_parens_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            (
+                """wow cool docs""" 
+                """and docs"""
+            )
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docsand docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docsand docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     (
+        4 |         """wow cool docs""" 
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_func_with_nextline_commented_parens_docstring() {
+        let test = cursor_test(
+            r#"
+        def a<CURSOR>b():
+            (
+                """wow cool docs""" 
+                # and a comment that shouldn't be included
+                """and docs"""
+            )
+            return
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        def ab() -> Unknown
+        ---------------------------------------------
+        wow cool docsand docs
+
+        ---------------------------------------------
+        ```python
+        def ab() -> Unknown
+        ```
+        ---
+        wow cool docsand docs
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:2:5
+          |
+        2 | def ab():
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        3 |     (
+        4 |         """wow cool docs""" 
+          |
+        "#);
+    }
+
+    #[test]
+    fn hover_attribute_docstring_spill() {
+        let test = cursor_test(
+            r#"
+        if True:
+            a<CURSOR>b = 1
+        "this shouldn't be a docstring but also it doesn't matter much"
+        "#,
+        );
+
+        assert_snapshot!(test.hover(), @r#"
+        Literal[1]
+        ---------------------------------------------
+        ```python
+        Literal[1]
+        ```
+        ---------------------------------------------
+        info[hover]: Hovered content is
+         --> main.py:3:5
+          |
+        2 | if True:
+        3 |     ab = 1
+          |     ^-
+          |     ||
+          |     |Cursor offset
+          |     source
+        4 | "this shouldn't be a docstring but also it doesn't matter much"
+          |
+        "#);
+    }
+
+    #[test]
     fn hover_class_typevar_variance() {
         let test = cursor_test(
             r#"

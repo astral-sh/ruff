@@ -7007,12 +7007,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
 
+        let has_generic_context = bindings
+            .iter()
+            .flat_map(CallableBinding::overloads)
+            .any(|overload| overload.signature.generic_context.is_some());
+
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets: &[_] = match call_expression_tcx.annotation {
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
-            Some(Type::Union(union)) => union.elements(db),
+            //
+            // We only need to attempt narrowing on generic calls, otherwise the type
+            // context has no effect.
+            Some(Type::Union(union)) if has_generic_context => union.elements(db),
             _ => &[],
         };
 

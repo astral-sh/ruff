@@ -41,6 +41,9 @@ if sys.version_info >= (3, 11):
         dot are special cases that are not matched by '*' and '?'
         patterns by default.
 
+        The order of the returned list is undefined. Sort it if you need a
+        particular order.
+
         If `include_hidden` is true, the patterns '*', '?', '**'  will match hidden
         directories.
 
@@ -62,6 +65,9 @@ if sys.version_info >= (3, 11):
         fnmatch. However, unlike fnmatch, filenames starting with a
         dot are special cases that are not matched by '*' and '?'
         patterns.
+
+        The order of the returned paths is undefined. Sort them if you need a
+        particular order.
 
         If recursive is true, the pattern '**' will match any files and
         zero or more directories and subdirectories.

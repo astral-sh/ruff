@@ -36,8 +36,12 @@ class HTMLParser(ParserBase):
     def __init__(self, *, convert_charrefs: bool = True, scripting: bool = False) -> None:
         """Initialize and reset this instance.
 
-        If convert_charrefs is True (the default), all character references
+        If convert_charrefs is true (the default), all character references
         are automatically converted to the corresponding Unicode characters.
+
+        If *scripting* is false (the default), the content of the
+        ``noscript`` element is parsed normally; if it's true,
+        it's returned as is without being parsed.
         """
 
     def feed(self, data: str) -> None:

@@ -63,12 +63,7 @@ fn generate_markdown() -> String {
     let _ = writeln!(&mut output, "# Rules\n");
 
     let mut lints: Vec<_> = registry.lints().iter().collect();
-    lints.sort_by(|a, b| {
-        a.default_level()
-            .cmp(&b.default_level())
-            .reverse()
-            .then_with(|| a.name().cmp(&b.name()))
-    });
+    lints.sort_by_key(|a| a.name());
 
     for lint in lints {
         let _ = writeln!(&mut output, "## `{rule_name}`\n", rule_name = lint.name());

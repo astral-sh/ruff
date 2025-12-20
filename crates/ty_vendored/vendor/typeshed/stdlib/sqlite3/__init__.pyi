@@ -378,8 +378,8 @@ class Connection:
               Table name.
             column
               Column name.
-            row
-              Row index.
+            rowid
+              Row id.
             readonly
               Open the BLOB without write permissions.
             name

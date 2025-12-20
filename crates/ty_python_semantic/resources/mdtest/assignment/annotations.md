@@ -511,7 +511,7 @@ def f(self, dt: dict[str, Any], key: str):
 
 ```toml
 [environment]
-python-version = "3.12"
+python-version = "3.14"
 ```
 
 ```py
@@ -550,7 +550,7 @@ g: list[Any] | dict[Any, Any] = f3(1)
 reveal_type(g)  # revealed: list[int] | dict[int, int]
 ```
 
-We currently prefer the generic declared type regardless of its variance:
+We only prefer the declared type if it is in non-covariant position.
 
 ```py
 class Bivariant[T]:
@@ -594,10 +594,20 @@ x6: Covariant[Any] = covariant(1)
 x7: Contravariant[Any] = contravariant(1)
 x8: Invariant[Any] = invariant(1)
 
-reveal_type(x5)  # revealed: Bivariant[Any]
-reveal_type(x6)  # revealed: Covariant[Any]
+reveal_type(x5)  # revealed: Bivariant[Literal[1]]
+reveal_type(x6)  # revealed: Covariant[Literal[1]]
 reveal_type(x7)  # revealed: Contravariant[Any]
 reveal_type(x8)  # revealed: Invariant[Any]
+```
+
+```py
+class X[T]:
+    def __init__(self: X[None]): ...
+    def pop(self) -> T:
+        raise NotImplementedError
+
+x1: X[int | None] = X()
+reveal_type(x1)  # revealed: X[None]
 ```
 
 ## Narrow generic unions

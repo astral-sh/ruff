@@ -1411,12 +1411,12 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
           --> main2.py:8:5
@@ -1505,12 +1505,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
           --> main2.py:9:5
@@ -1561,12 +1561,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
           --> main2.py:10:5
@@ -2393,12 +2393,12 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:2:5
@@ -2446,12 +2446,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:3:5
@@ -2501,12 +2501,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:4:5
@@ -2540,13 +2540,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2591:7
+            --> stdlib/builtins.pyi:2618:7
              |
-        2590 | @final
-        2591 | class bool(int):
+        2617 | @final
+        2618 | class bool(int):
              |       ^^^^
-        2592 |     """Returns True when the argument is true, False otherwise.
-        2593 |     The builtins True and False are the only two instances of the class bool.
+        2619 |     """Returns True when the argument is true, False otherwise.
+        2620 |     The builtins True and False are the only two instances of the class bool.
              |
         info: Source
          --> main2.py:4:20
@@ -2560,12 +2560,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:5:5
@@ -2619,12 +2619,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:6:5
@@ -2678,12 +2678,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:7:5
@@ -2737,12 +2737,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
           --> main2.py:8:5
@@ -2796,12 +2796,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
           --> main2.py:9:5
@@ -2854,12 +2854,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
           --> main2.py:10:5
@@ -2913,12 +2913,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
           --> main2.py:11:5
@@ -2987,12 +2987,12 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
           --> main2.py:12:5
@@ -3106,12 +3106,12 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
          --> main2.py:7:5
@@ -3278,12 +3278,12 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:4:18
@@ -3296,12 +3296,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
          --> main2.py:5:18
@@ -3434,12 +3434,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2695:7
+            --> stdlib/builtins.pyi:2722:7
              |
-        2694 | @disjoint_base
-        2695 | class tuple(Sequence[_T_co]):
+        2721 | @disjoint_base
+        2722 | class tuple(Sequence[_T_co]):
              |       ^^^^^
-        2696 |     """Built-in immutable sequence.
+        2723 |     """Built-in immutable sequence.
              |
         info: Source
           --> main2.py:8:5
@@ -4418,6 +4418,167 @@ mod tests {
            |      ^
            |
         ");
+    }
+
+    #[test]
+    fn test_function_call_with_positional_or_keyword_parameter_redundant_subscript() {
+        let mut test = inlay_hint_test(
+            "
+            def foo(x: int): pass
+            x = [1]
+            y = [2]
+
+            foo(x[0])
+            foo(y[0])",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def foo(x: int): pass
+        x[: list[Unknown | int]] = [1]
+        y[: list[Unknown | int]] = [2]
+
+        foo(x[0])
+        foo([x=]y[0])
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:3:5
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+          |     ^^^^
+        4 | y[: list[Unknown | int]] = [2]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:3:10
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+          |          ^^^^^^^
+        4 | y[: list[Unknown | int]] = [2]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+          |                    ^^^
+        4 | y[: list[Unknown | int]] = [2]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+        4 | y[: list[Unknown | int]] = [2]
+          |     ^^^^
+        5 |
+        6 | foo(x[0])
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:20:1
+           |
+        19 | # Types
+        20 | Unknown = object()
+           | ^^^^^^^
+        21 | AlwaysTruthy = object()
+        22 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:4:10
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+        4 | y[: list[Unknown | int]] = [2]
+          |          ^^^^^^^
+        5 |
+        6 | foo(x[0])
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:20
+          |
+        2 | def foo(x: int): pass
+        3 | x[: list[Unknown | int]] = [1]
+        4 | y[: list[Unknown | int]] = [2]
+          |                    ^^^
+        5 |
+        6 | foo(x[0])
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(x: int): pass
+          |         ^
+        3 | x = [1]
+        4 | y = [2]
+          |
+        info: Source
+         --> main2.py:7:6
+          |
+        6 | foo(x[0])
+        7 | foo([x=]y[0])
+          |      ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def foo(x: int): pass
+        x: list[Unknown | int] = [1]
+        y: list[Unknown | int] = [2]
+
+        foo(x[0])
+        foo(y[0])
+        "#);
     }
 
     #[test]
@@ -5640,12 +5801,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:3:14
@@ -6078,13 +6239,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2591:7
+            --> stdlib/builtins.pyi:2618:7
              |
-        2590 | @final
-        2591 | class bool(int):
+        2617 | @final
+        2618 | class bool(int):
              |       ^^^^
-        2592 |     """Returns True when the argument is true, False otherwise.
-        2593 |     The builtins True and False are the only two instances of the class bool.
+        2619 |     """Returns True when the argument is true, False otherwise.
+        2620 |     The builtins True and False are the only two instances of the class bool.
              |
         info: Source
          --> main2.py:4:25
@@ -6132,12 +6293,12 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/builtins.pyi:2802:7
+            --> stdlib/builtins.pyi:2829:7
              |
-        2801 | @disjoint_base
-        2802 | class list(MutableSequence[_T]):
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
              |       ^^^^
-        2803 |     """Built-in mutable sequence.
+        2830 |     """Built-in mutable sequence.
              |
         info: Source
          --> main2.py:4:49
@@ -6771,14 +6932,14 @@ mod tests {
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2032:26
+            --> stdlib/typing.pyi:2037:26
              |
-        2030 |         """
-        2031 |
-        2032 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2035 |         """
+        2036 |
+        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2033 |         @property
-        2034 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2038 |         @property
+        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -6789,14 +6950,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2032:37
+            --> stdlib/typing.pyi:2037:37
              |
-        2030 |         """
-        2031 |
-        2032 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2035 |         """
+        2036 |
+        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2033 |         @property
-        2034 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2038 |         @property
+        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32

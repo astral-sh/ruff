@@ -111,6 +111,8 @@ pub(crate) struct ProjectFilesWalker<'a> {
     walker: WalkDirectoryBuilder,
 
     filter: ProjectFilesFilter<'a>,
+
+    force_exclude: bool,
 }
 
 impl<'a> ProjectFilesWalker<'a> {
@@ -158,7 +160,11 @@ impl<'a> ProjectFilesWalker<'a> {
             walker = walker.add(path);
         }
 
-        Some(Self { walker, filter })
+        Some(Self {
+            walker,
+            filter,
+            force_exclude: db.project().force_exclude(db),
+        })
     }
 
     /// Walks the project paths and collects the paths of all files that
@@ -179,7 +185,7 @@ impl<'a> ProjectFilesWalker<'a> {
                         // Skip excluded directories unless they were explicitly passed to the walker
                         // (which is the case passed to `ty check <paths>`).
                         if entry.file_type().is_directory() {
-                            if entry.depth() > 0 {
+                            if entry.depth() > 0 || self.force_exclude {
                                 let directory_included = filter
                                     .is_directory_included(entry.path(), GlobFilterCheckMode::TopDown);
                                 return match directory_included {
@@ -218,7 +224,7 @@ impl<'a> ProjectFilesWalker<'a> {
 
                             // For all files, except the ones that were explicitly passed to the walker (CLI),
                             // check if they're included in the project.
-                            if entry.depth() > 0 {
+                            if entry.depth() > 0 || self.force_exclude {
                                 match filter
                                     .is_file_included(entry.path(), GlobFilterCheckMode::TopDown)
                                 {

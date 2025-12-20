@@ -3016,7 +3016,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                 .class_specialization(self.db)?;
 
-            builder.infer(return_ty, tcx).ok()?;
+            builder
+                .infer_map(return_ty, tcx, |(_, variance, inferred_ty)| {
+                    // Avoid unnecessarily widening the return type based on a covariant
+                    // type parameter from the type context, as it can lead to argument
+                    // assignability errors if the type variable is constrained by a narrower
+                    // parameter type.
+                    if variance.is_covariant() {
+                        return None;
+                    }
+
+                    Some(inferred_ty)
+                })
+                .ok()?;
             Some(builder.type_mappings().clone())
         });
 

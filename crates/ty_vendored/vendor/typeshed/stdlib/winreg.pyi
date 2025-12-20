@@ -8,6 +8,7 @@ ConnectRegistry() - Establishes a connection to a predefined registry handle
 CreateKey() - Creates the specified key, or opens it if it already exists.
 DeleteKey() - Deletes the specified key.
 DeleteValue() - Removes a named value from the specified registry key.
+DeleteTree() - Deletes the specified key and all its subkeys and values recursively.
 EnumKey() - Enumerates subkeys of the specified open registry key.
 EnumValue() - Enumerates values of the specified open registry key.
 ExpandEnvironmentStrings() - Expand the env strings in a REG_EXPAND_SZ
@@ -539,7 +540,8 @@ if sys.platform == "win32":
         Operations:
         __bool__ - Handles with an open object return true, otherwise false.
         __int__ - Converting a handle to an integer returns the Win32 handle.
-        rich comparison - Handle objects are compared using the handle value.
+        __enter__, __exit__ - Context manager support for 'with' statement,
+        automatically closes handle.
         """
 
         def __bool__(self) -> bool:
