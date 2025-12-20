@@ -354,6 +354,9 @@ class Baz(Bar): ...
 def guard_foo(a: object) -> TypeGuard[Foo]:
     return True
 
+def guard_bar(a: object) -> TypeGuard[Bar]:
+    return True
+
 def is_bar(a: object) -> TypeIs[Bar]:
     return True
 
@@ -372,6 +375,8 @@ def narrowed_type_must_be_exact(a: object, b: Baz):
 
     if isinstance(a, Bar) and guard_foo(a):
         reveal_type(a)  # revealed: Foo
+        if guard_bar(a):
+            reveal_type(a)  # revealed: Bar
 ```
 
 ## TypeGuard overrides normal constraints

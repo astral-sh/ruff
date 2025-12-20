@@ -757,11 +757,22 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
+        // Constraints are in reverse-source order. Due to TypeGuard semantics
+        // constraint AND is non-commutative and so we _must_ apply in
+        // source order.
+        //
+        // Fortunately, constraint AND is still associative, so we can still iterate left-to-right
+        // and accumulate rightward.
         self.filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
-            .fold(NarrowingConstraint::regular(base_ty), |acc, constraint| {
-                acc.merge_constraint_and(&constraint, db)
+            .reduce(|acc, constraint| {
+                // See above---note the reverse application
+                constraint.merge_constraint_and(&acc, db)
             })
-            .evaluate_type_constraint(db)
+            .map_or(base_ty, |constraint| {
+                NarrowingConstraint::regular(base_ty)
+                    .merge_constraint_and(&constraint, db)
+                    .evaluate_type_constraint(db)
+            })
     }
 }
 
