@@ -129,10 +129,10 @@ impl InlayHint {
                         }
 
                         // Always use original text for the label part
-                        let label_text = &details.label[start..end];
-
-                        label_parts
-                            .push(InlayHintLabelPart::new(label_text).with_target(nav_target));
+                        label_parts.push(
+                            InlayHintLabelPart::new(&details.label[start..end])
+                                .with_target(nav_target),
+                        );
                         offset = end;
                     }
                 }
