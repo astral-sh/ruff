@@ -5,7 +5,7 @@ pub use module::KnownModule;
 pub use module::Module;
 pub use path::{SearchPath, SearchPathValidationError};
 pub use resolver::SearchPaths;
-pub(crate) use resolver::file_to_module;
+pub use resolver::file_to_module;
 pub use resolver::{
     resolve_module, resolve_module_confident, resolve_real_module, resolve_real_module_confident,
     resolve_real_shadowable_module,

@@ -13,7 +13,7 @@ pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use module_resolver::{
     KnownModule, Module, SearchPath, SearchPathValidationError, SearchPaths, all_modules,
-    list_modules, resolve_module, resolve_module_confident, resolve_real_module,
+    file_to_module, list_modules, resolve_module, resolve_module_confident, resolve_real_module,
     resolve_real_module_confident, resolve_real_shadowable_module, system_module_search_paths,
 };
 pub use program::{
