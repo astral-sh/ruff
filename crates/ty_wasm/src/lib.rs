@@ -470,6 +470,7 @@ impl Workspace {
             &InlayHintSettings {
                 variable_types: true,
                 call_argument_names: true,
+                auto_import: true,
             },
         );
 
