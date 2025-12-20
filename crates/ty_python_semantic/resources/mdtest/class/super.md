@@ -168,13 +168,14 @@ class A:
 
 class B(A):
     def __init__(self, a: int):
-        reveal_type(super())  # revealed: <super: <class 'B'>, B>
+        reveal_type(super())  # revealed: <super: <class 'B'>, Self@__init__>
         reveal_type(super(object, super()))  # revealed: <super: <class 'object'>, super>
         super().__init__(a)
 
     @classmethod
     def f(cls):
-        reveal_type(super())  # revealed: <super: <class 'B'>, <class 'B'>>
+        reveal_type(super())  # revealed: <super: <class 'B'>, Self@f>
+        # error: [invalid-argument-type]
         super().f()
 
 super(B, B(42)).__init__(42)
@@ -229,16 +230,17 @@ class Foo[T]:
         reveal_type(super())
 
     def method4(self: Self):
-        # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+        # revealed: <super: <class 'Foo'>, Self@method4>
         reveal_type(super())
 
     def method5[S: Foo[int]](self: S, other: S) -> S:
-        # revealed: <super: <class 'Foo'>, Foo[int]>
+        # revealed: <super: <class 'Foo'>, S@method5>
         reveal_type(super())
         return self
 
     def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
-        # revealed: <super: <class 'Foo'>, Foo[int]> | <super: <class 'Foo'>, Foo[str]>
+        # error: [invalid-super-argument]
+        # revealed: Unknown
         reveal_type(super())
         return self
 
@@ -261,8 +263,7 @@ class Foo[T]:
         return self
 
     def method10[S: Callable[..., str]](self: S, other: S) -> S:
-        # error: [invalid-super-argument]
-        # revealed: Unknown
+        # revealed: <super: <class 'Foo'>, S@method10>
         reveal_type(super())
         return self
 
@@ -359,15 +360,15 @@ from __future__ import annotations
 
 class A:
     def test(self):
-        reveal_type(super())  # revealed: <super: <class 'A'>, A>
+        reveal_type(super())  # revealed: <super: <class 'A'>, Self@test>
 
     class B:
         def test(self):
-            reveal_type(super())  # revealed: <super: <class 'B'>, B>
+            reveal_type(super())  # revealed: <super: <class 'B'>, Self@test>
 
             class C(A.B):
                 def test(self):
-                    reveal_type(super())  # revealed: <super: <class 'C'>, C>
+                    reveal_type(super())  # revealed: <super: <class 'C'>, Self@test>
 
             def inner(t: C):
                 reveal_type(super())  # revealed: <super: <class 'B'>, C>
@@ -645,7 +646,7 @@ class A:
 class B(A):
     def __init__(self, a: int):
         super().__init__(a)
-        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"
+        # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, Self@__init__>` has no attribute `a`"
         super().a
 
 # error: [unresolved-attribute] "Object of type `<super: <class 'B'>, B>` has no attribute `a`"

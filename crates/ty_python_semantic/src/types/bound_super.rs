@@ -8,9 +8,10 @@ use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
-        NominalInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner, Type,
-        TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+        BoundTypeVarInstance, ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass,
+        MemberLookupPolicy, NominalInstanceType, NormalizedVisitor, SpecialFormType,
+        SubclassOfInner, SubclassOfType, Type, TypeVarBoundOrConstraints, TypeVarInstance,
+        UnionBuilder,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         todo_type, visitor,
@@ -185,6 +186,12 @@ pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
+    /// A type variable owner. Used when the owner is a type variable like `Self` in a classmethod.
+    /// The boolean indicates whether this is a class access (true) or instance access (false).
+    TypeVar {
+        bound_typevar: BoundTypeVarInstance<'db>,
+        is_class: bool,
+    },
 }
 
 impl<'db> SuperOwnerKind<'db> {
@@ -199,6 +206,13 @@ impl<'db> SuperOwnerKind<'db> {
                 .as_nominal_instance()
                 .map(Self::Instance)
                 .unwrap_or(Self::Dynamic(DynamicType::Any)),
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => SuperOwnerKind::TypeVar {
+                bound_typevar: bound_typevar.normalized_impl(db, visitor),
+                is_class,
+            },
         }
     }
 
@@ -218,6 +232,17 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Instance(instance) => Some(SuperOwnerKind::Instance(
                 instance.recursive_type_normalized_impl(db, div, nested)?,
             )),
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => {
+                // Type variables don't contain recursive types, so just return unchanged
+                let _ = (db, div, nested);
+                Some(SuperOwnerKind::TypeVar {
+                    bound_typevar,
+                    is_class,
+                })
+            }
         }
     }
 
@@ -226,8 +251,56 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
             }
-            SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
-            SuperOwnerKind::Instance(instance) => Either::Right(instance.class(db).iter_mro(db)),
+            SuperOwnerKind::Class(class) => Either::Right(Either::Left(class.iter_mro(db))),
+            SuperOwnerKind::Instance(instance) => {
+                Either::Right(Either::Left(instance.class(db).iter_mro(db)))
+            }
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => {
+                // Use the upper bound's MRO for method lookup
+                let class = match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
+                        Type::NominalInstance(instance) => Some(instance.class(db)),
+                        Type::ClassLiteral(class) => Some(class.default_specialization(db)),
+                        Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
+                        Type::SubclassOf(subclass_of) if is_class => {
+                            // For class type variables (type[Self]), the upper bound is type[X].
+                            // We need to get the class X from type[X].
+                            match subclass_of.subclass_of() {
+                                SubclassOfInner::Class(class) => Some(class),
+                                SubclassOfInner::Dynamic(_) => None,
+                                SubclassOfInner::TypeVar(inner_tv) => {
+                                    // Recursively get the class from the inner type variable
+                                    inner_tv.typevar(db).bound_or_constraints(db).and_then(
+                                        |bound_or_constraints| match bound_or_constraints {
+                                            TypeVarBoundOrConstraints::UpperBound(inner_bound) => {
+                                                inner_bound.to_class_type(db).or_else(|| {
+                                                    if let Type::NominalInstance(instance) =
+                                                        inner_bound
+                                                    {
+                                                        Some(instance.class(db))
+                                                    } else {
+                                                        None
+                                                    }
+                                                })
+                                            }
+                                            _ => None,
+                                        },
+                                    )
+                                }
+                            }
+                        }
+                        _ => bound.to_class_type(db),
+                    },
+                    _ => KnownClass::Object.to_class_literal(db).to_class_type(db),
+                };
+                match class {
+                    Some(c) => Either::Right(Either::Left(c.iter_mro(db))),
+                    None => Either::Right(Either::Right(std::iter::empty())),
+                }
+            }
         }
     }
 
@@ -236,6 +309,63 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
             SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => {
+                // Return the upper bound's class for subclass checking
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
+                        Type::NominalInstance(instance) => Some(instance.class(db)),
+                        Type::ClassLiteral(class) => Some(class.default_specialization(db)),
+                        Type::GenericAlias(alias) => Some(ClassType::Generic(alias)),
+                        Type::SubclassOf(subclass_of) if is_class => {
+                            // For class type variables (type[Self]), the upper bound is type[X].
+                            match subclass_of.subclass_of() {
+                                SubclassOfInner::Class(class) => Some(class),
+                                SubclassOfInner::Dynamic(_) => None,
+                                SubclassOfInner::TypeVar(inner_tv) => inner_tv
+                                    .typevar(db)
+                                    .bound_or_constraints(db)
+                                    .and_then(|bound_or_constraints| match bound_or_constraints {
+                                        TypeVarBoundOrConstraints::UpperBound(inner_bound) => {
+                                            inner_bound.to_class_type(db).or_else(|| {
+                                                if let Type::NominalInstance(instance) = inner_bound
+                                                {
+                                                    Some(instance.class(db))
+                                                } else {
+                                                    None
+                                                }
+                                            })
+                                        }
+                                        _ => None,
+                                    }),
+                            }
+                        }
+                        _ => bound.to_class_type(db),
+                    },
+                    _ => KnownClass::Object.to_class_literal(db).to_class_type(db),
+                }
+            }
+        }
+    }
+
+    /// Returns the type to use when binding methods via the descriptor protocol.
+    pub(super) fn binding_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            SuperOwnerKind::Class(class) => class.into(),
+            SuperOwnerKind::Instance(instance) => instance.into(),
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => {
+                if is_class {
+                    SubclassOfType::from(db, SubclassOfInner::TypeVar(bound_typevar)).into()
+                } else {
+                    Type::TypeVar(bound_typevar)
+                }
+            }
         }
     }
 }
@@ -246,6 +376,9 @@ impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SuperOwnerKind::Class(class) => class.into(),
             SuperOwnerKind::Instance(instance) => instance.into(),
+            // For From trait without db access, just return the type variable
+            // The actual binding happens through binding_type() or as_type()
+            SuperOwnerKind::TypeVar { bound_typevar, .. } => Type::TypeVar(bound_typevar),
         }
     }
 }
@@ -323,9 +456,10 @@ impl<'db> BoundSuperType<'db> {
                 match subclass_of_type.subclass_of().with_transposed_type_var(db) {
                     SubclassOfInner::Class(class) => SuperOwnerKind::Class(class),
                     SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
-                    SubclassOfInner::TypeVar(bound_typevar) => {
-                        return delegate_to(Type::TypeVar(bound_typevar));
-                    }
+                    SubclassOfInner::TypeVar(bound_typevar) => SuperOwnerKind::TypeVar {
+                        bound_typevar,
+                        is_class: true,
+                    },
                 }
             }
             Type::NominalInstance(instance) => SuperOwnerKind::Instance(instance),
@@ -556,21 +690,49 @@ impl<'db> BoundSuperType<'db> {
                     db,
                     attribute,
                     Type::none(db),
-                    Type::from(owner),
+                    owner.binding_type(db),
                 )
                 .0,
             ),
             SuperOwnerKind::Instance(_) => {
-                let owner = Type::from(owner);
+                let binding_type = owner.binding_type(db);
                 Some(
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        owner,
-                        owner.to_meta_type(db),
+                        binding_type,
+                        binding_type.to_meta_type(db),
                     )
                     .0,
                 )
+            }
+            SuperOwnerKind::TypeVar { is_class, .. } => {
+                let binding_type = owner.binding_type(db);
+                if is_class {
+                    // For class-like type variables (e.g., cls: type[Self]),
+                    // pass None as instance and the type variable as owner
+                    Some(
+                        Type::try_call_dunder_get_on_attribute(
+                            db,
+                            attribute,
+                            Type::none(db),
+                            binding_type,
+                        )
+                        .0,
+                    )
+                } else {
+                    // For instance-like type variables (e.g., self: Self),
+                    // pass the type variable as both instance and owner's meta type
+                    Some(
+                        Type::try_call_dunder_get_on_attribute(
+                            db,
+                            attribute,
+                            binding_type,
+                            binding_type.to_meta_type(db),
+                        )
+                        .0,
+                    )
+                }
             }
         }
     }
@@ -592,6 +754,57 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class(db),
+            SuperOwnerKind::TypeVar {
+                bound_typevar,
+                is_class,
+            } => {
+                // For type variables, use the upper bound's class for MRO lookup
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
+                        Type::NominalInstance(instance) => instance.class(db),
+                        Type::ClassLiteral(class) => class.default_specialization(db),
+                        Type::GenericAlias(alias) => ClassType::Generic(alias),
+                        Type::SubclassOf(subclass_of) if is_class => {
+                            // For class type variables (type[Self]), the upper bound is type[X].
+                            match subclass_of.subclass_of() {
+                                SubclassOfInner::Class(class) => class,
+                                SubclassOfInner::Dynamic(_) => {
+                                    return Place::Undefined.into();
+                                }
+                                SubclassOfInner::TypeVar(inner_tv) => {
+                                    match inner_tv.typevar(db).bound_or_constraints(db) {
+                                        Some(TypeVarBoundOrConstraints::UpperBound(
+                                            inner_bound,
+                                        )) => {
+                                            if let Some(class) = inner_bound.to_class_type(db) {
+                                                class
+                                            } else if let Type::NominalInstance(instance) =
+                                                inner_bound
+                                            {
+                                                instance.class(db)
+                                            } else {
+                                                return Place::Undefined.into();
+                                            }
+                                        }
+                                        _ => return Place::Undefined.into(),
+                                    }
+                                }
+                            }
+                        }
+                        _ => {
+                            if let Some(class) = bound.to_class_type(db) {
+                                class
+                            } else {
+                                return Place::Undefined.into();
+                            }
+                        }
+                    },
+                    _ => match KnownClass::Object.to_class_literal(db).to_class_type(db) {
+                        Some(class) => class,
+                        None => return Place::Undefined.into(),
+                    },
+                }
+            }
         };
 
         let (class_literal, _) = class.class_literal(db);
