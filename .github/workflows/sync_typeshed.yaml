@@ -16,8 +16,7 @@ name: Sync typeshed
 # 3. Once the Windows worker is done, a MacOS worker:
 #    a. Checks out the branch created by the Linux worker
 #    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
-#    c. Attempts to update any snapshots that might have changed
-#       (this sub-step is allowed to fail)
+#    c. Formats the code again
 #    d. Commits the changes and pushes them to the same upstream branch
 #    e. Creates a PR against the `main` branch using the branch all three workers have pushed to
 # 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
