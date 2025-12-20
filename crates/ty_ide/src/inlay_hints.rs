@@ -673,6 +673,7 @@ impl<'db> DynamicImporter<'db> {
             Entry::Vacant(entry) => {
                 let request = ImportRequest::import_from(module_name, definition_name);
                 let import_action = self.importer.import(request, &self.members);
+                println!("Import action: {:?}", import_action);
                 let qualified_name = qualified_name(&import_action);
 
                 entry.insert(import_action);
@@ -8097,6 +8098,86 @@ mod tests {
 
         a: D[Baz] = D(Baz)
         ");
+    }
+
+    #[test]
+    fn test_auto_import_typing_literal() {
+        let mut test = inlay_hint_test(
+            r#"
+            from typing import Any
+
+            def foo(x: Any):
+                a = getattr(x, 'foo', "some")
+            "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from typing import Any
+
+        def foo(x: Any):
+            a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main2.py:5:9
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |         ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:351:1
+            |
+        349 | Final: _SpecialForm
+        350 |
+        351 | Literal: _SpecialForm
+            | ^^^^^^^
+        352 | TypedDict: _SpecialForm
+            |
+        info: Source
+         --> main2.py:5:15
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |               ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:5:23
+          |
+        4 | def foo(x: Any):
+        5 |     a[: Any | Literal["some"]] = getattr(x, 'foo', "some")
+          |                       ^^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        from typing import Any
+
+        def foo(x: Any):
+            a: Any | Literal["some"] = getattr(x, 'foo', "some")
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {
