@@ -1,28 +1,37 @@
+//! Python module resolver for ty.
+//!
+//! This crate provides module resolution functionality for Python code,
+//! including resolving import statements to their corresponding modules
+//! and files.
+
 use std::iter::FusedIterator;
 
-pub use list::{all_modules, list_modules};
-pub use module::KnownModule;
-pub use module::Module;
-pub use path::{SearchPath, SearchPathValidationError};
-pub use resolver::SearchPaths;
-pub(crate) use resolver::file_to_module;
-pub use resolver::{
-    resolve_module, resolve_module_confident, resolve_real_module, resolve_real_module_confident,
-    resolve_real_shadowable_module,
-};
 use ruff_db::system::SystemPath;
 
-use crate::Db;
-pub(crate) use resolver::{ModuleResolveMode, SearchPathIterator, search_paths};
+pub use db::Db;
+pub use module::KnownModule;
+pub use module::Module;
+pub use module_name::{ModuleName, ModuleNameResolutionError};
+pub use path::{SearchPath, SearchPathValidationError};
+pub use resolve::{
+    SearchPaths, SearchPathsBuilder, file_to_module, resolve_module, resolve_module_confident,
+    resolve_real_module, resolve_real_module_confident, resolve_real_shadowable_module,
+};
+pub use typeshed::{PyVersionRange, TypeshedVersions, vendored_typeshed_versions};
 
+pub use list::{all_modules, list_modules};
+pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
+
+mod db;
 mod list;
 mod module;
+mod module_name;
 mod path;
-mod resolver;
+mod resolve;
 mod typeshed;
 
 #[cfg(test)]
-mod testing;
+pub(crate) mod testing;
 
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
@@ -43,9 +52,8 @@ impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let next = self.inner.next()?;
-
-            if let Some(system_path) = next.as_system_path() {
-                return Some(system_path);
+            if let Some(path) = next.as_system_path() {
+                return Some(path);
             }
         }
     }

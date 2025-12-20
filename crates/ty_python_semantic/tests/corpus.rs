@@ -239,6 +239,13 @@ impl ruff_db::Db for CorpusDb {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for CorpusDb {
+    fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl ty_python_semantic::Db for CorpusDb {
     fn should_check_file(&self, file: File) -> bool {
         !file.path(self).is_vendored_path()

@@ -24,6 +24,7 @@ ruff_source_file = { workspace = true }
 ruff_text_size = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_trivia = { workspace = true }
+ty_module_resolver = { workspace = true }
 ty_static = { workspace = true }
 
 anyhow = { workspace = true }
@@ -67,14 +68,13 @@ glob = { workspace = true }
 indoc = { workspace = true }
 insta = { workspace = true }
 pretty_assertions = { workspace = true }
-tempfile = { workspace = true }
 quickcheck = { version = "1.0.3", default-features = false }
 quickcheck_macros = { version = "1.0.0" }
 
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
-testing = []
+testing = ["ty_module_resolver/testing"]
 
 [[test]]
 name = "mdtest"

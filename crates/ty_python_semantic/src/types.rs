@@ -34,8 +34,6 @@ pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
-use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{
     Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
 };
@@ -75,12 +73,15 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
+use ty_module_resolver::Module;
+use ty_module_resolver::ModuleName;
+use ty_module_resolver::{KnownModule, resolve_module};
 
 mod bound_super;
 mod builder;

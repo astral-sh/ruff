@@ -17,8 +17,6 @@ use ruff_python_parser::semantic_errors::{
 use ruff_text_size::TextRange;
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::ModuleName;
-use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -51,6 +49,8 @@ use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestors
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
+use ty_module_resolver::ModuleName;
+use ty_module_resolver::resolve_module;
 
 mod except_handlers;
 

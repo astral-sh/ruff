@@ -1,7 +1,8 @@
 use std::sync::Arc;
 
+use rustc_hash::{FxBuildHasher, FxHashSet};
+
 use crate::Db;
-use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
 
 use ruff_db::diagnostic::Span;
@@ -12,6 +13,10 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
+pub use ty_module_resolver::{
+    SearchPath, SearchPathValidationError, SearchPaths, SearchPathsBuilder, TypeshedVersions,
+    vendored_typeshed_versions,
+};
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
@@ -22,7 +27,7 @@ pub struct Program {
     pub python_platform: PythonPlatform,
 
     #[returns(ref)]
-    pub(crate) search_paths: SearchPaths,
+    pub search_paths: SearchPaths,
 }
 
 impl Program {
@@ -227,6 +232,239 @@ impl SearchPathSettings {
         system: &dyn System,
         vendored: &VendoredFileSystem,
     ) -> Result<SearchPaths, SearchPathValidationError> {
-        SearchPaths::from_settings(self, system, vendored)
+        fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
+            system
+                .canonicalize_path(path)
+                .unwrap_or_else(|_| path.to_path_buf())
+        }
+
+        let SearchPathSettings {
+            extra_paths,
+            src_roots,
+            custom_typeshed: typeshed,
+            site_packages_paths,
+            real_stdlib_path,
+            misconfiguration_mode,
+        } = self;
+
+        let mut static_paths = vec![];
+
+        for path in extra_paths {
+            let path = canonicalize(path, system);
+            tracing::debug!("Adding extra search-path `{path}`");
+
+            match SearchPath::extra(system, path) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid extra search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path `{src_root}`");
+            match SearchPath::first_party(system, src_root.to_path_buf()) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid first-party search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
+        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
+            let typeshed = canonicalize(typeshed, system);
+            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
+
+            let versions_path = typeshed.join("stdlib/VERSIONS");
+
+            let results = system
+                .read_to_string(&versions_path)
+                .map_err(
+                    |error| SearchPathValidationError::FailedToReadVersionsFile {
+                        path: versions_path,
+                        error,
+                    },
+                )
+                .and_then(|versions_content| Ok(versions_content.parse()?))
+                .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
+
+            match results {
+                Ok(results) => results,
+                Err(err) => {
+                    if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                        (
+                            vendored_typeshed_versions(vendored),
+                            SearchPath::vendored_stdlib(),
+                        )
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        } else {
+            tracing::debug!("Using vendored stdlib");
+            (
+                vendored_typeshed_versions(vendored),
+                SearchPath::vendored_stdlib(),
+            )
+        };
+
+        let real_stdlib_path = if let Some(path) = real_stdlib_path {
+            match SearchPath::real_stdlib(system, path.clone()) {
+                Ok(path) => Some(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                        None
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
+        let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
+
+        for path in site_packages_paths {
+            tracing::debug!("Adding site-packages search path `{path}`");
+            match SearchPath::site_packages(system, path.clone()) {
+                Ok(path) => site_packages.push(path),
+                Err(err) => {
+                    if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid site-packages search-path: {err}");
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        }
+
+        // Filter out module resolution paths that point to the same directory
+        // on disk (the same invariant maintained by [`sys.path` at runtime]).
+        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
+        // and `src/foo` as module resolution paths simultaneously.)
+        //
+        // This code doesn't use an `IndexSet` because the key is the system
+        // path and not the search root.
+        //
+        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+        let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
+
+        static_paths.retain(|path| {
+            if let Some(path) = path.as_system_path() {
+                seen_paths.insert(path.to_path_buf())
+            } else {
+                true
+            }
+        });
+
+        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
+        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
+        // "remember" that fact for static paths.
+        let stdlib_path_is_shadowed = stdlib_path
+            .as_system_path()
+            .map(|path| seen_paths.contains(path))
+            .unwrap_or(false);
+        let real_stdlib_path_is_shadowed = real_stdlib_path
+            .as_ref()
+            .and_then(SearchPath::as_system_path)
+            .map(|path| seen_paths.contains(path))
+            .unwrap_or(false);
+
+        // Build the search paths using the builder
+        let mut builder = SearchPathsBuilder::new(vendored).static_paths(static_paths);
+
+        if !stdlib_path_is_shadowed {
+            builder = builder.stdlib_path(stdlib_path, typeshed_versions);
+        }
+
+        if !real_stdlib_path_is_shadowed {
+            builder = builder.real_stdlib_path(real_stdlib_path);
+        }
+
+        builder = builder.site_packages_paths(site_packages);
+
+        Ok(builder.build())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use ruff_db::Db as _;
+    use ruff_db::files::File;
+    use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _, SystemPathBuf};
+
+    use crate::db::tests::TestDb;
+    use crate::program::{Program, SearchPathSettings};
+    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_module_resolver::{ModuleName, resolve_module_confident};
+
+    #[test]
+    fn multiple_site_packages_with_editables() {
+        let mut db = TestDb::new();
+
+        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
+        let site_packages_pth = venv_site_packages.join("foo.pth");
+        let system_site_packages = SystemPathBuf::from("/system-site-packages");
+        let editable_install_location = SystemPathBuf::from("/x/y/a.py");
+        let system_site_packages_location = system_site_packages.join("a.py");
+
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
+        db.write_files([
+            (&site_packages_pth, "/x/y"),
+            (&editable_install_location, ""),
+            (&system_site_packages_location, ""),
+        ])
+        .unwrap();
+
+        Program::from_settings(
+            &db,
+            ProgramSettings {
+                python_version: PythonVersionWithSource::default(),
+                python_platform: PythonPlatform::default(),
+                search_paths: SearchPathSettings {
+                    site_packages_paths: vec![venv_site_packages, system_site_packages],
+                    ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+                }
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+            },
+        );
+
+        // The editable installs discovered from the `.pth` file in the first `site-packages` directory
+        // take precedence over the second `site-packages` directory...
+        let a_module_name = ModuleName::new_static("a").unwrap();
+        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
+        assert_eq!(
+            a_module.file(&db).unwrap().path(&db),
+            &editable_install_location
+        );
+
+        db.memory_file_system()
+            .remove_file(&site_packages_pth)
+            .unwrap();
+        File::sync_path(&mut db, &site_packages_pth);
+
+        // ...But now that the `.pth` file in the first `site-packages` directory has been deleted,
+        // the editable install no longer exists, so the module now resolves to the file in the
+        // second `site-packages` directory
+        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
+        assert_eq!(
+            a_module.file(&db).unwrap().path(&db),
+            &system_site_packages_location
+        );
     }
 }

@@ -21,10 +21,6 @@ use super::{
     infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
-use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{
-    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
-};
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
@@ -118,6 +114,10 @@ use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
+use ty_module_resolver::{
+    KnownModule, ModuleName, ModuleNameResolutionError, ModuleResolveMode, file_to_module,
+    resolve_module, search_paths,
+};
 
 mod annotation_expression;
 mod type_expression;
@@ -4283,7 +4283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         )
                                     })
                                     .and_then(|module| module.search_path(db))
-                                    .is_some_and(crate::SearchPath::is_first_party)
+                                    .is_some_and(ty_module_resolver::SearchPath::is_first_party)
                                 {
                                     diagnostic.help(format_args!(
                                         "Consider adding a `__setitem__` method to `{}`.",

@@ -37,10 +37,10 @@ use std::iter::FusedIterator;
 use std::str::Split;
 
 use compact_str::format_compact;
-use rustc_hash::{FxBuildHasher, FxHashSet};
+use rustc_hash::FxHashSet;
 
 use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
+use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
     self as ast, PySourceType, PythonVersion,
@@ -48,13 +48,10 @@ use ruff_python_ast::{
 };
 
 use crate::db::Db;
+use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::module_resolver::typeshed::{TypeshedVersions, vendored_typeshed_versions};
-use crate::program::MisconfigurationMode;
-use crate::{Program, SearchPathSettings};
-
-use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SearchPathValidationError, SystemOrVendoredPathRef};
+use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -137,7 +134,7 @@ pub fn resolve_real_shadowable_module<'db>(
 /// Which files should be visible when doing a module query
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, get_size2::GetSize)]
 #[allow(clippy::enum_variant_names)]
-pub(crate) enum ModuleResolveMode {
+pub enum ModuleResolveMode {
     /// Stubs are allowed to appear.
     ///
     /// This is the "normal" mode almost everything uses, as type checkers are in fact supposed
@@ -326,7 +323,7 @@ pub(crate) fn path_to_module<'db>(db: &'db dyn Db, path: &FilePath) -> Option<Mo
 /// This intuition is particularly useful for understanding why it's correct that we pass
 /// the file itself as `importing_file` to various subroutines.
 #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
+pub fn file_to_module(db: &dyn Db, file: File) -> Option<Module<'_>> {
     let _span = tracing::trace_span!("file_to_module", ?file).entered();
 
     let path = SystemOrVendoredPathRef::try_from_file(db, file)?;
@@ -392,8 +389,8 @@ fn file_to_module_impl<'db, 'a>(
     None
 }
 
-pub(crate) fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
-    Program::get(db).search_paths(db).iter(db, resolve_mode)
+pub fn search_paths(db: &dyn Db, resolve_mode: ModuleResolveMode) -> SearchPathIterator<'_> {
+    db.search_paths().iter(db, resolve_mode)
 }
 
 /// Get the search-paths for desperate resolution of absolute imports in this file.
@@ -548,197 +545,26 @@ pub struct SearchPaths {
 }
 
 impl SearchPaths {
-    /// Validate and normalize the raw settings given by the user
-    /// into settings we can use for module resolution
+    /// Creates a new `SearchPaths` builder using the vendored typeshed.
+    pub fn builder(vendored: &VendoredFileSystem) -> SearchPathsBuilder {
+        SearchPathsBuilder::new(vendored)
+    }
+
+    /// Returns a new `SearchPaths` with no search paths configured.
     ///
-    /// This method also implements the typing spec's [module resolution order].
-    ///
-    /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
-    pub(crate) fn from_settings(
-        settings: &SearchPathSettings,
-        system: &dyn System,
-        vendored: &VendoredFileSystem,
-    ) -> Result<Self, SearchPathValidationError> {
-        fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
-            system
-                .canonicalize_path(path)
-                .unwrap_or_else(|_| path.to_path_buf())
+    /// This is primarily useful for testing.
+    pub fn empty(vendored: &VendoredFileSystem) -> Self {
+        Self {
+            static_paths: vec![],
+            stdlib_path: Some(SearchPath::vendored_stdlib()),
+            real_stdlib_path: None,
+            site_packages: vec![],
+            typeshed_versions: vendored_typeshed_versions(vendored),
         }
-
-        let SearchPathSettings {
-            extra_paths,
-            src_roots,
-            custom_typeshed: typeshed,
-            site_packages_paths,
-            real_stdlib_path,
-            misconfiguration_mode,
-        } = settings;
-
-        let mut static_paths = vec![];
-
-        for path in extra_paths {
-            let path = canonicalize(path, system);
-            tracing::debug!("Adding extra search-path `{path}`");
-
-            match SearchPath::extra(system, path) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid extra search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-        }
-
-        for src_root in src_roots {
-            tracing::debug!("Adding first-party search path `{src_root}`");
-            match SearchPath::first_party(system, src_root.to_path_buf()) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid first-party search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-        }
-
-        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
-            let typeshed = canonicalize(typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
-
-            let versions_path = typeshed.join("stdlib/VERSIONS");
-
-            let results = system
-                .read_to_string(&versions_path)
-                .map_err(
-                    |error| SearchPathValidationError::FailedToReadVersionsFile {
-                        path: versions_path,
-                        error,
-                    },
-                )
-                .and_then(|versions_content| Ok(versions_content.parse()?))
-                .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
-
-            match results {
-                Ok(results) => results,
-                Err(err) => {
-                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
-                        (
-                            vendored_typeshed_versions(vendored),
-                            SearchPath::vendored_stdlib(),
-                        )
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-        } else {
-            tracing::debug!("Using vendored stdlib");
-            (
-                vendored_typeshed_versions(vendored),
-                SearchPath::vendored_stdlib(),
-            )
-        };
-
-        let real_stdlib_path = if let Some(path) = real_stdlib_path {
-            match SearchPath::real_stdlib(system, path.clone()) {
-                Ok(path) => Some(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                        None
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-        } else {
-            None
-        };
-
-        let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
-
-        for path in site_packages_paths {
-            tracing::debug!("Adding site-packages search path `{path}`");
-            match SearchPath::site_packages(system, path.clone()) {
-                Ok(path) => site_packages.push(path),
-                Err(err) => {
-                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
-                }
-            }
-        }
-
-        // TODO vendor typeshed's third-party stubs as well as the stdlib and
-        // fallback to them as a final step?
-        //
-        // See: <https://github.com/astral-sh/ruff/pull/19620#discussion_r2240609135>
-
-        // Filter out module resolution paths that point to the same directory
-        // on disk (the same invariant maintained by [`sys.path` at runtime]).
-        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
-        // and `src/foo` as module resolution paths simultaneously.)
-        //
-        // This code doesn't use an `IndexSet` because the key is the system
-        // path and not the search root.
-        //
-        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-        let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
-
-        static_paths.retain(|path| {
-            if let Some(path) = path.as_system_path() {
-                seen_paths.insert(path.to_path_buf())
-            } else {
-                true
-            }
-        });
-
-        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
-        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
-        // "remember" that fact for static paths.
-        //
-        // (We used to shove these into static_paths, so the above retain implicitly did this. I am opting to
-        // preserve this behaviour to avoid getting into the weeds of corner cases.)
-        let stdlib_path_is_shadowed = stdlib_path
-            .as_system_path()
-            .map(|path| seen_paths.contains(path))
-            .unwrap_or(false);
-        let real_stdlib_path_is_shadowed = real_stdlib_path
-            .as_ref()
-            .and_then(SearchPath::as_system_path)
-            .map(|path| seen_paths.contains(path))
-            .unwrap_or(false);
-
-        let stdlib_path = if stdlib_path_is_shadowed {
-            None
-        } else {
-            Some(stdlib_path)
-        };
-        let real_stdlib_path = if real_stdlib_path_is_shadowed {
-            None
-        } else {
-            real_stdlib_path
-        };
-
-        Ok(SearchPaths {
-            static_paths,
-            stdlib_path,
-            real_stdlib_path,
-            site_packages,
-            typeshed_versions,
-        })
     }
 
     /// Registers the file roots for all non-dynamically discovered search paths that aren't first-party.
-    pub(crate) fn try_register_static_roots(&self, db: &dyn Db) {
+    pub fn try_register_static_roots(&self, db: &dyn Db) {
         let files = db.files();
         for path in self
             .static_paths
@@ -779,14 +605,104 @@ impl SearchPaths {
         }
     }
 
-    pub(crate) fn custom_stdlib(&self) -> Option<&SystemPath> {
+    pub fn custom_stdlib(&self) -> Option<&SystemPath> {
         self.stdlib_path
             .as_ref()
             .and_then(SearchPath::as_system_path)
     }
 
-    pub(crate) fn typeshed_versions(&self) -> &TypeshedVersions {
+    pub fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
+    }
+}
+
+/// Builder for constructing [`SearchPaths`].
+#[derive(Debug, Clone)]
+pub struct SearchPathsBuilder {
+    static_paths: Vec<SearchPath>,
+    stdlib_path: Option<SearchPath>,
+    real_stdlib_path: Option<SearchPath>,
+    site_packages: Vec<SearchPath>,
+    typeshed_versions: TypeshedVersions,
+}
+
+impl SearchPathsBuilder {
+    /// Creates a new builder with the vendored typeshed as the default stdlib.
+    pub fn new(vendored: &VendoredFileSystem) -> Self {
+        Self {
+            static_paths: vec![],
+            stdlib_path: Some(SearchPath::vendored_stdlib()),
+            real_stdlib_path: None,
+            site_packages: vec![],
+            typeshed_versions: vendored_typeshed_versions(vendored),
+        }
+    }
+
+    /// Adds a static search path (extra path, first-party, etc.).
+    #[must_use]
+    pub fn static_path(mut self, path: SearchPath) -> Self {
+        self.static_paths.push(path);
+        self
+    }
+
+    /// Adds multiple static search paths.
+    #[must_use]
+    pub fn static_paths(mut self, paths: impl IntoIterator<Item = SearchPath>) -> Self {
+        self.static_paths.extend(paths);
+        self
+    }
+
+    /// Sets a custom stdlib path, replacing the vendored typeshed.
+    #[must_use]
+    pub fn stdlib_path(mut self, path: SearchPath, versions: TypeshedVersions) -> Self {
+        self.stdlib_path = Some(path);
+        self.typeshed_versions = versions;
+        self
+    }
+
+    /// Sets the real stdlib path (for goto-definition).
+    #[must_use]
+    pub fn real_stdlib_path(mut self, path: Option<SearchPath>) -> Self {
+        self.real_stdlib_path = path;
+        self
+    }
+
+    /// Adds a site-packages search path.
+    #[must_use]
+    pub fn site_packages_path(mut self, path: SearchPath) -> Self {
+        self.site_packages.push(path);
+        self
+    }
+
+    /// Adds multiple site-packages search paths.
+    #[must_use]
+    pub fn site_packages_paths(mut self, paths: impl IntoIterator<Item = SearchPath>) -> Self {
+        self.site_packages.extend(paths);
+        self
+    }
+
+    /// Adds an editable install search path.
+    ///
+    /// Editable installs are discovered from `.pth` files in site-packages.
+    /// This method allows directly adding an editable path for testing purposes.
+    #[must_use]
+    pub fn editable_path(mut self, path: SearchPath) -> Self {
+        // Editable paths are added to site_packages list
+        // They'll be interleaved with site-packages in the proper order
+        self.site_packages.push(path);
+        self
+    }
+
+    /// Builds the [`SearchPaths`].
+    #[must_use]
+    pub fn build(self) -> SearchPaths {
+        SearchPaths {
+            static_paths: self.static_paths,
+            stdlib_path: self.stdlib_path,
+            real_stdlib_path: self.real_stdlib_path,
+            site_packages: self.site_packages,
+            typeshed_versions: self.typeshed_versions,
+        }
     }
 }
 
@@ -811,7 +727,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
         site_packages,
         typeshed_versions: _,
         real_stdlib_path,
-    } = Program::get(db).search_paths(db);
+    } = db.search_paths();
 
     let mut dynamic_paths = Vec::new();
 
@@ -932,7 +848,7 @@ pub(crate) fn dynamic_resolution_paths<'db>(
 /// are only calculated lazily.
 ///
 /// [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-pub(crate) struct SearchPathIterator<'db> {
+pub struct SearchPathIterator<'db> {
     db: &'db dyn Db,
     static_paths: std::slice::Iter<'db, SearchPath>,
     stdlib_path: Option<&'db SearchPath>,
@@ -1101,8 +1017,7 @@ fn resolve_name_impl<'a>(
     mode: ModuleResolveMode,
     search_paths: impl Iterator<Item = &'a SearchPath>,
 ) -> Option<ResolvedName> {
-    let program = Program::get(db);
-    let python_version = program.python_version(db);
+    let python_version = db.python_version();
     let resolver_state = ResolverContext::new(db, python_version, mode);
     let is_non_shadowable = mode.is_non_shadowable(python_version.minor, name.as_str());
 
@@ -1740,10 +1655,9 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
+    use crate::module::ModuleKind;
     use crate::module_name::ModuleName;
-    use crate::module_resolver::module::ModuleKind;
-    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 
@@ -2267,15 +2181,13 @@ mod tests {
     #[cfg(target_family = "unix")]
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
-
-        use crate::{
-            PythonPlatform, PythonVersionSource, PythonVersionWithSource, program::Program,
-        };
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
+        use crate::path::SearchPath;
+        use crate::typeshed::TypeshedVersions;
 
-        let mut db = TestDb::new();
+        let mut db = TestDb::new().with_python_version(PythonVersion::PY38);
 
         let temp_dir = tempfile::tempdir()?;
         let root = temp_dir
@@ -2300,23 +2212,26 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY38,
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    custom_typeshed: Some(custom_typeshed),
-                    site_packages_paths: vec![site_packages],
-                    ..SearchPathSettings::new(vec![src.clone()])
-                }
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings"),
-            },
-        );
+        // Build search paths using the builder
+        let versions_content =
+            std::fs::read_to_string(custom_typeshed.join("stdlib/VERSIONS").as_std_path())
+                .unwrap_or_default();
+        let typeshed_versions: TypeshedVersions = versions_content.parse().unwrap_or_else(|_| {
+            SearchPathsBuilder::new(db.vendored())
+                .build()
+                .typeshed_versions()
+                .clone()
+        });
+
+        let search_paths = SearchPathsBuilder::new(db.vendored())
+            .static_path(SearchPath::first_party(db.system(), src.clone()).unwrap())
+            .stdlib_path(
+                SearchPath::custom_stdlib(db.system(), &custom_typeshed).unwrap(),
+                typeshed_versions,
+            )
+            .site_packages_path(SearchPath::site_packages(db.system(), site_packages).unwrap())
+            .build();
+        db.set_search_paths(search_paths);
 
         let foo_module =
             resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
@@ -2828,69 +2743,17 @@ not_a_directory
         );
     }
 
-    #[test]
-    fn multiple_site_packages_with_editables() {
-        let mut db = TestDb::new();
-
-        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
-        let site_packages_pth = venv_site_packages.join("foo.pth");
-        let system_site_packages = SystemPathBuf::from("/system-site-packages");
-        let editable_install_location = SystemPathBuf::from("/x/y/a.py");
-        let system_site_packages_location = system_site_packages.join("a.py");
-
-        db.memory_file_system()
-            .create_directory_all("/src")
-            .unwrap();
-        db.write_files([
-            (&site_packages_pth, "/x/y"),
-            (&editable_install_location, ""),
-            (&system_site_packages_location, ""),
-        ])
-        .unwrap();
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![venv_site_packages, system_site_packages],
-                    ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
-                }
-                .to_search_paths(db.system(), db.vendored())
-                .expect("Valid search path settings"),
-            },
-        );
-
-        // The editable installs discovered from the `.pth` file in the first `site-packages` directory
-        // take precedence over the second `site-packages` directory...
-        let a_module_name = ModuleName::new_static("a").unwrap();
-        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
-        assert_eq!(
-            a_module.file(&db).unwrap().path(&db),
-            &editable_install_location
-        );
-
-        db.memory_file_system()
-            .remove_file(&site_packages_pth)
-            .unwrap();
-        File::sync_path(&mut db, &site_packages_pth);
-
-        // ...But now that the `.pth` file in the first `site-packages` directory has been deleted,
-        // the editable install no longer exists, so the module now resolves to the file in the
-        // second `site-packages` directory
-        let a_module = resolve_module_confident(&db, &a_module_name).unwrap();
-        assert_eq!(
-            a_module.file(&db).unwrap().path(&db),
-            &system_site_packages_location
-        );
-    }
+    // NOTE: Tests for `.pth` file discovery and editable install interactions
+    // remain in ty_python_semantic/src/module_resolver/resolver.rs since they
+    // depend on SearchPathSettings::to_search_paths.
 
     #[test]
     #[cfg(unix)]
     fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
         use anyhow::Context;
         use ruff_db::system::OsSystem;
+
+        use crate::path::SearchPath;
 
         let temp_dir = tempfile::TempDir::new()?;
         let root = SystemPathBuf::from_path_buf(
@@ -2924,16 +2787,10 @@ not_a_directory
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![src])
-                    .to_search_paths(db.system(), db.vendored())
-                    .expect("valid search path settings"),
-            },
-        );
+        let search_paths = SearchPathsBuilder::new(db.vendored())
+            .static_path(SearchPath::first_party(db.system(), src).unwrap())
+            .build();
+        db.set_search_paths(search_paths);
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
         let a_module_name = ModuleName::new_static("A").unwrap();
@@ -2957,6 +2814,9 @@ not_a_directory
 
     #[test]
     fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
+        use crate::path::SearchPath;
+        use ruff_db::files::FileRootKind;
+
         let project_directory = SystemPathBuf::from("/project");
         let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
         let installed_foo_module = site_packages.join("foo/__init__.py");
@@ -2964,19 +2824,19 @@ not_a_directory
         let mut db = TestDb::new();
         db.write_file(&installed_foo_module, "").unwrap();
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![site_packages.clone()],
-                    ..SearchPathSettings::new(vec![project_directory])
-                }
-                .to_search_paths(db.system(), db.vendored())
-                .unwrap(),
-            },
-        );
+        // Register file roots
+        db.files()
+            .try_add_root(&db, &project_directory, FileRootKind::Project);
+        db.files()
+            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
+
+        let search_paths = SearchPathsBuilder::new(db.vendored())
+            .static_path(SearchPath::first_party(db.system(), project_directory).unwrap())
+            .site_packages_path(
+                SearchPath::site_packages(db.system(), site_packages.clone()).unwrap(),
+            )
+            .build();
+        db.set_search_paths(search_paths);
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();

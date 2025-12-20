@@ -1125,24 +1125,64 @@ B() <CURSOR>+ A()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
-        info[goto-definition]: Go to definition
-         --> main.py:8:5
+        assert_snapshot!(test.goto_definition(), @r###"
+        info[goto-definition]: Definition
+         --> main.py:5:5
           |
-        6 | class B: ...
-        7 |
-        8 | B() + A()
-          |     ^ Clicking here
+        4 | @overload
+        5 | def ab(a: int): ...
+          |     ^^
+        6 |
+        7 | @overload
           |
-        info: Found 1 definition
-         --> main.py:3:9
-          |
-        2 | class A:
-        3 |     def __radd__(self, other) -> A:
-          |         --------
-        4 |         return self
-          |
-        ");
+        info: Source
+          --> main.py:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     ^^
+         9 |
+        10 | def ab(a: int, c: Any):
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     ^^
+         9 |
+        10 | def ab(a: int, c: Any):
+           |
+        info: Source
+          --> main.py:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     ^^
+         9 |
+        10 | def ab(a: int, c: Any):
+           |
+
+        info[goto-definition]: Definition
+          --> main.py:10:5
+           |
+         8 | def ab(a: int, b: int): ...
+         9 |
+        10 | def ab(a: int, c: Any):
+           |     ^^
+        11 |     return 1
+           |
+        info: Source
+          --> main.py:8:5
+           |
+         7 | @overload
+         8 | def ab(a: int, b: int): ...
+           |     ^^
+         9 |
+        10 | def ab(a: int, c: Any):
+           |
+        "###);
     }
 
     #[test]

@@ -29,10 +29,11 @@ use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal
 use ruff_python_codegen::Stylist;
 use ruff_python_importer::Insertion;
 use ruff_text_size::{Ranged, TextRange, TextSize};
+use ty_module_resolver::ModuleName;
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
 use ty_python_semantic::types::Type;
-use ty_python_semantic::{MemberDefinition, ModuleName, SemanticModel};
+use ty_python_semantic::{MemberDefinition, SemanticModel};
 
 pub(crate) struct Importer<'a> {
     /// The ty Salsa database.

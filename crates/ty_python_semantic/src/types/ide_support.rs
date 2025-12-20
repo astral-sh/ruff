@@ -847,11 +847,11 @@ mod resolve_definition {
     use rustc_hash::FxHashSet;
     use tracing::trace;
 
-    use crate::module_resolver::file_to_module;
+    use crate::Db;
     use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
+    use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.

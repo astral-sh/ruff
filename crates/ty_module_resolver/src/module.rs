@@ -7,10 +7,9 @@ use ruff_db::vendored::VendoredPath;
 use salsa::Database;
 use salsa::plumbing::AsId;
 
-use super::path::SearchPath;
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::path::SystemOrVendoredPathRef;
+use crate::path::{SearchPath, SystemOrVendoredPathRef};
 
 /// Representation of a Python module.
 #[derive(Clone, Copy, Eq, Hash, PartialEq, salsa::Supertype, salsa::Update)]
@@ -304,7 +303,7 @@ impl ModuleKind {
 
 /// Enumeration of various core stdlib modules in which important types are located
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
-#[cfg_attr(test, derive(strum_macros::EnumIter))]
+#[cfg_attr(any(test, feature = "testing"), derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {
     Builtins,
@@ -330,16 +329,16 @@ pub enum KnownModule {
     TyExtensions,
     #[strum(serialize = "importlib")]
     ImportLib,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
-    #[cfg(test)]
+    #[cfg(any(test, feature = "testing"))]
     Uuid,
     Warnings,
 }
 
 impl KnownModule {
-    pub(crate) const fn as_str(self) -> &'static str {
+    pub const fn as_str(self) -> &'static str {
         match self {
             Self::Builtins => "builtins",
             Self::Enum => "enum",
@@ -360,20 +359,20 @@ impl KnownModule {
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
-            #[cfg(test)]
+            #[cfg(any(test, feature = "testing"))]
             Self::UnittestMock => "unittest.mock",
-            #[cfg(test)]
+            #[cfg(any(test, feature = "testing"))]
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
         }
     }
 
-    pub(crate) fn name(self) -> ModuleName {
+    pub fn name(self) -> ModuleName {
         ModuleName::new_static(self.as_str())
             .unwrap_or_else(|| panic!("{self} should be a valid module name!"))
     }
 
-    pub(crate) fn try_from_search_path_and_name(
+    pub fn try_from_search_path_and_name(
         search_path: &SearchPath,
         name: &ModuleName,
     ) -> Option<Self> {
@@ -384,23 +383,23 @@ impl KnownModule {
         }
     }
 
-    pub(crate) const fn is_builtins(self) -> bool {
+    pub const fn is_builtins(self) -> bool {
         matches!(self, Self::Builtins)
     }
 
-    pub(crate) const fn is_typing(self) -> bool {
+    pub const fn is_typing(self) -> bool {
         matches!(self, Self::Typing)
     }
 
-    pub(crate) const fn is_ty_extensions(self) -> bool {
+    pub const fn is_ty_extensions(self) -> bool {
         matches!(self, Self::TyExtensions)
     }
 
-    pub(crate) const fn is_inspect(self) -> bool {
+    pub const fn is_inspect(self) -> bool {
         matches!(self, Self::Inspect)
     }
 
-    pub(crate) const fn is_importlib(self) -> bool {
+    pub const fn is_importlib(self) -> bool {
         matches!(self, Self::ImportLib)
     }
 }

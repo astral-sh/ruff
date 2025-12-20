@@ -8,11 +8,10 @@ use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_pa
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
-use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::resolver::{PyTyped, ResolverContext};
-use crate::site_packages::SitePackagesDiscoveryError;
+use crate::resolve::{PyTyped, ResolverContext};
+use crate::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 
 /// A path that points to a Python module.
 ///
@@ -432,7 +431,7 @@ pub enum SearchPathValidationError {
 
     /// Failed to discover the site-packages for the configured virtual environment.
     #[error("Failed to discover the site-packages directory")]
-    SitePackagesDiscovery(#[source] SitePackagesDiscoveryError),
+    SitePackagesDiscovery(#[source] Box<dyn std::error::Error + Send + Sync>),
 }
 
 impl From<TypeshedVersionsParseError> for SearchPathValidationError {
@@ -441,9 +440,10 @@ impl From<TypeshedVersionsParseError> for SearchPathValidationError {
     }
 }
 
-impl From<SitePackagesDiscoveryError> for SearchPathValidationError {
-    fn from(value: SitePackagesDiscoveryError) -> Self {
-        Self::SitePackagesDiscovery(value)
+impl SearchPathValidationError {
+    /// Create a site-packages discovery error from any error type.
+    pub fn site_packages_discovery(error: impl std::error::Error + Send + Sync + 'static) -> Self {
+        Self::SitePackagesDiscovery(Box::new(error))
     }
 }
 
@@ -500,24 +500,21 @@ impl SearchPath {
     }
 
     /// Create a new "Extra" search path
-    pub(crate) fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::Extra(
             Self::directory_path(system, root)?,
         ))))
     }
 
     /// Create a new first-party search path, pointing to the user code we were directly invoked on
-    pub(crate) fn first_party(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub fn first_party(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::FirstParty(
             Self::directory_path(system, root)?,
         ))))
     }
 
     /// Create a new standard-library search path pointing to a custom directory on disk
-    pub(crate) fn custom_stdlib(
-        system: &dyn System,
-        typeshed: &SystemPath,
-    ) -> SearchPathResult<Self> {
+    pub fn custom_stdlib(system: &dyn System, typeshed: &SystemPath) -> SearchPathResult<Self> {
         if !system.is_directory(typeshed) {
             return Err(SearchPathValidationError::NotADirectory(
                 typeshed.to_path_buf(),
@@ -539,14 +536,14 @@ impl SearchPath {
 
     /// Create a new search path pointing to the `stdlib/` subdirectory in the vendored zip archive
     #[must_use]
-    pub(crate) fn vendored_stdlib() -> Self {
+    pub fn vendored_stdlib() -> Self {
         Self(Arc::new(SearchPathInner::StandardLibraryVendored(
             VendoredPathBuf::from("stdlib"),
         )))
     }
 
     /// Create a new search path pointing to the real stdlib of a python install
-    pub(crate) fn real_stdlib(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub fn real_stdlib(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::StandardLibraryReal(
             Self::directory_path(system, root)?,
         ))))
@@ -559,10 +556,7 @@ impl SearchPath {
     /// However, removing the validation here breaks some file-watching tests -- and
     /// ultimately we'll probably want all search paths to be validated before a
     /// `Program` is instantiated, so it doesn't seem like a huge priority right now.
-    pub(crate) fn site_packages(
-        system: &dyn System,
-        root: SystemPathBuf,
-    ) -> SearchPathResult<Self> {
+    pub fn site_packages(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::SitePackages(
             Self::directory_path(system, root)?,
         ))))
@@ -585,7 +579,7 @@ impl SearchPath {
 
     /// Does this search path point to the standard library?
     #[must_use]
-    pub(crate) fn is_standard_library(&self) -> bool {
+    pub fn is_standard_library(&self) -> bool {
         matches!(
             &*self.0,
             SearchPathInner::StandardLibraryCustom(_)
@@ -680,7 +674,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+    pub fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 
@@ -709,7 +703,7 @@ impl SearchPath {
     /// Returns a string suitable for describing what kind of search path this is
     /// in user-facing diagnostics.
     #[must_use]
-    pub(crate) fn describe_kind(&self) -> &'static str {
+    pub fn describe_kind(&self) -> &'static str {
         match *self.0 {
             SearchPathInner::Extra(_) => {
                 "extra search path specified on the CLI or in your config file"
@@ -869,8 +863,8 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
-    use crate::module_resolver::resolver::ModuleResolveMode;
-    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::resolve::ModuleResolveMode;
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 

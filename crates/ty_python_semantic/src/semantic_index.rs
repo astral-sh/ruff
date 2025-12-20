@@ -12,7 +12,6 @@ use salsa::Update;
 use salsa::plumbing::AsId;
 
 use crate::Db;
-use crate::module_name::ModuleName;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIds;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
@@ -28,6 +27,7 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
+use ty_module_resolver::ModuleName;
 
 pub mod ast_ids;
 mod builder;

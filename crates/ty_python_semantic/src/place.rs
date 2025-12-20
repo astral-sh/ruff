@@ -2,7 +2,6 @@ use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;
@@ -16,6 +15,7 @@ use crate::types::{
     declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, Program};
+use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,

@@ -6,14 +6,15 @@ use ruff_python_parser::Parsed;
 use ruff_source_file::LineIndex;
 use rustc_hash::FxHashMap;
 
-use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, Module, list_modules, resolve_module};
+use crate::Db;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::semantic_index;
 use crate::types::list_members::{Member, all_members, all_reachable_members};
 use crate::types::{Type, binding_type, infer_scope_types};
-use crate::{Db, resolve_real_shadowable_module};
+use ty_module_resolver::{
+    KnownModule, Module, ModuleName, list_modules, resolve_module, resolve_real_shadowable_module,
+};
 
 /// The primary interface the LSP should use for querying semantic information about a [`File`].
 ///
