@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 
+use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast as ast;
-use ruff_text_size::Ranged;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
@@ -37,7 +38,7 @@ use crate::{FixAvailability, Violation};
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::None;
+    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +46,7 @@ impl Violation for DuplicateEntryInDunderAll {
     }
 
     fn fix_title(&self) -> Option<String> {
-        None
+        Some("Remove duplicate entries to `__all__`".to_string())
     }
 }
 
@@ -82,6 +83,7 @@ pub(crate) fn duplicate_entry_in_dunder_all(
     }
 
     let mut deduplicated_elts = HashSet::with_capacity(elts.len());
+    let source = checker.locator().contents();
 
     for expr in elts {
         let Some(string_value) = expr.as_string_literal_expr() else {
@@ -92,8 +94,25 @@ pub(crate) fn duplicate_entry_in_dunder_all(
         };
 
         if !deduplicated_elts.insert(string_value.value.to_str()) {
-            checker.report_diagnostic(DuplicateEntryInDunderAll, expr.range());
+            let range = expr.range();
+            let mut diagnostic = checker.report_diagnostic(DuplicateEntryInDunderAll, range);
+
+            let leading_len: TextSize = source[..range.start().to_usize()]
+                .chars()
+                .rev()
+                .take_while(|c| c.is_whitespace() || *c == ',')
+                .map(TextLen::text_len)
+                .sum();
+
+            let fix_range = TextRange::new(range.start() - leading_len, range.end());
+
+            let edit = Edit::range_deletion(fix_range);
+
+            if checker.comment_ranges().intersects(fix_range) {
+                diagnostic.set_fix(Fix::unsafe_edit(edit));
+            } else {
+                diagnostic.set_fix(Fix::safe_edit(edit));
+            }
         }
     }
-    // TODO: Make a fix for this rule
 }
