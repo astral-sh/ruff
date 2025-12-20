@@ -2,7 +2,6 @@ use ruff_db::Db as SourceDb;
 
 use crate::resolve::SearchPaths;
 
-/// Database giving access to the module resolver.
 #[salsa::db]
 pub trait Db: SourceDb {
     /// Returns the search paths for module resolution.

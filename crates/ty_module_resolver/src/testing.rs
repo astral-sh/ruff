@@ -247,22 +247,33 @@ impl TestCaseBuilder<MockedTypeshed> {
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
         let stdlib = typeshed.join("stdlib");
 
-        // Build search paths using SearchPathSettings
-        let settings = SearchPathSettings {
+        let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             custom_typeshed: Some(typeshed),
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
-        };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
 
-        // Register file roots for Salsa tracking
+        // This root is needed for correct Salsa tracking.
+        // Namely, a `SearchPath` is treated as an input, and
+        // thus the revision number must be bumped accordingly
+        // when the directory tree changes. We rely on detecting
+        // this revision from the file root. If we don't add them
+        // here, they won't get added.
+        //
+        // Roots for other search paths are added as part of
+        // search path initialization in `SearchPaths::from_settings`,
+        // and any remaining are added below.
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
+
+        db.files()
+            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
+
         for root in &roots {
             db.files()
                 .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
@@ -311,15 +322,13 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        // Build search paths using SearchPathSettings (vendored typeshed is the default)
-        let settings = SearchPathSettings {
+        let search_paths = SearchPathSettings {
             src_roots: vec![src.clone()],
             site_packages_paths: vec![site_packages.clone()],
             ..SearchPathSettings::empty()
-        };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
 

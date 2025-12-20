@@ -1315,9 +1315,9 @@ mod tests {
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
     use crate::types::{KnownClass, Truthiness};
-    use ty_module_resolver::KnownModule;
 
     use test_case::test_case;
+    use ty_module_resolver::KnownModule;
 
     #[test]
     fn build_union_no_elements() {

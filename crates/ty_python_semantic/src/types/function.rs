@@ -87,8 +87,7 @@ use crate::types::{
     definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
-use ty_module_resolver::{KnownModule, file_to_module};
-use ty_module_resolver::{ModuleName, resolve_module};
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///

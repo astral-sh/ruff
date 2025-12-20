@@ -18,6 +18,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
+use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 use type_ordering::union_or_intersection_elements_ordering;
 
@@ -79,9 +80,6 @@ pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
-use ty_module_resolver::Module;
-use ty_module_resolver::ModuleName;
-use ty_module_resolver::{KnownModule, resolve_module};
 
 mod bound_super;
 mod builder;

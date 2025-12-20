@@ -70,8 +70,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
-use ty_module_resolver::KnownModule;
-use ty_module_resolver::file_to_module;
+use ty_module_resolver::{KnownModule, file_to_module};
 
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,

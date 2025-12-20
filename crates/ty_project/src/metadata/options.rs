@@ -28,8 +28,7 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
-use ty_module_resolver::SearchPaths;
-use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError};
+use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,

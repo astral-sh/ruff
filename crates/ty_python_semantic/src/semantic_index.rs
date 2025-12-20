@@ -4,12 +4,12 @@ use std::sync::Arc;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_index::{IndexSlice, IndexVec};
-
 use ruff_python_ast::NodeIndex;
 use ruff_python_parser::semantic_errors::SemanticSyntaxError;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::Update;
 use salsa::plumbing::AsId;
+use ty_module_resolver::ModuleName;
 
 use crate::Db;
 use crate::node_key::NodeKey;
@@ -27,7 +27,6 @@ use crate::semantic_index::scope::{
 use crate::semantic_index::symbol::ScopedSymbolId;
 use crate::semantic_index::use_def::{EnclosingSnapshotKey, ScopedEnclosingSnapshotId, UseDefMap};
 use crate::semantic_model::HasTrackedScope;
-use ty_module_resolver::ModuleName;
 
 pub mod ast_ids;
 mod builder;

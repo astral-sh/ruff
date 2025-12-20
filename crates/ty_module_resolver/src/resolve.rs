@@ -37,7 +37,7 @@ use std::iter::FusedIterator;
 use std::str::Split;
 
 use compact_str::format_compact;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_db::files::{File, FilePath, FileRootKind};
 use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
@@ -52,6 +52,7 @@ use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
 use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
 use crate::typeshed::{TypeshedVersions, vendored_typeshed_versions};
+use crate::{MisconfigurationMode, SearchPathSettings, SearchPathSettingsError};
 
 /// Resolves a module name to a module.
 pub fn resolve_module<'db>(
@@ -552,20 +553,17 @@ impl SearchPaths {
     ///
     /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
     pub fn from_settings(
-        settings: &crate::settings::SearchPathSettings,
+        settings: &SearchPathSettings,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> Result<Self, crate::settings::SearchPathSettingsError> {
-        use crate::settings::{MisconfigurationMode, SearchPathSettingsError};
-        use rustc_hash::{FxBuildHasher, FxHashSet};
-
+    ) -> Result<Self, SearchPathSettingsError> {
         fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
             system
                 .canonicalize_path(path)
                 .unwrap_or_else(|_| path.to_path_buf())
         }
 
-        let crate::settings::SearchPathSettings {
+        let SearchPathSettings {
             extra_paths,
             src_roots,
             custom_typeshed: typeshed,
@@ -675,6 +673,11 @@ impl SearchPaths {
             }
         }
 
+        // TODO vendor typeshed's third-party stubs as well as the stdlib and
+        // fallback to them as a final step?
+        //
+        // See: <https://github.com/astral-sh/ruff/pull/19620#discussion_r2240609135>
+
         // Filter out module resolution paths that point to the same directory
         // on disk (the same invariant maintained by [`sys.path` at runtime]).
         // (Paths may, however, *overlap* -- e.g. you could have both `src/`
@@ -697,6 +700,9 @@ impl SearchPaths {
         // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
         // This notably will mess up anything that checks if a search path "is the standard library" as we won't
         // "remember" that fact for static paths.
+        //
+        // (We used to shove these into static_paths, so the above retain implicitly did this. I am opting to
+        // preserve this behaviour to avoid getting into the weeds of corner cases.)
         let stdlib_path_is_shadowed = stdlib_path
             .as_system_path()
             .is_some_and(|path| seen_paths.contains(path));
@@ -2295,17 +2301,16 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        // Build search paths using SearchPathSettings
-        let settings = crate::settings::SearchPathSettings {
-            src_roots: vec![src.clone()],
-            custom_typeshed: Some(custom_typeshed),
-            site_packages_paths: vec![site_packages],
-            ..crate::settings::SearchPathSettings::empty()
-        };
-        let search_paths = settings
+        db.set_search_paths(
+            SearchPathSettings {
+                src_roots: vec![src.clone()],
+                custom_typeshed: Some(custom_typeshed),
+                site_packages_paths: vec![site_packages],
+                ..SearchPathSettings::empty()
+            }
             .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
+            .expect("Valid search path settings"),
+        );
 
         let foo_module =
             resolve_module_confident(&db, &ModuleName::new_static("foo").unwrap()).unwrap();
@@ -2819,8 +2824,6 @@ not_a_directory
 
     #[test]
     fn multiple_site_packages_with_editables() {
-        use ruff_db::files::File;
-
         let mut db = TestDb::new();
 
         let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
@@ -2839,14 +2842,14 @@ not_a_directory
         ])
         .unwrap();
 
-        let settings = crate::settings::SearchPathSettings {
-            site_packages_paths: vec![venv_site_packages, system_site_packages],
-            ..crate::settings::SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
-        };
-        let search_paths = settings
+        db.set_search_paths(
+            SearchPathSettings {
+                site_packages_paths: vec![venv_site_packages, system_site_packages],
+                ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+            }
             .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
+            .expect("Valid search path settings"),
+        );
 
         // The editable installs discovered from the `.pth` file in the first `site-packages` directory
         // take precedence over the second `site-packages` directory...
@@ -2910,11 +2913,11 @@ not_a_directory
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
-        let settings = crate::settings::SearchPathSettings::new(vec![src]);
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
+        db.set_search_paths(
+            SearchPathSettings::new(vec![src])
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+        );
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
         let a_module_name = ModuleName::new_static("A").unwrap();
@@ -2938,8 +2941,6 @@ not_a_directory
 
     #[test]
     fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
-        use ruff_db::files::FileRootKind;
-
         let project_directory = SystemPathBuf::from("/project");
         let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
         let installed_foo_module = site_packages.join("foo/__init__.py");
@@ -2947,19 +2948,14 @@ not_a_directory
         let mut db = TestDb::new();
         db.write_file(&installed_foo_module, "").unwrap();
 
-        let settings = crate::settings::SearchPathSettings {
-            src_roots: vec![project_directory.clone()],
+        let search_paths = SearchPathSettings {
+            src_roots: vec![project_directory],
             site_packages_paths: vec![site_packages.clone()],
-            ..crate::settings::SearchPathSettings::empty()
-        };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Valid search path settings");
         db.set_search_paths(search_paths);
-
-        // Register file roots for Salsa tracking
-        db.files()
-            .try_add_root(&db, &project_directory, FileRootKind::Project);
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();

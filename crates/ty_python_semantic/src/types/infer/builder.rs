@@ -13,6 +13,10 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use ty_module_resolver::{
+    KnownModule, ModuleName, ModuleNameResolutionError, ModuleResolveMode, file_to_module,
+    resolve_module, search_paths,
+};
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
@@ -114,10 +118,6 @@ use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
 use crate::unpack::{EvaluationMode, UnpackPosition};
 use crate::{Db, FxIndexSet, FxOrderSet, Program};
-use ty_module_resolver::{
-    KnownModule, ModuleName, ModuleNameResolutionError, ModuleResolveMode, file_to_module,
-    resolve_module, search_paths,
-};
 
 mod annotation_expression;
 mod type_expression;

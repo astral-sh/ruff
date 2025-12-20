@@ -959,19 +959,19 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        // Build search paths using SearchPathSettings
         let settings = SearchPathSettings {
             src_roots: vec![src.clone()],
             custom_typeshed: Some(custom_typeshed),
             site_packages_paths: vec![site_packages],
             ..SearchPathSettings::empty()
         };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
 
-        // Register file roots for Salsa tracking
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+        );
+
         db.files().try_add_root(&db, &src, FileRootKind::Project);
 
         // From the original test in the "resolve this module"
@@ -1452,9 +1452,6 @@ not_a_directory
 
     #[test]
     fn editable_installs_into_first_party_search_path() {
-        use crate::db::tests::TestDb;
-        use crate::settings::SearchPathSettings;
-
         let mut db = TestDb::new();
 
         let src = SystemPath::new("/src");
@@ -1475,10 +1472,12 @@ not_a_directory
             site_packages_paths: vec![venv_site_packages],
             ..SearchPathSettings::new(vec![src.to_path_buf()])
         };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
+
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+        );
 
         insta::assert_debug_snapshot!(
             list_snapshot_filter(&db, |m| m.name(&db).as_str() == "a"),
@@ -1499,9 +1498,6 @@ not_a_directory
 
     #[test]
     fn multiple_site_packages_with_editables() {
-        use crate::db::tests::TestDb;
-        use crate::settings::SearchPathSettings;
-
         let mut db = TestDb::new();
 
         let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
@@ -1527,10 +1523,12 @@ not_a_directory
             site_packages_paths: vec![venv_site_packages, system_site_packages],
             ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
         };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .expect("Valid search path settings");
-        db.set_search_paths(search_paths);
+
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored())
+                .expect("Valid search path settings"),
+        );
 
         // The editable installs discovered from the `.pth` file in the
         // first `site-packages` directory take precedence over the
@@ -1570,9 +1568,7 @@ not_a_directory
     #[test]
     #[cfg(unix)]
     fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
-        use crate::db::tests::TestDb;
-        use crate::settings::SearchPathSettings;
-        use anyhow::Context;
+        use anyhow::Context as _;
 
         let temp_dir = tempfile::TempDir::with_prefix("PREFIX-SENTINEL")?;
         let root = SystemPathBuf::from_path_buf(
@@ -1634,9 +1630,6 @@ not_a_directory
 
     #[test]
     fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
-        use crate::db::tests::TestDb;
-        use crate::settings::SearchPathSettings;
-
         let project_directory = SystemPathBuf::from("/project");
         let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
         let installed_foo_module = site_packages.join("foo/__init__.py");
@@ -1651,10 +1644,11 @@ not_a_directory
             site_packages_paths: vec![site_packages],
             ..SearchPathSettings::new(vec![project_directory])
         };
-        let search_paths = settings
-            .to_search_paths(db.system(), db.vendored())
-            .unwrap();
-        db.set_search_paths(search_paths);
+        db.set_search_paths(
+            settings
+                .to_search_paths(db.system(), db.vendored())
+                .unwrap(),
+        );
 
         insta::assert_debug_snapshot!(
             list_snapshot_filter(&db, |m| m.name(&db).as_str() == "foo"),

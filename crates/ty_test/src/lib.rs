@@ -17,8 +17,9 @@ use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
-use ty_module_resolver::SearchPathSettings;
-use ty_module_resolver::{Module, SearchPath, list_modules, resolve_module_confident};
+use ty_module_resolver::{
+    Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
+};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{

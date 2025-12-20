@@ -1,9 +1,3 @@
-//! Python module resolver for ty.
-//!
-//! This crate provides module resolution functionality for Python code,
-//! including resolving import statements to their corresponding modules
-//! and files.
-
 use std::iter::FusedIterator;
 
 use ruff_db::system::SystemPath;
@@ -57,8 +51,8 @@ impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
         loop {
             let next = self.inner.next()?;
 
-            if let Some(path) = next.as_system_path() {
-                return Some(path);
+            if let Some(system_path) = next.as_system_path() {
+                return Some(system_path);
             }
         }
     }

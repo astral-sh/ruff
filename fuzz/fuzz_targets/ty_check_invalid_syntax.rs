@@ -15,12 +15,12 @@ use ruff_db::system::{
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 use ruff_python_parser::{Mode, ParseOptions, parse_unchecked};
-use ty_module_resolver::{Db as ModuleResolverDb, ModuleResolveMode};
+use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
     Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry, lint::RuleSelection,
+    default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.

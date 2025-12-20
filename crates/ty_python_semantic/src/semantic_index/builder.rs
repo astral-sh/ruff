@@ -15,6 +15,7 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
 use crate::node_key::NodeKey;
@@ -49,8 +50,6 @@ use crate::semantic_index::{ExpressionsScopeMap, SemanticIndex, VisibleAncestors
 use crate::semantic_model::HasTrackedScope;
 use crate::unpack::{EvaluationMode, Unpack, UnpackKind, UnpackPosition, UnpackValue};
 use crate::{Db, Program};
-use ty_module_resolver::ModuleName;
-use ty_module_resolver::resolve_module;
 
 mod except_handlers;
 
