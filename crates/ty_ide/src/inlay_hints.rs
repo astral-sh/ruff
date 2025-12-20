@@ -61,7 +61,6 @@ impl InlayHint {
         // So we record where we are in the string, and every time we find a type, we
         // check if it's further along in the string. If it is, great, we give it the
         // span for its range, and then advance where we are.
-        let original_label = details.label.clone();
         let mut offset = 0;
 
         // This could be different from the original label if we need to
@@ -79,7 +78,7 @@ impl InlayHint {
 
                     // If we skipped over some bytes, push them with no target
                     if start > offset {
-                        label_parts.push(original_label[offset..start].into());
+                        label_parts.push(details.label[offset..start].into());
                     }
 
                     // Get the possible qualified label part
@@ -129,7 +128,7 @@ impl InlayHint {
                         }
 
                         // Always use original text for the label part
-                        let label_text = &original_label[start..end];
+                        let label_text = &details.label[start..end];
 
                         label_parts
                             .push(InlayHintLabelPart::new(label_text).with_target(nav_target));
@@ -145,8 +144,8 @@ impl InlayHint {
         }
 
         // "flush" the rest of the label without any target
-        if offset < original_label.len() {
-            label_parts.push(original_label[offset..].into());
+        if offset < details.label.len() {
+            label_parts.push(details.label[offset..details.label.len()].into());
         }
 
         let text_edits = if details.is_valid_syntax && allow_edits {
@@ -162,7 +161,7 @@ impl InlayHint {
 
             text_edits
         } else {
-            Vec::new()
+            vec![]
         };
 
         Some(Self {
