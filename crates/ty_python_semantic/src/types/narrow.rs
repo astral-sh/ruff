@@ -72,7 +72,10 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints.get(&place).copied()
+        constraints
+            .constraints
+            .get(&place)
+            .map(|constraint| constraint.clone().evaluate_type_constraint(db))
     } else {
         None
     }
@@ -82,7 +85,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
 fn all_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), true).finish()
 }
@@ -95,7 +98,7 @@ fn all_narrowing_constraints_for_pattern<'db>(
 fn all_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     let module = parsed_module(db, expression.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), true)
         .finish()
@@ -109,7 +112,7 @@ fn all_narrowing_constraints_for_expression<'db>(
 fn all_negative_narrowing_constraints_for_expression<'db>(
     db: &'db dyn Db,
     expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     let module = parsed_module(db, expression.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Expression(expression), false)
         .finish()
@@ -119,7 +122,7 @@ fn all_negative_narrowing_constraints_for_expression<'db>(
 fn all_negative_narrowing_constraints_for_pattern<'db>(
     db: &'db dyn Db,
     pattern: PatternPredicate<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     let module = parsed_module(db, pattern.file(db)).load(db);
     NarrowingConstraintsBuilder::new(db, &module, PredicateNode::Pattern(pattern), false).finish()
 }
@@ -128,7 +131,7 @@ fn constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     None
 }
 
@@ -136,7 +139,7 @@ fn negative_constraints_for_expression_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
     _expression: Expression<'db>,
-) -> Option<NarrowingConstraints<'db>> {
+) -> Option<InternalConstraints<'db>> {
     None
 }
 
@@ -393,9 +396,25 @@ impl<'db> From<Type<'db>> for NarrowingConstraint<'db> {
 ///
 /// This is a newtype wrapper around `FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>` that
 /// provides methods for working with constraints during boolean operation evaluation.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 struct InternalConstraints<'db> {
     constraints: FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>,
+}
+
+impl get_size2::GetSize for InternalConstraints<'_> {}
+
+// SAFETY: InternalConstraints contains only `'db` lifetimes which are covariant,
+// and the inner types (FxHashMap, ScopedPlaceId, NarrowingConstraint) are all safe to transmute
+unsafe impl salsa::Update for InternalConstraints<'_> {
+    unsafe fn maybe_update(old_pointer: *mut Self, new_value: Self) -> bool {
+        let old_ref = unsafe { &mut (*old_pointer) };
+        if *old_ref != new_value {
+            *old_ref = new_value;
+            true
+        } else {
+            false
+        }
+    }
 }
 
 impl<'db> InternalConstraints<'db> {
@@ -580,8 +599,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
     }
 
-    fn finish(mut self) -> Option<NarrowingConstraints<'db>> {
-        let constraints: Option<InternalConstraints<'db>> = match self.predicate {
+    fn finish(mut self) -> Option<InternalConstraints<'db>> {
+        let mut constraints: Option<InternalConstraints<'db>> = match self.predicate {
             PredicateNode::Expression(expression) => {
                 self.evaluate_expression_predicate(expression, self.is_positive)
             }
@@ -591,12 +610,12 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             PredicateNode::ReturnsNever(_) => return None,
             PredicateNode::StarImportPlaceholder(_) => return None,
         };
-        if let Some(mut constraints) = constraints {
+
+        if let Some(ref mut constraints) = constraints {
             constraints.constraints.shrink_to_fit();
-            Some(constraints.evaluate_type_constraints(self.db))
-        } else {
-            None
         }
+
+        constraints
     }
 
     fn evaluate_expression_predicate(
