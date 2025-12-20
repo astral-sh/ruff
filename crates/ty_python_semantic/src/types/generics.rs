@@ -1866,6 +1866,17 @@ impl<'db> SpecializationBuilder<'db> {
                 }
             }
 
+            (formal, Type::ProtocolInstance(actual_protocol)) => {
+                if let Some(actual_nominal) = actual_protocol.as_nominal_type() {
+                    return self.infer_map_impl(
+                        formal,
+                        Type::NominalInstance(actual_nominal),
+                        polarity,
+                        f,
+                    );
+                }
+            }
+
             (formal, Type::NominalInstance(actual_nominal)) => {
                 // Special case: `formal` and `actual` are both tuples.
                 if let (Some(formal_tuple), Some(actual_tuple)) = (
