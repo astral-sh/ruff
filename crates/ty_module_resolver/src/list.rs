@@ -962,12 +962,6 @@ mod tests {
 
         let stdlib = custom_typeshed.join("stdlib");
 
-        db.files().try_add_root(&db, &src, FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
-
         // Build search paths using the builder
         let versions_content =
             std::fs::read_to_string(stdlib.join("VERSIONS").as_std_path()).unwrap_or_default();
@@ -981,16 +975,19 @@ mod tests {
 
         let mut builder = SearchPathsBuilder::new(db.vendored());
         builder
-            .first_party_path(db.system(), src)
+            .first_party_path(db.system(), src.clone())
             .expect("Valid first-party path");
         builder
             .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
             .expect("Valid custom stdlib path");
         builder
-            .site_packages_path(db.system(), site_packages)
+            .site_packages_path(db.system(), site_packages.clone())
             .expect("Valid site-packages path");
         let search_paths = builder.build();
         db.set_search_paths(search_paths);
+
+        // Register file roots for Salsa tracking
+        db.files().try_add_root(&db, &src, FileRootKind::Project);
 
         // From the original test in the "resolve this module"
         // implementation, this test seems to symlink a Python module

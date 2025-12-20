@@ -2875,21 +2875,19 @@ not_a_directory
         let mut db = TestDb::new();
         db.write_file(&installed_foo_module, "").unwrap();
 
-        // Register file roots
-        db.files()
-            .try_add_root(&db, &project_directory, FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
-
         let mut builder = SearchPathsBuilder::new(db.vendored());
         builder
-            .first_party_path(db.system(), project_directory)
+            .first_party_path(db.system(), project_directory.clone())
             .expect("Valid first-party path");
         builder
             .site_packages_path(db.system(), site_packages.clone())
             .expect("Valid site-packages path");
         let search_paths = builder.build();
         db.set_search_paths(search_paths);
+
+        // Register file roots for Salsa tracking
+        db.files()
+            .try_add_root(&db, &project_directory, FileRootKind::Project);
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));
         let module = file_to_module(&db, foo_module_file).unwrap();

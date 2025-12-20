@@ -58,7 +58,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn with_search_paths(mut self, search_paths: SearchPaths) -> Self {
-            self.search_paths = Arc::new(search_paths);
+            self.set_search_paths(search_paths);
             self
         }
 
@@ -68,6 +68,7 @@ pub(crate) mod tests {
         }
 
         pub(crate) fn set_search_paths(&mut self, search_paths: SearchPaths) {
+            search_paths.try_register_static_roots(self);
             self.search_paths = Arc::new(search_paths);
         }
 

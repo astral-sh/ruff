@@ -33,7 +33,7 @@ mod resolve;
 mod typeshed;
 
 #[cfg(test)]
-pub(crate) mod testing;
+mod testing;
 
 /// Returns an iterator over all search paths pointing to a system path
 pub fn system_module_search_paths(db: &dyn Db) -> SystemModuleSearchPathsIter<'_> {
@@ -54,6 +54,7 @@ impl<'db> Iterator for SystemModuleSearchPathsIter<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let next = self.inner.next()?;
+
             if let Some(path) = next.as_system_path() {
                 return Some(path);
             }

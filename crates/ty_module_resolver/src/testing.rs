@@ -276,10 +276,6 @@ impl TestCaseBuilder<MockedTypeshed> {
         // Register file roots for Salsa tracking
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
         for root in &roots {
             db.files()
                 .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
@@ -342,8 +338,6 @@ impl TestCaseBuilder<VendoredTypeshed> {
 
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-        db.files()
-            .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
         for root in &roots {
             db.files()
                 .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
