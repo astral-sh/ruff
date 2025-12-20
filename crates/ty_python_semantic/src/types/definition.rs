@@ -75,7 +75,8 @@ impl<'db> TypeDefinition<'db> {
     pub fn definition<'a>(&'a self) -> Option<&'a Definition<'db>> {
         match self {
             Self::Module(_) => None,
-            Self::Class(definition)
+            Self::StaticClass(definition)
+            | Self::DynamicClass(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
             | Self::TypeAlias(definition)

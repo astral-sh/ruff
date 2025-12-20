@@ -673,7 +673,6 @@ impl<'db> DynamicImporter<'db> {
             Entry::Vacant(entry) => {
                 let request = ImportRequest::import_from(module_name, definition_name);
                 let import_action = self.importer.import(request, &self.members);
-                println!("Import action: {:?}", import_action);
                 let qualified_name = qualified_name(&import_action);
 
                 entry.insert(import_action);

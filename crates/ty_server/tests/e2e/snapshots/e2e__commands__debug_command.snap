@@ -19,6 +19,7 @@ Settings: WorkspaceSettings {
     inlay_hints: InlayHintSettings {
         variable_types: true,
         call_argument_names: true,
+        auto_import: true,
     },
     completions: CompletionSettings {
         auto_import: true,
