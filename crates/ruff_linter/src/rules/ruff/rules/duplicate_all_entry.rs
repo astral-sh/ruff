@@ -34,7 +34,7 @@ use crate::{FixAvailability, Violation};
 /// ]
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.10")]
+#[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct DuplicateEntryInDunderAll;
 
 impl Violation for DuplicateEntryInDunderAll {
