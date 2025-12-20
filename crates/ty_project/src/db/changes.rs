@@ -11,7 +11,7 @@ use ruff_db::files::{File, FileRootKind, Files};
 use ruff_db::system::SystemPath;
 use rustc_hash::FxHashSet;
 use salsa::Setter;
-use ty_python_semantic::Program;
+use ty_python_semantic::{FailStrategy, Program};
 
 /// Represents the result of applying changes to the project database.
 pub struct ChangeResult {
@@ -260,7 +260,11 @@ impl ProjectDatabase {
                         metadata.apply_overrides(overrides);
                     }
 
-                    match metadata.to_program_settings(self.system(), self.vendored()) {
+                    match metadata.to_program_settings(
+                        self.system(),
+                        self.vendored(),
+                        &FailStrategy,
+                    ) {
                         Ok(program_settings) => {
                             let program = Program::get(self);
                             program.update_from_settings(self, program_settings);
@@ -276,7 +280,7 @@ impl ProjectDatabase {
                         tracing::debug!("Reloading project after structural change");
                         project.reload(self, metadata);
                     } else {
-                        match Project::from_metadata(self, metadata) {
+                        match Project::from_metadata(self, metadata, &FailStrategy) {
                             Ok(new_project) => {
                                 tracing::debug!("Replace project after structural change");
                                 project = new_project;
@@ -304,10 +308,11 @@ impl ProjectDatabase {
 
             return result;
         } else if result.custom_stdlib_changed {
-            match project
-                .metadata(self)
-                .to_program_settings(self.system(), self.vendored())
-            {
+            match project.metadata(self).to_program_settings(
+                self.system(),
+                self.vendored(),
+                &FailStrategy,
+            ) {
                 Ok(program_settings) => {
                     program.update_from_settings(self, program_settings);
                 }

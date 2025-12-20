@@ -6,6 +6,7 @@ mod version;
 
 pub use args::Cli;
 use ty_project::metadata::settings::TerminalSettings;
+use ty_python_semantic::FailStrategy;
 use ty_static::EnvVars;
 
 use std::fmt::Write;
@@ -129,7 +130,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let project_options_overrides = ProjectOptionsOverrides::new(config_file, args.into_options());
     project_metadata.apply_overrides(&project_options_overrides);
 
-    let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let mut db = ProjectDatabase::new(project_metadata, system, &FailStrategy)?;
 
     db.project()
         .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);

@@ -15,7 +15,7 @@ use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_python_semantic::{Db as SemanticDb, MisconfigurationStrategy, Program};
 
 mod changes;
 
@@ -44,7 +44,11 @@ pub struct ProjectDatabase {
 }
 
 impl ProjectDatabase {
-    pub fn new<S>(project_metadata: ProjectMetadata, system: S) -> anyhow::Result<Self>
+    pub fn new<S, Strategy: MisconfigurationStrategy>(
+        project_metadata: ProjectMetadata,
+        system: S,
+        strategy: &Strategy,
+    ) -> Result<Self, Strategy::Error<anyhow::Error>>
     where
         S: System + 'static + Send + Sync + RefUnwindSafe,
     {
@@ -72,13 +76,17 @@ impl ProjectDatabase {
         //   we may want to have a dedicated method for this?
 
         // Initialize the `Program` singleton
-        let program_settings = project_metadata.to_program_settings(db.system(), db.vendored())?;
+        let program_settings = strategy.to_anyhow(project_metadata.to_program_settings(
+            db.system(),
+            db.vendored(),
+            strategy,
+        ))?;
         Program::from_settings(&db, program_settings);
 
-        db.project = Some(
-            Project::from_metadata(&db, project_metadata)
-                .map_err(|error| anyhow::anyhow!("{}", error.pretty(&db)))?,
-        );
+        db.project = Some(strategy.map_err(
+            Project::from_metadata(&db, project_metadata, strategy),
+            |error| anyhow::anyhow!("{}", error.pretty(&db)),
+        )?);
 
         Ok(db)
     }
@@ -525,7 +533,8 @@ pub(crate) mod tests {
     use ruff_db::vendored::VendoredFileSystem;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
+        FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+        SearchPathSettings,
     };
 
     use crate::db::Db;
@@ -562,7 +571,7 @@ pub(crate) mod tests {
                 project: None,
             };
 
-            let project = Project::from_metadata(&db, project).unwrap();
+            let project = Project::from_metadata(&db, project, &FailStrategy).unwrap();
             db.project = Some(project);
             db
         }
@@ -571,7 +580,7 @@ pub(crate) mod tests {
             let root = self.project().root(self);
 
             let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
-                .to_search_paths(self.system(), self.vendored())
+                .to_search_paths(self.system(), self.vendored(), &FailStrategy)
                 .expect("Valid search path settings");
 
             Program::from_settings(

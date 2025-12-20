@@ -9,8 +9,9 @@ use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
+    Db, FailStrategy, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin,
+    default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -47,7 +48,7 @@ impl ModuleDb {
                 .into_vec();
         }
         let search_paths = search_paths
-            .to_search_paths(db.system(), db.vendored())
+            .to_search_paths(db.system(), db.vendored(), &FailStrategy)
             .context("Invalid search path settings")?;
 
         Program::from_settings(

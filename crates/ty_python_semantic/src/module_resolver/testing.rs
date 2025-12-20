@@ -8,7 +8,9 @@ use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
 use crate::program::{Program, SearchPathSettings};
-use crate::{ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource};
+use crate::{
+    FailStrategy, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
+};
 
 /// A test case for the module resolver.
 ///
@@ -280,7 +282,7 @@ impl TestCaseBuilder<MockedTypeshed> {
                     site_packages_paths: vec![site_packages.clone()],
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("valid search path settings"),
             },
         );
@@ -351,7 +353,7 @@ impl TestCaseBuilder<VendoredTypeshed> {
                     site_packages_paths: vec![site_packages.clone()],
                     ..SearchPathSettings::new(vec![src.clone()])
                 }
-                .to_search_paths(db.system(), db.vendored())
+                .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                 .expect("valid search path settings"),
             },
         );

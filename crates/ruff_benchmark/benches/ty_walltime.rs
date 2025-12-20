@@ -1,5 +1,6 @@
 use divan::{Bencher, bench};
 use std::fmt::{Display, Formatter};
+use ty_python_semantic::FailStrategy;
 
 use rayon::ThreadPoolBuilder;
 use ruff_benchmark::real_world_projects::{InstalledProject, RealWorldProject};
@@ -51,7 +52,7 @@ impl<'a> Benchmark<'a> {
             ..Options::default()
         });
 
-        let mut db = ProjectDatabase::new(metadata, system).unwrap();
+        let mut db = ProjectDatabase::new(metadata, system, &FailStrategy).unwrap();
 
         db.project().set_included_paths(
             &mut db,

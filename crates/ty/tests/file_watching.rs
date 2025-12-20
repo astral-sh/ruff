@@ -15,7 +15,9 @@ use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module_confident};
+use ty_python_semantic::{
+    FailStrategy, Module, ModuleName, PythonPlatform, resolve_module_confident,
+};
 
 struct TestCase {
     db: ProjectDatabase,
@@ -434,7 +436,7 @@ where
         }
     }
 
-    let mut db = ProjectDatabase::new(project, system)?;
+    let mut db = ProjectDatabase::new(project, system, &FailStrategy)?;
 
     if let Some(included_paths) = included_paths {
         db.project().set_included_paths(&mut db, included_paths);

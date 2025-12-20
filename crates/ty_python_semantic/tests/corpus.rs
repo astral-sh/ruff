@@ -8,8 +8,8 @@ use ruff_python_ast::PythonVersion;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
-    Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
+    FailStrategy, Program, ProgramSettings, PythonPlatform, PythonVersionSource,
+    PythonVersionWithSource, SearchPathSettings, default_lint_registry,
 };
 
 use test_case::test_case;
@@ -200,7 +200,7 @@ impl CorpusDb {
                 },
                 python_platform: PythonPlatform::default(),
                 search_paths: SearchPathSettings::new(vec![])
-                    .to_search_paths(db.system(), db.vendored())
+                    .to_search_paths(db.system(), db.vendored(), &FailStrategy)
                     .unwrap(),
             },
         );
