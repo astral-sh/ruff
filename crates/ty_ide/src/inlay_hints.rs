@@ -1,13 +1,19 @@
 use std::{fmt, vec};
 
+use rustc_hash::FxHashMap;
+
+use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
-use ruff_db::parsed::parsed_module;
+use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
+use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
+use ty_module_resolver::file_to_module;
 use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
@@ -19,69 +25,127 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
+    #[allow(clippy::too_many_arguments)]
     fn variable_type(
+        db: &dyn Db,
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
-        db: &dyn Db,
+        file: File,
+        parsed: &ParsedModuleRef,
         allow_edits: bool,
+        allow_auto_import: bool,
     ) -> Option<Self> {
         let position = expr.range().end();
-        // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
 
-        // Filter out a reptitive hints like `x: T = T()`
+        // Filter out repetitive hints like `x: T = T()`
         if call_matches_name(rhs, &details.label) {
             return None;
         }
 
-        // Ok so the idea here is that we potentially have a random soup of spans here,
-        // and each byte of the string can have at most one target associate with it.
-        // Thankfully, they were generally pushed in print order, with the inner smaller types
-        // appearing before the outer bigger ones.
-        //
-        // So we record where we are in the string, and every time we find a type, we
-        // check if it's further along in the string. If it is, great, we give it the
-        // span for its range, and then advance where we are.
+        // Set up auto-import infrastructure if needed
+        let source = source_text(db, file);
+        let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
+        let should_auto_import = details.is_valid_syntax && allow_edits && allow_auto_import;
+        let mut dynamic_importer = should_auto_import.then(|| {
+            let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
+            let members = importer.members_in_scope_at(expr.into(), expr.range().start());
+            DynamicImporter::new(importer, members)
+        });
+
+        // Track imports and build label
+        let original_label = details.label.clone();
         let mut offset = 0;
+
+        // This could be different from the original label if we need to
+        // qualify certain imported symbols. `A` could turn into `foo.A`.
+        let mut text_edit_label = details.label.clone();
+        let mut text_edit_offset = 0;
         let mut label_parts = vec![": ".into()];
+
         for (target, detail) in details.targets.iter().zip(&details.details) {
-            match detail {
-                TypeDetail::Type(ty) => {
-                    let start = target.start().to_usize();
-                    let end = target.end().to_usize();
-                    // If we skipped over some bytes, push them with no target
-                    if start > offset {
-                        label_parts.push(details.label[offset..start].into());
+            if let TypeDetail::Type(ty) = detail {
+                let start = target.start().to_usize();
+                let end = target.end().to_usize();
+
+                // Get the possible qualified label part
+                let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
+                    let type_definition = ty.definition(db)?;
+                    let definition = type_definition.definition()?;
+                    let definition_name = definition.name(db)?;
+
+                    // Don't try to import symbols in scope.
+                    if definition.file(db) == file {
+                        return None;
                     }
-                    // Ok, this is the first type that claimed these bytes, give it the target
-                    if start >= offset {
-                        let target = ty.navigation_targets(db).into_iter().next();
-                        label_parts.push(
-                            InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
-                        );
-                        offset = end;
+
+                    let module = file_to_module(db, definition.file(db))?;
+                    let module_name = module.name(db).as_str();
+
+                    if module_name == "builtins" {
+                        return None;
                     }
+
+                    dynamic_importer.import_symbol(
+                        module_name,
+                        &definition_name,
+                        &details.label[start..end],
+                    )
+                };
+
+                let text_edit_start = start + text_edit_offset;
+                let text_edit_end = end + text_edit_offset;
+
+                if start > offset {
+                    label_parts.push(original_label[offset..start].into());
                 }
-                TypeDetail::SignatureStart
-                | TypeDetail::SignatureEnd
-                | TypeDetail::Parameter(_) => {
-                    // Don't care about these
+
+                // Skip if this position was already claimed
+                if start >= offset {
+                    let nav_target = ty.navigation_targets(db).into_iter().next();
+
+                    // Update qualified_label for text edits if needed
+                    if let Some(qualified_label_part) =
+                        dynamic_importer.as_mut().and_then(qualified_label_part)
+                    {
+                        let old_len = text_edit_end - text_edit_start;
+                        let new_len = qualified_label_part.len();
+
+                        text_edit_label
+                            .replace_range(text_edit_start..text_edit_end, &qualified_label_part);
+                        text_edit_offset += new_len - old_len;
+                    }
+
+                    // Always use original text for the label part
+                    let label_text = &original_label[start..end];
+
+                    label_parts.push(InlayHintLabelPart::new(label_text).with_target(nav_target));
+                    offset = end;
                 }
             }
         }
-        // "flush" the rest of the label without any target
-        if offset < details.label.len() {
-            label_parts.push(details.label[offset..details.label.len()].into());
+
+        // Finish label by adding any remaining text
+        if offset < original_label.len() {
+            label_parts.push(original_label[offset..].into());
         }
 
+        // Build text edits
         let text_edits = if details.is_valid_syntax && allow_edits {
-            vec![InlayHintTextEdit {
+            let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!(": {}", details.label),
-            }]
+                new_text: format!(": {text_edit_label}"),
+            }];
+
+            if let Some(dynamic_importer) = dynamic_importer {
+                let import_edits = dynamic_importer.into_text_edits();
+                text_edits.extend(import_edits);
+            }
+
+            text_edits
         } else {
-            vec![]
+            Vec::new()
         };
 
         Some(Self {
@@ -211,9 +275,9 @@ pub fn inlay_hints(
     range: TextRange,
     settings: &InlayHintSettings,
 ) -> Vec<InlayHint> {
-    let mut visitor = InlayHintVisitor::new(db, file, range, settings);
-
     let ast = parsed_module(db, file).load(db);
+
+    let mut visitor = InlayHintVisitor::new(db, file, &ast, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -240,6 +304,7 @@ pub struct InlayHintSettings {
     /// ```
     pub call_argument_names: bool,
     // Add any new setting that enables additional inlays to `any_enabled`.
+    pub auto_import: bool,
 }
 
 impl InlayHintSettings {
@@ -253,13 +318,15 @@ impl Default for InlayHintSettings {
         Self {
             variable_types: true,
             call_argument_names: true,
+            auto_import: true,
         }
     }
 }
 
-struct InlayHintVisitor<'a, 'db> {
+struct InlayHintVisitor<'a, 'db, 'ast> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
+    ast: &'ast ParsedModuleRef,
     hints: Vec<InlayHint>,
     assignment_rhs: Option<&'a Expr>,
     range: TextRange,
@@ -267,11 +334,18 @@ struct InlayHintVisitor<'a, 'db> {
     in_no_edits_allowed: bool,
 }
 
-impl<'a, 'db> InlayHintVisitor<'a, 'db> {
-    fn new(db: &'db dyn Db, file: File, range: TextRange, settings: &'a InlayHintSettings) -> Self {
+impl<'a, 'db, 'ast> InlayHintVisitor<'a, 'db, 'ast> {
+    fn new(
+        db: &'db dyn Db,
+        file: File,
+        ast: &'ast ParsedModuleRef,
+        range: TextRange,
+        settings: &'a InlayHintSettings,
+    ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
+            ast,
             hints: Vec::new(),
             assignment_rhs: None,
             range,
@@ -289,7 +363,16 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
             return;
         }
 
-        if let Some(inlay_hint) = InlayHint::variable_type(expr, rhs, ty, self.db, allow_edits) {
+        if let Some(inlay_hint) = InlayHint::variable_type(
+            self.db,
+            expr,
+            rhs,
+            ty,
+            self.model.file(),
+            self.ast,
+            allow_edits,
+            self.settings.auto_import,
+        ) {
             self.hints.push(inlay_hint);
         }
     }
@@ -314,7 +397,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
+impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -511,6 +594,93 @@ fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
     name.starts_with('_') && !is_dunder
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+struct DynamicImportedMember {
+    module: String,
+    name: String,
+}
+
+struct DynamicImporter<'db> {
+    importer: Importer<'db>,
+    members: MembersInScope<'db>,
+
+    /// Imports that we have already resolved.
+    /// We store these imports so we don't create multiple imports for the same symbol.
+    dynamic_imports: FxHashMap<DynamicImportedMember, ImportAction>,
+}
+
+impl<'db> DynamicImporter<'db> {
+    fn new(importer: Importer<'db>, members: MembersInScope<'db>) -> Self {
+        Self {
+            importer,
+            members,
+            dynamic_imports: FxHashMap::default(),
+        }
+    }
+
+    /// Attempts to import a given symbol.
+    /// If the symbol in the text edit needs to be qualified, we return the qualified symbol text.
+    fn import_symbol(
+        &mut self,
+        module_name: &str,
+        definition_name: &str,
+        label_text: &str,
+    ) -> Option<String> {
+        use std::collections::hash_map::Entry;
+
+        let key = DynamicImportedMember {
+            module: module_name.to_string(),
+            name: definition_name.to_string(),
+        };
+
+        let qualified_name = |import_action: &ImportAction| {
+            if import_action.import().is_some() {
+                return None;
+            }
+
+            let symbol_text = import_action.symbol_text();
+
+            if symbol_text != label_text {
+                Some(symbol_text.to_string())
+            } else {
+                None
+            }
+        };
+
+        match self.dynamic_imports.entry(key) {
+            Entry::Vacant(entry) => {
+                let request = ImportRequest::import_from(module_name, definition_name);
+                let import_action = self.importer.import(request, &self.members);
+                let qualified_name = qualified_name(&import_action);
+
+                entry.insert(import_action);
+
+                qualified_name
+            }
+            Entry::Occupied(entry) => {
+                let import_action = entry.get();
+
+                qualified_name(import_action)
+            }
+        }
+    }
+
+    /// Builds the text edits from all collected imports.
+    fn into_text_edits(self) -> Vec<InlayHintTextEdit> {
+        self.dynamic_imports
+            .into_values()
+            .filter_map(|import_action| {
+                import_action.import().and_then(|edit| {
+                    edit.content().map(|content| InlayHintTextEdit {
+                        range: edit.range(),
+                        new_text: content.to_string(),
+                    })
+                })
+            })
+            .collect()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -630,17 +800,17 @@ mod tests {
                     hint_str.push_str(part.text());
                 }
 
-                for edit in hint.text_edits {
+                for edit in hint
+                    .text_edits
+                    .iter()
+                    .sorted_by_key(|edit| edit.range.start())
+                {
                     let start = edit.range.start().to_usize() + edit_offset;
                     let end = edit.range.end().to_usize() + edit_offset;
 
                     text_edit_buf.replace_range(start..end, &edit.new_text);
 
-                    if start == end {
-                        edit_offset += edit.new_text.len();
-                    } else {
-                        edit_offset += edit.new_text.len() - edit.range.len().to_usize();
-                    }
+                    edit_offset += edit.new_text.len() - edit.range.len().to_usize();
                 }
 
                 hint_str.push(']');
@@ -2071,6 +2241,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
 
         class A:
             def __init__(self, y):
@@ -2372,8 +2543,12 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
-
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                auto_import: false,
+            }), @r#"
         a[: list[Unknown | int]] = [1, 2]
         b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
@@ -3103,8 +3278,12 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
-
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                auto_import: false,
+            }), @r#"
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3270,8 +3449,12 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r#"
-
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                auto_import: false,
+            }), @r#"
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -4392,8 +4575,12 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(test.inlay_hints(), @"
-
+        assert_snapshot!(
+            test.inlay_hints_with_settings(&InlayHintSettings {
+                variable_types: true,
+                call_argument_names: true,
+                auto_import: false,
+            }), @r"
         from typing import List
 
         def foo(x: int): pass
@@ -5842,6 +6029,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from types import NoneType
 
         def branch(cond: int):
             if cond < 10:
@@ -6023,6 +6211,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from main import whatever
 
         class F:
             @property
@@ -7371,6 +7560,530 @@ mod tests {
             if isinstance(xyxy, list):
                 x: Top[list[Unknown]] = xyxy
         "#);
+    }
+
+    #[test]
+    fn test_auto_import_with_qualification_of_names() {
+        let mut test = inlay_hint_test(
+            "
+            import foo
+
+            a = foo.C().foo()
+            ",
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            "
+            import bar
+
+            class A[T]: ...
+
+            class B[T]: ...
+
+            class C:
+                def foo(self) -> B[A[bar.D[int, list[str | A[B[int]]]]]]:
+                    raise NotImplementedError
+                    ",
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            "
+            class D[T, U]: ...
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        import foo
+
+        a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:7
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |       ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class D[T, U]: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:9
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |         ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:11
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |           ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2802:7
+             |
+        2801 | @disjoint_base
+        2802 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2803 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:16
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:21
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                     ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:27
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                           ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:29
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                             ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:31
+          |
+        2 | import foo
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = foo.C().foo()
+          |                               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from bar import D
+
+        import foo
+
+        a: foo.B[foo.A[D[int, list[str | foo.A[foo.B[int]]]]]] = foo.C().foo()
+        "#);
+    }
+
+    #[test]
+    fn test_auto_import_with_update_import_from_statement() {
+        let mut test = inlay_hint_test(
+            "
+            from foo import C
+
+            a = C().foo()
+            ",
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            "
+            import bar
+
+            class A[T]: ...
+
+            class B[T]: ...
+
+            class C:
+                def foo(self) -> B[A[bar.D[int, list[str | A[B[int]]]]]]:
+                    raise NotImplementedError
+                    ",
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            "
+            class D[T, U]: ...
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from foo import C
+
+        a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:7
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |       ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class D[T, U]: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:9
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |         ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:11
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |           ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2802:7
+             |
+        2801 | @disjoint_base
+        2802 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2803 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:16
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:915:7
+            |
+        914 | @disjoint_base
+        915 | class str(Sequence[str]):
+            |       ^^^
+        916 |     """str(object='') -> str
+        917 |     str(bytes_or_buffer[, encoding[, errors]]) -> str
+            |
+        info: Source
+         --> main2.py:4:21
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                     ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:4:19
+          |
+        2 |             import bar
+        3 |
+        4 |             class A[T]: ...
+          |                   ^
+        5 |
+        6 |             class B[T]: ...
+          |
+        info: Source
+         --> main2.py:4:27
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                           ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo.py:6:19
+          |
+        4 |             class A[T]: ...
+        5 |
+        6 |             class B[T]: ...
+          |                   ^
+        7 |
+        8 |             class C:
+          |
+        info: Source
+         --> main2.py:4:29
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                             ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:4:31
+          |
+        2 | from foo import C
+        3 |
+        4 | a[: B[A[D[int, list[str | A[B[int]]]]]]] = C().foo()
+          |                               ^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from bar import D
+
+        from foo import C, B, A
+
+        a: B[A[D[int, list[str | A[B[int]]]]]] = C().foo()
+        "#);
+    }
+
+    #[test]
+    fn test_auto_import_() {
+        let mut test = inlay_hint_test(
+            "
+            from foo import D
+
+            class Baz: ...
+
+            a = D(Baz)
+            ",
+        );
+
+        test.with_extra_file(
+            "foo/__init__.py",
+            "
+            from foo.bar import D
+                    ",
+        );
+
+        test.with_extra_file(
+            "foo/bar.py",
+            "
+            class D[T]:
+                def __init__(self, x: type[T]):
+                    pass
+            ",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from foo import D
+
+        class Baz: ...
+
+        a[: D[Baz]] = D([x=]Baz)
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo/bar.py:2:19
+          |
+        2 |             class D[T]:
+          |                   ^
+        3 |                 def __init__(self, x: type[T]):
+        4 |                     pass
+          |
+        info: Source
+         --> main2.py:6:5
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |     ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:4:7
+          |
+        2 | from foo import D
+        3 |
+        4 | class Baz: ...
+          |       ^^^
+        5 |
+        6 | a = D(Baz)
+          |
+        info: Source
+         --> main2.py:6:7
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |       ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> foo/bar.py:3:36
+          |
+        2 |             class D[T]:
+        3 |                 def __init__(self, x: type[T]):
+          |                                    ^
+        4 |                     pass
+          |
+        info: Source
+         --> main2.py:6:18
+          |
+        4 | class Baz: ...
+        5 |
+        6 | a[: D[Baz]] = D([x=]Baz)
+          |                  ^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        import foo.bar
+
+        from foo import D
+
+        class Baz: ...
+
+        a: D[Baz] = D(Baz)
+        ");
     }
 
     struct InlayHintLocationDiagnostic {
