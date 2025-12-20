@@ -981,7 +981,7 @@ mod tests {
             .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
             .expect("Valid custom stdlib path");
         builder
-            .site_packages_path(db.system(), site_packages.clone())
+            .site_packages_path(db.system(), site_packages)
             .expect("Valid site-packages path");
         let search_paths = builder.build();
         db.set_search_paths(search_paths);

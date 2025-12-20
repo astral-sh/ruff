@@ -3,7 +3,6 @@ use std::sync::Arc;
 use crate::Db;
 use crate::python_platform::PythonPlatform;
 
-use crate::site_packages::SitePackagesDiscoveryError;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -351,17 +350,6 @@ pub enum SearchPathsValidationError {
     /// (This is only relevant for stdlib search paths.)
     #[error(transparent)]
     VersionsParseError(#[from] TypeshedVersionsParseError),
-
-    /// Failed to discover the site-packages for the configured virtual environment.
-    #[error("Failed to discover the site-packages directory")]
-    SitePackagesDiscovery(#[source] Box<SitePackagesDiscoveryError>),
-}
-
-impl SearchPathsValidationError {
-    /// Create a site-packages discovery error from any error type.
-    pub fn site_packages_discovery(error: SitePackagesDiscoveryError) -> Self {
-        Self::SitePackagesDiscovery(Box::new(error))
-    }
 }
 
 #[cfg(test)]
