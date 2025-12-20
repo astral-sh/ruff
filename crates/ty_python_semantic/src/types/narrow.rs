@@ -52,7 +52,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
-) -> Option<Type<'db>> {
+) -> Option<NarrowingConstraint<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
             if predicate.is_positive {
@@ -72,10 +72,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
     if let Some(constraints) = constraints {
-        constraints
-            .constraints
-            .get(&place)
-            .map(|constraint| constraint.clone().evaluate_type_constraint(db))
+        constraints.constraints.get(&place).cloned()
     } else {
         None
     }
@@ -351,7 +348,7 @@ impl<'db> Conjunction<'db> {
 ///   => `[Conjunction { constraint: A, typeguard: None }, Conjunction { constraint: object, typeguard: Some(B) }]`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
-struct NarrowingConstraint<'db> {
+pub(crate) struct NarrowingConstraint<'db> {
     /// Disjunction of conjunctions (DNF)
     disjuncts: SmallVec<[Conjunction<'db>; 1]>,
 }
@@ -360,7 +357,7 @@ impl get_size2::GetSize for NarrowingConstraint<'_> {}
 
 impl<'db> NarrowingConstraint<'db> {
     /// Create a constraint from a regular (non-`TypeGuard`) type
-    fn regular(constraint: Type<'db>) -> Self {
+    pub(crate) fn regular(constraint: Type<'db>) -> Self {
         Self {
             disjuncts: smallvec![Conjunction::regular(constraint)],
         }
@@ -373,10 +370,41 @@ impl<'db> NarrowingConstraint<'db> {
         }
     }
 
+    /// Merge two constraints, taking their intersection but respecting `TypeGuard` semantics
+    pub(crate) fn merge_constraint_and(&self, other: &Self, db: &'db dyn Db) -> Self {
+        let mut new_disjuncts = SmallVec::new();
+
+        // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
+        // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
+        for left_conj in &self.disjuncts {
+            for right_conj in &other.disjuncts {
+                if right_conj.typeguard.is_some() {
+                    // If the right conjunct has a TypeGuard, it "wins" the conjunction
+                    new_disjuncts.push(*right_conj);
+                } else {
+                    // Intersect the regular constraints
+                    let new_regular = IntersectionBuilder::new(db)
+                        .add_positive(left_conj.constraint)
+                        .add_positive(right_conj.constraint)
+                        .build();
+
+                    new_disjuncts.push(Conjunction {
+                        constraint: new_regular,
+                        typeguard: left_conj.typeguard,
+                    });
+                }
+            }
+        }
+
+        NarrowingConstraint {
+            disjuncts: new_disjuncts,
+        }
+    }
+
     /// Evaluate the type this effectively constrains to
     ///
     /// Forgets whether each constraint originated from a `TypeGuard` or not
-    fn evaluate_type_constraint(self, db: &'db dyn Db) -> Type<'db> {
+    pub(crate) fn evaluate_type_constraint(self, db: &'db dyn Db) -> Type<'db> {
         UnionType::from_elements(
             db,
             self.disjuncts
@@ -465,33 +493,7 @@ fn merge_constraints_and<'db>(
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get();
 
-                // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
-                // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
-                let mut new_disjuncts = SmallVec::new();
-
-                for left_conj in &into_constraint.disjuncts {
-                    for right_conj in &from_constraint.disjuncts {
-                        if right_conj.typeguard.is_some() {
-                            // If the right conjunct has a TypeGuard, it "wins" the conjunction
-                            new_disjuncts.push(*right_conj);
-                        } else {
-                            // Intersect the regular constraints
-                            let new_regular = IntersectionBuilder::new(db)
-                                .add_positive(left_conj.constraint)
-                                .add_positive(right_conj.constraint)
-                                .build();
-
-                            new_disjuncts.push(Conjunction {
-                                constraint: new_regular,
-                                typeguard: left_conj.typeguard,
-                            });
-                        }
-                    }
-                }
-
-                *entry.get_mut() = NarrowingConstraint {
-                    disjuncts: new_disjuncts,
-                };
+                entry.insert(into_constraint.merge_constraint_and(&from_constraint, db));
             }
             Entry::Vacant(entry) => {
                 entry.insert(from_constraint.clone());

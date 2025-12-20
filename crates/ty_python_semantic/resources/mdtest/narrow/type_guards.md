@@ -200,6 +200,27 @@ def _(a: Foo | Bar):
         reveal_type(a)  # revealed: Foo & ~Bar
 ```
 
+```py
+from typing import TypeGuard, reveal_type
+
+class P:
+    pass
+
+class A:
+    pass
+
+class B:
+    pass
+
+def is_b(val: object) -> TypeGuard[B]:
+    return isinstance(val, B)
+
+def _(x: P):
+    if isinstance(x, A) or is_b(x):
+        # currently reveals `(P & A) | (P & B)`, should reveal `(P & A) | B`
+        reveal_type(x)  # revealed: (P & A) | B
+```
+
 Attribute and subscript narrowing is supported:
 
 ```py
@@ -212,18 +233,16 @@ class C(Generic[T]):
 
 def _(a: tuple[Foo, Bar] | tuple[Bar, Foo], c: C[Any]):
     if reveal_type(guard_foo(a[1])):  # revealed: TypeGuard[Foo @ a[1]]
-        # TODO: Should be `tuple[Bar, Foo]`
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
         reveal_type(a[1])  # revealed: Foo
 
     if reveal_type(is_bar(a[0])):  # revealed: TypeIs[Bar @ a[0]]
-        # TODO: Should be `tuple[Bar, Bar & Foo]`
         reveal_type(a)  # revealed: tuple[Foo, Bar] | tuple[Bar, Foo]
         reveal_type(a[0])  # revealed: Bar
 
     if reveal_type(guard_foo(c.v)):  # revealed: TypeGuard[Foo @ c.v]
         reveal_type(c)  # revealed: C[Any]
-        reveal_type(c.v)  # revealed: Any & Foo
+        reveal_type(c.v)  # revealed: Foo
 
     if reveal_type(is_bar(c.v)):  # revealed: TypeIs[Bar @ c.v]
         reveal_type(c)  # revealed: C[Any]
@@ -347,7 +366,7 @@ def does_not_narrow_in_negative_case(a: Foo | Bar):
 
 def narrowed_type_must_be_exact(a: object, b: Baz):
     if guard_foo(b):
-        reveal_type(b)  # revealed: Baz & Foo
+        reveal_type(b)  # revealed: Foo
 
     if isinstance(a, Baz) and is_bar(a):
         reveal_type(a)  # revealed: Baz

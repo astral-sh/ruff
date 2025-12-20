@@ -65,7 +65,7 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::mro::{Mro, MroError, MroIterator};
-pub(crate) use crate::types::narrow::infer_narrowing_constraint;
+pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};

@@ -266,7 +266,7 @@ use crate::semantic_index::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
-use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
+use crate::types::{NarrowingConstraint, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
 
@@ -757,22 +757,11 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
-            .collect();
-
-        if constraint_tys.is_empty() {
-            base_ty
-        } else {
-            constraint_tys
-                .into_iter()
-                .rev()
-                .fold(
-                    IntersectionBuilder::new(db).add_positive(base_ty),
-                    IntersectionBuilder::add_positive,
-                )
-                .build()
-        }
+        self.filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
+            .fold(NarrowingConstraint::regular(base_ty), |acc, constraint| {
+                acc.merge_constraint_and(&constraint, db)
+            })
+            .evaluate_type_constraint(db)
     }
 }
 
