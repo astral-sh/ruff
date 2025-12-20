@@ -11,6 +11,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
+use ty_python_semantic::semantic_index::definition::Definition;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
     Completion as SemanticCompletion, KnownModule, ModuleName, NameKind, SemanticModel,
@@ -250,6 +251,9 @@ pub struct Completion<'db> {
     /// an unimported symbol. In that case, computing the
     /// type of all such symbols could be quite expensive.
     pub ty: Option<Type<'db>>,
+    /// The first reachable definition for this
+    /// completion, if available.
+    pub first_reachable_definition: Option<Definition<'db>>,
     /// The "kind" of this completion.
     ///
     /// When this is set, it takes priority over any kind
@@ -306,6 +310,7 @@ impl<'db> Completion<'db> {
             qualified: None,
             insert: None,
             ty: semantic.ty,
+            first_reachable_definition: semantic.first_reachable_definition,
             kind: None,
             module_name: None,
             import: None,
@@ -326,7 +331,7 @@ impl<'db> Completion<'db> {
         type CompletionKindVisitor<'db> =
             CycleDetector<CompletionKind, Type<'db>, Option<CompletionKind>>;
 
-        fn imp<'db>(
+        fn by_type<'db>(
             db: &'db dyn Db,
             ty: Type<'db>,
             visitor: &CompletionKindVisitor<'db>,
@@ -361,10 +366,10 @@ impl<'db> Completion<'db> {
                 Type::Union(union) => union
                     .elements(db)
                     .iter()
-                    .find_map(|&ty| imp(db, ty, visitor))?,
+                    .find_map(|&ty| by_type(db, ty, visitor))?,
                 Type::Intersection(intersection) => intersection
                     .iter_positive(db)
-                    .find_map(|ty| imp(db, ty, visitor))?,
+                    .find_map(|ty| by_type(db, ty, visitor))?,
                 Type::Dynamic(_)
                 | Type::Never
                 | Type::SpecialForm(_)
@@ -372,14 +377,45 @@ impl<'db> Completion<'db> {
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy => return None,
                 Type::TypeAlias(alias) => {
-                    visitor.visit(ty, || imp(db, alias.value_type(db), visitor))?
+                    visitor.visit(ty, || by_type(db, alias.value_type(db), visitor))?
                 }
             })
         }
-        self.kind.or_else(|| {
-            self.ty
-                .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
-        })
+
+        fn by_definition<'db>(db: &'db dyn Db, def: Definition<'db>) -> Option<CompletionKind> {
+            use ty_python_semantic::semantic_index::definition::DefinitionKind::*;
+            Some(match def.kind(db) {
+                Import(_) | ImportFrom(_) | ImportFromSubmodule(_) => CompletionKind::Module,
+                Function(_) => CompletionKind::Function,
+                Class(_) => CompletionKind::Class,
+                NamedExpression(_)
+                | Assignment(_)
+                | AnnotatedAssignment(_)
+                | AugmentedAssignment(_)
+                | For(_)
+                | Comprehension(_)
+                | VariadicPositionalParameter(_)
+                | VariadicKeywordParameter(_)
+                | Parameter(_)
+                | WithItem(_)
+                | MatchPattern(_)
+                | ExceptHandler(_)
+                | ParamSpec(_) => CompletionKind::Variable,
+                TypeVar(_) | TypeVarTuple(_) => CompletionKind::TypeParameter,
+                // Give up and defer to type.
+                StarImport(_) | TypeAlias(_) => return None,
+            })
+        }
+
+        self.kind
+            .or_else(|| {
+                self.first_reachable_definition
+                    .and_then(|def| by_definition(db, def))
+            })
+            .or_else(|| {
+                self.ty
+                    .and_then(|ty| by_type(db, ty, &CompletionKindVisitor::default()))
+            })
     }
 
     fn keyword(name: &str) -> Self {
@@ -388,6 +424,7 @@ impl<'db> Completion<'db> {
             qualified: None,
             insert: None,
             ty: None,
+            first_reachable_definition: None,
             kind: Some(CompletionKind::Keyword),
             module_name: None,
             import: None,
@@ -404,6 +441,7 @@ impl<'db> Completion<'db> {
             qualified: None,
             insert: None,
             ty: Some(ty),
+            first_reachable_definition: None,
             kind: Some(CompletionKind::Keyword),
             module_name: None,
             import: None,
@@ -1137,6 +1175,7 @@ fn add_function_arg_completions<'db>(
                 qualified: None,
                 insert,
                 ty: p.ty,
+                first_reachable_definition: None,
                 kind: Some(CompletionKind::Variable),
                 module_name: None,
                 import: None,
@@ -1324,6 +1363,7 @@ fn add_unimported_completions<'db>(
             qualified: Some(ast::name::Name::new(qualified)),
             insert: Some(import_action.symbol_text().into()),
             ty: None,
+            first_reachable_definition: None,
             kind: symbol.kind().to_completion_kind(),
             module_name: Some(module_name),
             import: import_action.import().cloned(),
@@ -7508,6 +7548,52 @@ TypedDi<CURSOR>
         );
     }
 
+    #[test]
+    fn local_variable_kind_string() {
+        let builder = completion_test_builder(
+            "\
+zqzqzq = 'Hello ty'
+zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.kinds().skip_auto_import().build().snapshot(),
+            @"zqzqzq :: Variable",
+        );
+    }
+
+    #[test]
+    fn local_variable_kind_int() {
+        let builder = completion_test_builder(
+            "\
+zqzqzq: int = 3
+zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.kinds().skip_auto_import().build().snapshot(),
+            @"zqzqzq :: Variable",
+        );
+    }
+
+    #[test]
+    fn local_variable_kind_class_and_rebind() {
+        let builder = completion_test_builder(
+            "\
+class zqzqzq: pass
+zqzqzq_var = zqzqzq
+zqzq<CURSOR>
+",
+        );
+        assert_snapshot!(
+            builder.kinds().skip_auto_import().build().snapshot(),
+            @r"
+        zqzqzq :: Class
+        zqzqzq_var :: Variable
+        ",
+        );
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///
@@ -7535,6 +7621,7 @@ TypedDi<CURSOR>
         type_signatures: bool,
         imports: bool,
         module_names: bool,
+        kinds: bool,
         // This doesn't seem like a "very complex" type to me... ---AG
         #[allow(clippy::type_complexity)]
         predicate: Option<Box<dyn Fn(&Completion) -> bool>>,
@@ -7568,6 +7655,7 @@ TypedDi<CURSOR>
                 type_signatures: self.type_signatures,
                 imports: self.imports,
                 module_names: self.module_names,
+                kinds: self.kinds,
             }
         }
 
@@ -7643,6 +7731,13 @@ TypedDi<CURSOR>
             self
         }
 
+        /// When set, the "completion kind" for each symbol is included
+        /// in the snapshot (if available).
+        fn kinds(mut self) -> CompletionTestBuilder {
+            self.kinds = true;
+            self
+        }
+
         /// Apply arbitrary filtering to completions.
         fn filter(
             mut self,
@@ -7674,6 +7769,9 @@ TypedDi<CURSOR>
         /// Whether module names should be included in the snapshot
         /// generated by `CompletionTest::snapshot`.
         module_names: bool,
+        /// Whether "completion kinds" should be included in the snapshot
+        /// generated by `CompletionTest::snapshot`.
+        kinds: bool,
     }
 
     impl<'db> CompletionTest<'db> {
@@ -7715,6 +7813,13 @@ TypedDi<CURSOR>
                             }
                         } else {
                             snapshot = format!("{snapshot} :: <no import edit>");
+                        }
+                    }
+                    if self.kinds {
+                        if let Some(kind) = c.kind(self.db) {
+                            snapshot = format!("{snapshot} :: {kind:?}");
+                        } else {
+                            snapshot = format!("{snapshot} :: <no completion kind>");
                         }
                     }
                     snapshot
@@ -7767,6 +7872,7 @@ TypedDi<CURSOR>
                 type_signatures: false,
                 imports: false,
                 module_names: false,
+                kinds: false,
                 predicate: None,
             }
         }
