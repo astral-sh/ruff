@@ -1451,6 +1451,222 @@ not_a_directory
     }
 
     #[test]
+    fn editable_installs_into_first_party_search_path() {
+        use crate::db::tests::TestDb;
+        use crate::settings::SearchPathSettings;
+
+        let mut db = TestDb::new();
+
+        let src = SystemPath::new("/src");
+        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
+        let site_packages_pth = venv_site_packages.join("foo.pth");
+        let editable_install_location = src.join("x/y/a.py");
+
+        db.write_files([
+            (&site_packages_pth, "/src/x/y/"),
+            (&editable_install_location, ""),
+        ])
+        .unwrap();
+
+        db.files()
+            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
+
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![venv_site_packages],
+            ..SearchPathSettings::new(vec![src.to_path_buf()])
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
+        db.set_search_paths(search_paths);
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "a"),
+            @r#"
+        [
+            Module::File("a", "editable", "/src/x/y/a.py", Module, None),
+        ]
+        "#,
+        );
+
+        let editable_root = db
+            .files()
+            .root(&db, &editable_install_location)
+            .expect("file root for editable install");
+
+        assert_eq!(editable_root.path(&db), src);
+    }
+
+    #[test]
+    fn multiple_site_packages_with_editables() {
+        use crate::db::tests::TestDb;
+        use crate::settings::SearchPathSettings;
+
+        let mut db = TestDb::new();
+
+        let venv_site_packages = SystemPathBuf::from("/venv-site-packages");
+        let site_packages_pth = venv_site_packages.join("foo.pth");
+        let system_site_packages = SystemPathBuf::from("/system-site-packages");
+        let editable_install_location = SystemPathBuf::from("/x/y/a.py");
+        let system_site_packages_location = system_site_packages.join("a.py");
+
+        db.memory_file_system()
+            .create_directory_all("/src")
+            .unwrap();
+        db.write_files([
+            (&site_packages_pth, "/x/y"),
+            (&editable_install_location, ""),
+            (&system_site_packages_location, ""),
+        ])
+        .unwrap();
+
+        db.files()
+            .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
+
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![venv_site_packages, system_site_packages],
+            ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
+        db.set_search_paths(search_paths);
+
+        // The editable installs discovered from the `.pth` file in the
+        // first `site-packages` directory take precedence over the
+        // second `site-packages` directory...
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "a"),
+            @r#"
+        [
+            Module::File("a", "editable", "/x/y/a.py", Module, None),
+        ]
+        "#,
+        );
+
+        db.memory_file_system()
+            .remove_file(&site_packages_pth)
+            .unwrap();
+        // NOTE: This is present in the test for the "resolve this
+        // module" implementation as well. It seems like it kind of
+        // defeats the point to me. Shouldn't this be the thing we're
+        // testing? ---AG
+        File::sync_path(&mut db, &site_packages_pth);
+
+        // ...But now that the `.pth` file in the first `site-packages`
+        // directory has been deleted, the editable install no longer
+        // exists, so the module now resolves to the file in the second
+        // `site-packages` directory
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "a"),
+            @r#"
+        [
+            Module::File("a", "site-packages", "/system-site-packages/a.py", Module, None),
+        ]
+        "#,
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
+        use crate::db::tests::TestDb;
+        use crate::settings::SearchPathSettings;
+        use anyhow::Context;
+
+        let temp_dir = tempfile::TempDir::with_prefix("PREFIX-SENTINEL")?;
+        let root = SystemPathBuf::from_path_buf(
+            temp_dir
+                .path()
+                .canonicalize()
+                .context("Failed to canonicalized path")?,
+        )
+        .expect("UTF8 path for temp dir");
+
+        let mut db = TestDb::new();
+
+        let src = root.join("src");
+        let a_package_target = root.join("a-package");
+        let a_src = src.join("a");
+
+        db.use_system(OsSystem::new(&root));
+
+        db.write_file(
+            a_package_target.join("__init__.py"),
+            "class Foo: x: int = 4",
+        )
+        .context("Failed to write `a-package/__init__.py`")?;
+
+        db.write_file(src.join("main.py"), "print('Hy')")
+            .context("Failed to write `main.py`")?;
+
+        // The symlink triggers the slow-path in the `OsSystem`'s
+        // `exists_path_case_sensitive` code because canonicalizing the path
+        // for `a/__init__.py` results in `a-package/__init__.py`
+        std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
+            .context("Failed to symlink `src/a` to `a-package`")?;
+
+        db.files().try_add_root(&db, &root, FileRootKind::Project);
+
+        let settings = SearchPathSettings::new(vec![src]);
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("valid search path settings");
+        db.set_search_paths(search_paths);
+
+        insta::with_settings!({
+            // Temporary directory often have random chars in them, so
+            // get rid of that part for a stable snapshot.
+            filters => [(r#""\S*PREFIX-SENTINEL.*?/"#, r#""/"#)],
+        }, {
+            insta::assert_debug_snapshot!(
+                list_snapshot_filter(&db, |m| matches!(m.name(&db).as_str(), "A" | "a")),
+                @r#"
+            [
+                Module::File("a", "first-party", "/src/a/__init__.py", Package, None),
+            ]
+            "#,
+            );
+        });
+
+        Ok(())
+    }
+
+    #[test]
+    fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
+        use crate::db::tests::TestDb;
+        use crate::settings::SearchPathSettings;
+
+        let project_directory = SystemPathBuf::from("/project");
+        let site_packages = project_directory.join(".venv/lib/python3.13/site-packages");
+        let installed_foo_module = site_packages.join("foo/__init__.py");
+
+        let mut db = TestDb::new();
+        db.write_file(&installed_foo_module, "").unwrap();
+
+        db.files()
+            .try_add_root(&db, &project_directory, FileRootKind::Project);
+
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![site_packages],
+            ..SearchPathSettings::new(vec![project_directory])
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .unwrap();
+        db.set_search_paths(search_paths);
+
+        insta::assert_debug_snapshot!(
+            list_snapshot_filter(&db, |m| m.name(&db).as_str() == "foo"),
+            @r#"
+        [
+            Module::File("foo", "site-packages", "/project/.venv/lib/python3.13/site-packages/foo/__init__.py", Package, None),
+        ]
+        "#,
+        );
+    }
+
+    #[test]
     fn namespace_package() {
         let TestCase { db, .. } = TestCaseBuilder::new()
             .with_src_files(&[("foo/bar.py", "")])
