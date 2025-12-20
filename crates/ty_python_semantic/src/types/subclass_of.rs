@@ -302,6 +302,35 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Compute the metatype of this `type[T]`.
+    ///
+    /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
+    /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
+    /// `TypeVar`'s bounds or constraints.
+    pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self.subclass_of.with_transposed_type_var(db) {
+            SubclassOfInner::Dynamic(dynamic) => {
+                SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic))
+            }
+            SubclassOfInner::Class(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
+                .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
+            // the bounds from instance types to `type[]` types. For example, `type[T]` where
+            // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
+            // then the metatype of that bound.
+            SubclassOfInner::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    // `with_transposed_type_var` always adds a bound for unbounded TypeVars
+                    None => unreachable!(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db).to_meta_type(db)
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.subclass_of
             .into_class(db)
