@@ -57,7 +57,6 @@ strsim = "0.11.1"
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ruff_python_parser = { workspace = true }
-ty_python_semantic = { workspace = true, features = ["testing"] }
 ty_static = { workspace = true }
 ty_test = { workspace = true }
 ty_vendored = { workspace = true }
@@ -74,7 +73,7 @@ quickcheck_macros = { version = "1.0.0" }
 [features]
 schemars = ["dep:schemars", "dep:serde_json"]
 serde = ["ruff_db/serde", "dep:serde", "ruff_python_ast/serde"]
-testing = ["ty_module_resolver/testing"]
+testing = []
 
 [[test]]
 name = "mdtest"

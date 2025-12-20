@@ -35,7 +35,7 @@ pub mod lint;
 pub(crate) mod list;
 mod node_key;
 pub(crate) mod place;
-pub mod program;
+mod program;
 mod python_platform;
 mod rank;
 pub mod semantic_index;

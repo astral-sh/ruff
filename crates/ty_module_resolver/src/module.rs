@@ -303,7 +303,7 @@ impl ModuleKind {
 
 /// Enumeration of various core stdlib modules in which important types are located
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, strum_macros::EnumString, get_size2::GetSize)]
-#[cfg_attr(any(test, feature = "testing"), derive(strum_macros::EnumIter))]
+#[cfg_attr(test, derive(strum_macros::EnumIter))]
 #[strum(serialize_all = "snake_case")]
 pub enum KnownModule {
     Builtins,
@@ -329,10 +329,8 @@ pub enum KnownModule {
     TyExtensions,
     #[strum(serialize = "importlib")]
     ImportLib,
-    #[cfg(any(test, feature = "testing"))]
     #[strum(serialize = "unittest.mock")]
     UnittestMock,
-    #[cfg(any(test, feature = "testing"))]
     Uuid,
     Warnings,
 }
@@ -359,9 +357,7 @@ impl KnownModule {
             Self::TyExtensions => "ty_extensions",
             Self::ImportLib => "importlib",
             Self::Warnings => "warnings",
-            #[cfg(any(test, feature = "testing"))]
             Self::UnittestMock => "unittest.mock",
-            #[cfg(any(test, feature = "testing"))]
             Self::Uuid => "uuid",
             Self::Templatelib => "string.templatelib",
         }
@@ -372,10 +368,7 @@ impl KnownModule {
             .unwrap_or_else(|| panic!("{self} should be a valid module name!"))
     }
 
-    pub fn try_from_search_path_and_name(
-        search_path: &SearchPath,
-        name: &ModuleName,
-    ) -> Option<Self> {
+    fn try_from_search_path_and_name(search_path: &SearchPath, name: &ModuleName) -> Option<Self> {
         if search_path.is_standard_library() {
             Self::from_str(name.as_str()).ok()
         } else {

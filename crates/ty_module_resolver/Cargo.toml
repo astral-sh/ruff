@@ -26,9 +26,6 @@ tracing = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 
-[features]
-testing = []
-
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing", "os"] }
 ty_vendored = { workspace = true }

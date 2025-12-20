@@ -13,8 +13,8 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
-pub use ty_module_resolver::{
-    SearchPath, SearchPathValidationError, SearchPaths, SearchPathsBuilder, TypeshedVersions,
+use ty_module_resolver::{
+    SearchPath, SearchPathValidationError, SearchPaths, SearchPathsBuilder,
     vendored_typeshed_versions,
 };
 

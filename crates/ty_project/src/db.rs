@@ -637,7 +637,7 @@ pub(crate) mod tests {
 
     #[salsa::db]
     impl ty_module_resolver::Db for TestDb {
-        fn search_paths(&self) -> &ty_python_semantic::program::SearchPaths {
+        fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
             Program::get(self).search_paths(self)
         }
     }

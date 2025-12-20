@@ -4560,7 +4560,6 @@ dependencies = [
  "thiserror 2.0.17",
  "tracing",
  "ty_module_resolver",
- "ty_python_semantic",
  "ty_static",
  "ty_test",
  "ty_vendored",

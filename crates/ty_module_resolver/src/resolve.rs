@@ -545,11 +545,6 @@ pub struct SearchPaths {
 }
 
 impl SearchPaths {
-    /// Creates a new `SearchPaths` builder using the vendored typeshed.
-    pub fn builder(vendored: &VendoredFileSystem) -> SearchPathsBuilder {
-        SearchPathsBuilder::new(vendored)
-    }
-
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
     /// This is primarily useful for testing.
