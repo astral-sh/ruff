@@ -12,12 +12,14 @@ pub use db::Db;
 pub use module::KnownModule;
 pub use module::Module;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
-pub use path::{SearchPath, SearchPathValidationError};
+pub use path::{SearchPath, SearchPathError};
 pub use resolve::{
     SearchPaths, SearchPathsBuilder, file_to_module, resolve_module, resolve_module_confident,
     resolve_real_module, resolve_real_module_confident, resolve_real_shadowable_module,
 };
-pub use typeshed::{PyVersionRange, TypeshedVersions, vendored_typeshed_versions};
+pub use typeshed::{
+    PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
+};
 
 pub use list::{all_modules, list_modules};
 pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};

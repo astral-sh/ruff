@@ -3,6 +3,7 @@ use std::sync::Arc;
 use crate::Db;
 use crate::python_platform::PythonPlatform;
 
+use crate::site_packages::SitePackagesDiscoveryError;
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
@@ -11,7 +12,9 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
-use ty_module_resolver::{SearchPathValidationError, SearchPaths, SearchPathsBuilder};
+use ty_module_resolver::{
+    SearchPathError, SearchPaths, SearchPathsBuilder, TypeshedVersionsParseError,
+};
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
@@ -226,7 +229,7 @@ impl SearchPathSettings {
         &self,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> Result<SearchPaths, SearchPathValidationError> {
+    ) -> Result<SearchPaths, SearchPathsValidationError> {
         fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
             system
                 .canonicalize_path(path)
@@ -252,7 +255,7 @@ impl SearchPathSettings {
                 if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                     tracing::debug!("Skipping invalid extra search-path: {err}");
                 } else {
-                    return Err(err);
+                    return Err(err.into());
                 }
             }
         }
@@ -263,7 +266,7 @@ impl SearchPathSettings {
                 if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                     tracing::debug!("Skipping invalid first-party search-path: {err}");
                 } else {
-                    return Err(err);
+                    return Err(err.into());
                 }
             }
         }
@@ -277,13 +280,13 @@ impl SearchPathSettings {
             let results = system
                 .read_to_string(&versions_path)
                 .map_err(
-                    |error| SearchPathValidationError::FailedToReadVersionsFile {
+                    |error| SearchPathsValidationError::FailedToReadVersionsFile {
                         path: versions_path,
                         error,
                     },
                 )
                 .and_then(|versions_content| Ok(versions_content.parse()?))
-                .and_then(|parsed| builder.custom_stdlib_path(system, &typeshed, parsed));
+                .and_then(|parsed| Ok(builder.custom_stdlib_path(system, &typeshed, parsed)?));
 
             if let Err(err) = results {
                 if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
@@ -303,7 +306,7 @@ impl SearchPathSettings {
                 if *misconfiguration_mode == MisconfigurationMode::UseDefault {
                     tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
                 } else {
-                    return Err(err);
+                    return Err(err.into());
                 }
             }
         }
@@ -314,12 +317,50 @@ impl SearchPathSettings {
                 if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
                     tracing::debug!("Skipping invalid site-packages search-path: {err}");
                 } else {
-                    return Err(err);
+                    return Err(err.into());
                 }
             }
         }
 
         Ok(builder.build())
+    }
+}
+
+/// Enumeration describing the various ways in which validation of the search paths options might fail.
+///
+/// If validation fails for a search path derived from the user settings,
+/// a message must be displayed to the user,
+/// as type checking cannot be done reliably in these circumstances.
+#[derive(Debug, thiserror::Error)]
+pub enum SearchPathsValidationError {
+    #[error(transparent)]
+    InvalidSearchPath(#[from] SearchPathError),
+
+    /// The typeshed path provided by the user is a directory,
+    /// but `stdlib/VERSIONS` could not be read.
+    /// (This is only relevant for stdlib search paths.)
+    #[error("Failed to read the custom typeshed versions file '{path}'")]
+    FailedToReadVersionsFile {
+        path: SystemPathBuf,
+        #[source]
+        error: std::io::Error,
+    },
+
+    /// The path provided by the user is a directory,
+    /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
+    /// (This is only relevant for stdlib search paths.)
+    #[error(transparent)]
+    VersionsParseError(#[from] TypeshedVersionsParseError),
+
+    /// Failed to discover the site-packages for the configured virtual environment.
+    #[error("Failed to discover the site-packages directory")]
+    SitePackagesDiscovery(#[source] Box<SitePackagesDiscoveryError>),
+}
+
+impl SearchPathsValidationError {
+    /// Create a site-packages discovery error from any error type.
+    pub fn site_packages_discovery(error: SitePackagesDiscoveryError) -> Self {
+        Self::SitePackagesDiscovery(Box::new(error))
     }
 }
 

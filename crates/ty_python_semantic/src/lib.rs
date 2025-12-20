@@ -12,7 +12,7 @@ pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{
     MisconfigurationMode, Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings,
+    PythonVersionWithSource, SearchPathSettings, SearchPathsValidationError,
 };
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;

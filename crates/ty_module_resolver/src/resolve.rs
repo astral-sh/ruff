@@ -638,7 +638,7 @@ impl SearchPathsBuilder {
         &mut self,
         system: &dyn System,
         root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathValidationError> {
+    ) -> Result<(), crate::path::SearchPathError> {
         self.static_paths.push(SearchPath::extra(system, root)?);
         Ok(())
     }
@@ -648,7 +648,7 @@ impl SearchPathsBuilder {
         &mut self,
         system: &dyn System,
         root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathValidationError> {
+    ) -> Result<(), crate::path::SearchPathError> {
         self.static_paths
             .push(SearchPath::first_party(system, root)?);
         Ok(())
@@ -660,7 +660,7 @@ impl SearchPathsBuilder {
         system: &dyn System,
         typeshed: &SystemPath,
         versions: TypeshedVersions,
-    ) -> Result<(), crate::path::SearchPathValidationError> {
+    ) -> Result<(), crate::path::SearchPathError> {
         self.stdlib_path = Some(SearchPath::custom_stdlib(system, typeshed)?);
         self.typeshed_versions = versions;
         Ok(())
@@ -676,7 +676,7 @@ impl SearchPathsBuilder {
         &mut self,
         system: &dyn System,
         root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathValidationError> {
+    ) -> Result<(), crate::path::SearchPathError> {
         self.real_stdlib_path = Some(SearchPath::real_stdlib(system, root)?);
         Ok(())
     }
@@ -686,7 +686,7 @@ impl SearchPathsBuilder {
         &mut self,
         system: &dyn System,
         root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathValidationError> {
+    ) -> Result<(), crate::path::SearchPathError> {
         self.site_packages
             .push(SearchPath::site_packages(system, root)?);
         Ok(())
