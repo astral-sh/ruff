@@ -8,7 +8,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
     MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, todo_type,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -79,6 +79,18 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        // Handle unions by distributing `type[]` over each element:
+        // `type[A | B]` -> `type[A] | type[B]`
+        if let Type::Union(union) = ty {
+            return UnionType::try_from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| Self::try_from_instance(db, *element)),
+            );
+        }
+
         SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 

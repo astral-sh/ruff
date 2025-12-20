@@ -1179,6 +1179,34 @@ def _(
     reveal_type(subclass_of_p)  # revealed: type[P]
 ```
 
+Using `type[]` with a union type alias distributes the `type[]` over the union elements:
+
+```py
+from typing import Union
+
+class C: ...
+class D: ...
+
+UnionAlias1 = C | D
+UnionAlias2 = Union[C, D]
+
+SubclassOfUnionAlias1 = type[UnionAlias1]
+SubclassOfUnionAlias2 = type[UnionAlias2]
+
+reveal_type(SubclassOfUnionAlias1)  # revealed: <special-form 'type[C | D]'>
+reveal_type(SubclassOfUnionAlias2)  # revealed: <special-form 'type[C | D]'>
+
+def _(
+    subclass_of_union_alias1: SubclassOfUnionAlias1,
+    subclass_of_union_alias2: SubclassOfUnionAlias2,
+):
+    reveal_type(subclass_of_union_alias1)  # revealed: type[C] | type[D]
+    reveal_type(subclass_of_union_alias1())  # revealed: C | D
+
+    reveal_type(subclass_of_union_alias2)  # revealed: type[C] | type[D]
+    reveal_type(subclass_of_union_alias2())  # revealed: C | D
+```
+
 Invalid uses result in diagnostics:
 
 ```py
