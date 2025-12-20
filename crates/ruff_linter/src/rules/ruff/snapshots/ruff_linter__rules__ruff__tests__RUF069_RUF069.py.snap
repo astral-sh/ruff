@@ -1,0 +1,36 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF069 `__all__` contains duplicated entries
+ --> RUF069.py:2:17
+  |
+1 | __all__ = ["A", "B"]
+2 | __all__ = ["A", "A", "B"]
+  |                 ^^^
+3 | __all__ = ["A", "A", "B", "B"]
+  |
+help: Remove duplicated entries in `__all__`
+
+RUF069 `__all__` contains duplicated entries
+ --> RUF069.py:3:17
+  |
+1 | __all__ = ["A", "B"]
+2 | __all__ = ["A", "A", "B"]
+3 | __all__ = ["A", "A", "B", "B"]
+  |                 ^^^
+4 |
+5 | class A: ...
+  |
+help: Remove duplicated entries in `__all__`
+
+RUF069 `__all__` contains duplicated entries
+ --> RUF069.py:3:27
+  |
+1 | __all__ = ["A", "B"]
+2 | __all__ = ["A", "A", "B"]
+3 | __all__ = ["A", "A", "B", "B"]
+  |                           ^^^
+4 |
+5 | class A: ...
+  |
+help: Remove duplicated entries in `__all__`

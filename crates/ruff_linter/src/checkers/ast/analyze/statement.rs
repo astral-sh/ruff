@@ -1434,6 +1434,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_assign(checker, assign);
             }
+            if checker.is_rule_enabled(Rule::DuplicateEntryInDunderAll) {
+                ruff::rules::duplicate_entry_in_dunder_all(checker, assign);
+            }
             if checker.source_type.is_stub() {
                 if checker.any_rule_enabled(&[
                     Rule::UnprefixedTypeParam,
