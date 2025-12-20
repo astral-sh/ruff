@@ -73,64 +73,74 @@ impl InlayHint {
         let mut label_parts = vec![": ".into()];
 
         for (target, detail) in details.targets.iter().zip(&details.details) {
-            if let TypeDetail::Type(ty) = detail {
-                let start = target.start().to_usize();
-                let end = target.end().to_usize();
+            match detail {
+                TypeDetail::Type(ty) => {
+                    let start = target.start().to_usize();
+                    let end = target.end().to_usize();
 
-                // If we skipped over some bytes, push them with no target
-                if start > offset {
-                    label_parts.push(original_label[offset..start].into());
+                    // If we skipped over some bytes, push them with no target
+                    if start > offset {
+                        label_parts.push(original_label[offset..start].into());
+                    }
+
+                    // Get the possible qualified label part
+                    let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
+                        let type_definition = ty.definition(db)?;
+                        let definition = type_definition.definition()?;
+                        let definition_name = definition.name(db)?;
+
+                        // Don't try to import symbols in scope.
+                        if definition.file(db) == file {
+                            return None;
+                        }
+
+                        let module = file_to_module(db, definition.file(db))?;
+                        let module_name = module.name(db).as_str();
+
+                        if module_name == "builtins" {
+                            return None;
+                        }
+
+                        dynamic_importer.import_symbol(
+                            module_name,
+                            &definition_name,
+                            &details.label[start..end],
+                        )
+                    };
+
+                    let text_edit_start = start + text_edit_offset;
+                    let text_edit_end = end + text_edit_offset;
+
+                    // Ok, this is the first type that claimed these bytes, give it the target
+                    if start >= offset {
+                        let nav_target = ty.navigation_targets(db).into_iter().next();
+
+                        // Update qualified_label for text edits if needed
+                        if let Some(qualified_label_part) =
+                            dynamic_importer.as_mut().and_then(qualified_label_part)
+                        {
+                            let old_len = text_edit_end - text_edit_start;
+                            let new_len = qualified_label_part.len();
+
+                            text_edit_label.replace_range(
+                                text_edit_start..text_edit_end,
+                                &qualified_label_part,
+                            );
+                            text_edit_offset += new_len - old_len;
+                        }
+
+                        // Always use original text for the label part
+                        let label_text = &original_label[start..end];
+
+                        label_parts
+                            .push(InlayHintLabelPart::new(label_text).with_target(nav_target));
+                        offset = end;
+                    }
                 }
-
-                // Get the possible qualified label part
-                let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
-                    let type_definition = ty.definition(db)?;
-                    let definition = type_definition.definition()?;
-                    let definition_name = definition.name(db)?;
-
-                    // Don't try to import symbols in scope.
-                    if definition.file(db) == file {
-                        return None;
-                    }
-
-                    let module = file_to_module(db, definition.file(db))?;
-                    let module_name = module.name(db).as_str();
-
-                    if module_name == "builtins" {
-                        return None;
-                    }
-
-                    dynamic_importer.import_symbol(
-                        module_name,
-                        &definition_name,
-                        &details.label[start..end],
-                    )
-                };
-
-                let text_edit_start = start + text_edit_offset;
-                let text_edit_end = end + text_edit_offset;
-
-                // Ok, this is the first type that claimed these bytes, give it the target
-                if start >= offset {
-                    let nav_target = ty.navigation_targets(db).into_iter().next();
-
-                    // Update qualified_label for text edits if needed
-                    if let Some(qualified_label_part) =
-                        dynamic_importer.as_mut().and_then(qualified_label_part)
-                    {
-                        let old_len = text_edit_end - text_edit_start;
-                        let new_len = qualified_label_part.len();
-
-                        text_edit_label
-                            .replace_range(text_edit_start..text_edit_end, &qualified_label_part);
-                        text_edit_offset += new_len - old_len;
-                    }
-
-                    // Always use original text for the label part
-                    let label_text = &original_label[start..end];
-
-                    label_parts.push(InlayHintLabelPart::new(label_text).with_target(nav_target));
-                    offset = end;
+                TypeDetail::SignatureStart
+                | TypeDetail::SignatureEnd
+                | TypeDetail::Parameter(_) => {
+                    // Don't care about these
                 }
             }
         }
