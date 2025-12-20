@@ -9,10 +9,10 @@ use crate::checkers::ast::Checker;
 use crate::{FixAvailability, Violation};
 
 /// ## What it does
-/// Checks for `__all__` definitions that contains duplicated elements.
+/// Detects duplicate elements in `__all__` definitions.
 ///
 /// ## Why is this bad?
-/// Duplicated elements are likely a mistake.
+/// Duplicate elements are usually mistakes.
 ///
 /// ## Example
 /// ```python
@@ -42,11 +42,11 @@ impl Violation for DuplicateEntryInDunderAll {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        "`__all__` contains duplicated entries".to_string()
+        "`__all__` contains duplicate entries".to_string()
     }
 
     fn fix_title(&self) -> Option<String> {
-        Some("Remove duplicate entries to `__all__`".to_string())
+        Some("Remove duplicate entries from `__all__`".to_string())
     }
 }
 

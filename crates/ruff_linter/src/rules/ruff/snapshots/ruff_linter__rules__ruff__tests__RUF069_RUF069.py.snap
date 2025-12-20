@@ -1,7 +1,7 @@
 ---
 source: crates/ruff_linter/src/rules/ruff/mod.rs
 ---
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
  --> RUF069.py:2:17
   |
 1 | __all__ = ["A", "B"]
@@ -10,7 +10,7 @@ RUF069 [*] `__all__` contains duplicated entries
 3 | __all__ = ["A", "B", "A"]
 4 | __all__ = ["A", "A", "B", "B"]
   |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 1 | __all__ = ["A", "B"]
   - __all__ = ["A", "A", "B"]
 2 + __all__ = ["A", "B"]
@@ -18,7 +18,7 @@ help: Remove duplicate entries to `__all__`
 4 | __all__ = ["A", "A", "B", "B"]
 5 | __all__ = [
 
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
  --> RUF069.py:3:22
   |
 1 | __all__ = ["A", "B"]
@@ -28,7 +28,7 @@ RUF069 [*] `__all__` contains duplicated entries
 4 | __all__ = ["A", "A", "B", "B"]
 5 | __all__ = [
   |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 1 | __all__ = ["A", "B"]
 2 | __all__ = ["A", "A", "B"]
   - __all__ = ["A", "B", "A"]
@@ -37,7 +37,7 @@ help: Remove duplicate entries to `__all__`
 5 | __all__ = [
 6 |     "A",
 
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
  --> RUF069.py:4:17
   |
 2 | __all__ = ["A", "A", "B"]
@@ -47,7 +47,7 @@ RUF069 [*] `__all__` contains duplicated entries
 5 | __all__ = [
 6 |     "A",
   |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 1 | __all__ = ["A", "B"]
 2 | __all__ = ["A", "A", "B"]
 3 | __all__ = ["A", "B", "A"]
@@ -57,7 +57,7 @@ help: Remove duplicate entries to `__all__`
 6 |     "A",
 7 |     "A",
 
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
  --> RUF069.py:4:27
   |
 2 | __all__ = ["A", "A", "B"]
@@ -67,7 +67,7 @@ RUF069 [*] `__all__` contains duplicated entries
 5 | __all__ = [
 6 |     "A",
   |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 1 | __all__ = ["A", "B"]
 2 | __all__ = ["A", "A", "B"]
 3 | __all__ = ["A", "B", "A"]
@@ -77,7 +77,7 @@ help: Remove duplicate entries to `__all__`
 6 |     "A",
 7 |     "A",
 
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
  --> RUF069.py:7:5
   |
 5 | __all__ = [
@@ -87,7 +87,7 @@ RUF069 [*] `__all__` contains duplicated entries
 8 |     "B",
 9 |     # Comment
   |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 4 | __all__ = ["A", "A", "B", "B"]
 5 | __all__ = [
 6 |     "A",
@@ -96,7 +96,7 @@ help: Remove duplicate entries to `__all__`
 8 |     # Comment
 9 |     "B"
 
-RUF069 [*] `__all__` contains duplicated entries
+RUF069 [*] `__all__` contains duplicate entries
   --> RUF069.py:10:5
    |
  8 |     "B",
@@ -105,7 +105,7 @@ RUF069 [*] `__all__` contains duplicated entries
    |     ^^^
 11 | ]
    |
-help: Remove duplicate entries to `__all__`
+help: Remove duplicate entries from `__all__`
 7  |     "A",
 8  |     "B",
 9  |     # Comment
