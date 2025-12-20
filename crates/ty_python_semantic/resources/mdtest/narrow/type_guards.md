@@ -217,7 +217,6 @@ def is_b(val: object) -> TypeGuard[B]:
 
 def _(x: P):
     if isinstance(x, A) or is_b(x):
-        # currently reveals `(P & A) | (P & B)`, should reveal `(P & A) | B`
         reveal_type(x)  # revealed: (P & A) | B
 ```
 
