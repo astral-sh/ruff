@@ -353,7 +353,7 @@ impl<'db> Conjunction<'db> {
 #[derive(Hash, PartialEq, Debug, Eq, Clone)]
 struct NarrowingConstraint<'db> {
     /// Disjunction of conjunctions (DNF)
-    disjuncts: SmallVec<[Conjunction<'db>; 4]>,
+    disjuncts: SmallVec<[Conjunction<'db>; 1]>,
 }
 
 impl get_size2::GetSize for NarrowingConstraint<'_> {}
@@ -528,10 +528,8 @@ fn merge_constraints_or<'db>(
                     .disjuncts
                     .extend(from_constraint.disjuncts.clone());
             }
-            Entry::Vacant(entry) => {
-                // Place only appears in `from`, not in `into`.
-                // Widen to object since the other branch doesn't constrain it.
-                entry.insert(NarrowingConstraint::regular(Type::object()));
+            Entry::Vacant(_) => {
+                // Place only appears in `from`, not in `into`. No constraint needed.
             }
         }
     }
