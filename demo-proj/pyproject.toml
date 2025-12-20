@@ -1,6 +1,11 @@
 [tool.ruff.lint]
-select = ["I"]
+select = [
+    "I",
+    "E",
+    "W",
+]
 
+extend-safe-fixes = ["E402"]
 
 [tool.ruff.lint.isort]
 combine-as-imports = true
