@@ -403,9 +403,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,

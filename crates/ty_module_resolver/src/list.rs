@@ -386,11 +386,10 @@ mod tests {
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
     use crate::resolve::{
-        ModuleResolveMode, ModuleResolveModeIngredient, SearchPathsBuilder,
-        dynamic_resolution_paths,
+        ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
+    use crate::settings::SearchPathSettings;
     use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::typeshed::TypeshedVersions;
 
     use super::list_modules;
 
@@ -960,30 +959,16 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        let stdlib = custom_typeshed.join("stdlib");
-
-        // Build search paths using the builder
-        let versions_content =
-            std::fs::read_to_string(stdlib.join("VERSIONS").as_std_path()).unwrap_or_default();
-        let typeshed_versions: TypeshedVersions = versions_content.parse().unwrap_or_else(|_| {
-            // Empty VERSIONS file - use vendored typeshed versions as fallback
-            SearchPathsBuilder::new(db.vendored())
-                .build()
-                .typeshed_versions()
-                .clone()
-        });
-
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), src.clone())
-            .expect("Valid first-party path");
-        builder
-            .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
-            .expect("Valid custom stdlib path");
-        builder
-            .site_packages_path(db.system(), site_packages)
-            .expect("Valid site-packages path");
-        let search_paths = builder.build();
+        // Build search paths using SearchPathSettings
+        let settings = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            custom_typeshed: Some(custom_typeshed),
+            site_packages_paths: vec![site_packages],
+            ..SearchPathSettings::empty()
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
         // Register file roots for Salsa tracking
@@ -1599,11 +1584,10 @@ not_a_directory
         db.files()
             .try_add_root(&db, SystemPath::new("/"), FileRootKind::Project);
 
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), project_directory)
-            .expect("Valid first-party path");
-        let search_paths = builder.build();
+        let settings = SearchPathSettings::new(vec![project_directory]);
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
         insta::assert_debug_snapshot!(

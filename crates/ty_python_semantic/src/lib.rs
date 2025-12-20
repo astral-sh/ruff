@@ -11,8 +11,7 @@ use crate::suppression::{
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{
-    MisconfigurationMode, Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SearchPathsValidationError,
+    Program, ProgramSettings, PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource,
 };
 pub use python_platform::PythonPlatform;
 use rustc_hash::FxHasher;
@@ -21,6 +20,7 @@ pub use semantic_model::{
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
 pub use suppression::create_suppression_fix;
+pub use ty_module_resolver::MisconfigurationMode;
 pub use types::DisplaySettings;
 pub use types::ide_support::{
     ImportAliasResolution, ResolvedDefinition, definitions_for_attribute, definitions_for_bin_op,

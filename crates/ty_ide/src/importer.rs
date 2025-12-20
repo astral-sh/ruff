@@ -881,10 +881,10 @@ mod tests {
     use ruff_python_codegen::Stylist;
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::TextSize;
+    use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
     use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-        SemanticModel,
+        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SemanticModel,
     };
 
     use super::*;

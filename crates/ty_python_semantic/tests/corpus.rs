@@ -5,11 +5,12 @@ use ruff_db::system::{DbWithTestSystem, System, SystemPath, SystemPathBuf, TestS
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::PythonVersion;
 
+use ty_module_resolver::SearchPathSettings;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::{
     Program, ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-    SearchPathSettings, default_lint_registry,
+    default_lint_registry,
 };
 
 use test_case::test_case;

@@ -531,10 +531,9 @@ pub(crate) mod tests {
     use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};

@@ -29,11 +29,12 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
 use ty_module_resolver::SearchPaths;
+use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
-    SearchPathsValidationError, SitePackagesPaths, SysPrefixPathOrigin,
+    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
+    SysPrefixPathOrigin,
 };
 use ty_static::EnvVars;
 
@@ -259,7 +260,7 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathsValidationError> {
+    ) -> Result<SearchPaths, SearchPathSettingsError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 

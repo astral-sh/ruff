@@ -14,9 +14,10 @@ pub use module::Module;
 pub use module_name::{ModuleName, ModuleNameResolutionError};
 pub use path::{SearchPath, SearchPathError};
 pub use resolve::{
-    SearchPaths, SearchPathsBuilder, file_to_module, resolve_module, resolve_module_confident,
-    resolve_real_module, resolve_real_module_confident, resolve_real_shadowable_module,
+    SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
+    resolve_real_module_confident, resolve_real_shadowable_module,
 };
+pub use settings::{MisconfigurationMode, SearchPathSettings, SearchPathSettingsError};
 pub use typeshed::{
     PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
 };
@@ -30,6 +31,7 @@ mod module;
 mod module_name;
 mod path;
 mod resolve;
+mod settings;
 mod typeshed;
 
 #[cfg(test)]

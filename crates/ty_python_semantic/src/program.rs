@@ -5,15 +5,12 @@ use crate::python_platform::PythonPlatform;
 
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
-use ty_module_resolver::{
-    SearchPathError, SearchPaths, SearchPathsBuilder, TypeshedVersionsParseError,
-};
+use ty_module_resolver::SearchPaths;
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
@@ -165,193 +162,6 @@ impl Default for PythonVersionWithSource {
     }
 }
 
-#[derive(PartialEq, Eq, Debug, Copy, Clone, get_size2::GetSize)]
-pub enum MisconfigurationMode {
-    /// Settings Failure Is Not An Error.
-    ///
-    /// This is used by the default database, which we are incentivized to make infallible,
-    /// while still trying to "do our best" to set things up properly where we can.
-    UseDefault,
-    /// Settings Failure Is An Error.
-    Fail,
-}
-
-/// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct SearchPathSettings {
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<SystemPathBuf>,
-
-    /// The root of the project, used for finding first-party modules.
-    pub src_roots: Vec<SystemPathBuf>,
-
-    /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
-    /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
-    /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
-
-    /// List of site packages paths to use.
-    pub site_packages_paths: Vec<SystemPathBuf>,
-
-    /// Option path to the real stdlib on the system, and not some instance of typeshed.
-    ///
-    /// We should ideally only ever use this for things like goto-definition,
-    /// where typeshed isn't the right answer.
-    pub real_stdlib_path: Option<SystemPathBuf>,
-
-    /// How to handle apparent misconfiguration
-    pub misconfiguration_mode: MisconfigurationMode,
-}
-
-impl SearchPathSettings {
-    pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
-        Self {
-            src_roots,
-            ..SearchPathSettings::empty()
-        }
-    }
-
-    pub fn empty() -> Self {
-        SearchPathSettings {
-            src_roots: vec![],
-            extra_paths: vec![],
-            custom_typeshed: None,
-            site_packages_paths: vec![],
-            real_stdlib_path: None,
-            misconfiguration_mode: MisconfigurationMode::Fail,
-        }
-    }
-
-    pub fn to_search_paths(
-        &self,
-        system: &dyn System,
-        vendored: &VendoredFileSystem,
-    ) -> Result<SearchPaths, SearchPathsValidationError> {
-        fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
-            system
-                .canonicalize_path(path)
-                .unwrap_or_else(|_| path.to_path_buf())
-        }
-
-        let SearchPathSettings {
-            extra_paths,
-            src_roots,
-            custom_typeshed: typeshed,
-            site_packages_paths,
-            real_stdlib_path,
-            misconfiguration_mode,
-        } = self;
-
-        let mut builder = SearchPathsBuilder::new(vendored);
-
-        for path in extra_paths {
-            let path = canonicalize(path, system);
-            tracing::debug!("Adding extra search-path `{path}`");
-
-            if let Err(err) = builder.extra_path(system, path) {
-                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Skipping invalid extra search-path: {err}");
-                } else {
-                    return Err(err.into());
-                }
-            }
-        }
-
-        for src_root in src_roots {
-            tracing::debug!("Adding first-party search path `{src_root}`");
-            if let Err(err) = builder.first_party_path(system, src_root.to_path_buf()) {
-                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Skipping invalid first-party search-path: {err}");
-                } else {
-                    return Err(err.into());
-                }
-            }
-        }
-
-        if let Some(typeshed) = typeshed {
-            let typeshed = canonicalize(typeshed, system);
-            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
-
-            let versions_path = typeshed.join("stdlib/VERSIONS");
-
-            let results = system
-                .read_to_string(&versions_path)
-                .map_err(
-                    |error| SearchPathsValidationError::FailedToReadVersionsFile {
-                        path: versions_path,
-                        error,
-                    },
-                )
-                .and_then(|versions_content| Ok(versions_content.parse()?))
-                .and_then(|parsed| Ok(builder.custom_stdlib_path(system, &typeshed, parsed)?));
-
-            if let Err(err) = results {
-                if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Skipping custom-stdlib search-path: {err}");
-                    builder.vendored_stdlib_path();
-                } else {
-                    return Err(err);
-                }
-            }
-        } else {
-            tracing::debug!("Using vendored stdlib");
-            builder.vendored_stdlib_path();
-        }
-
-        if let Some(path) = real_stdlib_path {
-            if let Err(err) = builder.real_stdlib_path(system, path.clone()) {
-                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                } else {
-                    return Err(err.into());
-                }
-            }
-        }
-
-        for path in site_packages_paths {
-            tracing::debug!("Adding site-packages search path `{path}`");
-            if let Err(err) = builder.site_packages_path(system, path.clone()) {
-                if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                    tracing::debug!("Skipping invalid site-packages search-path: {err}");
-                } else {
-                    return Err(err.into());
-                }
-            }
-        }
-
-        Ok(builder.build())
-    }
-}
-
-/// Enumeration describing the various ways in which validation of the search paths options might fail.
-///
-/// If validation fails for a search path derived from the user settings,
-/// a message must be displayed to the user,
-/// as type checking cannot be done reliably in these circumstances.
-#[derive(Debug, thiserror::Error)]
-pub enum SearchPathsValidationError {
-    #[error(transparent)]
-    InvalidSearchPath(#[from] SearchPathError),
-
-    /// The typeshed path provided by the user is a directory,
-    /// but `stdlib/VERSIONS` could not be read.
-    /// (This is only relevant for stdlib search paths.)
-    #[error("Failed to read the custom typeshed versions file '{path}'")]
-    FailedToReadVersionsFile {
-        path: SystemPathBuf,
-        #[source]
-        error: std::io::Error,
-    },
-
-    /// The path provided by the user is a directory,
-    /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
-    /// (This is only relevant for stdlib search paths.)
-    #[error(transparent)]
-    VersionsParseError(#[from] TypeshedVersionsParseError),
-}
-
 #[cfg(test)]
 mod tests {
     use ruff_db::Db as _;
@@ -359,8 +169,9 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem as _, DbWithWritableSystem as _, SystemPathBuf};
 
     use crate::db::tests::TestDb;
-    use crate::program::{Program, SearchPathSettings};
+    use crate::program::Program;
     use crate::{ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_module_resolver::SearchPathSettings;
     use ty_module_resolver::{ModuleName, resolve_module_confident};
 
     #[test]

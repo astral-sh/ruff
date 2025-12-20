@@ -545,6 +545,186 @@ pub struct SearchPaths {
 }
 
 impl SearchPaths {
+    /// Validate and normalize the raw settings given by the user
+    /// into settings we can use for module resolution
+    ///
+    /// This method also implements the typing spec's [module resolution order].
+    ///
+    /// [module resolution order]: https://typing.python.org/en/latest/spec/distributing.html#import-resolution-ordering
+    pub fn from_settings(
+        settings: &crate::settings::SearchPathSettings,
+        system: &dyn System,
+        vendored: &VendoredFileSystem,
+    ) -> Result<Self, crate::settings::SearchPathSettingsError> {
+        use crate::settings::{MisconfigurationMode, SearchPathSettingsError};
+        use rustc_hash::{FxBuildHasher, FxHashSet};
+
+        fn canonicalize(path: &SystemPath, system: &dyn System) -> SystemPathBuf {
+            system
+                .canonicalize_path(path)
+                .unwrap_or_else(|_| path.to_path_buf())
+        }
+
+        let crate::settings::SearchPathSettings {
+            extra_paths,
+            src_roots,
+            custom_typeshed: typeshed,
+            site_packages_paths,
+            real_stdlib_path,
+            misconfiguration_mode,
+        } = settings;
+
+        let mut static_paths = vec![];
+
+        for path in extra_paths {
+            let path = canonicalize(path, system);
+            tracing::debug!("Adding extra search-path `{path}`");
+
+            match SearchPath::extra(system, path) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid extra search-path: {err}");
+                    } else {
+                        return Err(err.into());
+                    }
+                }
+            }
+        }
+
+        for src_root in src_roots {
+            tracing::debug!("Adding first-party search path `{src_root}`");
+            match SearchPath::first_party(system, src_root.to_path_buf()) {
+                Ok(path) => static_paths.push(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid first-party search-path: {err}");
+                    } else {
+                        return Err(err.into());
+                    }
+                }
+            }
+        }
+
+        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
+            let typeshed = canonicalize(typeshed, system);
+            tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
+
+            let versions_path = typeshed.join("stdlib/VERSIONS");
+
+            let results = system
+                .read_to_string(&versions_path)
+                .map_err(|error| SearchPathSettingsError::FailedToReadVersionsFile {
+                    path: versions_path,
+                    error,
+                })
+                .and_then(|versions_content| Ok(versions_content.parse()?))
+                .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
+
+            match results {
+                Ok(results) => results,
+                Err(err) => {
+                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                        (
+                            vendored_typeshed_versions(vendored),
+                            SearchPath::vendored_stdlib(),
+                        )
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        } else {
+            tracing::debug!("Using vendored stdlib");
+            (
+                vendored_typeshed_versions(vendored),
+                SearchPath::vendored_stdlib(),
+            )
+        };
+
+        let real_stdlib_path = if let Some(path) = real_stdlib_path {
+            match SearchPath::real_stdlib(system, path.clone()) {
+                Ok(path) => Some(path),
+                Err(err) => {
+                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                        None
+                    } else {
+                        return Err(err.into());
+                    }
+                }
+            }
+        } else {
+            None
+        };
+
+        let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
+
+        for path in site_packages_paths {
+            tracing::debug!("Adding site-packages search path `{path}`");
+            match SearchPath::site_packages(system, path.clone()) {
+                Ok(path) => site_packages.push(path),
+                Err(err) => {
+                    if settings.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!("Skipping invalid site-packages search-path: {err}");
+                    } else {
+                        return Err(err.into());
+                    }
+                }
+            }
+        }
+
+        // Filter out module resolution paths that point to the same directory
+        // on disk (the same invariant maintained by [`sys.path` at runtime]).
+        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
+        // and `src/foo` as module resolution paths simultaneously.)
+        //
+        // This code doesn't use an `IndexSet` because the key is the system
+        // path and not the search root.
+        //
+        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+        let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
+
+        static_paths.retain(|path| {
+            if let Some(path) = path.as_system_path() {
+                seen_paths.insert(path.to_path_buf())
+            } else {
+                true
+            }
+        });
+
+        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
+        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
+        // "remember" that fact for static paths.
+        let stdlib_path_is_shadowed = stdlib_path
+            .as_system_path()
+            .is_some_and(|path| seen_paths.contains(path));
+        let real_stdlib_path_is_shadowed = real_stdlib_path
+            .as_ref()
+            .and_then(SearchPath::as_system_path)
+            .is_some_and(|path| seen_paths.contains(path));
+
+        let stdlib_path = if stdlib_path_is_shadowed {
+            None
+        } else {
+            Some(stdlib_path)
+        };
+        let real_stdlib_path = if real_stdlib_path_is_shadowed {
+            None
+        } else {
+            real_stdlib_path
+        };
+
+        Ok(SearchPaths {
+            static_paths,
+            stdlib_path,
+            real_stdlib_path,
+            site_packages,
+            typeshed_versions,
+        })
+    }
+
     /// Returns a new `SearchPaths` with no search paths configured.
     ///
     /// This is primarily useful for testing.
@@ -608,150 +788,6 @@ impl SearchPaths {
 
     pub fn typeshed_versions(&self) -> &TypeshedVersions {
         &self.typeshed_versions
-    }
-}
-
-/// Builder for constructing [`SearchPaths`].
-#[derive(Debug, Clone)]
-pub struct SearchPathsBuilder {
-    static_paths: Vec<SearchPath>,
-    stdlib_path: Option<SearchPath>,
-    real_stdlib_path: Option<SearchPath>,
-    site_packages: Vec<SearchPath>,
-    typeshed_versions: TypeshedVersions,
-}
-
-impl SearchPathsBuilder {
-    /// Creates a new builder with the vendored typeshed as the default stdlib.
-    pub fn new(vendored: &VendoredFileSystem) -> Self {
-        Self {
-            static_paths: vec![],
-            stdlib_path: Some(SearchPath::vendored_stdlib()),
-            real_stdlib_path: None,
-            site_packages: vec![],
-            typeshed_versions: vendored_typeshed_versions(vendored),
-        }
-    }
-
-    /// Adds an "extra" search path with validation.
-    pub fn extra_path(
-        &mut self,
-        system: &dyn System,
-        root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathError> {
-        self.static_paths.push(SearchPath::extra(system, root)?);
-        Ok(())
-    }
-
-    /// Adds a first-party search path with validation.
-    pub fn first_party_path(
-        &mut self,
-        system: &dyn System,
-        root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathError> {
-        self.static_paths
-            .push(SearchPath::first_party(system, root)?);
-        Ok(())
-    }
-
-    /// Adds a custom stdlib search path with validation.
-    pub fn custom_stdlib_path(
-        &mut self,
-        system: &dyn System,
-        typeshed: &SystemPath,
-        versions: TypeshedVersions,
-    ) -> Result<(), crate::path::SearchPathError> {
-        self.stdlib_path = Some(SearchPath::custom_stdlib(system, typeshed)?);
-        self.typeshed_versions = versions;
-        Ok(())
-    }
-
-    /// Adds the vendored stdlib search path.
-    pub fn vendored_stdlib_path(&mut self) {
-        self.stdlib_path = Some(SearchPath::vendored_stdlib());
-    }
-
-    /// Adds a real stdlib search path with validation.
-    pub fn real_stdlib_path(
-        &mut self,
-        system: &dyn System,
-        root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathError> {
-        self.real_stdlib_path = Some(SearchPath::real_stdlib(system, root)?);
-        Ok(())
-    }
-
-    /// Adds a site-packages search path with validation.
-    pub fn site_packages_path(
-        &mut self,
-        system: &dyn System,
-        root: SystemPathBuf,
-    ) -> Result<(), crate::path::SearchPathError> {
-        self.site_packages
-            .push(SearchPath::site_packages(system, root)?);
-        Ok(())
-    }
-
-    fn deduplicate(&mut self) {
-        use rustc_hash::{FxBuildHasher, FxHashSet};
-
-        // Filter out module resolution paths that point to the same directory
-        // on disk (the same invariant maintained by [`sys.path` at runtime]).
-        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
-        // and `src/foo` as module resolution paths simultaneously.)
-        //
-        // This code doesn't use an `IndexSet` because the key is the system
-        // path and not the search root.
-        //
-        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-        let mut seen_paths =
-            FxHashSet::with_capacity_and_hasher(self.static_paths.len(), FxBuildHasher);
-
-        self.static_paths.retain(|path| {
-            if let Some(path) = path.as_system_path() {
-                seen_paths.insert(path.to_path_buf())
-            } else {
-                true
-            }
-        });
-
-        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
-        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
-        // "remember" that fact for static paths.
-        let stdlib_path_is_shadowed = self
-            .stdlib_path
-            .as_ref()
-            .and_then(|p| p.as_system_path())
-            .is_some_and(|path| seen_paths.contains(path));
-
-        if stdlib_path_is_shadowed {
-            self.stdlib_path = None;
-        }
-
-        // If real stdlib path is shadowed by a static path, clear it.
-        let real_stdlib_path_is_shadowed = self
-            .real_stdlib_path
-            .as_ref()
-            .and_then(|p| p.as_system_path())
-            .is_some_and(|path| seen_paths.contains(path));
-
-        if real_stdlib_path_is_shadowed {
-            self.real_stdlib_path = None;
-        }
-    }
-
-    /// Builds the [`SearchPaths`].
-    #[must_use]
-    pub fn build(mut self) -> SearchPaths {
-        self.deduplicate();
-
-        SearchPaths {
-            static_paths: self.static_paths,
-            stdlib_path: self.stdlib_path,
-            real_stdlib_path: self.real_stdlib_path,
-            site_packages: self.site_packages,
-            typeshed_versions: self.typeshed_versions,
-        }
     }
 }
 
@@ -2234,8 +2270,6 @@ mod tests {
 
         use crate::db::tests::TestDb;
 
-        use crate::typeshed::TypeshedVersions;
-
         let mut db = TestDb::new().with_python_version(PythonVersion::PY38);
 
         let temp_dir = tempfile::tempdir()?;
@@ -2261,28 +2295,16 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        // Build search paths using the builder
-        let versions_content =
-            std::fs::read_to_string(custom_typeshed.join("stdlib/VERSIONS").as_std_path())
-                .unwrap_or_default();
-        let typeshed_versions: TypeshedVersions = versions_content.parse().unwrap_or_else(|_| {
-            SearchPathsBuilder::new(db.vendored())
-                .build()
-                .typeshed_versions()
-                .clone()
-        });
-
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), src.clone())
-            .expect("Valid first-party path");
-        builder
-            .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
-            .expect("Valid custom stdlib path");
-        builder
-            .site_packages_path(db.system(), site_packages)
-            .expect("Valid site-packages path");
-        let search_paths = builder.build();
+        // Build search paths using SearchPathSettings
+        let settings = crate::settings::SearchPathSettings {
+            src_roots: vec![src.clone()],
+            custom_typeshed: Some(custom_typeshed),
+            site_packages_paths: vec![site_packages],
+            ..crate::settings::SearchPathSettings::empty()
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
         let foo_module =
@@ -2837,11 +2859,10 @@ not_a_directory
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), src)
-            .expect("Valid first-party path");
-        let search_paths = builder.build();
+        let settings = crate::settings::SearchPathSettings::new(vec![src]);
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
@@ -2875,14 +2896,14 @@ not_a_directory
         let mut db = TestDb::new();
         db.write_file(&installed_foo_module, "").unwrap();
 
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), project_directory.clone())
-            .expect("Valid first-party path");
-        builder
-            .site_packages_path(db.system(), site_packages.clone())
-            .expect("Valid site-packages path");
-        let search_paths = builder.build();
+        let settings = crate::settings::SearchPathSettings {
+            src_roots: vec![project_directory.clone()],
+            site_packages_paths: vec![site_packages.clone()],
+            ..crate::settings::SearchPathSettings::empty()
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
         db.set_search_paths(search_paths);
 
         // Register file roots for Salsa tracking

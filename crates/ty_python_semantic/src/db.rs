@@ -22,11 +22,12 @@ pub trait Db: SourceDb + ModuleResolverDb {
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::program::{Program, SearchPathSettings};
+    use crate::program::Program;
     use crate::{
         ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
         default_lint_registry,
     };
+    use ty_module_resolver::SearchPathSettings;
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};

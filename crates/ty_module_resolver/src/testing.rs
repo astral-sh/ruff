@@ -7,8 +7,7 @@ use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
-use crate::resolve::SearchPathsBuilder;
-use crate::typeshed::TypeshedVersions;
+use crate::settings::SearchPathSettings;
 
 /// A test case for the module resolver.
 ///
@@ -248,28 +247,16 @@ impl TestCaseBuilder<MockedTypeshed> {
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
         let stdlib = typeshed.join("stdlib");
 
-        // Parse the typeshed versions file
-        let versions_path = stdlib.join("VERSIONS");
-        let versions_content = db
-            .system()
-            .read_to_string(&versions_path)
-            .expect("VERSIONS file should exist");
-        let typeshed_versions: TypeshedVersions = versions_content
-            .parse()
-            .expect("VERSIONS file should be valid");
-
-        // Build search paths using the builder
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), src.clone())
-            .expect("Valid first-party path");
-        builder
-            .custom_stdlib_path(db.system(), &typeshed, typeshed_versions)
-            .expect("Valid custom stdlib path");
-        builder
-            .site_packages_path(db.system(), site_packages.clone())
-            .expect("Valid site-packages path");
-        let search_paths = builder.build();
+        // Build search paths using SearchPathSettings
+        let settings = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            custom_typeshed: Some(typeshed),
+            site_packages_paths: vec![site_packages.clone()],
+            ..SearchPathSettings::empty()
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
 
@@ -324,15 +311,15 @@ impl TestCaseBuilder<VendoredTypeshed> {
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
-        // Build search paths using vendored typeshed (the default)
-        let mut builder = SearchPathsBuilder::new(db.vendored());
-        builder
-            .first_party_path(db.system(), src.clone())
-            .expect("Valid first-party path");
-        builder
-            .site_packages_path(db.system(), site_packages.clone())
-            .expect("Valid site-packages path");
-        let search_paths = builder.build();
+        // Build search paths using SearchPathSettings (vendored typeshed is the default)
+        let settings = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            site_packages_paths: vec![site_packages.clone()],
+            ..SearchPathSettings::empty()
+        };
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
 
         db = db.with_search_paths(search_paths);
 
