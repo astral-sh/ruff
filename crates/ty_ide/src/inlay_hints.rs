@@ -665,6 +665,10 @@ impl<'db> DynamicImporter<'db> {
             }
         };
 
+        if self.members.contains_symbol(definition_name) {
+            return None;
+        }
+
         match self.dynamic_imports.entry(key) {
             Entry::Vacant(entry) => {
                 let request = ImportRequest::import_from(module_name, definition_name);
@@ -8086,7 +8090,6 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
-        import foo.bar
 
         from foo import D
 

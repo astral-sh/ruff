@@ -362,6 +362,10 @@ impl<'ast> MembersInScope<'ast> {
             .collect();
         MembersInScope { at, map }
     }
+
+    pub(crate) fn contains_symbol(&self, symbol: &str) -> bool {
+        self.map.contains_key(&Name::from(symbol))
+    }
 }
 
 #[derive(Debug)]
