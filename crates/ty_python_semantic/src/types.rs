@@ -7744,10 +7744,43 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                None => self,
-                Some(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
+                SubclassOfInner::Dynamic(dynamic) => {
+                    SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic))
+                }
+                SubclassOfInner::Class(class) => {
+                    SubclassOfType::try_from_type(db, class.metaclass(db))
+                        .unwrap_or(SubclassOfType::subclass_of_unknown())
+                }
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    // For `type[T]` where T is a TypeVar, compute the metatype by
+                    // getting the metatype of the bound. This correctly handles union
+                    // bounds like `T: A | B` by distributing: the metatype of
+                    // `type[T]` becomes `metatype(A) | metatype(B)`.
+                    match bound_typevar.typevar(db).bound_or_constraints(db) {
+                        None => {
+                            // Unbounded TypeVar: metatype is type[type] (metaclass of object)
+                            SubclassOfType::try_from_type(db, ClassType::object(db).metaclass(db))
+                                .unwrap_or(SubclassOfType::subclass_of_unknown())
+                        }
+                        Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
+                            // Get the metatype by converting the bound to type[bound] first,
+                            // then getting the metatype. For unions, this distributes:
+                            // type[A | B] = type[A] | type[B], and the metatype becomes
+                            // metatype(type[A]) | metatype(type[B]).
+                            SubclassOfType::try_from_instance(db, bound)
+                                .unwrap_or(SubclassOfType::subclass_of_unknown())
+                                .to_meta_type(db)
+                        }
+                        Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                            // For constraints like `T: (int, str)`, we need the metaclass of
+                            // each constraint class, not the metatype of the instance types.
+                            SubclassOfType::try_from_instance(db, constraints.as_type(db))
+                                .unwrap_or(SubclassOfType::subclass_of_unknown())
+                                .to_meta_type(db)
+                        }
+                    }
+                }
             },
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),

@@ -71,6 +71,26 @@ reveal_type(constrained(str))  # revealed: str
 constrained(A)
 ```
 
+`type[T]` with a union upper bound `T: A | B` represents any subclass of `A` or `B`. Metaclass
+attributes like `__name__` and `__qualname__` should still be accessible:
+
+```py
+class Replace: ...
+class Multiply: ...
+
+def union_bound[T: Replace | Multiply](x: type[T]) -> T:
+    reveal_type(x)  # revealed: type[T@union_bound]
+    # All classes have __name__ and __qualname__ from type's metaclass
+    reveal_type(x.__name__)  # revealed: str
+    reveal_type(x.__qualname__)  # revealed: str
+    reveal_type(x())  # revealed: T@union_bound
+
+    return x()
+
+reveal_type(union_bound(Replace))  # revealed: Replace
+reveal_type(union_bound(Multiply))  # revealed: Multiply
+```
+
 ## Union
 
 ```py
