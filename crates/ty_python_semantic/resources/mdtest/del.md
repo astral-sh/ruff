@@ -239,21 +239,43 @@ del g[0]
 ### TypedDict deletion
 
 Deleting a required key from a TypedDict is a type error because it would make the object no longer
-a valid instance of that TypedDict type.
+a valid instance of that TypedDict type. However, deleting `NotRequired` keys (or keys in
+`total=False` TypedDicts) is allowed.
 
 ```py
-from typing_extensions import TypedDict
+from typing_extensions import TypedDict, NotRequired
 
 class Movie(TypedDict):
     name: str
     year: int
 
-m: Movie = {"name": "Blade Runner", "year": 1982}
+class PartialMovie(TypedDict, total=False):
+    name: str
+    year: int
 
+class MixedMovie(TypedDict):
+    name: str
+    year: NotRequired[int]
+
+m: Movie = {"name": "Blade Runner", "year": 1982}
+p: PartialMovie = {"name": "Test"}
+mixed: MixedMovie = {"name": "Test"}
+
+# Required keys cannot be deleted.
 # error: [invalid-argument-type]
 del m["name"]
-```
 
-TODO: Deletion of `NotRequired` keys (or keys in `total=False` TypedDicts) should be allowed, but ty
-currently uses the typeshed stub `__delitem__(k: Never)` which rejects all deletions. See
-mypy/pyright behavior for reference.
+# In a partial TypedDict (`total=False`), all keys can be deleted.
+del p["name"]
+
+# `NotRequired` keys can always be deleted.
+del mixed["year"]
+
+# But required keys in mixed `TypedDict` still cannot be deleted.
+# error: [invalid-argument-type]
+del mixed["name"]
+
+# And keys that don't exist cannot be deleted.
+# error: [invalid-argument-type]
+del mixed["non_existent"]
+```

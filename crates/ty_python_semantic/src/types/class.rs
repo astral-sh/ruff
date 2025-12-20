@@ -2818,6 +2818,62 @@ impl<'db> ClassLiteral<'db> {
                     CallableTypeKind::FunctionLike,
                 )))
             }
+            (CodeGeneratorKind::TypedDict, "__delitem__") => {
+                let fields = self.fields(db, specialization, field_policy);
+
+                // Only non-required fields can be deleted. Required fields cannot be deleted
+                // because that would violate the TypedDict's structural type.
+                let mut deletable_fields = fields
+                    .iter()
+                    .filter(|(_, field)| !field.is_required())
+                    .peekable();
+
+                if deletable_fields.peek().is_none() {
+                    // If there are no deletable fields (all fields are required), synthesize a
+                    // `__delitem__` that takes a `key` of type `Never` to signal that no keys
+                    // can be deleted.
+                    return Some(Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::single(Signature::new(
+                            Parameters::new(
+                                db,
+                                [
+                                    Parameter::positional_only(Some(Name::new_static("self")))
+                                        .with_annotated_type(instance_ty),
+                                    Parameter::positional_only(Some(Name::new_static("key")))
+                                        .with_annotated_type(Type::Never),
+                                ],
+                            ),
+                            Some(Type::none(db)),
+                        )),
+                        CallableTypeKind::FunctionLike,
+                    )));
+                }
+
+                // Otherwise, add overloads for all deletable fields.
+                let overloads = deletable_fields.map(|(name, _field)| {
+                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_only(Some(Name::new_static("self")))
+                                    .with_annotated_type(instance_ty),
+                                Parameter::positional_only(Some(Name::new_static("key")))
+                                    .with_annotated_type(key_type),
+                            ],
+                        ),
+                        Some(Type::none(db)),
+                    )
+                });
+
+                Some(Type::Callable(CallableType::new(
+                    db,
+                    CallableSignature::from_overloads(overloads),
+                    CallableTypeKind::FunctionLike,
+                )))
+            }
             (CodeGeneratorKind::TypedDict, "get") => {
                 let overloads = self
                     .fields(db, specialization, field_policy)
