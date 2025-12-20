@@ -1192,6 +1192,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Logging, "014") => rules::flake8_logging::rules::ExcInfoOutsideExceptHandler,
         (Flake8Logging, "015") => rules::flake8_logging::rules::RootLoggerCall,
 
+        // ssort
+        (SSort, "001") => rules::ssort::rules::UnsortedStatements,
+
         _ => return None,
     })
 }
