@@ -25,7 +25,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use super::UnionType;
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
@@ -370,28 +370,30 @@ impl<'db> NarrowingConstraint<'db> {
     pub(crate) fn merge_constraint_and(&self, other: &Self, db: &'db dyn Db) -> Self {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
-        let new_disjuncts = self
+        let new_disjuncts = other
             .disjuncts
             .iter()
-            .cartesian_product(other.disjuncts.iter())
-            .map(|(left_conj, right_conj)| {
+            .flat_map(|right_conj| {
+                // We iterate the RHS first because if it has a typeguard then we don't need to consider the LHS
                 if right_conj.typeguard.is_some() {
                     // If the right conjunct has a TypeGuard, it "wins" the conjunction
-                    *right_conj
+                    Either::Left(std::iter::once(*right_conj))
                 } else {
-                    // Intersect the regular constraints
-                    let new_regular = IntersectionBuilder::new(db)
-                        .add_positive(left_conj.constraint)
-                        .add_positive(right_conj.constraint)
-                        .build();
+                    // Otherwise, we need to consider all LHS disjuncts
+                    Either::Right(self.disjuncts.iter().map(|left_conj| {
+                        let new_regular = IntersectionBuilder::new(db)
+                            .add_positive(left_conj.constraint)
+                            .add_positive(right_conj.constraint)
+                            .build();
 
-                    Conjunction {
-                        constraint: new_regular,
-                        typeguard: left_conj.typeguard,
-                    }
+                        Conjunction {
+                            constraint: new_regular,
+                            typeguard: left_conj.typeguard,
+                        }
+                    }))
                 }
             })
-            .collect::<SmallVec<_>>();
+            .collect();
 
         NarrowingConstraint {
             disjuncts: new_disjuncts,
@@ -454,10 +456,13 @@ fn merge_constraints_and<'db>(
 ///
 /// However, if a place appears in only one branch of the OR, we need to widen it
 /// to `object` in the overall result (because the other branch doesn't constrain it).
+///
+/// When none of the disjuncts have `TypeGuard`, we simplify the constraint types
+/// via `UnionBuilder` to enable simplifications like `~AlwaysFalsy | ~AlwaysTruthy -> object`.
 fn merge_constraints_or<'db>(
     into: &mut NarrowingConstraints<'db>,
     from: &NarrowingConstraints<'db>,
-    _db: &'db dyn Db,
+    db: &'db dyn Db,
 ) {
     // For places that appear in `into` but not in `from`, widen to object
     into.retain(|key, _| from.contains_key(key));
@@ -465,11 +470,35 @@ fn merge_constraints_or<'db>(
     for (key, from_constraint) in from {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
-                // Simply concatenate the disjuncts
-                entry
-                    .get_mut()
+                let into_constraint = entry.get_mut();
+                // Concatenate disjuncts
+                into_constraint
                     .disjuncts
                     .extend(from_constraint.disjuncts.clone());
+
+                // If none of the disjuncts have TypeGuard, we can simplify the constraint types
+                // via UnionBuilder. This enables simplifications like:
+                // `~AlwaysFalsy | ~AlwaysTruthy -> object`
+                let all_regular = into_constraint
+                    .disjuncts
+                    .iter()
+                    .all(|conj| conj.typeguard.is_none());
+
+                if all_regular {
+                    // Simplify via UnionBuilder
+                    let simplified = UnionType::from_elements(
+                        db,
+                        into_constraint.disjuncts.iter().map(|conj| conj.constraint),
+                    );
+                    // If simplified to object, we can drop the constraint entirely
+                    if simplified.is_object() {
+                        // Remove this entry since it provides no constraint
+                        entry.remove();
+                    } else {
+                        // Replace with simplified constraint
+                        into_constraint.disjuncts = smallvec![Conjunction::regular(simplified)];
+                    }
+                }
             }
             Entry::Vacant(_) => {
                 // Place only appears in `from`, not in `into`. No constraint needed.
@@ -1077,7 +1106,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .collect();
             if filtered.len() < union.elements(self.db).len() {
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(place, UnionType::from_elements(self.db, filtered));
+                constraints.insert(
+                    place,
+                    NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                );
             }
         }
 
@@ -1143,7 +1175,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 // As mentioned above, the synthesized `TypedDict` is always negated.
                 let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(place, intersection);
+                constraints.insert(place, NarrowingConstraint::regular(intersection));
             }
         }
 
