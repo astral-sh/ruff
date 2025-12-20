@@ -71,11 +71,8 @@ pub(crate) fn infer_narrowing_constraint<'db>(
         PredicateNode::ReturnsNever(_) => return None,
         PredicateNode::StarImportPlaceholder(_) => return None,
     };
-    if let Some(constraints) = constraints {
-        constraints.get(&place).cloned()
-    } else {
-        None
-    }
+
+    constraints.and_then(|constraints| constraints.get(&place).cloned())
 }
 
 #[salsa::tracked(returns(as_ref), heap_size=ruff_memory_usage::heap_size)]
@@ -432,18 +429,18 @@ type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'d
 /// - Intersect the constraints normally otherwise
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
-    from: &NarrowingConstraints<'db>,
+    from: NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
     for (key, from_constraint) in from {
-        match into.entry(*key) {
+        match into.entry(key) {
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get();
 
-                entry.insert(into_constraint.merge_constraint_and(from_constraint, db));
+                entry.insert(into_constraint.merge_constraint_and(&from_constraint, db));
             }
             Entry::Vacant(entry) => {
-                entry.insert(from_constraint.clone());
+                entry.insert(from_constraint);
             }
         }
     }
@@ -461,20 +458,18 @@ fn merge_constraints_and<'db>(
 /// via `UnionBuilder` to enable simplifications like `~AlwaysFalsy | ~AlwaysTruthy -> object`.
 fn merge_constraints_or<'db>(
     into: &mut NarrowingConstraints<'db>,
-    from: &NarrowingConstraints<'db>,
+    from: NarrowingConstraints<'db>,
     db: &'db dyn Db,
 ) {
     // For places that appear in `into` but not in `from`, widen to object
     into.retain(|key, _| from.contains_key(key));
 
     for (key, from_constraint) in from {
-        match into.entry(*key) {
+        match into.entry(key) {
             Entry::Occupied(mut entry) => {
                 let into_constraint = entry.get_mut();
                 // Concatenate disjuncts
-                into_constraint
-                    .disjuncts
-                    .extend(from_constraint.disjuncts.clone());
+                into_constraint.disjuncts.extend(from_constraint.disjuncts);
 
                 // If none of the disjuncts have TypeGuard, we can simplify the constraint types
                 // via UnionBuilder. This enables simplifications like:
@@ -490,9 +485,8 @@ fn merge_constraints_or<'db>(
                         db,
                         into_constraint.disjuncts.iter().map(|conj| conj.constraint),
                     );
-                    // If simplified to object, we can drop the constraint entirely
                     if simplified.is_object() {
-                        // Remove this entry since it provides no constraint
+                        // If simplified to object, we can drop the constraint entirely
                         entry.remove();
                     } else {
                         // Replace with simplified constraint
@@ -1483,7 +1477,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 self.evaluate_pattern_predicate_kind(predicate, subject, is_positive)
             })
             .reduce(|mut constraints, constraints_| {
-                merge_constraints(&mut constraints, &constraints_, db);
+                merge_constraints(&mut constraints, constraints_, db);
                 constraints
             })
     }
@@ -1515,7 +1509,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let mut aggregation: Option<NarrowingConstraints> = None;
                 for sub_constraint in sub_constraints.into_iter().flatten() {
                     if let Some(ref mut some_aggregation) = aggregation {
-                        merge_constraints_and(some_aggregation, &sub_constraint, self.db);
+                        merge_constraints_and(some_aggregation, sub_constraint, self.db);
                     } else {
                         aggregation = Some(sub_constraint);
                     }
@@ -1531,7 +1525,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(ref mut first) = first {
                     for rest_constraint in rest {
                         if let Some(rest_constraint) = rest_constraint {
-                            merge_constraints_or(first, &rest_constraint, self.db);
+                            merge_constraints_or(first, rest_constraint, self.db);
                         } else {
                             return None;
                         }
