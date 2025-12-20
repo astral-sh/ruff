@@ -37,6 +37,7 @@ impl InlayHint {
         allow_auto_import: bool,
     ) -> Option<Self> {
         let position = expr.range().end();
+        // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
 
         // Filter out repetitive hints like `x: T = T()`
@@ -44,7 +45,6 @@ impl InlayHint {
             return None;
         }
 
-        // Set up auto-import infrastructure if needed
         let source = source_text(db, file);
         let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
         let should_auto_import = details.is_valid_syntax && allow_edits && allow_auto_import;
@@ -54,7 +54,14 @@ impl InlayHint {
             DynamicImporter::new(importer, members)
         });
 
-        // Track imports and build label
+        // Ok so the idea here is that we potentially have a random soup of spans here,
+        // and each byte of the string can have at most one target associate with it.
+        // Thankfully, they were generally pushed in print order, with the inner smaller types
+        // appearing before the outer bigger ones.
+        //
+        // So we record where we are in the string, and every time we find a type, we
+        // check if it's further along in the string. If it is, great, we give it the
+        // span for its range, and then advance where we are.
         let original_label = details.label.clone();
         let mut offset = 0;
 
@@ -62,12 +69,18 @@ impl InlayHint {
         // qualify certain imported symbols. `A` could turn into `foo.A`.
         let mut text_edit_label = details.label.clone();
         let mut text_edit_offset = 0;
+
         let mut label_parts = vec![": ".into()];
 
         for (target, detail) in details.targets.iter().zip(&details.details) {
             if let TypeDetail::Type(ty) = detail {
                 let start = target.start().to_usize();
                 let end = target.end().to_usize();
+
+                // If we skipped over some bytes, push them with no target
+                if start > offset {
+                    label_parts.push(original_label[offset..start].into());
+                }
 
                 // Get the possible qualified label part
                 let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
@@ -97,11 +110,7 @@ impl InlayHint {
                 let text_edit_start = start + text_edit_offset;
                 let text_edit_end = end + text_edit_offset;
 
-                if start > offset {
-                    label_parts.push(original_label[offset..start].into());
-                }
-
-                // Skip if this position was already claimed
+                // Ok, this is the first type that claimed these bytes, give it the target
                 if start >= offset {
                     let nav_target = ty.navigation_targets(db).into_iter().next();
 
@@ -126,12 +135,11 @@ impl InlayHint {
             }
         }
 
-        // Finish label by adding any remaining text
+        // "flush" the rest of the label without any target
         if offset < original_label.len() {
             label_parts.push(original_label[offset..].into());
         }
 
-        // Build text edits
         let text_edits = if details.is_valid_syntax && allow_edits {
             let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
@@ -6204,7 +6212,6 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
-        from main import whatever
 
         class F:
             @property
@@ -7978,7 +7985,7 @@ mod tests {
     }
 
     #[test]
-    fn test_auto_import_() {
+    fn test_auto_import_symbol_imported_from_different_path() {
         let mut test = inlay_hint_test(
             "
             from foo import D
