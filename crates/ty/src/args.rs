@@ -4,7 +4,7 @@ use clap::builder::Styles;
 use clap::builder::styling::{AnsiColor, Effects};
 use clap::error::ErrorKind;
 use clap::{ArgAction, ArgMatches, Error, Parser};
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
@@ -178,7 +178,7 @@ pub(crate) struct CheckCommand {
 }
 
 impl CheckCommand {
-    pub(crate) fn into_options(self) -> Options {
+    pub(crate) fn into_options(self, project_root: &SystemPath) -> Options {
         let rules = if self.rules.is_empty() {
             None
         } else {
@@ -197,6 +197,36 @@ impl CheckCommand {
             .no_respect_ignore_files
             .then_some(false)
             .or(self.respect_ignore_files);
+
+        // When users explicitly specify directories on the command line, adds it as "dir/**/*"
+        // to include, ensuring their subfolders and subfiles are checked regardless of
+        // `pyproject.toml` original include configuration.
+        let include = {
+            let glob_patterns: Vec<RelativeGlobPattern> = {
+                self.paths
+                    .iter()
+                    .filter_map(|path| {
+                        if !path.as_std_path().is_dir() {
+                            return None;
+                        }
+
+                        let path = SystemPath::absolute(path, project_root);
+                        let path = path.strip_prefix(project_root).ok()?;
+                        let path = path.to_string().replace('\\', "/");
+                        let path = path.strip_suffix('/').unwrap_or(&path);
+
+                        Some(RelativeGlobPattern::cli(format!("{path}/**/*")))
+                    })
+                    .collect()
+            };
+
+            if glob_patterns.is_empty() {
+                None
+            } else {
+                Some(RangedValue::cli(glob_patterns))
+            }
+        };
+
         let options = Options {
             environment: Some(EnvironmentOptions {
                 python_version: self
@@ -226,6 +256,7 @@ impl CheckCommand {
                 exclude: self.exclude.map(|excludes| {
                     RangedValue::cli(excludes.iter().map(RelativeGlobPattern::cli).collect())
                 }),
+                include,
                 ..SrcOptions::default()
             }),
             rules,
