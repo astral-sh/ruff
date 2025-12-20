@@ -1537,9 +1537,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 }
                 _ => TypeGuardType::unbound(
                     self.db(),
-                    // Similar to TypeIs, use top materialization
-                    self.infer_type_expression(arguments_slice)
-                        .top_materialization(self.db()),
+                    // Unlike `TypeIs`, don't use top materialization, because
+                    // `TypeGuard` clobbering behavior makes it counterintuitive
+                    self.infer_type_expression(arguments_slice),
                 ),
             },
             SpecialFormType::Concatenate => {
