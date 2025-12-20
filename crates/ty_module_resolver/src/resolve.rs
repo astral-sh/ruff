@@ -40,7 +40,7 @@ use compact_str::format_compact;
 use rustc_hash::FxHashSet;
 
 use ruff_db::files::{File, FilePath, FileRootKind};
-use ruff_db::system::{DirectoryEntry, SystemPath, SystemPathBuf};
+use ruff_db::system::{DirectoryEntry, System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{
     self as ast, PySourceType, PythonVersion,
@@ -633,64 +633,118 @@ impl SearchPathsBuilder {
         }
     }
 
-    /// Adds a static search path (extra path, first-party, etc.).
-    #[must_use]
-    pub fn static_path(mut self, path: SearchPath) -> Self {
-        self.static_paths.push(path);
-        self
+    /// Adds an "extra" search path with validation.
+    pub fn extra_path(
+        &mut self,
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> Result<(), crate::path::SearchPathValidationError> {
+        self.static_paths.push(SearchPath::extra(system, root)?);
+        Ok(())
     }
 
-    /// Adds multiple static search paths.
-    #[must_use]
-    pub fn static_paths(mut self, paths: impl IntoIterator<Item = SearchPath>) -> Self {
-        self.static_paths.extend(paths);
-        self
+    /// Adds a first-party search path with validation.
+    pub fn first_party_path(
+        &mut self,
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> Result<(), crate::path::SearchPathValidationError> {
+        self.static_paths
+            .push(SearchPath::first_party(system, root)?);
+        Ok(())
     }
 
-    /// Sets a custom stdlib path, replacing the vendored typeshed.
-    #[must_use]
-    pub fn stdlib_path(mut self, path: SearchPath, versions: TypeshedVersions) -> Self {
-        self.stdlib_path = Some(path);
+    /// Adds a custom stdlib search path with validation.
+    pub fn custom_stdlib_path(
+        &mut self,
+        system: &dyn System,
+        typeshed: &SystemPath,
+        versions: TypeshedVersions,
+    ) -> Result<(), crate::path::SearchPathValidationError> {
+        self.stdlib_path = Some(SearchPath::custom_stdlib(system, typeshed)?);
         self.typeshed_versions = versions;
-        self
+        Ok(())
     }
 
-    /// Sets the real stdlib path (for goto-definition).
-    #[must_use]
-    pub fn real_stdlib_path(mut self, path: Option<SearchPath>) -> Self {
-        self.real_stdlib_path = path;
-        self
+    /// Adds the vendored stdlib search path.
+    pub fn vendored_stdlib_path(&mut self) {
+        self.stdlib_path = Some(SearchPath::vendored_stdlib());
     }
 
-    /// Adds a site-packages search path.
-    #[must_use]
-    pub fn site_packages_path(mut self, path: SearchPath) -> Self {
-        self.site_packages.push(path);
-        self
+    /// Adds a real stdlib search path with validation.
+    pub fn real_stdlib_path(
+        &mut self,
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> Result<(), crate::path::SearchPathValidationError> {
+        self.real_stdlib_path = Some(SearchPath::real_stdlib(system, root)?);
+        Ok(())
     }
 
-    /// Adds multiple site-packages search paths.
-    #[must_use]
-    pub fn site_packages_paths(mut self, paths: impl IntoIterator<Item = SearchPath>) -> Self {
-        self.site_packages.extend(paths);
-        self
+    /// Adds a site-packages search path with validation.
+    pub fn site_packages_path(
+        &mut self,
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> Result<(), crate::path::SearchPathValidationError> {
+        self.site_packages
+            .push(SearchPath::site_packages(system, root)?);
+        Ok(())
     }
 
-    /// Adds an editable install search path.
-    ///
-    /// Editable installs are discovered from `.pth` files in site-packages.
-    /// This method allows directly adding an editable path for testing purposes.
-    #[must_use]
-    pub fn editable_path(mut self, path: SearchPath) -> Self {
-        // Editable paths are added to site_packages list
-        // They'll be interleaved with site-packages in the proper order
-        self.site_packages.push(path);
-        self
+    fn deduplicate(&mut self) {
+        use rustc_hash::{FxBuildHasher, FxHashSet};
+
+        // Filter out module resolution paths that point to the same directory
+        // on disk (the same invariant maintained by [`sys.path` at runtime]).
+        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
+        // and `src/foo` as module resolution paths simultaneously.)
+        //
+        // This code doesn't use an `IndexSet` because the key is the system
+        // path and not the search root.
+        //
+        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
+        let mut seen_paths =
+            FxHashSet::with_capacity_and_hasher(self.static_paths.len(), FxBuildHasher);
+
+        self.static_paths.retain(|path| {
+            if let Some(path) = path.as_system_path() {
+                seen_paths.insert(path.to_path_buf())
+            } else {
+                true
+            }
+        });
+
+        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
+        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
+        // "remember" that fact for static paths.
+        let stdlib_path_is_shadowed = self
+            .stdlib_path
+            .as_ref()
+            .and_then(|p| p.as_system_path())
+            .is_some_and(|path| seen_paths.contains(path));
+
+        if stdlib_path_is_shadowed {
+            self.stdlib_path = None;
+        }
+
+        // If real stdlib path is shadowed by a static path, clear it.
+        let real_stdlib_path_is_shadowed = self
+            .real_stdlib_path
+            .as_ref()
+            .and_then(|p| p.as_system_path())
+            .is_some_and(|path| seen_paths.contains(path));
+
+        if real_stdlib_path_is_shadowed {
+            self.real_stdlib_path = None;
+        }
     }
 
     /// Builds the [`SearchPaths`].
     #[must_use]
-    pub fn build(self) -> SearchPaths {
+    pub fn build(mut self) -> SearchPaths {
+        self.deduplicate();
+
         SearchPaths {
             static_paths: self.static_paths,
             stdlib_path: self.stdlib_path,
@@ -2179,7 +2233,7 @@ mod tests {
         use ruff_db::system::{OsSystem, SystemPath};
 
         use crate::db::tests::TestDb;
-        use crate::path::SearchPath;
+
         use crate::typeshed::TypeshedVersions;
 
         let mut db = TestDb::new().with_python_version(PythonVersion::PY38);
@@ -2218,14 +2272,17 @@ mod tests {
                 .clone()
         });
 
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), src.clone()).unwrap())
-            .stdlib_path(
-                SearchPath::custom_stdlib(db.system(), &custom_typeshed).unwrap(),
-                typeshed_versions,
-            )
-            .site_packages_path(SearchPath::site_packages(db.system(), site_packages).unwrap())
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), src.clone())
+            .expect("Valid first-party path");
+        builder
+            .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
+            .expect("Valid custom stdlib path");
+        builder
+            .site_packages_path(db.system(), site_packages)
+            .expect("Valid site-packages path");
+        let search_paths = builder.build();
         db.set_search_paths(search_paths);
 
         let foo_module =
@@ -2748,8 +2805,6 @@ not_a_directory
         use anyhow::Context;
         use ruff_db::system::OsSystem;
 
-        use crate::path::SearchPath;
-
         let temp_dir = tempfile::TempDir::new()?;
         let root = SystemPathBuf::from_path_buf(
             temp_dir
@@ -2782,9 +2837,11 @@ not_a_directory
         std::os::unix::fs::symlink(a_package_target.as_std_path(), a_src.as_std_path())
             .context("Failed to symlink `src/a` to `a-package`")?;
 
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), src).unwrap())
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), src)
+            .expect("Valid first-party path");
+        let search_paths = builder.build();
         db.set_search_paths(search_paths);
 
         // Now try to resolve the module `A` (note the capital `A` instead of `a`).
@@ -2809,7 +2866,6 @@ not_a_directory
 
     #[test]
     fn file_to_module_where_one_search_path_is_subdirectory_of_other() {
-        use crate::path::SearchPath;
         use ruff_db::files::FileRootKind;
 
         let project_directory = SystemPathBuf::from("/project");
@@ -2825,12 +2881,14 @@ not_a_directory
         db.files()
             .try_add_root(&db, &site_packages, FileRootKind::LibrarySearchPath);
 
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), project_directory).unwrap())
-            .site_packages_path(
-                SearchPath::site_packages(db.system(), site_packages.clone()).unwrap(),
-            )
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), project_directory)
+            .expect("Valid first-party path");
+        builder
+            .site_packages_path(db.system(), site_packages.clone())
+            .expect("Valid site-packages path");
+        let search_paths = builder.build();
         db.set_search_paths(search_paths);
 
         let foo_module_file = File::new(&db, FilePath::System(installed_foo_module));

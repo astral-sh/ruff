@@ -385,7 +385,6 @@ mod tests {
 
     use crate::db::{Db, tests::TestDb};
     use crate::module::Module;
-    use crate::path::SearchPath;
     use crate::resolve::{
         ModuleResolveMode, ModuleResolveModeIngredient, SearchPathsBuilder,
         dynamic_resolution_paths,
@@ -980,14 +979,17 @@ mod tests {
                 .clone()
         });
 
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), src).unwrap())
-            .stdlib_path(
-                SearchPath::custom_stdlib(db.system(), &custom_typeshed).unwrap(),
-                typeshed_versions,
-            )
-            .site_packages_path(SearchPath::site_packages(db.system(), site_packages).unwrap())
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), src)
+            .expect("Valid first-party path");
+        builder
+            .custom_stdlib_path(db.system(), &custom_typeshed, typeshed_versions)
+            .expect("Valid custom stdlib path");
+        builder
+            .site_packages_path(db.system(), site_packages)
+            .expect("Valid site-packages path");
+        let search_paths = builder.build();
         db.set_search_paths(search_paths);
 
         // From the original test in the "resolve this module"
@@ -1600,9 +1602,11 @@ not_a_directory
         db.files()
             .try_add_root(&db, SystemPath::new("/"), FileRootKind::Project);
 
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), project_directory).unwrap())
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), project_directory)
+            .expect("Valid first-party path");
+        let search_paths = builder.build();
         db.set_search_paths(search_paths);
 
         insta::assert_debug_snapshot!(

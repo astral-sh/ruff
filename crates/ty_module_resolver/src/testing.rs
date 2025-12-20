@@ -7,7 +7,6 @@ use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
-use crate::path::SearchPath;
 use crate::resolve::SearchPathsBuilder;
 use crate::typeshed::TypeshedVersions;
 
@@ -260,16 +259,17 @@ impl TestCaseBuilder<MockedTypeshed> {
             .expect("VERSIONS file should be valid");
 
         // Build search paths using the builder
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), src.clone()).unwrap())
-            .stdlib_path(
-                SearchPath::custom_stdlib(db.system(), &typeshed).unwrap(),
-                typeshed_versions,
-            )
-            .site_packages_path(
-                SearchPath::site_packages(db.system(), site_packages.clone()).unwrap(),
-            )
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), src.clone())
+            .expect("Valid first-party path");
+        builder
+            .custom_stdlib_path(db.system(), &typeshed, typeshed_versions)
+            .expect("Valid custom stdlib path");
+        builder
+            .site_packages_path(db.system(), site_packages.clone())
+            .expect("Valid site-packages path");
+        let search_paths = builder.build();
 
         db = db.with_search_paths(search_paths);
 
@@ -329,12 +329,14 @@ impl TestCaseBuilder<VendoredTypeshed> {
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
         // Build search paths using vendored typeshed (the default)
-        let search_paths = SearchPathsBuilder::new(db.vendored())
-            .static_path(SearchPath::first_party(db.system(), src.clone()).unwrap())
-            .site_packages_path(
-                SearchPath::site_packages(db.system(), site_packages.clone()).unwrap(),
-            )
-            .build();
+        let mut builder = SearchPathsBuilder::new(db.vendored());
+        builder
+            .first_party_path(db.system(), src.clone())
+            .expect("Valid first-party path");
+        builder
+            .site_packages_path(db.system(), site_packages.clone())
+            .expect("Valid site-packages path");
+        let search_paths = builder.build();
 
         db = db.with_search_paths(search_paths);
 

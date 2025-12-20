@@ -500,21 +500,24 @@ impl SearchPath {
     }
 
     /// Create a new "Extra" search path
-    pub fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub(crate) fn extra(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::Extra(
             Self::directory_path(system, root)?,
         ))))
     }
 
     /// Create a new first-party search path, pointing to the user code we were directly invoked on
-    pub fn first_party(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub(crate) fn first_party(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::FirstParty(
             Self::directory_path(system, root)?,
         ))))
     }
 
     /// Create a new standard-library search path pointing to a custom directory on disk
-    pub fn custom_stdlib(system: &dyn System, typeshed: &SystemPath) -> SearchPathResult<Self> {
+    pub(crate) fn custom_stdlib(
+        system: &dyn System,
+        typeshed: &SystemPath,
+    ) -> SearchPathResult<Self> {
         if !system.is_directory(typeshed) {
             return Err(SearchPathValidationError::NotADirectory(
                 typeshed.to_path_buf(),
@@ -536,14 +539,14 @@ impl SearchPath {
 
     /// Create a new search path pointing to the `stdlib/` subdirectory in the vendored zip archive
     #[must_use]
-    pub fn vendored_stdlib() -> Self {
+    pub(crate) fn vendored_stdlib() -> Self {
         Self(Arc::new(SearchPathInner::StandardLibraryVendored(
             VendoredPathBuf::from("stdlib"),
         )))
     }
 
     /// Create a new search path pointing to the real stdlib of a python install
-    pub fn real_stdlib(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub(crate) fn real_stdlib(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::StandardLibraryReal(
             Self::directory_path(system, root)?,
         ))))
@@ -556,7 +559,10 @@ impl SearchPath {
     /// However, removing the validation here breaks some file-watching tests -- and
     /// ultimately we'll probably want all search paths to be validated before a
     /// `Program` is instantiated, so it doesn't seem like a huge priority right now.
-    pub fn site_packages(system: &dyn System, root: SystemPathBuf) -> SearchPathResult<Self> {
+    pub(crate) fn site_packages(
+        system: &dyn System,
+        root: SystemPathBuf,
+    ) -> SearchPathResult<Self> {
         Ok(Self(Arc::new(SearchPathInner::SitePackages(
             Self::directory_path(system, root)?,
         ))))

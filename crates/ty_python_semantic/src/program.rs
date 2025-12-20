@@ -1,7 +1,5 @@
 use std::sync::Arc;
 
-use rustc_hash::{FxBuildHasher, FxHashSet};
-
 use crate::Db;
 use crate::python_platform::PythonPlatform;
 
@@ -13,10 +11,7 @@ use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
-use ty_module_resolver::{
-    SearchPath, SearchPathValidationError, SearchPaths, SearchPathsBuilder,
-    vendored_typeshed_versions,
-};
+use ty_module_resolver::{SearchPathValidationError, SearchPaths, SearchPathsBuilder};
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
@@ -247,39 +242,33 @@ impl SearchPathSettings {
             misconfiguration_mode,
         } = self;
 
-        let mut static_paths = vec![];
+        let mut builder = SearchPathsBuilder::new(vendored);
 
         for path in extra_paths {
             let path = canonicalize(path, system);
             tracing::debug!("Adding extra search-path `{path}`");
 
-            match SearchPath::extra(system, path) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid extra search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
+            if let Err(err) = builder.extra_path(system, path) {
+                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Skipping invalid extra search-path: {err}");
+                } else {
+                    return Err(err);
                 }
             }
         }
 
         for src_root in src_roots {
             tracing::debug!("Adding first-party search path `{src_root}`");
-            match SearchPath::first_party(system, src_root.to_path_buf()) {
-                Ok(path) => static_paths.push(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid first-party search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
+            if let Err(err) = builder.first_party_path(system, src_root.to_path_buf()) {
+                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Skipping invalid first-party search-path: {err}");
+                } else {
+                    return Err(err);
                 }
             }
         }
 
-        let (typeshed_versions, stdlib_path) = if let Some(typeshed) = typeshed {
+        if let Some(typeshed) = typeshed {
             let typeshed = canonicalize(typeshed, system);
             tracing::debug!("Adding custom-stdlib search path `{typeshed}`");
 
@@ -294,106 +283,41 @@ impl SearchPathSettings {
                     },
                 )
                 .and_then(|versions_content| Ok(versions_content.parse()?))
-                .and_then(|parsed| Ok((parsed, SearchPath::custom_stdlib(system, &typeshed)?)));
+                .and_then(|parsed| builder.custom_stdlib_path(system, &typeshed, parsed));
 
-            match results {
-                Ok(results) => results,
-                Err(err) => {
-                    if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping custom-stdlib search-path: {err}");
-                        (
-                            vendored_typeshed_versions(vendored),
-                            SearchPath::vendored_stdlib(),
-                        )
-                    } else {
-                        return Err(err);
-                    }
+            if let Err(err) = results {
+                if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Skipping custom-stdlib search-path: {err}");
+                    builder.vendored_stdlib_path();
+                } else {
+                    return Err(err);
                 }
             }
         } else {
             tracing::debug!("Using vendored stdlib");
-            (
-                vendored_typeshed_versions(vendored),
-                SearchPath::vendored_stdlib(),
-            )
-        };
+            builder.vendored_stdlib_path();
+        }
 
-        let real_stdlib_path = if let Some(path) = real_stdlib_path {
-            match SearchPath::real_stdlib(system, path.clone()) {
-                Ok(path) => Some(path),
-                Err(err) => {
-                    if *misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
-                        None
-                    } else {
-                        return Err(err);
-                    }
+        if let Some(path) = real_stdlib_path {
+            if let Err(err) = builder.real_stdlib_path(system, path.clone()) {
+                if *misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Skipping invalid real-stdlib search-path: {err}");
+                } else {
+                    return Err(err);
                 }
             }
-        } else {
-            None
-        };
-
-        let mut site_packages: Vec<_> = Vec::with_capacity(site_packages_paths.len());
+        }
 
         for path in site_packages_paths {
             tracing::debug!("Adding site-packages search path `{path}`");
-            match SearchPath::site_packages(system, path.clone()) {
-                Ok(path) => site_packages.push(path),
-                Err(err) => {
-                    if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
-                        tracing::debug!("Skipping invalid site-packages search-path: {err}");
-                    } else {
-                        return Err(err);
-                    }
+            if let Err(err) = builder.site_packages_path(system, path.clone()) {
+                if self.misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Skipping invalid site-packages search-path: {err}");
+                } else {
+                    return Err(err);
                 }
             }
         }
-
-        // Filter out module resolution paths that point to the same directory
-        // on disk (the same invariant maintained by [`sys.path` at runtime]).
-        // (Paths may, however, *overlap* -- e.g. you could have both `src/`
-        // and `src/foo` as module resolution paths simultaneously.)
-        //
-        // This code doesn't use an `IndexSet` because the key is the system
-        // path and not the search root.
-        //
-        // [`sys.path` at runtime]: https://docs.python.org/3/library/site.html#module-site
-        let mut seen_paths = FxHashSet::with_capacity_and_hasher(static_paths.len(), FxBuildHasher);
-
-        static_paths.retain(|path| {
-            if let Some(path) = path.as_system_path() {
-                seen_paths.insert(path.to_path_buf())
-            } else {
-                true
-            }
-        });
-
-        // Users probably shouldn't do this but... if they've shadowed their stdlib we should deduplicate it away.
-        // This notably will mess up anything that checks if a search path "is the standard library" as we won't
-        // "remember" that fact for static paths.
-        let stdlib_path_is_shadowed = stdlib_path
-            .as_system_path()
-            .map(|path| seen_paths.contains(path))
-            .unwrap_or(false);
-        let real_stdlib_path_is_shadowed = real_stdlib_path
-            .as_ref()
-            .and_then(SearchPath::as_system_path)
-            .map(|path| seen_paths.contains(path))
-            .unwrap_or(false);
-
-        // Build the search paths using the builder
-        let mut builder = SearchPathsBuilder::new(vendored).static_paths(static_paths);
-
-        if !stdlib_path_is_shadowed {
-            builder = builder.stdlib_path(stdlib_path, typeshed_versions);
-        }
-
-        if !real_stdlib_path_is_shadowed {
-            builder = builder.real_stdlib_path(real_stdlib_path);
-        }
-
-        builder = builder.site_packages_paths(site_packages);
 
         Ok(builder.build())
     }
