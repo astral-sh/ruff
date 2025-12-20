@@ -85,7 +85,7 @@ RUF069 [*] `__all__` contains duplicated entries
 7 |     "A",
   |     ^^^
 8 |     "B",
-9 |     "B"
+9 |     # Comment
   |
 help: Remove duplicate entries to `__all__`
 4 | __all__ = ["A", "A", "B", "B"]
@@ -93,23 +93,24 @@ help: Remove duplicate entries to `__all__`
 6 |     "A",
   -     "A",
 7 |     "B",
-8 |     "B"
-9 | ]
+8 |     # Comment
+9 |     "B"
 
 RUF069 [*] `__all__` contains duplicated entries
-  --> RUF069.py:9:5
+  --> RUF069.py:10:5
    |
- 7 |     "A",
  8 |     "B",
- 9 |     "B"
+ 9 |     # Comment
+10 |     "B"
    |     ^^^
-10 | ]
+11 | ]
    |
 help: Remove duplicate entries to `__all__`
-5  | __all__ = [
-6  |     "A",
 7  |     "A",
-   -     "B",
-8  |     "B"
-9  | ]
-10 |
+8  |     "B",
+9  |     # Comment
+   -     "B"
+10 | ]
+11 | 
+12 | class A: ...
+note: This is an unsafe fix and may change runtime behavior
