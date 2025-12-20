@@ -178,6 +178,7 @@ and we accept the unions they expand into.
 
 ```py
 from typing import NewType
+from ty_extensions import static_assert, is_assignable_to
 
 Foo = NewType("Foo", float)
 Foo(3.14)
@@ -186,6 +187,8 @@ Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected 
 
 reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
 reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
+static_assert(is_assignable_to(Foo, float))
+static_assert(is_assignable_to(Foo, int | float))
 
 Bar = NewType("Bar", complex)
 Bar(1 + 2j)
@@ -196,6 +199,8 @@ Bar("goodbye")  # error: [invalid-argument-type]
 reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[complex]
 reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
 reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
+static_assert(is_assignable_to(Bar, complex))
+static_assert(is_assignable_to(Foo, int | float | complex))
 ```
 
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
@@ -221,6 +226,15 @@ f(Foo)
 def g(_: Callable[[int | float | complex], Bar]): ...
 
 g(Bar)
+```
+
+Arithmetic also works:
+
+```py
+reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
+reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
+reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
+reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
 ```
 
 ## A `NewType` definition must be a simple variable assignment
@@ -300,8 +314,7 @@ A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
 static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
-# TODO: This should be `Literal[True]` also.
-reveal_type(A(...) is ...)  # revealed: bool
+reveal_type(A(...) is ...)  # revealed: Literal[True]
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))

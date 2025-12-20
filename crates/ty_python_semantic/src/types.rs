@@ -2426,6 +2426,30 @@ impl<'db> Type<'db> {
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
 
+            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(target_newtype)) => {
+                self_newtype.has_relation_to_impl(db, target_newtype)
+            }
+            // This case needs to come before the `Union` cases below. For example:
+            // ```py
+            // Foo = NewType("Foo", float)
+            // _: float = Foo(1.0)
+            // ```
+            // The assignment from `Foo` to `float | int` (the special case of `float` in type
+            // position) should be legal, because the concrete base type of `Foo` is `float | int`.
+            // However, if we take the `(_, Type::Union(union))` branch below, we'll incorrectly
+            // ask whether `Foo` is assignable to `int` (false) and `float` (false), instead of
+            // whether `int` and `float` are each assignable to `float | int` (true).
+            (Type::NewTypeInstance(self_newtype), _) => {
+                self_newtype.concrete_base_type(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
+
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(
                     db,
@@ -3075,21 +3099,6 @@ impl<'db> Type<'db> {
                         disjointness_visitor,
                     )
                 })
-            }
-
-            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self_newtype.has_relation_to_impl(db, target_newtype)
-            }
-
-            (Type::NewTypeInstance(self_newtype), _) => {
-                self_newtype.concrete_base_type(db).has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
             }
 
             (Type::PropertyInstance(_), _) => {
