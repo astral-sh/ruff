@@ -8,7 +8,6 @@ use super::{
     SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
-use crate::module_resolver::KnownModule;
 use crate::place::TypeOrigin;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope, ScopeKind};
@@ -46,7 +45,6 @@ use crate::types::{
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
-    module_resolver::file_to_module,
     place::{
         Definedness, LookupError, LookupResult, Place, PlaceAndQualifiers, known_module_symbol,
         place_from_bindings, place_from_declarations,
@@ -72,6 +70,7 @@ use ruff_python_ast::name::Name;
 use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::{KnownModule, file_to_module};
 
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -4175,7 +4174,7 @@ pub(super) enum DisjointBaseKind {
 ///
 /// Feel free to expand this enum if you ever find yourself using the same class in multiple
 /// places.
-/// Note: good candidates are any classes in `[crate::module_resolver::module::KnownModule]`
+/// Note: good candidates are any classes in `[ty_module_resolver::module::KnownModule]`
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
 #[cfg_attr(test, derive(strum_macros::EnumIter))]
 pub enum KnownClass {
@@ -5999,10 +5998,10 @@ impl SlotsKind {
 mod tests {
     use super::*;
     use crate::db::tests::setup_db;
-    use crate::module_resolver::resolve_module_confident;
     use crate::{PythonVersionSource, PythonVersionWithSource};
     use salsa::Setter;
     use strum::IntoEnumIterator;
+    use ty_module_resolver::resolve_module_confident;
 
     #[test]
     fn known_class_roundtrip_from_str() {

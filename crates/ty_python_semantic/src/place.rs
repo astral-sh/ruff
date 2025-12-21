@@ -1,8 +1,8 @@
 use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::{KnownModule, file_to_module, resolve_module_confident};
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::place::{PlaceExprRef, ScopedPlaceId};
 use crate::semantic_index::scope::ScopeId;

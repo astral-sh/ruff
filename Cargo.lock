@@ -3129,6 +3129,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
+ "ty_module_resolver",
  "ty_python_semantic",
  "zip",
 ]
@@ -4375,6 +4376,7 @@ dependencies = [
  "tracing-flame",
  "tracing-subscriber",
  "ty_combine",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
@@ -4407,8 +4409,8 @@ dependencies = [
  "tempfile",
  "toml",
  "ty_ide",
+ "ty_module_resolver",
  "ty_project",
- "ty_python_semantic",
  "walkdir",
 ]
 
@@ -4438,8 +4440,32 @@ dependencies = [
  "salsa",
  "smallvec",
  "tracing",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_module_resolver"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "compact_str",
+ "get-size2",
+ "insta",
+ "ruff_db",
+ "ruff_memory_usage",
+ "ruff_python_ast",
+ "ruff_python_stdlib",
+ "rustc-hash",
+ "salsa",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tracing",
  "ty_vendored",
 ]
 
@@ -4477,6 +4503,7 @@ dependencies = [
  "toml",
  "tracing",
  "ty_combine",
+ "ty_module_resolver",
  "ty_python_semantic",
  "ty_static",
  "ty_vendored",
@@ -4529,11 +4556,10 @@ dependencies = [
  "strsim",
  "strum",
  "strum_macros",
- "tempfile",
  "test-case",
  "thiserror 2.0.17",
  "tracing",
- "ty_python_semantic",
+ "ty_module_resolver",
  "ty_static",
  "ty_test",
  "ty_vendored",
@@ -4572,6 +4598,7 @@ dependencies = [
  "tracing-subscriber",
  "ty_combine",
  "ty_ide",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
 ]
@@ -4612,6 +4639,7 @@ dependencies = [
  "thiserror 2.0.17",
  "toml",
  "tracing",
+ "ty_module_resolver",
  "ty_python_semantic",
  "ty_static",
  "ty_vendored",

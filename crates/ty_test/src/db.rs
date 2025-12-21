@@ -11,6 +11,7 @@ use ruff_notebook::{Notebook, NotebookError};
 use std::borrow::Cow;
 use std::sync::Arc;
 use tempfile::TempDir;
+use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program, default_lint_registry};
 
@@ -72,6 +73,13 @@ impl SourceDb for Db {
 
     fn python_version(&self) -> ruff_python_ast::PythonVersion {
         Program::get(self).python_version(self)
+    }
+}
+
+#[salsa::db]
+impl ty_module_resolver::Db for Db {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
     }
 }
 

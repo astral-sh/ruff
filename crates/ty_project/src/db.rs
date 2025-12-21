@@ -14,6 +14,7 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
+use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{Db as SemanticDb, Program};
 
@@ -447,6 +448,13 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for ProjectDatabase {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl SemanticDb for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
         self.project
@@ -523,10 +531,9 @@ pub(crate) mod tests {
     use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
+    use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -624,6 +631,13 @@ pub(crate) mod tests {
 
         fn python_version(&self) -> ruff_python_ast::PythonVersion {
             Program::get(self).python_version(self)
+        }
+    }
+
+    #[salsa::db]
+    impl ty_module_resolver::Db for TestDb {
+        fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+            Program::get(self).search_paths(self)
         }
     }
 

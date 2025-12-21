@@ -14,8 +14,8 @@ use ruff_python_ast::name::{Name, UnqualifiedName};
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
+use ty_module_resolver::{ModuleName, resolve_module};
 use ty_project::Db;
-use ty_python_semantic::{ModuleName, resolve_module};
 
 use crate::completion::CompletionKind;
 

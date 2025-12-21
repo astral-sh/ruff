@@ -13,6 +13,10 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use ty_module_resolver::{
+    KnownModule, ModuleName, ModuleNameResolutionError, ModuleResolveMode, file_to_module,
+    resolve_module, search_paths,
+};
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
@@ -21,10 +25,6 @@ use super::{
     infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
-use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{
-    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
-};
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
@@ -4283,7 +4283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         )
                                     })
                                     .and_then(|module| module.search_path(db))
-                                    .is_some_and(crate::SearchPath::is_first_party)
+                                    .is_some_and(ty_module_resolver::SearchPath::is_first_party)
                                 {
                                     diagnostic.help(format_args!(
                                         "Consider adding a `__setitem__` method to `{}`.",

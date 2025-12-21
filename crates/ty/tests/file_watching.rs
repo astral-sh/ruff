@@ -10,12 +10,13 @@ use ruff_db::system::{
     OsSystem, System, SystemPath, SystemPathBuf, UserConfigDirectoryOverrideGuard, file_time_now,
 };
 use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{Module, ModuleName, resolve_module_confident};
 use ty_project::metadata::options::{EnvironmentOptions, Options, ProjectOptionsOverrides};
 use ty_project::metadata::pyproject::{PyProject, Tool};
 use ty_project::metadata::value::{RangedValue, RelativePathBuf};
 use ty_project::watch::{ChangeEvent, ProjectWatcher, directory_watcher};
 use ty_project::{Db, ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::{Module, ModuleName, PythonPlatform, resolve_module_confident};
+use ty_python_semantic::PythonPlatform;
 
 struct TestCase {
     db: ProjectDatabase,

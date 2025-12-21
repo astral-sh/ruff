@@ -31,7 +31,7 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
-use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
+use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
@@ -44,6 +44,7 @@ use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
+use ty_module_resolver::{Module, ModuleName};
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {

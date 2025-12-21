@@ -8,13 +8,10 @@ use ruff_db::vendored::VendoredFileSystem;
 use ruff_python_ast::{PythonVersion, PythonVersionDeserializationError};
 use rustc_hash::FxHashMap;
 
-use crate::Program;
 use crate::db::Db;
 use crate::module_name::ModuleName;
 
-pub(in crate::module_resolver) fn vendored_typeshed_versions(
-    vendored: &VendoredFileSystem,
-) -> TypeshedVersions {
+pub fn vendored_typeshed_versions(vendored: &VendoredFileSystem) -> TypeshedVersions {
     TypeshedVersions::from_str(
         &vendored
             .read_to_string("stdlib/VERSIONS")
@@ -24,7 +21,7 @@ pub(in crate::module_resolver) fn vendored_typeshed_versions(
 }
 
 pub(crate) fn typeshed_versions(db: &dyn Db) -> &TypeshedVersions {
-    Program::get(db).search_paths(db).typeshed_versions()
+    db.search_paths().typeshed_versions()
 }
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -61,7 +58,7 @@ impl std::error::Error for TypeshedVersionsParseError {
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, thiserror::Error)]
-pub(crate) enum TypeshedVersionsParseErrorKind {
+pub enum TypeshedVersionsParseErrorKind {
     #[error("File has too many lines ({0}); maximum allowed is {max_allowed}", max_allowed = NonZeroU16::MAX)]
     TooManyLines(NonZeroUsize),
     #[error("Expected every non-comment line to have exactly one colon")]
@@ -75,16 +72,16 @@ pub(crate) enum TypeshedVersionsParseErrorKind {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, get_size2::GetSize)]
-pub(crate) struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
+pub struct TypeshedVersions(FxHashMap<ModuleName, PyVersionRange>);
 
 impl TypeshedVersions {
     #[must_use]
-    pub(crate) fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
+    pub fn exact(&self, module_name: &ModuleName) -> Option<&PyVersionRange> {
         self.0.get(module_name)
     }
 
     #[must_use]
-    pub(in crate::module_resolver) fn query_module(
+    pub(crate) fn query_module(
         &self,
         module: &ModuleName,
         python_version: PythonVersion,
@@ -231,14 +228,14 @@ impl fmt::Display for TypeshedVersions {
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, Hash, get_size2::GetSize)]
-pub(crate) enum PyVersionRange {
+pub enum PyVersionRange {
     AvailableFrom(RangeFrom<PythonVersion>),
     AvailableWithin(RangeInclusive<PythonVersion>),
 }
 
 impl PyVersionRange {
     #[must_use]
-    pub(crate) fn contains(&self, version: PythonVersion) -> bool {
+    pub fn contains(&self, version: PythonVersion) -> bool {
         match self {
             Self::AvailableFrom(inner) => inner.contains(&version),
             Self::AvailableWithin(inner) => inner.contains(&version),
@@ -246,7 +243,7 @@ impl PyVersionRange {
     }
 
     /// Display the version range in a way that is suitable for rendering in user-facing diagnostics.
-    pub(crate) fn diagnostic_display(&self) -> impl std::fmt::Display {
+    pub fn diagnostic_display(&self) -> impl std::fmt::Display {
         struct DiagnosticDisplay<'a>(&'a PyVersionRange);
 
         impl fmt::Display for DiagnosticDisplay<'_> {

@@ -15,10 +15,9 @@ use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError, SemanticSyntaxErrorKind,
 };
 use ruff_text_size::TextRange;
+use ty_module_resolver::{ModuleName, resolve_module};
 
 use crate::ast_node_ref::AstNodeRef;
-use crate::module_name::ModuleName;
-use crate::module_resolver::resolve_module;
 use crate::node_key::NodeKey;
 use crate::semantic_index::ast_ids::AstIdsBuilder;
 use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;

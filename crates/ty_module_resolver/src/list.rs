@@ -3,12 +3,10 @@ use std::collections::btree_map::{BTreeMap, Entry};
 use ruff_python_ast::PythonVersion;
 
 use crate::db::Db;
+use crate::module::{Module, ModuleKind};
 use crate::module_name::ModuleName;
-use crate::program::Program;
-
-use super::module::{Module, ModuleKind};
-use super::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
-use super::resolver::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
+use crate::path::{ModulePath, SearchPath, SystemOrVendoredPathRef};
+use crate::resolve::{ModuleResolveMode, ResolverContext, resolve_file_module, search_paths};
 
 /// List all available modules, including all sub-modules, sorted in lexicographic order.
 pub fn all_modules(db: &dyn Db) -> Vec<Module<'_>> {
@@ -100,7 +98,6 @@ fn list_modules_in<'db>(
 /// in the same directory).
 struct Lister<'db> {
     db: &'db dyn Db,
-    program: Program,
     search_path: &'db SearchPath,
     modules: BTreeMap<&'db ModuleName, Module<'db>>,
 }
@@ -109,10 +106,8 @@ impl<'db> Lister<'db> {
     /// Create new state that can accumulate modules from a list
     /// of file paths.
     fn new(db: &'db dyn Db, search_path: &'db SearchPath) -> Lister<'db> {
-        let program = Program::get(db);
         Lister {
             db,
-            program,
             search_path,
             modules: BTreeMap::new(),
         }
@@ -314,7 +309,7 @@ impl<'db> Lister<'db> {
     /// Returns the Python version we want to perform module resolution
     /// with.
     fn python_version(&self) -> PythonVersion {
-        self.program.python_version(self.db)
+        self.db.python_version()
     }
 
     /// Constructs a resolver context for use with some APIs that require it.
@@ -389,13 +384,12 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     use crate::db::{Db, tests::TestDb};
-    use crate::module_resolver::module::Module;
-    use crate::module_resolver::resolver::{
+    use crate::module::Module;
+    use crate::resolve::{
         ModuleResolveMode, ModuleResolveModeIngredient, dynamic_resolution_paths,
     };
-    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
-    use crate::program::{Program, ProgramSettings, SearchPathSettings};
-    use crate::{PythonPlatform, PythonVersionSource, PythonVersionWithSource};
+    use crate::settings::SearchPathSettings;
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::list_modules;
 
@@ -940,7 +934,7 @@ mod tests {
     fn symlink() -> anyhow::Result<()> {
         use anyhow::Context;
 
-        let mut db = TestDb::new();
+        let mut db = TestDb::new().with_python_version(PythonVersion::PY38);
 
         let temp_dir = tempfile::TempDir::with_prefix("PREFIX-SENTINEL")?;
         let root = temp_dir
@@ -965,25 +959,20 @@ mod tests {
         std::fs::write(foo.as_std_path(), "")?;
         std::os::unix::fs::symlink(foo.as_std_path(), bar.as_std_path())?;
 
-        db.files().try_add_root(&db, &src, FileRootKind::Project);
+        let settings = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            custom_typeshed: Some(custom_typeshed),
+            site_packages_paths: vec![site_packages],
+            ..SearchPathSettings::empty()
+        };
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: PythonVersion::PY38,
-                    source: PythonVersionSource::default(),
-                },
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    custom_typeshed: Some(custom_typeshed),
-                    site_packages_paths: vec![site_packages],
-                    ..SearchPathSettings::new(vec![src])
-                }
+        db.set_search_paths(
+            settings
                 .to_search_paths(db.system(), db.vendored())
                 .expect("Valid search path settings"),
-            },
         );
+
+        db.files().try_add_root(&db, &src, FileRootKind::Project);
 
         // From the original test in the "resolve this module"
         // implementation, this test seems to symlink a Python module
@@ -1479,18 +1468,15 @@ not_a_directory
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![venv_site_packages],
-                    ..SearchPathSettings::new(vec![src.to_path_buf()])
-                }
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![venv_site_packages],
+            ..SearchPathSettings::new(vec![src.to_path_buf()])
+        };
+
+        db.set_search_paths(
+            settings
                 .to_search_paths(db.system(), db.vendored())
                 .expect("Valid search path settings"),
-            },
         );
 
         insta::assert_debug_snapshot!(
@@ -1533,18 +1519,15 @@ not_a_directory
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![venv_site_packages, system_site_packages],
-                    ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
-                }
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![venv_site_packages, system_site_packages],
+            ..SearchPathSettings::new(vec![SystemPathBuf::from("/src")])
+        };
+
+        db.set_search_paths(
+            settings
                 .to_search_paths(db.system(), db.vendored())
                 .expect("Valid search path settings"),
-            },
         );
 
         // The editable installs discovered from the `.pth` file in the
@@ -1585,7 +1568,7 @@ not_a_directory
     #[test]
     #[cfg(unix)]
     fn case_sensitive_resolution_with_symlinked_directory() -> anyhow::Result<()> {
-        use anyhow::Context;
+        use anyhow::Context as _;
 
         let temp_dir = tempfile::TempDir::with_prefix("PREFIX-SENTINEL")?;
         let root = SystemPathBuf::from_path_buf(
@@ -1621,16 +1604,11 @@ not_a_directory
 
         db.files().try_add_root(&db, &root, FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![src])
-                    .to_search_paths(db.system(), db.vendored())
-                    .expect("valid search path settings"),
-            },
-        );
+        let settings = SearchPathSettings::new(vec![src]);
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("valid search path settings");
+        db.set_search_paths(search_paths);
 
         insta::with_settings!({
             // Temporary directory often have random chars in them, so
@@ -1662,18 +1640,14 @@ not_a_directory
         db.files()
             .try_add_root(&db, &project_directory, FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![site_packages],
-                    ..SearchPathSettings::new(vec![project_directory])
-                }
+        let settings = SearchPathSettings {
+            site_packages_paths: vec![site_packages],
+            ..SearchPathSettings::new(vec![project_directory])
+        };
+        db.set_search_paths(
+            settings
                 .to_search_paths(db.system(), db.vendored())
                 .unwrap(),
-            },
         );
 
         insta::assert_debug_snapshot!(
@@ -1820,16 +1794,11 @@ not_a_directory
         db.files()
             .try_add_root(&db, SystemPath::new("/"), FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![project_directory])
-                    .to_search_paths(db.system(), db.vendored())
-                    .unwrap(),
-            },
-        );
+        let settings = SearchPathSettings::new(vec![project_directory]);
+        let search_paths = settings
+            .to_search_paths(db.system(), db.vendored())
+            .expect("Valid search path settings");
+        db.set_search_paths(search_paths);
 
         insta::assert_debug_snapshot!(
             list_snapshot_filter(&db, |m| m.name(&db).as_str() == "foo"),

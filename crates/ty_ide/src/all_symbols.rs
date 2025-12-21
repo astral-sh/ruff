@@ -1,6 +1,6 @@
 use ruff_db::files::File;
+use ty_module_resolver::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 use ty_project::Db;
-use ty_python_semantic::{Module, ModuleName, all_modules, resolve_real_shadowable_module};
 
 use crate::{
     SymbolKind,

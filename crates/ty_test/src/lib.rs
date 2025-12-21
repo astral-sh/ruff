@@ -17,12 +17,14 @@ use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
+use ty_module_resolver::{
+    Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
+};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    MisconfigurationMode, Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SearchPath, SearchPathSettings,
-    SysPrefixPathOrigin, list_modules, resolve_module_confident,
+    MisconfigurationMode, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod assertion;
