@@ -141,6 +141,23 @@ class A:
         return self.__class__()
 ```
 
+## Instantiating `type[Self]` is strict
+
+Constructor calls on `type[Self]` are checked against the current class's `__init__`/`__new__`
+signature. This is intentional, even though subclasses could widen the signature.
+
+```py
+from typing import Self
+
+class B:
+    def __init__(self, x: int) -> None: ...
+    def clone(self: Self):
+        # TODO: This is stricter than ideal for `type[Self]`; relaxing it safely would require
+        # modeling subclass-widened constructors and decorator-generated `__init__` (attrs, etc.).
+        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `int`, found `Literal["x"]`"
+        return self.__class__("x")
+```
+
 ## Subtyping
 
 A class `A` is a subtype of `type[T]` if any instance of `A` is a subtype of `T`.
