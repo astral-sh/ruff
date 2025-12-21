@@ -31,7 +31,7 @@ use ty_combine::Combine;
 use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
     PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
     SysPrefixPathOrigin,
 };
@@ -86,6 +86,10 @@ pub struct Options {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option_group]
     pub terminal: Option<TerminalOptions>,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub analysis: Option<AnalysisOptions>,
 
     /// Override configurations for specific file patterns.
     ///
@@ -435,6 +439,8 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
+        let analysis = self.analysis.or_default().to_settings();
+
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
@@ -447,6 +453,7 @@ impl Options {
             rules: Arc::new(rules),
             terminal,
             src,
+            analysis,
             overrides,
         };
 
@@ -1252,6 +1259,53 @@ pub struct TerminalOptions {
         "#
     )]
     pub error_on_warning: Option<bool>,
+}
+
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalysisOptions {
+    /// Whether ty should respect `type: ignore` comments.
+    ///
+    /// When set to `false`, ty only respects `ty: ignore` comment,
+    /// and `type: ignore` comments are treated as any other normal comment
+    /// (they can't be used to suppress ty errors).
+    ///
+    /// Defaults to `true`.
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+        # Disable support for `type: ignore` comments
+        respect-type-ignore-comments = false
+        "#
+    )]
+    respect_type_ignore_comments: Option<bool>,
+}
+
+impl AnalysisOptions {
+    fn to_settings(&self) -> AnalysisSettings {
+        let AnalysisSettings {
+            respect_type_ignore_comments: respect_type_ignore_default,
+        } = AnalysisSettings::default();
+
+        AnalysisSettings {
+            respect_type_ignore_comments: self
+                .respect_type_ignore_comments
+                .unwrap_or(respect_type_ignore_default),
+        }
+    }
 }
 
 /// Configuration override that applies to specific files based on glob patterns.

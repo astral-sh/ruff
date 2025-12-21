@@ -101,6 +101,8 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
+    let respect_type_ignore = db.analysis_settings().respect_type_ignore_comments;
+
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();
 
@@ -116,6 +118,9 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 for comment in parser {
                     match comment {
                         Ok(comment) => {
+                            if comment.kind.is_type_ignore() && !respect_type_ignore {
+                                continue;
+                            }
                             builder.add_comment(comment, TextRange::new(line_start, token.end()));
                         }
                         Err(error) => match error.kind {
@@ -127,6 +132,10 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                             | ParseErrorKind::CodesMissingComma(kind)
                             | ParseErrorKind::InvalidCode(kind)
                             | ParseErrorKind::CodesMissingClosingBracket(kind) => {
+                                if kind.is_type_ignore() && !respect_type_ignore {
+                                    continue;
+                                }
+
                                 builder.add_invalid_comment(kind, error);
                             }
                         },
