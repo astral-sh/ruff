@@ -191,3 +191,21 @@ def test(x: Status | int):
     else:
         reveal_type(x)  # revealed: Literal[Status.REJECTED] | int
 ```
+
+## Union with tuple and `Literal`
+
+Parameterized tuple types like `tuple[A, B]` have a known structure and use standard tuple `__eq__`
+which only returns True for other tuples. So they are excluded from the narrowed type when disjoint
+from the RHS values.
+
+```py
+from typing import Literal
+
+def test(x: Literal["none", "auto", "required"] | tuple[list[str], Literal["auto", "required"]]):
+    if x in ("auto", "required"):
+        # tuple type is excluded because it's disjoint from the string literals
+        reveal_type(x)  # revealed: Literal["auto", "required"]
+    else:
+        # tuple type remains in the else branch
+        reveal_type(x)  # revealed: Literal["none"] | tuple[list[str], Literal["auto", "required"]]
+```
