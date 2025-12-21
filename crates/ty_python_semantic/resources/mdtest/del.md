@@ -242,6 +242,8 @@ Deleting a required key from a TypedDict is a type error because it would make t
 a valid instance of that TypedDict type. However, deleting `NotRequired` keys (or keys in
 `total=False` TypedDicts) is allowed.
 
+<!-- snapshot-diagnostics -->
+
 ```py
 from typing_extensions import TypedDict, NotRequired
 
