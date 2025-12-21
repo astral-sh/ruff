@@ -61,10 +61,31 @@ impl<'a> JunitRenderer<'a> {
                     let mut sub_diags = diagnostic
                         .sub_diagnostics()
                         .into_iter()
-                        .map(|i| i.concise_message().to_string())
+                        .map(|sub_diagnostic| {
+                            let mut message = sub_diagnostic.concise_message().to_string();
+                            // Include function/method/etc definition location
+                            // Example:
+                            // "Function defined here: /Path/to/file.py:123:456"
+                            if let Some(anno) = sub_diagnostic.primary_annotation() {
+                                if let Some(span) = anno.span.range() {
+                                    let file = anno.span.file();
+                                    let path = file.path(self.resolver);
+                                    let location = file
+                                        .diagnostic_source(self.resolver)
+                                        .as_source_code()
+                                        .line_column(span.start());
+                                    message = format!(
+                                        "{}: {}:{}:{}",
+                                        message, path, location.line, location.column
+                                    );
+                                }
+                            }
+                            message
+                        })
                         .collect::<Vec<String>>()
                         .join("\n");
-                    if sub_diags != "" {
+
+                    if !sub_diags.is_empty() {
                         // Add some space between the body and sub_diags if there are some
                         sub_diags = format!("\n\n{sub_diags}");
                     }
@@ -191,12 +212,20 @@ impl std::io::Write for FmtAdapter<'_> {
 mod tests {
     use crate::diagnostic::{
         DiagnosticFormat,
-        render::tests::{create_diagnostics, create_syntax_error_diagnostics},
+        render::tests::{
+            create_diagnostics, create_sub_diagnostics, create_syntax_error_diagnostics,
+        },
     };
 
     #[test]
     fn output() {
         let (env, diagnostics) = create_diagnostics(DiagnosticFormat::Junit);
+        insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
+    }
+
+    #[test]
+    fn sub_diagnostics() {
+        let (env, diagnostics) = create_sub_diagnostics(DiagnosticFormat::Junit);
         insta::assert_snapshot!(env.render_diagnostics(&diagnostics));
     }
 
