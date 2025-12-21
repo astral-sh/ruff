@@ -489,7 +489,7 @@ impl SearchPath {
                 SearchPathError::NotADirectory(_) => {
                     SearchPathError::NoStdlibSubdirectory(typeshed.to_path_buf())
                 }
-                err @ SearchPathError::NoStdlibSubdirectory(_) => err,
+                SearchPathError::NoStdlibSubdirectory(_) => err,
             })?;
 
         Ok(Self(Arc::new(SearchPathInner::StandardLibraryCustom(

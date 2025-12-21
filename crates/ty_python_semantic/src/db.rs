@@ -1,11 +1,10 @@
 use crate::lint::{LintRegistry, RuleSelection};
-use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
 use ty_module_resolver::Db as ModuleResolverDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb + ModuleResolverDb {
+pub trait Db: ModuleResolverDb {
     /// Returns `true` if the file should be checked.
     fn should_check_file(&self, file: File) -> bool;
 
