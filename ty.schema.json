@@ -425,7 +425,7 @@
         },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
-          "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
+          "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -745,7 +745,7 @@
         },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
-          "description": "## What it does\nChecks for forward annotations that contain invalid syntax.\n\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain invalid syntax.\n\n## Example\n\n```python\ndef foo() -> \"/\": ...\n```",
+          "description": "## What it does\nChecks for string-literal annotations where the string cannot be\nparsed as a Python expression.\n\n## Why is this bad?\nType annotations are expected to be Python expressions that\ndescribe the expected type of a variable, parameter, attribute or\n`return` statement.\n\nType annotations are permitted to be string-literal expressions, in\norder to enable forward references to names not yet defined.\nHowever, it must be possible to parse the contents of that string\nliteral as a normal Python expression.\n\n## Example\n\n```python\ndef foo() -> \"intstance of C\":\n    return 42\n\nclass C: ...\n```\n\nUse instead:\n\n```python\ndef foo() -> \"C\":\n    return 42\n\nclass C: ...\n```\n\n## References\n- [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)\n- [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)",
           "default": "error",
           "oneOf": [
             {
