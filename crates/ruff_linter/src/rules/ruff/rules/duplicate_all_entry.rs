@@ -50,14 +50,66 @@ impl Violation for DuplicateEntryInDunderAll {
     }
 }
 
-/// RUF069
-/// This routine checks whether `__all__` contains duplicated entries, and emits
-/// a violation if it does.
-pub(crate) fn duplicate_entry_in_dunder_all(
+/// Apply RUF069 to `StmtAssign` AST node. For example: `__all__ = ["a", "b", "a"]`.
+pub(crate) fn duplicate_entry_in_dunder_all_assign(
     checker: &Checker,
     ast::StmtAssign { value, targets, .. }: &ast::StmtAssign,
 ) {
-    let [target] = targets.as_slice() else { return };
+    if let [expr] = targets.as_slice() {
+        duplicate_entry_in_dunder_all(checker, expr, value);
+    }
+}
+
+/// Apply RUF069 to `StmtAugAssign` AST node. For example: `__all__ += ["a", "b", "a"]`.
+pub(crate) fn duplicate_entry_in_dunder_all_aug_assign(
+    checker: &Checker,
+    node: &ast::StmtAugAssign,
+) {
+    if node.op.is_add() {
+        duplicate_entry_in_dunder_all(checker, &node.target, &node.value);
+    }
+}
+
+/// Apply RUF069 to `__all__.extend()`.
+pub(crate) fn duplicate_entry_in_dunder_all_extend_call(
+    checker: &Checker,
+    ast::ExprCall {
+        func,
+        arguments: ast::Arguments { args, keywords, .. },
+        ..
+    }: &ast::ExprCall,
+) {
+    let ([value_passed], []) = (&**args, &**keywords) else {
+        return;
+    };
+    let ast::Expr::Attribute(ast::ExprAttribute {
+        ref value,
+        ref attr,
+        ..
+    }) = **func
+    else {
+        return;
+    };
+    if attr == "extend" {
+        duplicate_entry_in_dunder_all(checker, value, value_passed);
+    }
+}
+
+/// Apply RUF069 to a `StmtAnnAssign` AST node.
+/// For example: `__all__: list[str] = ["a", "b", "a"]`.
+pub(crate) fn duplicate_entry_in_dunder_all_ann_assign(
+    checker: &Checker,
+    node: &ast::StmtAnnAssign,
+) {
+    if let Some(value) = &node.value {
+        duplicate_entry_in_dunder_all(checker, &node.target, value);
+    }
+}
+
+/// RUF069
+/// This routine checks whether `__all__` contains duplicated entries, and emits
+/// a violation if it does.
+fn duplicate_entry_in_dunder_all(checker: &Checker, target: &ast::Expr, value: &ast::Expr) {
     let ast::Expr::Name(ast::ExprName { id, .. }) = target else {
         return;
     };
@@ -71,7 +123,7 @@ pub(crate) fn duplicate_entry_in_dunder_all(
         return;
     }
 
-    let elts = match value.as_ref() {
+    let elts = match value {
         ast::Expr::List(ast::ExprList { elts, .. }) => elts,
         ast::Expr::Tuple(ast::ExprTuple { elts, .. }) => elts,
         _ => return,
