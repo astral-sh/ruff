@@ -58,15 +58,29 @@ impl<'a> JunitRenderer<'a> {
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     status.set_message(diagnostic.concise_message().to_str());
 
+                    let mut sub_diags = diagnostic
+                        .sub_diagnostics()
+                        .into_iter()
+                        .map(|i| i.concise_message().to_string())
+                        .collect::<Vec<String>>()
+                        .join("\n");
+                    if sub_diags != "" {
+                        // Add some space between the body and sub_diags if there are some
+                        sub_diags = format!("\n\n{sub_diags}");
+                    }
+
                     if let Some(location) = location {
                         status.set_description(format!(
-                            "line {row}, col {col}, {body}",
+                            "line {row}, col {col}, {body}{sub_diags}",
                             row = location.line,
                             col = location.column,
                             body = diagnostic.concise_message()
                         ));
                     } else {
-                        status.set_description(diagnostic.concise_message().to_str());
+                        status.set_description(format!(
+                            "{body}{sub_diags}",
+                            body = diagnostic.concise_message(),
+                        ));
                     }
 
                     let code = diagnostic
@@ -85,7 +99,6 @@ impl<'a> JunitRenderer<'a> {
                             XmlString::new(location.column.to_string()),
                         );
                     }
-
                     test_suite.add_test_case(case);
                 }
                 report.add_test_suite(test_suite);
