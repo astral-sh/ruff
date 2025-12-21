@@ -250,7 +250,7 @@ fn tanjun(bencher: Bencher) {
     run_single_threaded(bencher, &TANJUN);
 }
 
-#[bench(sample_size = 1, sample_count = 3)]
+#[bench(sample_size = 2, sample_count = 3)]
 fn pydantic(bencher: Bencher) {
     run_single_threaded(bencher, &PYDANTIC);
 }
