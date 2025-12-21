@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use ruff_diagnostics::{Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
@@ -82,7 +82,7 @@ pub(crate) fn duplicate_entry_in_dunder_all(
         return;
     }
 
-    let mut deduplicated_elts = HashSet::with_capacity(elts.len());
+    let mut deduplicated_elts = FxHashSet::with_capacity_and_hasher(elts.len(), FxBuildHasher);
     let source = checker.locator().contents();
 
     for expr in elts {
