@@ -60,6 +60,8 @@ class Foo:
 
 reveal_type(Foo(1))  # revealed: Foo
 
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["x"]`"
+reveal_type(Foo("x"))  # revealed: Foo
 # error: [missing-argument] "No argument provided for required parameter `x` of function `__new__`"
 reveal_type(Foo())  # revealed: Foo
 # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
@@ -86,6 +88,23 @@ reveal_type(Foo(1))  # revealed: Foo
 reveal_type(Foo())  # revealed: Foo
 # error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+## `__new__` present but `__init__` missing
+
+`object.__init__` allows arbitrary arguments when a custom `__new__` exists. This should not trigger
+`__init__` argument errors.
+
+```py
+class Foo:
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+reveal_type(Foo(1))  # revealed: Foo
+
+Foo(1)
+# error: [too-many-positional-arguments] "Too many positional arguments to function `__new__`: expected 2, got 3"
+Foo(1, 2)
 ```
 
 ## Conditional `__new__`
@@ -128,6 +147,30 @@ class Foo:
 reveal_type(Foo(1))  # revealed: Foo
 # error: [missing-argument] "No argument provided for required parameter `x` of bound method `__call__`"
 reveal_type(Foo())  # revealed: Foo
+```
+
+## `__new__` defined as a staticmethod
+
+```py
+class Foo:
+    @staticmethod
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+## `__new__` defined as a classmethod
+
+```py
+class Foo:
+    @classmethod
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+# error: [invalid-argument-type] "Argument to bound method `__new__` is incorrect: Expected `int`, found `<class 'Foo'>`"
+# error: [too-many-positional-arguments] "Too many positional arguments to bound method `__new__`: expected 1, got 2"
+Foo(1)
 ```
 
 ## A callable instance in place of `__new__`
@@ -200,6 +243,35 @@ reveal_type(Foo(1))  # revealed: Foo
 reveal_type(Foo())  # revealed: Foo
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+## Generic constructor inference
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Box(Generic[T]):
+    def __init__(self, x: T) -> None: ...
+
+reveal_type(Box(1))  # revealed: Box[int]
+```
+
+## Union of constructors
+
+```py
+class A:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+class B:
+    def __init__(self, x: int) -> None:
+        self.x = x
+
+def f(flag: bool):
+    cls = A if flag else B
+    reveal_type(cls(1))  # revealed: A | B
 ```
 
 ## `__init__` present on a superclass
@@ -346,6 +418,23 @@ reveal_type(Foo(1))  # revealed: Foo
 
 # error: [too-many-positional-arguments] "Too many positional arguments to bound method `__init__`: expected 2, got 3"
 reveal_type(Foo(1, 2))  # revealed: Foo
+```
+
+### Conflicting parameter types
+
+```py
+class Foo:
+    def __new__(cls, x: int):
+        return object.__new__(cls)
+
+    def __init__(self, x: str) -> None:
+        self.x = x
+
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `str`, found `Literal[1]`"
+Foo(1)
+
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `int`, found `Literal["x"]`"
+Foo("x")
 ```
 
 ### Incompatible signatures
