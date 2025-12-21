@@ -7743,11 +7743,7 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                None => self,
-                Some(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown()),
-            },
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
