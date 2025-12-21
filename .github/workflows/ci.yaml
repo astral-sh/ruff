@@ -1034,7 +1034,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: benchmarks-walltime-binary
-          path: target/codspeed/walltime/ty_walltime
+          path: target/codspeed/walltime/ruff_benchmark
           retention-days: 1
 
   benchmarks-walltime-run:
@@ -1069,7 +1069,7 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: benchmarks-walltime-binary
-          path: target/codspeed/walltime/ty_walltime
+          path: target/codspeed/walltime/ruff_benchmark
 
       - name: "Restore binary permissions"
         run: chmod +x target/codspeed/walltime/ruff_benchmark/ty_walltime
