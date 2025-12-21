@@ -1,4 +1,5 @@
-use std::{collections::BTreeMap, ops::Deref, path::Path};
+use std::path::Path;
+use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
@@ -48,39 +49,63 @@ impl<'a> JunitRenderer<'a> {
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
-                let classname = Path::new(filename).with_extension("");
-
                 for diagnostic in diagnostics {
                     let DiagnosticWithLocation {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
-                    let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                    status.set_message(diagnostic.concise_message().to_str());
-
+                    let indent = " ".repeat(4 * 4);
                     let mut sub_diags = diagnostic
                         .sub_diagnostics()
-                        .into_iter()
+                        .iter()
                         .map(|sub_diagnostic| {
-                            let mut message = sub_diagnostic.concise_message().to_string();
-                            // Include function/method/etc definition location
-                            // Example:
-                            // "Function defined here: /Path/to/file.py:123:456"
-                            if let Some(anno) = sub_diagnostic.primary_annotation() {
-                                if let Some(span) = anno.span.range() {
-                                    let file = anno.span.file();
-                                    let path = file.path(self.resolver);
-                                    let location = file
-                                        .diagnostic_source(self.resolver)
-                                        .as_source_code()
-                                        .line_column(span.start());
-                                    message = format!(
-                                        "{}: {}:{}:{}",
-                                        message, path, location.line, location.column
+                            // Hydrates the sub-diagnostic with information from the
+                            // parent and formats it for rendering into the XML structure
+
+                            let message = sub_diagnostic.concise_message().to_string();
+                            let severity = sub_diagnostic.inner.severity;
+                            let mut annotations = vec![];
+
+                            // Add function/method/etc definition location
+                            // Such as: "Function defined here: /Path/to/file.py:123:456"
+                            for annotation in sub_diagnostic.annotations() {
+                                let file = annotation.span.file();
+                                let path = file.path(self.resolver);
+                                let source = file.diagnostic_source(self.resolver);
+
+                                // NOTE: (@cetanu)
+                                // It would be possible to rename the test cases, suite,
+                                // and report here, to either Ty or Ruff,
+                                // but I'm not sure if this should be done.
+                                //
+                                // match source {
+                                //     DiagnosticSource::Ty(_) => (),
+                                //     DiagnosticSource::Ruff(_) => (),
+                                // };
+
+                                let sub_message = match annotation.get_message() {
+                                    Some(m) => m,
+                                    None => message.as_str(),
+                                };
+
+                                let mut sub_diag_loc = String::new();
+                                if let Some(span) = annotation.span.range() {
+                                    let loc = source.as_source_code().line_column(span.start());
+                                    sub_diag_loc = format!(
+                                        ":{line}:{column}",
+                                        line = loc.line,
+                                        column = loc.column
                                     );
                                 }
+                                annotations.push(format!(
+                                    "{indent}{severity:?}: {sub_message} → {path}{sub_diag_loc}",
+                                ));
                             }
-                            message
+                            if annotations.is_empty() {
+                                format!("{indent}{severity:?}: {message}")
+                            } else {
+                                annotations.join("\n")
+                            }
                         })
                         .collect::<Vec<String>>()
                         .join("\n");
@@ -90,26 +115,17 @@ impl<'a> JunitRenderer<'a> {
                         sub_diags = format!("\n\n{sub_diags}");
                     }
 
-                    if let Some(location) = location {
-                        status.set_description(format!(
-                            "line {row}, col {col}, {body}{sub_diags}",
-                            row = location.line,
-                            col = location.column,
-                            body = diagnostic.concise_message()
-                        ));
-                    } else {
-                        status.set_description(format!(
-                            "{body}{sub_diags}",
-                            body = diagnostic.concise_message(),
-                        ));
-                    }
-
                     let code = diagnostic
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
+                    let status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
+                    let classname = Path::new(filename).with_extension("");
                     case.set_classname(classname.to_str().unwrap());
+                    case.status
+                        .set_message(diagnostic.concise_message().to_str());
 
+                    let mut diagnostic_loc = String::new();
                     if let Some(location) = location {
                         case.extra.insert(
                             XmlString::new("line"),
@@ -119,7 +135,17 @@ impl<'a> JunitRenderer<'a> {
                             XmlString::new("column"),
                             XmlString::new(location.column.to_string()),
                         );
+                        diagnostic_loc = format!(
+                            "line {row}, col {col}, ",
+                            row = location.line,
+                            col = location.column,
+                        );
                     }
+                    case.status.set_description(format!(
+                        "\n{indent}{diagnostic_loc}{body}{sub_diags}\n{after_indent}",
+                        after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
+                        body = diagnostic.concise_message().to_str(),
+                    ));
                     test_suite.add_test_case(case);
                 }
                 report.add_test_suite(test_suite);
