@@ -96,8 +96,8 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/final.md
  82 | 
  83 | class Grandchild(OtherChild):
  84 |     @staticmethod
- 85 |     # TODO: we should emit a Liskov violation here too
- 86 |     # error: [override-of-final-method]
+ 85 |     # error: [override-of-final-method]
+ 86 |     # error: [invalid-method-override]
  87 |     def foo(): ...
  88 |     @property
  89 |     # TODO: we should emit a Liskov violation here too
@@ -407,11 +407,37 @@ note: This is an unsafe fix and may change runtime behavior
 ```
 
 ```
+error[invalid-method-override]: Invalid override of method `foo`
+  --> src/mdtest_snippet.pyi:87:9
+   |
+85 |     # error: [override-of-final-method]
+86 |     # error: [invalid-method-override]
+87 |     def foo(): ...
+   |         ^^^^^ Definition is incompatible with `Parent.foo`
+88 |     @property
+89 |     # TODO: we should emit a Liskov violation here too
+   |
+  ::: src/mdtest_snippet.pyi:7:9
+   |
+ 5 | class Parent:
+ 6 |     @final
+ 7 |     def foo(self): ...
+   |         --------- `Parent.foo` defined here
+ 8 |
+ 9 |     @final
+   |
+info: `Grandchild.foo` is a staticmethod but `Parent.foo` is an instance method
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
 error[override-of-final-method]: Cannot override `Parent.foo`
   --> src/mdtest_snippet.pyi:87:9
    |
-85 |     # TODO: we should emit a Liskov violation here too
-86 |     # error: [override-of-final-method]
+85 |     # error: [override-of-final-method]
+86 |     # error: [invalid-method-override]
 87 |     def foo(): ...
    |         ^^^ Overrides a definition from superclass `Parent`
 88 |     @property
@@ -434,8 +460,8 @@ info: rule `override-of-final-method` is enabled by default
 82 | 
 83 | class Grandchild(OtherChild):
    -     @staticmethod
-   -     # TODO: we should emit a Liskov violation here too
    -     # error: [override-of-final-method]
+   -     # error: [invalid-method-override]
    -     def foo(): ...
 84 +     
 85 |     @property

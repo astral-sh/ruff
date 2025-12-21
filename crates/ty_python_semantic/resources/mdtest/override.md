@@ -185,7 +185,7 @@ class LiskovViolatingButNotOverrideViolating(Parent):
 
     @staticmethod
     @override
-    def class_method1() -> int: ...
+    def class_method1() -> int: ...  # error: [invalid-method-override]
 
     @classmethod
     @override

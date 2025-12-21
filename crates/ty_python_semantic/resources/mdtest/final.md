@@ -119,8 +119,8 @@ class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
     @staticmethod
-    # TODO: we should emit a Liskov violation here too
     # error: [override-of-final-method]
+    # error: [invalid-method-override]
     def foo(): ...
     @property
     # TODO: we should emit a Liskov violation here too

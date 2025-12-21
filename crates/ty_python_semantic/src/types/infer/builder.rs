@@ -2436,6 +2436,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         .and_then(CallableTypes::exactly_one)
                         .and_then(|callable| match callable.kind(self.db()) {
                             kind @ (CallableTypeKind::FunctionLike
+                            | CallableTypeKind::StaticMethodLike
                             | CallableTypeKind::ClassMethodLike) => Some(kind),
                             _ => None,
                         });
@@ -2445,9 +2446,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         // When a method on a class is decorated with a function that returns a
                         // `Callable`, assume that the returned callable is also function-like (or
-                        // classmethod-like). See "Decorating a method with a `Callable`-typed
-                        // decorator" in `callables_as_descriptors.md` for the extended
-                        // explanation.
+                        // classmethod-like or staticmethod-like). See "Decorating a method with
+                        // a `Callable`-typed decorator" in `callables_as_descriptors.md` for the
+                        // extended explanation.
                         return_ty_modified
                     } else {
                         return_ty
