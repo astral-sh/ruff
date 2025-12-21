@@ -919,7 +919,7 @@ jobs:
 
   benchmarks-instrumented-ruff:
     name: "benchmarks instrumented (ruff)"
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-4' || 'ubuntu-24.04' }}
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -962,7 +962,7 @@ jobs:
 
   benchmarks-instrumented-ty:
     name: "benchmarks instrumented (ty)"
-    runs-on: ubuntu-24.04
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-24.04-4' || 'ubuntu-24.04' }}
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
