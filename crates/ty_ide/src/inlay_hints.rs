@@ -104,6 +104,7 @@ impl InlayHint {
                             module_name,
                             &definition_name,
                             &details.label[start..end],
+                            *ty,
                         )
                     };
 
@@ -612,7 +613,7 @@ fn is_ignored_variable_assignment_target(expr: &Expr) -> bool {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-struct DynamicImportedMember {
+struct DynamicallyImportedMember {
     module: String,
     name: String,
 }
@@ -623,7 +624,7 @@ struct DynamicImporter<'db> {
 
     /// Imports that we have already resolved.
     /// We store these imports so we don't create multiple imports for the same symbol.
-    dynamic_imports: FxHashMap<DynamicImportedMember, ImportAction>,
+    dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
 }
 
 impl<'db> DynamicImporter<'db> {
@@ -642,13 +643,9 @@ impl<'db> DynamicImporter<'db> {
         module_name: &str,
         definition_name: &str,
         label_text: &str,
+        symbol_ty: Type<'_>,
     ) -> Option<String> {
         use std::collections::hash_map::Entry;
-
-        let key = DynamicImportedMember {
-            module: module_name.to_string(),
-            name: definition_name.to_string(),
-        };
 
         let qualified_name = |import_action: &ImportAction| {
             if import_action.import().is_some() {
@@ -657,21 +654,31 @@ impl<'db> DynamicImporter<'db> {
 
             let symbol_text = import_action.symbol_text();
 
-            if symbol_text != label_text {
-                Some(symbol_text.to_string())
-            } else {
-                None
-            }
+            Some(symbol_text.to_string())
         };
 
-        if self.members.contains_symbol(definition_name) {
+        if self.members.contains_symbol(definition_name, symbol_ty) {
             return None;
         }
 
+        // Check if the label is like `foo.A`
+        let is_possibly_qualified_name = label_text.contains('.');
+
+        let key = DynamicallyImportedMember {
+            module: module_name.to_string(),
+            name: definition_name.to_string(),
+        };
+
         match self.dynamic_imports.entry(key) {
             Entry::Vacant(entry) => {
-                let request = ImportRequest::import_from(module_name, definition_name);
+                let request = if is_possibly_qualified_name {
+                    ImportRequest::import(module_name, definition_name).force()
+                } else {
+                    ImportRequest::import_from(module_name, definition_name)
+                };
+
                 let import_action = self.importer.import(request, &self.members);
+
                 let qualified_name = qualified_name(&import_action);
 
                 entry.insert(import_action);
@@ -8176,6 +8183,292 @@ mod tests {
         def foo(x: Any):
             a: Any | Literal["some"] = getattr(x, 'foo', "some")
         "#);
+    }
+
+    #[test]
+    fn test_auto_import_other_symbols() {
+        let mut test = inlay_hint_test(
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+        from typing import TypeVar, Any
+
+        def foo() -> dict[TypeVar, Any] | None: ...
+        "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        from foo import foo
+
+        a[: dict[TypeVar, Any] | None] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2947:7
+             |
+        2946 | @disjoint_base
+        2947 | class dict(MutableMapping[_KT, _VT]):
+             |       ^^^^
+        2948 |     """dict() -> new empty dictionary
+        2949 |     dict(mapping) -> new dictionary initialized from a mapping object's
+             |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:211:7
+            |
+        210 | @final
+        211 | class TypeVar:
+            |       ^^^^^^^
+        212 |     """Type variable.
+            |
+        info: Source
+         --> main2.py:4:10
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |          ^^^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/typing.pyi:166:7
+            |
+        164 | # from _typeshed import AnnotationForm
+        165 |
+        166 | class Any:
+            |       ^^^
+        167 |     """Special type indicating an unconstrained type.
+            |
+        info: Source
+         --> main2.py:4:19
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |                   ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/types.pyi:950:11
+            |
+        948 | if sys.version_info >= (3, 10):
+        949 |     @final
+        950 |     class NoneType:
+            |           ^^^^^^^^
+        951 |         """The type of the None singleton."""
+            |
+        info: Source
+         --> main2.py:4:26
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: dict[TypeVar, Any] | None] = foo()
+          |                          ^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        from types import NoneType
+        from typing import TypeVar
+        from typing import Any
+
+        from foo import foo
+
+        a: dict[TypeVar, Any] | None = foo()
+        "#);
+    }
+
+    /// Tests that if we have an inlay hint containing two symbols with the same name
+    /// from unimported modules, then we add two `import <module>` statements, and
+    /// qualify both symbols (<module1.<symbol1>, <module2.<symbol1>).
+    #[test]
+    fn test_auto_import_same_name_different_modules_both_qualified() {
+        let mut test = inlay_hint_test(
+            r#"
+            from foo import foo
+
+            a = foo()
+            "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+        import bar
+        import baz
+
+        def foo() -> bar.A | baz.A:
+            return bar.A()
+        "#,
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            r#"
+            class A: ...
+        "#,
+        );
+
+        test.with_extra_file(
+            "baz.py",
+            r#"
+            class A: ...
+        "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from foo import foo
+
+        a[: bar.A | baz.A] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:5
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: bar.A | baz.A] = foo()
+          |     ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:19
+          |
+        2 |             class A: ...
+          |                   ^
+          |
+        info: Source
+         --> main2.py:4:13
+          |
+        2 | from foo import foo
+        3 |
+        4 | a[: bar.A | baz.A] = foo()
+          |             ^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        import bar
+        import baz
+
+        from foo import foo
+
+        a: bar.A | baz.A = foo()
+        ");
+    }
+
+    /// Tests that if we have an inlay hint containing two symbols with the same name
+    /// from two modules, one which is imported already via a "import from" statement,
+    /// then we still add two `import <module>` statements.
+    #[test]
+    fn test_auto_import_same_name_different_modules_one_qualified() {
+        let mut test = inlay_hint_test(
+            r#"
+               from foo import foo
+               from bar import B
+
+               a = foo()
+               "#,
+        );
+
+        test.with_extra_file(
+            "foo.py",
+            r#"
+           import bar
+           import baz
+
+           def foo() -> bar.A | baz.A:
+               return bar.A()
+           "#,
+        );
+
+        test.with_extra_file(
+            "bar.py",
+            r#"
+               class A: ...
+               class B: ...
+           "#,
+        );
+
+        test.with_extra_file(
+            "baz.py",
+            r#"
+               class A: ...
+           "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        from foo import foo
+        from bar import B
+
+        a[: bar.A | baz.A] = foo()
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+        3 |                class B: ...
+          |
+        info: Source
+         --> main2.py:5:5
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A] = foo()
+          |     ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+          |
+        info: Source
+         --> main2.py:5:13
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A] = foo()
+          |             ^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+        import bar
+        import baz
+
+        from foo import foo
+        from bar import B
+
+        a: bar.A | baz.A = foo()
+        ");
     }
 
     struct InlayHintLocationDiagnostic {
