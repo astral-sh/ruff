@@ -8383,6 +8383,8 @@ mod tests {
     /// Tests that if we have an inlay hint containing two symbols with the same name
     /// from two modules, one which is imported already via a "import from" statement,
     /// then we still add two `import <module>` statements.
+    ///
+    /// We also show here that we don't add repeated import statements.
     #[test]
     fn test_auto_import_same_name_different_modules_one_qualified() {
         let mut test = inlay_hint_test(
@@ -8400,7 +8402,7 @@ mod tests {
            import bar
            import baz
 
-           def foo() -> bar.A | baz.A:
+           def foo() -> bar.A | baz.A | list[bar.A | baz.A]:
                return bar.A()
            "#,
         );
@@ -8420,11 +8422,11 @@ mod tests {
            "#,
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
         from foo import foo
         from bar import B
 
-        a[: bar.A | baz.A] = foo()
+        a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
@@ -8439,7 +8441,7 @@ mod tests {
           |
         3 | from bar import B
         4 |
-        5 | a[: bar.A | baz.A] = foo()
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
           |     ^^^^^
           |
 
@@ -8454,8 +8456,56 @@ mod tests {
           |
         3 | from bar import B
         4 |
-        5 | a[: bar.A | baz.A] = foo()
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
           |             ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:5:21
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                     ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> bar.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+        3 |                class B: ...
+          |
+        info: Source
+         --> main2.py:5:26
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                          ^^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> baz.py:2:22
+          |
+        2 |                class A: ...
+          |                      ^
+          |
+        info: Source
+         --> main2.py:5:34
+          |
+        3 | from bar import B
+        4 |
+        5 | a[: bar.A | baz.A | list[bar.A | baz.A]] = foo()
+          |                                  ^^^^^
           |
 
         ---------------------------------------------
@@ -8467,8 +8517,8 @@ mod tests {
         from foo import foo
         from bar import B
 
-        a: bar.A | baz.A = foo()
-        ");
+        a: bar.A | baz.A | list[bar.A | baz.A] = foo()
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {
