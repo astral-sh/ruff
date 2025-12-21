@@ -425,7 +425,7 @@
         },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -745,7 +745,7 @@
         },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for forward annotations that contain invalid syntax.\n\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain invalid syntax.\n\n## Example\n\n```python\ndef foo() -> \"/\": ...\n```",
           "default": "error",
           "oneOf": [
             {

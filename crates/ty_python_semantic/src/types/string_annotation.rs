@@ -109,7 +109,18 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+        /// ## What it does
+        /// Checks for forward annotations that contain invalid syntax.
+        ///
+        ///
+        /// ## Why is this bad?
+        /// Static analysis tools like ty can't analyze type annotations that contain invalid syntax.
+        ///
+        /// ## Example
+        ///
+        /// ```python
+        /// def foo() -> "/": ...
+        /// ```
     pub(crate) static INVALID_SYNTAX_IN_FORWARD_ANNOTATION = {
         summary: "detects invalid syntax in forward annotations",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -118,7 +129,18 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+        /// ## What it does
+        /// Checks for forward annotations that contain escape characters.
+        ///
+        ///
+        /// ## Why is this bad?
+        /// Static analysis tools like ty can't analyze type annotations that contain escape characters.
+        ///
+        /// ## Example
+        ///
+        /// ```python
+        /// def foo() -> "intt\b": ...
+        /// ```
     pub(crate) static ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION = {
         summary: "detects forward type annotations with escape characters",
         status: LintStatus::stable("0.0.1-alpha.1"),

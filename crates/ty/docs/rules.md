@@ -380,11 +380,25 @@ class A:  # Crash at runtime
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20escape-character-in-forward-annotation" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fstring_annotation.rs#L120" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fstring_annotation.rs#L131" target="_blank">View source</a>
 </small>
 
 
-TODO #14889
+**What it does**
+
+Checks for forward annotations that contain escape characters.
+
+
+**Why is this bad?**
+
+Static analysis tools like ty can't analyze type annotations that contain escape characters.
+
+**Example**
+
+
+```python
+def foo() -> "intt\b": ...
+```
 
 ## `fstring-type-annotation`
 
@@ -1597,7 +1611,21 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 </small>
 
 
-TODO #14889
+**What it does**
+
+Checks for forward annotations that contain invalid syntax.
+
+
+**Why is this bad?**
+
+Static analysis tools like ty can't analyze type annotations that contain invalid syntax.
+
+**Example**
+
+
+```python
+def foo() -> "/": ...
+```
 
 ## `invalid-type-alias-type`
 
