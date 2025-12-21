@@ -90,6 +90,22 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
             })?
     };
 
+    let system = OsSystem::new(&cwd);
+
+    // If we see a single path, check if it's a PEP-723 script
+    let mut script_project = None;
+    if let [path] = &*args.paths {
+        match ProjectMetadata::discover_script(path, &system) {
+            Ok(project) => {
+                script_project = Some(project);
+            }
+            Err(ty_project::ProjectMetadataError::NotAScript(_)) => {
+                // This is fine
+            }
+            Err(e) => tracing::info!("Issue reading script at `{path}`: {e}"),
+        }
+    }
+
     let project_path = args
         .project
         .as_ref()
@@ -111,7 +127,6 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .map(|path| SystemPath::absolute(path, &cwd))
         .collect();
 
-    let system = OsSystem::new(&cwd);
     let watch = args.watch;
     let exit_zero = args.exit_zero;
     let config_file = args
@@ -122,7 +137,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
 
     let mut project_metadata = match &config_file {
         Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
-        None => ProjectMetadata::discover(&project_path, &system)?,
+        None => {
+            if let Some(project) = script_project {
+                project
+            } else {
+                ProjectMetadata::discover(&project_path, &system)?
+            }
+        }
     };
 
     project_metadata.apply_configuration_files(&system)?;

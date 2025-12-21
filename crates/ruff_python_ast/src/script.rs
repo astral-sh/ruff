@@ -12,11 +12,11 @@ static FINDER: LazyLock<Finder> = LazyLock::new(|| Finder::new(b"# /// script"))
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct ScriptTag {
     /// The content of the script before the metadata block.
-    prelude: String,
+    pub prelude: String,
     /// The metadata block.
-    metadata: String,
+    pub metadata: String,
     /// The content of the script after the metadata block.
-    postlude: String,
+    pub postlude: String,
 }
 
 impl ScriptTag {
