@@ -380,11 +380,24 @@ class A:  # Crash at runtime
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20escape-character-in-forward-annotation" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fstring_annotation.rs#L120" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fstring_annotation.rs#L154" target="_blank">View source</a>
 </small>
 
 
-TODO #14889
+**What it does**
+
+Checks for forward annotations that contain escape characters.
+
+**Why is this bad?**
+
+Static analysis tools like ty can't analyze type annotations that contain escape characters.
+
+**Example**
+
+
+```python
+def foo() -> "intt\b": ...
+```
 
 ## `fstring-type-annotation`
 
@@ -1597,7 +1610,45 @@ Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.
 </small>
 
 
-TODO #14889
+**What it does**
+
+Checks for string-literal annotations where the string cannot be
+parsed as a Python expression.
+
+**Why is this bad?**
+
+Type annotations are expected to be Python expressions that
+describe the expected type of a variable, parameter, attribute or
+`return` statement.
+
+Type annotations are permitted to be string-literal expressions, in
+order to enable forward references to names not yet defined.
+However, it must be possible to parse the contents of that string
+literal as a normal Python expression.
+
+**Example**
+
+
+```python
+def foo() -> "intstance of C":
+    return 42
+
+class C: ...
+```
+
+Use instead:
+
+```python
+def foo() -> "C":
+    return 42
+
+class C: ...
+```
+
+**References**
+
+- [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)
+- [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)
 
 ## `invalid-type-alias-type`
 
