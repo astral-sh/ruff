@@ -718,8 +718,26 @@ mod tests {
             "#,
         );
 
-        // TODO: This should jump to the definition of `Alias` above.
-        assert_snapshot!(test.goto_type_definition(), @"No type definitions found");
+        assert_snapshot!(test.goto_type_definition(), @r#"
+        info[goto-type-definition]: Type definition
+         --> main.py:4:1
+          |
+        2 | from typing_extensions import TypeAliasType
+        3 |
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+          | ^^^^^
+        5 |
+        6 | Alias
+          |
+        info: Source
+         --> main.py:6:1
+          |
+        4 | Alias = TypeAliasType("Alias", tuple[int, int])
+        5 |
+        6 | Alias
+          | ^^^^^
+          |
+        "#);
     }
 
     #[test]

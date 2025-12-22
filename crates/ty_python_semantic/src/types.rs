@@ -13637,6 +13637,8 @@ pub struct ManualPEP695TypeAliasType<'db> {
     pub name: ast::name::Name,
     pub definition: Option<Definition<'db>>,
     pub value: Type<'db>,
+    generic_context: Option<GenericContext<'db>>,
+    specialization: Option<Specialization<'db>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -13651,12 +13653,50 @@ fn walk_manual_pep_695_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 }
 
 impl<'db> ManualPEP695TypeAliasType<'db> {
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.apply_function_specialization(db, self.value(db))
+    }
+
+    fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        if let Some(generic_context) = self.generic_context(db) {
+            let specialization = self
+                .specialization(db)
+                .unwrap_or_else(|| generic_context.default_specialization(db, None));
+            ty.apply_specialization(db, specialization)
+        } else {
+            ty
+        }
+    }
+
+    pub(crate) fn apply_specialization(
+        self,
+        db: &'db dyn Db,
+        f: impl FnOnce(GenericContext<'db>) -> Specialization<'db>,
+    ) -> ManualPEP695TypeAliasType<'db> {
+        match self.generic_context(db) {
+            None => self,
+            Some(generic_context) => {
+                let specialization = f(generic_context);
+                ManualPEP695TypeAliasType::new(
+                    db,
+                    self.name(db),
+                    self.definition(db),
+                    self.value(db),
+                    self.generic_context(db),
+                    Some(specialization),
+                )
+            }
+        }
+    }
+
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         Self::new(
             db,
             self.name(db),
             self.definition(db),
             self.value(db).normalized_impl(db, visitor),
+            self.generic_context(db),
+            self.specialization(db),
         )
     }
 
@@ -13668,6 +13708,8 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
             self.definition(db),
             self.value(db)
                 .recursive_type_normalized_impl(db, div, true)?,
+            self.generic_context(db),
+            self.specialization(db),
         ))
     }
 }
@@ -13738,7 +13780,7 @@ impl<'db> TypeAliasType<'db> {
     pub fn value_type(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
-            TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -13757,24 +13799,25 @@ impl<'db> TypeAliasType<'db> {
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {
-        // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.generic_context(db),
         }
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(type_alias) => type_alias.specialization(db),
         }
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
+            TypeAliasType::ManualPEP695(type_alias) => {
+                type_alias.apply_function_specialization(db, ty)
+            }
         }
     }
 
@@ -13787,7 +13830,9 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::ManualPEP695(type_alias) => {
+                TypeAliasType::ManualPEP695(type_alias.apply_specialization(db, f))
+            }
         }
     }
 }
