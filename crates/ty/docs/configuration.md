@@ -352,8 +352,8 @@ If not specified, defaults to `[]` (excludes no files).
 === "ty.toml"
 
     ```toml
-    overrides
-    [[tool.ty.overrides]]
+    
+    [[overrides]]
     exclude = [
         "generated",
         "*.proto",
@@ -394,8 +394,8 @@ If not specified, defaults to `["**"]` (matches all files).
 === "ty.toml"
 
     ```toml
-    overrides
-    [[tool.ty.overrides]]
+    
+    [[overrides]]
     include = [
         "src",
         "tests",
@@ -432,11 +432,11 @@ severity levels or disable them entirely.
 === "ty.toml"
 
     ```toml
-    overrides
-    [[tool.ty.overrides]]
+    
+    [[overrides]]
     include = ["src"]
 
-    [tool.ty.overrides.rules]
+    [overrides.rules]
     possibly-unresolved-reference = "ignore"
     ```
 

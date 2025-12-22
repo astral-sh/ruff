@@ -168,27 +168,24 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
-    output.push_str(&format_tab(
-        "pyproject.toml",
-        &format_header(
-            field.scope,
-            field.example,
-            parents,
-            ConfigurationFile::PyprojectToml,
-        ),
+    let (header, example) = format_snippet(
+        field.scope,
         field.example,
-    ));
+        parents,
+        ConfigurationFile::PyprojectToml,
+    );
+    output.push_str(&format_tab("pyproject.toml", &header, &example));
+
     output.push('\n');
-    output.push_str(&format_tab(
-        "ty.toml",
-        &format_header(
-            field.scope,
-            field.example,
-            parents,
-            ConfigurationFile::TyToml,
-        ),
+
+    let (header, example) = format_snippet(
+        field.scope,
         field.example,
-    ));
+        parents,
+        ConfigurationFile::TyToml,
+    );
+    output.push_str(&format_tab("ty.toml", &header, &example));
+
     output.push('\n');
 }
 
@@ -203,12 +200,12 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
-fn format_header(
+fn format_snippet(
     scope: Option<&str>,
     example: &str,
     parents: &[Set],
     configuration: ConfigurationFile,
-) -> String {
+) -> (String, String) {
     let tool_parent = match configuration {
         ConfigurationFile::PyprojectToml => Some("tool.ty"),
         ConfigurationFile::TyToml => None,
@@ -222,26 +219,25 @@ fn format_header(
 
     // Ex) `[[tool.ty.xx]]`
     if example.starts_with(&format!("[[{header}")) {
-        return String::new();
+        return (String::new(), example.to_string());
     }
 
     // Ex) `[tool.ty.rules]`
     if example.starts_with(&format!("[{header}")) {
-        return String::new();
+        return (String::new(), example.to_string());
     }
 
     // Some examples show headers which would show up in `pyproject.toml`,
-    // so we much adjust the header to match the format of `ty.toml`
     if matches!(configuration, ConfigurationFile::TyToml) {
         if example.starts_with("[[tool.ty") || example.starts_with("[tool.ty") {
-            return header.replacen("tool.ty", "", 1);
+            return (String::new(), example.replace("tool.ty.", ""));
         }
     }
 
     if header.is_empty() {
-        String::new()
+        (String::new(), example.to_string())
     } else {
-        format!("[{header}]")
+        (format!("[{header}]"), example.to_string())
     }
 }
 
