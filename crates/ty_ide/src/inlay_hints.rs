@@ -65,10 +65,8 @@ impl InlayHint {
         let mut label_parts = vec![": ".into()];
 
         for (target, detail) in details.targets.iter().zip(&details.details) {
-            println!("target: {:?}", target);
             match detail {
                 TypeDetail::Type(ty) => {
-                    println!("ty: {:?}", ty.display(db));
                     let start = target.start().to_usize();
                     let end = target.end().to_usize();
 
@@ -81,9 +79,7 @@ impl InlayHint {
                     let qualified_label_part =
                         |dynamic_importer: &mut DynamicImporter, label: &str| {
                             let type_definition = ty.definition(db)?;
-                            println!("Type definition: {:?}", type_definition);
                             let definition = type_definition.definition()?;
-                            println!("Definition: {:?}", definition);
                             let definition_name = definition.name(db).unwrap_or(label.to_string());
 
                             // Don't try to import symbols in scope.
