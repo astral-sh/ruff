@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Instant;
 
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
