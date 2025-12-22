@@ -65,8 +65,10 @@ impl InlayHint {
         let mut label_parts = vec![": ".into()];
 
         for (target, detail) in details.targets.iter().zip(&details.details) {
+            println!("target: {:?}", target);
             match detail {
                 TypeDetail::Type(ty) => {
+                    println!("ty: {:?}", ty.display(db));
                     let start = target.start().to_usize();
                     let end = target.end().to_usize();
 
@@ -76,30 +78,33 @@ impl InlayHint {
                     }
 
                     // Get the possible qualified label part
-                    let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
-                        let type_definition = ty.definition(db)?;
-                        let definition = type_definition.definition()?;
-                        let definition_name = definition.name(db)?;
+                    let qualified_label_part =
+                        |dynamic_importer: &mut DynamicImporter, label: &str| {
+                            let type_definition = ty.definition(db)?;
+                            println!("Type definition: {:?}", type_definition);
+                            let definition = type_definition.definition()?;
+                            println!("Definition: {:?}", definition);
+                            let definition_name = definition.name(db).unwrap_or(label.to_string());
 
-                        // Don't try to import symbols in scope.
-                        if definition.file(db) == file {
-                            return None;
-                        }
+                            // Don't try to import symbols in scope.
+                            if definition.file(db) == file {
+                                return None;
+                            }
 
-                        let module = file_to_module(db, definition.file(db))?;
+                            let module = file_to_module(db, definition.file(db))?;
 
-                        if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
-                            return None;
-                        }
+                            if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
+                                return None;
+                            }
 
-                        let module_name = module.name(db).as_str();
+                            let module_name = module.name(db).as_str();
 
-                        dynamic_importer.import_symbol(
-                            module_name,
-                            &definition_name,
-                            &details.label[start..end],
-                        )
-                    };
+                            dynamic_importer.import_symbol(
+                                module_name,
+                                &definition_name,
+                                &details.label[start..end],
+                            )
+                        };
 
                     let text_edit_start = start + text_edit_offset;
                     let text_edit_end = end + text_edit_offset;
@@ -109,7 +114,9 @@ impl InlayHint {
                         let nav_target = ty.navigation_targets(db).into_iter().next();
 
                         // Update qualified_label for text edits if needed
-                        if let Some(qualified_label_part) = qualified_label_part(dynamic_importer) {
+                        if let Some(qualified_label_part) =
+                            qualified_label_part(dynamic_importer, &details.label[start..end])
+                        {
                             let old_len = text_edit_end - text_edit_start;
                             let new_len = qualified_label_part.len();
 
@@ -1063,6 +1070,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
@@ -2157,6 +2165,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
@@ -8188,7 +8197,7 @@ mod tests {
         info[inlay-hint-edit]: File after edits
         info: Source
 
-        from typing import Any
+        from typing import Any, Literal
 
         def foo(x: Any):
             a: Any | Literal["some"] = getattr(x, 'foo', "some")
