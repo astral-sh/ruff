@@ -67,7 +67,7 @@ tracing = { workspace = true }
 workspace = true
 
 [features]
-default = ["ty_instrumented", "ty_walltime"]
+default = ["ty_instrumented", "ty_walltime", "ruff_instrumented"]
 # Enables the ruff instrumented benchmarks
 ruff_instrumented = [
     "criterion",
