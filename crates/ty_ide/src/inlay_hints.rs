@@ -76,31 +76,35 @@ impl InlayHint {
                     }
 
                     // Get the possible qualified label part
-                    let qualified_label_part =
-                        |dynamic_importer: &mut DynamicImporter, label: &str| {
-                            let type_definition = ty.definition(db)?;
-                            let definition = type_definition.definition()?;
-                            let definition_name = definition.name(db).unwrap_or(label.to_string());
+                    let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
+                        let type_definition = ty.definition(db)?;
+                        let definition = type_definition.definition()?;
 
-                            // Don't try to import symbols in scope.
-                            if definition.file(db) == file {
-                                return None;
-                            }
+                        // Don't try to import symbols in scope.
+                        if definition.file(db) == file {
+                            return None;
+                        }
 
-                            let module = file_to_module(db, definition.file(db))?;
+                        let definition_name = definition.name(db);
 
-                            if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
-                                return None;
-                            }
+                        let definition_name = definition_name
+                            .as_deref()
+                            .unwrap_or(&details.label[start..end]);
 
-                            let module_name = module.name(db).as_str();
+                        let module = file_to_module(db, definition.file(db))?;
 
-                            dynamic_importer.import_symbol(
-                                module_name,
-                                &definition_name,
-                                &details.label[start..end],
-                            )
-                        };
+                        if dont_import_symbol(db, module, ty) {
+                            return None;
+                        }
+
+                        let module_name = module.name(db).as_str();
+
+                        dynamic_importer.import_symbol(
+                            module_name,
+                            definition_name,
+                            &details.label[start..end],
+                        )
+                    };
 
                     let text_edit_start = start + text_edit_offset;
                     let text_edit_end = end + text_edit_offset;
@@ -110,9 +114,7 @@ impl InlayHint {
                         let nav_target = ty.navigation_targets(db).into_iter().next();
 
                         // Update qualified_label for text edits if needed
-                        if let Some(qualified_label_part) =
-                            qualified_label_part(dynamic_importer, &details.label[start..end])
-                        {
+                        if let Some(qualified_label_part) = qualified_label_part(dynamic_importer) {
                             let old_len = text_edit_end - text_edit_start;
                             let new_len = qualified_label_part.len();
 
@@ -590,6 +592,18 @@ fn type_hint_is_excessive_for_expr(expr: &Expr) -> bool {
         // Everything else is reasonable
         _ => false,
     }
+}
+
+fn dont_import_symbol(db: &dyn Db, module: ty_module_resolver::Module, ty: &Type) -> bool {
+    if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
+        return true;
+    }
+
+    if ty.is_none(db) {
+        return true;
+    }
+
+    false
 }
 
 fn annotations_are_valid_syntax(stmt_assign: &ruff_python_ast::StmtAssign) -> bool {
@@ -3291,7 +3305,6 @@ mod tests {
         info[inlay-hint-edit]: File after edits
         info: Source
         from ty_extensions import Unknown
-        from types import NoneType
         from string.templatelib import Template
 
         a: list[Unknown | int] = [1, 2]
@@ -6067,7 +6080,6 @@ mod tests {
         info[inlay-hint-edit]: File after edits
         info: Source
         from typing import Literal
-        from types import NoneType
 
         def branch(cond: int):
             if cond < 10:
@@ -8303,7 +8315,6 @@ mod tests {
         info: Source
         from typing import TypeVar
         from typing import Any
-        from types import NoneType
 
         from foo import foo
 
