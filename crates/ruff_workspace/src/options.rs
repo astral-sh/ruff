@@ -3497,6 +3497,17 @@ pub struct RuffOptions {
         note = "The `allowed-markup-names` option has been moved to the `flake8-bandit` section of the configuration."
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
+    /// Whether to require `__init__.py` files to contain no code at all, including imports and
+    /// docstrings (see `RUF070`).
+    #[option(
+        default = r#"false"#,
+        value_type = "bool",
+        example = r#"
+        # Make it a violation to include any code, including imports and docstrings in `__init__.py`
+        strictly-empty-init-modules = true
+        "#
+    )]
+    pub strictly_empty_init_modules: Option<bool>,
 }
 
 impl RuffOptions {
@@ -3505,6 +3516,7 @@ impl RuffOptions {
             parenthesize_tuple_in_subscript: self
                 .parenthesize_tuple_in_subscript
                 .unwrap_or_default(),
+            strictly_empty_init_modules: self.strictly_empty_init_modules.unwrap_or_default(),
         }
     }
 }

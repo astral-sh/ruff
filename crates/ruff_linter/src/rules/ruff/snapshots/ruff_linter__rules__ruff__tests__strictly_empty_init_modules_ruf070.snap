@@ -1,0 +1,99 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+--- Linter settings ---
+-linter.ruff.strictly_empty_init_modules = false
++linter.ruff.strictly_empty_init_modules = true
+
+--- Summary ---
+Removed: 0
+Added: 8
+
+--- Added ---
+RUF070 Code detected
+ --> __init__.py:1:1
+  |
+1 | """This is the module docstring."""
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+2 |
+3 | # convenience imports:
+  |
+
+
+RUF070 Code detected
+ --> __init__.py:4:1
+  |
+3 | # convenience imports:
+4 | import os
+  | ^^^^^^^^^
+5 | from pathlib import Path
+  |
+
+
+RUF070 Code detected
+ --> __init__.py:5:1
+  |
+3 | # convenience imports:
+4 | import os
+5 | from pathlib import Path
+  | ^^^^^^^^^^^^^^^^^^^^^^^^
+6 |
+7 | __all__ = ["MY_CONSTANT"]
+  |
+
+
+RUF070 Code detected
+ --> __init__.py:7:1
+  |
+5 | from pathlib import Path
+6 |
+7 | __all__ = ["MY_CONSTANT"]
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^
+8 | __all__ += ["foo"]
+9 | __all__: list[str] = __all__
+  |
+
+
+RUF070 Code detected
+  --> __init__.py:8:1
+   |
+ 7 | __all__ = ["MY_CONSTANT"]
+ 8 | __all__ += ["foo"]
+   | ^^^^^^^^^^^^^^^^^^
+ 9 | __all__: list[str] = __all__
+10 | __all__ = __all__ = __all__
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:9:1
+   |
+ 7 | __all__ = ["MY_CONSTANT"]
+ 8 | __all__ += ["foo"]
+ 9 | __all__: list[str] = __all__
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+10 | __all__ = __all__ = __all__
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:10:1
+   |
+ 8 | __all__ += ["foo"]
+ 9 | __all__: list[str] = __all__
+10 | __all__ = __all__ = __all__
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+11 |
+12 | MY_CONSTANT = 5
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:13:1
+   |
+12 | MY_CONSTANT = 5
+13 | """This is an important constant."""
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | os.environ["FOO"] = 1
+   |

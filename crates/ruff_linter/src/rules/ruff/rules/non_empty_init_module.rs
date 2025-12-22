@@ -34,6 +34,23 @@ use crate::{Violation, checkers::ast::Checker};
 /// __all__ = ["MyClass"]
 /// ```
 ///
+/// When [`lint.ruff.strictly-empty-init-modules`] is enabled, all code, including imports, will be
+/// flagged:
+///
+/// ```python
+/// from submodule import MyClass
+///
+/// __all__ = ["MyClass"]
+/// ```
+///
+/// And the only fix is entirely emptying the file:
+///
+/// ```python
+/// ```
+///
+/// ## Options
+/// - [`lint.ruff.strictly-empty-init-modules`]
+///
 /// ## References
 /// - [`flake8-empty-init-modules`](https://github.com/samueljsb/flake8-empty-init-modules/)
 #[derive(ViolationMetadata)]
@@ -58,38 +75,41 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
         return;
     }
 
-    if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring() {
-        return;
-    }
-
-    if matches!(stmt, ast::Stmt::Import(_) | ast::Stmt::ImportFrom(_)) {
-        return;
-    }
-
-    // Allow assignments to `__all__`.
-    //
-    // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could also
-    // append or extend `__all__`.
-    //
-    // This is actually going slightly beyond the upstream rule already, which only checks for
-    // `Stmt::Assign`.
-    let targets = match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-        | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-            std::slice::from_ref(&**target)
+    if !checker.settings().ruff.strictly_empty_init_modules {
+        if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring()
+        {
+            return;
         }
-        _ => &[],
-    };
 
-    if !targets.is_empty()
-        && targets.iter().all(|target| {
-            target
-                .as_name_expr()
-                .is_some_and(|name| name.id == "__all__")
-        })
-    {
-        return;
+        if matches!(stmt, ast::Stmt::Import(_) | ast::Stmt::ImportFrom(_)) {
+            return;
+        }
+
+        // Allow assignments to `__all__`.
+        //
+        // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could
+        // also append or extend `__all__`.
+        //
+        // This is actually going slightly beyond the upstream rule already, which only checks for
+        // `Stmt::Assign`.
+        let targets = match stmt {
+            ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
+            ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+            | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+                std::slice::from_ref(&**target)
+            }
+            _ => &[],
+        };
+
+        if !targets.is_empty()
+            && targets.iter().all(|target| {
+                target
+                    .as_name_expr()
+                    .is_some_and(|name| name.id == "__all__")
+            })
+        {
+            return;
+        }
     }
 
     checker.report_diagnostic(NonEmptyInitModule, stmt.range());

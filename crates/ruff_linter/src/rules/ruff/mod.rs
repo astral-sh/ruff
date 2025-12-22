@@ -138,6 +138,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: true,
+                    ..super::settings::Settings::default()
                 },
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
             },
@@ -153,6 +154,7 @@ mod tests {
             &LinterSettings {
                 ruff: super::settings::Settings {
                     parenthesize_tuple_in_subscript: false,
+                    ..super::settings::Settings::default()
                 },
                 unresolved_target_version: PythonVersion::PY310.into(),
                 ..LinterSettings::for_rule(Rule::IncorrectlyParenthesizedTupleInSubscript)
@@ -714,6 +716,28 @@ mod tests {
             },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn strictly_empty_init_modules_ruf070() -> Result<()> {
+        assert_diagnostics_diff!(
+            Path::new("ruff/RUF070/modules/__init__.py"),
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: false,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+            &LinterSettings {
+                ruff: super::settings::Settings {
+                    strictly_empty_init_modules: true,
+                    ..super::settings::Settings::default()
+                },
+                ..LinterSettings::for_rule(Rule::NonEmptyInitModule)
+            },
+        );
         Ok(())
     }
 }
