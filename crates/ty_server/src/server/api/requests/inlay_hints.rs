@@ -53,7 +53,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
-        let inlay_hints = inlay_hints
+        let inlay_hints: Vec<lsp_types::InlayHint> = inlay_hints
             .into_iter()
             .filter_map(|hint| {
                 Some(lsp_types::InlayHint {
