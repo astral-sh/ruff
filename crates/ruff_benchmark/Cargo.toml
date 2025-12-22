@@ -19,32 +19,32 @@ doctest = false
 [[bench]]
 name = "linter"
 harness = false
-required-features = ["instrumented"]
+required-features = ["ruff_instrumented"]
 
 [[bench]]
 name = "lexer"
 harness = false
-required-features = ["instrumented"]
+required-features = ["ruff_instrumented"]
 
 [[bench]]
 name = "parser"
 harness = false
-required-features = ["instrumented"]
+required-features = ["ruff_instrumented"]
 
 [[bench]]
 name = "formatter"
 harness = false
-required-features = ["instrumented"]
+required-features = ["ruff_instrumented"]
 
 [[bench]]
 name = "ty"
 harness = false
-required-features = ["instrumented"]
+required-features = ["ty_instrumented"]
 
 [[bench]]
 name = "ty_walltime"
 harness = false
-required-features = ["walltime"]
+required-features = ["ty_walltime"]
 
 [dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
@@ -67,19 +67,23 @@ tracing = { workspace = true }
 workspace = true
 
 [features]
-default = ["instrumented", "walltime"]
-# Enables the benchmark that should only run with codspeed's instrumented runner
-instrumented = [
+default = ["ty_instrumented", "ty_walltime"]
+# Enables the ruff instrumented benchmarks
+ruff_instrumented = [
     "criterion",
     "ruff_linter",
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
+]
+# Enables the ty instrumented benchmarks
+ty_instrumented = [
+    "criterion",
     "ty_project",
 ]
 codspeed = ["codspeed-criterion-compat"]
-# Enables benchmark that should only run with codspeed's walltime runner.
-walltime = ["ruff_db/os", "ty_project", "divan"]
+# Enables the ty_walltime benchmarks
+ty_walltime = ["ruff_db/os", "ty_project", "divan"]
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = { workspace = true }
