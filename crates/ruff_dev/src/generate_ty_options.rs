@@ -3,6 +3,7 @@
 use anyhow::bail;
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
+use ruff_python_trivia::textwrap;
 use std::{fmt::Write, path::PathBuf};
 
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
@@ -167,7 +168,7 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
-    output.push_str(&format_example(
+    output.push_str(&format_tab(
         "pyproject.toml",
         &format_header(
             field.scope,
@@ -178,16 +179,27 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
         field.example,
     ));
     output.push('\n');
+    output.push_str(&format_tab(
+        "ty.toml",
+        &format_header(
+            field.scope,
+            field.example,
+            parents,
+            ConfigurationFile::TyToml,
+        ),
+        field.example,
+    ));
+    output.push('\n');
 }
 
-fn format_example(title: &str, header: &str, content: &str) -> String {
-    if header.is_empty() {
-        format!("```toml title=\"{title}\"\n{content}\n```\n",)
-    } else {
-        format!("```toml title=\"{title}\"\n{header}\n{content}\n```\n",)
-    }
+fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    format!(
+        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        tab_name,
+        header,
+        textwrap::indent(content, "    ")
+    )
 }
-
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
@@ -212,9 +224,18 @@ fn format_header(
     if example.starts_with(&format!("[[{header}")) {
         return String::new();
     }
+
     // Ex) `[tool.ty.rules]`
     if example.starts_with(&format!("[{header}")) {
         return String::new();
+    }
+
+    // Some examples show headers which would show up in `pyproject.toml`,
+    // so we much adjust the header to match the format of `ty.toml`
+    if matches!(configuration, ConfigurationFile::TyToml) {
+        if example.starts_with("[[tool.ty") || example.starts_with("[tool.ty") {
+            return header.replacen("tool.ty", "", 1);
+        }
     }
 
     if header.is_empty() {
@@ -243,7 +264,6 @@ impl Visit for CollectOptionsVisitor {
 #[derive(Debug, Copy, Clone)]
 enum ConfigurationFile {
     PyprojectToml,
-    #[expect(dead_code)]
     TyToml,
 }
 
