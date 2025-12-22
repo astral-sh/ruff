@@ -190,8 +190,13 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
 }
 
 fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
+    let header = if header.is_empty() {
+        String::new()
+    } else {
+        format!("\n    {header}")
+    };
     format!(
-        "=== \"{}\"\n\n    ```toml\n    {}\n{}\n    ```\n",
+        "=== \"{}\"\n\n    ```toml{}\n{}\n    ```\n",
         tab_name,
         header,
         textwrap::indent(content, "    ")

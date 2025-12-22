@@ -23,7 +23,6 @@ Valid severities are:
 === "pyproject.toml"
 
     ```toml
-    
     [tool.ty.rules]
     possibly-unresolved-reference = "warn"
     division-by-zero = "ignore"
@@ -32,7 +31,6 @@ Valid severities are:
 === "ty.toml"
 
     ```toml
-    
     [tool.ty.rules]
     possibly-unresolved-reference = "warn"
     division-by-zero = "ignore"
@@ -339,7 +337,6 @@ If not specified, defaults to `[]` (excludes no files).
 === "pyproject.toml"
 
     ```toml
-    
     [[tool.ty.overrides]]
     exclude = [
         "generated",
@@ -352,7 +349,6 @@ If not specified, defaults to `[]` (excludes no files).
 === "ty.toml"
 
     ```toml
-    
     [[overrides]]
     exclude = [
         "generated",
@@ -383,7 +379,6 @@ If not specified, defaults to `["**"]` (matches all files).
 === "pyproject.toml"
 
     ```toml
-    
     [[tool.ty.overrides]]
     include = [
         "src",
@@ -394,7 +389,6 @@ If not specified, defaults to `["**"]` (matches all files).
 === "ty.toml"
 
     ```toml
-    
     [[overrides]]
     include = [
         "src",
@@ -421,7 +415,6 @@ severity levels or disable them entirely.
 === "pyproject.toml"
 
     ```toml
-    
     [[tool.ty.overrides]]
     include = ["src"]
 
@@ -432,7 +425,6 @@ severity levels or disable them entirely.
 === "ty.toml"
 
     ```toml
-    
     [[overrides]]
     include = ["src"]
 
