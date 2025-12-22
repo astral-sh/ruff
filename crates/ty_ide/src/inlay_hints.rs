@@ -1812,6 +1812,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
 
         def i(x: int, /) -> int:
             return x
