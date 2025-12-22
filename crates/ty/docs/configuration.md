@@ -31,7 +31,7 @@ Valid severities are:
 === "ty.toml"
 
     ```toml
-    [tool.ty.rules]
+    [rules]
     possibly-unresolved-reference = "warn"
     division-by-zero = "ignore"
     ```

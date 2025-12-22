@@ -222,6 +222,13 @@ fn format_snippet(
         .chain(scope)
         .join(".");
 
+    // Some examples show headers which would show up in `pyproject.toml`,
+    if matches!(configuration, ConfigurationFile::TyToml) {
+        if example.contains("tool.ty") {
+            return (String::new(), example.replace("tool.ty.", ""));
+        }
+    }
+
     // Ex) `[[tool.ty.xx]]`
     if example.starts_with(&format!("[[{header}")) {
         return (String::new(), example.to_string());
@@ -230,13 +237,6 @@ fn format_snippet(
     // Ex) `[tool.ty.rules]`
     if example.starts_with(&format!("[{header}")) {
         return (String::new(), example.to_string());
-    }
-
-    // Some examples show headers which would show up in `pyproject.toml`,
-    if matches!(configuration, ConfigurationFile::TyToml) {
-        if example.starts_with("[[tool.ty") || example.starts_with("[tool.ty") {
-            return (String::new(), example.replace("tool.ty.", ""));
-        }
     }
 
     if header.is_empty() {
