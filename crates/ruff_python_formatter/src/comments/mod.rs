@@ -109,7 +109,7 @@ use crate::comments::visitor::{CommentsMapBuilder, CommentsVisitor};
 mod debug;
 pub(crate) mod format;
 mod map;
-mod node_key;
+pub(crate) mod node_key;
 mod placement;
 mod visitor;
 

@@ -8,18 +8,18 @@ use std::hash::{Hash, Hasher};
 /// Implements equality and hashing based on the address of the [`AnyNodeRef`] to get fast and cheap
 /// hashing/equality comparison.
 #[derive(Copy, Clone)]
-pub(super) struct NodeRefEqualityKey<'a> {
+pub(crate) struct NodeRefEqualityKey<'a> {
     node: AnyNodeRef<'a>,
 }
 
 impl<'a> NodeRefEqualityKey<'a> {
     /// Creates a key for a node reference.
-    pub(super) const fn from_ref(node: AnyNodeRef<'a>) -> Self {
+    pub(crate) const fn from_ref(node: AnyNodeRef<'a>) -> Self {
         Self { node }
     }
 
     /// Returns the underlying node.
-    pub(super) fn node(&self) -> AnyNodeRef<'_> {
+    pub(crate) fn node(&self) -> AnyNodeRef<'_> {
         self.node
     }
 }
