@@ -98,7 +98,6 @@ impl InlayHint {
                             module_name,
                             &definition_name,
                             &details.label[start..end],
-                            *ty,
                         )
                     };
 
@@ -653,9 +652,8 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
     fn import_symbol(
         &mut self,
         module_name: &str,
-        definition_name: &str,
+        symbol_name: &str,
         label_text: &str,
-        symbol_ty: Type<'_>,
     ) -> Option<String> {
         use std::collections::hash_map::Entry;
 
@@ -669,7 +667,7 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
             Some(symbol_text.to_string())
         };
 
-        if self.members.contains_symbol(definition_name, symbol_ty) {
+        if self.members.contains_symbol(symbol_name) {
             return None;
         }
 
@@ -678,15 +676,15 @@ impl<'a, 'db> DynamicImporter<'a, 'db> {
 
         let key = DynamicallyImportedMember {
             module: module_name.to_string(),
-            name: definition_name.to_string(),
+            name: symbol_name.to_string(),
         };
 
         match self.dynamic_imports.entry(key.clone()) {
             Entry::Vacant(entry) => {
                 let request = if is_possibly_qualified_name {
-                    ImportRequest::import(module_name, definition_name).force()
+                    ImportRequest::import(module_name, symbol_name).force()
                 } else {
-                    ImportRequest::import_from(module_name, definition_name)
+                    ImportRequest::import_from(module_name, symbol_name)
                 };
 
                 let import_action = self.importer.import(request, &self.members);
