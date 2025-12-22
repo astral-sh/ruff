@@ -6856,13 +6856,6 @@ mod tests {
         3 |     y[: type[T@f]] = x
           |              ^^^
           |
-
-        ---------------------------------------------
-        info[inlay-hint-edit]: File after edits
-        info: Source
-
-        def f[T](x: type[T]):
-            y: type[T@f] = x
         "#);
     }
 

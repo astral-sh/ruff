@@ -711,6 +711,7 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     f.write_char(']')
                 }
                 SubclassOfInner::TypeVar(bound_typevar) => {
+                    f.set_invalid_syntax();
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
