@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::time::Instant;
 
 use lsp_types::request::InlayHintRequest;
 use lsp_types::{InlayHintParams, Url};
@@ -31,6 +32,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
         _client: &Client,
         params: InlayHintParams,
     ) -> crate::server::Result<Option<Vec<lsp_types::InlayHint>>> {
+        let start = Instant::now();
         let workspace_settings = snapshot.workspace_settings();
         if workspace_settings.is_language_services_disabled()
             || !workspace_settings.inlay_hints().any_enabled()
@@ -51,7 +53,7 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
 
         let inlay_hints = inlay_hints(db, file, range, workspace_settings.inlay_hints());
 
-        let inlay_hints = inlay_hints
+        let inlay_hints: Vec<lsp_types::InlayHint> = inlay_hints
             .into_iter()
             .filter_map(|hint| {
                 Some(lsp_types::InlayHint {
@@ -76,6 +78,12 @@ impl BackgroundDocumentRequestHandler for InlayHintRequestHandler {
                 })
             })
             .collect();
+
+        tracing::debug!(
+            "Inlay hint request returned {} hints in {:?}",
+            inlay_hints.len(),
+            start.elapsed()
+        );
 
         Ok(Some(inlay_hints))
     }
