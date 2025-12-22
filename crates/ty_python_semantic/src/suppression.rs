@@ -118,7 +118,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 for comment in parser {
                     match comment {
                         Ok(comment) => {
-                            if comment.kind.is_type_ignore() && !respect_type_ignore {
+                            if comment.kind().is_type_ignore() && !respect_type_ignore {
                                 continue;
                             }
                             builder.add_comment(comment, TextRange::new(line_start, token.end()));
