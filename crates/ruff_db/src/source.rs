@@ -98,7 +98,7 @@ impl SourceText {
         match &mut inner.kind {
             SourceTextKind::Text(text) => *text = new_source,
             SourceTextKind::Notebook { notebook } => {
-                notebook.update(&source_map, new_source);
+                notebook.update(source_map, new_source);
             }
         };
     }

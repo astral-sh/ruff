@@ -418,10 +418,9 @@ impl MainLoop {
                     let exit_status = if diagnostics.is_empty() {
                         ExitStatus::Success
                     } else {
-                        let exit_status =
-                            exit_status_from_diagnostics(&diagnostics, terminal_settings);
+                        
 
-                        exit_status
+                        exit_status_from_diagnostics(&diagnostics, terminal_settings)
                     };
 
                     if exit_status.is_internal_error() {

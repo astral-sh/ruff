@@ -64,13 +64,13 @@ pub fn suppress_all_diagnostics(db: &dyn Db, diagnostics: Vec<Diagnostic>) -> Su
 
         let count_current_file = to_suppress.len();
 
-        let fixes = suppress_all(db, file, to_suppress);
+        let fixes = suppress_all(db, file, &to_suppress);
         let (new_source, source_map) = apply_fixes(db, file, fixes);
 
         source.updated(new_source, &source_map);
 
         // Create new source from applying fixes
-        if let Err(err) = system.write_file(path, &*source.to_raw_content()) {
+        if let Err(err) = system.write_file(path, &source.to_raw_content()) {
             let mut diag = Diagnostic::new(
                 DiagnosticId::Io,
                 Severity::Error,
@@ -100,7 +100,7 @@ fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> (String, SourceM
 
     let mut source_map = SourceMap::default();
 
-    fixes.sort_unstable_by_key(|fix| fix.min_start());
+    fixes.sort_unstable_by_key(ruff_diagnostics::Fix::min_start);
 
     for fix in fixes {
         let mut edits = fix.edits().iter().peekable();
