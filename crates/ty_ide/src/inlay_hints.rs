@@ -76,7 +76,7 @@ impl InlayHint {
                     }
 
                     // Get the possible qualified label part
-                    let qualified_label_part = |dynamic_importer: &mut DynamicImporter| {
+                    let qualified_name = |dynamic_importer: &mut DynamicImporter| {
                         let type_definition = ty.definition(db)?;
                         let definition = type_definition.definition()?;
 
@@ -106,22 +106,21 @@ impl InlayHint {
                         )
                     };
 
-                    let text_edit_start = start + text_edit_offset;
-                    let text_edit_end = end + text_edit_offset;
-
                     // Ok, this is the first type that claimed these bytes, give it the target
                     if start >= offset {
                         let nav_target = ty.navigation_targets(db).into_iter().next();
 
-                        // Update qualified_label for text edits if needed
-                        if let Some(qualified_label_part) = qualified_label_part(dynamic_importer) {
-                            let old_len = text_edit_end - text_edit_start;
-                            let new_len = qualified_label_part.len();
+                        let text_edit_start = start + text_edit_offset;
+                        let text_edit_end = end + text_edit_offset;
 
-                            text_edit_label.replace_range(
-                                text_edit_start..text_edit_end,
-                                &qualified_label_part,
-                            );
+                        // Try to import the current type
+                        if let Some(qualified_name) = qualified_name(dynamic_importer) {
+                            let old_len = text_edit_end - text_edit_start;
+                            let new_len = qualified_name.len();
+
+                            // Update qualified_label for text edits if needed
+                            text_edit_label
+                                .replace_range(text_edit_start..text_edit_end, &qualified_name);
                             text_edit_offset += new_len - old_len;
                         }
 
