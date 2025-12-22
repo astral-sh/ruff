@@ -218,6 +218,35 @@ try:
 except Exception as e:
     logging.warning("...", exc_info=e)
 
+try:
+    pass
+except Exception:
+    logging.warn("...")
+
+
+try:
+    pass
+except Exception:
+    logging.warn("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    logging.warn("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    logging.warn("...", exc_info=True)
+
+
+try:
+    pass
+except Exception as e:
+    logging.warn("...", exc_info=e)
+
 
 try:
     pass
@@ -249,7 +278,7 @@ except Exception as e:
     logging.log(logging.INFO, "...", exc_info=e)
 
 
-from logging import critical, error, exception, debug, info, warning, log
+from logging import critical, error, exception, debug, info, warning, log, warn
 
 try:
     pass
@@ -379,6 +408,30 @@ except Exception:
 try:
     pass
 except Exception:
+    warn("...")
+
+
+try:
+    pass
+except Exception:
+    warn("...", exc_info=False)
+
+
+try:
+    pass
+except Exception:
+    warn("...", exc_info=None)
+
+
+try:
+    pass
+except Exception:
+    warn("...", exc_info=True)
+
+
+try:
+    pass
+except Exception:
     log(logging.INFO, "...")
 
 
@@ -422,6 +475,12 @@ try:
     pass
 except Exception as e:
     warning("...", exc_info=e)
+
+
+try:
+    pass
+except Exception as e:
+    warn("...", exc_info=e)
 
 
 try:

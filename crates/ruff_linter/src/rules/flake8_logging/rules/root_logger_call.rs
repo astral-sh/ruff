@@ -1,3 +1,4 @@
+use crate::helpers::is_logger_method_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
@@ -65,12 +66,4 @@ pub(crate) fn root_logger_call(checker: &Checker, call: &ExprCall) {
         attr: (*attr).to_string(),
     };
     checker.report_diagnostic(kind, call.range);
-}
-
-#[inline]
-fn is_logger_method_name(attr: &str) -> bool {
-    matches!(
-        attr,
-        "debug" | "info" | "warn" | "warning" | "error" | "critical" | "log" | "exception"
-    )
 }
