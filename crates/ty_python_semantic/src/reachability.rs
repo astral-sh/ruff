@@ -198,8 +198,8 @@ use crate::{
     dunder_all::dunder_all_names,
     place::{DefinedPlace, Definedness, Place, RequiresExplicitReExport, imported_symbol},
     types::{
-        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Type, TypeContext,
-        UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
+        CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, TupleSpec, Type,
+        TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
     },
 };
 use ruff_text_size::TextRange;
@@ -274,11 +274,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
                 Type::Never
             }
         }
-        PatternPredicateKind::Sequence(kind) => {
+        PatternPredicateKind::Sequence(kind, patterns) => {
             if kind.is_irrefutable() {
                 sequence_pattern_type(db)
-            } else {
+            } else if patterns.is_empty() {
                 Type::Never
+            } else {
+                Type::heterogeneous_tuple(db, patterns.iter().map(|p| pattern_kind_to_type(db, p)))
             }
         }
         PatternPredicateKind::Or(predicates) => {
@@ -683,16 +685,39 @@ fn analyze_single_pattern_predicate_kind<'db>(
                 Truthiness::Ambiguous
             }
         }
-        PatternPredicateKind::Sequence(kind) => {
+        PatternPredicateKind::Sequence(kind, patterns) => {
             let sequence_ty = sequence_pattern_type(db);
-            if subject_ty.is_subtype_of(db, sequence_ty) {
-                if kind.is_irrefutable() {
-                    Truthiness::AlwaysTrue
-                } else {
-                    Truthiness::Ambiguous
+
+            if subject_ty.is_disjoint_from(db, sequence_ty) {
+                return Truthiness::AlwaysFalse;
+            }
+
+            if let Type::NominalInstance(instance) = subject_ty
+                && let Some(tuple_spec) = instance.tuple_spec(db)
+            {
+                match tuple_spec.as_ref() {
+                    TupleSpec::Fixed(fixed) => {
+                        if fixed.len() != patterns.len() {
+                            return Truthiness::AlwaysFalse;
+                        }
+
+                        let mut truthiness = Truthiness::AlwaysTrue;
+                        for (element_ty, pattern) in fixed.all_elements().iter().zip(patterns) {
+                            match analyze_single_pattern_predicate_kind(db, pattern, *element_ty) {
+                                Truthiness::AlwaysFalse => return Truthiness::AlwaysFalse,
+                                Truthiness::Ambiguous => truthiness = Truthiness::Ambiguous,
+                                Truthiness::AlwaysTrue => {}
+                            }
+                        }
+
+                        return truthiness;
+                    }
+                    TupleSpec::Variable(_) => {}
                 }
-            } else if subject_ty.is_disjoint_from(db, sequence_ty) {
-                Truthiness::AlwaysFalse
+            }
+
+            if kind.is_irrefutable() && subject_ty.is_subtype_of(db, sequence_ty) {
+                Truthiness::AlwaysTrue
             } else {
                 Truthiness::Ambiguous
             }
