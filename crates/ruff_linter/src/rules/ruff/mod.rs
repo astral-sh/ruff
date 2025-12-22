@@ -119,6 +119,8 @@ mod tests {
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF070/modules/__init__.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF070/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

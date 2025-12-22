@@ -1,0 +1,29 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF070 Code detected
+  --> __init__.py:12:1
+   |
+10 | __all__ = __all__ = __all__
+11 |
+12 | MY_CONSTANT = 5
+   | ^^^^^^^^^^^^^^^
+13 | """This is an important constant."""
+   |
+
+RUF070 Code detected
+  --> __init__.py:15:1
+   |
+13 | """This is an important constant."""
+14 |
+15 | os.environ["FOO"] = 1
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+
+RUF070 Code detected
+  --> __init__.py:18:1
+   |
+18 | / def foo():
+19 | |     return Path("foo.py")
+   | |_________________________^
+   |

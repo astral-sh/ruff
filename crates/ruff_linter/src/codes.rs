@@ -1060,6 +1060,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Ruff, "064") => rules::ruff::rules::NonOctalPermissions,
         (Ruff, "065") => rules::ruff::rules::LoggingEagerConversion,
         (Ruff, "066") => rules::ruff::rules::PropertyWithoutReturn,
+        (Ruff, "070") => rules::ruff::rules::NonEmptyInitModule,
 
         (Ruff, "100") => rules::ruff::rules::UnusedNOQA,
         (Ruff, "101") => rules::ruff::rules::RedirectedNOQA,
