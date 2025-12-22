@@ -44,10 +44,10 @@ return 42
 
     insta::with_settings!({
         filters => vec![
-            (r"\b[0-9]+.[0-9]+MB\b","[X.XXMB]"),
-            (r"Workspace .+\)","Workspace XXX"),
-            (r"Project at .+","Project at XXX"),
-            (r"rules: \{(.|\n)+?\}\,","rules: {<RULES>},"),
+            (r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]"),
+            (r"Workspace .+\)", "Workspace XXX"),
+            (r"Project at .+", "Project at XXX"),
+            (r"rules: \{(.|\n)+?\}\,", "rules: <RULES>,"),
     ]}, {
         insta::assert_snapshot!(response);
     });

@@ -27,7 +27,7 @@ Settings: WorkspaceSettings {
 
 Project at XXX
 Settings: Settings {
-    rules: {<RULES>},
+    rules: <RULES>,
     terminal: TerminalSettings {
         output_format: Full,
         error_on_warning: false,
