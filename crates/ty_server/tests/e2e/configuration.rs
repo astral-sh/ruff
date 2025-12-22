@@ -98,7 +98,7 @@ unresolved-reference="warn"
     assert_json_snapshot!(show_message, @r#"
     {
       "type": 1,
-      "message": "Failed to load project rooted at <temp_dir>/src. Please refer to the logs for more details."
+      "message": "Failed to load project for workspace file://<temp_dir>/src. Please refer to the logs for more details."
     }
     "#);
     assert_json_snapshot!(diagnostics);
