@@ -139,7 +139,7 @@ pub(crate) mod tests {
         }
 
         fn analysis_settings(&self) -> &AnalysisSettings {
-            &*self.analysis_settings
+            &self.analysis_settings
         }
 
         fn verbose(&self) -> bool {

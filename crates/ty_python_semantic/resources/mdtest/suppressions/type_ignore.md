@@ -214,7 +214,6 @@ a = 10 / 0  # error: [division-by-zero]
 b = a / 0  # error: [division-by-zero]
 ```
 
-
 ## `respect-type-ignore-comments=false`
 
 ty ignore `type-ignore` comments if `respect-type-ignore-comments` is set to false.
@@ -228,18 +227,17 @@ respect-type-ignore-comments = false
 
 ```py
 # error: [unresolved-reference]
-a = b + 10 # type: ignore
+a = b + 10  # type: ignore
 ```
 
 ty doesn't report or remove unused `type: ignore` comments:
 
 ```py
-a = 10 + 5 # type: ignore
+a = 10 + 5  # type: ignore
 ```
 
 ty doesn't report invalid `type: ignore` comments:
 
 ```py
-a = 10 + 4 # type: ignoreee
+a = 10 + 4  # type: ignoreee
 ```
-
