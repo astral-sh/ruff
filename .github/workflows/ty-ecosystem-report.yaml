@@ -14,7 +14,6 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CF_API_TOKEN_EXISTS: ${{ secrets.CF_API_TOKEN != '' }}
 
 jobs:
   ty-ecosystem-report:
