@@ -188,15 +188,18 @@ pub struct WorkspaceOptions {
 
 impl WorkspaceOptions {
     pub(crate) fn into_settings(self, root: &SystemPath, client: &Client) -> WorkspaceSettings {
-        let configuration_file = self.configuration_file.and_then(|config_file| {
-            match shellexpand::full(&config_file) {
-                Ok(path) => Some(SystemPath::absolute(&*path, root)),
-                Err(error) => {
-                    client.show_error_message(format_args!("Failed to expand the environment variables in the `ty.configuration_file` setting: {error}"));
-                    None
-                }
-            }
-        });
+        let configuration_file =
+            self.configuration_file
+                .and_then(|config_file| match shellexpand::full(&config_file) {
+                    Ok(path) => Some(SystemPath::absolute(&*path, root)),
+                    Err(error) => {
+                        client.show_error_message(format_args!(
+                            "Failed to expand the environment variables \
+                            for the `ty.configuration_file` setting: {error}"
+                        ));
+                        None
+                    }
+                });
 
         let options_overrides =
             self.configuration.and_then(|map| {

@@ -515,8 +515,12 @@ impl TestServer {
     /// a panic-free alternative.
     #[track_caller]
     pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
-        self.try_await_notification::<N>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive notification `{}`: {err}", N::METHOD))
+        match self.try_await_notification::<N>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive notification `{}`: {err}", N::METHOD)
+            }
+        }
     }
 
     /// Wait for a notification of the specified type from the server and return its parameters.
@@ -596,8 +600,12 @@ impl TestServer {
     /// If receiving the request fails.
     #[track_caller]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
-        self.try_await_request::<R>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive server request `{}`: {err}", R::METHOD))
+        match self.try_await_request::<R>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive server request `{}`: {err}", R::METHOD)
+            }
+        }
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and

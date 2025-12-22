@@ -463,7 +463,7 @@ impl Session {
                 .clone()
                 .combine(options.clone());
 
-            tracing::debug!("Initializing workspace `{url}: {workspace:#?}`");
+            tracing::debug!("Initializing workspace `{url}`: {workspace:#?}");
 
             let unknown_options = &options.unknown;
             if !unknown_options.is_empty() {

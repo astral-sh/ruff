@@ -54,6 +54,59 @@ unresolved-reference="warn"
 }
 
 #[test]
+fn invalid_configuration_file() -> Result<()> {
+    let _filter = filter_result_id();
+
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return a
+";
+
+    let builder = TestServerBuilder::new()?;
+
+    let settings_path = builder.file_path("ty2.toml");
+
+    let mut server = builder
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions {
+                workspace: WorkspaceOptions {
+                    configuration_file: Some(settings_path.to_string()),
+                    ..WorkspaceOptions::default()
+                },
+                ..ClientOptions::default()
+            }),
+        )?
+        .with_file(foo, foo_content)?
+        .with_file(
+            settings_path,
+            r#"
+[rule]
+unresolved-reference="warn"
+        "#,
+        )?
+        .enable_pull_diagnostics(true)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let show_message = server.await_notification::<lsp_types::notification::ShowMessage>();
+    let diagnostics = server.document_diagnostic_request(foo, None);
+
+    assert_json_snapshot!(show_message, @r#"
+    {
+      "type": 1,
+      "message": "Failed to load project rooted at <temp_dir>/src. Please refer to the logs for more details."
+    }
+    "#);
+    assert_json_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
 fn configuration_overrides() -> Result<()> {
     let _filter = filter_result_id();
 
