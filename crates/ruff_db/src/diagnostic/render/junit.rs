@@ -3,6 +3,7 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
+use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
@@ -49,13 +50,15 @@ impl<'a> JunitRenderer<'a> {
                     .extra
                     .insert(XmlString::new("package"), XmlString::new("org.ruff"));
 
+                let indent = " ".repeat(4 * 4);
                 for diagnostic in diagnostics {
                     let DiagnosticWithLocation {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
                     let indent = " ".repeat(4 * 4);
-                    let mut sub_diags = diagnostic
+
+                    let mut output = diagnostic
                         .sub_diagnostics()
                         .iter()
                         .map(|sub_diagnostic| {
@@ -63,7 +66,8 @@ impl<'a> JunitRenderer<'a> {
                             // parent and formats it for rendering into the XML structure
 
                             let message = sub_diagnostic.concise_message().to_string();
-                            let severity = sub_diagnostic.inner.severity;
+                            let severity =
+                                format!("{:?}", sub_diagnostic.inner.severity).to_lowercase();
                             let mut annotations = vec![];
 
                             // Add function/method/etc definition location
@@ -98,22 +102,16 @@ impl<'a> JunitRenderer<'a> {
                                     );
                                 }
                                 annotations.push(format!(
-                                    "{indent}{severity:?}: {sub_message} → {path}{sub_diag_loc}",
+                                    "{indent}{severity}: {sub_message} → {path}{sub_diag_loc}",
                                 ));
                             }
                             if annotations.is_empty() {
-                                format!("{indent}{severity:?}: {message}")
-                            } else {
-                                annotations.join("\n")
+                                annotations.push(format!("{indent}{severity}: {message}"));
                             }
+                            annotations.join("\n")
                         })
                         .collect::<Vec<String>>()
                         .join("\n");
-
-                    if !sub_diags.is_empty() {
-                        // Add some space between the body and sub_diags if there are some
-                        sub_diags = format!("\n\n{sub_diags}");
-                    }
 
                     let code = diagnostic
                         .secondary_code()
@@ -124,8 +122,12 @@ impl<'a> JunitRenderer<'a> {
                     case.set_classname(classname.to_str().unwrap());
                     case.status
                         .set_message(diagnostic.concise_message().to_str());
+                    case.status.set_description(format!(
+                        "\n{snippet}\n{output}\n{after_indent}",
+                        snippet = self.render_snippet(diagnostic, Some(indent.len())),
+                        after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
+                    ));
 
-                    let mut diagnostic_loc = String::new();
                     if let Some(location) = location {
                         case.extra.insert(
                             XmlString::new("line"),
@@ -134,11 +136,6 @@ impl<'a> JunitRenderer<'a> {
                         case.extra.insert(
                             XmlString::new("column"),
                             XmlString::new(location.column.to_string()),
-                        );
-                        diagnostic_loc = format!(
-                            "line {row}, col {col}, ",
-                            row = location.line,
-                            col = location.column,
                         );
                     }
                     case.status.set_description(format!(
@@ -154,6 +151,79 @@ impl<'a> JunitRenderer<'a> {
 
         let adapter = FmtAdapter { fmt: f };
         report.serialize(adapter).map_err(|_| std::fmt::Error)
+    }
+
+    fn render_snippet(&self, diagnostic: &Diagnostic, indentation: Option<usize>) -> String {
+        let (source_text, filename) = if let Some(span) = diagnostic.primary_span_ref() {
+            let file = span.file();
+            let source = file.diagnostic_source(self.resolver);
+            let filename = match file {
+                crate::diagnostic::UnifiedFile::Ty(file) => self.resolver.path(*file),
+                crate::diagnostic::UnifiedFile::Ruff(file) => file.name(),
+            };
+            (
+                source.as_source_code().text().to_string(),
+                filename.to_string(),
+            )
+        } else {
+            return String::new();
+        };
+
+        let mut snippet = Snippet::source(&source_text)
+            .line_start(1)
+            .origin(&filename);
+
+        let mut annotations = vec![];
+        if let Some(primary) = diagnostic.primary_annotation() {
+            if let Some(range) = primary.get_span().range() {
+                annotations.push(
+                    Level::Error
+                        .span(range.into())
+                        // Message next to the location of the problem
+                        .label(primary.get_message().unwrap_or_default()),
+                );
+            }
+        }
+
+        for secondary in diagnostic.secondary_annotations() {
+            if let Some(range) = secondary.get_span().range() {
+                annotations.push(
+                    Level::Info
+                        .span(range.into())
+                        // Message at related location involved in the problem
+                        .label(secondary.get_message().unwrap_or_default()),
+                );
+            }
+        }
+
+        for sub in diagnostic.sub_diagnostics() {
+            if let Some(primary) = sub.primary_annotation() {
+                if let Some(range) = primary.get_span().range() {
+                    annotations.push(
+                        Level::Help
+                            .span(range.into())
+                            // Help message goes here usually
+                            .label(primary.get_message().unwrap_or_default()),
+                    );
+                }
+            }
+        }
+        snippet = snippet.annotations(annotations);
+
+        let message = Level::Error.title(diagnostic.body()).snippet(snippet);
+        let renderer = Renderer::plain();
+        let rendered = renderer.render(message).to_string();
+
+        if let Some(indentation) = indentation {
+            let indent = " ".repeat(indentation);
+            rendered
+                .lines()
+                .map(|line| format!("{indent}{line}"))
+                .collect::<Vec<_>>()
+                .join("\n")
+        } else {
+            rendered
+        }
     }
 }
 
