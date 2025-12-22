@@ -120,6 +120,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&UNSAFE_TUPLE_SUBCLASS);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
@@ -2241,6 +2242,15 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks for overrides of
+    pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
+        summary: "detects dataclasses with invalid frozen inheritance",
+        status: LintStatus::stable("0.0.5"),
+        default_level: Level::Warn,
+    }
+}
+declare_lint! {
+    /// ## What it does
     /// Checks for dataclasses with invalid frozen inheritance:
     /// - A frozen dataclass cannot inherit from a non-frozen dataclass.
     /// - A non-frozen dataclass cannot inherit from a frozen dataclass.
@@ -3833,6 +3843,14 @@ pub(crate) fn report_rebound_typevar<'db>(
     }
 }
 
+fn signature_span(db: &dyn Db, function: FunctionType<'_>) -> Option<Span> {
+    function
+        .literal(db)
+        .last_definition(db)
+        .spans(db)
+        .map(|spans| spans.signature)
+}
+
 // I tried refactoring this function to placate Clippy,
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]
@@ -3848,16 +3866,8 @@ pub(super) fn report_invalid_method_override<'db>(
 ) {
     let db = context.db();
 
-    let signature_span = |function: FunctionType<'db>| {
-        function
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-            .map(|spans| spans.signature)
-    };
-
     let subclass_definition_kind = subclass_definition.kind(db);
-    let subclass_definition_signature_span = signature_span(subclass_function);
+    let subclass_definition_signature_span = signature_span(db, subclass_function);
 
     // If the function was originally defined elsewhere and simply assigned
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
@@ -3945,8 +3955,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => signature_span(function),
-                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    Type::FunctionLiteral(function) => signature_span(db, function),
+                    Type::BoundMethod(method) => signature_span(db, method.function(db)),
                     _ => None,
                 };
 
@@ -4021,6 +4031,41 @@ pub(super) fn report_invalid_method_override<'db>(
             diagnostic.help(subdiag);
         }
     }
+}
+
+pub(super) fn report_unsafe_tuple_subclass<'db>(
+    context: &InferContext<'db, '_>,
+    member: &str,
+    member_definition: Definition<'db>,
+    member_ty: Type<'db>,
+) {
+    let db = context.db();
+
+    let subclass_definition_kind = member_definition.kind(db);
+
+    let diagnostic_range = if let Type::FunctionLiteral(function_literal) = member_ty
+        && subclass_definition_kind.is_function_def()
+    {
+        signature_span(db, function_literal)
+            .as_ref()
+            .and_then(Span::range)
+            .unwrap_or_else(|| {
+                function_literal
+                    .node(db, context.file(), context.module())
+                    .range
+            })
+    } else {
+        member_definition.full_range(db, context.module()).range()
+    };
+
+    let Some(builder) = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range) else {
+        return;
+    };
+
+    let mut diagnostic =
+        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
+
+    diagnostic.set_primary_message("Definition is incompatible with ");
 }
 
 pub(super) fn report_overridden_final_method<'db>(

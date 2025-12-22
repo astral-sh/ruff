@@ -1049,6 +1049,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
+            // (9) Check for unsafe overrides of dunder methods in tuple subclasses
+            if class.is_tuple_subclass(self.context.db()) {
+                overrides::check_tuple_subclass(&self.context, class);
+            }
+
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
             }

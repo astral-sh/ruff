@@ -22,7 +22,7 @@ use crate::{
         diagnostic::{
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
-            report_overridden_final_method,
+            report_overridden_final_method, report_unsafe_tuple_subclass,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
@@ -455,5 +455,38 @@ fn extract_underlying_functions<'db>(
             }
         }
         _ => None,
+    }
+}
+
+const PROHIBITED_TUPLE_SUBCLASS_METHODS: &[&str] = &["__eq__", "__len__", "__bool__"];
+
+pub(super) fn check_tuple_subclass<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
+    let db = context.db();
+    let configuration = OverrideRulesConfig::from(context);
+    if configuration.no_rules_enabled() {
+        return;
+    }
+
+    let scope = class.body_scope(db);
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+
+    for member in own_class_members {
+        check_tuple_member(context, &member);
+    }
+}
+
+fn check_tuple_member<'db>(context: &InferContext<'db, '_>, member: &MemberWithDefinition<'db>) {
+    let MemberWithDefinition {
+        member,
+        first_reachable_definition,
+    } = member;
+
+    if PROHIBITED_TUPLE_SUBCLASS_METHODS.contains(&member.name.as_str()) {
+        report_unsafe_tuple_subclass(
+            context,
+            &member.name,
+            *first_reachable_definition,
+            member.ty,
+        );
     }
 }
