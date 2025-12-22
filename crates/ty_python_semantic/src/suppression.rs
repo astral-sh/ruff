@@ -525,6 +525,7 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
+    #[expect(clippy::needless_pass_by_value)]
     fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
         // `type: ignore` comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
@@ -574,7 +575,7 @@ impl<'a> SuppressionsBuilder<'a> {
             }
 
             // `ty: ignore[]`
-            Some(codes) if codes.is_empty() => {
+            Some([]) => {
                 self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
                     kind: comment.kind(),
