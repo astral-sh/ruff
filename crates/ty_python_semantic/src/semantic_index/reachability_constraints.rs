@@ -209,7 +209,7 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, Type,
+    CallableTypes, IntersectionBuilder, KnownClass, NarrowingConstraint, Truthiness, TupleSpec, Type,
     TypeContext, UnionBuilder, UnionType, infer_expression_type, infer_narrowing_constraint,
 };
 
@@ -374,6 +374,13 @@ fn pattern_kind_to_type<'db>(db: &'db dyn Db, kind: &PatternPredicateKind<'db>) 
             .as_deref()
             .map(|p| pattern_kind_to_type(db, p))
             .unwrap_or_else(Type::object),
+        PatternPredicateKind::Sequence(patterns) => {
+            let elements: Vec<_> = patterns
+                .iter()
+                .map(|p| pattern_kind_to_type(db, p))
+                .collect();
+            Type::heterogeneous_tuple(db, elements)
+        }
         PatternPredicateKind::Unsupported => Type::Never,
     }
 }
@@ -1077,6 +1084,52 @@ impl ReachabilityConstraints {
                 .as_deref()
                 .map(|p| Self::analyze_single_pattern_predicate_kind(db, p, subject_ty))
                 .unwrap_or(Truthiness::AlwaysTrue),
+            PatternPredicateKind::Sequence(patterns) => {
+                // Check if the subject is a tuple with matching length.
+                let tuple_spec = match subject_ty {
+                    Type::NominalInstance(instance) => instance.tuple_spec(db),
+                    _ => None,
+                };
+
+                let Some(tuple_spec) = tuple_spec else {
+                    // Subject is not a tuple type; can't determine if it matches.
+                    return Truthiness::Ambiguous;
+                };
+
+                match tuple_spec.as_ref() {
+                    TupleSpec::Fixed(fixed) => {
+                        if fixed.len() != patterns.len() {
+                            // Length mismatch; pattern definitely can't match.
+                            return Truthiness::AlwaysFalse;
+                        }
+
+                        // Check each element pattern against its corresponding element type.
+                        let mut result = Truthiness::AlwaysTrue;
+
+                        for (element_ty, pattern) in
+                            fixed.all_elements().iter().zip(patterns.iter())
+                        {
+                            let element_result = Self::analyze_single_pattern_predicate_kind(
+                                db,
+                                pattern,
+                                *element_ty,
+                            );
+
+                            match element_result {
+                                Truthiness::AlwaysFalse => return Truthiness::AlwaysFalse,
+                                Truthiness::Ambiguous => result = Truthiness::Ambiguous,
+                                Truthiness::AlwaysTrue => {}
+                            }
+                        }
+
+                        result
+                    }
+                    TupleSpec::Variable(_) => {
+                        // Variable-length tuples could match patterns of various lengths.
+                        Truthiness::Ambiguous
+                    }
+                }
+            }
             PatternPredicateKind::Unsupported => Truthiness::Ambiguous,
         }
     }
