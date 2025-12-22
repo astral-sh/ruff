@@ -213,8 +213,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        # TODO: a better top-materialization for `Callable`s (https://github.com/astral-sh/ty/issues/1426)
-        reveal_type(y)  # revealed: () -> object
+        reveal_type(y)  # revealed: (...) -> object
 ```
 
 ## Class types

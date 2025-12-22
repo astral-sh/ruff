@@ -2058,11 +2058,8 @@ impl<'db> Parameters<'db> {
             TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
                 Parameters::object()
             }
-            // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
-            // The bottom materialization is not currently representable and implementing it
-            // properly requires extending the Parameters struct.
             TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
-                Parameters::empty()
+                Parameters::gradual_form()
             }
             _ => Self {
                 value: self
