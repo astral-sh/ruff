@@ -377,9 +377,7 @@ mod tests {
     use camino::{Utf8Component, Utf8Path};
     use ruff_db::Db as _;
     use ruff_db::files::{File, FilePath, FileRootKind};
-    use ruff_db::system::{
-        DbWithTestSystem, DbWithWritableSystem, OsSystem, SystemPath, SystemPathBuf,
-    };
+    use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::PythonVersion;
 
@@ -942,7 +940,7 @@ mod tests {
             .canonicalize()
             .context("Failed to canonicalize temp dir")?;
         let root = SystemPath::from_std_path(&root).unwrap();
-        db.use_system(OsSystem::new(root));
+        db.use_system(ruff_db::system::OsSystem::new(root));
 
         let src = root.join("src");
         let site_packages = root.join("site-packages");
@@ -1585,7 +1583,7 @@ not_a_directory
         let a_package_target = root.join("a-package");
         let a_src = src.join("a");
 
-        db.use_system(OsSystem::new(&root));
+        db.use_system(ruff_db::system::OsSystem::new(&root));
 
         db.write_file(
             a_package_target.join("__init__.py"),
