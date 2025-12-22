@@ -1370,18 +1370,32 @@ help: Convert to f-string
 276 +     string = f"{(number := number + 1)}"
 277 |     print(string)
 278 | 
-279 | # Unicode escape
+279 | # Unicode escape in regular string, should convert.
 
 UP032 [*] Use f-string instead of `format` call
    --> UP032_0.py:280:1
     |
-279 | # Unicode escape
+279 | # Unicode escape in regular string, should convert.
 280 | "\N{angle}AOB = {angle}°".format(angle=180)
     | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+281 |
+282 | # Unicode escape in raw string, should not convert - would change semantics.
     |
 help: Convert to f-string
 277 |     print(string)
 278 | 
-279 | # Unicode escape
+279 | # Unicode escape in regular string, should convert.
     - "\N{angle}AOB = {angle}°".format(angle=180)
 280 + f"\N{angle}AOB = {180}°"
+281 | 
+282 | # Unicode escape in raw string, should not convert - would change semantics.
+283 | r"\N{angle}AOB = {angle}°".format(angle=180)
+
+UP032 Use f-string instead of `format` call
+   --> UP032_0.py:283:1
+    |
+282 | # Unicode escape in raw string, should not convert - would change semantics.
+283 | r"\N{angle}AOB = {angle}°".format(angle=180)
+    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Convert to f-string
