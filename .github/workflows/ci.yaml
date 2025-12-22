@@ -1002,20 +1002,14 @@ jobs:
           mode: simulation
           run: cargo codspeed run
 
-  benchmarks-walltime:
-    name: "benchmarks walltime (${{ matrix.benchmarks }})"
-    runs-on: codspeed-macro
+  benchmarks-walltime-build:
+    name: "benchmarks walltime (build)"
+    # We only run this job if `github.repository == 'astral-sh/ruff'`,
+    # so hardcoding depot here is fine
+    runs-on: depot-ubuntu-22.04-arm-4
     needs: determine_changes
     if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
     timeout-minutes: 20
-    permissions:
-      contents: read # required for actions/checkout
-      id-token: write # required for OIDC authentication with CodSpeed
-    strategy:
-      matrix:
-        benchmarks:
-          - "medium|multithreaded"
-          - "small|large"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -1036,7 +1030,51 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,walltime" --profile profiling --no-default-features -p ruff_benchmark
+        run: cargo codspeed build -m walltime --features "codspeed,walltime" --profile profiling --no-default-features -p ruff_benchmark
+
+      - name: "Upload benchmark binary"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmarks-walltime-binary
+          path: target/codspeed/walltime/ruff_benchmark
+          retention-days: 1
+
+  benchmarks-walltime-run:
+    name: "benchmarks walltime (${{ matrix.benchmark }})"
+    runs-on: codspeed-macro
+    needs: benchmarks-walltime-build
+    timeout-minutes: 20
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
+    strategy:
+      matrix:
+        benchmark:
+          - colour_science
+          - "pandas|tanjun|altair"
+          - "static_frame|sympy"
+          - "pydantic|multithreaded|freqtrade"
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
+        with:
+          tool: cargo-codspeed
+
+      - name: "Download benchmark binary"
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: benchmarks-walltime-binary
+          path: target/codspeed/walltime/ruff_benchmark
+
+      - name: "Restore binary permissions"
+        run: chmod +x target/codspeed/walltime/ruff_benchmark/ty_walltime
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
@@ -1047,4 +1085,4 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run --bench ty_walltime "${{ matrix.benchmarks }}"
+          run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"
