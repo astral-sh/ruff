@@ -284,6 +284,59 @@ impl Violation for PytestDuplicateParametrizeTestCases {
     }
 }
 
+/// ## What it does
+/// Checks for `pytest.mark.parametrize` calls where the parameter values contain
+/// booleans but no `ids` keyword argument is provided.
+///
+/// ## Why is this bad?
+/// When using boolean values in parametrized tests, the test names can be unclear
+/// without explicit IDs. For example, `test_foo[True]` and `test_foo[False]` don't
+/// convey what the boolean represents.
+///
+/// Providing explicit `ids` makes test output more readable and helps identify
+/// which test case failed.
+///
+/// ## Example
+///
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize("flag", [True, False])
+/// def test_foo(flag): ...
+///
+///
+/// @pytest.mark.parametrize(("x", "flag"), [(1, True), (2, False)])
+/// def test_bar(x, flag): ...
+/// ```
+///
+/// Use instead:
+///
+/// ```python
+/// import pytest
+///
+///
+/// @pytest.mark.parametrize("flag", [True, False], ids=["enabled", "disabled"])
+/// def test_foo(flag): ...
+///
+///
+/// @pytest.mark.parametrize(("x", "flag"), [(1, True), (2, False)], ids=["case1", "case2"])
+/// def test_bar(x, flag): ...
+/// ```
+///
+/// ## References
+/// - [`pytest` documentation: How to parametrize fixtures and test functions](https://docs.pytest.org/en/latest/how-to/parametrize.html#pytest-mark-parametrize)
+#[derive(ViolationMetadata)]
+#[violation_metadata(stable_since = "v0.0.0")]
+pub(crate) struct PytestParametrizeBoolWithoutIds;
+
+impl Violation for PytestParametrizeBoolWithoutIds {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        "Boolean value in `pytest.mark.parametrize` without `ids` argument".to_string()
+    }
+}
+
 fn elts_to_csv(elts: &[Expr], generator: Generator, flags: StringLiteralFlags) -> Option<String> {
     if !elts.iter().all(Expr::is_string_literal_expr) {
         return None;
@@ -848,6 +901,36 @@ fn handle_value_rows(
     }
 }
 
+fn expr_contains_boolean(expr: &Expr) -> bool {
+    match expr {
+        Expr::BooleanLiteral(_) => true,
+        Expr::Tuple(ast::ExprTuple { elts, .. }) | Expr::List(ast::ExprList { elts, .. }) => {
+            elts.iter().any(expr_contains_boolean)
+        }
+        _ => false,
+    }
+}
+
+/// PT101
+fn check_boolean_without_ids(checker: &Checker, call: &ExprCall) {
+    let Some(values) = call.arguments.find_argument_value("argvalues", 1) else {
+        // No argvalues? Nothing to check.
+        return;
+    };
+
+    if call.arguments.find_keyword("ids").is_some() {
+        // Have `ids`, this is fine.
+        return;
+    }
+
+    if !expr_contains_boolean(values) {
+        // No boolean values, this is fine.
+        return;
+    }
+
+    checker.report_diagnostic(PytestParametrizeBoolWithoutIds, call.range());
+}
+
 pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
     if !is_pytest_parametrize(call, checker.semantic()) {
         return;
@@ -873,5 +956,8 @@ pub(crate) fn parametrize(checker: &Checker, call: &ExprCall) {
         if let Some(values) = call.arguments.find_argument_value("argvalues", 1) {
             check_duplicates(checker, values);
         }
+    }
+    if checker.is_rule_enabled(Rule::PytestParametrizeBoolWithoutIds) {
+        check_boolean_without_ids(checker, call);
     }
 }
