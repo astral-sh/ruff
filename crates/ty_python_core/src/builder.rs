@@ -1628,6 +1628,11 @@ impl<'db, 'ast> SemanticIndexBuilder<'db, 'ast> {
                     } else {
                         ClassPatternKind::Refutable
                     },
+                    pattern
+                        .patterns
+                        .iter()
+                        .map(|pattern| self.predicate_kind(pattern))
+                        .collect(),
                 )
             }
             ast::Pattern::MatchOr(pattern) => {
