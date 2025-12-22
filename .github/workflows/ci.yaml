@@ -952,7 +952,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: cargo codspeed build --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
@@ -960,9 +960,9 @@ jobs:
           mode: simulation
           run: cargo codspeed run
 
-  benchmarks-instrumented-ty:
-    name: "benchmarks instrumented (ty)"
-    runs-on: ubuntu-24.04
+  benchmarks-instrumented-ty-build:
+    name: "benchmarks instrumented ty (build)"
+    runs-on: depot-ubuntu-24.04-4
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -971,9 +971,6 @@ jobs:
         needs.determine_changes.outputs.ty == 'true'
       )
     timeout-minutes: 20
-    permissions:
-      contents: read # required for actions/checkout
-      id-token: write # required for OIDC authentication with CodSpeed
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -983,7 +980,6 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
 
       - name: "Install Rust toolchain"
         run: rustup show
@@ -994,13 +990,55 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
+        run: cargo codspeed build -m instrumentation --features "codspeed,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
+
+      - name: "Upload benchmark binary"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: target/codspeed/instrumentation/ruff_benchmark
+          retention-days: 1
+
+  benchmarks-instrumented-ty-run:
+    name: "benchmarks instrumented ty (${{ matrix.benchmark }})"
+    runs-on: ubuntu-24.04
+    needs: benchmarks-instrumented-ty-build
+    timeout-minutes: 20
+    permissions:
+      contents: read # required for actions/checkout
+      id-token: write # required for OIDC authentication with CodSpeed
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark:
+          - "check_file|micro|anyio"
+          - "attrs|hydra|datetype"
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
+        with:
+          tool: cargo-codspeed
+
+      - name: "Download benchmark binary"
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.0
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: target/codspeed/instrumentation/ruff_benchmark
+
+      - name: "Restore binary permissions"
+        run: chmod +x target/codspeed/instrumentation/ruff_benchmark/ty
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
         with:
           mode: simulation
-          run: cargo codspeed run
+          run: cargo codspeed run --bench ty "${{ matrix.benchmark }}"
 
   benchmarks-walltime-build:
     name: "benchmarks walltime (build)"
@@ -1030,7 +1068,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build -m walltime --features "codspeed,walltime" --profile profiling --no-default-features -p ruff_benchmark
+        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
 
       - name: "Upload benchmark binary"
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
