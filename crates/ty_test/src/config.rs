@@ -106,6 +106,7 @@ pub(crate) struct Environment {
 }
 
 #[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
 pub(crate) struct Analysis {
     /// Whether ty should support `type: ignore` comments.
     pub(crate) respect_type_ignore_comments: Option<bool>,

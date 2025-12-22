@@ -1278,9 +1278,11 @@ pub struct TerminalOptions {
 pub struct AnalysisOptions {
     /// Whether ty should respect `type: ignore` comments.
     ///
-    /// When set to `false`, ty only respects `ty: ignore` comment,
-    /// and `type: ignore` comments are treated as any other normal comment
-    /// (they can't be used to suppress ty errors).
+    /// When set to `false`, `type: ignore` comments are treated like any other normal
+    /// comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+    ///
+    /// Setting this option can be useful when using ty alongside other type checkers or when
+    /// you prefer using `ty: ignore` over `type: ignore`.
     ///
     /// Defaults to `true`.
     #[option(
