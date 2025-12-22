@@ -6065,6 +6065,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from typing import Literal
         from types import NoneType
 
         def branch(cond: int):
