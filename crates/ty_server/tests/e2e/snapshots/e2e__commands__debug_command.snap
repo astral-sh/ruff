@@ -52,6 +52,7 @@ Settings: Settings {
         "invalid-await": Error (Default),
         "invalid-base": Error (Default),
         "invalid-context-manager": Error (Default),
+        "invalid-dataclass-override": Error (Default),
         "invalid-declaration": Error (Default),
         "invalid-exception-caught": Error (Default),
         "invalid-explicit-override": Error (Default),
