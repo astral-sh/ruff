@@ -452,10 +452,10 @@ from dataclasses import dataclass
 class MyFrozenClass:
     x: int
 
-    # error: [unsound-dataclass-method-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__setattr__` in class `MyFrozenClass`"
     def __setattr__(self, name: str, value: object) -> None: ...
 
-    # error: [unsound-dataclass-method-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
+    # error: [invalid-dataclass-override] "Cannot overwrite attribute `__delattr__` in class `MyFrozenClass`"
     def __delattr__(self, name: str) -> None: ...
 ```
 
