@@ -19,9 +19,9 @@ use crate::{Violation, checkers::ast::Checker};
 /// ```python
 /// """My module docstring."""
 ///
+///
 /// class MyClass:
-///     def my_method(self):
-///         ...
+///     def my_method(self): ...
 /// ```
 ///
 /// Use instead:
