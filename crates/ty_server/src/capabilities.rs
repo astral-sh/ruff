@@ -354,7 +354,7 @@ pub(crate) fn server_capabilities(
             // capabilities dynamically based on the `ty.diagnosticMode` setting.
             None
         } else {
-            // Otherwise, we always advertise support for workspace diagnostics.
+            // Otherwise, we always advertise support for workspace and pull diagnostics.
             Some(DiagnosticServerCapabilities::Options(
                 server_diagnostic_options(true),
             ))

@@ -334,9 +334,13 @@ impl CompletionOptions {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DiagnosticMode {
+    /// Disable all diagnostics so that ty can be used as an LSP only
+    Off,
+
     /// Check only currently open files.
     #[default]
     OpenFilesOnly,
+
     /// Check all files in the workspace.
     Workspace,
 }
@@ -351,6 +355,10 @@ impl DiagnosticMode {
     pub(crate) const fn is_open_files_only(self) -> bool {
         matches!(self, DiagnosticMode::OpenFilesOnly)
     }
+
+    pub(crate) const fn is_off(self) -> bool {
+        matches!(self, DiagnosticMode::Off)
+    }
 }
 
 impl Combine for DiagnosticMode {
@@ -363,8 +371,8 @@ impl Combine for DiagnosticMode {
         // So, this is a workaround to ensure that if the diagnostic mode is set to `workspace` in
         // either an initialization options or one of the workspace options, it is always set to
         // `workspace` in the global options.
-        if other.is_workspace() {
-            *self = DiagnosticMode::Workspace;
+        if other != DiagnosticMode::default() {
+            *self = other;
         }
     }
 }

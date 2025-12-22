@@ -634,24 +634,35 @@ impl Session {
 
             let diagnostic_mode = self.global_settings.diagnostic_mode;
 
-            tracing::debug!(
-                "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
-            );
-            registrations.push(Registration {
-                id: DIAGNOSTIC_REGISTRATION_ID.into(),
-                method: DocumentDiagnosticRequest::METHOD.into(),
-                register_options: Some(
-                    serde_json::to_value(DiagnosticServerCapabilities::RegistrationOptions(
-                        DiagnosticRegistrationOptions {
-                            diagnostic_options: server_diagnostic_options(
-                                diagnostic_mode.is_workspace(),
-                            ),
-                            ..Default::default()
-                        },
-                    ))
-                    .unwrap(),
-                ),
-            });
+            match diagnostic_mode {
+                DiagnosticMode::Off => {
+                    tracing::debug!(
+                        "Skipping registration of diagnostic capability because diagnostics are turned off"
+                    );
+                }
+                DiagnosticMode::OpenFilesOnly | DiagnosticMode::Workspace => {
+                    tracing::debug!(
+                        "Registering diagnostic capability with {diagnostic_mode:?} diagnostic mode"
+                    );
+                    registrations.push(Registration {
+                        id: DIAGNOSTIC_REGISTRATION_ID.into(),
+                        method: DocumentDiagnosticRequest::METHOD.into(),
+                        register_options: Some(
+                            serde_json::to_value(
+                                DiagnosticServerCapabilities::RegistrationOptions(
+                                    DiagnosticRegistrationOptions {
+                                        diagnostic_options: server_diagnostic_options(
+                                            diagnostic_mode.is_workspace(),
+                                        ),
+                                        ..Default::default()
+                                    },
+                                ),
+                            )
+                            .unwrap(),
+                        ),
+                    });
+                }
+            }
         }
 
         if let Some(register_options) = self.file_watcher_registration_options() {
@@ -1024,7 +1035,6 @@ impl DocumentSnapshot {
     }
 
     /// Returns the client settings for all workspaces.
-    #[expect(unused)]
     pub(crate) fn global_settings(&self) -> &GlobalSettings {
         &self.global_settings
     }

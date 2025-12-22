@@ -6,6 +6,7 @@ use lsp_types::{
     notification::{DidOpenTextDocument, PublishDiagnostics},
 };
 use ruff_db::system::SystemPath;
+use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
@@ -29,6 +30,37 @@ def foo() -> str:
     let diagnostics = server.await_notification::<PublishDiagnostics>();
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_open_diagnostics_off() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let diagnostics =
+        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+
+    assert!(
+        diagnostics.is_err(),
+        "Server should not send a publish diagnostics notification when diagnostics are off"
+    );
 
     Ok(())
 }
@@ -65,6 +97,46 @@ def foo() -> str:
     assert_eq!(diagnostics.version, Some(2));
 
     insta::assert_debug_snapshot!(diagnostics);
+
+    Ok(())
+}
+
+#[test]
+fn on_did_change_diagnostics_off() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = "\
+def foo() -> str:
+    return 42
+";
+
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            workspace_root,
+            Some(ClientOptions::default().with_diagnostic_mode(ty_server::DiagnosticMode::Off)),
+        )?
+        .with_file(foo, foo_content)?
+        .enable_pull_diagnostics(false)
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+
+    let changes = vec![lsp_types::TextDocumentContentChangeEvent {
+        range: None,
+        range_length: None,
+        text: "def foo() -> int: return 42".to_string(),
+    }];
+
+    server.change_text_document(foo, changes, 2);
+
+    let diagnostics =
+        server.try_await_notification::<PublishDiagnostics>(Some(Duration::from_millis(100)));
+
+    assert!(
+        diagnostics.is_err(),
+        "Server should not send a publish diagnostics notification when diagnostics are off"
+    );
 
     Ok(())
 }
