@@ -1,59 +1,49 @@
-use std::cmp::Ordering;
-use std::collections::{BTreeMap, BTreeSet};
-
+use crate::Db;
+use crate::lint::LintId;
+use crate::suppression::{SuppressionTarget, suppressions};
 use ruff_db::diagnostic::LintName;
+use ruff_db::display::FormatterJoinExtension;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::token::TokenKind;
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use smallvec::SmallVec;
+use std::cmp::Ordering;
+use std::collections::{BTreeMap, BTreeSet};
+use std::fmt::Formatter;
 
-use crate::Db;
-use crate::lint::LintId;
-use crate::suppression::{SuppressionTarget, suppressions};
-
-pub fn suppress_all<I>(db: &dyn Db, file: File, ids_with_range: I) -> Vec<Fix>
-where
-    I: IntoIterator<Item = (LintName, TextRange)>,
-{
-    let grouped = group_by_suppression_range(db, file, ids_with_range);
-    create_all_fixes(db, file, grouped)
+/// Creates fixes to suppress all violations in `ids_with_range`.
+///
+/// This is different from calling `suppress_single` for every item in `ids_with_range`
+/// in that errors on the same line are grouped together and ty will only insert a single
+/// suppression with possibly multiple codes instead of adding multiple suppression comments.
+pub fn suppress_all(db: &dyn Db, file: File, ids_with_range: &[(LintName, TextRange)]) -> Vec<Fix> {
+    group_by_line(db, file, ids_with_range)
+        .into_iter()
+        .map(|(range, lints)| {
+            let codes: SmallVec<[LintName; 2]> = lints.into_iter().collect();
+            create_suppression_fix(db, file, &codes, range)
+        })
+        .collect()
 }
 
 /// Creates a fix to suppress a single lint.
 pub fn suppress_single(db: &dyn Db, file: File, id: LintId, range: TextRange) -> Fix {
     let suppression_range = suppression_range(db, file, range);
-    create_suppression_fix(db, file, id.name(), suppression_range)
+    create_suppression_fix(db, file, &[id.name()], suppression_range)
 }
 
-fn create_all_fixes(
+/// Computes the suppression range for every provided violation to suppress
+/// and groups the lints by that range.
+fn group_by_line(
     db: &dyn Db,
     file: File,
-    grouped: BTreeMap<SuppressionRange, BTreeSet<LintName>>,
-) -> Vec<Fix> {
-    let mut fixes = Vec::new();
-
-    for (range, lints) in grouped {
-        for lint in lints.into_iter().rev() {
-            let fix = create_suppression_fix(db, file, lint, range);
-            fixes.push(fix);
-        }
-    }
-
-    fixes
-}
-
-fn group_by_suppression_range<I>(
-    db: &dyn Db,
-    file: File,
-    ids_with_range: I,
-) -> BTreeMap<SuppressionRange, BTreeSet<LintName>>
-where
-    I: IntoIterator<Item = (LintName, TextRange)>,
-{
+    ids_with_range: &[(LintName, TextRange)],
+) -> BTreeMap<SuppressionRange, BTreeSet<LintName>> {
     let mut map: BTreeMap<SuppressionRange, BTreeSet<LintName>> = BTreeMap::new();
-    for (id, range) in ids_with_range {
+    for &(id, range) in ids_with_range {
         let full_range = suppression_range(db, file, range);
         map.entry(full_range).or_default().insert(id);
     }
@@ -124,11 +114,11 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> SuppressionRa
 struct SuppressionRange(TextRange);
 
 impl SuppressionRange {
-    fn text_range(&self) -> TextRange {
+    fn text_range(self) -> TextRange {
         self.0
     }
 
-    fn line_end(&self) -> TextSize {
+    fn line_end(self) -> TextSize {
         self.0.end()
     }
 }
@@ -145,14 +135,14 @@ impl Ord for SuppressionRange {
     }
 }
 
-/// Creates a fix for adding a suppression comment to suppress `lint` for `range`.
+/// Creates a fix for adding a suppression comment to suppress `codes` for `range`.
 ///
 /// The fix prefers adding the code to an existing `ty: ignore[]` comment over
 /// adding a new suppression comment.
 fn create_suppression_fix(
     db: &dyn Db,
     file: File,
-    name: LintName,
+    codes: &[LintName],
     suppression_range: SuppressionRange,
 ) -> Fix {
     let suppressions = suppressions(db, file);
@@ -175,9 +165,9 @@ fn create_suppression_fix(
             let up_to_last_code = before_closing_paren.trim_end();
 
             let insertion = if up_to_last_code.ends_with(',') {
-                format!(" {name}")
+                format!(" {codes}", codes = Codes(codes))
             } else {
-                format!(", {name}")
+                format!(", {codes}", codes = Codes(codes))
             };
 
             let relative_offset_from_end = comment_text.text_len() - up_to_last_code.text_len();
@@ -197,7 +187,7 @@ fn create_suppression_fix(
     let up_to_first_content = up_to_line_end.trim_end();
     let trailing_whitespace_len = up_to_line_end.text_len() - up_to_first_content.text_len();
 
-    let insertion = format!("  # ty:ignore[{name}]");
+    let insertion = format!("  # ty:ignore[{codes}]", codes = Codes(codes));
 
     Fix::safe_edit(if trailing_whitespace_len == TextSize::ZERO {
         Edit::insertion(insertion, line_end)
@@ -206,4 +196,12 @@ fn create_suppression_fix(
         // Trim the trailing whitespace
         Edit::replacement(insertion, line_end - trailing_whitespace_len, line_end)
     })
+}
+
+struct Codes<'a>(&'a [LintName]);
+
+impl std::fmt::Display for Codes<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.join(", ").entries(self.0).finish()
+    }
 }
