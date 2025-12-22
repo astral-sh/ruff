@@ -246,7 +246,6 @@ impl WorkspaceOptions {
 struct InlayHintOptions {
     variable_types: Option<bool>,
     call_argument_names: Option<bool>,
-    auto_import: Option<bool>,
 }
 
 impl InlayHintOptions {
@@ -254,7 +253,6 @@ impl InlayHintOptions {
         InlayHintSettings {
             variable_types: self.variable_types.unwrap_or(true),
             call_argument_names: self.call_argument_names.unwrap_or(true),
-            auto_import: self.auto_import.unwrap_or(true),
         }
     }
 }
