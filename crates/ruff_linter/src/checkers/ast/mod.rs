@@ -21,7 +21,7 @@
 //! represents the lint-rule analysis phase. In the future, these steps may be separated into
 //! distinct passes over the AST.
 
-use std::cell::RefCell;
+use std::cell::{OnceCell, RefCell};
 use std::path::Path;
 
 use itertools::Itertools;
@@ -198,6 +198,8 @@ pub(crate) struct Checker<'a> {
     parsed_type_annotation: Option<&'a ParsedAnnotation>,
     /// The [`Path`] to the file under analysis.
     path: &'a Path,
+    /// Whether `path` points to an `__init__.py` file.
+    in_init_module: OnceCell<bool>,
     /// The [`Path`] to the package containing the current file.
     package: Option<PackageRoot<'a>>,
     /// The module representation of the current file (e.g., `foo.bar`).
@@ -274,6 +276,7 @@ impl<'a> Checker<'a> {
             noqa_line_for,
             noqa,
             path,
+            in_init_module: OnceCell::new(),
             package,
             module,
             source_type,
@@ -482,9 +485,11 @@ impl<'a> Checker<'a> {
         self.context.settings
     }
 
-    /// The [`Path`] to the file under analysis.
-    pub(crate) const fn path(&self) -> &'a Path {
-        self.path
+    /// Returns whether the file under analysis is an `__init__.py` file.
+    pub(crate) fn in_init_module(&self) -> bool {
+        *self
+            .in_init_module
+            .get_or_init(|| self.path.ends_with("__init__.py"))
     }
 
     /// The [`Path`] to the package containing the current file.
@@ -3171,7 +3176,7 @@ impl<'a> Checker<'a> {
                         // F822
                         if self.is_rule_enabled(Rule::UndefinedExport) {
                             if is_undefined_export_in_dunder_init_enabled(self.settings())
-                                || !self.path.ends_with("__init__.py")
+                                || !self.in_init_module()
                             {
                                 self.report_diagnostic(
                                     pyflakes::rules::UndefinedExport {

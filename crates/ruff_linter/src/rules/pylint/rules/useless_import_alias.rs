@@ -70,7 +70,7 @@ pub(crate) fn useless_import_alias(checker: &Checker, alias: &Alias) {
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py") {
+    if checker.in_init_module() {
         return;
     }
 
@@ -109,7 +109,7 @@ pub(crate) fn useless_import_from_alias(
     }
 
     // A re-export in __init__.py is probably intentional.
-    if checker.path().ends_with("__init__.py") {
+    if checker.in_init_module() {
         return;
     }
 

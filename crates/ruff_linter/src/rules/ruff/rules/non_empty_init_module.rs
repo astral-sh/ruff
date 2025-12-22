@@ -66,7 +66,7 @@ impl Violation for NonEmptyInitModule {
 
 /// RUF070
 pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
-    if !checker.path().ends_with("__init__.py") {
+    if !checker.in_init_module() {
         return;
     }
 
