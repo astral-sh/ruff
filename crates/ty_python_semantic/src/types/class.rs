@@ -20,8 +20,8 @@ use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
 use crate::types::diagnostic::{
-    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
-    UNSOUND_DATACLASS_METHOD_OVERRIDE, report_conflicting_metaclass_from_bases,
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_DATACLASS_OVERRIDE, INVALID_TYPE_ALIAS_TYPE,
+    SUPER_CALL_IN_NAMED_TUPLE_METHOD, report_conflicting_metaclass_from_bases,
 };
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
@@ -3901,7 +3901,7 @@ impl<'db> StaticClassLiteral<'db> {
                     && self.has_dataclass_param(db, field_policy, DataclassFlags::FROZEN)
                 {
                     if let Some(builder) = context.report_lint(
-                        &UNSOUND_DATACLASS_METHOD_OVERRIDE,
+                        &INVALID_DATACLASS_OVERRIDE,
                         literal.node(db, context.file(), context.module()),
                     ) {
                         let mut diagnostic = builder.into_diagnostic(format_args!(

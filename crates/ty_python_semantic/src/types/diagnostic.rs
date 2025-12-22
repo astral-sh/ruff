@@ -52,7 +52,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&CALL_NON_CALLABLE);
     registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
-    registry.register_lint(&UNSOUND_DATACLASS_METHOD_OVERRIDE);
+    registry.register_lint(&INVALID_DATACLASS_OVERRIDE);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
     registry.register_lint(&CONFLICTING_METACLASS);
@@ -449,7 +449,7 @@ declare_lint! {
     /// class A:
     ///     def __setattr__(self, name: str, value: object) -> None: ...
     /// ```
-    pub(crate) static UNSOUND_DATACLASS_METHOD_OVERRIDE = {
+    pub(crate) static INVALID_DATACLASS_OVERRIDE = {
         summary: "detects dataclasses with `frozen=True` that have a custom `__setattr__` or `__delattr__` implementation",
         status: LintStatus::preview("1.0.0"),
         default_level: Level::Error,

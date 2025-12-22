@@ -878,6 +878,38 @@ with 1:
     print(2)
 ```
 
+## `invalid-dataclass-override`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.0</a>) ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-dataclass-override" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L433" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
+`__delattr__` method defined.
+
+**Why is this bad?**
+
+Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
+`FrozenInstanceError` to emulate immutability.
+
+Overriding either of these methods raises a runtime error.
+
+**Examples**
+
+```python
+from dataclasses import dataclass
+
+@dataclass(frozen=True)
+class A:
+    def __setattr__(self, name: str, value: object) -> None: ...
+```
+
 ## `invalid-declaration`
 
 <small>
@@ -2869,38 +2901,6 @@ Using an undefined variable will raise a `NameError` at runtime.
 
 ```python
 print(x)  # NameError: name 'x' is not defined
-```
-
-## `unsound-dataclass-method-override`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Preview (since <a href="https://github.com/astral-sh/ty/releases/tag/1.0.0">1.0.0</a>) ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20unsound-dataclass-method-override" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L433" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for dataclass definitions that have both `frozen=True` and a custom `__setattr__` or
-`__delattr__` method defined.
-
-**Why is this bad?**
-
-Frozen dataclasses synthesize `__setattr__` and `__delattr__` methods which raise a
-`FrozenInstanceError` to emulate immutability.
-
-Overriding either of these methods raises a runtime error.
-
-**Examples**
-
-```python
-from dataclasses import dataclass
-
-@dataclass(frozen=True)
-class A:
-    def __setattr__(self, name: str, value: object) -> None: ...
 ```
 
 ## `unsupported-base`
