@@ -194,9 +194,8 @@ def test(x: Status | int):
 
 ## Union with tuple and `Literal`
 
-Parameterized tuple types like `tuple[A, B]` have a known structure and use standard tuple `__eq__`
-which only returns True for other tuples. So they are excluded from the narrowed type when disjoint
-from the RHS values.
+We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
+tuples. So they are excluded from the narrowed type when disjoint from the RHS values.
 
 ```py
 from typing import Literal

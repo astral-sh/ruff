@@ -347,7 +347,7 @@ fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<
         // `True == 1` and `False == 0`.
         (Type::BooleanLiteral(b), Type::IntLiteral(i))
         | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
-        // Tuples with known structure use standard `__eq__` which only returns True
+        // We assume that tuples use `tuple.__eq__` which only returns True
         // for other tuples, so they cannot compare equal to non-tuple types.
         (Type::NominalInstance(instance), _) if instance.tuple_spec(db).is_some() => false,
         (_, Type::NominalInstance(instance)) if instance.tuple_spec(db).is_some() => false,

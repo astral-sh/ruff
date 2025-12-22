@@ -241,9 +241,8 @@ def _(s: LiteralString | None, t: LiteralString | Any):
 
 ## Narrowing with tuple types
 
-Parameterized tuple types like `tuple[A, B]` have a known structure and use standard tuple `__eq__`
-which only returns True for other tuples. So they are excluded from the narrowed type when comparing
-to non-tuple values.
+We assume that tuple subclasses don't override `tuple.__eq__`, which only returns True for other
+tuples. So they are excluded from the narrowed type when comparing to non-tuple values.
 
 ```py
 from typing import Literal
