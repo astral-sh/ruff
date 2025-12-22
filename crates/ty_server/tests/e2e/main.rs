@@ -1344,13 +1344,6 @@ impl TestContext {
             .map_err(|()| anyhow!("Failed to convert root directory to url"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
         settings.add_filter(&tempdir_filter(project_dir_url.path()), "<temp_dir>/");
-
-        if let Ok(path) = project_dir_url.to_file_path()
-            && let Some(path) = path.to_str()
-        {
-            settings.add_filter(&tempdir_filter(path), "<temp_dir>/");
-        }
-
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(
             r#"The system cannot find the file specified."#,

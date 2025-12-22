@@ -531,12 +531,12 @@ impl Session {
                 Ok(db) => (root, db),
                 Err(err) => {
                     tracing::error!(
-                        "Failed to create project for `{root}`: {err:#}. \
+                        "Failed to create project for workspace `{url}`: {err:#}. \
                         Falling back to default settings"
                     );
 
                     client.show_error_message(format!(
-                        "Failed to load project rooted at {root}. \
+                        "Failed to load project for workspace {url}. \
                         Please refer to the logs for more details.",
                     ));
 
