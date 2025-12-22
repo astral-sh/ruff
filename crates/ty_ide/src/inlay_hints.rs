@@ -5,7 +5,7 @@ use rustc_hash::FxHashMap;
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
 use ruff_db::files::File;
-use ruff_db::parsed::{ParsedModuleRef, parsed_module};
+use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
@@ -25,17 +25,19 @@ pub struct InlayHint {
 }
 
 impl InlayHint {
-    #[allow(clippy::too_many_arguments)]
     fn variable_type(
-        db: &dyn Db,
+        context: InlayHintImporterContext,
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
-        file: File,
-        parsed: &ParsedModuleRef,
         allow_edits: bool,
-        allow_auto_import: bool,
     ) -> Option<Self> {
+        let InlayHintImporterContext {
+            db,
+            file,
+            dynamic_importer,
+        } = context;
+
         let position = expr.range().end();
         // Render the type to a string, and get subspans for all the types that make it up
         let details = ty.display(db).to_string_parts();
@@ -44,15 +46,6 @@ impl InlayHint {
         if call_matches_name(rhs, &details.label) {
             return None;
         }
-
-        let source = source_text(db, file);
-        let stylist = Stylist::from_tokens(parsed.tokens(), source.as_str());
-        let should_auto_import = details.is_valid_syntax && allow_edits && allow_auto_import;
-        let mut dynamic_importer = should_auto_import.then(|| {
-            let importer = Importer::new(db, &stylist, file, source.as_str(), parsed);
-            let members = importer.members_in_scope_at(expr.into(), expr.range().start());
-            DynamicImporter::new(importer, members)
-        });
 
         // Ok so the idea here is that we potentially have a random soup of spans here,
         // and each byte of the string can have at most one target associate with it.
@@ -94,11 +87,12 @@ impl InlayHint {
                         }
 
                         let module = file_to_module(db, definition.file(db))?;
-                        let module_name = module.name(db).as_str();
 
-                        if module_name == "builtins" {
+                        if module.is_known(db, ty_module_resolver::KnownModule::Builtins) {
                             return None;
                         }
+
+                        let module_name = module.name(db).as_str();
 
                         dynamic_importer.import_symbol(
                             module_name,
@@ -116,9 +110,7 @@ impl InlayHint {
                         let nav_target = ty.navigation_targets(db).into_iter().next();
 
                         // Update qualified_label for text edits if needed
-                        if let Some(qualified_label_part) =
-                            dynamic_importer.as_mut().and_then(qualified_label_part)
-                        {
+                        if let Some(qualified_label_part) = qualified_label_part(dynamic_importer) {
                             let old_len = text_edit_end - text_edit_start;
                             let new_len = qualified_label_part.len();
 
@@ -156,10 +148,8 @@ impl InlayHint {
                 new_text: format!(": {text_edit_label}"),
             }];
 
-            if let Some(dynamic_importer) = dynamic_importer {
-                let import_edits = dynamic_importer.into_text_edits();
-                text_edits.extend(import_edits);
-            }
+            let import_edits = dynamic_importer.text_edits();
+            text_edits.extend(import_edits);
 
             text_edits
         } else {
@@ -295,7 +285,11 @@ pub fn inlay_hints(
 ) -> Vec<InlayHint> {
     let ast = parsed_module(db, file).load(db);
 
-    let mut visitor = InlayHintVisitor::new(db, file, &ast, range, settings);
+    let source = source_text(db, file);
+    let stylist = Stylist::from_tokens(ast.tokens(), source.as_str());
+    let importer = Importer::new(db, &stylist, file, source.as_str(), &ast);
+
+    let mut visitor = InlayHintVisitor::new(db, file, importer, range, settings);
 
     visitor.visit_body(ast.suite());
 
@@ -322,7 +316,6 @@ pub struct InlayHintSettings {
     /// ```
     pub call_argument_names: bool,
     // Add any new setting that enables additional inlays to `any_enabled`.
-    pub auto_import: bool,
 }
 
 impl InlayHintSettings {
@@ -336,15 +329,23 @@ impl Default for InlayHintSettings {
         Self {
             variable_types: true,
             call_argument_names: true,
-            auto_import: true,
         }
     }
 }
 
-struct InlayHintVisitor<'a, 'db, 'ast> {
+struct InlayHintImporterContext<'a, 'db> {
+    db: &'db dyn Db,
+    file: File,
+    dynamic_importer: &'a mut DynamicImporter<'a, 'db>,
+}
+
+struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    ast: &'ast ParsedModuleRef,
+    /// Imports that we have already resolved.
+    /// We store these imports so we don't create multiple imports for the same symbol.
+    dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
+    importer: Importer<'db>,
     hints: Vec<InlayHint>,
     assignment_rhs: Option<&'a Expr>,
     range: TextRange,
@@ -352,18 +353,19 @@ struct InlayHintVisitor<'a, 'db, 'ast> {
     in_no_edits_allowed: bool,
 }
 
-impl<'a, 'db, 'ast> InlayHintVisitor<'a, 'db, 'ast> {
+impl<'a, 'db> InlayHintVisitor<'a, 'db> {
     fn new(
         db: &'db dyn Db,
         file: File,
-        ast: &'ast ParsedModuleRef,
+        importer: Importer<'db>,
         range: TextRange,
         settings: &'a InlayHintSettings,
     ) -> Self {
         Self {
             db,
             model: SemanticModel::new(db, file),
-            ast,
+            dynamic_imports: FxHashMap::default(),
+            importer,
             hints: Vec::new(),
             assignment_rhs: None,
             range,
@@ -381,16 +383,19 @@ impl<'a, 'db, 'ast> InlayHintVisitor<'a, 'db, 'ast> {
             return;
         }
 
-        if let Some(inlay_hint) = InlayHint::variable_type(
-            self.db,
-            expr,
-            rhs,
-            ty,
-            self.model.file(),
-            self.ast,
-            allow_edits,
-            self.settings.auto_import,
-        ) {
+        let members = self
+            .importer
+            .members_in_scope_at(expr.into(), expr.range().start());
+        let mut dynamic_importer =
+            DynamicImporter::new(&self.importer, members, &mut self.dynamic_imports);
+
+        let context = InlayHintImporterContext {
+            db: self.db,
+            file: self.model.file(),
+            dynamic_importer: &mut dynamic_importer,
+        };
+
+        if let Some(inlay_hint) = InlayHint::variable_type(context, expr, rhs, ty, allow_edits) {
             self.hints.push(inlay_hint);
         }
     }
@@ -415,7 +420,7 @@ impl<'a, 'db, 'ast> InlayHintVisitor<'a, 'db, 'ast> {
     }
 }
 
-impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_, '_> {
+impl<'a> SourceOrderVisitor<'a> for InlayHintVisitor<'a, '_> {
     fn enter_node(&mut self, node: AnyNodeRef<'a>) -> TraversalSignal {
         if self.range.intersect(node.range()).is_some() {
             TraversalSignal::Traverse
@@ -618,21 +623,28 @@ struct DynamicallyImportedMember {
     name: String,
 }
 
-struct DynamicImporter<'db> {
-    importer: Importer<'db>,
+struct DynamicImporter<'a, 'db> {
+    importer: &'a Importer<'db>,
     members: MembersInScope<'db>,
 
     /// Imports that we have already resolved.
     /// We store these imports so we don't create multiple imports for the same symbol.
-    dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
+    dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
+
+    imported_members: Vec<DynamicallyImportedMember>,
 }
 
-impl<'db> DynamicImporter<'db> {
-    fn new(importer: Importer<'db>, members: MembersInScope<'db>) -> Self {
+impl<'a, 'db> DynamicImporter<'a, 'db> {
+    fn new(
+        importer: &'a Importer<'db>,
+        members: MembersInScope<'db>,
+        dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
+    ) -> Self {
         Self {
             importer,
             members,
-            dynamic_imports: FxHashMap::default(),
+            dynamic_imports,
+            imported_members: Vec::new(),
         }
     }
 
@@ -669,7 +681,7 @@ impl<'db> DynamicImporter<'db> {
             name: definition_name.to_string(),
         };
 
-        match self.dynamic_imports.entry(key) {
+        match self.dynamic_imports.entry(key.clone()) {
             Entry::Vacant(entry) => {
                 let request = if is_possibly_qualified_name {
                     ImportRequest::import(module_name, definition_name).force()
@@ -683,6 +695,8 @@ impl<'db> DynamicImporter<'db> {
 
                 entry.insert(import_action);
 
+                self.imported_members.push(key);
+
                 qualified_name
             }
             Entry::Occupied(entry) => {
@@ -694,9 +708,10 @@ impl<'db> DynamicImporter<'db> {
     }
 
     /// Builds the text edits from all collected imports.
-    fn into_text_edits(self) -> Vec<InlayHintTextEdit> {
-        self.dynamic_imports
-            .into_values()
+    fn text_edits(&self) -> Vec<InlayHintTextEdit> {
+        self.imported_members
+            .iter()
+            .filter_map(|member| self.dynamic_imports.get(member))
             .filter_map(|import_action| {
                 import_action.import().and_then(|edit| {
                     edit.content().map(|content| InlayHintTextEdit {
@@ -796,14 +811,6 @@ mod tests {
             self.inlay_hints_with_settings(&InlayHintSettings::default())
         }
 
-        fn inlay_hints_no_auto_import(&mut self) -> String {
-            self.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-                auto_import: false,
-            })
-        }
-
         fn with_extra_file(&mut self, file_name: &str, content: &str) {
             self.db.write_file(file_name, content).unwrap();
         }
@@ -819,7 +826,7 @@ mod tests {
 
             let mut offset = 0;
 
-            let mut edit_offset = 0;
+            let mut all_edits = Vec::new();
 
             for hint in hints {
                 let end_position = hint.position.to_usize() + offset;
@@ -836,23 +843,23 @@ mod tests {
                     hint_str.push_str(part.text());
                 }
 
-                for edit in hint
-                    .text_edits
-                    .iter()
-                    .sorted_by_key(|edit| edit.range.start())
-                {
-                    let start = edit.range.start().to_usize() + edit_offset;
-                    let end = edit.range.end().to_usize() + edit_offset;
-
-                    text_edit_buf.replace_range(start..end, &edit.new_text);
-
-                    edit_offset += edit.new_text.len() - edit.range.len().to_usize();
-                }
+                all_edits.extend(hint.text_edits);
 
                 hint_str.push(']');
                 offset += hint_str.len();
 
                 inlay_hint_buf.insert_str(end_position, &hint_str);
+            }
+
+            let mut edit_offset = 0;
+
+            for edit in all_edits.iter().sorted_by_key(|edit| edit.range.start()) {
+                let start = edit.range.start().to_usize() + edit_offset;
+                let end = edit.range.end().to_usize() + edit_offset;
+
+                text_edit_buf.replace_range(start..end, &edit.new_text);
+
+                edit_offset += edit.new_text.len() - edit.range.len().to_usize();
             }
 
             self.db.write_file("main2.py", &inlay_hint_buf).unwrap();
@@ -877,7 +884,9 @@ mod tests {
                 );
             }
 
-            let rendered_edit_diagnostic = if edit_offset != 0 {
+            let rendered_edit_diagnostic = if all_edits.is_empty() {
+                String::new()
+            } else {
                 let edit_diagnostic = InlayHintEditDiagnostic::new(text_edit_buf);
                 let text_edit_buf = self.render_diagnostic(edit_diagnostic);
 
@@ -886,8 +895,6 @@ mod tests {
                     crate::MarkupKind::PlainText.horizontal_line(),
                     text_edit_buf
                 )
-            } else {
-                String::new()
             };
 
             format!("{inlay_hint_buf}{rendered_diagnostics}{rendered_edit_diagnostic}",)
@@ -2579,7 +2586,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r#"
         a[: list[Unknown | int]] = [1, 2]
         b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
@@ -3279,6 +3286,9 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
+        from types import NoneType
+        from string.templatelib import Template
 
         a: list[Unknown | int] = [1, 2]
         b: list[Unknown | int | float] = [1.0, 2.0]
@@ -3309,7 +3319,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r#"
         class MyClass:
             def __init__(self):
                 self.x: int = 1
@@ -3475,7 +3485,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r#"
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
                 self.x[: list[T@MyClass]] = x
@@ -4330,6 +4340,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
 
         class MyClass[T, U]:
             def __init__(self, x: list[T], y: tuple[U, U]):
@@ -4600,7 +4611,7 @@ mod tests {
             test.inlay_hints_with_settings(&InlayHintSettings {
                 variable_types: true,
                 call_argument_names: true,
-                auto_import: false,
+
             }), @r"
         from typing import List
 
@@ -4648,7 +4659,7 @@ mod tests {
             foo(y[0])",
         );
 
-        assert_snapshot!(test.inlay_hints_no_auto_import(), @r#"
+        assert_snapshot!(test.inlay_hints(), @r#"
 
         def foo(x: int): pass
         x[: list[Unknown | int]] = [1]
@@ -4788,6 +4799,7 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Unknown
 
         def foo(x: int): pass
         x: list[Unknown | int] = [1]
@@ -8284,9 +8296,9 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
-        from types import NoneType
         from typing import TypeVar
         from typing import Any
+        from types import NoneType
 
         from foo import foo
 
