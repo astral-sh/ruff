@@ -1867,6 +1867,11 @@ impl<'db> SpecializationBuilder<'db> {
             }
 
             (formal, Type::ProtocolInstance(actual_protocol)) => {
+                // TODO: This will only handle protocol classes that explicit inherit
+                // from other generic protocol classes by listing it as a base class.
+                // To handle classes that implicitly implement a generic protocol, we
+                // will need to check the types of the protocol members to be able to
+                // infer the specialization of the protocol that the class implements.
                 if let Some(actual_nominal) = actual_protocol.as_nominal_type() {
                     return self.infer_map_impl(
                         formal,
