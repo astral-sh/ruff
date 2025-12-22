@@ -92,13 +92,16 @@ If `__len__` is overridden, we use the overridden return type:
 from typing import Literal
 
 class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
+    # error: [unsafe-tuple-subclass]
     def __len__(self) -> Literal[42]:
         return 42
 
 reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
 
 class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
-    def __len__(self) -> Literal[42]:  # error: [invalid-method-override]
+    # error: [invalid-method-override]
+    # error: [unsafe-tuple-subclass]
+    def __len__(self) -> Literal[42]:
         return 42
 
 reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]

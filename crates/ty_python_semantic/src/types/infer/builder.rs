@@ -1494,6 +1494,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
+            // (17) Check for unsafe overrides of dunder methods in tuple subclasses
+            if class.is_tuple_subclass(self.context.db()) {
+                overrides::check_tuple_subclass(&self.context, class);
+            }
+
             class.validate_members(&self.context);
         }
     }

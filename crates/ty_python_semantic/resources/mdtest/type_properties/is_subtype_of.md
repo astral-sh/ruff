@@ -655,7 +655,7 @@ static_assert(not is_subtype_of(UnknownLength, AlwaysTruthy))
 static_assert(not is_subtype_of(UnknownLength, AlwaysFalsy))
 
 class Invalid(tuple[int, str]):
-    # TODO: we should emit an error here (Liskov violation)
+    # error: [unsafe-tuple-subclass]
     def __bool__(self) -> Literal[False]:
         return False
 
