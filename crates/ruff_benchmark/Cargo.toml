@@ -75,21 +75,24 @@ ruff_instrumented = [
     "ruff_python_formatter",
     "ruff_python_parser",
     "ruff_python_trivia",
+    "mimalloc",
+    "tikv-jemallocator",
 ]
 # Enables the ty instrumented benchmarks
 ty_instrumented = [
     "criterion",
     "ty_project",
+    "ruff_python_trivia",
 ]
 codspeed = ["codspeed-criterion-compat"]
 # Enables the ty_walltime benchmarks
 ty_walltime = ["ruff_db/os", "ty_project", "divan"]
 
-[target.'cfg(target_os = "windows")'.dev-dependencies]
-mimalloc = { workspace = true }
+[target.'cfg(target_os = "windows")'.dependencies]
+mimalloc = { workspace = true, optional = true }
 
-[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dev-dependencies]
-tikv-jemallocator = { workspace = true }
+[target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64", target_arch = "riscv64")))'.dependencies]
+tikv-jemallocator = { workspace = true, optional = true }
 
 [dev-dependencies]
 rustc-hash = { workspace = true }
