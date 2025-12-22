@@ -454,7 +454,7 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from typing import reveal_type
-        2 |
+        2 | 
         3 | reveal_type(1)
 
         info[code-action]: Ignore 'undefined-reveal' for this line
@@ -463,7 +463,7 @@ mod tests {
         2 | reveal_type(1)
           | ^^^^^^^^^^^
           |
-        1 |
+        1 | 
           - reveal_type(1)
         2 + reveal_type(1)  # ty:ignore[undefined-reveal]
         ");
@@ -488,7 +488,7 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from warnings import deprecated
-        2 |
+        2 | 
         3 | @deprecated("do not use")
         4 | def my_func(): ...
 
@@ -499,7 +499,7 @@ mod tests {
           |  ^^^^^^^^^^
         3 | def my_func(): ...
           |
-        1 |
+        1 | 
           - @deprecated("do not use")
         2 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
         3 | def my_func(): ...
@@ -529,9 +529,9 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from warnings import deprecated
-        2 |
+        2 | 
         3 | import warnings
-        4 |
+        4 | 
 
         info[code-action]: qualify warnings.deprecated
          --> main.py:4:2
@@ -543,9 +543,9 @@ mod tests {
         5 | def my_func(): ...
           |
         help: This is a preferred code action
-        1 |
+        1 | 
         2 | import warnings
-        3 |
+        3 | 
           - @deprecated("do not use")
         4 + @warnings.deprecated("do not use")
         5 | def my_func(): ...
@@ -559,9 +559,9 @@ mod tests {
           |  ^^^^^^^^^^
         5 | def my_func(): ...
           |
-        1 |
+        1 | 
         2 | import warnings
-        3 |
+        3 | 
           - @deprecated("do not use")
         4 + @deprecated("do not use")  # ty:ignore[unresolved-reference]
         5 | def my_func(): ...
@@ -586,7 +586,7 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
-        2 |
+        2 | 
         3 | ExecutionLoader
 
         info[code-action]: Ignore 'unresolved-reference' for this line
@@ -595,7 +595,7 @@ mod tests {
         2 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
           |
-        1 |
+        1 | 
           - ExecutionLoader
         2 + ExecutionLoader  # ty:ignore[unresolved-reference]
         ");
@@ -624,7 +624,7 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
-        2 |
+        2 | 
         3 | import importlib
         4 | ExecutionLoader
 
@@ -635,7 +635,7 @@ mod tests {
         3 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
           |
-        1 |
+        1 | 
         2 | import importlib
           - ExecutionLoader
         3 + ExecutionLoader  # ty:ignore[unresolved-reference]
@@ -662,7 +662,7 @@ mod tests {
           |
         help: This is a preferred code action
         1 + from importlib.abc import ExecutionLoader
-        2 |
+        2 | 
         3 | import importlib.abc
         4 | ExecutionLoader
 
@@ -674,7 +674,7 @@ mod tests {
           | ^^^^^^^^^^^^^^^
           |
         help: This is a preferred code action
-        1 |
+        1 | 
         2 | import importlib.abc
           - ExecutionLoader
         3 + importlib.abc.ExecutionLoader
@@ -686,7 +686,7 @@ mod tests {
         3 | ExecutionLoader
           | ^^^^^^^^^^^^^^^
           |
-        1 |
+        1 | 
         2 | import importlib.abc
           - ExecutionLoader
         3 + ExecutionLoader  # ty:ignore[unresolved-reference]
