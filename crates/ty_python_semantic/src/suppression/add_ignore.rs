@@ -78,13 +78,12 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> SuppressionRa
     // Always insert a new suppression at the end of the range to avoid having to deal with multiline strings
     // etc. Also make sure to not pass a sub-token range to `Tokens::after`.
     let parsed = parsed_module(db, file).load(db);
-    let tokens = parsed.tokens().at_offset(range.end());
-    let token_range = match tokens {
+    let before_token_range = match parsed.tokens().at_offset(range.start()) {
         ruff_python_ast::token::TokenAt::None => range,
         ruff_python_ast::token::TokenAt::Single(token) => token.range(),
         ruff_python_ast::token::TokenAt::Between(..) => range,
     };
-    let before_tokens = parsed.tokens().after(token_range.end());
+    let before_tokens = parsed.tokens().before(before_token_range.start());
 
     let line_start = before_tokens
         .iter()
@@ -97,7 +96,12 @@ fn suppression_range(db: &dyn Db, file: File, range: TextRange) -> SuppressionRa
         .map(Ranged::end)
         .unwrap_or(TextSize::default());
 
-    let after_tokens = parsed.tokens().after(range.end());
+    let after_token_range = match parsed.tokens().at_offset(range.end()) {
+        ruff_python_ast::token::TokenAt::None => range,
+        ruff_python_ast::token::TokenAt::Single(token) => token.range(),
+        ruff_python_ast::token::TokenAt::Between(..) => range,
+    };
+    let after_tokens = parsed.tokens().after(after_token_range.end());
     let line_end = after_tokens
         .iter()
         .find(|token| {
