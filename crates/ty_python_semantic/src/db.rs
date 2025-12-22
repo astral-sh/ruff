@@ -1,10 +1,10 @@
 use crate::lint::{LintRegistry, RuleSelection};
-use ruff_db::Db as SourceDb;
 use ruff_db::files::File;
+use ty_module_resolver::Db as ModuleResolverDb;
 
 /// Database giving access to semantic information about a Python program.
 #[salsa::db]
-pub trait Db: SourceDb {
+pub trait Db: ModuleResolverDb {
     /// Returns `true` if the file should be checked.
     fn should_check_file(&self, file: File) -> bool;
 
@@ -21,11 +21,12 @@ pub trait Db: SourceDb {
 pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
-    use crate::program::{Program, SearchPathSettings};
+    use crate::program::Program;
     use crate::{
         ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
         default_lint_registry,
     };
+    use ty_module_resolver::SearchPathSettings;
 
     use super::Db;
     use crate::lint::{LintRegistry, RuleSelection};
@@ -37,6 +38,8 @@ pub(crate) mod tests {
     };
     use ruff_db::vendored::VendoredFileSystem;
     use ruff_python_ast::PythonVersion;
+    use ty_module_resolver::Db as ModuleResolverDb;
+    use ty_module_resolver::SearchPaths;
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
@@ -132,6 +135,13 @@ pub(crate) mod tests {
 
         fn verbose(&self) -> bool {
             false
+        }
+    }
+
+    #[salsa::db]
+    impl ModuleResolverDb for TestDb {
+        fn search_paths(&self) -> &SearchPaths {
+            Program::get(self).search_paths(self)
         }
     }
 

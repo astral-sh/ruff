@@ -8,11 +8,10 @@ use ruff_db::files::{File, FileError, FilePath, system_path_to_file, vendored_pa
 use ruff_db::system::{System, SystemPath, SystemPathBuf};
 use ruff_db::vendored::{VendoredPath, VendoredPathBuf};
 
-use super::typeshed::{TypeshedVersionsParseError, TypeshedVersionsQueryResult, typeshed_versions};
 use crate::Db;
 use crate::module_name::ModuleName;
-use crate::module_resolver::resolver::{PyTyped, ResolverContext};
-use crate::site_packages::SitePackagesDiscoveryError;
+use crate::resolve::{PyTyped, ResolverContext};
+use crate::typeshed::{TypeshedVersionsQueryResult, typeshed_versions};
 
 /// A path that points to a Python module.
 ///
@@ -397,13 +396,8 @@ fn query_stdlib_version(
     typeshed_versions(*db).query_module(&module_name, *python_version)
 }
 
-/// Enumeration describing the various ways in which validation of a search path might fail.
-///
-/// If validation fails for a search path derived from the user settings,
-/// a message must be displayed to the user,
-/// as type checking cannot be done reliably in these circumstances.
 #[derive(Debug, thiserror::Error)]
-pub enum SearchPathValidationError {
+pub enum SearchPathError {
     /// The path provided by the user was not a directory
     #[error("{0} does not point to a directory")]
     NotADirectory(SystemPathBuf),
@@ -413,41 +407,9 @@ pub enum SearchPathValidationError {
     /// (This is only relevant for stdlib search paths.)
     #[error("The directory at {0} has no `stdlib/` subdirectory")]
     NoStdlibSubdirectory(SystemPathBuf),
-
-    /// The typeshed path provided by the user is a directory,
-    /// but `stdlib/VERSIONS` could not be read.
-    /// (This is only relevant for stdlib search paths.)
-    #[error("Failed to read the custom typeshed versions file '{path}'")]
-    FailedToReadVersionsFile {
-        path: SystemPathBuf,
-        #[source]
-        error: std::io::Error,
-    },
-
-    /// The path provided by the user is a directory,
-    /// and a `stdlib/VERSIONS` file exists, but it fails to parse.
-    /// (This is only relevant for stdlib search paths.)
-    #[error(transparent)]
-    VersionsParseError(TypeshedVersionsParseError),
-
-    /// Failed to discover the site-packages for the configured virtual environment.
-    #[error("Failed to discover the site-packages directory")]
-    SitePackagesDiscovery(#[source] SitePackagesDiscoveryError),
 }
 
-impl From<TypeshedVersionsParseError> for SearchPathValidationError {
-    fn from(value: TypeshedVersionsParseError) -> Self {
-        Self::VersionsParseError(value)
-    }
-}
-
-impl From<SitePackagesDiscoveryError> for SearchPathValidationError {
-    fn from(value: SitePackagesDiscoveryError) -> Self {
-        Self::SitePackagesDiscovery(value)
-    }
-}
-
-type SearchPathResult<T> = Result<T, SearchPathValidationError>;
+type SearchPathResult<T> = Result<T, SearchPathError>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
 enum SearchPathInner {
@@ -495,7 +457,7 @@ impl SearchPath {
         if system.is_directory(&root) {
             Ok(root)
         } else {
-            Err(SearchPathValidationError::NotADirectory(root))
+            Err(SearchPathError::NotADirectory(root))
         }
     }
 
@@ -519,17 +481,15 @@ impl SearchPath {
         typeshed: &SystemPath,
     ) -> SearchPathResult<Self> {
         if !system.is_directory(typeshed) {
-            return Err(SearchPathValidationError::NotADirectory(
-                typeshed.to_path_buf(),
-            ));
+            return Err(SearchPathError::NotADirectory(typeshed.to_path_buf()));
         }
 
         let stdlib =
             Self::directory_path(system, typeshed.join("stdlib")).map_err(|err| match err {
-                SearchPathValidationError::NotADirectory(_) => {
-                    SearchPathValidationError::NoStdlibSubdirectory(typeshed.to_path_buf())
+                SearchPathError::NotADirectory(_) => {
+                    SearchPathError::NoStdlibSubdirectory(typeshed.to_path_buf())
                 }
-                err => err,
+                SearchPathError::NoStdlibSubdirectory(_) => err,
             })?;
 
         Ok(Self(Arc::new(SearchPathInner::StandardLibraryCustom(
@@ -585,7 +545,7 @@ impl SearchPath {
 
     /// Does this search path point to the standard library?
     #[must_use]
-    pub(crate) fn is_standard_library(&self) -> bool {
+    pub fn is_standard_library(&self) -> bool {
         matches!(
             &*self.0,
             SearchPathInner::StandardLibraryCustom(_)
@@ -680,7 +640,7 @@ impl SearchPath {
     }
 
     #[must_use]
-    pub(crate) fn as_system_path(&self) -> Option<&SystemPath> {
+    pub fn as_system_path(&self) -> Option<&SystemPath> {
         self.as_path().as_system_path()
     }
 
@@ -709,7 +669,7 @@ impl SearchPath {
     /// Returns a string suitable for describing what kind of search path this is
     /// in user-facing diagnostics.
     #[must_use]
-    pub(crate) fn describe_kind(&self) -> &'static str {
+    pub fn describe_kind(&self) -> &'static str {
         match *self.0 {
             SearchPathInner::Extra(_) => {
                 "extra search path specified on the CLI or in your config file"
@@ -869,8 +829,8 @@ mod tests {
     use ruff_python_ast::PythonVersion;
 
     use crate::db::tests::TestDb;
-    use crate::module_resolver::resolver::ModuleResolveMode;
-    use crate::module_resolver::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
+    use crate::resolve::ModuleResolveMode;
+    use crate::testing::{FileSpec, MockedTypeshed, TestCase, TestCaseBuilder};
 
     use super::*;
 

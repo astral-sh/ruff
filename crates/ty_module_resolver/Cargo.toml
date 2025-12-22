@@ -1,0 +1,38 @@
+[package]
+name = "ty_module_resolver"
+version = "0.0.0"
+publish = false
+authors = { workspace = true }
+edition = { workspace = true }
+rust-version = { workspace = true }
+homepage = { workspace = true }
+documentation = { workspace = true }
+repository = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+ruff_db = { workspace = true }
+ruff_memory_usage = { workspace = true }
+ruff_python_ast = { workspace = true, features = ["salsa"] }
+ruff_python_stdlib = { workspace = true }
+
+camino = { workspace = true }
+compact_str = { workspace = true }
+get-size2 = { workspace = true }
+rustc-hash = { workspace = true }
+salsa = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+strum = { workspace = true }
+strum_macros = { workspace = true }
+
+[dev-dependencies]
+ruff_db = { workspace = true, features = ["testing", "os"] }
+ty_vendored = { workspace = true }
+
+anyhow = { workspace = true }
+insta = { workspace = true, features = ["filters"] }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

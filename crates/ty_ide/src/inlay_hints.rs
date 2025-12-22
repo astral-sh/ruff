@@ -1,6 +1,7 @@
 use std::{fmt, vec};
 
 use rustc_hash::FxHashMap;
+use ty_module_resolver::file_to_module;
 
 use crate::importer::{ImportAction, ImportRequest, Importer, MembersInScope};
 use crate::{Db, HasNavigationTargets, NavigationTarget};
@@ -13,7 +14,7 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
 use ty_python_semantic::types::{Type, TypeDetail};
-use ty_python_semantic::{HasType, SemanticModel, file_to_module};
+use ty_python_semantic::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
 pub struct InlayHint {

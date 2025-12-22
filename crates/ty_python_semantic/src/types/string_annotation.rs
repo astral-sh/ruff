@@ -34,23 +34,23 @@ declare_lint! {
 }
 
 declare_lint! {
-        /// ## What it does
-        /// Checks for byte-strings in type annotation positions.
-        ///
-        /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyze type annotations that use byte-string notation.
-        ///
-        /// ## Examples
-        /// ```python
-        /// def test(): -> b"int":
-        ///     ...
-        /// ```
-        ///
-        /// Use instead:
-        /// ```python
-        /// def test(): -> "int":
-        ///     ...
-        /// ```
+    /// ## What it does
+    /// Checks for byte-strings in type annotation positions.
+    ///
+    /// ## Why is this bad?
+    /// Static analysis tools like ty can't analyze type annotations that use byte-string notation.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def test(): -> b"int":
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def test(): -> "int":
+    ///     ...
+    /// ```
     pub(crate) static BYTE_STRING_TYPE_ANNOTATION = {
         summary: "detects byte strings in type annotation positions",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -59,23 +59,23 @@ declare_lint! {
 }
 
 declare_lint! {
-        /// ## What it does
-        /// Checks for raw-strings in type annotation positions.
-        ///
-        /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyze type annotations that use raw-string notation.
-        ///
-        /// ## Examples
-        /// ```python
-        /// def test(): -> r"int":
-        ///     ...
-        /// ```
-        ///
-        /// Use instead:
-        /// ```python
-        /// def test(): -> "int":
-        ///     ...
-        /// ```
+    /// ## What it does
+    /// Checks for raw-strings in type annotation positions.
+    ///
+    /// ## Why is this bad?
+    /// Static analysis tools like ty can't analyze type annotations that use raw-string notation.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def test(): -> r"int":
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def test(): -> "int":
+    ///     ...
+    /// ```
     pub(crate) static RAW_STRING_TYPE_ANNOTATION = {
         summary: "detects raw strings in type annotation positions",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -84,23 +84,23 @@ declare_lint! {
 }
 
 declare_lint! {
-        /// ## What it does
-        /// Checks for implicit concatenated strings in type annotation positions.
-        ///
-        /// ## Why is this bad?
-        /// Static analysis tools like ty can't analyze type annotations that use implicit concatenated strings.
-        ///
-        /// ## Examples
-        /// ```python
-        /// def test(): -> "Literal[" "5" "]":
-        ///     ...
-        /// ```
-        ///
-        /// Use instead:
-        /// ```python
-        /// def test(): -> "Literal[5]":
-        ///     ...
-        /// ```
+    /// ## What it does
+    /// Checks for implicit concatenated strings in type annotation positions.
+    ///
+    /// ## Why is this bad?
+    /// Static analysis tools like ty can't analyze type annotations that use implicit concatenated strings.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def test(): -> "Literal[" "5" "]":
+    ///     ...
+    /// ```
+    ///
+    /// Use instead:
+    /// ```python
+    /// def test(): -> "Literal[5]":
+    ///     ...
+    /// ```
     pub(crate) static IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION = {
         summary: "detects implicit concatenated strings in type annotations",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -109,7 +109,41 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for string-literal annotations where the string cannot be
+    /// parsed as a Python expression.
+    ///
+    /// ## Why is this bad?
+    /// Type annotations are expected to be Python expressions that
+    /// describe the expected type of a variable, parameter, attribute or
+    /// `return` statement.
+    ///
+    /// Type annotations are permitted to be string-literal expressions, in
+    /// order to enable forward references to names not yet defined.
+    /// However, it must be possible to parse the contents of that string
+    /// literal as a normal Python expression.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def foo() -> "intstance of C":
+    ///     return 42
+    ///
+    /// class C: ...
+    /// ```
+    ///
+    /// Use instead:
+    ///
+    /// ```python
+    /// def foo() -> "C":
+    ///     return 42
+    ///
+    /// class C: ...
+    /// ```
+    ///
+    /// ## References
+    /// - [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)
+    /// - [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)
     pub(crate) static INVALID_SYNTAX_IN_FORWARD_ANNOTATION = {
         summary: "detects invalid syntax in forward annotations",
         status: LintStatus::stable("0.0.1-alpha.1"),
@@ -118,7 +152,17 @@ declare_lint! {
 }
 
 declare_lint! {
-    /// TODO #14889
+    /// ## What it does
+    /// Checks for forward annotations that contain escape characters.
+    ///
+    /// ## Why is this bad?
+    /// Static analysis tools like ty can't analyze type annotations that contain escape characters.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// def foo() -> "intt\b": ...
+    /// ```
     pub(crate) static ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION = {
         summary: "detects forward type annotations with escape characters",
         status: LintStatus::stable("0.0.1-alpha.1"),

@@ -1,4 +1,4 @@
-use ruff_db::Db;
+use ruff_db::Db as _;
 use ruff_db::files::FileRootKind;
 use ruff_db::system::{
     DbWithTestSystem as _, DbWithWritableSystem as _, SystemPath, SystemPathBuf,
@@ -7,8 +7,7 @@ use ruff_db::vendored::VendoredPathBuf;
 use ruff_python_ast::PythonVersion;
 
 use crate::db::tests::TestDb;
-use crate::program::{Program, SearchPathSettings};
-use crate::{ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource};
+use crate::settings::SearchPathSettings;
 
 /// A test case for the module resolver.
 ///
@@ -20,7 +19,7 @@ pub(crate) struct TestCase<T> {
     pub(crate) stdlib: T,
     // Most test cases only ever need a single `site-packages` directory,
     // so this is a single directory instead of a `Vec` of directories,
-    // like it is in `ruff_db::Program`.
+    // like it is in `SearchPaths`.
     pub(crate) site_packages: SystemPathBuf,
     pub(crate) python_version: PythonVersion,
 }
@@ -105,7 +104,6 @@ pub(crate) struct UnspecifiedTypeshed;
 pub(crate) struct TestCaseBuilder<T> {
     typeshed_option: T,
     python_version: PythonVersion,
-    python_platform: PythonPlatform,
     first_party_files: Vec<FileSpec>,
     site_packages_files: Vec<FileSpec>,
     // Additional file roots (beyond site_packages, src and stdlib)
@@ -166,7 +164,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         Self {
             typeshed_option: UnspecifiedTypeshed,
             python_version: PythonVersion::default(),
-            python_platform: PythonPlatform::default(),
             first_party_files: vec![],
             site_packages_files: vec![],
             roots: vec![],
@@ -178,7 +175,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
@@ -186,7 +182,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
@@ -201,7 +196,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         let TestCaseBuilder {
             typeshed_option: _,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
@@ -210,7 +204,6 @@ impl TestCaseBuilder<UnspecifiedTypeshed> {
         TestCaseBuilder {
             typeshed_option: typeshed,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
@@ -241,18 +234,29 @@ impl TestCaseBuilder<MockedTypeshed> {
         let TestCaseBuilder {
             typeshed_option,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
         } = self;
 
-        let mut db = TestDb::new();
+        let mut db = TestDb::new().with_python_version(python_version);
 
         let site_packages =
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
         let typeshed = Self::build_typeshed_mock(&mut db, &typeshed_option);
+        let stdlib = typeshed.join("stdlib");
+
+        let search_paths = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            custom_typeshed: Some(typeshed),
+            site_packages_paths: vec![site_packages.clone()],
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Valid search path settings");
+
+        db = db.with_search_paths(search_paths);
 
         // This root is needed for correct Salsa tracking.
         // Namely, a `SearchPath` is treated as an input, and
@@ -262,36 +266,19 @@ impl TestCaseBuilder<MockedTypeshed> {
         // here, they won't get added.
         //
         // Roots for other search paths are added as part of
-        // search path initialization in `Program::from_settings`,
+        // search path initialization in `SearchPaths::from_settings`,
         // and any remaining are added below.
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
 
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: python_version,
-                    source: PythonVersionSource::default(),
-                },
-                python_platform,
-                search_paths: SearchPathSettings {
-                    custom_typeshed: Some(typeshed.clone()),
-                    site_packages_paths: vec![site_packages.clone()],
-                    ..SearchPathSettings::new(vec![src.clone()])
-                }
-                .to_search_paths(db.system(), db.vendored())
-                .expect("valid search path settings"),
-            },
-        );
-
-        let stdlib = typeshed.join("stdlib");
         db.files()
             .try_add_root(&db, &stdlib, FileRootKind::LibrarySearchPath);
+
         for root in &roots {
             db.files()
                 .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
         }
+
         TestCase {
             db,
             src,
@@ -324,42 +311,34 @@ impl TestCaseBuilder<VendoredTypeshed> {
         let TestCaseBuilder {
             typeshed_option: VendoredTypeshed,
             python_version,
-            python_platform,
             first_party_files,
             site_packages_files,
             roots,
         } = self;
 
-        let mut db = TestDb::new();
+        let mut db = TestDb::new().with_python_version(python_version);
 
         let site_packages =
             Self::write_mock_directory(&mut db, "/site-packages", site_packages_files);
         let src = Self::write_mock_directory(&mut db, "/src", first_party_files);
 
+        let search_paths = SearchPathSettings {
+            src_roots: vec![src.clone()],
+            site_packages_paths: vec![site_packages.clone()],
+            ..SearchPathSettings::empty()
+        }
+        .to_search_paths(db.system(), db.vendored())
+        .expect("Valid search path settings");
+
+        db = db.with_search_paths(search_paths);
+
         db.files()
             .try_add_root(&db, SystemPath::new("/src"), FileRootKind::Project);
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource {
-                    version: python_version,
-                    source: PythonVersionSource::default(),
-                },
-                python_platform,
-                search_paths: SearchPathSettings {
-                    site_packages_paths: vec![site_packages.clone()],
-                    ..SearchPathSettings::new(vec![src.clone()])
-                }
-                .to_search_paths(db.system(), db.vendored())
-                .expect("valid search path settings"),
-            },
-        );
-
         for root in &roots {
             db.files()
                 .try_add_root(&db, root, FileRootKind::LibrarySearchPath);
         }
+
         TestCase {
             db,
             src,

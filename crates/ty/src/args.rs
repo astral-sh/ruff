@@ -190,7 +190,7 @@ pub(crate) struct CheckCommand {
 
 impl CheckCommand {
     pub(crate) fn force_exclude(&self) -> bool {
-        resolve_bool_arg(self.force_exclude, self.no_progress).unwrap_or_default()
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
     }
 
     pub(crate) fn into_options(self) -> Options {

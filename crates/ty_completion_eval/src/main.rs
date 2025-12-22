@@ -15,11 +15,11 @@ use regex::bytes::Regex;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::Completion;
+use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::ModuleName;
 
 #[derive(Debug, clap::Parser)]
 #[command(

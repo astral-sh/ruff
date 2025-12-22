@@ -3,7 +3,7 @@ use ruff_python_ast::visitor::source_order::{
     SourceOrderVisitor, walk_expr, walk_module, walk_stmt,
 };
 use ruff_python_ast::{self as ast, Expr, Mod, Stmt};
-use ty_python_semantic::ModuleName;
+use ty_module_resolver::ModuleName;
 
 /// Collect all imports for a given Python file.
 #[derive(Default, Debug)]

@@ -758,7 +758,7 @@ impl Session {
             let paths = self
                 .project_dbs()
                 .flat_map(|db| {
-                    ty_python_semantic::system_module_search_paths(db).map(move |path| (db, path))
+                    ty_module_resolver::system_module_search_paths(db).map(move |path| (db, path))
                 })
                 .filter(|(db, path)| !path.starts_with(db.project().root(*db)))
                 .map(|(_, path)| path)

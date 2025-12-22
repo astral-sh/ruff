@@ -5,7 +5,7 @@ use tracing::info;
 
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_db::system::{SystemPath, SystemPathBuf};
-use ty_python_semantic::system_module_search_paths;
+use ty_module_resolver::system_module_search_paths;
 
 use crate::db::{Db, ProjectDatabase};
 use crate::watch::Watcher;

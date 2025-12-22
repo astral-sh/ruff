@@ -1,6 +1,6 @@
 use ruff_db::files::{File, FilePath, system_path_to_file};
 use ruff_db::system::SystemPath;
-use ty_python_semantic::{
+use ty_module_resolver::{
     ModuleName, resolve_module, resolve_module_confident, resolve_real_module,
     resolve_real_module_confident,
 };

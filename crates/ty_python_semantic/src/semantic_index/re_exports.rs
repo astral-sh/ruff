@@ -27,8 +27,9 @@ use ruff_python_ast::{
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
+use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::{Db, module_name::ModuleName, resolve_module};
+use crate::Db;
 
 fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()

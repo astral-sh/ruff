@@ -18,6 +18,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
+use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 use type_ordering::union_or_intersection_elements_ordering;
 
@@ -34,8 +35,6 @@ pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
-use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{
     Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
 };
@@ -75,7 +74,7 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
@@ -7744,11 +7743,7 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                None => self,
-                Some(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown()),
-            },
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
