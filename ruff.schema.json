@@ -2926,6 +2926,13 @@
             "boolean",
             "null"
           ]
+        },
+        "strictly-empty-init-modules": {
+          "description": "Whether to require `__init__.py` files to contain no code at all, including imports and\ndocstrings (see `RUF070`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false
@@ -4046,6 +4053,8 @@
         "RUF064",
         "RUF065",
         "RUF066",
+        "RUF07",
+        "RUF070",
         "RUF1",
         "RUF10",
         "RUF100",
