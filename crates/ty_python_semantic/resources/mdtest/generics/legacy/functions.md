@@ -80,6 +80,7 @@ class CanIndex(Protocol[T]):
     def __getitem__(self, index: int, /) -> T: ...
 
 class ExplicitlyImplements(CanIndex[T]): ...
+class SubProtocol(CanIndex[T], Protocol): ...
 
 def takes_in_list(x: list[T]) -> list[T]:
     return x
@@ -101,6 +102,18 @@ def deep_explicit(x: ExplicitlyImplements[str]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: str
 
 def deeper_explicit(x: ExplicitlyImplements[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def deep_subprotocol(x: SubProtocol[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deeper_subprotocol(x: SubProtocol[set[str]]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: set[str]
+
+def itself(x: CanIndex[str]) -> None:
+    reveal_type(takes_in_protocol(x))  # revealed: str
+
+def deep_itself(x: CanIndex[set[str]]) -> None:
     reveal_type(takes_in_protocol(x))  # revealed: set[str]
 
 def takes_in_type(x: type[T]) -> type[T]:
