@@ -526,7 +526,9 @@ struct StringLiteralContext<'m> {
 
 #[derive(Debug)]
 enum StringLiteralSite<'m> {
+    /// Cursor is inside a string that is currently being typed as an argument in a call.
     CallArg,
+    /// Cursor is inside the RHS value of an annotated assignment (`x: T = "..."`).
     AnnAssignValue { annotation: &'m ast::Expr },
 }
 
@@ -695,10 +697,7 @@ impl<'m> ContextCursor<'m> {
             .is_some_and(|t| t.kind().is_comment())
     }
 
-    /// Whether the last token is positioned within a string token (regular, f-string, t-string, etc).
-    ///
-    /// Note that this will return `false` when the last token is positioned within an
-    /// interpolation block in an f-string or a t-string.
+    /// Returns the string literal expression under the cursor, if present.
     fn string_literal(&self) -> Option<&'m ast::ExprStringLiteral> {
         if !self.is_in_string() {
             return None;
@@ -747,6 +746,10 @@ impl<'m> ContextCursor<'m> {
         })
     }
 
+    /// Whether the last token is positioned within a string token (regular, f-string, t-string, etc).
+    ///
+    /// Note that this will return `false` when the last token is positioned within an
+    /// interpolation block in an f-string or a t-string.
     fn is_in_string(&self) -> bool {
         self.tokens_before.last().is_some_and(|t| {
             matches!(
