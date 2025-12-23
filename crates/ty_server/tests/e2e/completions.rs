@@ -5,13 +5,6 @@ use ty_server::ClientOptions;
 
 use crate::TestServerBuilder;
 
-<<<<<<< HEAD
-#[test]
-fn completions() -> Result<()> {
-    let workspace_root = SystemPath::new("src");
-    let foo = SystemPath::new("src/foo.py");
-    let foo_content = "type";
-=======
 /// Tests that auto-import is enabled by default.
 #[test]
 fn default_auto_import() -> Result<()> {
@@ -20,51 +13,11 @@ fn default_auto_import() -> Result<()> {
     let foo_content = "\
 walktr
 ";
->>>>>>> main
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default())
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
-<<<<<<< HEAD
-        .enable_completions(true)
-        .build()
-        .wait_until_workspaces_are_initialized();
-
-    server.open_text_document(foo, &foo_content, 1);
-    let _ = server.await_notification::<PublishDiagnostics>();
-
-    let hints = server
-        .completions_request(foo, Position::new(0, 4))
-        .unwrap();
-
-    insta::assert_json_snapshot!(hints, @r#"
-    {
-      "isIncomplete": true,
-      "items": [
-        {
-          "label": "TypeError",
-          "kind": 7,
-          "detail": "<class 'TypeError'>",
-          "documentation": {
-            "kind": "plaintext",
-            "value": "Inappropriate argument type.\n"
-          },
-          "sortText": "0"
-        },
-        {
-          "label": "type",
-          "kind": 7,
-          "detail": "<class 'type'>",
-          "documentation": {
-            "kind": "plaintext",
-            "value": "type(object) -> the object's type/ntype(name, bases, dict, **kwds) -> a new type\n"
-          },
-          "sortText": "1"
-        }
-      ]
-    }
-=======
         .build()
         .wait_until_workspaces_are_initialized();
 
@@ -367,25 +320,33 @@ re.match('', '', fla<CURSOR>
         "label": "FloatingPointError",
         "kind": 7,
         "detail": "<class 'FloatingPointError'>",
-        "documentation": "Floating-point operation failed.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Floating-point operation failed.\n"
+        },
         "sortText": "1"
       },
       {
         "label": "PythonFinalizationError",
         "kind": 7,
         "detail": "<class 'PythonFinalizationError'>",
-        "documentation": "Operation blocked during Python finalization.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Operation blocked during Python finalization.\n"
+        },
         "sortText": "2"
       },
       {
         "label": "float",
         "kind": 7,
         "detail": "<class 'float'>",
-        "documentation": "Convert a string or number to a floating-point number, if possible.\n",
+        "documentation": {
+          "kind": "plaintext",
+          "value": "Convert a string or number to a floating-point number, if possible.\n"
+        },
         "sortText": "3"
       }
     ]
->>>>>>> main
     "#);
 
     Ok(())

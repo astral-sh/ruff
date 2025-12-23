@@ -34,14 +34,10 @@ bitflags::bitflags! {
         const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
-<<<<<<< HEAD
         const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 17;
-        const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
-=======
-        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
-        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
->>>>>>> main
+        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 18;
+        const PREFER_MARKDOWN_IN_COMPLETION = 1 << 19;
     }
 }
 
