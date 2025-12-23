@@ -906,11 +906,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let rhs_type = inference.expression_type(&comparators[0])
             && matches!(rhs_type, Type::StringLiteral(_) | Type::IntLiteral(_))
         {
-            let constrain_with_equality = match (ops[0], is_positive) {
-                (ast::CmpOp::Eq, true) | (ast::CmpOp::NotEq, false) => true,
-                (ast::CmpOp::Eq, false) | (ast::CmpOp::NotEq, true) => false,
-                _ => unreachable!("we checked for Eq/NotEq above"),
-            };
             // If we have an equality constraint (either `==` on the `if` side, or `!=` on the
             // `else` side), we have to be careful. If all the matching fields in all the
             // `TypedDict`s here have literal types, then yes, equality is as good as a type check.
@@ -918,7 +913,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // narrow their type at all, because subclasses of those types can implement `__eq__`
             // in any perverse way they like. On the other hand, if this is an *inequality*
             // constraint, then we can go ahead and assert "you can't be this exact literal type"
-            // without worrying about what types are present.
+            // without worrying about what other types might be present.
+            let constrain_with_equality = is_positive == (ops[0] == ast::CmpOp::Eq);
             if !constrain_with_equality
                 || all_matching_typeddict_fields_have_literal_types(
                     self.db,
