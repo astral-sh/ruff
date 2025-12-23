@@ -375,3 +375,107 @@ try:
 except ValueError:
     pass
 ```
+
+## Sequence patterns
+
+Sequence patterns narrow tuple element types based on the patterns matched against each element.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (x, str()):
+            reveal_type(subj)  # revealed: tuple[int | str, str]
+        case (int(), y):
+            reveal_type(subj)  # revealed: tuple[int, int | str]
+
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+
+def _(subj: tuple[int | str | None, int | str | None]):
+    match subj:
+        case (None, _):
+            reveal_type(subj)  # revealed: tuple[None, int | str | None]
+        case (_, None):
+            reveal_type(subj)  # revealed: tuple[int | str | None, None]
+```
+
+## Sequence patterns with nested tuples
+
+```py
+def _(subj: tuple[tuple[int | str, int], int | str]):
+    match subj:
+        case ((str(), _), _):
+            # The inner tuple is narrowed by intersecting with the pattern's constraint
+            reveal_type(subj)  # revealed: tuple[tuple[int | str, int] & tuple[str, object], int | str]
+```
+
+## Sequence patterns with or patterns
+
+```py
+def _(subj: tuple[int | str | bytes, int | str]):
+    match subj:
+        case (int() | str(), _):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence patterns with wildcards
+
+Wildcards (`_`) and name patterns don't narrow the element type.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (_, _):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (x, y):
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence pattern negative narrowing
+
+Negative narrowing for sequence patterns is not currently supported. When a sequence pattern doesn't
+match, subsequent cases see the original type.
+
+```py
+def _(subj: tuple[int | str, int | str]):
+    match subj:
+        case (int(), int()):
+            reveal_type(subj)  # revealed: tuple[int, int]
+        case _:
+            reveal_type(subj)  # revealed: tuple[int | str, int | str]
+```
+
+## Sequence pattern exhaustiveness
+
+When a sequence pattern exhaustively matches all possible tuple values, subsequent cases should be
+unreachable (`Never`).
+
+```py
+def _(subj: tuple[int, str]):
+    match subj:
+        case (int(), str()):
+            reveal_type(subj)  # revealed: tuple[int, str]
+        case _:
+            reveal_type(subj)  # revealed: Never
+```
+
+## Sequence patterns with homogeneous tuples
+
+Sequence patterns on homogeneous tuples narrow to a fixed-length tuple with the specified length.
+
+```py
+def _(subj: tuple[int | str, ...]):
+    match subj:
+        case (x, str()):
+            reveal_type(subj)  # revealed: tuple[int | str, str]
+
+def _(subj: tuple[int | str, ...]):
+    match subj:
+        case (int(), int(), y):
+            reveal_type(subj)  # revealed: tuple[int, int, int | str]
+```
