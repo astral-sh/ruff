@@ -26,4 +26,6 @@ RUF070 Code detected
 18 | / def foo():
 19 | |     return Path("foo.py")
    | |_________________________^
+20 |
+21 |   def __getattr__(name):  # ok
    |

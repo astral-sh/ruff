@@ -85,6 +85,14 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
             return;
         }
 
+        // Allow PEP-562 module `__getattr__`
+        if stmt
+            .as_function_def_stmt()
+            .is_some_and(|func| &*func.name == "__getattr__")
+        {
+            return;
+        }
+
         // Allow assignments to `__all__`.
         //
         // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could

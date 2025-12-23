@@ -17,3 +17,6 @@ os.environ["FOO"] = 1
 
 def foo():
     return Path("foo.py")
+
+def __getattr__(name):  # ok
+    return name

@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 8
+Added: 9
 
 --- Added ---
 RUF070 Code detected
@@ -96,4 +96,15 @@ RUF070 Code detected
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 14 |
 15 | os.environ["FOO"] = 1
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:21:1
+   |
+19 |       return Path("foo.py")
+20 |
+21 | / def __getattr__(name):  # ok
+22 | |     return name
+   | |_______________^
    |
