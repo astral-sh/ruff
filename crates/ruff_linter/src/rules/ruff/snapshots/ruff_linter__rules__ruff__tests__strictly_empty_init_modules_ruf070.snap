@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 13
+Added: 15
 
 --- Added ---
 RUF070 Code detected
@@ -157,4 +157,29 @@ RUF070 Code detected
 34 | / if typing.TYPE_CHECKING: # ok
 35 | |     MY_CONSTANT = 2
    | |___________________^
+36 |
+37 |   __version__ = "1.2.3"  # ok
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:37:1
+   |
+35 |     MY_CONSTANT = 2
+36 |
+37 | __version__ = "1.2.3"  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^
+38 |
+39 | def __dir__():  # ok
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:39:1
+   |
+37 |   __version__ = "1.2.3"  # ok
+38 |
+39 | / def __dir__():  # ok
+40 | |     return ["foo"]
+   | |__________________^
    |

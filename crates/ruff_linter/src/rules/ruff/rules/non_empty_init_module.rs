@@ -87,8 +87,8 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
             // Allow imports
             Stmt::Import(_) | Stmt::ImportFrom(_) => return,
 
-            // Allow PEP-562 module `__getattr__`
-            Stmt::FunctionDef(func) if &*func.name == "__getattr__" => return,
+            // Allow PEP-562 module `__getattr__` and `__dir__`
+            Stmt::FunctionDef(func) if matches!(&*func.name, "__getattr__" | "__dir__") => return,
 
             // Allow `TYPE_CHECKING` blocks
             Stmt::If(stmt_if) if is_type_checking_block(stmt_if, semantic) => return,
@@ -113,6 +113,11 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
         // __path__ = __import__('pkgutil').extend_path(__path__, __name__)
         // ```
         if is_assignment_to(stmt, "__path__") {
+            return;
+        }
+
+        // Allow assignments to `__version__`.
+        if is_assignment_to(stmt, "__version__") {
             return;
         }
     }

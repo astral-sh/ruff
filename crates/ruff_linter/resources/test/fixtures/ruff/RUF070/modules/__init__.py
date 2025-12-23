@@ -33,3 +33,8 @@ import typing
 
 if typing.TYPE_CHECKING: # ok
     MY_CONSTANT = 2
+
+__version__ = "1.2.3"  # ok
+
+def __dir__():  # ok
+    return ["foo"]
