@@ -461,6 +461,8 @@ fn extract_underlying_functions<'db>(
 const PROHIBITED_TUPLE_SUBCLASS_METHODS: &[&str] = &["__eq__", "__len__", "__bool__"];
 
 /// Checks if a tuple subclass overrides any prohibited methods.
+///
+/// Here we assume that `class` is a subclass of `tuple`.
 pub(super) fn check_tuple_subclass<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
 

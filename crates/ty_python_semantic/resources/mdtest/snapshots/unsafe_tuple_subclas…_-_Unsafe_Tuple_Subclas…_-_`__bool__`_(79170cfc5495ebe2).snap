@@ -36,63 +36,63 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 # Diagnostics
 
 ```
-warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
  --> src/mdtest_snippet.py:3:9
   |
 1 | class A(tuple):
 2 |     # error: [unsafe-tuple-subclass]
 3 |     def __bool__(self):
-  |         ^^^^^^^^^^^^^^ Unsafely overriding method `__bool__` in a subclass of `tuple`
+  |         ^^^^^^^^^^^^^^
 4 |         return False
   |
-help: Overriding `__bool__` can cause unexpected behavior
+help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 
 ```
-warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
   --> src/mdtest_snippet.py:8:5
    |
  6 | class B(tuple):
  7 |     # error: [unsafe-tuple-subclass]
  8 |     __bool__ = None
-   |     ^^^^^^^^^^^^^^^ Unsafely overriding method `__bool__` in a subclass of `tuple`
+   |     ^^^^^^^^^^^^^^^
  9 |
 10 | class C(tuple):
    |
-help: Overriding `__bool__` can cause unexpected behavior
+help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 
 ```
-warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
   --> src/mdtest_snippet.py:12:5
    |
 10 | class C(tuple):
 11 |     # error: [unsafe-tuple-subclass]
 12 |     __bool__ = lambda self: False
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unsafely overriding method `__bool__` in a subclass of `tuple`
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 13 |
 14 | class D(tuple): ...
    |
-help: Overriding `__bool__` can cause unexpected behavior
+help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 
 ```
-warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
   --> src/mdtest_snippet.py:18:9
    |
 16 | class E(D):
 17 |     # error: [unsafe-tuple-subclass]
 18 |     def __bool__(self):
-   |         ^^^^^^^^^^^^^^ Unsafely overriding method `__bool__` in a subclass of `tuple`
+   |         ^^^^^^^^^^^^^^
 19 |         return False
    |
-help: Overriding `__bool__` can cause unexpected behavior
+help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
