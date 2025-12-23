@@ -101,7 +101,6 @@ reveal_type(bool(MixedTupleSubclass((1, b"foo"))))  # revealed: Literal[True]
 
 # Unknown length with an overridden `__bool__`:
 class VariadicTupleSubclassWithDunderBoolOverride(tuple[int, ...]):
-    # error: [unsafe-tuple-subclass]
     def __bool__(self) -> Literal[True]:
         return True
 
