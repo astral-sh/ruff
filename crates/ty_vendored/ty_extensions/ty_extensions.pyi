@@ -184,9 +184,13 @@ def reveal_mro(cls: type | types.GenericAlias) -> None:
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
 class NamedTupleLike(Protocol):
-    # from typing.NamedTuple stub
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
     _field_defaults: ClassVar[dict[str, Any]]
-    _fields: ClassVar[tuple[str, ...]]
     @classmethod
     def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
