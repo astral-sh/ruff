@@ -1390,6 +1390,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
+    pub(crate) const fn as_bound_method(self) -> Option<BoundMethodType<'db>> {
+        match self {
+            Type::BoundMethod(bound_method_type) => Some(bound_method_type),
+            _ => None,
+        }
+    }
+
     /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
     pub(crate) fn is_literal_or_union_of_literals(&self, db: &'db dyn Db) -> bool {
         match self {
@@ -12355,6 +12362,10 @@ impl<'db> BoundMethodType<'db> {
         class_ty
             .known_function_decorators(db)
             .any(|deco| deco == KnownFunction::Final)
+    }
+
+    fn is_init(self, db: &'db dyn Db) -> bool {
+        self.function(db).name(db) == "__init__"
     }
 
     fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
