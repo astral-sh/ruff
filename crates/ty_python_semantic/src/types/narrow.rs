@@ -7,6 +7,7 @@ use crate::semantic_index::predicate::{
     PredicateNode,
 };
 use crate::semantic_index::scope::ScopeId;
+use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::infer_same_file_expression_type;
@@ -23,13 +24,12 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::name::Name;
 use ruff_python_stdlib::identifiers::is_identifier;
 
+use super::UnionType;
 use itertools::Itertools;
 use ruff_python_ast as ast;
 use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
-
-use super::UnionType;
 
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
@@ -880,6 +880,39 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .chain(comparators)
             .tuple_windows::<(&ruff_python_ast::Expr, &ruff_python_ast::Expr)>();
         let mut constraints = NarrowingConstraints::default();
+
+        // Narrow unions of tuples based on element checks. For example:
+        //
+        //     def _(t: tuple[int, int] | tuple[None, None]):
+        //         if t[0] is not None:
+        //             reveal_type(t)  # tuple[int, int]
+        if matches!(&**ops, [ast::CmpOp::Is | ast::CmpOp::IsNot])
+            && let ast::Expr::Subscript(subscript) = &**left
+            && let Type::Union(union) = inference.expression_type(&*subscript.value)
+            && let Some(subscript_place_expr) = place_expr(&subscript.value)
+            && let Type::IntLiteral(index) = inference.expression_type(&*subscript.slice)
+            && let Ok(index) = i32::try_from(index)
+            && let rhs_ty = inference.expression_type(&comparators[0])
+            && rhs_ty.is_singleton(self.db)
+        {
+            let dominated = is_positive == (ops[0] == ast::CmpOp::Is);
+            let filtered: Vec<_> = union
+                .elements(self.db)
+                .iter()
+                .filter(|elem| {
+                    elem.as_nominal_instance()
+                        .and_then(|inst| inst.tuple_spec(self.db))
+                        .and_then(|spec| spec.py_index(self.db, index).ok())
+                        .filter(|el_ty| !el_ty.is_union())
+                        .is_none_or(|el_ty| el_ty.is_disjoint_from(self.db, rhs_ty) != dominated)
+                })
+                .copied()
+                .collect();
+            if filtered.len() < union.elements(self.db).len() {
+                let place = self.expect_place(&subscript_place_expr);
+                constraints.insert(place, UnionType::from_elements(self.db, filtered));
+            }
+        }
 
         // Narrow tagged unions of `TypedDict`s with `Literal` keys, for example:
         //
