@@ -359,10 +359,13 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
-Because `_replace` is synthesized with specific keyword-only parameters (to enable error detection
-for invalid keyword arguments), NamedTuple instances are not strictly assignable to
-`NamedTupleLike`. This is a trade-off: we gain compile-time detection of invalid `_replace`
-arguments at the cost of strict protocol compatibility.
+NamedTuples are assignable to `NamedTupleLike`, even though the synthesized `_replace` signature
+`(*, x: int = ..., y: int = ...)` is not strictly a subtype of `(**kwargs: Any)`. We special-case
+this in protocol checking because:
+
+1. The specific `_replace` signature enables compile-time detection of invalid keyword arguments
+1. In practice, all valid calls to `_replace` on a NamedTupleLike will also work on any concrete
+    NamedTuple
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -376,16 +379,13 @@ reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterabl
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 
-# Point is not assignable to NamedTuple because the synthesized `_replace` signature
-# `(*, x: int = ..., y: int = ...)` is not a subtype of `(**kwargs: Any)`. This is a
-# deliberate trade-off: detecting invalid `_replace` arguments at the cost of protocol
-# compatibility. Mypy makes the same trade-off.
-# error: [static-assert-error]
+# Point is assignable to NamedTuple (we special-case _replace in protocol checking).
 static_assert(is_assignable_to(Point, NamedTuple))
 
-# error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `Point`"
+# NamedTuple instances can be passed to functions expecting NamedTupleLike.
 expects_named_tuple(Point(x=42, y=56))
 
+# But plain tuples are not NamedTupleLike (they don't have _make, _asdict, _replace, etc.).
 # error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `tuple[Literal[1], Literal[2]]`"
 expects_named_tuple((1, 2))
 ```

@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use super::class::CodeGeneratorKind;
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -132,6 +133,16 @@ impl<'db> Type<'db> {
         relation_visitor: &HasRelationToVisitor<'db>,
         disjointness_visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
+        // Iff we're checking a NamedTuple against NamedTupleLike, skip the `_replace` method
+        // signature. NamedTuples synthesize `_replace` methods with specific keyword-only
+        // parameters (to detect invalid arguments), which are not strictly subtypes of the
+        // protocol's `(**kwargs)` signature, but are intended to be considered as satisfying it.
+        let is_namedtuple_protocol_check = matches!(&protocol.inner, Protocol::FromClass(class) if class.is_known(db, KnownClass::NamedTupleLike))
+            && self.as_nominal_instance().is_some_and(|instance| {
+                let (class_literal, specialization) = instance.class(db).class_literal(db);
+                CodeGeneratorKind::NamedTuple.matches(db, class_literal, specialization)
+            });
+
         let structurally_satisfied = if let Type::ProtocolInstance(self_protocol) = self {
             self_protocol.interface(db).has_relation_to_impl(
                 db,
@@ -146,6 +157,16 @@ impl<'db> Type<'db> {
                 .inner
                 .interface(db)
                 .members(db)
+                .filter(|member| {
+                    // Skip `_replace` check for NamedTuple vs NamedTupleLike. NamedTuples
+                    // synthesize `_replace` with specific keyword-only parameters to detect
+                    // invalid arguments, but this signature is not a strict subtype of the
+                    // protocol's `(**kwargs)` signature.
+                    if is_namedtuple_protocol_check && member.name() == "_replace" {
+                        return false;
+                    }
+                    true
+                })
                 .when_all(db, |member| {
                     member.is_satisfied_by(
                         db,
