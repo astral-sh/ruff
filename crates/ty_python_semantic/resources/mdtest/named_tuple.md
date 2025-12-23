@@ -269,7 +269,7 @@ reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: (self: Person, *, name: str = ..., age: int | None = ...) -> Person
+reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -377,7 +377,7 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
+reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 
 # Point is assignable to NamedTuple (we special-case _replace in protocol checking).
 static_assert(is_assignable_to(Point, NamedTuple))
