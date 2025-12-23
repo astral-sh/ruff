@@ -1,11 +1,15 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::collections::BTreeMap;
 
 use ruff_db::files::File;
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_db::source::{SourceText, source_text};
 use ruff_diagnostics::Edit;
+use ruff_python_ast::StringFlags;
 use ruff_python_ast::find_node::{CoveringNode, covering_node};
 use ruff_python_ast::name::Name;
+use ruff_python_ast::str::Quote;
 use ruff_python_ast::token::{Token, TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
@@ -14,8 +18,8 @@ use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, ModuleName};
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
-    Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
+    Completion as SemanticCompletion, HasType, NameKind, SemanticModel,
+    types::{CycleDetector, KnownClass, StringLiteralType, Type},
 };
 
 use crate::docstring::Docstring;
@@ -45,6 +49,16 @@ pub fn completion<'db>(
     match context.kind {
         ContextKind::Import(ref import) => {
             import.add_completions(db, file, &mut completions);
+        }
+        ContextKind::StringLiteral(ref string_context) => {
+            add_string_literal_completions(
+                db,
+                file,
+                &parsed,
+                &context.cursor,
+                string_context,
+                &mut completions,
+            );
         }
         ContextKind::NonImport(ref non_import) => {
             let model = SemanticModel::new(db, file);
@@ -377,6 +391,7 @@ impl<'db> Completion<'db> {
                 }
             })
         }
+
         self.kind.or_else(|| {
             self.ty
                 .and_then(|ty| imp(db, ty, &CompletionKindVisitor::default()))
@@ -492,6 +507,7 @@ struct Context<'m> {
 #[derive(Debug)]
 enum ContextKind<'m> {
     Import(ImportStatement<'m>),
+    StringLiteral(StringLiteralContext<'m>),
     NonImport(ContextNonImport<'m>),
 }
 
@@ -500,6 +516,18 @@ enum ContextKind<'m> {
 struct ContextNonImport<'m> {
     /// The AST of the completion target.
     target: CompletionTargetAst<'m>,
+}
+
+#[derive(Debug)]
+struct StringLiteralContext<'m> {
+    literal: &'m ast::ExprStringLiteral,
+    site: StringLiteralSite<'m>,
+}
+
+#[derive(Debug)]
+enum StringLiteralSite<'m> {
+    CallArg,
+    AnnAssignValue { annotation: &'m ast::Expr },
 }
 
 impl<'m> Context<'m> {
@@ -516,6 +544,15 @@ impl<'m> Context<'m> {
             return None;
         }
 
+        if cursor.is_in_string() {
+            let site = cursor.string_literal_site()?;
+            let literal = cursor.string_literal()?;
+            return Some(Context {
+                kind: ContextKind::StringLiteral(StringLiteralContext { literal, site }),
+                cursor,
+            });
+        }
+
         let kind = if let Some(import) = ImportStatement::detect(db, file, &cursor) {
             ContextKind::Import(import)
         } else {
@@ -530,7 +567,7 @@ impl<'m> Context<'m> {
     /// Returns a filtering context for use with a completion collector.
     fn collection_context<'db>(&self, db: &'db dyn Db) -> CollectionContext<'db> {
         match self.kind {
-            ContextKind::Import(_) => CollectionContext::none(),
+            ContextKind::Import(_) | ContextKind::StringLiteral(_) => CollectionContext::none(),
             ContextKind::NonImport(_) => {
                 let is_raising_exception = self.cursor.is_raising_exception();
                 CollectionContext {
@@ -648,7 +685,7 @@ impl<'m> ContextCursor<'m> {
 
     /// Whether the last token is in a place where we should not provide completions.
     fn is_in_no_completions_place(&self) -> bool {
-        self.is_in_comment() || self.is_in_string() || self.is_in_definition_place()
+        self.is_in_comment() || self.is_in_definition_place()
     }
 
     /// Whether the last token is within a comment or not.
@@ -662,6 +699,54 @@ impl<'m> ContextCursor<'m> {
     ///
     /// Note that this will return `false` when the last token is positioned within an
     /// interpolation block in an f-string or a t-string.
+    fn string_literal(&self) -> Option<&'m ast::ExprStringLiteral> {
+        if !self.is_in_string() {
+            return None;
+        }
+
+        let range = TextRange::empty(self.offset);
+        let node = self
+            .covering_node(range)
+            .find_last(|node| node.is_expr_string_literal())
+            .ok()?;
+
+        let AnyNodeRef::ExprStringLiteral(literal) = node.node() else {
+            return None;
+        };
+        Some(literal)
+    }
+
+    /// Determine whether we're in a syntactic place where literal suggestions make sense.
+    fn string_literal_site(&self) -> Option<StringLiteralSite<'m>> {
+        // Call argument site (and keyword args, I suppose)
+        if self
+            .covering_node(TextRange::empty(self.offset))
+            .ancestors()
+            .take_while(|node| !node.is_statement())
+            .any(|node| node.is_arguments())
+        {
+            return Some(StringLiteralSite::CallArg);
+        }
+
+        // Annotated assignment RHS: `x: T = "..."`
+        let range = TextRange::empty(self.offset);
+        let covering = self.covering_node(range);
+        let ann = covering.ancestors().find_map(|node| match node {
+            AnyNodeRef::StmtAnnAssign(ann_assign) => {
+                let in_value = ann_assign
+                    .value
+                    .as_deref()
+                    .is_some_and(|value| value.range().contains_range(range));
+                in_value.then_some(ann_assign)
+            }
+            _ => None,
+        })?;
+
+        Some(StringLiteralSite::AnnAssignValue {
+            annotation: &ann.annotation,
+        })
+    }
+
     fn is_in_string(&self) -> bool {
         self.tokens_before.last().is_some_and(|t| {
             matches!(
@@ -1090,6 +1175,159 @@ enum Sort {
     /// Assign a smaller rank. The suggestion will appear lower
     /// in the completion results.
     Lower,
+}
+
+fn add_string_literal_completions<'db>(
+    db: &'db dyn Db,
+    file: File,
+    _parsed: &ParsedModuleRef,
+    cursor: &ContextCursor<'_>,
+    ctx: &StringLiteralContext<'_>,
+    completions: &mut Completions<'db>,
+) {
+    let mut out: BTreeMap<&'db str, StringLiteralType<'db>> = BTreeMap::new();
+    let mut seen_types: FxHashSet<Type<'db>> = FxHashSet::default();
+
+    match ctx.site {
+        StringLiteralSite::CallArg => {
+            collect_call_site_literals(db, file, cursor.offset, &mut out, &mut seen_types);
+        }
+        StringLiteralSite::AnnAssignValue { annotation } => {
+            let model = SemanticModel::new(db, file);
+            collect_annotation_site_literals(db, &model, annotation, &mut out, &mut seen_types);
+        }
+    }
+
+    if out.is_empty() {
+        return;
+    }
+
+    let quote_char = match ctx.literal.value.first_literal_flags().quote_style() {
+        Quote::Single => '\'',
+        Quote::Double => '"',
+    };
+
+    for (value, literal_ty) in out {
+        let escaped = escape_for_quote(value, quote_char);
+        let insert: Box<str> = match escaped {
+            Cow::Borrowed(s) => Box::<str>::from(s),
+            Cow::Owned(s) => s.into_boxed_str(),
+        };
+
+        completions.add(Completion {
+            name: Name::new(value),
+            qualified: None,
+            insert: Some(insert),
+            ty: Some(Type::StringLiteral(literal_ty)),
+            kind: Some(CompletionKind::Value),
+            module_name: None,
+            import: None,
+            builtin: false,
+            is_type_check_only: false,
+            is_definitively_raisable: false,
+            documentation: None,
+        });
+    }
+}
+
+fn collect_call_site_literals<'db>(
+    db: &'db dyn Db,
+    file: File,
+    offset: TextSize,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+) {
+    let Some(sig_help) = signature_help(db, file, offset) else {
+        return;
+    };
+
+    if let Some(i) = sig_help.active_signature {
+        if let Some(sig) = sig_help.signatures.get(i) {
+            collect_from_signature(db, sig, seen_types, out);
+        }
+        return;
+    }
+
+    for sig in &sig_help.signatures {
+        collect_from_signature(db, sig, seen_types, out);
+    }
+}
+
+fn collect_from_signature<'db>(
+    db: &'db dyn Db,
+    signature: &crate::SignatureDetails<'db>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+) {
+    let Some(active_parameter) = signature.active_parameter else {
+        return;
+    };
+    let Some(parameter) = signature.parameters.get(active_parameter) else {
+        return;
+    };
+    let Some(ty) = parameter.ty else {
+        return;
+    };
+
+    collect_string_literals_from_type(db, ty, seen_types, out);
+}
+
+fn collect_annotation_site_literals<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    annotation: &ast::Expr,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+) {
+    let Some(annotation_ty) = annotation.inferred_type(model) else {
+        return;
+    };
+    collect_string_literals_from_type(db, annotation_ty, seen_types, out);
+}
+
+fn collect_string_literals_from_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+) {
+    if !seen_types.insert(ty) {
+        return;
+    }
+
+    match ty {
+        Type::StringLiteral(literal) => {
+            out.entry(literal.as_str(db)).or_insert(literal);
+        }
+        Type::Union(union) => {
+            for ty in union.elements(db) {
+                collect_string_literals_from_type(db, *ty, seen_types, out);
+            }
+        }
+        Type::Intersection(intersection) => {
+            for ty in intersection.iter_positive(db) {
+                collect_string_literals_from_type(db, ty, seen_types, out);
+            }
+        }
+        Type::TypeAlias(alias) => {
+            collect_string_literals_from_type(db, alias.value_type(db), seen_types, out);
+        }
+        _ => {}
+    }
+}
+
+fn escape_for_quote<'a>(value: &'a str, quote: char) -> Cow<'a, str> {
+    if !value.bytes().any(|b| b == b'\\' || b == quote as u8) {
+        return Cow::Borrowed(value);
+    }
+    let mut escaped = String::with_capacity(value.len());
+    for ch in value.chars() {
+        if ch == quote || ch == '\\' {
+            escaped.push('\\');
+        }
+        escaped.push(ch);
+    }
+    Cow::Owned(escaped)
 }
 
 /// Detect and construct completions for unset function arguments.

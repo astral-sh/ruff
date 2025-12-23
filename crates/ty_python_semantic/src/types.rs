@@ -14502,6 +14502,11 @@ impl<'db> StringLiteralType<'db> {
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
     }
+
+    /// Returns the contents of this string literal.
+    pub fn as_str(self, db: &'db dyn Db) -> &'db str {
+        self.value(db)
+    }
 }
 
 /// # Ordering
