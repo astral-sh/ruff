@@ -166,27 +166,17 @@ fn emit_field(output: &mut String, name: &str, field: &OptionField, parents: &[S
     let _ = writeln!(output, "**Default value**: `{}`", field.default);
     output.push('\n');
     let _ = writeln!(output, "**Type**: `{}`", field.value_type);
+
     output.push('\n');
     output.push_str("**Example usage**:\n\n");
-    let (header, example) = format_snippet(
-        field.scope,
-        field.example,
-        parents,
-        ConfigurationFile::PyprojectToml,
-    );
-    output.push_str(&format_tab("pyproject.toml", &header, &example));
 
-    output.push('\n');
+    for configuration_file in [ConfigurationFile::PyprojectToml, ConfigurationFile::TyToml] {
+        let (header, example) =
+            format_snippet(field.scope, field.example, parents, configuration_file);
+        output.push_str(&format_tab(configuration_file.name(), &header, &example));
 
-    let (header, example) = format_snippet(
-        field.scope,
-        field.example,
-        parents,
-        ConfigurationFile::TyToml,
-    );
-    output.push_str(&format_tab("ty.toml", &header, &example));
-
-    output.push('\n');
+        output.push('\n');
+    }
 }
 
 fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
@@ -204,19 +194,15 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
 }
 /// Format the TOML header for the example usage for a given option.
 ///
-/// For example: `[tool.ruff.format]` or `[tool.ruff.lint.isort]`.
+/// For example: `[tool.ty.rules]`.
 fn format_snippet(
     scope: Option<&str>,
     example: &str,
     parents: &[Set],
     configuration: ConfigurationFile,
 ) -> (String, String) {
-    let tool_parent = match configuration {
-        ConfigurationFile::PyprojectToml => Some("tool.ty"),
-        ConfigurationFile::TyToml => None,
-    };
-
-    let header = tool_parent
+    let header = configuration
+        .parent_table()
         .into_iter()
         .chain(parents.iter().filter_map(|parent| parent.name()))
         .chain(scope)
@@ -266,6 +252,22 @@ impl Visit for CollectOptionsVisitor {
 enum ConfigurationFile {
     PyprojectToml,
     TyToml,
+}
+
+impl ConfigurationFile {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::PyprojectToml => "pyproject.toml",
+            Self::TyToml => "ty.toml",
+        }
+    }
+
+    const fn parent_table(self) -> Option<&'static str> {
+        match self {
+            Self::PyprojectToml => Some("tool.ty"),
+            Self::TyToml => None,
+        }
+    }
 }
 
 #[cfg(test)]

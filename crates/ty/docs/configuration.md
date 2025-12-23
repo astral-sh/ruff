@@ -58,11 +58,21 @@ Defaults to `true`.
 
 **Example usage**:
 
-```toml title="pyproject.toml"
-[tool.ty.analysis]
-# Disable support for `type: ignore` comments
-respect-type-ignore-comments = false
-```
+=== "pyproject.toml"
+
+    ```toml
+    [tool.ty.analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
+
+=== "ty.toml"
+
+    ```toml
+    [analysis]
+    # Disable support for `type: ignore` comments
+    respect-type-ignore-comments = false
+    ```
 
 ---
 
