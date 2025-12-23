@@ -2564,7 +2564,12 @@ impl<'db> ClassLiteral<'db> {
                     .with_annotated_type(KnownClass::Type.to_instance(db));
                 signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
             }
-            (CodeGeneratorKind::NamedTuple, "_replace") => {
+            (CodeGeneratorKind::NamedTuple, "_replace" | "__replace__") => {
+                if name == "__replace__"
+                    && Program::get(db).python_version(db) < PythonVersion::PY313
+                {
+                    return None;
+                }
                 // Use `Self` type variable as return type so that subclasses get the correct
                 // return type when calling `_replace`. For example, if `IntBox` inherits from
                 // `Box[int]` (a NamedTuple), then `IntBox(1)._replace(content=42)` should return

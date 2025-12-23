@@ -36,6 +36,7 @@ const PROHIBITED_NAMEDTUPLE_ATTRS: &[&str] = &[
     "__init__",
     "__slots__",
     "__getnewargs__",
+    "__replace__",
     "_fields",
     "_field_defaults",
     "_field_types",
