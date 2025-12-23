@@ -938,7 +938,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .required(false)
                     .read_only(true)
                     .build();
-                let schema: TypedDictSchema = std::iter::once((field_name, field)).collect();
+                let schema = TypedDictSchema::from_iter([(field_name, field)]);
                 let synthesized_typeddict =
                     TypedDictType::Synthesized(SynthesizedTypedDictType::new(self.db, schema));
                 // As mentioned above, the synthesized `TypedDict` is always negated.
