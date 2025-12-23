@@ -2583,6 +2583,15 @@ impl<'db> ClassLiteral<'db> {
                     .with_annotated_type(self_ty);
                 signature_from_fields(vec![self_parameter], Some(self_ty))
             }
+            (CodeGeneratorKind::NamedTuple, "_fields") => {
+                // Synthesize a precise tuple type for _fields based on the actual number of fields.
+                // For example, a NamedTuple with two fields gets `tuple[str, str]` instead of
+                // `tuple[str, ...]`.
+                let fields = self.fields(db, specialization, field_policy);
+                let str_ty = KnownClass::Str.to_instance(db);
+                let field_types = fields.keys().map(|_| str_ty);
+                Some(Type::heterogeneous_tuple(db, field_types))
+            }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassFlags::ORDER) {
                     return None;
