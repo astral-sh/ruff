@@ -217,7 +217,7 @@ def is_b(val: object) -> TypeGuard[B]:
 
 def _(x: P):
     if isinstance(x, A) or is_b(x):
-        reveal_type(x)  # revealed: (P & A) | B
+        reveal_type(x)  # revealed: B | (P & A)
 ```
 
 Attribute and subscript narrowing is supported:

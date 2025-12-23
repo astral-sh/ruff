@@ -766,12 +766,12 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         self.filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
             .reduce(|acc, constraint| {
                 // See above---note the reverse application
-                constraint.merge_constraint_and(&acc, db)
+                constraint.merge_constraint_and(acc, db)
             })
             .map_or(base_ty, |constraint| {
                 NarrowingConstraint::regular(base_ty)
-                    .merge_constraint_and(&constraint, db)
-                    .evaluate_type_constraint(db)
+                    .merge_constraint_and(constraint, db)
+                    .evaluate_constraint_type(db)
             })
     }
 }
