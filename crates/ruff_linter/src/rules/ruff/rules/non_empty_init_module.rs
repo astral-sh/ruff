@@ -1,5 +1,6 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast as ast;
+use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
 
 use crate::{Violation, checkers::ast::Checker};
@@ -65,32 +66,34 @@ impl Violation for NonEmptyInitModule {
 }
 
 /// RUF070
-pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
+pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     if !checker.in_init_module() {
         return;
     }
 
+    let semantic = checker.semantic();
+
     // Only flag top-level statements
-    if checker.semantic().current_statement_parent().is_some() {
+    if semantic.current_statement_parent().is_some() {
         return;
     }
 
     if !checker.settings().ruff.strictly_empty_init_modules {
-        if checker.semantic().in_pep_257_docstring() || checker.semantic().in_attribute_docstring()
-        {
+        if semantic.in_pep_257_docstring() || semantic.in_attribute_docstring() {
             return;
         }
 
-        if matches!(stmt, ast::Stmt::Import(_) | ast::Stmt::ImportFrom(_)) {
-            return;
-        }
+        match stmt {
+            // Allow imports
+            Stmt::Import(_) | Stmt::ImportFrom(_) => return,
 
-        // Allow PEP-562 module `__getattr__`
-        if stmt
-            .as_function_def_stmt()
-            .is_some_and(|func| &*func.name == "__getattr__")
-        {
-            return;
+            // Allow PEP-562 module `__getattr__`
+            Stmt::FunctionDef(func) if &*func.name == "__getattr__" => return,
+
+            // Allow `TYPE_CHECKING` blocks
+            Stmt::If(stmt_if) if is_type_checking_block(stmt_if, semantic) => return,
+
+            _ => {}
         }
 
         // Allow assignments to `__all__`.
@@ -117,18 +120,15 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
     checker.report_diagnostic(NonEmptyInitModule, stmt.range());
 }
 
-fn is_assignment_to(stmt: &ast::Stmt, name: &str) -> bool {
+fn is_assignment_to(stmt: &Stmt, name: &str) -> bool {
     let targets = match stmt {
-        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
-        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-        | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-            std::slice::from_ref(&**target)
-        }
-        _ => &[],
+        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
+        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+        | Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => std::slice::from_ref(&**target),
+        _ => return false,
     };
 
-    !targets.is_empty()
-        && targets
-            .iter()
-            .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
+    targets
+        .iter()
+        .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
 }

@@ -25,3 +25,11 @@ __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
 
 if os.environ["FOO"] != "1":  # RUF070
     MY_CONSTANT = 4  # ok, don't flag nested statements
+
+if TYPE_CHECKING:  # ok
+    MY_CONSTANT = 3
+
+import typing
+
+if typing.TYPE_CHECKING: # ok
+    MY_CONSTANT = 2

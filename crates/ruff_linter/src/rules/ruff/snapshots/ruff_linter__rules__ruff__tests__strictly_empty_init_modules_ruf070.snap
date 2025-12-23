@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 10
+Added: 13
 
 --- Added ---
 RUF070 Code detected
@@ -121,4 +121,40 @@ RUF070 Code detected
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |
 26 | if os.environ["FOO"] != "1":  # RUF070
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:29:1
+   |
+27 |       MY_CONSTANT = 4  # ok, don't flag nested statements
+28 |
+29 | / if TYPE_CHECKING:  # ok
+30 | |     MY_CONSTANT = 3
+   | |___________________^
+31 |
+32 |   import typing
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:32:1
+   |
+30 |     MY_CONSTANT = 3
+31 |
+32 | import typing
+   | ^^^^^^^^^^^^^
+33 |
+34 | if typing.TYPE_CHECKING: # ok
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:34:1
+   |
+32 |   import typing
+33 |
+34 | / if typing.TYPE_CHECKING: # ok
+35 | |     MY_CONSTANT = 2
+   | |___________________^
    |

@@ -38,4 +38,6 @@ RUF070 Code detected
 26 | / if os.environ["FOO"] != "1":  # RUF070
 27 | |     MY_CONSTANT = 4  # ok, don't flag nested statements
    | |___________________^
+28 |
+29 |   if TYPE_CHECKING:  # ok
    |
