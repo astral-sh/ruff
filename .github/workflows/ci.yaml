@@ -996,7 +996,7 @@ jobs:
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: benchmarks-instrumented-ty-binary
-          path: target/codspeed/instrumentation/ruff_benchmark
+          path: target/codspeed/simulation/ruff_benchmark
           retention-days: 1
 
   benchmarks-instrumented-ty-run:
@@ -1029,10 +1029,10 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.0
         with:
           name: benchmarks-instrumented-ty-binary
-          path: target/codspeed/instrumentation/ruff_benchmark
+          path: target/codspeed/simulation/ruff_benchmark
 
       - name: "Restore binary permissions"
-        run: chmod +x target/codspeed/instrumentation/ruff_benchmark/ty
+        run: chmod +x target/codspeed/simulation/ruff_benchmark/ty
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
