@@ -6448,13 +6448,15 @@ impl<'db> Type<'db> {
                     .constructor_bindings(db)
                     .unwrap_or_else(|| Type::from(class).bindings(db)),
 
+                // `type[T]` calls should be checked as constructor calls for `T` (or its bound)
                 // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
-                SubclassOfInner::TypeVar(_) => Binding::single(
-                    self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                )
-                .into(),
+                SubclassOfInner::TypeVar(_) => self.constructor_bindings(db).unwrap_or_else(|| {
+                    Binding::single(
+                        self,
+                        Signature::new(Parameters::gradual_form(), self.to_instance(db)),
+                    )
+                    .into()
+                }),
             },
 
             Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
@@ -6588,12 +6590,13 @@ impl<'db> Type<'db> {
             })
         }
 
-        let class = match self {
-            Type::ClassLiteral(class) => ClassType::NonGeneric(class),
-            Type::GenericAlias(alias) => ClassType::Generic(alias),
+        let (class, lookup_from_bound) = match self {
+            Type::ClassLiteral(class) => (ClassType::NonGeneric(class), false),
+            Type::GenericAlias(alias) => (ClassType::Generic(alias), false),
             Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Class(class) => class,
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return None,
+                SubclassOfInner::Dynamic(_) => return None,
+                SubclassOfInner::Class(class) => (class, false),
+                inner @ SubclassOfInner::TypeVar(_) => (inner.into_class(db)?, true),
             },
             _ => return None,
         };
@@ -6641,6 +6644,13 @@ impl<'db> Type<'db> {
             return None;
         }
 
+        let identity_specialize_if_generic = |ty: Type<'db>| match ty {
+            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
+                Type::from(class.identity_specialization(db))
+            }
+            _ => ty,
+        };
+
         // If we are trying to construct a non-specialized generic class, we should use the
         // constructor parameters to try to infer the class specialization. To do this, we need to
         // tweak our member lookup logic a bit. Normally, when looking up a class or instance
@@ -6649,11 +6659,14 @@ impl<'db> Type<'db> {
         // have the class's typevars still in the method signature when we attempt to call it. To
         // do this, we instead use the _identity_ specialization, which maps each of the class's
         // generic typevars to itself.
-        let self_type = match self {
-            Type::ClassLiteral(class) if class.generic_context(db).is_some() => {
-                Type::from(class.identity_specialization(db))
-            }
-            _ => self,
+        let self_type = identity_specialize_if_generic(self);
+
+        // For `type[T]`, validate arguments against the bound/constraint class constructors,
+        // but keep the constructed type as `T`.
+        let lookup_type = if lookup_from_bound {
+            identity_specialize_if_generic(Type::from(class))
+        } else {
+            self_type
         };
 
         // As of now we do not model custom `__call__` on meta-classes, so the code below
@@ -6681,16 +6694,18 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must bind the `cls` argument when forming
         // constructor-call bindings.
-        let new_method = self_type.lookup_dunder_new(db);
+        let new_method = lookup_type.lookup_dunder_new(db);
+
+        let constructor_instance_ty = self_type.to_instance(db)?;
 
         // Construct an instance type to look up `__init__`. We use `self_type` (possibly identity-
         // specialized) so the instance retains inferable class typevars during constructor checking.
         // TODO: we should use the actual return type of `__new__` to determine the instance type
-        let init_ty = self_type.to_instance(db)?;
+        let lookup_init_ty = lookup_type.to_instance(db)?;
 
         // Lookup the `__init__` instance method in the MRO, excluding `object` initially; we only
         // fall back to `object.__init__` in the `__new__`-absent case (see rules above).
-        let init_method_no_object = init_ty.member_lookup_with_policy(
+        let init_method_no_object = lookup_init_ty.member_lookup_with_policy(
             db,
             "__init__".into(),
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
@@ -6698,7 +6713,7 @@ impl<'db> Type<'db> {
 
         let mut missing_init_bindings = None;
         let (new_bindings, has_any_new) = match new_method.as_ref().map(|method| method.place) {
-            Some(place) => match resolve_dunder_new_callable(db, self_type, place) {
+            Some(place) => match resolve_dunder_new_callable(db, lookup_type, place) {
                 Some((new_callable, definedness)) => {
                     let mut bindings =
                         bind_constructor_new(db, new_callable.bindings(db), self_type);
@@ -6722,7 +6737,7 @@ impl<'db> Type<'db> {
                 Some((bindings, *init_method))
             }
             (Place::Undefined, false) => {
-                let init_method_with_object = init_ty.member_lookup_with_policy(
+                let init_method_with_object = lookup_init_ty.member_lookup_with_policy(
                     db,
                     "__init__".into(),
                     MemberLookupPolicy::NO_INSTANCE_FALLBACK,
@@ -6744,7 +6759,10 @@ impl<'db> Type<'db> {
                         // lint via the builder.
                         let mut bindings: Bindings<'db> = Binding::single(
                             self_type,
-                            Signature::new(Parameters::gradual_form(), Some(init_ty)),
+                            Signature::new(
+                                Parameters::gradual_form(),
+                                Some(constructor_instance_ty),
+                            ),
                         )
                         .into();
                         bindings.set_implicit_dunder_init_is_possibly_unbound();
@@ -6779,7 +6797,7 @@ impl<'db> Type<'db> {
         Some(
             bindings
                 .with_generic_context(db, class_generic_context)
-                .with_constructor_instance_type(init_ty),
+                .with_constructor_instance_type(constructor_instance_ty),
         )
     }
 

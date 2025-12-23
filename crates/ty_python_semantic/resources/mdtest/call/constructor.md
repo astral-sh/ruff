@@ -258,6 +258,23 @@ class Box(Generic[T]):
 reveal_type(Box(1))  # revealed: Box[int]
 ```
 
+## Constructor calls through `type[T]` with a bound TypeVar
+
+```py
+from typing import TypeVar
+
+class C:
+    def __new__(cls, x: int, y: str): ...
+
+T = TypeVar("T", bound=C)
+
+def f(cls: type[T]):
+    # error: [missing-argument] "No argument provided for required parameter `y` of function `__new__`"
+    cls(1)
+    # error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `str`, found `Literal[2]`"
+    cls(1, 2)
+```
+
 ## Union of constructors
 
 ```py
