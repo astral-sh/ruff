@@ -24,6 +24,7 @@ use super::{
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
 };
+use crate::ast_node_ref::AstNodeRef;
 use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
 use crate::place::{
@@ -2634,12 +2635,30 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
         } = parameter_with_default;
-        let default_ty = default
-            .as_ref()
-            .map(|default| self.file_expression_type(default));
+        let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
-            if let Some(default_ty) = default_ty {
+            if let Some(default_expr) = default_expr {
+                let default_expr = default_expr.as_ref();
+                let default_expression =
+                    self.index.try_expression(default_expr).unwrap_or_else(|| {
+                        // Default expressions aren't registered as standalone expressions, so
+                        // synthesize an `Expression` to allow type-context inference.
+                        Expression::new(
+                            self.db(),
+                            self.file(),
+                            self.index.expression_scope_id(default_expr),
+                            AstNodeRef::new(self.module(), default_expr),
+                            None,
+                            ExpressionKind::Normal,
+                        )
+                    });
+                let default_ty = infer_same_file_expression_type(
+                    self.db(),
+                    default_expression,
+                    TypeContext::new(Some(declared_ty)),
+                    self.module(),
+                );
                 if !default_ty.is_assignable_to(self.db(), declared_ty)
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
@@ -2669,7 +2688,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(declared_ty),
             );
         } else {
-            let ty = if let Some(default_ty) = default_ty {
+            let ty = if let Some(default_expr) = default_expr {
+                let default_ty = self.file_expression_type(default_expr);
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
