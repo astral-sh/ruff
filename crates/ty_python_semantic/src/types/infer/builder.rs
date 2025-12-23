@@ -4966,8 +4966,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let sym = if module
                     .module(db)
                     .known(db)
-                    .filter(|x| x.is_builtins())
-                    .is_some()
+                    .is_some_and(KnownModule::is_builtins)
                 {
                     builtins_symbol(db, attribute)
                 } else {
