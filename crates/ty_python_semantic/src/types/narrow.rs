@@ -1320,11 +1320,11 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
     field_name: &str,
 ) -> bool {
     let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
-        if let Some(field) = typeddict.items(db).get(field_name) {
-            is_supported_typeddict_tag_literal(field.declared_ty)
-        } else {
-            true // no matching field to check
-        }
+        // There's no matching field to check if `.get()` returns `None`.
+        typeddict
+            .items(db)
+            .get(field_name)
+            .is_none_or(|field| is_supported_typeddict_tag_literal(field.declared_ty))
     };
 
     match ty {
