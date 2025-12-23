@@ -4727,10 +4727,6 @@ pub(crate) fn report_rebound_typevar<'db>(
     )));
 }
 
-fn signature_span(db: &dyn Db, function: FunctionType<'_>) -> Span {
-    function.literal(db).last_definition(db).spans(db).signature
-}
-
 // I tried refactoring this function to placate Clippy,
 // but it did not improve readability! -- AW.
 #[expect(clippy::too_many_arguments)]
@@ -4747,7 +4743,7 @@ pub(super) fn report_invalid_method_override<'db>(
     let db = context.db();
 
     let subclass_definition_kind = subclass_definition.kind(db);
-    let subclass_definition_signature_span = signature_span(db, subclass_function);
+    let subclass_definition_signature_span = subclass_function.signature_span(db);
 
     // If the function was originally defined elsewhere and simply assigned
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
@@ -4838,8 +4834,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => Some(signature_span(db, function)),
-                    Type::BoundMethod(method) => Some(signature_span(db, method.function(db))),
+                    Type::FunctionLiteral(function) => Some(function.signature_span(db)),
+                    Type::BoundMethod(method) => Some(method.function(db).signature_span(db)),
                     _ => None,
                 };
 
@@ -4927,7 +4923,8 @@ pub(super) fn report_unsafe_tuple_subclass<'ctx, 'db>(
     let subclass_definition_kind = subclass_definition.kind(db);
 
     let diagnostic_range = if subclass_definition_kind.is_function_def() {
-        signature_span(db, subclass_function)
+        subclass_function
+            .signature_span(db)
             .range()
             .unwrap_or_else(|| {
                 subclass_function

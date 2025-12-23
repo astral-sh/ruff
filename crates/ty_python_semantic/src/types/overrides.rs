@@ -650,7 +650,7 @@ fn check_tuple_subclass_member<'db>(
     let mut tuple: Option<&'db TupleSpec> = None;
 
     for class in class.iter_mro(db) {
-        let Some(class) = class.into_class_type() else {
+        let Some(class) = class.into_class() else {
             continue;
         };
 

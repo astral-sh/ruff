@@ -3,7 +3,7 @@ source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
 ---
-mdtest name: unsafe_tuple_subclass.md - Unsafe Tuple Subclass - `__bool__`
+mdtest name: unsafe_tuple_subclass.md - Unsafe Tuple Subclass - `__bool__` - Regular Tuple Subclasses
 mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 ---
 

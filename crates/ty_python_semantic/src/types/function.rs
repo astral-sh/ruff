@@ -1274,6 +1274,10 @@ impl<'db> FunctionType<'db> {
     ) -> Option<AbstractMethodKind> {
         self.literal(db).as_abstract_method(db, enclosing_class)
     }
+
+    pub(crate) fn signature_span(self, db: &dyn Db) -> Span {
+        self.literal(db).last_definition(db).spans(db).signature
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that
