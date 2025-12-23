@@ -6,7 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
-use crate::types::TypeContext;
+use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
@@ -896,7 +896,10 @@ fn cached_protocol_interface<'db>(
         // type narrowing that uses `isinstance()` or `issubclass()` with
         // runtime-checkable protocols.
         for (symbol_id, bindings) in use_def_map.all_end_of_scope_symbol_bindings() {
-            let Some(ty) = place_from_bindings(db, bindings).ignore_possibly_undefined() else {
+            let Some(ty) = place_from_bindings(db, bindings)
+                .place
+                .ignore_possibly_undefined()
+            else {
                 continue;
             };
             direct_members.insert(
@@ -983,5 +986,9 @@ fn protocol_bind_self<'db>(
     callable: CallableType<'db>,
     self_type: Option<Type<'db>>,
 ) -> CallableType<'db> {
-    CallableType::new(db, callable.signatures(db).bind_self(db, self_type), false)
+    CallableType::new(
+        db,
+        callable.signatures(db).bind_self(db, self_type),
+        CallableTypeKind::Regular,
+    )
 }

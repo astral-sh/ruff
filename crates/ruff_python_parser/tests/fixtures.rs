@@ -1,52 +1,64 @@
 use std::cell::RefCell;
 use std::cmp::Ordering;
 use std::fmt::{Formatter, Write};
-use std::fs;
-use std::path::Path;
 
+use datatest_stable::Utf8Path;
+use itertools::Itertools;
 use ruff_annotate_snippets::{Level, Renderer, Snippet};
+use ruff_python_ast::token::{Token, Tokens};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::visitor::source_order::{SourceOrderVisitor, TraversalSignal, walk_module};
 use ruff_python_ast::{self as ast, AnyNodeRef, Mod, PythonVersion};
 use ruff_python_parser::semantic_errors::{
     SemanticSyntaxChecker, SemanticSyntaxContext, SemanticSyntaxError,
 };
-use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Token, parse_unchecked};
+use ruff_python_parser::{Mode, ParseErrorType, ParseOptions, Parsed, parse_unchecked};
 use ruff_source_file::{LineIndex, OneIndexed, SourceCode};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
-#[test]
-fn valid_syntax() {
-    insta::glob!("../resources", "valid/**/*.py", test_valid_syntax);
+#[expect(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+fn valid_syntax(path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
+    test_valid_syntax(path, &content, "./resources/valid");
+    Ok(())
 }
 
-#[test]
-fn invalid_syntax() {
-    insta::glob!("../resources", "invalid/**/*.py", test_invalid_syntax);
+#[expect(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+fn invalid_syntax(path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
+    test_invalid_syntax(path, &content, "./resources/invalid");
+    Ok(())
 }
 
-#[test]
-fn inline_ok() {
-    insta::glob!("../resources/inline", "ok/**/*.py", test_valid_syntax);
+#[expect(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+fn inline_ok(path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
+    test_valid_syntax(path, &content, "./resources/inline/ok");
+    Ok(())
 }
 
-#[test]
-fn inline_err() {
-    insta::glob!("../resources/inline", "err/**/*.py", test_invalid_syntax);
+#[expect(clippy::needless_pass_by_value, clippy::unnecessary_wraps)]
+fn inline_err(path: &Utf8Path, content: String) -> datatest_stable::Result<()> {
+    test_invalid_syntax(path, &content, "./resources/inline/err");
+    Ok(())
+}
+
+datatest_stable::harness! {
+    { test = valid_syntax, root = "./resources/valid", pattern = r"\.pyi?$" },
+    { test = inline_ok, root = "./resources/inline/ok", pattern = r"\.pyi?$" },
+    { test = invalid_syntax, root = "./resources/invalid", pattern = r"\.pyi?$" },
+    { test = inline_err, root="./resources/inline/err", pattern = r"\.pyi?$" }
 }
 
 /// Asserts that the parser generates no syntax errors for a valid program.
 /// Snapshots the AST.
-fn test_valid_syntax(input_path: &Path) {
-    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let options = extract_options(&source).unwrap_or_else(|| {
+fn test_valid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+    let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::latest_preview())
     });
-    let parsed = parse_unchecked(&source, options.clone());
+    let parsed = parse_unchecked(source, options.clone());
 
     if parsed.has_syntax_errors() {
-        let line_index = LineIndex::from_source_text(&source);
-        let source_code = SourceCode::new(&source, &line_index);
+        let line_index = LineIndex::from_source_text(source);
+        let source_code = SourceCode::new(source, &line_index);
 
         let mut message = "Expected no syntax errors for a valid program but the parser generated the following errors:\n".to_string();
 
@@ -79,8 +91,8 @@ fn test_valid_syntax(input_path: &Path) {
         panic!("{input_path:?}: {message}");
     }
 
-    validate_tokens(parsed.tokens(), source.text_len(), input_path);
-    validate_ast(parsed.syntax(), source.text_len(), input_path);
+    validate_tokens(parsed.tokens(), source.text_len());
+    validate_ast(&parsed, source.text_len());
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
@@ -89,7 +101,7 @@ fn test_valid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
+        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
@@ -100,8 +112,8 @@ fn test_valid_syntax(input_path: &Path) {
     if !semantic_syntax_errors.is_empty() {
         let mut message = "Expected no semantic syntax errors for a valid program:\n".to_string();
 
-        let line_index = LineIndex::from_source_text(&source);
-        let source_code = SourceCode::new(&source, &line_index);
+        let line_index = LineIndex::from_source_text(source);
+        let source_code = SourceCode::new(source, &line_index);
 
         for error in semantic_syntax_errors {
             writeln!(
@@ -123,6 +135,7 @@ fn test_valid_syntax(input_path: &Path) {
         omit_expression => true,
         input_file => input_path,
         prepend_module_to_snapshot => false,
+        snapshot_suffix => test_name
     }, {
         insta::assert_snapshot!(output);
     });
@@ -130,22 +143,23 @@ fn test_valid_syntax(input_path: &Path) {
 
 /// Assert that the parser generates at least one syntax error for the given input file.
 /// Snapshots the AST and the error messages.
-fn test_invalid_syntax(input_path: &Path) {
-    let source = fs::read_to_string(input_path).expect("Expected test file to exist");
-    let options = extract_options(&source).unwrap_or_else(|| {
+fn test_invalid_syntax(input_path: &Utf8Path, source: &str, root: &str) {
+    let test_name = input_path.strip_prefix(root).unwrap_or(input_path).as_str();
+
+    let options = extract_options(source).unwrap_or_else(|| {
         ParseOptions::from(Mode::Module).with_target_version(PythonVersion::PY314)
     });
-    let parsed = parse_unchecked(&source, options.clone());
+    let parsed = parse_unchecked(source, options.clone());
 
-    validate_tokens(parsed.tokens(), source.text_len(), input_path);
-    validate_ast(parsed.syntax(), source.text_len(), input_path);
+    validate_tokens(parsed.tokens(), source.text_len());
+    validate_ast(&parsed, source.text_len());
 
     let mut output = String::new();
     writeln!(&mut output, "## AST").unwrap();
     writeln!(&mut output, "\n```\n{:#?}\n```", parsed.syntax()).unwrap();
 
-    let line_index = LineIndex::from_source_text(&source);
-    let source_code = SourceCode::new(&source, &line_index);
+    let line_index = LineIndex::from_source_text(source);
+    let source_code = SourceCode::new(source, &line_index);
 
     if !parsed.errors().is_empty() {
         writeln!(&mut output, "## Errors\n").unwrap();
@@ -184,7 +198,7 @@ fn test_invalid_syntax(input_path: &Path) {
     let parsed = parsed.try_into_module().expect("Parsed with Mode::Module");
 
     let mut visitor =
-        SemanticSyntaxCheckerVisitor::new(&source).with_python_version(options.target_version());
+        SemanticSyntaxCheckerVisitor::new(source).with_python_version(options.target_version());
 
     for stmt in parsed.suite() {
         visitor.visit_stmt(stmt);
@@ -194,7 +208,7 @@ fn test_invalid_syntax(input_path: &Path) {
 
     assert!(
         parsed.has_syntax_errors() || !semantic_syntax_errors.is_empty(),
-        "{input_path:?}: Expected parser to generate at least one syntax error for a program containing syntax errors."
+        "Expected parser to generate at least one syntax error for a program containing syntax errors."
     );
 
     if !semantic_syntax_errors.is_empty() {
@@ -218,6 +232,7 @@ fn test_invalid_syntax(input_path: &Path) {
         omit_expression => true,
         input_file => input_path,
         prepend_module_to_snapshot => false,
+        snapshot_suffix => test_name
     }, {
         insta::assert_snapshot!(output);
     });
@@ -370,26 +385,24 @@ impl std::fmt::Display for CodeFrame<'_> {
 /// Verifies that:
 /// * the ranges are strictly increasing when loop the tokens in insertion order
 /// * all ranges are within the length of the source code
-fn validate_tokens(tokens: &[Token], source_length: TextSize, test_path: &Path) {
+fn validate_tokens(tokens: &[Token], source_length: TextSize) {
     let mut previous: Option<&Token> = None;
 
     for token in tokens {
         assert!(
             token.end() <= source_length,
-            "{path}: Token range exceeds the source code length. Token: {token:#?}",
-            path = test_path.display()
+            "Token range exceeds the source code length. Token: {token:#?}",
         );
 
         if let Some(previous) = previous {
             assert_eq!(
                 previous.range().ordering(token.range()),
                 Ordering::Less,
-                "{path}: Token ranges are not in increasing order
+                "Token ranges are not in increasing order
 Previous token: {previous:#?}
 Current token: {token:#?}
 Tokens: {tokens:#?}
 ",
-                path = test_path.display(),
             );
         }
 
@@ -401,25 +414,67 @@ Tokens: {tokens:#?}
 /// * the range of the parent node fully encloses all its child nodes
 /// * the ranges are strictly increasing when traversing the nodes in pre-order.
 /// * all ranges are within the length of the source code.
-fn validate_ast(root: &Mod, source_len: TextSize, test_path: &Path) {
-    walk_module(&mut ValidateAstVisitor::new(source_len, test_path), root);
+fn validate_ast(parsed: &Parsed<Mod>, source_len: TextSize) {
+    walk_module(
+        &mut ValidateAstVisitor::new(parsed.tokens(), source_len),
+        parsed.syntax(),
+    );
 }
 
 #[derive(Debug)]
 struct ValidateAstVisitor<'a> {
+    tokens: std::iter::Peekable<std::slice::Iter<'a, Token>>,
     parents: Vec<AnyNodeRef<'a>>,
     previous: Option<AnyNodeRef<'a>>,
     source_length: TextSize,
-    test_path: &'a Path,
 }
 
 impl<'a> ValidateAstVisitor<'a> {
-    fn new(source_length: TextSize, test_path: &'a Path) -> Self {
+    fn new(tokens: &'a Tokens, source_length: TextSize) -> Self {
         Self {
+            tokens: tokens.iter().peekable(),
             parents: Vec::new(),
             previous: None,
             source_length,
-            test_path,
+        }
+    }
+}
+
+impl ValidateAstVisitor<'_> {
+    /// Check that the node's start doesn't fall within a token.
+    /// Called in `enter_node` before visiting children.
+    fn assert_start_boundary(&mut self, node: AnyNodeRef<'_>) {
+        // Skip tokens that end at or before the node starts.
+        self.tokens
+            .peeking_take_while(|t| t.end() <= node.start())
+            .last();
+
+        if let Some(next) = self.tokens.peek() {
+            // At this point, next_token.end() > node.start()
+            assert!(
+                next.start() >= node.start(),
+                "The start of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                root = self.parents.first()
+            );
+        }
+    }
+
+    /// Check that the node's end doesn't fall within a token.
+    /// Called in `leave_node` after visiting children, so all tokens
+    /// within the node have been consumed.
+    fn assert_end_boundary(&mut self, node: AnyNodeRef<'_>) {
+        // Skip tokens that end at or before the node ends.
+        self.tokens
+            .peeking_take_while(|t| t.end() <= node.end())
+            .last();
+
+        if let Some(next) = self.tokens.peek() {
+            // At this point, `next_token.end() > node.end()`
+            assert!(
+                next.start() >= node.end(),
+                "The end of the node falls within a token.\nNode: {node:#?}\n\nToken: {next:#?}\n\nRoot: {root:#?}",
+                root = self.parents.first()
+            );
         }
     }
 }
@@ -428,16 +483,14 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     fn enter_node(&mut self, node: AnyNodeRef<'ast>) -> TraversalSignal {
         assert!(
             node.end() <= self.source_length,
-            "{path}: The range of the node exceeds the length of the source code. Node: {node:#?}",
-            path = self.test_path.display()
+            "The range of the node exceeds the length of the source code. Node: {node:#?}",
         );
 
         if let Some(previous) = self.previous {
             assert_ne!(
                 previous.range().ordering(node.range()),
                 Ordering::Greater,
-                "{path}: The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
-                path = self.test_path.display(),
+                "The ranges of the nodes are not strictly increasing when traversing the AST in pre-order.\nPrevious node: {previous:#?}\n\nCurrent node: {node:#?}\n\nRoot: {root:#?}",
                 root = self.parents.first()
             );
         }
@@ -445,11 +498,12 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
         if let Some(parent) = self.parents.last() {
             assert!(
                 parent.range().contains_range(node.range()),
-                "{path}: The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
-                path = self.test_path.display(),
+                "The range of the parent node does not fully enclose the range of the child node.\nParent node: {parent:#?}\n\nChild node: {node:#?}\n\nRoot: {root:#?}",
                 root = self.parents.first()
             );
         }
+
+        self.assert_start_boundary(node);
 
         self.parents.push(node);
 
@@ -457,6 +511,8 @@ impl<'ast> SourceOrderVisitor<'ast> for ValidateAstVisitor<'ast> {
     }
 
     fn leave_node(&mut self, node: AnyNodeRef<'ast>) {
+        self.assert_end_boundary(node);
+
         self.parents.pop().expect("Expected tree to be balanced");
 
         self.previous = Some(node);
@@ -572,7 +628,7 @@ impl SemanticSyntaxContext for SemanticSyntaxCheckerVisitor<'_> {
         true
     }
 
-    fn in_generator_scope(&self) -> bool {
+    fn in_generator_context(&self) -> bool {
         true
     }
 

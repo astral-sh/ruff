@@ -644,6 +644,7 @@ if sys.version_info >= (3, 10):
         def __or__(self, other: Any) -> _SpecialForm: ...
         def __ror__(self, other: Any) -> _SpecialForm: ...
         __supertype__: type | NewType
+        __name__: str
 
 else:
     def NewType(name: str, tp: Any) -> Any:
@@ -722,12 +723,22 @@ def no_type_check(arg: _F) -> _F:
     This mutates the function(s) or class(es) in place.
     """
 
-def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
-    """Decorator to give another decorator the @no_type_check effect.
+if sys.version_info >= (3, 13):
+    @deprecated("Deprecated since Python 3.13; removed in Python 3.15.")
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+        """Decorator to give another decorator the @no_type_check effect.
 
-    This wraps the decorator with something that wraps the decorated
-    function in @no_type_check.
-    """
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
+
+else:
+    def no_type_check_decorator(decorator: Callable[_P, _T]) -> Callable[_P, _T]:
+        """Decorator to give another decorator the @no_type_check effect.
+
+        This wraps the decorator with something that wraps the decorated
+        function in @no_type_check.
+        """
 
 # This itself is only available during type checking
 def type_check_only(func_or_cls: _FT) -> _FT: ...
@@ -1233,6 +1244,11 @@ class ValuesView(MappingView, Collection[_VT_co]):
     def __contains__(self, value: object) -> bool: ...
     def __iter__(self) -> Iterator[_VT_co]: ...
 
+# note for Mapping.get and MutableMapping.pop and MutableMapping.setdefault
+# In _collections_abc.py the parameters are positional-or-keyword,
+# but dict and types.MappingProxyType (the vast majority of Mapping types)
+# don't allow keyword arguments.
+
 class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     """A Mapping is a generic container for associating key/value
     pairs.
@@ -1251,9 +1267,9 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
 
     @overload
-    def get(self, key: _KT, /, default: _VT_co) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
-    def get(self, key: _KT, /, default: _T) -> _VT_co | _T: ...
+    def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
     def items(self) -> ItemsView[_KT, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
 
@@ -1289,9 +1305,9 @@ class MutableMapping(Mapping[_KT, _VT]):
         """
 
     @overload
-    def pop(self, key: _KT, /, default: _VT) -> _VT: ...
+    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, /, default: _T) -> _VT | _T: ...
+    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
     def popitem(self) -> tuple[_KT, _VT]:
         """D.popitem() -> (k, v), remove and return some (key, value) pair
         as a 2-tuple; but raise KeyError if D is empty.
@@ -1784,9 +1800,7 @@ class NamedTuple(tuple[Any, ...]):
     @overload
     def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
     @overload
-    @typing_extensions.deprecated(
-        "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
-    )
+    @deprecated("Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15")
     def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...

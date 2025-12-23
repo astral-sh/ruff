@@ -304,6 +304,14 @@ impl<'db> NominalInstanceType<'db> {
         matches!(self.0, NominalInstanceInner::Object)
     }
 
+    pub(super) fn is_definition_generic(self) -> bool {
+        match self.0 {
+            NominalInstanceInner::NonTuple(class) => class.is_generic(),
+            NominalInstanceInner::ExactTuple(_) => true,
+            NominalInstanceInner::Object => false,
+        }
+    }
+
     /// If this type is an *exact* tuple type (*not* a subclass of `tuple`), returns the
     /// tuple spec.
     ///

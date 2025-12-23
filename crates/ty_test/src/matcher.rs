@@ -403,9 +403,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -427,10 +426,16 @@ mod tests {
             let mut diag = if self.id == DiagnosticId::RevealedType {
                 Diagnostic::new(self.id, Severity::Error, "Revealed type")
             } else {
-                Diagnostic::new(self.id, Severity::Error, "")
+                Diagnostic::new(self.id, Severity::Error, self.message)
             };
             let span = Span::from(file).with_range(self.range);
-            diag.annotate(Annotation::primary(span).message(self.message));
+            let mut annotation = Annotation::primary(span);
+
+            if self.id == DiagnosticId::RevealedType {
+                annotation = annotation.message(self.message);
+            }
+
+            diag.annotate(annotation);
             diag
         }
     }

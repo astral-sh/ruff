@@ -722,7 +722,7 @@ with tempfile.TemporaryDirectory() as d1:
 
 ### Preserving parentheses around single-element lists
 
-Ruff preserves at least one parentheses around list elements, even if the list only contains a single element. The Black 2025 or newer, on the other hand, removes the parentheses 
+Ruff preserves at least one set of parentheses around list elements, even if the list only contains a single element. The Black 2025 style or newer, on the other hand, removes the parentheses
 for single-element lists if they aren't multiline and doing so does not change semantics:
 
 ```python
@@ -741,4 +741,99 @@ items = [(True)]
 items = [(True)]
 items = {(123)}
 
+```
+
+### Long lambda expressions
+
+In [preview](../preview.md), Ruff will keep lambda parameters on a single line,
+just like Black:
+
+```python
+# Input
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ),
+    )
+
+# Ruff Stable
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self,
+        *args,
+        **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs),
+    )
+
+# Black and Ruff Preview
+def a():
+    return b(
+        c,
+        d,
+        e,
+        f=lambda self, *args, **kwargs: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ),
+    )
+```
+
+However, if the body expression exceeds the configured line length, Ruff will
+additionally add parentheses around the lambda body and break it over multiple
+lines:
+
+```python
+# Input
+def a():
+    return b(
+        c,
+        d,
+        e,
+        # Additional `b` character pushes this over the line length
+        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ),
+        # More complex expressions also trigger wrapping
+        g=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ) + 1,
+    )
+
+# Black
+def a():
+    return b(
+        c,
+        d,
+        e,
+        # Additional `b` character pushes this over the line length
+        f=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        ),
+        # More complex expressions also trigger wrapping
+        g=lambda self, *args, **kwargs: baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(
+            *args, **kwargs
+        )
+        + 1,
+    )
+
+# Ruff Preview
+def a():
+    return b(
+        c,
+        d,
+        e,
+        # Additional `b` character pushes this over the line length
+        f=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs)
+        ),
+        # More complex expressions also trigger wrapping
+        g=lambda self, *args, **kwargs: (
+            baaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa(*args, **kwargs) + 1
+        ),
+    )
 ```

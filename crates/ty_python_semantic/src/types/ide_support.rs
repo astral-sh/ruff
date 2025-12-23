@@ -1,13 +1,15 @@
 use std::collections::HashMap;
 
+use crate::FxIndexSet;
 use crate::place::builtins_module_scope;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
-use crate::types::signatures::Signature;
-use crate::types::{CallDunderError, UnionType};
-use crate::types::{CallableTypes, ClassBase, KnownClass, Type, TypeContext};
+use crate::types::signatures::{ParameterKind, Signature};
+use crate::types::{
+    CallDunderError, CallableTypes, ClassBase, KnownUnion, Type, TypeContext, UnionType,
+};
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -24,8 +26,9 @@ use resolve_definition::{find_symbol_in_scope, resolve_definition};
 pub fn definition_for_name<'db>(
     model: &SemanticModel<'db>,
     name: &ast::ExprName,
+    alias_resolution: ImportAliasResolution,
 ) -> Option<Definition<'db>> {
-    let definitions = definitions_for_name(model, name.id.as_str(), name.into());
+    let definitions = definitions_for_name(model, name.id.as_str(), name.into(), alias_resolution);
 
     // Find the first valid definition and return its kind
     for declaration in definitions {
@@ -43,6 +46,7 @@ pub fn definitions_for_name<'db>(
     model: &SemanticModel<'db>,
     name_str: &str,
     node: AnyNodeRef<'_>,
+    alias_resolution: ImportAliasResolution,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
     let file = model.file();
@@ -53,7 +57,7 @@ pub fn definitions_for_name<'db>(
         return vec![];
     };
 
-    let mut all_definitions = Vec::new();
+    let mut all_definitions = FxIndexSet::default();
 
     // Search through the scope hierarchy: start from the current scope and
     // traverse up through parent scopes to find definitions
@@ -83,19 +87,19 @@ pub fn definitions_for_name<'db>(
             if let Some(global_symbol_id) = global_place_table.symbol_id(name_str) {
                 let global_use_def_map = crate::semantic_index::use_def_map(db, global_scope_id);
                 let global_bindings =
-                    global_use_def_map.all_reachable_symbol_bindings(global_symbol_id);
+                    global_use_def_map.reachable_symbol_bindings(global_symbol_id);
                 let global_declarations =
-                    global_use_def_map.all_reachable_symbol_declarations(global_symbol_id);
+                    global_use_def_map.reachable_symbol_declarations(global_symbol_id);
 
                 for binding in global_bindings {
                     if let Some(def) = binding.binding.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
 
                 for declaration in global_declarations {
                     if let Some(def) = declaration.declaration.definition() {
-                        all_definitions.push(def);
+                        all_definitions.insert(def);
                     }
                 }
             }
@@ -111,18 +115,18 @@ pub fn definitions_for_name<'db>(
         let use_def_map = index.use_def_map(scope_id);
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
         for declaration in declarations {
             if let Some(def) = declaration.declaration.definition() {
-                all_definitions.push(def);
+                all_definitions.insert(def);
             }
         }
 
@@ -136,21 +140,14 @@ pub fn definitions_for_name<'db>(
     let mut resolved_definitions = Vec::new();
 
     for definition in &all_definitions {
-        let resolved = resolve_definition(
-            db,
-            *definition,
-            Some(name_str),
-            ImportAliasResolution::ResolveAliases,
-        );
+        let resolved = resolve_definition(db, *definition, Some(name_str), alias_resolution);
         resolved_definitions.extend(resolved);
     }
 
     // If we didn't find any definitions in scopes, fallback to builtins
-    if resolved_definitions.is_empty() {
-        let Some(builtins_scope) = builtins_module_scope(db) else {
-            return resolved_definitions;
-        };
-
+    if resolved_definitions.is_empty()
+        && let Some(builtins_scope) = builtins_module_scope(db)
+    {
         // Special cases for `float` and `complex` in type annotation positions.
         // We don't know whether we're in a type annotation position, so we'll just ask `Name`'s type,
         // which resolves to `int | float` or `int | float | complex` if `float` or `complex` is used in
@@ -159,7 +156,8 @@ pub fn definitions_for_name<'db>(
         // https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex
         if matches!(name_str, "float" | "complex")
             && let Some(expr) = node.expr_name()
-            && let Some(union) = expr.inferred_type(&SemanticModel::new(db, file)).as_union()
+            && let Some(ty) = expr.inferred_type(model)
+            && let Some(union) = ty.as_union()
             && is_float_or_complex_annotation(db, union, name_str)
         {
             return union
@@ -196,21 +194,8 @@ pub fn definitions_for_name<'db>(
 
 fn is_float_or_complex_annotation(db: &dyn Db, ty: UnionType, name: &str) -> bool {
     let float_or_complex_ty = match name {
-        "float" => UnionType::from_elements(
-            db,
-            [
-                KnownClass::Int.to_instance(db),
-                KnownClass::Float.to_instance(db),
-            ],
-        ),
-        "complex" => UnionType::from_elements(
-            db,
-            [
-                KnownClass::Int.to_instance(db),
-                KnownClass::Float.to_instance(db),
-                KnownClass::Complex.to_instance(db),
-            ],
-        ),
+        "float" => KnownUnion::Float.to_type(db),
+        "complex" => KnownUnion::Complex.to_type(db),
         _ => return false,
     }
     .expect_union();
@@ -238,7 +223,10 @@ pub fn definitions_for_attribute<'db>(
     let mut resolved = Vec::new();
 
     // Determine the type of the LHS
-    let lhs_ty = attribute.value.inferred_type(model);
+    let Some(lhs_ty) = attribute.value.inferred_type(model) else {
+        return resolved;
+    };
+
     let tys = match lhs_ty {
         Type::Union(union) => union.elements(model.db()).to_vec(),
         _ => vec![lhs_ty],
@@ -298,7 +286,7 @@ pub fn definitions_for_attribute<'db>(
                 let use_def = use_def_map(db, class_scope);
 
                 // Check declarations first
-                for decl in use_def.all_reachable_symbol_declarations(place_id) {
+                for decl in use_def.reachable_symbol_declarations(place_id) {
                     if let Some(def) = decl.declaration.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -311,7 +299,7 @@ pub fn definitions_for_attribute<'db>(
                 }
 
                 // If no declarations found, check bindings
-                for binding in use_def.all_reachable_symbol_bindings(place_id) {
+                for binding in use_def.reachable_symbol_bindings(place_id) {
                     if let Some(def) = binding.binding.definition() {
                         resolved.extend(resolve_definition(
                             db,
@@ -336,7 +324,7 @@ pub fn definitions_for_attribute<'db>(
                     let use_def = index.use_def_map(function_scope_id);
 
                     // Check declarations first
-                    for decl in use_def.all_reachable_member_declarations(place_id) {
+                    for decl in use_def.reachable_member_declarations(place_id) {
                         if let Some(def) = decl.declaration.definition() {
                             resolved.extend(resolve_definition(
                                 db,
@@ -349,7 +337,7 @@ pub fn definitions_for_attribute<'db>(
                     }
 
                     // If no declarations found, check bindings
-                    for binding in use_def.all_reachable_member_bindings(place_id) {
+                    for binding in use_def.reachable_member_bindings(place_id) {
                         if let Some(def) = binding.binding.definition() {
                             resolved.extend(resolve_definition(
                                 db,
@@ -378,7 +366,9 @@ pub fn definitions_for_keyword_argument<'db>(
     call_expr: &ast::ExprCall,
 ) -> Vec<ResolvedDefinition<'db>> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     let Some(keyword_name) = keyword.arg.as_ref() else {
         return Vec::new();
@@ -463,6 +453,12 @@ pub struct CallSignatureDetails<'db> {
     /// This provides easy access to parameter names for documentation lookup.
     pub parameter_names: Vec<String>,
 
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_kinds: Vec<ParameterKind<'db>>,
+
+    /// Parameter kinds, useful to determine correct autocomplete suggestions.
+    pub parameter_types: Vec<Option<Type<'db>>>,
+
     /// The definition where this callable was originally defined (useful for
     /// extracting docstrings).
     pub definition: Option<Definition<'db>>,
@@ -496,7 +492,9 @@ pub fn call_signature_details<'db>(
     model: &SemanticModel<'db>,
     call_expr: &ast::ExprCall,
 ) -> Vec<CallSignatureDetails<'db>> {
-    let func_type = call_expr.func.inferred_type(model);
+    let Some(func_type) = call_expr.func.inferred_type(model) else {
+        return Vec::new();
+    };
 
     // Use into_callable to handle all the complex type conversions
     if let Some(callable_type) = func_type
@@ -505,7 +503,9 @@ pub fn call_signature_details<'db>(
     {
         let call_arguments =
             CallArguments::from_arguments(&call_expr.arguments, |_, splatted_value| {
-                splatted_value.inferred_type(model)
+                splatted_value
+                    .inferred_type(model)
+                    .unwrap_or(Type::unknown())
             });
         let bindings = callable_type
             .bindings(model.db())
@@ -521,6 +521,12 @@ pub fn call_signature_details<'db>(
                 let display_details = signature.display(model.db()).to_string_parts();
                 let parameter_label_offsets = display_details.parameter_ranges;
                 let parameter_names = display_details.parameter_names;
+                let (parameter_kinds, parameter_types): (Vec<ParameterKind>, Vec<Option<Type>>) =
+                    signature
+                        .parameters()
+                        .iter()
+                        .map(|param| (param.kind().clone(), param.annotated_type()))
+                        .unzip();
 
                 CallSignatureDetails {
                     definition: signature.definition(),
@@ -528,6 +534,8 @@ pub fn call_signature_details<'db>(
                     label: display_details.label,
                     parameter_label_offsets,
                     parameter_names,
+                    parameter_kinds,
+                    parameter_types,
                     argument_to_parameter_mapping,
                 }
             })
@@ -554,7 +562,7 @@ pub fn call_type_simplified_by_overloads(
     call_expr: &ast::ExprCall,
 ) -> Option<String> {
     let db = model.db();
-    let func_type = call_expr.func.inferred_type(model);
+    let func_type = call_expr.func.inferred_type(model)?;
 
     // Use into_callable to handle all the complex type conversions
     let callable_type = func_type.try_upcast_to_callable(db)?.into_type(db);
@@ -569,7 +577,9 @@ pub fn call_type_simplified_by_overloads(
 
     // Hand the overload resolution system as much type info as we have
     let args = CallArguments::from_arguments_typed(&call_expr.arguments, |_, splatted_value| {
-        splatted_value.inferred_type(model)
+        splatted_value
+            .inferred_type(model)
+            .unwrap_or(Type::unknown())
     });
 
     // Try to resolve overloads with the arguments/types we have
@@ -602,8 +612,8 @@ pub fn definitions_for_bin_op<'db>(
     model: &SemanticModel<'db>,
     binary_op: &ast::ExprBinOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let left_ty = binary_op.left.inferred_type(model);
-    let right_ty = binary_op.right.inferred_type(model);
+    let left_ty = binary_op.left.inferred_type(model)?;
+    let right_ty = binary_op.right.inferred_type(model)?;
 
     let Ok(bindings) = Type::try_call_bin_op(model.db(), left_ty, binary_op.op, right_ty) else {
         return None;
@@ -629,7 +639,7 @@ pub fn definitions_for_unary_op<'db>(
     model: &SemanticModel<'db>,
     unary_op: &ast::ExprUnaryOp,
 ) -> Option<(Vec<ResolvedDefinition<'db>>, Type<'db>)> {
-    let operand_ty = unary_op.operand.inferred_type(model);
+    let operand_ty = unary_op.operand.inferred_type(model)?;
 
     let unary_dunder_method = match unary_op.op {
         ast::UnaryOp::Invert => "__invert__",
@@ -833,14 +843,15 @@ mod resolve_definition {
     use ruff_db::system::SystemPath;
     use ruff_db::vendored::VendoredPathBuf;
     use ruff_python_ast as ast;
+    use ruff_python_stdlib::sys::is_builtin_module;
     use rustc_hash::FxHashSet;
     use tracing::trace;
+    use ty_module_resolver::{ModuleName, file_to_module, resolve_module, resolve_real_module};
 
-    use crate::module_resolver::file_to_module;
+    use crate::Db;
     use crate::semantic_index::definition::{Definition, DefinitionKind, module_docstring};
     use crate::semantic_index::scope::{NodeWithScopeKind, ScopeId};
     use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
-    use crate::{Db, ModuleName, resolve_module, resolve_real_module};
 
     /// Represents the result of resolving an import to either a specific definition or
     /// a specific range within a file.
@@ -932,13 +943,19 @@ mod resolve_definition {
                 let module = parsed_module(db, file).load(db);
                 let alias = import_def.alias(&module);
 
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
+
                 // Get the full module name being imported
                 let Some(module_name) = ModuleName::new(&alias.name) else {
                     return Vec::new(); // Invalid module name, return empty list
                 };
 
                 // Resolve the module to its file
-                let Some(resolved_module) = resolve_module(db, &module_name) else {
+                let Some(resolved_module) = resolve_module(db, file, &module_name) else {
                     return Vec::new(); // Module not found, return empty list
                 };
 
@@ -955,7 +972,13 @@ mod resolve_definition {
                 let file = definition.file(db);
                 let module = parsed_module(db, file).load(db);
                 let import_node = import_from_def.import(&module);
-                let name = &import_from_def.alias(&module).name;
+                let alias = import_from_def.alias(&module);
+
+                if alias.asname.is_some()
+                    && alias_resolution == ImportAliasResolution::PreserveAliases
+                {
+                    return vec![ResolvedDefinition::Definition(definition)];
+                }
 
                 // For `ImportFrom`, we need to resolve the original imported symbol name
                 // (alias.name), not the local alias (symbol_name)
@@ -963,7 +986,7 @@ mod resolve_definition {
                     db,
                     file,
                     import_node,
-                    name,
+                    &alias.name,
                     visited,
                     alias_resolution,
                 )
@@ -1018,21 +1041,26 @@ mod resolve_definition {
             }
         }
 
-        // Resolve the target module file
-        let module_file = {
-            // Resolve the module being imported from (handles both relative and absolute imports)
-            let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
-            else {
-                return Vec::new();
-            };
-            let Some(resolved_module) = resolve_module(db, &module_name) else {
-                return Vec::new();
-            };
-            resolved_module.file(db)
+        // Resolve the module being imported from (handles both relative and absolute imports)
+        let Some(module_name) = ModuleName::from_import_statement(db, file, import_node).ok()
+        else {
+            return Vec::new();
+        };
+        let Some(resolved_module) = resolve_module(db, file, &module_name) else {
+            return Vec::new();
         };
 
+        // Resolve the target module file
+        let module_file = resolved_module.file(db);
+
         let Some(module_file) = module_file else {
-            return Vec::new(); // Module resolution failed
+            // No file means this is a namespace package, try to import the submodule
+            return Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ));
         };
 
         // Find the definition of this symbol in the imported module's global scope
@@ -1041,22 +1069,38 @@ mod resolve_definition {
 
         // Recursively resolve any import definitions found in the target module
         if definitions_in_module.is_empty() {
-            // If we can't find the specific symbol, return empty list
-            Vec::new()
-        } else {
-            let mut resolved_definitions = Vec::new();
-            for def in definitions_in_module {
-                let resolved = resolve_definition_recursive(
-                    db,
-                    def,
-                    visited,
-                    Some(symbol_name),
-                    alias_resolution,
-                );
-                resolved_definitions.extend(resolved);
-            }
-            resolved_definitions
+            // This might be importing a submodule, try that
+            return Vec::from_iter(resolve_from_import_submodule_definitions(
+                db,
+                file,
+                symbol_name,
+                module_name,
+            ));
         }
+
+        let mut resolved_definitions = Vec::new();
+        for def in definitions_in_module {
+            let resolved =
+                resolve_definition_recursive(db, def, visited, Some(symbol_name), alias_resolution);
+            resolved_definitions.extend(resolved);
+        }
+        resolved_definitions
+    }
+
+    // Helper to resolve `from x.y import z` assuming `x.y.z` is a module.
+    fn resolve_from_import_submodule_definitions<'db>(
+        db: &'db dyn Db,
+        file: File,
+        symbol_name: &str,
+        module_name: ModuleName,
+    ) -> Option<ResolvedDefinition<'db>> {
+        let submodule_name = ModuleName::new(symbol_name)?;
+        let mut full_submodule_name = module_name;
+        full_submodule_name.extend(&submodule_name);
+        let module = resolve_module(db, file, &full_submodule_name)?;
+        let file = module.file(db)?;
+
+        Some(ResolvedDefinition::Module(file))
     }
 
     /// Find definitions for a symbol name in a specific scope.
@@ -1074,8 +1118,8 @@ mod resolve_definition {
         let mut definitions = IndexSet::new();
 
         // Get all definitions (both bindings and declarations) for this place
-        let bindings = use_def_map.all_reachable_symbol_bindings(symbol_id);
-        let declarations = use_def_map.all_reachable_symbol_declarations(symbol_id);
+        let bindings = use_def_map.reachable_symbol_bindings(symbol_id);
+        let declarations = use_def_map.reachable_symbol_declarations(symbol_id);
 
         for binding in bindings {
             if let Some(def) = binding.binding.definition() {
@@ -1134,7 +1178,20 @@ mod resolve_definition {
         // It's definitely a stub, so now rerun module resolution but with stubs disabled.
         let stub_module = file_to_module(db, stub_file_for_module_lookup)?;
         trace!("Found stub module: {}", stub_module.name(db));
-        let real_module = resolve_real_module(db, stub_module.name(db))?;
+        // We need to pass an importing file to `resolve_real_module` which is a bit odd
+        // here because there isn't really an importing file. However this `resolve_real_module`
+        // can be understood as essentially `import .`, which is also what `file_to_module` is,
+        // so this is in fact exactly the file we want to consider the importer.
+        //
+        // ... unless we have a builtin module. i.e., A module embedded
+        // into the interpreter. In which case, all we have are stubs.
+        // `resolve_real_module` will always return `None` for this case, but
+        // it will emit false positive logs. And this saves us some work.
+        if is_builtin_module(db.python_version().minor, stub_module.name(db)) {
+            return None;
+        }
+        let real_module =
+            resolve_real_module(db, stub_file_for_module_lookup, stub_module.name(db))?;
         trace!("Found real module: {}", real_module.name(db));
         let real_file = real_module.file(db)?;
         trace!("Found real file: {}", real_file.path(db));

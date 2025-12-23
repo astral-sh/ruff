@@ -1,0 +1,80 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: custom.md - Custom binary operations - Classes
+mdtest path: crates/ty_python_semantic/resources/mdtest/binary/custom.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Literal
+ 2 | 
+ 3 | class Yes:
+ 4 |     def __add__(self, other) -> Literal["+"]:
+ 5 |         return "+"
+ 6 | 
+ 7 | class Sub(Yes): ...
+ 8 | class No: ...
+ 9 | 
+10 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Yes'>`"
+11 | reveal_type(Yes + Yes)  # revealed: Unknown
+12 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
+13 | reveal_type(Sub + Sub)  # revealed: Unknown
+14 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
+15 | reveal_type(No + No)  # revealed: Unknown
+```
+
+# Diagnostics
+
+```
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:11:13
+   |
+10 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Yes'>`"
+11 | reveal_type(Yes + Yes)  # revealed: Unknown
+   |             ---^^^---
+   |             |
+   |             Both operands have type `<class 'Yes'>`
+12 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
+13 | reveal_type(Sub + Sub)  # revealed: Unknown
+   |
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:13:13
+   |
+11 | reveal_type(Yes + Yes)  # revealed: Unknown
+12 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'Sub'>`"
+13 | reveal_type(Sub + Sub)  # revealed: Unknown
+   |             ---^^^---
+   |             |
+   |             Both operands have type `<class 'Sub'>`
+14 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
+15 | reveal_type(No + No)  # revealed: Unknown
+   |
+info: rule `unsupported-operator` is enabled by default
+
+```
+
+```
+error[unsupported-operator]: Unsupported `+` operation
+  --> src/mdtest_snippet.py:15:13
+   |
+13 | reveal_type(Sub + Sub)  # revealed: Unknown
+14 | # error: [unsupported-operator] "Operator `+` is not supported between two objects of type `<class 'No'>`"
+15 | reveal_type(No + No)  # revealed: Unknown
+   |             --^^^--
+   |             |
+   |             Both operands have type `<class 'No'>`
+   |
+info: rule `unsupported-operator` is enabled by default
+
+```

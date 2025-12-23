@@ -271,8 +271,7 @@ reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(itera
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
 
-# TODO: should be `Person` once we support implicit type of `self`
-reveal_type(Person._make(("Alice", 42)))  # revealed: Unknown
+reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
 person = Person("Alice", 42)
 
@@ -609,4 +608,25 @@ class Base(NamedTuple):
 class Child(Base):
     # This is fine - Child is not directly a NamedTuple
     _asdict = 42
+```
+
+## Edge case: multiple reachable definitions with distinct issues
+
+<!-- snapshot-diagnostics -->
+
+```py
+from typing import NamedTuple
+
+def coinflip() -> bool:
+    return True
+
+class Foo(NamedTuple):
+    if coinflip():
+        _asdict: bool  # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+    else:
+        # TODO: there should only be one diagnostic here...
+        #
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+        _asdict = True
 ```

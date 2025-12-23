@@ -5,7 +5,7 @@ resolver = "2"
 [workspace.package]
 # Please update rustfmt.toml when bumping the Rust edition
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 homepage = "https://docs.astral.sh/ruff"
 documentation = "https://docs.astral.sh/ruff"
 repository = "https://github.com/astral-sh/ruff"
@@ -45,6 +45,7 @@ ty = { path = "crates/ty" }
 ty_combine = { path = "crates/ty_combine" }
 ty_completion_eval = { path = "crates/ty_completion_eval" }
 ty_ide = { path = "crates/ty_ide" }
+ty_module_resolver = { path = "crates/ty_module_resolver" }
 ty_project = { path = "crates/ty_project", default-features = false }
 ty_python_semantic = { path = "crates/ty_python_semantic" }
 ty_server = { path = "crates/ty_server" }
@@ -81,14 +82,14 @@ compact_str = "0.9.0"
 criterion = { version = "0.7.0", default-features = false }
 crossbeam = { version = "0.8.4" }
 dashmap = { version = "6.0.1" }
-dir-test = { version = "0.4.0" }
+datatest-stable = { version = "0.3.3" }
 dunce = { version = "1.0.5" }
 drop_bomb = { version = "0.1.5" }
 etcetera = { version = "0.11.0" }
 fern = { version = "0.7.0" }
 filetime = { version = "0.2.23" }
 getrandom = { version = "0.3.1" }
-get-size2 = { version = "0.7.0", features = [
+get-size2 = { version = "0.7.3", features = [
     "derive",
     "smallvec",
     "hashbrown",
@@ -129,7 +130,7 @@ memchr = { version = "2.7.1" }
 mimalloc = { version = "0.1.39" }
 natord = { version = "1.0.9" }
 notify = { version = "8.0.0" }
-ordermap = { version = "0.5.0" }
+ordermap = { version = "1.0.0" }
 path-absolutize = { version = "3.1.1" }
 path-slash = { version = "0.2.1" }
 pathdiff = { version = "0.2.1" }
@@ -146,7 +147,7 @@ regex-automata = { version = "0.4.9" }
 rustc-hash = { version = "2.0.0" }
 rustc-stable-hash = { version = "0.1.2" }
 # When updating salsa, make sure to also update the revision in `fuzz/Cargo.toml`
-salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0", default-features = false, features = [
+salsa = { git = "https://github.com/salsa-rs/salsa.git", rev = "ce80691fa0b87dc2fd2235a26544e63e5e43d8d3", default-features = false, features = [
     "compact_str",
     "macros",
     "salsa_unstable",
@@ -271,6 +272,12 @@ large_stack_arrays = "allow"
 [profile.release]
 lto = "fat"
 codegen-units = 16
+
+# Profile to build a minimally sized binary for ruff/ty
+[profile.minimal-size]
+inherits = "release"
+opt-level = "z"
+codegen-units = 1
 
 # Some crates don't change as much but benefit more from
 # more expensive optimization passes, so we selectively

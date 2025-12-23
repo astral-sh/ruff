@@ -255,6 +255,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "bit-set"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "08807e080ed7f9d5433fa9b275196cfc35414f66a0c79d864dc51a0d825231a3"
+dependencies = [
+ "bit-vec",
+]
+
+[[package]]
+name = "bit-vec"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5e764a1d40d510daf35e07be9eb06e75770908c27d411ee6c92109c9840eaaf7"
+
+[[package]]
 name = "bitflags"
 version = "1.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -945,6 +960,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "datatest-stable"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a867d7322eb69cf3a68a5426387a25b45cb3b9c5ee41023ee6cea92e2afadd82"
+dependencies = [
+ "camino",
+ "fancy-regex",
+ "libtest-mimic 0.8.1",
+ "walkdir",
+]
+
+[[package]]
 name = "derive-where"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -978,27 +1005,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "dir-test"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "62c013fe825864f3e4593f36426c1fa7a74f5603f13ca8d1af7a990c1cd94a79"
-dependencies = [
- "dir-test-macros",
-]
-
-[[package]]
-name = "dir-test-macros"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d42f54d7b4a6bc2400fe5b338e35d1a335787585375322f49c5d5fe7b243da7e"
-dependencies = [
- "glob",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
 name = "dirs"
 version = "6.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1016,7 +1022,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1108,7 +1114,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1136,6 +1142,17 @@ checksum = "de48cc4d1c1d97a20fd819def54b890cadde72ed3ad0c614822a0a433361be96"
 dependencies = [
  "cfg-if",
  "windows-sys 0.61.0",
+]
+
+[[package]]
+name = "fancy-regex"
+version = "0.14.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6e24cb5a94bcae1e5408b0effca5cd7172ea3c5755049c5f3af4cd283a165298"
+dependencies = [
+ "bit-set",
+ "regex-automata",
+ "regex-syntax",
 ]
 
 [[package]]
@@ -1238,9 +1255,9 @@ dependencies = [
 
 [[package]]
 name = "get-size-derive2"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ff47daa61505c85af126e9dd64af6a342a33dc0cccfe1be74ceadc7d352e6efd"
+checksum = "ab21d7bd2c625f2064f04ce54bcb88bc57c45724cde45cba326d784e22d3f71a"
 dependencies = [
  "attribute-derive",
  "quote",
@@ -1249,14 +1266,15 @@ dependencies = [
 
 [[package]]
 name = "get-size2"
-version = "0.7.2"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac7bb8710e1f09672102be7ddf39f764d8440ae74a9f4e30aaa4820dcdffa4af"
+checksum = "879272b0de109e2b67b39fcfe3d25fdbba96ac07e44a254f5a0b4d7ff55340cb"
 dependencies = [
  "compact_str",
  "get-size-derive2",
  "hashbrown 0.16.1",
  "indexmap",
+ "ordermap",
  "smallvec",
 ]
 
@@ -1624,7 +1642,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "46fdb647ebde000f43b5b53f773c30cf9b0cb4300453208713fa38b2c70935a0"
 dependencies = [
  "console 0.15.11",
- "globset",
  "once_cell",
  "pest",
  "pest_derive",
@@ -1632,7 +1649,6 @@ dependencies = [
  "ron",
  "serde",
  "similar",
- "walkdir",
 ]
 
 [[package]]
@@ -1763,7 +1779,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -1916,6 +1932,18 @@ dependencies = [
  "escape8259",
  "termcolor",
  "threadpool",
+]
+
+[[package]]
+name = "libtest-mimic"
+version = "0.8.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5297962ef19edda4ce33aaa484386e0a5b3d7f2f4e037cbeee00503ef6b29d33"
+dependencies = [
+ "anstream",
+ "anstyle",
+ "clap",
+ "escape8259",
 ]
 
 [[package]]
@@ -2233,9 +2261,9 @@ checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
 
 [[package]]
 name = "ordermap"
-version = "0.5.12"
+version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b100f7dd605611822d30e182214d3c02fdefce2d801d23993f6b6ba6ca1392af"
+checksum = "ed637741ced8fb240855d22a2b4f208dab7a06bcce73380162e5253000c16758"
 dependencies = [
  "indexmap",
  "serde",
@@ -2859,7 +2887,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.14.7"
+version = "0.14.10"
 dependencies = [
  "anyhow",
  "argfile",
@@ -3101,6 +3129,7 @@ dependencies = [
  "salsa",
  "schemars",
  "serde",
+ "ty_module_resolver",
  "ty_python_semantic",
  "zip",
 ]
@@ -3117,13 +3146,14 @@ dependencies = [
 
 [[package]]
 name = "ruff_linter"
-version = "0.14.7"
+version = "0.14.10"
 dependencies = [
  "aho-corasick",
  "anyhow",
  "bitflags 2.10.0",
  "clap",
  "colored 3.0.0",
+ "compact_str",
  "fern",
  "glob",
  "globset",
@@ -3276,6 +3306,7 @@ dependencies = [
  "anyhow",
  "clap",
  "countme",
+ "datatest-stable",
  "insta",
  "itertools 0.14.0",
  "memchr",
@@ -3345,8 +3376,10 @@ dependencies = [
  "bitflags 2.10.0",
  "bstr",
  "compact_str",
+ "datatest-stable",
  "get-size2",
  "insta",
+ "itertools 0.14.0",
  "memchr",
  "ruff_annotate_snippets",
  "ruff_python_ast",
@@ -3472,7 +3505,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_wasm"
-version = "0.14.7"
+version = "0.14.10"
 dependencies = [
  "console_error_panic_hook",
  "console_log",
@@ -3570,7 +3603,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -3587,8 +3620,8 @@ checksum = "28d3b2b1366ec20994f1fd18c3c594f05c5dd4bc44d8bb0c1c632c8d6829481f"
 
 [[package]]
 name = "salsa"
-version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+version = "0.25.2"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ce80691fa0b87dc2fd2235a26544e63e5e43d8d3#ce80691fa0b87dc2fd2235a26544e63e5e43d8d3"
 dependencies = [
  "boxcar",
  "compact_str",
@@ -3599,6 +3632,7 @@ dependencies = [
  "indexmap",
  "intrusive-collections",
  "inventory",
+ "ordermap",
  "parking_lot",
  "portable-atomic",
  "rustc-hash",
@@ -3611,13 +3645,13 @@ dependencies = [
 
 [[package]]
 name = "salsa-macro-rules"
-version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+version = "0.25.2"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ce80691fa0b87dc2fd2235a26544e63e5e43d8d3#ce80691fa0b87dc2fd2235a26544e63e5e43d8d3"
 
 [[package]]
 name = "salsa-macros"
-version = "0.24.0"
-source = "git+https://github.com/salsa-rs/salsa.git?rev=59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0#59aa1075e837f5deb0d6ffb24b68fedc0f4bc5e0"
+version = "0.25.2"
+source = "git+https://github.com/salsa-rs/salsa.git?rev=ce80691fa0b87dc2fd2235a26544e63e5e43d8d3#ce80691fa0b87dc2fd2235a26544e63e5e43d8d3"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3971,7 +4005,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix",
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]
@@ -4307,7 +4341,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5fe242ee9e646acec9ab73a5c540e8543ed1b107f0ce42be831e0775d423c396"
 dependencies = [
  "ignore",
- "libtest-mimic",
+ "libtest-mimic 0.7.3",
  "snapbox",
 ]
 
@@ -4336,11 +4370,13 @@ dependencies = [
  "ruff_python_trivia",
  "salsa",
  "tempfile",
+ "tikv-jemallocator",
  "toml",
  "tracing",
  "tracing-flame",
  "tracing-subscriber",
  "ty_combine",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
  "ty_server",
@@ -4373,8 +4409,8 @@ dependencies = [
  "tempfile",
  "toml",
  "ty_ide",
+ "ty_module_resolver",
  "ty_project",
- "ty_python_semantic",
  "walkdir",
 ]
 
@@ -4404,8 +4440,32 @@ dependencies = [
  "salsa",
  "smallvec",
  "tracing",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
+ "ty_vendored",
+]
+
+[[package]]
+name = "ty_module_resolver"
+version = "0.0.0"
+dependencies = [
+ "anyhow",
+ "camino",
+ "compact_str",
+ "get-size2",
+ "insta",
+ "ruff_db",
+ "ruff_memory_usage",
+ "ruff_python_ast",
+ "ruff_python_stdlib",
+ "rustc-hash",
+ "salsa",
+ "strum",
+ "strum_macros",
+ "tempfile",
+ "thiserror 2.0.17",
+ "tracing",
  "ty_vendored",
 ]
 
@@ -4443,6 +4503,7 @@ dependencies = [
  "toml",
  "tracing",
  "ty_combine",
+ "ty_module_resolver",
  "ty_python_semantic",
  "ty_static",
  "ty_vendored",
@@ -4458,7 +4519,7 @@ dependencies = [
  "camino",
  "colored 3.0.0",
  "compact_str",
- "dir-test",
+ "datatest-stable",
  "drop_bomb",
  "get-size2",
  "glob",
@@ -4495,11 +4556,10 @@ dependencies = [
  "strsim",
  "strum",
  "strum_macros",
- "tempfile",
  "test-case",
  "thiserror 2.0.17",
  "tracing",
- "ty_python_semantic",
+ "ty_module_resolver",
  "ty_static",
  "ty_test",
  "ty_vendored",
@@ -4538,6 +4598,7 @@ dependencies = [
  "tracing-subscriber",
  "ty_combine",
  "ty_ide",
+ "ty_module_resolver",
  "ty_project",
  "ty_python_semantic",
 ]
@@ -4556,6 +4617,7 @@ dependencies = [
  "anyhow",
  "camino",
  "colored 3.0.0",
+ "dunce",
  "insta",
  "memchr",
  "path-slash",
@@ -4577,6 +4639,7 @@ dependencies = [
  "thiserror 2.0.17",
  "toml",
  "tracing",
+ "ty_module_resolver",
  "ty_python_semantic",
  "ty_static",
  "ty_vendored",
@@ -5024,7 +5087,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.61.0",
 ]
 
 [[package]]

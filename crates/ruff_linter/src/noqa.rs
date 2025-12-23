@@ -20,12 +20,14 @@ use crate::Locator;
 use crate::fs::relativize_path;
 use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
+use crate::suppression::Suppressions;
 
 /// Generates an array of edits that matches the length of `messages`.
 /// Each potential edit in the array is paired, in order, with the associated diagnostic.
 /// Each edit will add a `noqa` comment to the appropriate line in the source to hide
 /// the diagnostic. These edits may conflict with each other and should not be applied
 /// simultaneously.
+#[expect(clippy::too_many_arguments)]
 pub fn generate_noqa_edits(
     path: &Path,
     diagnostics: &[Diagnostic],
@@ -34,11 +36,19 @@ pub fn generate_noqa_edits(
     external: &[String],
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
+    suppressions: &Suppressions,
 ) -> Vec<Option<Edit>> {
     let file_directives = FileNoqaDirectives::extract(locator, comment_ranges, external, path);
     let exemption = FileExemption::from(&file_directives);
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(
+        diagnostics,
+        locator,
+        &exemption,
+        &directives,
+        noqa_line_for,
+        suppressions,
+    );
     build_noqa_edits_by_diagnostic(comments, locator, line_ending, None)
 }
 
@@ -725,6 +735,7 @@ pub(crate) fn add_noqa(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     reason: Option<&str>,
+    suppressions: &Suppressions,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         path,
@@ -735,6 +746,7 @@ pub(crate) fn add_noqa(
         noqa_line_for,
         line_ending,
         reason,
+        suppressions,
     );
 
     fs::write(path, output)?;
@@ -751,6 +763,7 @@ fn add_noqa_inner(
     noqa_line_for: &NoqaMapping,
     line_ending: LineEnding,
     reason: Option<&str>,
+    suppressions: &Suppressions,
 ) -> (usize, String) {
     let mut count = 0;
 
@@ -760,7 +773,14 @@ fn add_noqa_inner(
 
     let directives = NoqaDirectives::from_commented_ranges(comment_ranges, external, path, locator);
 
-    let comments = find_noqa_comments(diagnostics, locator, &exemption, &directives, noqa_line_for);
+    let comments = find_noqa_comments(
+        diagnostics,
+        locator,
+        &exemption,
+        &directives,
+        noqa_line_for,
+        suppressions,
+    );
 
     let edits = build_noqa_edits_by_line(comments, locator, line_ending, reason);
 
@@ -859,6 +879,7 @@ fn find_noqa_comments<'a>(
     exemption: &'a FileExemption,
     directives: &'a NoqaDirectives,
     noqa_line_for: &NoqaMapping,
+    suppressions: &'a Suppressions,
 ) -> Vec<Option<NoqaComment<'a>>> {
     // List of noqa comments, ordered to match up with `messages`
     let mut comments_by_line: Vec<Option<NoqaComment<'a>>> = vec![];
@@ -871,6 +892,12 @@ fn find_noqa_comments<'a>(
         };
 
         if exemption.contains_secondary_code(code) {
+            comments_by_line.push(None);
+            continue;
+        }
+
+        // Apply ranged suppressions next
+        if suppressions.check_diagnostic(message) {
             comments_by_line.push(None);
             continue;
         }
@@ -1253,6 +1280,7 @@ mod tests {
     use crate::rules::pycodestyle::rules::{AmbiguousVariableName, UselessSemicolon};
     use crate::rules::pyflakes::rules::UnusedVariable;
     use crate::rules::pyupgrade::rules::PrintfStringFormatting;
+    use crate::suppression::Suppressions;
     use crate::{Edit, Violation};
     use crate::{Locator, generate_noqa_edits};
 
@@ -2848,6 +2876,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}"));
@@ -2872,6 +2901,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -2903,6 +2933,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -2934,6 +2965,7 @@ mod tests {
             &noqa_line_for,
             LineEnding::Lf,
             None,
+            &Suppressions::default(),
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa");
@@ -2956,6 +2988,7 @@ print(
         let messages = [PrintfStringFormatting
             .into_diagnostic(TextRange::new(12.into(), 79.into()), &source_file)];
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2964,6 +2997,7 @@ print(
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,
@@ -2987,6 +3021,7 @@ bar =
             [UselessSemicolon.into_diagnostic(TextRange::new(4.into(), 5.into()), &source_file)];
         let noqa_line_for = NoqaMapping::default();
         let comment_ranges = CommentRanges::default();
+        let suppressions = Suppressions::default();
         let edits = generate_noqa_edits(
             path,
             &messages,
@@ -2995,6 +3030,7 @@ bar =
             &[],
             &noqa_line_for,
             LineEnding::Lf,
+            &suppressions,
         );
         assert_eq!(
             edits,

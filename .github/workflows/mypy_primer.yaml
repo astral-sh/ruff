@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
@@ -47,6 +52,7 @@ jobs:
 
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
+          shared-key: "mypy-primer"
           workspaces: "ruff"
 
       - name: Install Rust toolchain
@@ -86,6 +92,7 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
+          shared-key: "mypy-primer"
 
       - name: Install Rust toolchain
         run: rustup show
@@ -105,3 +112,54 @@ jobs:
         with:
           name: mypy_primer_memory_diff
           path: mypy_primer_memory.diff
+
+  # Runs mypy twice against the same ty version to catch any non-deterministic behavior (ideally).
+  # The job is disabled for now because there are some non-deterministic diagnostics.
+  mypy_primer_same_revision:
+    name: Run mypy_primer on same revision
+    runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
+    timeout-minutes: 20
+    # TODO: Enable once we fixed the non-deterministic diagnostics
+    if: false
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          path: ruff
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install the latest version of uv
+        uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          workspaces: "ruff"
+          shared-key: "mypy-primer"
+
+      - name: Install Rust toolchain
+        run: rustup show
+
+      - name: Run determinism check
+        env:
+          BASE_REVISION: ${{ github.event.pull_request.head.sha }}
+          PRIMER_SELECTOR: crates/ty_python_semantic/resources/primer/good.txt
+          CLICOLOR_FORCE: "1"
+          DIFF_FILE: mypy_primer_determinism.diff
+        run: |
+          cd ruff
+          scripts/mypy_primer.sh
+
+      - name: Check for non-determinism
+        run: |
+          # Remove ANSI color codes for checking
+          sed -e 's/\x1b\[[0-9;]*m//g' mypy_primer_determinism.diff > mypy_primer_determinism_clean.diff
+
+          # Check if there are any differences (non-determinism)
+          if [ -s mypy_primer_determinism_clean.diff ]; then
+            echo "ERROR: Non-deterministic output detected!"
+            echo "The following differences were found when running ty twice on the same commit:"
+            cat mypy_primer_determinism_clean.diff
+            exit 1
+          else
+            echo "✓ Output is deterministic"
+          fi

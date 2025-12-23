@@ -447,6 +447,9 @@ class Condition:
     ) -> None: ...
     def acquire(self, blocking: bool = True, timeout: float = -1) -> bool: ...
     def release(self) -> None: ...
+    if sys.version_info >= (3, 14):
+        def locked(self) -> bool: ...
+
     def wait(self, timeout: float | None = None) -> bool:
         """Wait until notified or until a timeout occurs.
 
@@ -643,7 +646,8 @@ class Event:
         (or fractions thereof).
 
         This method returns the internal flag on exit, so it will always return
-        True except if a timeout is given and the operation times out.
+        ``True`` except if a timeout is given and the operation times out, when
+        it will return ``False``.
 
         """
 

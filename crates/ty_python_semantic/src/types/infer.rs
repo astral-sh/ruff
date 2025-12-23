@@ -57,6 +57,7 @@ use crate::types::{
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
+pub(super) use builder::UnsupportedComparisonError;
 
 mod builder;
 #[cfg(test)]
@@ -353,7 +354,7 @@ pub(super) struct ExpressionWithContext<'db> {
 ///
 /// Knowing the outer type context when inferring an expression can enable
 /// more precise inference results, aka "bidirectional type inference".
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub(crate) struct TypeContext<'db> {
     pub(crate) annotation: Option<Type<'db>>,
 }

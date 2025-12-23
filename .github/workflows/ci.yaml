@@ -24,6 +24,8 @@ env:
   PACKAGE_NAME: ruff
   PYTHON_VERSION: "3.14"
   NEXTEST_PROFILE: ci
+  # Enable mdtests that require external dependencies
+  MDTEST_EXTERNAL: "1"
 
 jobs:
   determine_changes:
@@ -296,7 +298,7 @@ jobs:
       # sync, not just public items. Eventually we should do this for all
       # crates; for now add crates here as they are warning-clean to prevent
       # regression.
-      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db --document-private-items
+      - run: cargo doc --no-deps -p ty_python_semantic -p ty -p ty_test -p ruff_db -p ruff_python_formatter --document-private-items
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
@@ -779,8 +781,6 @@ jobs:
     name: "mkdocs"
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    env:
-      MKDOCS_INSIDERS_SSH_KEY_EXISTS: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY != '' }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -788,11 +788,6 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - name: "Add SSH key"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        uses: webfactory/ssh-agent@a6f90b1f127823b31d4d4a8d96047790581349bd # v0.9.1
-        with:
-          ssh-private-key: ${{ secrets.MKDOCS_INSIDERS_SSH_KEY }}
       - name: "Install Rust toolchain"
         run: rustup show
       - name: Install uv
@@ -800,11 +795,7 @@ jobs:
         with:
           python-version: 3.13
           activate-environment: true
-      - name: "Install Insiders dependencies"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: uv pip install -r docs/requirements-insiders.txt
       - name: "Install dependencies"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
         run: uv pip install -r docs/requirements.txt
       - name: "Update README File"
         run: python scripts/transform_readme.py --target mkdocs
@@ -812,12 +803,8 @@ jobs:
         run: python scripts/generate_mkdocs.py
       - name: "Check docs formatting"
         run: python scripts/check_docs_formatted.py
-      - name: "Build Insiders docs"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS == 'true' }}
-        run: mkdocs build --strict -f mkdocs.insiders.yml
       - name: "Build docs"
-        if: ${{ env.MKDOCS_INSIDERS_SSH_KEY_EXISTS != 'true' }}
-        run: mkdocs build --strict -f mkdocs.public.yml
+        run: mkdocs build --strict -f mkdocs.yml
 
   check-formatter-instability-and-black-similarity:
     name: "formatter instabilities and black similarity"
@@ -965,7 +952,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
+        run: cargo codspeed build --features "codspeed,ruff_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench formatter --bench lexer --bench linter --bench parser
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
@@ -973,9 +960,9 @@ jobs:
           mode: simulation
           run: cargo codspeed run
 
-  benchmarks-instrumented-ty:
-    name: "benchmarks instrumented (ty)"
-    runs-on: ubuntu-24.04
+  benchmarks-instrumented-ty-build:
+    name: "benchmarks instrumented ty (build)"
+    runs-on: depot-ubuntu-24.04-4
     needs: determine_changes
     if: |
       github.repository == 'astral-sh/ruff' &&
@@ -984,9 +971,83 @@ jobs:
         needs.determine_changes.outputs.ty == 'true'
       )
     timeout-minutes: 20
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: "Install Rust toolchain"
+        run: rustup show
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
+        with:
+          tool: cargo-codspeed
+
+      - name: "Build benchmarks"
+        run: cargo codspeed build -m instrumentation --features "codspeed,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
+
+      - name: "Upload benchmark binary"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: target/codspeed/instrumentation/ruff_benchmark
+          retention-days: 1
+
+  benchmarks-instrumented-ty-run:
+    name: "benchmarks instrumented ty (${{ matrix.benchmark }})"
+    runs-on: ubuntu-24.04
+    needs: benchmarks-instrumented-ty-build
+    timeout-minutes: 20
     permissions:
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
+    strategy:
+      fail-fast: false
+      matrix:
+        benchmark:
+          - "check_file|micro|anyio"
+          - "attrs|hydra|datetype"
+    steps:
+      - name: "Checkout Branch"
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
+
+      - name: "Install codspeed"
+        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
+        with:
+          tool: cargo-codspeed
+
+      - name: "Download benchmark binary"
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.0
+        with:
+          name: benchmarks-instrumented-ty-binary
+          path: target/codspeed/instrumentation/ruff_benchmark
+
+      - name: "Restore binary permissions"
+        run: chmod +x target/codspeed/instrumentation/ruff_benchmark/ty
+
+      - name: "Run benchmarks"
+        uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
+        with:
+          mode: simulation
+          run: cargo codspeed run --bench ty "${{ matrix.benchmark }}"
+
+  benchmarks-walltime-build:
+    name: "benchmarks walltime (build)"
+    # We only run this job if `github.repository == 'astral-sh/ruff'`,
+    # so hardcoding depot here is fine
+    runs-on: depot-ubuntu-22.04-arm-4
+    needs: determine_changes
+    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
+    timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -1007,49 +1068,51 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
+        run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
 
-      - name: "Run benchmarks"
-        uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
+      - name: "Upload benchmark binary"
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          mode: simulation
-          run: cargo codspeed run
+          name: benchmarks-walltime-binary
+          path: target/codspeed/walltime/ruff_benchmark
+          retention-days: 1
 
-  benchmarks-walltime:
-    name: "benchmarks walltime (${{ matrix.benchmarks }})"
+  benchmarks-walltime-run:
+    name: "benchmarks walltime (${{ matrix.benchmark }})"
     runs-on: codspeed-macro
-    needs: determine_changes
-    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
+    needs: benchmarks-walltime-build
     timeout-minutes: 20
     permissions:
       contents: read # required for actions/checkout
       id-token: write # required for OIDC authentication with CodSpeed
     strategy:
       matrix:
-        benchmarks:
-          - "medium|multithreaded"
-          - "small|large"
+        benchmark:
+          - colour_science
+          - "pandas|tanjun|altair"
+          - "static_frame|sympy"
+          - "pydantic|multithreaded|freqtrade"
     steps:
       - name: "Checkout Branch"
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-        with:
-          save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
-
-      - name: "Install Rust toolchain"
-        run: rustup show
 
       - name: "Install codspeed"
         uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
         with:
           tool: cargo-codspeed
 
-      - name: "Build benchmarks"
-        run: cargo codspeed build --features "codspeed,walltime" --profile profiling --no-default-features -p ruff_benchmark
+      - name: "Download benchmark binary"
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: benchmarks-walltime-binary
+          path: target/codspeed/walltime/ruff_benchmark
+
+      - name: "Restore binary permissions"
+        run: chmod +x target/codspeed/walltime/ruff_benchmark/ty_walltime
 
       - name: "Run benchmarks"
         uses: CodSpeedHQ/action@346a2d8a8d9d38909abd0bc3d23f773110f076ad # v4.4.1
@@ -1060,4 +1123,4 @@ jobs:
           CODSPEED_PERF_ENABLED: false
         with:
           mode: walltime
-          run: cargo codspeed run --bench ty_walltime "${{ matrix.benchmarks }}"
+          run: cargo codspeed run --bench ty_walltime -m walltime "${{ matrix.benchmark }}"

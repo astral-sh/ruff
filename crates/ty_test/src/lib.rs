@@ -1,6 +1,7 @@
 use crate::config::Log;
 use crate::db::Db;
 use crate::parser::{BacktickOffsets, EmbeddedFileSourceMap};
+use anyhow::anyhow;
 use camino::Utf8Path;
 use colored::Colorize;
 use config::SystemKind;
@@ -16,18 +17,21 @@ use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
+use ty_module_resolver::{
+    Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
+};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPath, SearchPathSettings, SysPrefixPathOrigin, list_modules,
-    resolve_module,
+    MisconfigurationMode, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod assertion;
 mod config;
 mod db;
 mod diagnostic;
+mod external_dependencies;
 mod matcher;
 mod parser;
 
@@ -36,27 +40,23 @@ use ty_static::EnvVars;
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
-#[expect(clippy::print_stdout)]
 pub fn run(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
+    source: &str,
     snapshot_path: &Utf8Path,
     short_title: &str,
     test_name: &str,
     output_format: OutputFormat,
-) {
-    let source = std::fs::read_to_string(absolute_fixture_path).unwrap();
-    let suite = match test_parser::parse(short_title, &source) {
-        Ok(suite) => suite,
-        Err(err) => {
-            panic!("Error parsing `{absolute_fixture_path}`: {err:?}")
-        }
-    };
+) -> anyhow::Result<()> {
+    let suite = test_parser::parse(short_title, source)
+        .map_err(|err| anyhow!("Failed to parse fixture: {err}"))?;
 
     let mut db = db::Db::setup();
 
     let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
+    let mut assertion = String::new();
     for test in suite.tests() {
         if filter
             .as_ref()
@@ -70,17 +70,28 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let failures = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
-        let inconsistencies = run_module_resolution_consistency_test(&db);
-        let this_test_failed = failures.is_err() || inconsistencies.is_err();
+        let result = run_test(
+            &mut db,
+            absolute_fixture_path,
+            relative_fixture_path,
+            snapshot_path,
+            &test,
+        );
+        let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
+            Ok(())
+        } else {
+            run_module_resolution_consistency_test(&db)
+        };
+
+        let this_test_failed = result.is_err() || inconsistencies.is_err();
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
-            println!("\n{}\n", test.name().bold().underline());
+            let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
-        if let Err(failures) = failures {
-            let md_index = LineIndex::from_source_text(&source);
+        if let Err(failures) = result {
+            let md_index = LineIndex::from_source_text(source);
 
             for test_failures in failures {
                 let source_map =
@@ -92,26 +103,29 @@ pub fn run(
                         OutputFormat::GitHub => absolute_fixture_path.as_str(),
                     };
 
-                    let absolute_line_number = match source_map
-                        .to_absolute_line_number(relative_line_number)
-                    {
-                        Ok(line_number) => line_number,
-                        Err(last_line_number) => {
-                            print!("{}",
-                                output_format.display_error(
-                                    file,
-                                    last_line_number,
-                                    "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
-                                    not followed by any statement."
-                                )
-                            );
+                    let absolute_line_number =
+                        match source_map.to_absolute_line_number(relative_line_number) {
+                            Ok(line_number) => line_number,
+                            Err(last_line_number) => {
+                                let _ = writeln!(
+                                    assertion,
+                                    "{}",
+                                    output_format.display_error(
+                                        file,
+                                        last_line_number,
+                                        "Found a trailing assertion comment \
+                                        (e.g., `# revealed:` or `# error:`) \
+                                        not followed by any statement."
+                                    )
+                                );
 
-                            continue;
-                        }
-                    };
+                                continue;
+                            }
+                        };
 
                     for failure in failures {
-                        print!(
+                        let _ = writeln!(
+                            assertion,
                             "{}",
                             output_format.display_error(file, absolute_line_number, failure)
                         );
@@ -125,10 +139,13 @@ pub fn run(
                 match output_format {
                     OutputFormat::Cli => {
                         let info = relative_fixture_path.to_string().cyan();
-                        println!("  {info} {inconsistency}");
+                        let _ = writeln!(assertion, "  {info} {inconsistency}");
                     }
                     OutputFormat::GitHub => {
-                        println!("::error file={absolute_fixture_path}::{inconsistency}");
+                        let _ = writeln!(
+                            assertion,
+                            "::error file={absolute_fixture_path}::{inconsistency}"
+                        );
                     }
                 }
             }
@@ -136,20 +153,26 @@ pub fn run(
 
         if this_test_failed && output_format.is_cli() {
             let escaped_test_name = test.name().replace('\'', "\\'");
-            println!(
-                "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+            let _ = writeln!(
+                assertion,
+                "\nTo rerun this specific test, \
+                set the environment variable: {}='{escaped_test_name}'",
                 EnvVars::MDTEST_TEST_FILTER,
             );
-            println!(
-                "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+            let _ = writeln!(
+                assertion,
+                "{}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                --test mdtest -- {test_name}",
                 EnvVars::MDTEST_TEST_FILTER,
             );
+
+            let _ = writeln!(assertion, "\n{}", "-".repeat(50));
         }
     }
 
-    println!("\n{}\n", "-".repeat(50));
+    assert!(!any_failures, "{}", &assertion);
 
-    assert!(!any_failures, "Some tests failed.");
+    Ok(())
 }
 
 /// Defines the format in which mdtest should print an error to the terminal
@@ -190,14 +213,14 @@ impl OutputFormat {
 
                 match format {
                     OutputFormat::Cli => {
-                        writeln!(
+                        write!(
                             f,
                             "  {file_line} {failure}",
                             file_line = format!("{file}:{line}").cyan()
                         )
                     }
                     OutputFormat::GitHub => {
-                        writeln!(f, "::error file={file},line={line}::{failure}")
+                        write!(f, "::error file={file},line={line}::{failure}")
                     }
                 }
             }
@@ -212,12 +235,25 @@ impl OutputFormat {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TestOutcome {
+    Success,
+    Skipped,
+}
+
+impl TestOutcome {
+    const fn has_been_skipped(self) -> bool {
+        matches!(self, TestOutcome::Skipped)
+    }
+}
+
 fn run_test(
     db: &mut db::Db,
+    absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
-) -> Result<(), Failures> {
+) -> Result<TestOutcome, Failures> {
     // Initialize the system and remove all files and directories to reset the system to a clean state.
     match test.configuration().system.unwrap_or_default() {
         SystemKind::InMemory => {
@@ -248,6 +284,30 @@ fn run_test(
     let custom_typeshed_path = test.configuration().typeshed();
     let python_version = test.configuration().python_version().unwrap_or_default();
 
+    // Setup virtual environment with dependencies if specified
+    let venv_for_external_dependencies = SystemPathBuf::from("/.venv");
+    if let Some(dependencies) = test.configuration().dependencies() {
+        if !std::env::var("MDTEST_EXTERNAL").is_ok_and(|v| v == "1") {
+            return Ok(TestOutcome::Skipped);
+        }
+
+        let python_platform = test.configuration().python_platform().expect(
+            "Tests with external dependencies must specify `python-platform` in the configuration",
+        );
+
+        let lockfile_path = absolute_fixture_path.with_extension("lock");
+
+        external_dependencies::setup_venv(
+            db,
+            dependencies,
+            python_version,
+            &python_platform,
+            &venv_for_external_dependencies,
+            &lockfile_path,
+        )
+        .expect("Failed to setup in-memory virtual environment with dependencies");
+    }
+
     let mut typeshed_files = vec![];
     let mut has_custom_versions_file = false;
 
@@ -259,7 +319,10 @@ fn run_test(
             }
 
             assert!(
-                matches!(embedded.lang, "py" | "pyi" | "python" | "text" | "cfg"),
+                matches!(
+                    embedded.lang,
+                    "py" | "pyi" | "python" | "text" | "cfg" | "pth"
+                ),
                 "Supported file types are: py (or python), pyi, text, cfg and ignore"
             );
 
@@ -296,7 +359,16 @@ fn run_test(
                 full_path = new_path;
             }
 
-            db.write_file(&full_path, &embedded.code).unwrap();
+            let temp_string;
+            let to_write = if embedded.lang == "pth" && !embedded.code.starts_with('/') {
+                // Make any relative .pths be relative to src_path
+                temp_string = format!("{src_path}/{}", embedded.code);
+                &*temp_string
+            } else {
+                &*embedded.code
+            };
+
+            db.write_file(&full_path, to_write).unwrap();
 
             if !(full_path.starts_with(&src_path)
                 && matches!(embedded.lang, "py" | "python" | "pyi"))
@@ -338,7 +410,19 @@ fn run_test(
 
     let configuration = test.configuration();
 
-    let site_packages_paths = if let Some(python) = configuration.python() {
+    let site_packages_paths = if configuration.dependencies().is_some() {
+        // If dependencies were specified, use the venv we just set up
+        let environment = PythonEnvironment::new(
+            &venv_for_external_dependencies,
+            SysPrefixPathOrigin::PythonCliFlag,
+            db.system(),
+        )
+        .expect("Python environment to point to a valid path");
+        environment
+            .site_packages_paths(db.system())
+            .expect("Python environment to be valid")
+            .into_vec()
+    } else if let Some(python) = configuration.python() {
         let environment =
             PythonEnvironment::new(python, SysPrefixPathOrigin::PythonCliFlag, db.system())
                 .expect("Python environment to point to a valid path");
@@ -378,6 +462,7 @@ fn run_test(
             custom_typeshed: custom_typeshed_path.map(SystemPath::to_path_buf),
             site_packages_paths,
             real_stdlib_path: None,
+            misconfiguration_mode: MisconfigurationMode::Fail,
         }
         .to_search_paths(db.system(), db.vendored())
         .expect("Failed to resolve search path settings"),
@@ -539,7 +624,7 @@ fn run_test(
     }
 
     if failures.is_empty() {
-        Ok(())
+        Ok(TestOutcome::Success)
     } else {
         Err(failures)
     }
@@ -566,7 +651,9 @@ struct ModuleInconsistency<'db> {
 fn run_module_resolution_consistency_test(db: &db::Db) -> Result<(), Vec<ModuleInconsistency<'_>>> {
     let mut errs = vec![];
     for from_list in list_modules(db) {
-        errs.push(match resolve_module(db, from_list.name(db)) {
+        // TODO: For now list_modules does not partake in desperate module resolution so
+        // only compare against confident module resolution.
+        errs.push(match resolve_module_confident(db, from_list.name(db)) {
             None => ModuleInconsistency {
                 db,
                 from_list,

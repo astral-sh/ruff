@@ -8,7 +8,6 @@ mod completion;
 mod doc_highlights;
 mod docstring;
 mod document_symbols;
-mod find_node;
 mod find_references;
 mod goto;
 mod goto_declaration;
@@ -229,6 +228,11 @@ impl NavigationTargets {
     #[cfg(test)]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    #[cfg(test)]
+    fn len(&self) -> usize {
+        self.0.len()
     }
 }
 

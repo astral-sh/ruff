@@ -43,10 +43,11 @@ return 42
         .expect("debug command to return a string response");
 
     insta::with_settings!({
-        filters =>vec![
-            (r"\b[0-9]+.[0-9]+MB\b","[X.XXMB]"),
-            (r"Workspace .+\)","Workspace XXX"),
-            (r"Project at .+","Project at XXX"),
+        filters => vec![
+            (r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]"),
+            (r"Workspace .+\)", "Workspace XXX"),
+            (r"Project at .+", "Project at XXX"),
+            (r"rules: \{(.|\n)+?\}\,", "rules: <RULES>,"),
     ]}, {
         insta::assert_snapshot!(response);
     });

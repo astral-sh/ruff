@@ -198,7 +198,7 @@ impl ClassInfoConstraintFunction {
                         self.generate_constraint(db, bound)
                     }
                     TypeVarBoundOrConstraints::Constraints(constraints) => {
-                        self.generate_constraint(db, Type::Union(constraints))
+                        self.generate_constraint(db, constraints.as_type(db))
                     }
                 }
             }
@@ -321,6 +321,39 @@ fn place_expr(expr: &ast::Expr) -> Option<PlaceExpr> {
     match expr {
         ast::Expr::Named(named) => PlaceExpr::try_from_expr(named.target.as_ref()),
         _ => PlaceExpr::try_from_expr(expr),
+    }
+}
+
+/// Return `true` if it is possible for any two inhabitants of the given types to
+/// compare equal to each other; otherwise return `false`.
+fn could_compare_equal<'db>(db: &'db dyn Db, left_ty: Type<'db>, right_ty: Type<'db>) -> bool {
+    if !left_ty.is_disjoint_from(db, right_ty) {
+        // If types overlap, they have inhabitants in common; it's definitely possible
+        // for an object to compare equal to itself.
+        return true;
+    }
+    match (left_ty, right_ty) {
+        // In order to be sure a union type cannot compare equal to another type, it
+        // must be true that no element of the union can compare equal to that type.
+        (Type::Union(union), _) => union
+            .elements(db)
+            .iter()
+            .any(|ty| could_compare_equal(db, *ty, right_ty)),
+        (_, Type::Union(union)) => union
+            .elements(db)
+            .iter()
+            .any(|ty| could_compare_equal(db, left_ty, *ty)),
+        // Boolean literals and int literals are disjoint, and single valued, and yet
+        // `True == 1` and `False == 0`.
+        (Type::BooleanLiteral(b), Type::IntLiteral(i))
+        | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
+        // We assume that tuples use `tuple.__eq__` which only returns True
+        // for other tuples, so they cannot compare equal to non-tuple types.
+        (Type::NominalInstance(instance), _) if instance.tuple_spec(db).is_some() => false,
+        (_, Type::NominalInstance(instance)) if instance.tuple_spec(db).is_some() => false,
+        // Other than the above cases, two single-valued disjoint types cannot compare
+        // equal.
+        _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
     }
 }
 
@@ -459,6 +492,82 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .expect("We should always have a place for every `PlaceExpr`")
     }
 
+    /// Check if a type is directly narrowable by `len()` (without considering unions or intersections).
+    ///
+    /// These are types where we know `__bool__` and `__len__` are consistent and the type
+    /// cannot be subclassed with a `__bool__` that disagrees.
+    fn is_base_type_narrowable_by_len(db: &'db dyn Db, ty: Type<'db>) -> bool {
+        match ty {
+            Type::StringLiteral(_) | Type::LiteralString | Type::BytesLiteral(_) => true,
+            Type::NominalInstance(instance) => instance.tuple_spec(db).is_some(),
+            _ => false,
+        }
+    }
+
+    /// Narrow a type based on `len()`, only narrowing the parts that are safe to narrow.
+    ///
+    /// For narrowable types (literals, tuples), we apply `~AlwaysFalsy` (positive) or
+    /// `~AlwaysTruthy` (negative). For non-narrowable types, we return them unchanged.
+    ///
+    /// Returns `None` if no part of the type is narrowable.
+    fn narrow_type_by_len(db: &'db dyn Db, ty: Type<'db>, is_positive: bool) -> Option<Type<'db>> {
+        match ty {
+            Type::Union(union) => {
+                let mut has_narrowable = false;
+                let narrowed_elements: Vec<_> = union
+                    .elements(db)
+                    .iter()
+                    .map(|element| {
+                        if let Some(narrowed) = Self::narrow_type_by_len(db, *element, is_positive)
+                        {
+                            has_narrowable = true;
+                            narrowed
+                        } else {
+                            // Non-narrowable elements are kept unchanged.
+                            *element
+                        }
+                    })
+                    .collect();
+
+                if has_narrowable {
+                    Some(UnionType::from_elements(db, narrowed_elements))
+                } else {
+                    None
+                }
+            }
+            Type::Intersection(intersection) => {
+                // For intersections, check if any positive element is narrowable.
+                let positive = intersection.positive(db);
+                let has_narrowable = positive
+                    .iter()
+                    .any(|element| Self::is_base_type_narrowable_by_len(db, *element));
+
+                if has_narrowable {
+                    // Apply the narrowing constraint to the whole intersection.
+                    let mut builder = IntersectionBuilder::new(db).add_positive(ty);
+                    if is_positive {
+                        builder = builder.add_negative(Type::AlwaysFalsy);
+                    } else {
+                        builder = builder.add_negative(Type::AlwaysTruthy);
+                    }
+                    Some(builder.build())
+                } else {
+                    None
+                }
+            }
+            _ if Self::is_base_type_narrowable_by_len(db, ty) => {
+                let mut builder = IntersectionBuilder::new(db).add_positive(ty);
+                if is_positive {
+                    builder = builder.add_negative(Type::AlwaysFalsy);
+                } else {
+                    builder = builder.add_negative(Type::AlwaysTruthy);
+                }
+                Some(builder.build())
+            }
+            _ => None,
+        }
+    }
+
     fn evaluate_simple_expr(
         &mut self,
         expr: &ast::Expr,
@@ -496,39 +605,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             // would be similar to this, but more efficient, would be to allow narrowing to return
             // something that is not a type, and handle this not-a-type in `symbol_from_bindings`,
             // instead of intersecting with a type.)
-
-            // Return `true` if it is possible for any two inhabitants of the given types to
-            // compare equal to each other; otherwise return `false`.
-            fn could_compare_equal<'db>(
-                db: &'db dyn Db,
-                left_ty: Type<'db>,
-                right_ty: Type<'db>,
-            ) -> bool {
-                if !left_ty.is_disjoint_from(db, right_ty) {
-                    // If types overlap, they have inhabitants in common; it's definitely possible
-                    // for an object to compare equal to itself.
-                    return true;
-                }
-                match (left_ty, right_ty) {
-                    // In order to be sure a union type cannot compare equal to another type, it
-                    // must be true that no element of the union can compare equal to that type.
-                    (Type::Union(union), _) => union
-                        .elements(db)
-                        .iter()
-                        .any(|ty| could_compare_equal(db, *ty, right_ty)),
-                    (_, Type::Union(union)) => union
-                        .elements(db)
-                        .iter()
-                        .any(|ty| could_compare_equal(db, left_ty, *ty)),
-                    // Boolean literals and int literals are disjoint, and single valued, and yet
-                    // `True == 1` and `False == 0`.
-                    (Type::BooleanLiteral(b), Type::IntLiteral(i))
-                    | (Type::IntLiteral(i), Type::BooleanLiteral(b)) => i64::from(b) == i,
-                    // Other than the above cases, two single-valued disjoint types cannot compare
-                    // equal.
-                    _ => !(left_ty.is_single_valued(db) && right_ty.is_single_valued(db)),
-                }
-            }
 
             // Return `true` if `lhs_ty` consists only of `LiteralString` and types that cannot
             // compare equal to `rhs_ty`.
@@ -584,7 +660,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         )
                     }
                     _ => {
-                        if ty.is_single_valued(db) && !could_compare_equal(db, ty, rhs_ty) {
+                        if !could_compare_equal(db, ty, rhs_ty) {
+                            // Cannot compare equal to rhs, so keep this type
                             ty
                         } else {
                             Type::Never
@@ -645,14 +722,22 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {
-                    // Keep only the non-single-valued portion of the original type.
-                    if !element.is_single_valued(self.db)
-                        && !element.is_literal_string()
-                        && !element.is_bool(self.db)
-                        && (!element.is_enum(self.db) || element.overrides_equality(self.db))
-                    {
-                        builder = builder.add(*element);
+                    // Skip single-valued types (handled via RHS matching).
+                    if element.is_single_valued(self.db) {
+                        continue;
                     }
+                    // Skip types that are handled specially (LiteralString, bool, enum).
+                    if element.is_literal_string()
+                        || element.is_bool(self.db)
+                        || (element.is_enum(self.db) && !element.overrides_equality(self.db))
+                    {
+                        continue;
+                    }
+                    // Skip types that cannot compare equal to any RHS value.
+                    if !could_compare_equal(self.db, *element, rhs_values) {
+                        continue;
+                    }
+                    builder = builder.add(*element);
                 }
             }
             Some(builder.build())
@@ -900,6 +985,27 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     place,
                     guarded_ty.negate_if(self.db, !is_positive),
                 )]))
+            }
+            // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
+            // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
+            // `__bool__` and `__len__` are consistent (literals, tuples). Non-narrowable parts
+            // (str, list, etc.) are kept unchanged.
+            Type::FunctionLiteral(function_type)
+                if expr_call.arguments.args.len() == 1
+                    && expr_call.arguments.keywords.is_empty()
+                    && function_type.known(self.db) == Some(KnownFunction::Len) =>
+            {
+                let arg = &expr_call.arguments.args[0];
+                let arg_ty = inference.expression_type(arg);
+
+                // Narrow only the parts of the type that are safe to narrow based on len().
+                if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
+                    let target = place_expr(arg)?;
+                    let place = self.expect_place(&target);
+                    Some(NarrowingConstraints::from_iter([(place, narrowed_ty)]))
+                } else {
+                    None
+                }
             }
             Type::FunctionLiteral(function_type) if expr_call.arguments.keywords.is_empty() => {
                 let [first_arg, second_arg] = &*expr_call.arguments.args else {

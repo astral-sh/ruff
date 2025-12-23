@@ -76,15 +76,25 @@ impl<'db> BoundSuperError<'db> {
             BoundSuperError::InvalidPivotClassType { pivot_class } => {
                 if let Some(builder) = context.report_lint(&INVALID_SUPER_ARGUMENT, node) {
                     match pivot_class {
-                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                            "`types.GenericAlias` instance `{}` is not a valid class",
-                            alias.display_with(context.db(), DisplaySettings::default()),
-                        )),
-                        _ => builder.into_diagnostic(format_args!(
-                            "`{pivot_class}` is not a valid class",
-                            pivot_class = pivot_class.display(context.db()),
-                        )),
-                    };
+                        Type::GenericAlias(alias) => {
+                            builder.into_diagnostic(format_args!(
+                                "`types.GenericAlias` instance `{}` is not a valid class",
+                                alias.display_with(context.db(), DisplaySettings::default()),
+                            ));
+                        }
+                        _ => {
+                            let mut diagnostic =
+                                builder.into_diagnostic("Argument is not a valid class");
+                            diagnostic.set_primary_message(format_args!(
+                                "Argument has type `{}`",
+                                pivot_class.display(context.db())
+                            ));
+                            diagnostic.set_concise_message(format_args!(
+                                "`{}` is not a valid class",
+                                pivot_class.display(context.db()),
+                            ));
+                        }
+                    }
                 }
             }
             BoundSuperError::FailingConditionCheck {
@@ -157,7 +167,7 @@ impl<'db> BoundSuperError<'db> {
                         .map(|c| c.display(db))
                         .join(", ")
                 ));
-                Type::Union(constraints)
+                constraints.as_type(db)
             }
             None => {
                 diagnostic.info(format_args!(
@@ -170,9 +180,9 @@ impl<'db> BoundSuperError<'db> {
     }
 }
 
-#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, get_size2::GetSize, salsa::Update)]
 pub enum SuperOwnerKind<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
 }
@@ -374,7 +384,7 @@ impl<'db> BoundSuperType<'db> {
                         delegate_with_error_mapped(bound, Some(type_var))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        delegate_with_error_mapped(Type::Union(constraints), Some(type_var))
+                        delegate_with_error_mapped(constraints.as_type(db), Some(type_var))
                     }
                     None => delegate_with_error_mapped(Type::object(), Some(type_var)),
                 };
@@ -429,7 +439,7 @@ impl<'db> BoundSuperType<'db> {
                 );
             }
             Type::NewTypeInstance(newtype) => {
-                return delegate_to(Type::instance(db, newtype.base_class_type(db)));
+                return delegate_to(newtype.concrete_base_type(db));
             }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));

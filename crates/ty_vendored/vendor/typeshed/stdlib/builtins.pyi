@@ -1835,14 +1835,22 @@ class bytes(Sequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytes object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
-        """
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2331,14 +2339,22 @@ class bytearray(MutableSequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytearray object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
-        """
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2414,7 +2430,7 @@ class bytearray(MutableSequence[int]):
             """Resize the internal buffer of bytearray to len.
 
             size
-              New size to resize to..
+              New size to resize to.
             """
 
 _IntegerFormats: TypeAlias = Literal[
@@ -2579,10 +2595,21 @@ class memoryview(Sequence[_I]):
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
-    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
-    # See https://github.com/python/cpython/issues/125420
-    index: ClassVar[None]  # type: ignore[assignment]
-    count: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 14):
+        def index(self, value: object, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
+            """Return the index of the first occurrence of a value.
+
+            Raises ValueError if the value is not present.
+            """
+
+        def count(self, value: object, /) -> int:
+            """Count the number of occurrences of a value."""
+    else:
+        # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+        # See https://github.com/python/cpython/issues/125420
+        index: ClassVar[None]  # type: ignore[assignment]
+        count: ClassVar[None]  # type: ignore[assignment]
+
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """See PEP 585"""

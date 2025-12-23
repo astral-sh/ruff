@@ -8,7 +8,7 @@ use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
     FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
     MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionType, todo_type,
+    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -79,6 +79,18 @@ impl<'db> SubclassOfType<'db> {
 
     /// Given an instance of the class or type variable `T`, returns a [`Type`] instance representing `type[T]`.
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+        // Handle unions by distributing `type[]` over each element:
+        // `type[A | B]` -> `type[A] | type[B]`
+        if let Type::Union(union) = ty {
+            return UnionType::try_from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|element| Self::try_from_instance(db, *element)),
+            );
+        }
+
         SubclassOfInner::try_from_instance(db, ty).map(|subclass_of| Self::from(db, subclass_of))
     }
 
@@ -119,7 +131,7 @@ impl<'db> SubclassOfType<'db> {
         subclass_of.is_type_var()
     }
 
-    pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
+    pub const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         self.subclass_of.into_type_var()
     }
 
@@ -190,7 +202,9 @@ impl<'db> SubclassOfType<'db> {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
                     None => unreachable!(),
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound,
-                    Some(TypeVarBoundOrConstraints::Constraints(union)) => Type::Union(union),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db)
+                    }
                 }
             }
         };
@@ -288,6 +302,35 @@ impl<'db> SubclassOfType<'db> {
         }
     }
 
+    /// Compute the metatype of this `type[T]`.
+    ///
+    /// For `type[C]` where `C` is a concrete class, this returns `type[metaclass(C)]`.
+    /// For `type[T]` where `T` is a `TypeVar`, this computes the metatype based on the
+    /// `TypeVar`'s bounds or constraints.
+    pub(crate) fn to_meta_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self.subclass_of.with_transposed_type_var(db) {
+            SubclassOfInner::Dynamic(dynamic) => {
+                SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic))
+            }
+            SubclassOfInner::Class(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
+                .unwrap_or(SubclassOfType::subclass_of_unknown()),
+            // For `type[T]` where `T` is a TypeVar, `with_transposed_type_var` transforms
+            // the bounds from instance types to `type[]` types. For example, `type[T]` where
+            // `T: A | B` becomes a TypeVar with bound `type[A] | type[B]`. The metatype is
+            // then the metatype of that bound.
+            SubclassOfInner::TypeVar(bound_typevar) => {
+                match bound_typevar.typevar(db).bound_or_constraints(db) {
+                    // `with_transposed_type_var` always adds a bound for unbounded TypeVars
+                    None => unreachable!(),
+                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => bound.to_meta_type(db),
+                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                        constraints.as_type(db).to_meta_type(db)
+                    }
+                }
+            }
+        }
+    }
+
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         self.subclass_of
             .into_class(db)
@@ -322,7 +365,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
 }
 
@@ -351,7 +394,7 @@ impl<'db> SubclassOfInner<'db> {
                             .and_then(|subclass_of| subclass_of.into_class(db))
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        match constraints.elements(db) {
+                        match &**constraints.elements(db) {
                             [bound] => Self::try_from_instance(db, *bound)
                                 .and_then(|subclass_of| subclass_of.into_class(db)),
                             _ => Some(ClassType::object(db)),
@@ -362,7 +405,7 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType> {
+    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
         match self {
             Self::Class(_) | Self::TypeVar(_) => None,
             Self::Dynamic(dynamic) => Some(dynamic),
@@ -379,7 +422,12 @@ impl<'db> SubclassOfInner<'db> {
     pub(crate) fn try_from_instance(db: &'db dyn Db, ty: Type<'db>) -> Option<Self> {
         Some(match ty {
             Type::NominalInstance(instance) => SubclassOfInner::Class(instance.class(db)),
-            Type::TypedDict(typed_dict) => SubclassOfInner::Class(typed_dict.defining_class()),
+            Type::TypedDict(typed_dict) => match typed_dict {
+                TypedDictType::Class(class) => SubclassOfInner::Class(class),
+                TypedDictType::Synthesized(_) => SubclassOfInner::Dynamic(
+                    todo_type!("type[T] for synthesized TypedDicts").expect_dynamic(),
+                ),
+            },
             Type::TypeVar(bound_typevar) => SubclassOfInner::TypeVar(bound_typevar),
             Type::Dynamic(DynamicType::Any) => SubclassOfInner::Dynamic(DynamicType::Any),
             Type::Dynamic(DynamicType::Unknown) => SubclassOfInner::Dynamic(DynamicType::Unknown),
@@ -416,16 +464,10 @@ impl<'db> SubclassOfInner<'db> {
                     )
                 }
                 Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                    let constraints = constraints
-                        .elements(db)
-                        .iter()
-                        .map(|constraint| {
-                            SubclassOfType::try_from_instance(db, *constraint)
-                                .unwrap_or(SubclassOfType::subclass_of_unknown())
-                        })
-                        .collect::<Box<_>>();
-
-                    TypeVarBoundOrConstraints::Constraints(UnionType::new(db, constraints))
+                    TypeVarBoundOrConstraints::Constraints(constraints.map(db, |constraint| {
+                        SubclassOfType::try_from_instance(db, *constraint)
+                            .unwrap_or(SubclassOfType::subclass_of_unknown())
+                    }))
                 }
             })
         });
@@ -465,8 +507,8 @@ impl<'db> From<ClassType<'db>> for SubclassOfInner<'db> {
     }
 }
 
-impl From<DynamicType> for SubclassOfInner<'_> {
-    fn from(value: DynamicType) -> Self {
+impl<'db> From<DynamicType<'db>> for SubclassOfInner<'db> {
+    fn from(value: DynamicType<'db>) -> Self {
         SubclassOfInner::Dynamic(value)
     }
 }

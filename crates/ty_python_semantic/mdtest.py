@@ -37,14 +37,23 @@ class MDTestRunner:
     mdtest_executable: Path | None
     console: Console
     filters: list[str]
+    enable_external: bool
+    upgrade_lockfiles: bool
 
-    def __init__(self, filters: list[str] | None = None) -> None:
+    def __init__(
+        self,
+        filters: list[str] | None,
+        enable_external: bool,
+        upgrade_lockfiles: bool,
+    ) -> None:
         self.mdtest_executable = None
         self.console = Console()
         self.filters = [
             f.removesuffix(".md").replace("/", "_").replace("-", "_")
             for f in (filters or [])
         ]
+        self.enable_external = enable_external
+        self.upgrade_lockfiles = upgrade_lockfiles
 
     def _run_cargo_test(self, *, message_format: Literal["human", "json"]) -> str:
         return subprocess.check_output(
@@ -120,23 +129,16 @@ class MDTestRunner:
                 CLICOLOR_FORCE="1",
                 INSTA_FORCE_PASS="1",
                 INSTA_OUTPUT="none",
+                MDTEST_EXTERNAL="1" if self.enable_external else "0",
+                MDTEST_UPGRADE_LOCKFILES="1" if self.upgrade_lockfiles else "0",
             ),
             capture_output=capture_output,
             text=True,
             check=False,
         )
 
-    def _mangle_path(self, markdown_file: Path) -> str:
-        return (
-            markdown_file.as_posix()
-            .replace("/", "_")
-            .replace("-", "_")
-            .removesuffix(".md")
-        )
-
     def _run_mdtests_for_file(self, markdown_file: Path) -> None:
-        path_mangled = self._mangle_path(markdown_file)
-        test_name = f"mdtest__{path_mangled}"
+        test_name = f"mdtest::{markdown_file}"
 
         output = self._run_mdtest(["--exact", test_name], capture_output=True)
 
@@ -242,16 +244,10 @@ class MDTestRunner:
             if rust_code_has_changed:
                 if self._recompile_tests("Rust code has changed, recompiling tests..."):
                     self._run_mdtest(self.filters)
-            elif vendored_typeshed_has_changed:
-                if self._recompile_tests(
-                    "Vendored typeshed has changed, recompiling tests..."
-                ):
-                    self._run_mdtest(self.filters)
-            elif new_md_files:
-                files = " ".join(file.as_posix() for file in new_md_files)
-                self._recompile_tests(
-                    f"New Markdown test [yellow]{files}[/yellow] detected, recompiling tests..."
-                )
+            elif vendored_typeshed_has_changed and self._recompile_tests(
+                "Vendored typeshed has changed, recompiling tests..."
+            ):
+                self._run_mdtest(self.filters)
 
             for path in new_md_files | changed_md_files:
                 self._run_mdtests_for_file(path)
@@ -266,11 +262,27 @@ def main() -> None:
         nargs="*",
         help="Partial paths or mangled names, e.g., 'loops/for.md' or 'loops_for'",
     )
+    parser.add_argument(
+        "--enable-external",
+        "-e",
+        action="store_true",
+        help="Enable tests with external dependencies",
+    )
+    parser.add_argument(
+        "--no-lockfile-upgrades",
+        action="store_true",
+        help="By default, lockfiles will be upgraded when dependency requirements in the Markdown test change."
+        + " Set this flag to never upgrade any lockfiles.",
+    )
 
     args = parser.parse_args()
 
     try:
-        runner = MDTestRunner(filters=args.filters)
+        runner = MDTestRunner(
+            filters=args.filters,
+            enable_external=args.enable_external,
+            upgrade_lockfiles=not args.no_lockfile_upgrades,
+        )
         runner.watch()
     except KeyboardInterrupt:
         print()

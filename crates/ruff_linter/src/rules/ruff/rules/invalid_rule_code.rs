@@ -9,6 +9,21 @@ use crate::registry::Rule;
 use crate::rule_redirects::get_redirect_target;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
+#[derive(Debug, PartialEq, Eq)]
+pub(crate) enum InvalidRuleCodeKind {
+    Noqa,
+    Suppression,
+}
+
+impl InvalidRuleCodeKind {
+    fn as_str(&self) -> &str {
+        match self {
+            InvalidRuleCodeKind::Noqa => "`# noqa`",
+            InvalidRuleCodeKind::Suppression => "suppression",
+        }
+    }
+}
+
 /// ## What it does
 /// Checks for `noqa` codes that are invalid.
 ///
@@ -36,12 +51,17 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 #[violation_metadata(preview_since = "0.11.4")]
 pub(crate) struct InvalidRuleCode {
     pub(crate) rule_code: String,
+    pub(crate) kind: InvalidRuleCodeKind,
 }
 
 impl AlwaysFixableViolation for InvalidRuleCode {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Invalid rule code in `# noqa`: {}", self.rule_code)
+        format!(
+            "Invalid rule code in {}: {}",
+            self.kind.as_str(),
+            self.rule_code
+        )
     }
 
     fn fix_title(&self) -> String {
@@ -61,7 +81,9 @@ pub(crate) fn invalid_noqa_code(
             continue;
         };
 
-        let all_valid = directive.iter().all(|code| code_is_valid(code, external));
+        let all_valid = directive
+            .iter()
+            .all(|code| code_is_valid(code.as_str(), external));
 
         if all_valid {
             continue;
@@ -69,7 +91,7 @@ pub(crate) fn invalid_noqa_code(
 
         let (valid_codes, invalid_codes): (Vec<_>, Vec<_>) = directive
             .iter()
-            .partition(|&code| code_is_valid(code, external));
+            .partition(|&code| code_is_valid(code.as_str(), external));
 
         if valid_codes.is_empty() {
             all_codes_invalid_diagnostic(directive, invalid_codes, context);
@@ -81,10 +103,9 @@ pub(crate) fn invalid_noqa_code(
     }
 }
 
-fn code_is_valid(code: &Code, external: &[String]) -> bool {
-    let code_str = code.as_str();
-    Rule::from_code(get_redirect_target(code_str).unwrap_or(code_str)).is_ok()
-        || external.iter().any(|ext| code_str.starts_with(ext))
+pub(crate) fn code_is_valid(code: &str, external: &[String]) -> bool {
+    Rule::from_code(get_redirect_target(code).unwrap_or(code)).is_ok()
+        || external.iter().any(|ext| code.starts_with(ext))
 }
 
 fn all_codes_invalid_diagnostic(
@@ -100,6 +121,7 @@ fn all_codes_invalid_diagnostic(
                     .map(Code::as_str)
                     .collect::<Vec<_>>()
                     .join(", "),
+                kind: InvalidRuleCodeKind::Noqa,
             },
             directive.range(),
         )
@@ -116,6 +138,7 @@ fn some_codes_are_invalid_diagnostic(
         .report_diagnostic(
             InvalidRuleCode {
                 rule_code: invalid_code.to_string(),
+                kind: InvalidRuleCodeKind::Noqa,
             },
             invalid_code.range(),
         )

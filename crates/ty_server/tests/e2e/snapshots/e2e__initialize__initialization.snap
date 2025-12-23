@@ -48,6 +48,9 @@ expression: initialization_result
         "quickfix"
       ]
     },
+    "renameProvider": {
+      "prepareProvider": true
+    },
     "declarationProvider": true,
     "executeCommandProvider": {
       "commands": [
@@ -77,7 +80,8 @@ expression: initialization_result
         "tokenModifiers": [
           "definition",
           "readonly",
-          "async"
+          "async",
+          "documentation"
         ]
       },
       "range": true,

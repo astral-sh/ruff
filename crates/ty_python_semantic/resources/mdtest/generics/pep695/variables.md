@@ -17,7 +17,7 @@ instances of `typing.TypeVar`, just like legacy type variables.
 ```py
 def f[T]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -33,7 +33,7 @@ python-version = "3.13"
 ```py
 def f[T = int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__default__)  # revealed: int
     reveal_type(T.__bound__)  # revealed: None
     reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -66,7 +66,7 @@ class Invalid[S = T]: ...
 ```py
 def f[T: int]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__bound__)  # revealed: int
     reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -79,7 +79,7 @@ def g[S]():
 ```py
 def f[T: (int, str)]():
     reveal_type(type(T))  # revealed: <class 'TypeVar'>
-    reveal_type(T)  # revealed: typing.TypeVar
+    reveal_type(T)  # revealed: TypeVar
     reveal_type(T.__constraints__)  # revealed: tuple[int, str]
     reveal_type(T.__bound__)  # revealed: None
 
@@ -96,6 +96,26 @@ def g[S]():
 # error: [invalid-type-variable-constraints] "TypeVar must have at least two constrained types"
 def f[T: (int,)]():
     pass
+```
+
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic type aliases that point to type variables can be explicitly specialized.
+
+```py
+type Positive[T] = T
+
+def _[T](
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    c: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: int
 ```
 
 ## Invalid uses
@@ -863,7 +883,7 @@ reveal_type(C[int]().y)  # revealed: int
 class D[T = T]:
     x: T
 
-reveal_type(D().x)  # revealed: T@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 [pep 695]: https://peps.python.org/pep-0695/

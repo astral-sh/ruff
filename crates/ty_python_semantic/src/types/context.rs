@@ -177,8 +177,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         std::mem::replace(&mut self.multi_inference, multi_inference)
     }
 
-    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
-        self.no_type_check = no_type_check;
+    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) -> InNoTypeCheck {
+        std::mem::replace(&mut self.no_type_check, no_type_check)
     }
 
     fn is_in_no_type_check(&self) -> bool {
@@ -360,6 +360,9 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                         "rule `{}` was selected in the configuration file",
                         diag.id()
                     )
+                }
+                LintSource::Editor => {
+                    format!("rule `{}` was selected in the editor settings", diag.id())
                 }
             },
         ));

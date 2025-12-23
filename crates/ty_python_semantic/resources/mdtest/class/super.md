@@ -174,8 +174,7 @@ class B(A):
 
     @classmethod
     def f(cls):
-        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, <class 'B'>>
         super().f()
 
 super(B, B(42)).__init__(42)
@@ -568,7 +567,7 @@ def f(x: int):
     super(x, x)
 
     type IntAlias = int
-    # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
+    # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
 # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
@@ -603,15 +602,33 @@ super(object, object()).__class__
 # Not all objects valid in a class's bases list are valid as the first argument to `super()`.
 # For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
 #
-# error: [invalid-super-argument] "`typing.ChainMap` is not a valid class"
+# error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
 reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 
 # Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
 # but it *is* valid as the first argument to `super()`.
-reveal_type(super(typing.Generic, typing.SupportsInt))  # revealed: <super: typing.Generic, <class 'SupportsInt'>>
+#
+# revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Generic, typing.SupportsInt))
 
 def _(x: type[typing.Any], y: typing.Any):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
+```
+
+### Diagnostic when the invalid type is rendered very verbosely
+
+<!-- snapshot-diagnostics -->
+
+```py
+def coinflip() -> bool:
+    return False
+
+def f():
+    if coinflip():
+        class A: ...
+    else:
+        class A: ...
+    super(A, A())  # error: [invalid-super-argument]
 ```
 
 ### Instance Member Access via `super`

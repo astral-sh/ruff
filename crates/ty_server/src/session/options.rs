@@ -1,21 +1,20 @@
 use std::collections::HashMap;
 
 use lsp_types::Url;
-use ruff_db::system::SystemPathBuf;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_macros::Combine;
 use ruff_python_ast::PythonVersion;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
-
+use serde_json::{Map, Value};
 use ty_combine::Combine;
-use ty_ide::InlayHintSettings;
+use ty_ide::{CompletionSettings, InlayHintSettings};
 use ty_project::metadata::Options as TyOptions;
 use ty_project::metadata::options::ProjectOptionsOverrides;
-use ty_project::metadata::value::{RangedValue, RelativePathBuf};
-
-use crate::logging::LogLevel;
+use ty_project::metadata::value::{RangedValue, RelativePathBuf, ValueSource};
 
 use super::settings::{ExperimentalSettings, GlobalSettings, WorkspaceSettings};
+use crate::logging::LogLevel;
+use crate::session::client::Client;
 
 /// Initialization options that are set once at server startup that never change.
 ///
@@ -83,15 +82,15 @@ impl InitializationOptions {
 #[serde(rename_all = "camelCase")]
 pub struct ClientOptions {
     #[serde(flatten)]
-    pub(crate) global: GlobalOptions,
+    pub global: GlobalOptions,
 
     #[serde(flatten)]
-    pub(crate) workspace: WorkspaceOptions,
+    pub workspace: WorkspaceOptions,
 
     /// Additional options that aren't valid as per the schema but we accept it to provide better
     /// error message to the user.
     #[serde(flatten)]
-    pub(crate) unknown: HashMap<String, Value>,
+    pub unknown: HashMap<String, Value>,
 }
 
 impl ClientOptions {
@@ -117,14 +116,11 @@ impl ClientOptions {
     }
 
     #[must_use]
-    pub fn with_experimental_rename(mut self, enabled: bool) -> Self {
-        self.global.experimental.get_or_insert_default().rename = Some(enabled);
-        self
-    }
-
-    #[must_use]
-    pub fn with_experimental_auto_import(mut self, enabled: bool) -> Self {
-        self.global.experimental.get_or_insert_default().auto_import = Some(enabled);
+    pub fn with_auto_import(mut self, enabled: bool) -> Self {
+        self.workspace
+            .completions
+            .get_or_insert_default()
+            .auto_import = Some(enabled);
         self
     }
 
@@ -141,7 +137,7 @@ impl ClientOptions {
 /// server.
 #[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct GlobalOptions {
+pub struct GlobalOptions {
     /// Diagnostic mode for the language server.
     diagnostic_mode: Option<DiagnosticMode>,
 
@@ -153,10 +149,7 @@ impl GlobalOptions {
     pub(crate) fn into_settings(self) -> GlobalSettings {
         let experimental = self
             .experimental
-            .map(|experimental| ExperimentalSettings {
-                rename: experimental.rename.unwrap_or(false),
-                auto_import: experimental.auto_import.unwrap_or(false),
-            })
+            .map(Experimental::into_settings)
             .unwrap_or_default();
 
         GlobalSettings {
@@ -169,28 +162,67 @@ impl GlobalOptions {
 /// Options that are specific to a workspace.
 ///
 /// These are the dynamic options that are applied to a specific workspace.
-#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct WorkspaceOptions {
+pub struct WorkspaceOptions {
+    /// Inline configuration, overrides settings from the configuration file.
+    pub configuration: Option<ConfigurationMap>,
+
+    /// Path to a `ty.toml` file, similar to `--config-file` on the CLI
+    pub configuration_file: Option<String>,
+
     /// Whether to disable language services like code completions, hover, etc.
-    disable_language_services: Option<bool>,
+    pub disable_language_services: Option<bool>,
 
     /// Options to configure inlay hints.
-    inlay_hints: Option<InlayHintOptions>,
+    pub inlay_hints: Option<InlayHintOptions>,
+
+    /// Options to configure completions.
+    pub completions: Option<CompletionOptions>,
 
     /// Information about the currently active Python environment in the VS Code Python extension.
     ///
     /// This is relevant only for VS Code and is populated by the ty VS Code extension.
-    python_extension: Option<PythonExtension>,
+    pub python_extension: Option<PythonExtension>,
 }
 
 impl WorkspaceOptions {
-    pub(crate) fn into_settings(self) -> WorkspaceSettings {
-        let overrides = self.python_extension.and_then(|extension| {
-            let active_environment = extension.active_environment?;
+    pub(crate) fn into_settings(self, root: &SystemPath, client: &Client) -> WorkspaceSettings {
+        let configuration_file =
+            self.configuration_file
+                .and_then(|config_file| match shellexpand::full(&config_file) {
+                    Ok(path) => Some(SystemPath::absolute(&*path, root)),
+                    Err(error) => {
+                        client.show_error_message(format_args!(
+                            "Failed to expand the environment variables \
+                            for the `ty.configuration_file` setting: {error}"
+                        ));
+                        None
+                    }
+                });
 
-            let mut overrides = ProjectOptionsOverrides::new(None, TyOptions::default());
+        let options_overrides =
+            self.configuration.and_then(|map| {
+                match TyOptions::deserialize_with(
+                    ValueSource::Editor,
+                    serde::de::value::MapDeserializer::new(map.0.into_iter()),
+                ) {
+                    Ok(options) => Some(options),
+                    Err(error) => {
+                        client.show_error_message(format_args!(
+                            "Invalid `ty.configuration` options: {error}"
+                        ));
+                        None
+                    }
+                }
+            });
 
+        let mut overrides =
+            ProjectOptionsOverrides::new(configuration_file, options_overrides.unwrap_or_default());
+
+        if let Some(extension) = self.python_extension
+            && let Some(active_environment) = extension.active_environment
+        {
             overrides.fallback_python = if let Some(environment) = &active_environment.environment {
                 environment.folder_uri.to_file_path().ok().and_then(|path| {
                     Some(RelativePathBuf::python_extension(
@@ -225,9 +257,13 @@ impl WorkspaceOptions {
                     in case the configuration doesn't specify a Python version",
                 );
             }
+        }
 
+        let overrides = if overrides == ProjectOptionsOverrides::default() {
+            None
+        } else {
             Some(overrides)
-        });
+        };
 
         WorkspaceSettings {
             disable_language_services: self.disable_language_services.unwrap_or_default(),
@@ -235,14 +271,32 @@ impl WorkspaceOptions {
                 .inlay_hints
                 .map(InlayHintOptions::into_settings)
                 .unwrap_or_default(),
+            completions: self
+                .completions
+                .map(CompletionOptions::into_settings)
+                .unwrap_or_default(),
             overrides,
         }
     }
 }
 
-#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(transparent)]
+pub struct ConfigurationMap(Map<String, Value>);
+
+impl From<Map<String, Value>> for ConfigurationMap {
+    fn from(map: Map<String, Value>) -> Self {
+        Self(map)
+    }
+}
+
+impl Combine for ConfigurationMap {
+    fn combine_with(&mut self, _other: Self) {}
+}
+
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct InlayHintOptions {
+pub struct InlayHintOptions {
     variable_types: Option<bool>,
     call_argument_names: Option<bool>,
 }
@@ -256,13 +310,37 @@ impl InlayHintOptions {
     }
 }
 
+#[derive(Clone, Combine, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CompletionOptions {
+    auto_import: Option<bool>,
+}
+
+impl CompletionOptions {
+    // N.B. It's important for the defaults here to
+    // match the defaults for `CompletionSettings`.
+    // This is because `WorkspaceSettings::default()`
+    // uses `CompletionSettings::default()`. But
+    // `WorkspaceOptions::default().into_settings()` will use this
+    // definition.
+    fn into_settings(self) -> CompletionSettings {
+        CompletionSettings {
+            auto_import: self.auto_import.unwrap_or(true),
+        }
+    }
+}
+
 /// Diagnostic mode for the language server.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum DiagnosticMode {
+    /// Disable all diagnostics so that ty can be used as an LSP only
+    Off,
+
     /// Check only currently open files.
     #[default]
     OpenFilesOnly,
+
     /// Check all files in the workspace.
     Workspace,
 }
@@ -277,6 +355,10 @@ impl DiagnosticMode {
     pub(crate) const fn is_open_files_only(self) -> bool {
         matches!(self, DiagnosticMode::OpenFilesOnly)
     }
+
+    pub(crate) const fn is_off(self) -> bool {
+        matches!(self, DiagnosticMode::Off)
+    }
 }
 
 impl Combine for DiagnosticMode {
@@ -289,28 +371,30 @@ impl Combine for DiagnosticMode {
         // So, this is a workaround to ensure that if the diagnostic mode is set to `workspace` in
         // either an initialization options or one of the workspace options, it is always set to
         // `workspace` in the global options.
-        if other.is_workspace() {
-            *self = DiagnosticMode::Workspace;
+        if other != DiagnosticMode::default() {
+            *self = other;
         }
     }
 }
 
 #[derive(Clone, Combine, Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct Experimental {
-    /// Whether to enable the experimental symbol rename feature.
-    pub(crate) rename: Option<bool>,
-    /// Whether to enable the experimental "auto-import" feature.
-    ///
-    /// At time of writing (2025-08-29), this feature is still
-    /// under active development. It may not work right or may be
-    /// incomplete.
-    pub(crate) auto_import: Option<bool>,
+#[expect(
+    clippy::empty_structs_with_brackets,
+    reason = "The LSP fails to deserialize the options when this is a unit type"
+)]
+pub(crate) struct Experimental {}
+
+impl Experimental {
+    #[expect(clippy::unused_self)]
+    fn into_settings(self) -> ExperimentalSettings {
+        ExperimentalSettings {}
+    }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-struct PythonExtension {
+pub struct PythonExtension {
     active_environment: Option<ActiveEnvironment>,
 }
 
@@ -323,7 +407,7 @@ impl Combine for PythonExtension {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct ActiveEnvironment {
     pub(crate) executable: PythonExecutable,
@@ -331,7 +415,7 @@ pub(crate) struct ActiveEnvironment {
     pub(crate) version: Option<EnvironmentVersion>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct EnvironmentVersion {
     pub(crate) major: i64,
@@ -342,7 +426,7 @@ pub(crate) struct EnvironmentVersion {
     pub(crate) sys_version: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonEnvironment {
     pub(crate) folder_uri: Url,
@@ -353,7 +437,7 @@ pub(crate) struct PythonEnvironment {
     pub(crate) name: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PythonExecutable {
     #[allow(dead_code)]

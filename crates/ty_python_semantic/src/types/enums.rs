@@ -60,11 +60,7 @@ pub(crate) fn enum_metadata<'db>(
         return None;
     }
 
-    if !Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
-        && !class
-            .metaclass(db)
-            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
-    {
+    if !is_enum_class_by_inheritance(db, class) {
         return None;
     }
 
@@ -76,8 +72,8 @@ pub(crate) fn enum_metadata<'db>(
     let mut auto_counter = 0;
 
     let ignored_names: Option<Vec<&str>> = if let Some(ignore) = table.symbol_id("_ignore_") {
-        let ignore_bindings = use_def_map.all_reachable_symbol_bindings(ignore);
-        let ignore_place = place_from_bindings(db, ignore_bindings);
+        let ignore_bindings = use_def_map.reachable_symbol_bindings(ignore);
+        let ignore_place = place_from_bindings(db, ignore_bindings).place;
 
         match ignore_place {
             Place::Defined(Type::StringLiteral(ignored_names), _, _) => {
@@ -111,7 +107,7 @@ pub(crate) fn enum_metadata<'db>(
                 return None;
             }
 
-            let inferred = place_from_bindings(db, bindings);
+            let inferred = place_from_bindings(db, bindings).place;
 
             let value_ty = match inferred {
                 Place::Undefined => {
@@ -292,5 +288,65 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
         _ => false,
+    }
+}
+
+/// Checks if a class is an enum class by inheritance (either a subtype of `Enum`
+/// or has a metaclass that is a subtype of `EnumType`).
+///
+/// This is a lighter-weight check than `enum_metadata`, which additionally
+/// verifies that the class has members.
+pub(crate) fn is_enum_class_by_inheritance<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+    Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+        || class
+            .metaclass(db)
+            .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
+}
+
+/// Extracts the inner value type from an `enum.nonmember()` wrapper.
+///
+/// At runtime, the enum metaclass unwraps `nonmember(value)`, so accessing the attribute
+/// returns the inner value, not the `nonmember` wrapper.
+///
+/// Returns `Some(value_type)` if the type is a `nonmember[T]`, otherwise `None`.
+pub(crate) fn try_unwrap_nonmember_value<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Type<'db>> {
+    match ty {
+        Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Nonmember) => {
+            Some(
+                ty.member(db, "value")
+                    .place
+                    .ignore_possibly_undefined()
+                    .unwrap_or(Type::unknown()),
+            )
+        }
+        Type::Union(union) => {
+            // TODO: This is a hack. The proper fix is to avoid unioning Unknown from
+            // declarations into Place when we have concrete bindings.
+            //
+            // For now, we filter out Unknown and expect exactly one nonmember type
+            // to remain. If there are other non-Unknown types mixed in, we bail out.
+            let mut non_unknown = union.elements(db).iter().filter(|elem| !elem.is_unknown());
+
+            let first = non_unknown.next()?;
+
+            // Ensure there's exactly one non-Unknown element.
+            if non_unknown.next().is_some() {
+                return None;
+            }
+
+            if let Type::NominalInstance(instance) = first {
+                if instance.has_known_class(db, KnownClass::Nonmember) {
+                    return Some(
+                        first
+                            .member(db, "value")
+                            .place
+                            .ignore_possibly_undefined()
+                            .unwrap_or(Type::unknown()),
+                    );
+                }
+            }
+            None
+        }
+        _ => None,
     }
 }

@@ -34,19 +34,6 @@ syntax, it's just how this README embeds an example mdtest Markdown document.)
 See actual example mdtest suites in
 [`crates/ty_python_semantic/resources/mdtest`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/resources/mdtest).
 
-> [!NOTE]
-> If you use `dir-test`, `rstest` or similar to generate a separate test for all Markdown files in a certain directory,
-> as with the example in `crates/ty_python_semantic/tests/mdtest.rs`,
-> you will likely want to also make sure that the crate the tests are in is rebuilt every time a
-> Markdown file is added or removed from the directory. See
-> [`crates/ty_python_semantic/build.rs`](https://github.com/astral-sh/ruff/tree/main/crates/ty_python_semantic/build.rs)
-> for an example of how to do this.
->
-> This is because these macros generate their tests at build time rather than at runtime.
-> Without the `build.rs` file to force a rebuild when a Markdown file is added or removed,
-> a new Markdown test suite might not be run unless some other change in the crate caused a rebuild
-> following the addition of the new test file.
-
 ## Assertions
 
 Two kinds of assertions are supported: `# revealed:` (shown above) and `# error:`.
@@ -315,6 +302,63 @@ section. Nested sections can override configurations from their parent sections.
 To enable logging in an mdtest, set `log = true` at the top level of the TOML block.
 See [`MarkdownTestConfig`](https://github.com/astral-sh/ruff/blob/main/crates/ty_test/src/config.rs)
 for the full list of supported configuration options.
+
+### Testing with external dependencies
+
+Tests can specify external Python dependencies using a `[project]` section in the TOML configuration.
+This allows testing code that uses third-party libraries like `pydantic`, `numpy`, etc.
+
+It is recommended to specify exact versions of packages to ensure reproducibility. The specified
+Python version and platform are required for tests with external dependencies, as they are used
+during package resolution.
+
+````markdown
+```toml
+[environment]
+python-version = "3.13"
+python-platform = "linux"
+
+[project]
+dependencies = ["pydantic==2.12.2"]
+```
+
+```py
+import pydantic
+
+# use pydantic in the test
+```
+````
+
+When a test has dependencies:
+
+1. The test framework creates a `pyproject.toml` in a temporary directory.
+1. The lockfile (e.g., `pydantic.lock`) is copied to the temporary directory.
+1. Runs `uv sync --locked` to install the dependencies.
+1. Copies the installed packages from the virtual environment's `site-packages` directory into the test's
+    in-memory filesystem.
+1. Configures the type checker to use these packages.
+
+**Note**: This feature requires `uv` to be installed and available in your `PATH`. The dependencies
+are installed fresh for each test that specifies them, so tests with many dependencies may be slower
+to run.
+
+#### Lockfiles
+
+Each `.md` file with external dependencies has a corresponding `.lock` file of the same name.
+This ensures reproducible test results across different environments and CI runs.
+
+When adding new tests or if you need to update dependency versions, regenerate the lockfiles
+with either of the following commands:
+
+```bash
+# Using the Python runner:
+uv run crates/ty_python_semantic/mdtest.py -e external/
+
+# Using `cargo`:
+MDTEST_EXTERNAL=1 MDTEST_UPGRADE_LOCKFILES=1 cargo test -p ty_python_semantic --test mdtest mdtest__external
+```
+
+After regenerating, commit the updated lockfiles to the repository.
 
 ### Specifying a custom typeshed
 

@@ -1,0 +1,51 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+[
+  {
+    "title": "Ignore 'unresolved-reference' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 1,
+            "character": 5
+          },
+          "end": {
+            "line": 1,
+            "character": 11
+          }
+        },
+        "severity": 1,
+        "code": "unresolved-reference",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unresolved-reference"
+        },
+        "source": "ty",
+        "message": "Name `foobar` used when not defined"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 1,
+                "character": 12
+              },
+              "end": {
+                "line": 1,
+                "character": 12
+              }
+            },
+            "newText": "  # ty:ignore[unresolved-reference]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]

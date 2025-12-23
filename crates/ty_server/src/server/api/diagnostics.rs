@@ -16,11 +16,12 @@ use ruff_db::system::SystemPathBuf;
 use serde::{Deserialize, Serialize};
 use ty_project::{Db as _, ProjectDatabase};
 
+use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentHandle;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DIAGNOSTIC_NAME, Db};
+use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
 pub(super) struct Diagnostics {
@@ -56,7 +57,11 @@ impl Diagnostics {
         Self::result_id_from_hash(&self.items)
     }
 
-    pub(super) fn to_lsp_diagnostics(&self, db: &ProjectDatabase) -> LspDiagnostics {
+    pub(super) fn to_lsp_diagnostics(
+        &self,
+        db: &ProjectDatabase,
+        client_capabilities: ResolvedClientCapabilities,
+    ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
 
@@ -67,7 +72,8 @@ impl Diagnostics {
             }
 
             for diagnostic in &self.items {
-                let (url, lsp_diagnostic) = to_lsp_diagnostic(db, diagnostic, self.encoding);
+                let (url, lsp_diagnostic) =
+                    to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities);
 
                 let Some(url) = url else {
                     tracing::warn!("Unable to find notebook cell");
@@ -85,7 +91,9 @@ impl Diagnostics {
             LspDiagnostics::TextDocument(
                 self.items
                     .iter()
-                    .map(|diagnostic| to_lsp_diagnostic(db, diagnostic, self.encoding).1)
+                    .map(|diagnostic| {
+                        to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities).1
+                    })
                     .collect(),
             )
         }
@@ -126,7 +134,7 @@ pub(super) fn clear_diagnostics_if_needed(
         return;
     }
 
-    clear_diagnostics(document.url(), client);
+    clear_diagnostics(document.url(), session, client);
 }
 
 /// Clears the diagnostics for the document identified by `uri`.
@@ -134,7 +142,11 @@ pub(super) fn clear_diagnostics_if_needed(
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
+pub(super) fn clear_diagnostics(uri: &lsp_types::Url, session: &Session, client: &Client) {
+    if session.global_settings().diagnostic_mode().is_off() {
+        return;
+    }
+
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
         uri: uri.clone(),
         diagnostics: vec![],
@@ -166,6 +178,10 @@ pub(super) fn publish_diagnostics_if_needed(
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
 pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
+    if session.global_settings().diagnostic_mode().is_off() {
+        return;
+    }
+
     let db = session.project_db(document.notebook_or_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
@@ -181,7 +197,7 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         });
     };
 
-    match diagnostics.to_lsp_diagnostics(db) {
+    match diagnostics.to_lsp_diagnostics(db, session.client_capabilities()) {
         LspDiagnostics::TextDocument(diagnostics) => {
             publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
@@ -207,11 +223,15 @@ pub(crate) fn publish_settings_diagnostics(
     // Note we DO NOT respect the fact that clients support pulls because these are
     // files they *specifically* won't pull diagnostics from us for, because we don't
     // claim to be an LSP for them.
-    if session.global_settings().diagnostic_mode().is_workspace() {
-        return;
+    match session.global_settings().diagnostic_mode() {
+        DiagnosticMode::Workspace | DiagnosticMode::Off => {
+            return;
+        }
+        DiagnosticMode::OpenFilesOnly => {}
     }
 
     let session_encoding = session.position_encoding();
+    let client_capabilities = session.client_capabilities();
     let state = session.project_state_mut(&AnySystemPath::System(path));
     let db = &state.db;
     let project = db.project();
@@ -253,7 +273,9 @@ pub(crate) fn publish_settings_diagnostics(
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .map(|diagnostic| to_lsp_diagnostic(db, &diagnostic, session_encoding).1)
+            .map(|diagnostic| {
+                to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1
+            })
             .collect::<Vec<_>>();
 
         client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
@@ -292,7 +314,11 @@ pub(super) fn to_lsp_diagnostic(
     db: &dyn Db,
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
+    client_capabilities: ResolvedClientCapabilities,
 ) -> (Option<lsp_types::Url>, Diagnostic) {
+    let supports_related_information =
+        client_capabilities.supports_diagnostic_related_information();
+
     let location = diagnostic.primary_span().and_then(|span| {
         let file = span.expect_ty_file();
         span.range()?
@@ -330,30 +356,35 @@ pub(super) fn to_lsp_diagnostic(
         Some(CodeDescription { href })
     });
 
-    let mut related_information = Vec::new();
+    let related_information =
+        if supports_related_information {
+            let mut related_information = Vec::new();
+            related_information.extend(diagnostic.secondary_annotations().filter_map(
+                |annotation| annotation_to_related_information(db, annotation, encoding),
+            ));
 
-    related_information.extend(
-        diagnostic
-            .secondary_annotations()
-            .filter_map(|annotation| annotation_to_related_information(db, annotation, encoding)),
-    );
+            for sub_diagnostic in diagnostic.sub_diagnostics() {
+                related_information.extend(sub_diagnostic_to_related_information(
+                    db,
+                    sub_diagnostic,
+                    encoding,
+                ));
 
-    for sub_diagnostic in diagnostic.sub_diagnostics() {
-        related_information.extend(sub_diagnostic_to_related_information(
-            db,
-            sub_diagnostic,
-            encoding,
-        ));
+                related_information.extend(
+                    sub_diagnostic
+                        .annotations()
+                        .iter()
+                        .filter(|annotation| !annotation.is_primary())
+                        .filter_map(|annotation| {
+                            annotation_to_related_information(db, annotation, encoding)
+                        }),
+                );
+            }
 
-        related_information.extend(
-            sub_diagnostic
-                .annotations()
-                .iter()
-                .filter_map(|annotation| {
-                    annotation_to_related_information(db, annotation, encoding)
-                }),
-        );
-    }
+            Some(related_information)
+        } else {
+            None
+        };
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
@@ -366,8 +397,21 @@ pub(super) fn to_lsp_diagnostic(
             code: Some(NumberOrString::String(diagnostic.id().to_string())),
             code_description,
             source: Some(DIAGNOSTIC_NAME.into()),
-            message: diagnostic.concise_message().to_string(),
-            related_information: Some(related_information),
+            message: if supports_related_information {
+                // Show both the primary and annotation messages if available,
+                // because we don't create a related information for the primary message.
+                if let Some(annotation_message) = diagnostic
+                    .primary_annotation()
+                    .and_then(|annotation| annotation.get_message())
+                {
+                    format!("{}: {annotation_message}", diagnostic.primary_message())
+                } else {
+                    diagnostic.primary_message().to_string()
+                }
+            } else {
+                diagnostic.concise_message().to_string()
+            },
+            related_information,
             data: serde_json::to_value(data).ok(),
         },
     )

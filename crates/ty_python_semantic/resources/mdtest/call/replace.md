@@ -36,7 +36,7 @@ class Point:
     x: int
     y: int
 
-reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = int, y: int = int) -> Point
+reveal_type(Point.__replace__)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 ```
 
 The `__replace__` method can either be called directly or through the `replace` function:

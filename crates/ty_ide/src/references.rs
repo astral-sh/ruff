@@ -10,15 +10,15 @@
 //! all references to these externally-visible symbols therefore requires
 //! an expensive search of all source files in the workspace.
 
-use crate::find_node::CoveringNode;
 use crate::goto::GotoTarget;
 use crate::{Db, NavigationTargets, ReferenceKind, ReferenceTarget};
 use ruff_db::files::File;
+use ruff_python_ast::find_node::CoveringNode;
+use ruff_python_ast::token::Tokens;
 use ruff_python_ast::{
     self as ast, AnyNodeRef,
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
-use ruff_python_parser::Tokens;
 use ruff_text_size::{Ranged, TextRange};
 use ty_python_semantic::{ImportAliasResolution, SemanticModel};
 
@@ -37,6 +37,38 @@ pub enum ReferencesMode {
     DocumentHighlights,
 }
 
+impl ReferencesMode {
+    pub(super) fn to_import_alias_resolution(self) -> ImportAliasResolution {
+        match self {
+            // Resolve import aliases for find references:
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            //
+            // When finding references on `my_deprecated`, we want to find all usages of `deprecated` across the entire
+            // project.
+            Self::References | Self::ReferencesSkipDeclaration => {
+                ImportAliasResolution::ResolveAliases
+            }
+            // For rename, don't resolve import aliases.
+            //
+            // ```py
+            // from warnings import deprecated as my_deprecated
+            //
+            // @my_deprecated
+            // def foo
+            // ```
+            // When renaming `my_deprecated`, only rename the alias, but not the original definition in `warnings`.
+            Self::Rename | Self::RenameMultiFile | Self::DocumentHighlights => {
+                ImportAliasResolution::PreserveAliases
+            }
+        }
+    }
+}
+
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
 pub(crate) fn references(
@@ -45,12 +77,9 @@ pub(crate) fn references(
     goto_target: &GotoTarget,
     mode: ReferencesMode,
 ) -> Option<Vec<ReferenceTarget>> {
-    // Get the definitions for the symbol at the cursor position
-
-    // When finding references, do not resolve any local aliases.
     let model = SemanticModel::new(db, file);
     let target_definitions = goto_target
-        .get_definition_targets(&model, ImportAliasResolution::PreserveAliases)?
+        .get_definition_targets(&model, mode.to_import_alias_resolution())?
         .declaration_targets(db)?;
 
     // Extract the target text from the goto target for fast comparison
@@ -305,10 +334,7 @@ impl LocalReferencesFinder<'_> {
 
     /// Determines whether the given covering node is a reference to
     /// the symbol we are searching for
-    fn check_reference_from_covering_node(
-        &mut self,
-        covering_node: &crate::find_node::CoveringNode<'_>,
-    ) {
+    fn check_reference_from_covering_node(&mut self, covering_node: &CoveringNode<'_>) {
         // Use the start of the covering node as the offset. Any offset within
         // the node is fine here. Offsets matter only for import statements
         // where the identifier might be a multi-part module name.
@@ -318,7 +344,7 @@ impl LocalReferencesFinder<'_> {
         {
             // Get the definitions for this goto target
             if let Some(current_definitions) = goto_target
-                .get_definition_targets(self.model, ImportAliasResolution::PreserveAliases)
+                .get_definition_targets(self.model, self.mode.to_import_alias_resolution())
                 .and_then(|definitions| definitions.declaration_targets(self.model.db()))
             {
                 // Check if any of the current definitions match our target definitions

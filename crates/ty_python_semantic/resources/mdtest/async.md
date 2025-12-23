@@ -43,9 +43,7 @@ async def main():
     loop = asyncio.get_event_loop()
     with concurrent.futures.ThreadPoolExecutor() as pool:
         result = await loop.run_in_executor(pool, blocking_function)
-
-        # TODO: should be `int`
-        reveal_type(result)  # revealed: Unknown
+        reveal_type(result)  # revealed: int
 ```
 
 ### `asyncio.Task`

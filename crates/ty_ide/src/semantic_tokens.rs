@@ -37,13 +37,12 @@ use bitflags::bitflags;
 use itertools::Itertools;
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
-use ruff_python_ast as ast;
 use ruff_python_ast::visitor::source_order::{
-    SourceOrderVisitor, TraversalSignal, walk_expr, walk_stmt,
+    SourceOrderVisitor, TraversalSignal, walk_arguments, walk_expr, walk_stmt,
 };
 use ruff_python_ast::{
-    AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt, StringLiteral,
-    TypeParam,
+    self as ast, AnyNodeRef, BytesLiteral, Expr, FString, InterpolatedStringElement, Stmt,
+    StringLiteral, TypeParam,
 };
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
@@ -132,6 +131,7 @@ bitflags! {
         const DEFINITION = 1 << 0;
         const READONLY = 1 << 1;
         const ASYNC = 1 << 2;
+        const DOCUMENTATION = 1 << 3;
     }
 }
 
@@ -144,7 +144,7 @@ impl SemanticTokenModifier {
     /// highlighting. For details, refer to this LSP specification:
     /// <https://microsoft.github.io/language-server-protocol/specifications/lsp/3.17/specification/#semanticTokenModifiers>
     pub fn all_names() -> Vec<&'static str> {
-        vec!["definition", "readonly", "async"]
+        vec!["definition", "readonly", "async", "documentation"]
     }
 }
 
@@ -190,18 +190,22 @@ pub fn semantic_tokens(db: &dyn Db, file: File, range: Option<TextRange>) -> Sem
     let model = SemanticModel::new(db, file);
 
     let mut visitor = SemanticTokenVisitor::new(&model, range);
+    visitor.expecting_docstring = true;
     visitor.visit_body(parsed.suite());
 
     SemanticTokens::new(visitor.tokens)
 }
 
 /// AST visitor that collects semantic tokens.
+#[expect(clippy::struct_excessive_bools)]
 struct SemanticTokenVisitor<'db> {
     model: &'db SemanticModel<'db>,
     tokens: Vec<SemanticToken>,
     in_class_scope: bool,
     in_type_annotation: bool,
     in_target_creating_definition: bool,
+    in_docstring: bool,
+    expecting_docstring: bool,
     range_filter: Option<TextRange>,
 }
 
@@ -213,7 +217,9 @@ impl<'db> SemanticTokenVisitor<'db> {
             in_class_scope: false,
             in_target_creating_definition: false,
             in_type_annotation: false,
+            in_docstring: false,
             range_filter,
+            expecting_docstring: false,
         }
     }
 
@@ -254,12 +260,18 @@ impl<'db> SemanticTokenVisitor<'db> {
     }
 
     fn is_constant_name(name: &str) -> bool {
-        name.chars().all(|c| c.is_uppercase() || c == '_') && name.len() > 1
+        name.chars()
+            .all(|c| c.is_uppercase() || c == '_' || c.is_numeric())
+            && name.len() > 1
     }
 
     fn classify_name(&self, name: &ast::ExprName) -> (SemanticTokenType, SemanticTokenModifier) {
         // First try to classify the token based on its definition kind.
-        let definition = definition_for_name(self.model, name);
+        let definition = definition_for_name(
+            self.model,
+            name,
+            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+        );
 
         if let Some(definition) = definition {
             let name_str = name.id.as_str();
@@ -269,7 +281,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         }
 
         // Fall back to type-based classification.
-        let ty = name.inferred_type(self.model);
+        let ty = name.inferred_type(self.model).unwrap_or(Type::unknown());
         let name_str = name.id.as_str();
         self.classify_from_type_and_name_str(ty, name_str)
     }
@@ -298,15 +310,25 @@ impl<'db> SemanticTokenVisitor<'db> {
                 let parsed = parsed_module(db, definition.file(db));
                 let ty = parameter.node(&parsed.load(db)).inferred_type(&model);
 
-                if let Type::TypeVar(type_var) = ty {
-                    match type_var.typevar(db).kind(db) {
-                        TypeVarKind::TypingSelf => {
-                            return Some((SemanticTokenType::SelfParameter, modifiers));
+                if let Some(ty) = ty {
+                    let type_var = match ty {
+                        Type::TypeVar(type_var) => Some((type_var, false)),
+                        Type::SubclassOf(subclass_of) => {
+                            subclass_of.into_type_var().map(|var| (var, true))
                         }
-                        TypeVarKind::Legacy
-                        | TypeVarKind::ParamSpec
-                        | TypeVarKind::Pep695ParamSpec
-                        | TypeVarKind::Pep695 => {}
+                        _ => None,
+                    };
+
+                    if let Some((type_var, is_cls)) = type_var
+                        && matches!(type_var.typevar(db).kind(db), TypeVarKind::TypingSelf)
+                    {
+                        let kind = if is_cls {
+                            SemanticTokenType::ClsParameter
+                        } else {
+                            SemanticTokenType::SelfParameter
+                        };
+
+                        return Some((kind, modifiers));
                     }
                 }
 
@@ -340,9 +362,9 @@ impl<'db> SemanticTokenVisitor<'db> {
                     _ => None,
                 };
 
-                if let Some(value) = value {
-                    let value_ty = value.inferred_type(&model);
-
+                if let Some(value) = value
+                    && let Some(value_ty) = value.inferred_type(&model)
+                {
                     if value_ty.is_class_literal()
                         || value_ty.is_subclass_of()
                         || value_ty.is_generic_alias()
@@ -586,6 +608,8 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
     }
 
     fn visit_stmt(&mut self, stmt: &Stmt) {
+        let expecting_docstring = self.expecting_docstring;
+        self.expecting_docstring = false;
         match stmt {
             ast::Stmt::FunctionDef(func) => {
                 // Visit decorator expressions
@@ -627,7 +651,9 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 let prev_in_class = self.in_class_scope;
 
                 self.in_class_scope = false;
+                self.expecting_docstring = true;
                 self.visit_body(&func.body);
+                self.expecting_docstring = false;
                 self.in_class_scope = prev_in_class;
             }
             ast::Stmt::ClassDef(class) => {
@@ -652,19 +678,14 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
                 // Handle base classes and type annotations in inheritance
                 if let Some(arguments) = &class.arguments {
-                    // Visit base class arguments
-                    for arg in &arguments.args {
-                        self.visit_expr(arg);
-                    }
-                    // Visit keyword arguments (for metaclass, etc.)
-                    for keyword in &arguments.keywords {
-                        self.visit_expr(&keyword.value);
-                    }
+                    walk_arguments(self, arguments);
                 }
 
                 let prev_in_class = self.in_class_scope;
                 self.in_class_scope = true;
+                self.expecting_docstring = true;
                 self.visit_body(&class.body);
+                self.expecting_docstring = false;
                 self.in_class_scope = prev_in_class;
             }
             ast::Stmt::TypeAlias(type_alias) => {
@@ -706,12 +727,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 for alias in &import.names {
                     if let Some(asname) = &alias.asname {
                         // For aliased imports (from X import Y as Z), classify Z based on what Y is
-                        let ty = alias.inferred_type(self.model);
+                        let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
                         let (token_type, modifiers) = self.classify_from_alias_type(ty, asname);
                         self.add_token(asname, token_type, modifiers);
                     } else {
                         // For direct imports (from X import Y), use semantic classification
-                        let ty = alias.inferred_type(self.model);
+                        let ty = alias.inferred_type(self.model).unwrap_or(Type::unknown());
                         let (token_type, modifiers) =
                             self.classify_from_alias_type(ty, &alias.name);
                         self.add_token(&alias.name, token_type, modifiers);
@@ -746,6 +767,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.in_target_creating_definition = false;
 
                 self.visit_expr(&assignment.value);
+                self.expecting_docstring = true;
             }
             ast::Stmt::AnnAssign(assignment) => {
                 self.in_target_creating_definition = true;
@@ -757,6 +779,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 if let Some(value) = &assignment.value {
                     self.visit_expr(value);
                 }
+                self.expecting_docstring = true;
             }
             ast::Stmt::For(for_stmt) => {
                 self.in_target_creating_definition = true;
@@ -801,7 +824,13 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_body(&try_stmt.orelse);
                 self.visit_body(&try_stmt.finalbody);
             }
-
+            ast::Stmt::Expr(expr) => {
+                if expecting_docstring && expr.value.is_string_literal_expr() {
+                    self.in_docstring = true;
+                }
+                walk_stmt(self, stmt);
+                self.in_docstring = false;
+            }
             _ => {
                 // For all other statement types, let the default visitor handle them
                 walk_stmt(self, stmt);
@@ -831,7 +860,7 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
                 self.visit_expr(&attr.value);
 
                 // Then add token for the attribute name (e.g., 'path' in 'os.path')
-                let ty = expr.inferred_type(self.model);
+                let ty = expr.inferred_type(self.model).unwrap_or(Type::unknown());
                 let (token_type, modifiers) =
                     Self::classify_from_type_for_attribute(ty, &attr.attr);
                 self.add_token(&attr.attr, token_type, modifiers);
@@ -895,11 +924,12 @@ impl SourceOrderVisitor<'_> for SemanticTokenVisitor<'_> {
 
     fn visit_string_literal(&mut self, string_literal: &StringLiteral) {
         // Emit a semantic token for this string literal part
-        self.add_token(
-            string_literal.range(),
-            SemanticTokenType::String,
-            SemanticTokenModifier::empty(),
-        );
+        let modifiers = if self.in_docstring {
+            SemanticTokenModifier::DOCUMENTATION
+        } else {
+            SemanticTokenModifier::empty()
+        };
+        self.add_token(string_literal.range(), SemanticTokenType::String, modifiers);
     }
 
     fn visit_bytes_literal(&mut self, bytes_literal: &BytesLiteral) {
@@ -1123,6 +1153,22 @@ mod tests {
     }
 
     #[test]
+    fn test_semantic_tokens_class_args() {
+        // This used to cause a panic because of an incorrect
+        // insertion-order when visiting arguments inside
+        // class definitions.
+        let test = SemanticTokenTest::new("class Foo(m=x, m)");
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        "Foo" @ 6..9: Class [definition]
+        "x" @ 12..13: Variable
+        "m" @ 15..16: Variable
+        "###);
+    }
+
+    #[test]
     fn test_semantic_tokens_variables() {
         let test = SemanticTokenTest::new(
             "
@@ -1197,7 +1243,7 @@ class MyClass:
             "
 class MyClass:
     @classmethod
-    def method(cls, x): pass
+    def method(cls, x): print(cls)
 ",
         );
 
@@ -1209,6 +1255,8 @@ class MyClass:
         "method" @ 41..47: Method [definition]
         "cls" @ 48..51: ClsParameter [definition]
         "x" @ 53..54: Parameter [definition]
+        "print" @ 57..62: Function
+        "cls" @ 63..66: ClsParameter
         "#);
     }
 
@@ -1240,7 +1288,7 @@ class MyClass:
 class MyClass:
     def method(instance, x): pass
     @classmethod
-    def other(klass, y): pass
+    def other(klass, y): print(klass)
     def complex_method(instance, posonly, /, regular, *args, kwonly, **kwargs): pass
 ",
         );
@@ -1256,13 +1304,15 @@ class MyClass:
         "other" @ 75..80: Method [definition]
         "klass" @ 81..86: ClsParameter [definition]
         "y" @ 88..89: Parameter [definition]
-        "complex_method" @ 105..119: Method [definition]
-        "instance" @ 120..128: SelfParameter [definition]
-        "posonly" @ 130..137: Parameter [definition]
-        "regular" @ 142..149: Parameter [definition]
-        "args" @ 152..156: Parameter [definition]
-        "kwonly" @ 158..164: Parameter [definition]
-        "kwargs" @ 168..174: Parameter [definition]
+        "print" @ 92..97: Function
+        "klass" @ 98..103: ClsParameter
+        "complex_method" @ 113..127: Method [definition]
+        "instance" @ 128..136: SelfParameter [definition]
+        "posonly" @ 138..145: Parameter [definition]
+        "regular" @ 150..157: Parameter [definition]
+        "args" @ 160..164: Parameter [definition]
+        "kwonly" @ 166..172: Parameter [definition]
+        "kwargs" @ 176..182: Parameter [definition]
         "#);
     }
 
@@ -1825,6 +1875,456 @@ y: Optional[str] = None
     }
 
     #[test]
+    fn function_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+def my_function(param1: int, param2: str) -> bool:
+    """Example function
+
+    Args:
+        param1: The first parameter.
+        param2: The second parameter.
+
+    Returns:
+        The return value. True for success, False otherwise.
+
+    """
+
+    x = "hello"
+    def other_func(): pass
+
+    """unrelated string"""
+
+    return False
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "my_function" @ 5..16: Function [definition]
+        "param1" @ 17..23: Parameter [definition]
+        "int" @ 25..28: Class
+        "param2" @ 30..36: Parameter [definition]
+        "str" @ 38..41: Class
+        "bool" @ 46..50: Class
+        "\"\"\"Example function\n\n    Args:\n        param1: The first parameter.\n        param2: The second parameter.\n\n    Returns:\n        The return value. True for success, False otherwise.\n\n    \"\"\"" @ 56..245: String [documentation]
+        "x" @ 251..252: Variable [definition]
+        "\"hello\"" @ 255..262: String
+        "other_func" @ 271..281: Function [definition]
+        "\"\"\"unrelated string\"\"\"" @ 295..317: String
+        "False" @ 330..335: BuiltinConstant
+        "#);
+    }
+
+    #[test]
+    fn class_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """Example class
+
+    What a good class wowwee
+    """
+
+    def __init__(self): pass
+
+    """unrelated string"""
+    
+    x: str = "hello"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"Example class\n\n    What a good class wowwee\n    \"\"\"" @ 20..74: String [documentation]
+        "__init__" @ 84..92: Method [definition]
+        "self" @ 93..97: SelfParameter [definition]
+        "\"\"\"unrelated string\"\"\"" @ 110..132: String
+        "x" @ 138..139: Variable [definition]
+        "str" @ 141..144: Class
+        "\"hello\"" @ 147..154: String
+        "#);
+    }
+
+    #[test]
+    fn module_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+"""Example module
+
+What a good module wooo
+"""
+
+def my_func(): pass
+
+"""unrelated string"""
+    
+x: str = "hello"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "\"\"\"Example module\n\nWhat a good module wooo\n\"\"\"" @ 1..47: String [documentation]
+        "my_func" @ 53..60: Function [definition]
+        "\"\"\"unrelated string\"\"\"" @ 70..92: String
+        "x" @ 94..95: Variable [definition]
+        "str" @ 97..100: Class
+        "\"hello\"" @ 103..110: String
+        "#);
+    }
+
+    #[test]
+    fn attribute_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+important_value: str = "wow"
+"""This is the most important value
+
+Don't trust the other guy
+"""
+
+x = "unrelated string"
+
+other_value: int = 2
+"""This is such an import value omg
+
+Trust me
+"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "important_value" @ 1..16: Variable [definition]
+        "str" @ 18..21: Class
+        "\"wow\"" @ 24..29: String
+        "\"\"\"This is the most important value\n\nDon't trust the other guy\n\"\"\"" @ 30..96: String [documentation]
+        "x" @ 98..99: Variable [definition]
+        "\"unrelated string\"" @ 102..120: String
+        "other_value" @ 122..133: Variable [definition]
+        "int" @ 135..138: Class
+        "2" @ 141..142: Number
+        "\"\"\"This is such an import value omg\n\nTrust me\n\"\"\"" @ 143..192: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn attribute_docstring_classification_spill() {
+        let test = SemanticTokenTest::new(
+            r#"
+if True:
+    x = 1
+"this shouldn't be a docstring but also it doesn't matter much"
+"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "True" @ 4..8: BuiltinConstant
+        "x" @ 14..15: Variable [definition]
+        "1" @ 18..19: Number
+        "\"this shouldn't be a docstring but also it doesn't matter much\"" @ 20..83: String [documentation]
+        "\"\"\"\n" @ 84..88: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" """and docs"""
+
+def my_func():
+    """wow cool docs""" """and docs"""
+
+x = 1
+"""wow cool docs""" """and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 40..54: String [documentation]
+        "my_func" @ 60..67: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 75..94: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 95..109: String [documentation]
+        "x" @ 111..112: Variable [definition]
+        "1" @ 115..116: Number
+        "\"\"\"wow cool docs\"\"\"" @ 117..136: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 137..151: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_parens() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    (
+        """wow cool docs"""
+        """and docs"""
+    )
+
+def my_func():
+    (
+        """wow cool docs"""
+        """and docs"""
+    )
+
+x = 1
+(
+    """wow cool docs"""
+    """and docs"""
+)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 30..49: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 58..72: String [documentation]
+        "my_func" @ 84..91: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 109..128: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 137..151: String [documentation]
+        "x" @ 159..160: Variable [definition]
+        "1" @ 163..164: Number
+        "\"\"\"wow cool docs\"\"\"" @ 171..190: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 195..209: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_parens_commented_nextline() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    (
+        """wow cool docs"""
+        # and a comment that shouldn't be included
+        """and docs"""
+    )
+
+def my_func():
+    (
+        """wow cool docs"""
+        # and a comment that shouldn't be included
+        """and docs"""
+    )
+
+x = 1
+(
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+)
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 30..49: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 109..123: String [documentation]
+        "my_func" @ 135..142: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 160..179: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 239..253: String [documentation]
+        "x" @ 261..262: Variable [definition]
+        "1" @ 265..266: Number
+        "\"\"\"wow cool docs\"\"\"" @ 273..292: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 344..358: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_commented_nextline() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+
+def my_func():
+    """wow cool docs"""
+    # and a comment that shouldn't be included
+    """and docs"""
+
+x = 1
+"""wow cool docs"""
+# and a comment that shouldn't be included
+"""and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 91..105: String
+        "my_func" @ 111..118: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 126..145: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 197..211: String
+        "x" @ 213..214: Variable [definition]
+        "1" @ 217..218: Number
+        "\"\"\"wow cool docs\"\"\"" @ 219..238: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 282..296: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_commented_sameline() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" # and a comment
+    """and docs"""      # that shouldn't be included
+
+def my_func():
+    """wow cool docs""" # and a comment
+    """and docs"""      # that shouldn't be included
+
+x = 1
+"""wow cool docs""" # and a comment
+"""and docs"""      # that shouldn't be included
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 60..74: String
+        "my_func" @ 114..121: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 129..148: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 169..183: String
+        "x" @ 219..220: Variable [definition]
+        "1" @ 223..224: Number
+        "\"\"\"wow cool docs\"\"\"" @ 225..244: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 261..275: String
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_concat_slashed() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    """wow cool docs""" \
+    """and docs"""
+
+def my_func():
+    """wow cool docs""" \
+    """and docs"""
+
+x = 1
+"""wow cool docs""" \
+"""and docs"""
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 20..39: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 46..60: String [documentation]
+        "my_func" @ 66..73: Function [definition]
+        "\"\"\"wow cool docs\"\"\"" @ 81..100: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 107..121: String [documentation]
+        "x" @ 123..124: Variable [definition]
+        "1" @ 127..128: Number
+        "\"\"\"wow cool docs\"\"\"" @ 129..148: String [documentation]
+        "\"\"\"and docs\"\"\"" @ 151..165: String [documentation]
+        "#);
+    }
+
+    #[test]
+    fn docstring_classification_plus() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    "wow cool docs" + "and docs"
+
+def my_func():
+    "wow cool docs" + "and docs"
+
+x = 1
+"wow cool docs" + "and docs"
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "\"wow cool docs\"" @ 20..35: String
+        "\"and docs\"" @ 38..48: String
+        "my_func" @ 54..61: Function [definition]
+        "\"wow cool docs\"" @ 69..84: String
+        "\"and docs\"" @ 87..97: String
+        "x" @ 99..100: Variable [definition]
+        "1" @ 103..104: Number
+        "\"wow cool docs\"" @ 105..120: String
+        "\"and docs\"" @ 123..133: String
+        "#);
+    }
+
+    #[test]
+    fn class_attribute_docstring_classification() {
+        let test = SemanticTokenTest::new(
+            r#"
+class MyClass:
+    important_value: str = "wow"
+    """This is the most important value
+
+    Don't trust the other guy
+    """
+
+    x = "unrelated string"
+
+    other_value: int = 2
+    """This is such an import value omg
+
+    Trust me
+    """
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "MyClass" @ 7..14: Class [definition]
+        "important_value" @ 20..35: Variable [definition]
+        "str" @ 37..40: Class
+        "\"wow\"" @ 43..48: String
+        "\"\"\"This is the most important value\n\n    Don't trust the other guy\n    \"\"\"" @ 53..127: String [documentation]
+        "x" @ 133..134: Variable [definition]
+        "\"unrelated string\"" @ 137..155: String
+        "other_value" @ 161..172: Variable [definition]
+        "int" @ 174..177: Class
+        "2" @ 180..181: Number
+        "\"\"\"This is such an import value omg\n\n    Trust me\n    \"\"\"" @ 186..243: String [documentation]
+        "#);
+    }
+
+    #[test]
     fn test_debug_int_classification() {
         let test = SemanticTokenTest::new(
             "
@@ -2210,6 +2710,49 @@ class MyClass:
         "dataclass" @ 75..84: Decorator
         "MyClass" @ 91..98: Class [definition]
         "###);
+    }
+
+    #[test]
+    fn test_constant_variations() {
+        let test = SemanticTokenTest::new(
+            r#"
+A = 1
+AB = 1
+ABC = 1
+A1 = 1
+AB1 = 1
+ABC1 = 1
+A_B = 1
+A1_B = 1
+A_B1 = 1
+A_1 = 1
+"#,
+        );
+
+        let tokens = test.highlight_file();
+
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
+        "A" @ 1..2: Variable [definition]
+        "1" @ 5..6: Number
+        "AB" @ 7..9: Variable [definition, readonly]
+        "1" @ 12..13: Number
+        "ABC" @ 14..17: Variable [definition, readonly]
+        "1" @ 20..21: Number
+        "A1" @ 22..24: Variable [definition, readonly]
+        "1" @ 27..28: Number
+        "AB1" @ 29..32: Variable [definition, readonly]
+        "1" @ 35..36: Number
+        "ABC1" @ 37..41: Variable [definition, readonly]
+        "1" @ 44..45: Number
+        "A_B" @ 46..49: Variable [definition, readonly]
+        "1" @ 52..53: Number
+        "A1_B" @ 54..58: Variable [definition, readonly]
+        "1" @ 61..62: Number
+        "A_B1" @ 63..67: Variable [definition, readonly]
+        "1" @ 70..71: Number
+        "A_1" @ 72..75: Variable [definition, readonly]
+        "1" @ 78..79: Number
+        "#);
     }
 
     #[test]
@@ -2784,6 +3327,12 @@ def foo(self, **key, value=10):
                     }
                     if token.modifiers.contains(SemanticTokenModifier::ASYNC) {
                         mods.push("async");
+                    }
+                    if token
+                        .modifiers
+                        .contains(SemanticTokenModifier::DOCUMENTATION)
+                    {
+                        mods.push("documentation");
                     }
                     format!(" [{}]", mods.join(", "))
                 };

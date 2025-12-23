@@ -209,7 +209,7 @@ from typing import Union
 
 IntOrStr = Union[int, str]
 
-reveal_type(IntOrStr)  # revealed: types.UnionType
+reveal_type(IntOrStr)  # revealed: <types.UnionType special-form 'int | str'>
 
 def f(x: type[int | str | bytes | range]):
     if issubclass(x, IntOrStr):
@@ -218,6 +218,48 @@ def f(x: type[int | str | bytes | range]):
         reveal_type(x)  # revealed: type[bytes]
     else:
         reveal_type(x)  # revealed: <class 'range'>
+```
+
+## `classinfo` is a generic final class
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+When we check a generic `@final` class against `type[GenericFinal]`, we can conclude that the check
+always succeeds:
+
+```py
+from typing import final
+
+@final
+class GenericFinal[T]:
+    x: T  # invariant
+
+def f(x: type[GenericFinal]):
+    reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+
+    if issubclass(x, GenericFinal):
+        reveal_type(x)  # revealed: <class 'GenericFinal[Unknown]'>
+    else:
+        reveal_type(x)  # revealed: Never
+```
+
+This also works if the typevar has an upper bound:
+
+```py
+@final
+class BoundedGenericFinal[T: int]:
+    x: T  # invariant
+
+def g(x: type[BoundedGenericFinal]):
+    reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+
+    if issubclass(x, BoundedGenericFinal):
+        reveal_type(x)  # revealed: <class 'BoundedGenericFinal[Unknown]'>
+    else:
+        reveal_type(x)  # revealed: Never
 ```
 
 ## Special cases

@@ -589,6 +589,128 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Test behavior when explicitly checking a path that matches an exclude pattern and `--force-exclude` is provided
+#[test]
+fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        (
+            "src/main.py",
+            r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "tests/generated.py",
+            r#"
+            print(dist_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "dist/other.py",
+            r#"
+            print(other_undefined_var)  # error: unresolved-reference
+            "#,
+        ),
+        (
+            "ty.toml",
+            r#"
+            [src]
+            exclude = ["tests/generated.py"]
+            "#,
+        ),
+    ])?;
+
+    // Explicitly checking a file in an excluded directory should still check that file
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `dist_undefined_var` used when not defined
+     --> tests/generated.py:2:7
+      |
+    2 | print(dist_undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    // Except when `--force-exclude` is set.
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py").arg("--force-exclude"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    // Explicitly checking the entire excluded directory should check all files in it
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `other_undefined_var` used when not defined
+     --> dist/other.py:2:7
+      |
+    2 | print(other_undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    // Except when using `--force-exclude`
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py").arg("--force-exclude"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main.py:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 #[test]
 fn cli_and_configuration_exclude() -> anyhow::Result<()> {
     let case = CliTest::with_files([

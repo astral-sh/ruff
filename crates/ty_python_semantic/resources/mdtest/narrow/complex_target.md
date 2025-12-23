@@ -104,6 +104,8 @@ class C:
     value: str | None
 
 def foo(c: C):
+    # The truthiness check `c.value` narrows to `str & ~AlwaysFalsy`.
+    # The subsequent `len(c.value)` doesn't narrow further since `str` is not narrowable by len().
     if c.value and len(c.value):
         reveal_type(c.value)  # revealed: str & ~AlwaysFalsy
 
@@ -114,7 +116,7 @@ def foo(c: C):
     if c.value is None or not len(c.value):
         reveal_type(c.value)  # revealed: str | None
     else:  # c.value is not None and len(c.value)
-        # TODO: should be # `str & ~AlwaysFalsy`
+        # `c.value is not None` narrows to `str`, but `str` is not narrowable by len().
         reveal_type(c.value)  # revealed: str
 ```
 

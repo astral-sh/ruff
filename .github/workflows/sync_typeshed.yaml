@@ -16,8 +16,7 @@ name: Sync typeshed
 # 3. Once the Windows worker is done, a MacOS worker:
 #    a. Checks out the branch created by the Linux worker
 #    b. Syncs all docstrings available on MacOS that are not available on Linux or Windows
-#    c. Attempts to update any snapshots that might have changed
-#       (this sub-step is allowed to fail)
+#    c. Formats the code again
 #    d. Commits the changes and pushes them to the same upstream branch
 #    e. Creates a PR against the `main` branch using the branch all three workers have pushed to
 # 4. If any of steps 1-3 failed, an issue is created in the `astral-sh/ruff` repository
@@ -198,42 +197,6 @@ jobs:
         run: |
           rm "${VENDORED_TYPESHED}/pyproject.toml"
           git commit -am "Remove pyproject.toml file"
-      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
-      - name: "Install Rust toolchain"
-        if: ${{ success() }}
-        run: rustup show
-      - name: "Install mold"
-        if: ${{ success() }}
-        uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-      - name: "Install cargo nextest"
-        if: ${{ success() }}
-        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
-        with:
-          tool: cargo-nextest
-      - name: "Install cargo insta"
-        if: ${{ success() }}
-        uses: taiki-e/install-action@3575e532701a5fc614b0c842e4119af4cc5fd16d # v2.62.60
-        with:
-          tool: cargo-insta
-      - name: Update snapshots
-        if: ${{ success() }}
-        run: |
-          cargo r \
-          --profile=profiling \
-          -p ty_completion_eval \
-          -- all --tasks ./crates/ty_completion_eval/completion-evaluation-tasks.csv
-
-          # The `cargo insta` docs indicate that `--unreferenced=delete` might be a good option,
-          # but from local testing it appears to just revert all changes made by `cargo insta test --accept`.
-          #
-          # If there were only snapshot-related failures, `cargo insta test --accept` will have exit code 0,
-          # but if there were also other mdtest failures (for example), it will return a nonzero exit code.
-          # We don't care about other tests failing here, we just want snapshots updated where possible,
-          # so we use `|| true` here to ignore the exit code.
-          cargo insta test --accept --color=always --all-features --test-runner=nextest || true
-      - name: Commit snapshot changes
-        if: ${{ success() }}
-        run: git commit -am "Update snapshots" || echo "No snapshot changes to commit"
       - name: Push changes upstream and create a PR
         if: ${{ success() }}
         run: |
@@ -245,7 +208,7 @@ jobs:
     name: Create an issue if the typeshed sync failed
     runs-on: ubuntu-latest
     needs: [sync, docstrings-windows, docstrings-macos-and-pr]
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result == 'failure' || needs.docstrings-windows.result == 'failure' || needs.docstrings-macos-and-pr.result == 'failure') }}
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && (needs.sync.result != 'success' || needs.docstrings-windows.result != 'success' || needs.docstrings-macos-and-pr.result != 'success') }}
     permissions:
       issues: write
     steps:

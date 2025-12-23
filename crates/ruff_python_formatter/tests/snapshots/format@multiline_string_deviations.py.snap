@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/multiline_string_deviations.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -105,4 +104,23 @@ generated_readme = (
 <Add content here!>
 """.strip().format(project_name)
 )
+```
+
+
+## Preview changes
+```diff
+--- Stable
++++ Preview
+@@ -44,10 +44,8 @@
+ # this by changing `Lambda::needs_parentheses` to return `BestFit` but it causes
+ # issues when the lambda has comments.
+ # Let's keep this as a known deviation for now.
+-generated_readme = (
+-    lambda project_name: """
++generated_readme = lambda project_name: """
+ {}
+ 
+ <Add content here!>
+ """.strip().format(project_name)
+-)
 ```

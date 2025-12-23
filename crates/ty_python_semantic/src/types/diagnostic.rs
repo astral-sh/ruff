@@ -14,37 +14,37 @@ use crate::semantic_index::place::{PlaceTable, ScopedPlaceId};
 use crate::semantic_index::{global_scope, place_table, use_def_map};
 use crate::suppression::FileSuppressionId;
 use crate::types::call::CallError;
-use crate::types::class::{
-    CodeGeneratorKind, DisjointBase, DisjointBaseKind, Field, MethodDecorator,
-};
+use crate::types::class::{CodeGeneratorKind, DisjointBase, DisjointBaseKind, MethodDecorator};
 use crate::types::function::{FunctionDecorators, FunctionType, KnownFunction, OverloadLiteral};
+use crate::types::infer::UnsupportedComparisonError;
 use crate::types::overrides::MethodKind;
 use crate::types::string_annotation::{
     BYTE_STRING_TYPE_ANNOTATION, ESCAPE_CHARACTER_IN_FORWARD_ANNOTATION, FSTRING_TYPE_ANNOTATION,
     IMPLICIT_CONCATENATED_STRING_TYPE_ANNOTATION, INVALID_SYNTAX_IN_FORWARD_ANNOTATION,
     RAW_STRING_TYPE_ANNOTATION,
 };
+use crate::types::tuple::TupleSpec;
+use crate::types::typed_dict::TypedDictSchema;
 use crate::types::{
     BoundTypeVarInstance, ClassType, DynamicType, LintDiagnosticGuard, Protocol,
     ProtocolInstanceType, SpecialFormType, SubclassOfInner, Type, TypeContext, binding_type,
     protocol_class::ProtocolClass,
 };
-use crate::types::{KnownInstanceType, MemberLookupPolicy};
-use crate::{Db, DisplaySettings, FxIndexMap, Module, ModuleName, Program, declare_lint};
+use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
+use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
     parsed::parsed_module,
-    source::source_text,
 };
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::name::Name;
-use ruff_python_ast::parenthesize::parentheses_iterator;
-use ruff_python_ast::{self as ast, AnyNodeRef, StringFlags};
-use ruff_python_trivia::CommentRanges;
+use ruff_python_ast::token::parentheses_iterator;
+use ruff_python_ast::{self as ast, AnyNodeRef, PythonVersion, StringFlags};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::fmt::{self, Formatter};
+use ty_module_resolver::{Module, ModuleName};
 
 /// Registers all known type check lints.
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
@@ -122,6 +122,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
+    registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
 
     // String annotations
     registry.register_lint(&BYTE_STRING_TYPE_ANNOTATION);
@@ -307,6 +308,10 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Dividing by zero raises a `ZeroDivisionError` at runtime.
+    ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
     ///
     /// ## Examples
     /// ```python
@@ -894,15 +899,20 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// There are several requirements that you must follow when defining a generic class.
+    /// Many of these result in `TypeError` being raised at runtime if they are violated.
     ///
     /// ## Examples
     /// ```python
-    /// from typing import Generic, TypeVar
+    /// from typing_extensions import Generic, TypeVar
     ///
-    /// T = TypeVar("T")  # okay
+    /// T = TypeVar("T")
+    /// U = TypeVar("U", default=int)
     ///
     /// # error: class uses both PEP-695 syntax and legacy syntax
     /// class C[U](Generic[T]): ...
+    ///
+    /// # error: type parameter with default comes before type parameter without default
+    /// class D(Generic[U, T]): ...
     /// ```
     ///
     /// ## References
@@ -1575,6 +1585,10 @@ declare_lint! {
     /// Importing a missing module or name will raise a `ModuleNotFoundError`
     /// or `ImportError` at runtime.
     ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
+    ///
     /// ## Examples
     /// ```python
     /// # module.py
@@ -1589,7 +1603,7 @@ declare_lint! {
     pub(crate) static POSSIBLY_MISSING_IMPORT = {
         summary: "detects possibly missing imports",
         status: LintStatus::stable("0.0.1-alpha.22"),
-        default_level: Level::Warn,
+        default_level: Level::Ignore,
     }
 }
 
@@ -1599,6 +1613,10 @@ declare_lint! {
     ///
     /// ## Why is this bad?
     /// Using an undefined variable will raise a `NameError` at runtime.
+    ///
+    /// ## Rule status
+    /// This rule is currently disabled by default because of the number of
+    /// false positives it can produce.
     ///
     /// ## Example
     ///
@@ -2221,6 +2239,44 @@ declare_lint! {
     }
 }
 
+declare_lint! {
+    /// ## What it does
+    /// Checks for dataclasses with invalid frozen inheritance:
+    /// - A frozen dataclass cannot inherit from a non-frozen dataclass.
+    /// - A non-frozen dataclass cannot inherit from a frozen dataclass.
+    ///
+    /// ## Why is this bad?
+    /// Python raises a `TypeError` at runtime when either of these inheritance
+    /// patterns occurs.
+    ///
+    /// ## Example
+    ///
+    /// ```python
+    /// from dataclasses import dataclass
+    ///
+    /// @dataclass
+    /// class Base:
+    ///     x: int
+    ///
+    /// @dataclass(frozen=True)
+    /// class Child(Base):  # Error raised here
+    ///     y: int
+    ///
+    /// @dataclass(frozen=True)
+    /// class FrozenBase:
+    ///     x: int
+    ///
+    /// @dataclass
+    /// class NonFrozenChild(FrozenBase):  # Error raised here
+    ///     y: int
+    /// ```
+    pub(crate) static INVALID_FROZEN_DATACLASS_SUBCLASS = {
+        summary: "detects dataclasses with invalid frozen/non-frozen subclassing",
+        status: LintStatus::stable("0.0.1-alpha.35"),
+        default_level: Level::Error,
+    }
+}
+
 /// A collection of type check diagnostics.
 #[derive(Default, Eq, PartialEq, get_size2::GetSize)]
 pub struct TypeCheckDiagnostics {
@@ -2410,7 +2466,7 @@ pub(super) fn report_invalid_assignment<'db>(
     }
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), target_ty, value_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [target_ty, value_ty]);
 
     let diagnostic_range = if let Some(value_node) = value_node {
         // Expand the range to include parentheses around the value, if any. This allows
@@ -2421,9 +2477,7 @@ pub(super) fn report_invalid_assignment<'db>(
         // )  # ty: ignore <- or here
         // ```
 
-        let comment_ranges = CommentRanges::from(context.module().tokens());
-        let source = source_text(context.db(), context.file());
-        parentheses_iterator(value_node.into(), None, &comment_ranges, &source)
+        parentheses_iterator(value_node.into(), None, context.module().tokens())
             .last()
             .unwrap_or(value_node.range())
     } else {
@@ -2548,7 +2602,7 @@ pub(super) fn report_invalid_return_type(
     };
 
     let settings =
-        DisplaySettings::from_possibly_ambiguous_type_pair(context.db(), expected_ty, actual_ty);
+        DisplaySettings::from_possibly_ambiguous_types(context.db(), [expected_ty, actual_ty]);
     let return_type_span = context.span(return_type_range);
 
     let mut diag = builder.into_diagnostic("Return type does not match returned value");
@@ -3000,11 +3054,10 @@ pub(crate) fn report_invalid_arguments_to_annotated(
     let Some(builder) = context.report_lint(&INVALID_TYPE_FORM, subscript) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Special form `{}` expected at least 2 arguments \
+    builder.into_diagnostic(
+        "Special form `typing.Annotated` expected at least 2 arguments \
          (one type and at least one metadata element)",
-        SpecialFormType::Annotated
-    ));
+    );
 }
 
 pub(crate) fn report_invalid_argument_number_to_special_form(
@@ -3105,8 +3158,7 @@ pub(crate) fn report_invalid_arguments_to_callable(
         return;
     };
     builder.into_diagnostic(format_args!(
-        "Special form `{}` expected exactly two arguments (parameter types and return type)",
-        SpecialFormType::Callable
+        "Special form `typing.Callable` expected exactly two arguments (parameter types and return type)",
     ));
 }
 
@@ -3439,13 +3491,16 @@ fn report_unsupported_base(
     let Some(builder) = context.report_lint(&UNSUPPORTED_BASE, base_node) else {
         return;
     };
-    let mut diagnostic = builder.into_diagnostic(format_args!(
+    let db = context.db();
+    let mut diagnostic = builder.into_diagnostic("Unsupported class base");
+    diagnostic.set_primary_message(format_args!("Has type `{}`", base_type.display(db)));
+    diagnostic.set_concise_message(format_args!(
         "Unsupported class base with type `{}`",
-        base_type.display(context.db())
+        base_type.display(db)
     ));
     diagnostic.info(format_args!(
         "ty cannot resolve a consistent MRO for class `{}` due to this base",
-        class.name(context.db())
+        class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
 }
@@ -3475,7 +3530,7 @@ pub(crate) fn report_invalid_key_on_typed_dict<'db>(
     typed_dict_ty: Type<'db>,
     full_object_ty: Option<Type<'db>>,
     key_ty: Type<'db>,
-    items: &FxIndexMap<Name, Field<'db>>,
+    items: &TypedDictSchema<'db>,
 ) {
     let db = context.db();
     if let Some(builder) = context.report_lint(&INVALID_KEY, key_node) {
@@ -3658,6 +3713,90 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
         builder.into_diagnostic(format_args!(
             "Cannot pop required field '{field_name}' from TypedDict `{typed_dict_name}`",
         ));
+    }
+}
+
+pub(crate) fn report_invalid_type_param_order<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    node: &ast::StmtClassDef,
+    typevar_with_default: TypeVarInstance<'db>,
+    invalid_later_typevars: &[TypeVarInstance<'db>],
+) {
+    let db = context.db();
+
+    let base_index = class
+        .explicit_bases(db)
+        .iter()
+        .position(|base| {
+            matches!(
+                base,
+                Type::KnownInstance(
+                    KnownInstanceType::SubscriptedProtocol(_)
+                        | KnownInstanceType::SubscriptedGeneric(_)
+                )
+            )
+        })
+        .expect(
+            "It should not be possible for a class to have a legacy generic context \
+            if it does not inherit from `Protocol[]` or `Generic[]`",
+        );
+
+    let base_node = &node.bases()[base_index];
+
+    let primary_diagnostic_range = base_node
+        .as_subscript_expr()
+        .map(|subscript| &*subscript.slice)
+        .unwrap_or(base_node)
+        .range();
+
+    let Some(builder) = context.report_lint(&INVALID_GENERIC_CLASS, primary_diagnostic_range)
+    else {
+        return;
+    };
+
+    let mut diagnostic = builder.into_diagnostic(
+        "Type parameters without defaults cannot follow type parameters with defaults",
+    );
+
+    diagnostic.set_concise_message(format_args!(
+        "Type parameter `{}` without a default cannot follow earlier parameter `{}` with a default",
+        invalid_later_typevars[0].name(db),
+        typevar_with_default.name(db),
+    ));
+
+    if let [single_typevar] = invalid_later_typevars {
+        diagnostic.set_primary_message(format_args!(
+            "Type variable `{}` does not have a default",
+            single_typevar.name(db),
+        ));
+    } else {
+        let later_typevars =
+            format_enumeration(invalid_later_typevars.iter().map(|tv| tv.name(db)));
+        diagnostic.set_primary_message(format_args!(
+            "Type variables {later_typevars} do not have defaults",
+        ));
+    }
+
+    diagnostic.annotate(
+        Annotation::primary(Span::from(context.file()).with_range(primary_diagnostic_range))
+            .message(format_args!(
+                "Earlier TypeVar `{}` does",
+                typevar_with_default.name(db)
+            )),
+    );
+
+    for tvar in [typevar_with_default, invalid_later_typevars[0]] {
+        let Some(definition) = tvar.definition(db) else {
+            continue;
+        };
+        let file = definition.file(db);
+        diagnostic.annotate(
+            Annotation::secondary(Span::from(
+                definition.full_range(db, &parsed_module(db, file).load(db)),
+            ))
+            .message(format_args!("`{}` defined here", tvar.name(db))),
+        );
     }
 }
 
@@ -4051,6 +4190,314 @@ pub(super) fn report_overridden_final_method<'db>(
         diagnostic.help(format_args!("Remove the getter and setter for `{member}`"));
     } else {
         diagnostic.help(format_args!("Remove the override of `{member}`"));
+    }
+}
+
+pub(super) fn report_unsupported_comparison<'db>(
+    context: &InferContext<'db, '_>,
+    error: &UnsupportedComparisonError<'db>,
+    range: TextRange,
+    left: &ast::Expr,
+    right: &ast::Expr,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) {
+    let db = context.db();
+
+    let Some(diagnostic_builder) = context.report_lint(&UNSUPPORTED_OPERATOR, range) else {
+        return;
+    };
+
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(
+        db,
+        [error.left_ty, error.right_ty, left_ty, right_ty],
+    );
+
+    let mut diagnostic =
+        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{}` operation", error.op));
+
+    if left_ty == right_ty {
+        diagnostic.set_primary_message(format_args!(
+            "Both operands have type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+        diagnostic.annotate(context.secondary(left));
+        diagnostic.annotate(context.secondary(right));
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between two objects of type `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone())
+        ));
+    } else {
+        for (ty, expr) in [(left_ty, left), (right_ty, right)] {
+            diagnostic.annotate(context.secondary(expr).message(format_args!(
+                "Has type `{}`",
+                ty.display_with(db, display_settings.clone())
+            )));
+        }
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{}` is not supported between objects of type `{}` and `{}`",
+            error.op,
+            left_ty.display_with(db, display_settings.clone()),
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+
+    // For non-atomic types like unions and tuples, we now provide context
+    // on the underlying elements that caused the error.
+    // If we're emitting a diagnostic for something like `(1, "foo") < (2, 3)`:
+    //
+    // - `left_ty` is `tuple[Literal[1], Literal["foo"]]`
+    // - `right_ty` is `tuple[Literal[2], Literal[3]]
+    // - `error.left_ty` is `Literal["foo"]`
+    // - `error.right_ty` is `Literal[3]`
+    if (error.left_ty, error.right_ty) != (left_ty, right_ty) {
+        if let Some(TupleSpec::Fixed(lhs_spec)) = left_ty.tuple_instance_spec(db).as_deref()
+            && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
+            && lhs_spec.len() == rhs_spec.len()
+            && let Some(position) = lhs_spec
+                .elements()
+                .zip(rhs_spec.elements())
+                .position(|tup| tup == (&error.left_ty, &error.right_ty))
+        {
+            if error.left_ty == error.right_ty {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported between \
+                    the tuple elements at index {} (both of type `{}`)",
+                    error.op,
+                    position + 1,
+                    error.left_ty.display_with(db, display_settings),
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported between \
+                    the tuple elements at index {} (of type `{}` and `{}`)",
+                    error.op,
+                    position + 1,
+                    error.left_ty.display_with(db, display_settings.clone()),
+                    error.right_ty.display_with(db, display_settings),
+                ));
+            }
+        } else {
+            if error.left_ty == error.right_ty {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported \
+                    between two objects of type `{}`",
+                    error.op,
+                    error.left_ty.display_with(db, display_settings),
+                ));
+            } else {
+                diagnostic.info(format_args!(
+                    "Operation fails because operator `{}` is not supported \
+                    between objects of type `{}` and `{}`",
+                    error.op,
+                    error.left_ty.display_with(db, display_settings.clone()),
+                    error.right_ty.display_with(db, display_settings)
+                ));
+            }
+        }
+    }
+}
+
+pub(super) fn report_unsupported_augmented_assignment<'db>(
+    context: &InferContext<'db, '_>,
+    stmt: &ast::StmtAugAssign,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+) {
+    report_unsupported_binary_operation_impl(
+        context,
+        stmt.range(),
+        &stmt.target,
+        &stmt.value,
+        left_ty,
+        right_ty,
+        OperatorDisplay {
+            operator: stmt.op,
+            is_augmented_assignment: true,
+        },
+    );
+}
+
+pub(super) fn report_unsupported_binary_operation<'db>(
+    context: &InferContext<'db, '_>,
+    binary_expression: &ast::ExprBinOp,
+    left_ty: Type<'db>,
+    right_ty: Type<'db>,
+    operator: ast::Operator,
+) {
+    let Some(mut diagnostic) = report_unsupported_binary_operation_impl(
+        context,
+        binary_expression.range(),
+        &binary_expression.left,
+        &binary_expression.right,
+        left_ty,
+        right_ty,
+        OperatorDisplay {
+            operator,
+            is_augmented_assignment: false,
+        },
+    ) else {
+        return;
+    };
+    let db = context.db();
+    if operator == ast::Operator::BitOr
+        && (left_ty.is_subtype_of(db, KnownClass::Type.to_instance(db))
+            || right_ty.is_subtype_of(db, KnownClass::Type.to_instance(db)))
+        && Program::get(db).python_version(db) < PythonVersion::PY310
+    {
+        diagnostic.info(
+            "Note that `X | Y` PEP 604 union syntax is only available in Python 3.10 and later",
+        );
+        add_inferred_python_version_hint_to_diagnostic(db, &mut diagnostic, "resolving types");
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+struct OperatorDisplay {
+    operator: ast::Operator,
+    is_augmented_assignment: bool,
+}
+
+impl std::fmt::Display for OperatorDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        if self.is_augmented_assignment {
+            write!(f, "{}=", self.operator)
+        } else {
+            write!(f, "{}", self.operator)
+        }
+    }
+}
+
+fn report_unsupported_binary_operation_impl<'a>(
+    context: &'a InferContext<'a, 'a>,
+    range: TextRange,
+    left: &ast::Expr,
+    right: &ast::Expr,
+    left_ty: Type<'a>,
+    right_ty: Type<'a>,
+    operator: OperatorDisplay,
+) -> Option<LintDiagnosticGuard<'a, 'a>> {
+    let db = context.db();
+    let diagnostic_builder = context.report_lint(&UNSUPPORTED_OPERATOR, range)?;
+    let display_settings = DisplaySettings::from_possibly_ambiguous_types(db, [left_ty, right_ty]);
+
+    let mut diagnostic =
+        diagnostic_builder.into_diagnostic(format_args!("Unsupported `{operator}` operation"));
+
+    if left_ty == right_ty {
+        diagnostic.set_primary_message(format_args!(
+            "Both operands have type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+        diagnostic.annotate(context.secondary(left));
+        diagnostic.annotate(context.secondary(right));
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{operator}` is not supported between two objects of type `{}`",
+            left_ty.display_with(db, display_settings.clone())
+        ));
+    } else {
+        for (ty, expr) in [(left_ty, left), (right_ty, right)] {
+            diagnostic.annotate(context.secondary(expr).message(format_args!(
+                "Has type `{}`",
+                ty.display_with(db, display_settings.clone())
+            )));
+        }
+        diagnostic.set_concise_message(format_args!(
+            "Operator `{operator}` is not supported between objects of type `{}` and `{}`",
+            left_ty.display_with(db, display_settings.clone()),
+            right_ty.display_with(db, display_settings.clone())
+        ));
+    }
+
+    Some(diagnostic)
+}
+
+pub(super) fn report_bad_frozen_dataclass_inheritance<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassLiteral<'db>,
+    class_node: &ast::StmtClassDef,
+    base_class: ClassLiteral<'db>,
+    base_class_node: &ast::Expr,
+    base_class_params: DataclassFlags,
+) {
+    let db = context.db();
+
+    let Some(builder) =
+        context.report_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS, class.header_range(db))
+    else {
+        return;
+    };
+
+    let mut diagnostic = if base_class_params.is_frozen() {
+        let mut diagnostic =
+            builder.into_diagnostic("Non-frozen dataclass cannot inherit from frozen dataclass");
+        diagnostic.set_concise_message(format_args!(
+            "Non-frozen dataclass `{}` cannot inherit from frozen dataclass `{}`",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "Subclass `{}` is not frozen but base class `{}` is",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic
+    } else {
+        let mut diagnostic =
+            builder.into_diagnostic("Frozen dataclass cannot inherit from non-frozen dataclass");
+        diagnostic.set_concise_message(format_args!(
+            "Frozen dataclass `{}` cannot inherit from non-frozen dataclass `{}`",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic.set_primary_message(format_args!(
+            "Subclass `{}` is frozen but base class `{}` is not",
+            class.name(db),
+            base_class.name(db)
+        ));
+        diagnostic
+    };
+
+    diagnostic.annotate(context.secondary(base_class_node));
+
+    if let Some(position) = class.find_dataclass_decorator_position(db) {
+        diagnostic.annotate(
+            context
+                .secondary(&class_node.decorator_list[position])
+                .message(format_args!("`{}` dataclass parameters", class.name(db))),
+        );
+    }
+    diagnostic.info("This causes the class creation to fail");
+
+    if let Some(decorator_position) = base_class.find_dataclass_decorator_position(db) {
+        let mut sub = SubDiagnostic::new(
+            SubDiagnosticSeverity::Info,
+            format_args!("Base class definition"),
+        );
+        sub.annotate(
+            Annotation::primary(base_class.header_span(db))
+                .message(format_args!("`{}` definition", base_class.name(db))),
+        );
+
+        let base_class_file = base_class.file(db);
+        let module = parsed_module(db, base_class_file).load(db);
+
+        let decorator_range = base_class
+            .body_scope(db)
+            .node(db)
+            .expect_class()
+            .node(&module)
+            .decorator_list[decorator_position]
+            .range();
+
+        sub.annotate(
+            Annotation::secondary(Span::from(base_class_file).with_range(decorator_range)).message(
+                format_args!("`{}` dataclass parameters", base_class.name(db)),
+            ),
+        );
+
+        diagnostic.sub(sub);
     }
 }
 

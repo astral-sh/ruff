@@ -5,8 +5,8 @@ use std::ops::Add;
 use ruff_diagnostics::Edit;
 use ruff_python_ast::Stmt;
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_codegen::Stylist;
-use ruff_python_parser::{TokenKind, Tokens};
 use ruff_python_trivia::is_python_whitespace;
 use ruff_python_trivia::{PythonWhitespace, textwrap::indent};
 use ruff_source_file::{LineRanges, UniversalNewlineIterator};
@@ -194,7 +194,7 @@ impl<'a> Insertion<'a> {
             tokens
                 .before(at)
                 .last()
-                .map(ruff_python_parser::Token::kind),
+                .map(ruff_python_ast::token::Token::kind),
             Some(TokenKind::Import)
         ) {
             return None;

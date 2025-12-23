@@ -453,17 +453,17 @@ impl<'db> UseDefMap<'db> {
         )
     }
 
-    pub(crate) fn all_reachable_bindings(
+    pub(crate) fn reachable_bindings(
         &self,
         place: ScopedPlaceId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_bindings(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_bindings(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_bindings(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_bindings(member),
         }
     }
 
-    pub(crate) fn all_reachable_symbol_bindings(
+    pub(crate) fn reachable_symbol_bindings(
         &self,
         symbol: ScopedSymbolId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -471,7 +471,7 @@ impl<'db> UseDefMap<'db> {
         self.bindings_iterator(bindings, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_bindings(
+    pub(crate) fn reachable_member_bindings(
         &self,
         symbol: ScopedMemberId,
     ) -> BindingWithConstraintsIterator<'_, 'db> {
@@ -547,7 +547,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::BasedOnUnboundVisibility)
     }
 
-    pub(crate) fn all_reachable_symbol_declarations(
+    pub(crate) fn reachable_symbol_declarations(
         &self,
         symbol: ScopedSymbolId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -555,7 +555,7 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_member_declarations(
+    pub(crate) fn reachable_member_declarations(
         &self,
         member: ScopedMemberId,
     ) -> DeclarationsIterator<'_, 'db> {
@@ -563,13 +563,13 @@ impl<'db> UseDefMap<'db> {
         self.declarations_iterator(declarations, BoundnessAnalysis::AssumeBound)
     }
 
-    pub(crate) fn all_reachable_declarations(
+    pub(crate) fn reachable_declarations(
         &self,
         place: ScopedPlaceId,
     ) -> DeclarationsIterator<'_, 'db> {
         match place {
-            ScopedPlaceId::Symbol(symbol) => self.all_reachable_symbol_declarations(symbol),
-            ScopedPlaceId::Member(member) => self.all_reachable_member_declarations(member),
+            ScopedPlaceId::Symbol(symbol) => self.reachable_symbol_declarations(symbol),
+            ScopedPlaceId::Member(member) => self.reachable_member_declarations(member),
         }
     }
 
@@ -588,6 +588,30 @@ impl<'db> UseDefMap<'db> {
         self.end_of_scope_symbols
             .indices()
             .map(|symbol_id| (symbol_id, self.end_of_scope_symbol_bindings(symbol_id)))
+    }
+
+    pub(crate) fn all_reachable_symbols<'map>(
+        &'map self,
+    ) -> impl Iterator<
+        Item = (
+            ScopedSymbolId,
+            DeclarationsIterator<'map, 'db>,
+            BindingWithConstraintsIterator<'map, 'db>,
+        ),
+    > + 'map {
+        self.reachable_definitions_by_symbol.iter_enumerated().map(
+            |(symbol_id, reachable_definitions)| {
+                let declarations = self.declarations_iterator(
+                    &reachable_definitions.declarations,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                let bindings = self.bindings_iterator(
+                    &reachable_definitions.bindings,
+                    BoundnessAnalysis::AssumeBound,
+                );
+                (symbol_id, declarations, bindings)
+            },
+        )
     }
 
     /// This function is intended to be called only once inside `TypeInferenceBuilder::infer_function_body`.
@@ -801,6 +825,13 @@ pub(super) struct FlowSnapshot {
     reachability: ScopedReachabilityConstraintId,
 }
 
+/// A snapshot of the state of a single symbol (e.g. `obj`) and all of its associated members
+/// (e.g. `obj.attr`, `obj["key"]`).
+pub(super) struct SingleSymbolSnapshot {
+    symbol_state: PlaceState,
+    associated_member_states: FxHashMap<ScopedMemberId, PlaceState>,
+}
+
 #[derive(Debug)]
 pub(super) struct UseDefMapBuilder<'db> {
     /// Append-only array of [`DefinitionState`].
@@ -991,13 +1022,26 @@ impl<'db> UseDefMapBuilder<'db> {
         }
     }
 
-    /// Snapshot the state of a single place at the current point in control flow.
+    /// Snapshot the state of a single symbol and all of its associated members, at the current
+    /// point in control flow.
     ///
     /// This is only used for `*`-import reachability constraints, which are handled differently
     /// to most other reachability constraints. See the doc-comment for
     /// [`Self::record_and_negate_star_import_reachability_constraint`] for more details.
-    pub(super) fn single_symbol_place_snapshot(&self, symbol: ScopedSymbolId) -> PlaceState {
-        self.symbol_states[symbol].clone()
+    pub(super) fn single_symbol_snapshot(
+        &self,
+        symbol: ScopedSymbolId,
+        associated_member_ids: &[ScopedMemberId],
+    ) -> SingleSymbolSnapshot {
+        let symbol_state = self.symbol_states[symbol].clone();
+        let mut associated_member_states = FxHashMap::default();
+        for &member_id in associated_member_ids {
+            associated_member_states.insert(member_id, self.member_states[member_id].clone());
+        }
+        SingleSymbolSnapshot {
+            symbol_state,
+            associated_member_states,
+        }
     }
 
     /// This method exists solely for handling `*`-import reachability constraints.
@@ -1033,14 +1077,14 @@ impl<'db> UseDefMapBuilder<'db> {
         &mut self,
         reachability_id: ScopedReachabilityConstraintId,
         symbol: ScopedSymbolId,
-        pre_definition_state: PlaceState,
+        pre_definition: SingleSymbolSnapshot,
     ) {
         let negated_reachability_id = self
             .reachability_constraints
             .add_not_constraint(reachability_id);
 
         let mut post_definition_state =
-            std::mem::replace(&mut self.symbol_states[symbol], pre_definition_state);
+            std::mem::replace(&mut self.symbol_states[symbol], pre_definition.symbol_state);
 
         post_definition_state
             .record_reachability_constraint(&mut self.reachability_constraints, reachability_id);
@@ -1055,6 +1099,30 @@ impl<'db> UseDefMapBuilder<'db> {
             &mut self.narrowing_constraints,
             &mut self.reachability_constraints,
         );
+
+        // And similarly for all associated members:
+        for (member_id, pre_definition_member_state) in pre_definition.associated_member_states {
+            let mut post_definition_state = std::mem::replace(
+                &mut self.member_states[member_id],
+                pre_definition_member_state,
+            );
+
+            post_definition_state.record_reachability_constraint(
+                &mut self.reachability_constraints,
+                reachability_id,
+            );
+
+            self.member_states[member_id].record_reachability_constraint(
+                &mut self.reachability_constraints,
+                negated_reachability_id,
+            );
+
+            self.member_states[member_id].merge(
+                post_definition_state,
+                &mut self.narrowing_constraints,
+                &mut self.reachability_constraints,
+            );
+        }
     }
 
     pub(super) fn record_reachability_constraint(

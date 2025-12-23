@@ -1,0 +1,114 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: special_form_attributes.md - Diagnostics for invalid attribute access on special forms
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/special_form_attributes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing_extensions import Any, Final, LiteralString, Self
+ 2 | 
+ 3 | X = Any
+ 4 | 
+ 5 | class Foo:
+ 6 |     X: Final = LiteralString
+ 7 |     a: int
+ 8 |     b: Self
+ 9 | 
+10 |     class Bar:
+11 |         def __init__(self):
+12 |             self.y: Final = LiteralString
+13 | 
+14 | X.foo  # error: [unresolved-attribute]
+15 | X.aaaaooooooo  # error: [unresolved-attribute]
+16 | Foo.X.startswith  # error: [unresolved-attribute]
+17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
+18 | 
+19 | # TODO: false positive (just testing the diagnostic in the meantime)
+20 | Foo().b.a  # error: [unresolved-attribute]
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Special form `typing.Any` has no attribute `foo`
+  --> src/mdtest_snippet.py:14:1
+   |
+12 |             self.y: Final = LiteralString
+13 |
+14 | X.foo  # error: [unresolved-attribute]
+   | ^^^^^
+15 | X.aaaaooooooo  # error: [unresolved-attribute]
+16 | Foo.X.startswith  # error: [unresolved-attribute]
+   |
+help: Objects with type `Any` have a `foo` attribute, but the symbol `typing.Any` does not itself inhabit the type `Any`
+help: This error may indicate that `X` was defined as `X = typing.Any` when `X: typing.Any` was intended
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Special form `typing.Any` has no attribute `aaaaooooooo`
+  --> src/mdtest_snippet.py:15:1
+   |
+14 | X.foo  # error: [unresolved-attribute]
+15 | X.aaaaooooooo  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^
+16 | Foo.X.startswith  # error: [unresolved-attribute]
+17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
+   |
+help: Objects with type `Any` have an `aaaaooooooo` attribute, but the symbol `typing.Any` does not itself inhabit the type `Any`
+help: This error may indicate that `X` was defined as `X = typing.Any` when `X: typing.Any` was intended
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Special form `typing.LiteralString` has no attribute `startswith`
+  --> src/mdtest_snippet.py:16:1
+   |
+14 | X.foo  # error: [unresolved-attribute]
+15 | X.aaaaooooooo  # error: [unresolved-attribute]
+16 | Foo.X.startswith  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^^
+17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
+   |
+help: Objects with type `LiteralString` have a `startswith` attribute, but the symbol `typing.LiteralString` does not itself inhabit the type `LiteralString`
+help: This error may indicate that `Foo.X` was defined as `Foo.X = typing.LiteralString` when `Foo.X: typing.LiteralString` was intended
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Special form `typing.LiteralString` has no attribute `startswith`
+  --> src/mdtest_snippet.py:17:1
+   |
+15 | X.aaaaooooooo  # error: [unresolved-attribute]
+16 | Foo.X.startswith  # error: [unresolved-attribute]
+17 | Foo.Bar().y.startswith  # error: [unresolved-attribute]
+   | ^^^^^^^^^^^^^^^^^^^^^^
+18 |
+19 | # TODO: false positive (just testing the diagnostic in the meantime)
+   |
+help: Objects with type `LiteralString` have a `startswith` attribute, but the symbol `typing.LiteralString` does not itself inhabit the type `LiteralString`
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Special form `typing.Self` has no attribute `a`
+  --> src/mdtest_snippet.py:20:1
+   |
+19 | # TODO: false positive (just testing the diagnostic in the meantime)
+20 | Foo().b.a  # error: [unresolved-attribute]
+   | ^^^^^^^^^
+   |
+info: rule `unresolved-attribute` is enabled by default
+
+```

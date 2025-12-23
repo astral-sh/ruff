@@ -112,7 +112,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
           "type": [
             "array",
             "null"
@@ -222,7 +222,7 @@
       "additionalProperties": false
     },
     "OverridesOptions": {
-      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence.\n\n### Precedence\n\n- Later overrides in the array take precedence over earlier ones\n- Override rules take precedence over global rules for matching files\n\n### Examples\n\n```toml\n# Relax rules for test files\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
+      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence. Override rules take precedence over global\nrules for matching files.\n\nFor example, to relax enforcement of rules in test files:\n\n```toml\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n```\n\nOr, to ignore a rule in generated files but retain enforcement in an important file:\n\n```toml\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
       "type": "array",
       "items": {
         "$ref": "#/definitions/OverrideOptions"
@@ -395,7 +395,7 @@
         },
         "division-by-zero": {
           "title": "detects division by zero",
-          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
+          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n5 / 0\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -425,7 +425,7 @@
         },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -583,9 +583,19 @@
             }
           ]
         },
+        "invalid-frozen-dataclass-subclass": {
+          "title": "detects dataclasses with invalid frozen/non-frozen subclassing",
+          "description": "## What it does\nChecks for dataclasses with invalid frozen inheritance:\n- A frozen dataclass cannot inherit from a non-frozen dataclass.\n- A non-frozen dataclass cannot inherit from a frozen dataclass.\n\n## Why is this bad?\nPython raises a `TypeError` at runtime when either of these inheritance\npatterns occurs.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Base:\n    x: int\n\n@dataclass(frozen=True)\nclass Child(Base):  # Error raised here\n    y: int\n\n@dataclass(frozen=True)\nclass FrozenBase:\n    x: int\n\n@dataclass\nclass NonFrozenChild(FrozenBase):  # Error raised here\n    y: int\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
-          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\nMany of these result in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n\n# error: type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {
@@ -735,7 +745,7 @@
         },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for string-literal annotations where the string cannot be\nparsed as a Python expression.\n\n## Why is this bad?\nType annotations are expected to be Python expressions that\ndescribe the expected type of a variable, parameter, attribute or\n`return` statement.\n\nType annotations are permitted to be string-literal expressions, in\norder to enable forward references to names not yet defined.\nHowever, it must be possible to parse the contents of that string\nliteral as a normal Python expression.\n\n## Example\n\n```python\ndef foo() -> \"intstance of C\":\n    return 42\n\nclass C: ...\n```\n\nUse instead:\n\n```python\ndef foo() -> \"C\":\n    return 42\n\nclass C: ...\n```\n\n## References\n- [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)\n- [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)",
           "default": "error",
           "oneOf": [
             {
@@ -915,8 +925,8 @@
         },
         "possibly-missing-import": {
           "title": "detects possibly missing imports",
-          "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -925,7 +935,7 @@
         },
         "possibly-unresolved-reference": {
           "title": "detects references to possibly undefined names",
-          "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
+          "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -1171,7 +1181,7 @@
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"

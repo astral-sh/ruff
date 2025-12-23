@@ -9,6 +9,7 @@ use ty_combine::Combine;
 use ty_project::metadata::options::{EnvironmentOptions, Options, SrcOptions, TerminalOptions};
 use ty_project::metadata::value::{RangedValue, RelativeGlobPattern, RelativePathBuf, ValueSource};
 use ty_python_semantic::lint;
+use ty_static::EnvVars;
 
 // Configures Clap v3-style help menu colors
 const STYLES: Styles = Styles::styled()
@@ -121,7 +122,7 @@ pub(crate) struct CheckCommand {
     /// The path to a `ty.toml` file to use for configuration.
     ///
     /// While ty configuration can be included in a `pyproject.toml` file, it is not allowed in this context.
-    #[arg(long, env = "TY_CONFIG_FILE", value_name = "PATH")]
+    #[arg(long, env = EnvVars::TY_CONFIG_FILE, value_name = "PATH")]
     pub(crate) config_file: Option<SystemPathBuf>,
 
     /// The format to use for printing diagnostic messages.
@@ -153,6 +154,17 @@ pub(crate) struct CheckCommand {
     #[clap(long, overrides_with("respect_ignore_files"), hide = true)]
     no_respect_ignore_files: bool,
 
+    /// Enforce exclusions, even for paths passed to ty directly on the command-line.
+    /// Use `--no-force-exclude` to disable.
+    #[arg(
+        long,
+        overrides_with("no_force_exclude"),
+        help_heading = "File selection"
+    )]
+    force_exclude: bool,
+    #[clap(long, overrides_with("force_exclude"), hide = true)]
+    no_force_exclude: bool,
+
     /// Glob patterns for files to exclude from type checking.
     ///
     /// Uses gitignore-style syntax to exclude files and directories from type checking.
@@ -177,6 +189,10 @@ pub(crate) struct CheckCommand {
 }
 
 impl CheckCommand {
+    pub(crate) fn force_exclude(&self) -> bool {
+        resolve_bool_arg(self.force_exclude, self.no_force_exclude).unwrap_or_default()
+    }
+
     pub(crate) fn into_options(self) -> Options {
         let rules = if self.rules.is_empty() {
             None
@@ -432,5 +448,14 @@ over all configuration files.",
 impl ConfigsArg {
     pub(crate) fn into_options(self) -> Option<Options> {
         self.0
+    }
+}
+
+fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
+    match (yes, no) {
+        (true, false) => Some(true),
+        (false, true) => Some(false),
+        (false, false) => None,
+        (..) => unreachable!("Clap should make this impossible"),
     }
 }

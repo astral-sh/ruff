@@ -35,8 +35,6 @@ mod tests {
     use crate::tests::{CursorTest, IntoDiagnostic, cursor_test};
     use insta::assert_snapshot;
     use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, LintName, Severity, Span};
-    use ruff_db::files::FileRange;
-    use ruff_text_size::Ranged;
 
     impl CursorTest {
         fn references(&self) -> String {
@@ -52,20 +50,14 @@ mod tests {
 
             reference_results.sort_by_key(ReferenceTarget::file);
 
-            self.render_diagnostics(reference_results.into_iter().enumerate().map(
-                |(i, ref_item)| -> ReferenceResult {
-                    ReferenceResult {
-                        index: i,
-                        file_range: FileRange::new(ref_item.file(), ref_item.range()),
-                    }
-                },
-            ))
+            self.render_diagnostics([ReferenceResult {
+                references: reference_results,
+            }])
         }
     }
 
     struct ReferenceResult {
-        index: usize,
-        file_range: FileRange,
+        references: Vec<ReferenceTarget>,
     }
 
     impl IntoDiagnostic for ReferenceResult {
@@ -73,11 +65,14 @@ mod tests {
             let mut main = Diagnostic::new(
                 DiagnosticId::Lint(LintName::of("references")),
                 Severity::Info,
-                format!("Reference {}", self.index + 1),
+                format!("Found {} references", self.references.len()),
             );
-            main.annotate(Annotation::primary(
-                Span::from(self.file_range.file()).with_range(self.file_range.range()),
-            ));
+
+            for reference in self.references {
+                main.annotate(Annotation::secondary(
+                    Span::from(reference.file()).with_range(reference.range()),
+                ));
+            }
 
             main
         }
@@ -97,55 +92,24 @@ result = calculate_sum(value=42)
 ",
         );
 
-        assert_snapshot!(test.references(), @r###"
-        info[references]: Reference 1
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 5 references
          --> main.py:2:19
           |
         2 | def calculate_sum(value: int) -> int:
-          |                   ^^^^^
+          |                   -----
         3 |     doubled = value * 2
+          |               -----
         4 |     result = value + doubled
-          |
-
-        info[references]: Reference 2
-         --> main.py:3:15
-          |
-        2 | def calculate_sum(value: int) -> int:
-        3 |     doubled = value * 2
-          |               ^^^^^
-        4 |     result = value + doubled
+          |              -----
         5 |     return value
-          |
-
-        info[references]: Reference 3
-         --> main.py:4:14
-          |
-        2 | def calculate_sum(value: int) -> int:
-        3 |     doubled = value * 2
-        4 |     result = value + doubled
-          |              ^^^^^
-        5 |     return value
-          |
-
-        info[references]: Reference 4
-         --> main.py:5:12
-          |
-        3 |     doubled = value * 2
-        4 |     result = value + doubled
-        5 |     return value
-          |            ^^^^^
+          |            -----
         6 |
         7 | # Call with keyword argument
-          |
-
-        info[references]: Reference 5
-         --> main.py:8:24
-          |
-        7 | # Call with keyword argument
         8 | result = calculate_sum(value=42)
-          |                        ^^^^^
+          |                        -----
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -176,95 +140,36 @@ def outer_function():
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> main.py:3:5
-          |
-        2 | def outer_function():
-        3 |     counter = 0
-          |     ^^^^^^^
-        4 |
-        5 |     def increment():
-          |
-
-        info[references]: Reference 2
-         --> main.py:6:18
-          |
-        5 |     def increment():
-        6 |         nonlocal counter
-          |                  ^^^^^^^
-        7 |         counter += 1
-        8 |         return counter
-          |
-
-        info[references]: Reference 3
-         --> main.py:7:9
-          |
-        5 |     def increment():
-        6 |         nonlocal counter
-        7 |         counter += 1
-          |         ^^^^^^^
-        8 |         return counter
-          |
-
-        info[references]: Reference 4
-          --> main.py:8:16
+        info[references]: Found 9 references
+          --> main.py:3:5
            |
+         2 | def outer_function():
+         3 |     counter = 0
+           |     -------
+         4 |
+         5 |     def increment():
          6 |         nonlocal counter
+           |                  -------
          7 |         counter += 1
+           |         -------
          8 |         return counter
-           |                ^^^^^^^
+           |                -------
          9 |
         10 |     def decrement():
-           |
-
-        info[references]: Reference 5
-          --> main.py:11:18
-           |
-        10 |     def decrement():
         11 |         nonlocal counter
-           |                  ^^^^^^^
+           |                  -------
         12 |         counter -= 1
+           |         -------
         13 |         return counter
-           |
-
-        info[references]: Reference 6
-          --> main.py:12:9
-           |
-        10 |     def decrement():
-        11 |         nonlocal counter
-        12 |         counter -= 1
-           |         ^^^^^^^
-        13 |         return counter
-           |
-
-        info[references]: Reference 7
-          --> main.py:13:16
-           |
-        11 |         nonlocal counter
-        12 |         counter -= 1
-        13 |         return counter
-           |                ^^^^^^^
+           |                -------
         14 |
         15 |     # Use counter in outer scope
-           |
-
-        info[references]: Reference 8
-          --> main.py:16:15
-           |
-        15 |     # Use counter in outer scope
         16 |     initial = counter
-           |               ^^^^^^^
-        17 |     increment()
-        18 |     decrement()
-           |
-
-        info[references]: Reference 9
-          --> main.py:19:13
-           |
+           |               -------
         17 |     increment()
         18 |     decrement()
         19 |     final = counter
-           |             ^^^^^^^
+           |             -------
         20 |
         21 |     return increment, decrement
            |
@@ -296,94 +201,35 @@ final_value = global_counter
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> main.py:2:1
-          |
-        2 | global_counter = 0
-          | ^^^^^^^^^^^^^^
-        3 |
-        4 | def increment_global():
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:12
-          |
-        4 | def increment_global():
-        5 |     global global_counter
-          |            ^^^^^^^^^^^^^^
-        6 |     global_counter += 1
-        7 |     return global_counter
-          |
-
-        info[references]: Reference 3
-         --> main.py:6:5
-          |
-        4 | def increment_global():
-        5 |     global global_counter
-        6 |     global_counter += 1
-          |     ^^^^^^^^^^^^^^
-        7 |     return global_counter
-          |
-
-        info[references]: Reference 4
-         --> main.py:7:12
-          |
-        5 |     global global_counter
-        6 |     global_counter += 1
-        7 |     return global_counter
-          |            ^^^^^^^^^^^^^^
-        8 |
-        9 | def decrement_global():
-          |
-
-        info[references]: Reference 5
-          --> main.py:10:12
+        info[references]: Found 9 references
+          --> main.py:2:1
            |
+         2 | global_counter = 0
+           | --------------
+         3 |
+         4 | def increment_global():
+         5 |     global global_counter
+           |            --------------
+         6 |     global_counter += 1
+           |     --------------
+         7 |     return global_counter
+           |            --------------
+         8 |
          9 | def decrement_global():
         10 |     global global_counter
-           |            ^^^^^^^^^^^^^^
+           |            --------------
         11 |     global_counter -= 1
+           |     --------------
         12 |     return global_counter
-           |
-
-        info[references]: Reference 6
-          --> main.py:11:5
-           |
-         9 | def decrement_global():
-        10 |     global global_counter
-        11 |     global_counter -= 1
-           |     ^^^^^^^^^^^^^^
-        12 |     return global_counter
-           |
-
-        info[references]: Reference 7
-          --> main.py:12:12
-           |
-        10 |     global global_counter
-        11 |     global_counter -= 1
-        12 |     return global_counter
-           |            ^^^^^^^^^^^^^^
+           |            --------------
         13 |
         14 | # Use global_counter at module level
-           |
-
-        info[references]: Reference 8
-          --> main.py:15:17
-           |
-        14 | # Use global_counter at module level
         15 | initial_value = global_counter
-           |                 ^^^^^^^^^^^^^^
-        16 | increment_global()
-        17 | decrement_global()
-           |
-
-        info[references]: Reference 9
-          --> main.py:18:15
-           |
+           |                 --------------
         16 | increment_global()
         17 | decrement_global()
         18 | final_value = global_counter
-           |               ^^^^^^^^^^^^^^
+           |               --------------
            |
         ");
     }
@@ -406,45 +252,23 @@ except ValueError as err:
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> main.py:4:29
-          |
-        2 | try:
-        3 |     x = 1 / 0
-        4 | except ZeroDivisionError as err:
-          |                             ^^^
-        5 |     print(f'Error: {err}')
-        6 |     return err
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:21
-          |
-        3 |     x = 1 / 0
-        4 | except ZeroDivisionError as err:
-        5 |     print(f'Error: {err}')
-          |                     ^^^
-        6 |     return err
-          |
-
-        info[references]: Reference 3
-         --> main.py:6:12
-          |
-        4 | except ZeroDivisionError as err:
-        5 |     print(f'Error: {err}')
-        6 |     return err
-          |            ^^^
-        7 |
-        8 | try:
-          |
-
-        info[references]: Reference 4
-          --> main.py:11:31
+        info[references]: Found 4 references
+          --> main.py:4:29
            |
+         2 | try:
+         3 |     x = 1 / 0
+         4 | except ZeroDivisionError as err:
+           |                             ---
+         5 |     print(f'Error: {err}')
+           |                     ---
+         6 |     return err
+           |            ---
+         7 |
+         8 | try:
          9 |     y = 2 / 0
         10 | except ValueError as err:
         11 |     print(f'Different error: {err}')
-           |                               ^^^
+           |                               ---
            |
         ");
     }
@@ -462,39 +286,21 @@ match x:
 ",
         );
 
-        assert_snapshot!(test.references(), @r###"
-        info[references]: Reference 1
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 3 references
          --> main.py:3:20
           |
         2 | match x:
         3 |     case [a, b] as pattern:
-          |                    ^^^^^^^
+          |                    -------
         4 |         print(f'Matched: {pattern}')
+          |                           -------
         5 |         return pattern
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:27
-          |
-        2 | match x:
-        3 |     case [a, b] as pattern:
-        4 |         print(f'Matched: {pattern}')
-          |                           ^^^^^^^
-        5 |         return pattern
-        6 |     case _:
-          |
-
-        info[references]: Reference 3
-         --> main.py:5:16
-          |
-        3 |     case [a, b] as pattern:
-        4 |         print(f'Matched: {pattern}')
-        5 |         return pattern
-          |                ^^^^^^^
+          |                -------
         6 |     case _:
         7 |         pass
           |
-        "###);
+        ");
     }
 
     #[test]
@@ -509,47 +315,21 @@ match data:
 ",
         );
 
-        assert_snapshot!(test.references(), @r###"
-        info[references]: Reference 1
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 4 references
          --> main.py:3:29
           |
         2 | match data:
         3 |     case {'a': a, 'b': b, **rest}:
-          |                             ^^^^
+          |                             ----
         4 |         print(f'Rest data: {rest}')
+          |                             ----
         5 |         process(rest)
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:29
-          |
-        2 | match data:
-        3 |     case {'a': a, 'b': b, **rest}:
-        4 |         print(f'Rest data: {rest}')
-          |                             ^^^^
-        5 |         process(rest)
+          |                 ----
         6 |         return rest
+          |                ----
           |
-
-        info[references]: Reference 3
-         --> main.py:5:17
-          |
-        3 |     case {'a': a, 'b': b, **rest}:
-        4 |         print(f'Rest data: {rest}')
-        5 |         process(rest)
-          |                 ^^^^
-        6 |         return rest
-          |
-
-        info[references]: Reference 4
-         --> main.py:6:16
-          |
-        4 |         print(f'Rest data: {rest}')
-        5 |         process(rest)
-        6 |         return rest
-          |                ^^^^
-          |
-        "###);
+        ");
     }
 
     #[test]
@@ -573,60 +353,30 @@ value = my_function
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> main.py:2:5
-          |
-        2 | def my_function():
-          |     ^^^^^^^^^^^
-        3 |     return 42
-          |
-
-        info[references]: Reference 2
-         --> main.py:6:11
-          |
-        5 | # Call the function multiple times
-        6 | result1 = my_function()
-          |           ^^^^^^^^^^^
-        7 | result2 = my_function()
-          |
-
-        info[references]: Reference 3
-         --> main.py:7:11
-          |
-        5 | # Call the function multiple times
-        6 | result1 = my_function()
-        7 | result2 = my_function()
-          |           ^^^^^^^^^^^
-        8 |
-        9 | # Function passed as an argument
-          |
-
-        info[references]: Reference 4
-          --> main.py:10:12
+        info[references]: Found 6 references
+          --> main.py:2:5
            |
+         2 | def my_function():
+           |     -----------
+         3 |     return 42
+           |
+          ::: main.py:6:11
+           |
+         5 | # Call the function multiple times
+         6 | result1 = my_function()
+           |           -----------
+         7 | result2 = my_function()
+           |           -----------
+         8 |
          9 | # Function passed as an argument
         10 | callback = my_function
-           |            ^^^^^^^^^^^
+           |            -----------
         11 |
         12 | # Function used in different contexts
-           |
-
-        info[references]: Reference 5
-          --> main.py:13:7
-           |
-        12 | # Function used in different contexts
         13 | print(my_function())
-           |       ^^^^^^^^^^^
+           |       -----------
         14 | value = my_function
-           |
-
-        info[references]: Reference 6
-          --> main.py:14:9
-           |
-        12 | # Function used in different contexts
-        13 | print(my_function())
-        14 | value = my_function
-           |         ^^^^^^^^^^^
+           |         -----------
            |
         ");
     }
@@ -653,59 +403,32 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> main.py:2:7
-          |
-        2 | class MyClass:
-          |       ^^^^^^^
-        3 |     def __init__(self):
-        4 |         pass
-          |
-
-        info[references]: Reference 2
-         --> main.py:7:8
-          |
-        6 | # Create instances
-        7 | obj1 = MyClass()
-          |        ^^^^^^^
-        8 | obj2 = MyClass()
-          |
-
-        info[references]: Reference 3
-          --> main.py:8:8
+        info[references]: Found 6 references
+          --> main.py:2:7
+           |
+         2 | class MyClass:
+           |       -------
+         3 |     def __init__(self):
+         4 |         pass
+           |
+          ::: main.py:7:8
            |
          6 | # Create instances
          7 | obj1 = MyClass()
+           |        -------
          8 | obj2 = MyClass()
-           |        ^^^^^^^
+           |        -------
          9 |
         10 | # Use in type annotations
-           |
-
-        info[references]: Reference 4
-          --> main.py:11:23
-           |
-        10 | # Use in type annotations
         11 | def process(instance: MyClass) -> MyClass:
-           |                       ^^^^^^^
+           |                       -------     -------
         12 |     return instance
            |
-
-        info[references]: Reference 5
-          --> main.py:11:35
-           |
-        10 | # Use in type annotations
-        11 | def process(instance: MyClass) -> MyClass:
-           |                                   ^^^^^^^
-        12 |     return instance
-           |
-
-        info[references]: Reference 6
-          --> main.py:15:7
+          ::: main.py:15:7
            |
         14 | # Reference the class itself
         15 | cls = MyClass
-           |       ^^^^^^^
+           |       -------
            |
         ");
     }
@@ -722,22 +445,14 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:5
           |
         2 | a: "MyClass" = 1
-          |     ^^^^^^^
+          |     -------
         3 |
         4 | class MyClass:
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:7
-          |
-        2 | a: "MyClass" = 1
-        3 |
-        4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -755,22 +470,14 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:12
           |
         2 | a: "None | MyClass" = 1
-          |            ^^^^^^^
+          |            -------
         3 |
         4 | class MyClass:
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:7
-          |
-        2 | a: "None | MyClass" = 1
-        3 |
-        4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -802,22 +509,14 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:12
           |
         2 | a: "None | MyClass" = 1
-          |            ^^^^^^^
+          |            -------
         3 |
         4 | class MyClass:
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:7
-          |
-        2 | a: "None | MyClass" = 1
-        3 |
-        4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -863,22 +562,14 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:5
           |
         2 | a: "MyClass | No" = 1
-          |     ^^^^^^^
+          |     -------
         3 |
         4 | class MyClass:
-          |
-
-        info[references]: Reference 2
-         --> main.py:4:7
-          |
-        2 | a: "MyClass | No" = 1
-        3 |
-        4 | class MyClass:
-          |       ^^^^^^^
+          |       -------
         5 |     """some docs"""
           |
         "#);
@@ -899,6 +590,35 @@ cls = MyClass
     }
 
     #[test]
+    fn references_string_annotation_recursive() {
+        let test = cursor_test(
+            r#"
+        ab: "a<CURSOR>b"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 2 references
+         --> main.py:2:1
+          |
+        2 | ab: "ab"
+          | --   --
+          |
+        "#);
+    }
+
+    #[test]
+    fn references_string_annotation_unknown() {
+        let test = cursor_test(
+            r#"
+        x: "foo<CURSOR>bar"
+        "#,
+        );
+
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
     fn references_match_name_stmt() {
         let test = cursor_test(
             r#"
@@ -910,23 +630,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:22
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", ab]:
-          |                      ^^
+          |                      --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -943,23 +655,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:22
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", ab]:
-          |                      ^^
+          |                      --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -976,23 +680,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:23
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", *ab]:
-          |                       ^^
+          |                       --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", *ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -1009,23 +705,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:23
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", *ab]:
-          |                       ^^
+          |                       --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", *ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -1042,23 +730,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:37
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
-          |                                     ^^
+          |                                     --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", ("a" | "b") as ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -1075,23 +755,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:4:37
           |
         2 | def my_func(command: str):
         3 |     match command.split():
         4 |         case ["get", ("a" | "b") as ab]:
-          |                                     ^^
+          |                                     --
         5 |             x = ab
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:17
-          |
-        3 |     match command.split():
-        4 |         case ["get", ("a" | "b") as ab]:
-        5 |             x = ab
-          |                 ^^
+          |                 --
           |
         "#);
     }
@@ -1114,23 +786,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
           --> main.py:10:30
            |
          8 | def my_func(event: Click):
          9 |     match event:
         10 |         case Click(x, button=ab):
-           |                              ^^
+           |                              --
         11 |             x = ab
-           |
-
-        info[references]: Reference 2
-          --> main.py:11:17
-           |
-         9 |     match event:
-        10 |         case Click(x, button=ab):
-        11 |             x = ab
-           |                 ^^
+           |                 --
            |
         ");
     }
@@ -1153,23 +817,15 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
           --> main.py:10:30
            |
          8 | def my_func(event: Click):
          9 |     match event:
         10 |         case Click(x, button=ab):
-           |                              ^^
+           |                              --
         11 |             x = ab
-           |
-
-        info[references]: Reference 2
-          --> main.py:11:17
-           |
-         9 |     match event:
-        10 |         case Click(x, button=ab):
-        11 |             x = ab
-           |                 ^^
+           |                 --
            |
         ");
     }
@@ -1192,33 +848,23 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r#"
-        info[references]: Reference 1
-         --> main.py:2:7
-          |
-        2 | class Click:
-          |       ^^^^^
-        3 |     __match_args__ = ("position", "button")
-        4 |     def __init__(self, pos, btn):
-          |
-
-        info[references]: Reference 2
-          --> main.py:8:20
+        info[references]: Found 3 references
+          --> main.py:2:7
+           |
+         2 | class Click:
+           |       -----
+         3 |     __match_args__ = ("position", "button")
+         4 |     def __init__(self, pos, btn):
+           |
+          ::: main.py:8:20
            |
          6 |         self.button: str = btn
          7 |
          8 | def my_func(event: Click):
-           |                    ^^^^^
+           |                    -----
          9 |     match event:
         10 |         case Click(x, button=ab):
-           |
-
-        info[references]: Reference 3
-          --> main.py:10:14
-           |
-         8 | def my_func(event: Click):
-         9 |     match event:
-        10 |         case Click(x, button=ab):
-           |              ^^^^^
+           |              -----
         11 |             x = ab
            |
         "#);
@@ -1253,25 +899,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |             ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:2:37
-          |
-        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |                                     ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:2:46
-          |
-        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |                                              ^^
+          |             --                      --       --
           |
         ");
     }
@@ -1285,25 +917,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:2:13
           |
         2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |             ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:2:37
-          |
-        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |                                     ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:2:46
-          |
-        2 | type Alias1[AB: int = bool] = tuple[AB, list[AB]]
-          |                                              ^^
+          |             --                      --       --
           |
         ");
     }
@@ -1318,28 +936,12 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:3:15
           |
         2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |               ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:3:43
-          |
-        2 | from typing import Callable
-        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |                                           ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:3:53
-          |
-        2 | from typing import Callable
-        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |                                                     ^^
+          |               --                          --        --
           |
         ");
     }
@@ -1354,28 +956,12 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:3:15
           |
         2 | from typing import Callable
         3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |               ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:3:43
-          |
-        2 | from typing import Callable
-        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |                                           ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:3:53
-          |
-        2 | from typing import Callable
-        3 | type Alias2[**AB = [int, str]] = Callable[AB, tuple[AB]]
-          |                                                     ^^
+          |               --                          --        --
           |
         ");
     }
@@ -1389,25 +975,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:2:14
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |              ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:2:38
-          |
-        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |                                      ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:2:50
-          |
-        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |                                                  ^^
+          |              --                      --          --
           |
         ");
     }
@@ -1421,25 +993,11 @@ cls = MyClass
         );
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 3 references
          --> main.py:2:14
           |
         2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |              ^^
-          |
-
-        info[references]: Reference 2
-         --> main.py:2:38
-          |
-        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |                                      ^^
-          |
-
-        info[references]: Reference 3
-         --> main.py:2:50
-          |
-        2 | type Alias3[*AB = ()] = tuple[tuple[*AB], tuple[*AB]]
-          |                                                  ^^
+          |              --                      --          --
           |
         ");
     }
@@ -1479,57 +1037,35 @@ class DataProcessor:
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> utils.py:2:5
-          |
-        2 | def func(x):
-          |     ^^^^
-        3 |     return x * 2
-          |
-
-        info[references]: Reference 2
-         --> module.py:2:19
-          |
-        2 | from utils import func
-          |                   ^^^^
-        3 |
-        4 | def process_data(data):
-          |
-
-        info[references]: Reference 3
-         --> module.py:5:12
-          |
-        4 | def process_data(data):
-        5 |     return func(data)
-          |            ^^^^
-          |
-
-        info[references]: Reference 4
+        info[references]: Found 6 references
          --> app.py:2:19
           |
         2 | from utils import func
-          |                   ^^^^
+          |                   ----
         3 |
-        4 | class DataProcessor:
-          |
-
-        info[references]: Reference 5
-         --> app.py:6:27
-          |
         4 | class DataProcessor:
         5 |     def __init__(self):
         6 |         self.multiplier = func
-          |                           ^^^^
+          |                           ----
         7 |
         8 |     def process(self, value):
-          |
-
-        info[references]: Reference 6
-         --> app.py:9:16
-          |
-        8 |     def process(self, value):
         9 |         return func(value)
-          |                ^^^^
+          |                ----
+          |
+         ::: module.py:2:19
+          |
+        2 | from utils import func
+          |                   ----
+        3 |
+        4 | def process_data(data):
+        5 |     return func(data)
+          |            ----
+          |
+         ::: utils.py:2:5
+          |
+        2 | def func(x):
+          |     ----
+        3 |     return x * 2
           |
         ");
     }
@@ -1562,52 +1098,27 @@ def process_model():
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
-         --> models.py:3:5
-          |
-        2 | class MyModel:
-        3 |     attr = 42
-          |     ^^^^
-        4 |
-        5 |     def get_attribute(self):
-          |
-
-        info[references]: Reference 2
-         --> models.py:6:24
-          |
-        5 |     def get_attribute(self):
-        6 |         return MyModel.attr
-          |                        ^^^^
-          |
-
-        info[references]: Reference 3
+        info[references]: Found 5 references
          --> main.py:6:19
           |
         4 | def process_model():
         5 |     model = MyModel()
         6 |     value = model.attr
-          |                   ^^^^
+          |                   ----
         7 |     model.attr = 100
+          |           ----
         8 |     return model.attr
+          |                  ----
           |
-
-        info[references]: Reference 4
-         --> main.py:7:11
+         ::: models.py:3:5
           |
-        5 |     model = MyModel()
-        6 |     value = model.attr
-        7 |     model.attr = 100
-          |           ^^^^
-        8 |     return model.attr
-          |
-
-        info[references]: Reference 5
-         --> main.py:8:18
-          |
-        6 |     value = model.attr
-        7 |     model.attr = 100
-        8 |     return model.attr
-          |                  ^^^^
+        2 | class MyModel:
+        3 |     attr = 42
+          |     ----
+        4 |
+        5 |     def get_attribute(self):
+        6 |         return MyModel.attr
+          |                        ----
           |
         ");
     }
@@ -1637,22 +1148,14 @@ func<CURSOR>_alias()
         // When finding references to the alias, we should NOT find references
         // to the original function in the original module
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> importer.py:2:30
           |
         2 | from original import func as func_alias
-          |                              ^^^^^^^^^^
+          |                              ----------
         3 |
         4 | func_alias()
-          |
-
-        info[references]: Reference 2
-         --> importer.py:4:1
-          |
-        2 | from original import func as func_alias
-        3 |
-        4 | func_alias()
-          | ^^^^^^^^^^
+          | ----------
           |
         ");
     }
@@ -1685,42 +1188,23 @@ func<CURSOR>_alias()
             )
             .build();
 
-        assert_snapshot!(test.references(), @r###"
-        info[references]: Reference 1
-         --> path.pyi:2:7
-          |
-        2 | class Path:
-          |       ^^^^
-        3 |     def __init__(self, path: str): ...
-          |
-
-        info[references]: Reference 2
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 4 references
          --> importer.py:2:18
           |
         2 | from path import Path
-          |                  ^^^^
+          |                  ----
         3 |
         4 | a: Path = Path("test")
+          |    ----   ----
           |
-
-        info[references]: Reference 3
-         --> importer.py:4:4
+         ::: path.pyi:2:7
           |
-        2 | from path import Path
-        3 |
-        4 | a: Path = Path("test")
-          |    ^^^^
+        2 | class Path:
+          |       ----
+        3 |     def __init__(self, path: str): ...
           |
-
-        info[references]: Reference 4
-         --> importer.py:4:11
-          |
-        2 | from path import Path
-        3 |
-        4 | a: Path = Path("test")
-          |           ^^^^
-          |
-        "###);
+        "#);
     }
 
     #[test]
@@ -1739,23 +1223,15 @@ func<CURSOR>_alias()
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:3:20
           |
         2 | import warnings
         3 | import warnings as abc
-          |                    ^^^
+          |                    ---
         4 |
         5 | x = abc
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:5
-          |
-        3 | import warnings as abc
-        4 |
-        5 | x = abc
-          |     ^^^
+          |     ---
         6 | y = warnings
           |
         ");
@@ -1777,23 +1253,15 @@ func<CURSOR>_alias()
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:3:20
           |
         2 | import warnings
         3 | import warnings as abc
-          |                    ^^^
+          |                    ---
         4 |
         5 | x = abc
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:5
-          |
-        3 | import warnings as abc
-        4 |
-        5 | x = abc
-          |     ^^^
+          |     ---
         6 | y = warnings
           |
         ");
@@ -1815,21 +1283,15 @@ func<CURSOR>_alias()
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:36
           |
         2 | from warnings import deprecated as xyz
-          |                                    ^^^
-        3 | from warnings import deprecated
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:5
-          |
+          |                                    ---
         3 | from warnings import deprecated
         4 |
         5 | y = xyz
-          |     ^^^
+          |     ---
         6 | z = deprecated
           |
         ");
@@ -1851,23 +1313,246 @@ func<CURSOR>_alias()
             .build();
 
         assert_snapshot!(test.references(), @r"
-        info[references]: Reference 1
+        info[references]: Found 2 references
          --> main.py:2:36
           |
         2 | from warnings import deprecated as xyz
-          |                                    ^^^
-        3 | from warnings import deprecated
-          |
-
-        info[references]: Reference 2
-         --> main.py:5:5
-          |
+          |                                    ---
         3 | from warnings import deprecated
         4 |
         5 | y = xyz
-          |     ^^^
+          |     ---
         6 | z = deprecated
           |
         ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 1 references
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg.submod import val
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg.submod import val
+
+                x = subpkg
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // TODO(submodule-imports): this should light up both instances of `subpkg`
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.submod import val
+
+                x = sub<CURSOR>mod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_wrong_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg.sub<CURSOR>mod import val
+
+                x = submod
+                "#,
+            )
+            .source("mypackage/subpkg/__init__.py", r#""#)
+            .source(
+                "mypackage/subpkg/submod.py",
+                r#"
+                val: int = 0
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_shadowed_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .sub<CURSOR>pkg import subpkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // No references is actually correct (or it should only see itself)
+        assert_snapshot!(test.references(), @"No references found");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_real_def() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import sub<CURSOR>pkg
+
+                x = subpkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 3 references
+         --> mypackage/__init__.py:2:21
+          |
+        2 | from .subpkg import subpkg
+          |                     ------
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+         ::: mypackage/subpkg/__init__.py:2:1
+          |
+        2 | subpkg: int = 10
+          | ------
+          |
+        ");
+    }
+
+    #[test]
+    fn references_submodule_import_from_confusing_use() {
+        let test = CursorTest::builder()
+            .source(
+                "mypackage/__init__.py",
+                r#"
+                from .subpkg import subpkg
+
+                x = sub<CURSOR>pkg
+                "#,
+            )
+            .source(
+                "mypackage/subpkg/__init__.py",
+                r#"
+                subpkg: int = 10
+                "#,
+            )
+            .build();
+
+        // TODO: this should also highlight the RHS subpkg in the import
+        assert_snapshot!(test.references(), @r"
+        info[references]: Found 1 references
+         --> mypackage/__init__.py:4:5
+          |
+        2 | from .subpkg import subpkg
+        3 |
+        4 | x = subpkg
+          |     ------
+          |
+        ");
+    }
+
+    // TODO: Should only return references to the last declaration
+    #[test]
+    fn declarations() {
+        let test = CursorTest::builder()
+            .source(
+                "main.py",
+                r#"
+                a: str = "test"
+
+                a: int = 10
+
+                print(a<CURSOR>)
+                "#,
+            )
+            .build();
+
+        assert_snapshot!(test.references(), @r#"
+        info[references]: Found 3 references
+         --> main.py:2:1
+          |
+        2 | a: str = "test"
+          | -
+        3 |
+        4 | a: int = 10
+          | -
+        5 |
+        6 | print(a)
+          |       -
+          |
+        "#);
     }
 }

@@ -218,8 +218,8 @@ class E(A[int]):
     def method(self, x: object) -> None: ...  # fine
 
 class F[T](A[T]):
-    # TODO: we should emit `invalid-method-override` on this:
     # `str` is not necessarily a supertype of `T`!
+    # error: [invalid-method-override]
     def method(self, x: str) -> None: ...
 
 class G(A[int]):
@@ -582,4 +582,18 @@ class GoodChild2(Parent):
     def class_method(cls, x: object) -> bool: ...
     @staticmethod
     def static_method(x: object) -> bool: ...
+```
+
+## Definitely bound members with no reachable definitions(!)
+
+We don't emit a Liskov-violation diagnostic here, but if you're writing code like this, you probably
+have bigger problems:
+
+```py
+from __future__ import annotations
+
+class MaybeEqWhile:
+    while ...:
+        def __eq__(self, other: MaybeEqWhile) -> bool:
+            return True
 ```

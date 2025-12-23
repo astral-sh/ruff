@@ -307,12 +307,10 @@ Using a `ParamSpec` in a `Callable` annotation:
 from typing_extensions import Callable
 
 def _[**P1](c: Callable[P1, int]):
-    # TODO: Should reveal `ParamSpecArgs` and `ParamSpecKwargs`
-    reveal_type(P1.args)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
-    reveal_type(P1.kwargs)  # revealed: @Todo(ParamSpecArgs / ParamSpecKwargs)
+    reveal_type(P1.args)  # revealed: P1@_.args
+    reveal_type(P1.kwargs)  # revealed: P1@_.kwargs
 
-    # TODO: Signature should be (**P1) -> int
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P1@_) -> int
 ```
 
 And, using the legacy syntax:
@@ -322,9 +320,8 @@ from typing_extensions import ParamSpec
 
 P2 = ParamSpec("P2")
 
-# TODO: argument list should not be `...` (requires `ParamSpec` support)
 def _(c: Callable[P2, int]):
-    reveal_type(c)  # revealed: (...) -> int
+    reveal_type(c)  # revealed: (**P2@_) -> int
 ```
 
 ## Using `typing.Unpack`
@@ -408,6 +405,24 @@ def f_okay(c: Callable[[], None]):
         reveal_type(result)  # revealed: property
         if isinstance(result, property) and result.fset:
             c.__qualname__ = "my_callable"  # okay
+```
+
+## From a class
+
+### Subclasses should return themselves, not superclass
+
+```py
+from ty_extensions import into_callable
+
+class Base:
+    def __init__(self) -> None:
+        pass
+
+class A(Base):
+    pass
+
+# revealed: () -> A
+reveal_type(into_callable(A))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

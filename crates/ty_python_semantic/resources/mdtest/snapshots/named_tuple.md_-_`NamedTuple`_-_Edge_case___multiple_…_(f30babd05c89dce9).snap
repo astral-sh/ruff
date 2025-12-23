@@ -1,0 +1,74 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: named_tuple.md - `NamedTuple` - Edge case: multiple reachable definitions with distinct issues
+mdtest path: crates/ty_python_semantic/resources/mdtest/named_tuple.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import NamedTuple
+ 2 | 
+ 3 | def coinflip() -> bool:
+ 4 |     return True
+ 5 | 
+ 6 | class Foo(NamedTuple):
+ 7 |     if coinflip():
+ 8 |         _asdict: bool  # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+ 9 |     else:
+10 |         # TODO: there should only be one diagnostic here...
+11 |         #
+12 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+13 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+14 |         _asdict = True
+```
+
+# Diagnostics
+
+```
+error[invalid-named-tuple]: NamedTuple field name cannot start with an underscore
+  --> src/mdtest_snippet.py:8:9
+   |
+ 6 | class Foo(NamedTuple):
+ 7 |     if coinflip():
+ 8 |         _asdict: bool  # error: [invalid-named-tuple] "NamedTuple field `_asdict` cannot start with an underscore"
+   |         ^^^^^^^^^^^^^ Class definition will raise `TypeError` at runtime due to this field
+ 9 |     else:
+10 |         # TODO: there should only be one diagnostic here...
+   |
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+13 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+14 |         _asdict = True
+   |         ^^^^^^^
+   |
+info: This will cause the class creation to fail at runtime
+info: rule `invalid-named-tuple` is enabled by default
+
+```
+
+```
+error[invalid-named-tuple]: Cannot overwrite NamedTuple attribute `_asdict`
+  --> src/mdtest_snippet.py:14:9
+   |
+12 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+13 |         # error: [invalid-named-tuple] "Cannot overwrite NamedTuple attribute `_asdict`"
+14 |         _asdict = True
+   |         ^^^^^^^
+   |
+info: This will cause the class creation to fail at runtime
+info: rule `invalid-named-tuple` is enabled by default
+
+```

@@ -27,8 +27,9 @@ use ruff_python_ast::{
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
+use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::{Db, module_name::ModuleName, resolve_module};
+use crate::Db;
 
 fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()
@@ -250,7 +251,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                             for export in
                                 ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
-                                    .and_then(|module_name| resolve_module(self.db, &module_name))
+                                    .and_then(|module_name| {
+                                        resolve_module(self.db, self.file, &module_name)
+                                    })
                                     .iter()
                                     .flat_map(|module| {
                                         module

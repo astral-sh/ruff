@@ -92,8 +92,7 @@ def f(x: A[int] | B):
         reveal_type(x)  # revealed: A[int] | B
 
     if type(x) is A:
-        # TODO: this should be `A[int]`, but `A[int] | B` would be better than `Never`
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: A[int]
     else:
         reveal_type(x)  # revealed: A[int] | B
 
@@ -111,8 +110,7 @@ def f(x: A[int] | B):
     if type(x) is not A:
         reveal_type(x)  # revealed: A[int] | B
     else:
-        # TODO: this should be `A[int]`, but `A[int] | B` would be better than `Never`
-        reveal_type(x)  # revealed: Never
+        reveal_type(x)  # revealed: A[int]
 
     if type(x) is not B:
         reveal_type(x)  # revealed: A[int] | B

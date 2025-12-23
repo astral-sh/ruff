@@ -27,7 +27,6 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
@@ -116,6 +115,10 @@ pub struct Project {
 
     #[default]
     verbose_flag: bool,
+
+    /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
+    #[default]
+    force_exclude_flag: bool,
 }
 
 /// A progress reporter.
@@ -379,6 +382,16 @@ impl Project {
 
     pub fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
+    }
+
+    pub fn set_force_exclude(self, db: &mut dyn Db, force: bool) {
+        if self.force_exclude_flag(db) != force {
+            self.set_force_exclude_flag(db).to(force);
+        }
+    }
+
+    pub fn force_exclude(self, db: &dyn Db) -> bool {
+        self.force_exclude_flag(db)
     }
 
     /// Returns the paths that should be checked.

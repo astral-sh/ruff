@@ -9,7 +9,7 @@ use std::sync::mpsc::channel;
 use anyhow::Result;
 use clap::CommandFactory;
 use colored::Colorize;
-use log::{error, warn};
+use log::error;
 use notify::{RecursiveMode, Watcher, recommended_watcher};
 
 use args::{GlobalConfigArgs, ServerCommand};

@@ -5,10 +5,11 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
 use ruff_python_ast::{self as ast};
+use ty_module_resolver::{ModuleName, resolve_module};
 
+use crate::Db;
 use crate::semantic_index::{SemanticIndex, semantic_index};
 use crate::types::{Truthiness, Type, TypeContext, infer_expression_types};
-use crate::{Db, ModuleName, resolve_module};
 
 fn dunder_all_names_cycle_initial(
     _db: &dyn Db,
@@ -166,7 +167,7 @@ impl<'db> DunderAllNamesCollector<'db> {
     ) -> Option<&'db FxHashSet<Name>> {
         let module_name =
             ModuleName::from_import_statement(self.db, self.file, import_from).ok()?;
-        let module = resolve_module(self.db, &module_name)?;
+        let module = resolve_module(self.db, self.file, &module_name)?;
         dunder_all_names(self.db, module.file(self.db)?)
     }
 

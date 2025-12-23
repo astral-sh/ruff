@@ -18,7 +18,7 @@ use crate::types::{
 /// automatically construct the default specialization for that class.
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub enum ClassBase<'db> {
-    Dynamic(DynamicType),
+    Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
@@ -62,7 +62,7 @@ impl<'db> ClassBase<'db> {
         match self {
             ClassBase::Class(class) => class.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
-            ClassBase::Dynamic(DynamicType::Unknown) => "Unknown",
+            ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
             ClassBase::Dynamic(
                 DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression,
             ) => "@Todo",
@@ -152,11 +152,9 @@ impl<'db> ClassBase<'db> {
 
             Type::TypeAlias(alias) => Self::try_from_type(db, alias.value_type(db), subclass),
 
-            Type::NewTypeInstance(newtype) => ClassBase::try_from_type(
-                db,
-                Type::instance(db, newtype.base_class_type(db)),
-                subclass,
-            ),
+            Type::NewTypeInstance(newtype) => {
+                ClassBase::try_from_type(db, newtype.concrete_base_type(db), subclass)
+            }
 
             Type::PropertyInstance(_)
             | Type::BooleanLiteral(_)

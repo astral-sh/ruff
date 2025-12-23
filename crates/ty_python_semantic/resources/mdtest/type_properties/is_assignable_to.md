@@ -537,6 +537,9 @@ static_assert(is_assignable_to(tuple[Any, ...], tuple[Any, Any]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int]))
 static_assert(is_assignable_to(tuple[Any, ...], tuple[int, int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[int, ...]]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[*tuple[int, ...], int]))
+static_assert(is_assignable_to(tuple[Any, ...], tuple[int, *tuple[int, ...], int]))
 ```
 
 This also applies when `tuple[Any, ...]` is unpacked into a mixed tuple.
@@ -560,6 +563,10 @@ static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, ...]))
 static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int]))
 static_assert(is_assignable_to(tuple[*tuple[Any, ...], int], tuple[int, int]))
 
+# `*tuple[Any, ...]` can materialize to a tuple of any length as a special case,
+# so this passes:
+static_assert(is_assignable_to(tuple[*tuple[Any, ...], Any], tuple[*tuple[Any, ...], Any, Any]))
+
 static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[int, *tuple[Any, ...], int]))
 static_assert(is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any, ...]))
 static_assert(not is_assignable_to(tuple[int, *tuple[Any, ...], int], tuple[Any]))
@@ -580,6 +587,9 @@ static_assert(not is_assignable_to(tuple[int, ...], tuple[Any, Any]))
 static_assert(is_assignable_to(tuple[int, ...], tuple[int, ...]))
 static_assert(not is_assignable_to(tuple[int, ...], tuple[int]))
 static_assert(not is_assignable_to(tuple[int, ...], tuple[int, int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...]]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[*tuple[int, ...], int]))
+static_assert(not is_assignable_to(tuple[int, ...], tuple[int, *tuple[int, ...], int]))
 
 static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[int, *tuple[Any, ...]]))
 static_assert(is_assignable_to(tuple[int, *tuple[int, ...]], tuple[Any, ...]))
@@ -1328,6 +1338,40 @@ def g3(obj: Foo[tuple[A]]):
     f3(obj)
 ```
 
+## Generic aliases
+
+```py
+from typing import final
+from ty_extensions import static_assert, is_assignable_to, TypeOf
+
+class GenericClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass]))
+static_assert(is_assignable_to(TypeOf[GenericClass], type[GenericClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClass[int]], type[GenericClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericClass[str]], type[GenericClass[int]]))
+
+class GenericClassIntBound[T: int]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound], type[GenericClassIntBound[int]]))
+static_assert(is_assignable_to(TypeOf[GenericClassIntBound[int]], type[GenericClassIntBound[int]]))
+
+@final
+class GenericFinalClass[T]:
+    x: T  # invariant
+
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass], type[GenericFinalClass[int]]))
+static_assert(is_assignable_to(TypeOf[GenericFinalClass[int]], type[GenericFinalClass[int]]))
+static_assert(not is_assignable_to(TypeOf[GenericFinalClass[str]], type[GenericFinalClass[int]]))
+```
+
 ## `TypeGuard` and `TypeIs`
 
 `TypeGuard[...]` and `TypeIs[...]` are always assignable to `bool`.
@@ -1342,6 +1386,38 @@ static_assert(is_assignable_to(TypeIs[Any], bool))
 # TODO no error
 static_assert(not is_assignable_to(TypeGuard[Unknown], str))  # error: [static-assert-error]
 static_assert(not is_assignable_to(TypeIs[Any], str))
+```
+
+## `ParamSpec`
+
+```py
+from ty_extensions import TypeOf, static_assert, is_assignable_to, Unknown
+from typing import ParamSpec, Mapping, Callable, Any
+
+P = ParamSpec("P")
+
+def f(func: Callable[P, int], *args: P.args, **kwargs: P.kwargs) -> None:
+    static_assert(is_assignable_to(TypeOf[args], tuple[Any, ...]))
+    static_assert(is_assignable_to(TypeOf[args], tuple[object, ...]))
+    static_assert(is_assignable_to(TypeOf[args], tuple[Unknown, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, ...]))
+    static_assert(not is_assignable_to(TypeOf[args], tuple[int, str]))
+
+    static_assert(not is_assignable_to(tuple[Any, ...], TypeOf[args]))
+    static_assert(not is_assignable_to(tuple[object, ...], TypeOf[args]))
+    static_assert(not is_assignable_to(tuple[Unknown, ...], TypeOf[args]))
+
+    static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Any]))
+    static_assert(is_assignable_to(TypeOf[kwargs], dict[str, Unknown]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, object]))
+    static_assert(not is_assignable_to(TypeOf[kwargs], dict[str, int]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Any]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, object]))
+    static_assert(is_assignable_to(TypeOf[kwargs], Mapping[str, Unknown]))
+
+    static_assert(not is_assignable_to(dict[str, Any], TypeOf[kwargs]))
+    static_assert(not is_assignable_to(dict[str, object], TypeOf[kwargs]))
+    static_assert(not is_assignable_to(dict[str, Unknown], TypeOf[kwargs]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

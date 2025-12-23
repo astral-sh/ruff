@@ -22,7 +22,7 @@ from typing import TypeVar
 
 T = TypeVar("T")
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__name__)  # revealed: Literal["T"]
 ```
 
@@ -104,6 +104,34 @@ S = TypeVar("S", **{"bound": int})
 reveal_type(S)  # revealed: TypeVar
 ```
 
+### No explicit specialization
+
+A type variable itself cannot be explicitly specialized; the result of the specialization is
+`Unknown`. However, generic PEP 613 type aliases that point to type variables can be explicitly
+specialized.
+
+```py
+from typing import TypeVar, TypeAlias
+
+T = TypeVar("T")
+ImplicitPositive = T
+Positive: TypeAlias = T
+
+def _(
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    a: T[int],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    b: T[T],
+    # error: [invalid-type-form] "A type variable itself cannot be specialized"
+    c: ImplicitPositive[int],
+    d: Positive[int],
+):
+    reveal_type(a)  # revealed: Unknown
+    reveal_type(b)  # revealed: Unknown
+    reveal_type(c)  # revealed: Unknown
+    reveal_type(d)  # revealed: int
+```
+
 ### Type variables with a default
 
 Note that the `__default__` property is only available in Python ≥3.13.
@@ -118,7 +146,7 @@ from typing import TypeVar
 
 T = TypeVar("T", default=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__default__)  # revealed: int
 reveal_type(T.__bound__)  # revealed: None
 reveal_type(T.__constraints__)  # revealed: tuple[()]
@@ -159,7 +187,7 @@ from typing import TypeVar
 
 T = TypeVar("T", bound=int)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__bound__)  # revealed: int
 reveal_type(T.__constraints__)  # revealed: tuple[()]
 
@@ -183,7 +211,7 @@ from typing import TypeVar
 
 T = TypeVar("T", int, str)
 reveal_type(type(T))  # revealed: <class 'TypeVar'>
-reveal_type(T)  # revealed: typing.TypeVar
+reveal_type(T)  # revealed: TypeVar
 reveal_type(T.__constraints__)  # revealed: tuple[int, str]
 
 S = TypeVar("S")
@@ -490,8 +518,7 @@ V = TypeVar("V", default="V")
 class D(Generic[V]):
     x: V
 
-# TODO: we shouldn't leak a typevar like this in type inference
-reveal_type(D().x)  # revealed: V@D
+reveal_type(D().x)  # revealed: Unknown
 ```
 
 ## Regression
