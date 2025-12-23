@@ -2771,9 +2771,11 @@ declare_lint! {
     ///
     /// ## Example
     /// ```python
+    /// from typing import Literal
+    ///
     /// class Foo(tuple[int, int]):
-    ///     def __len__(self) -> int:
-    ///         return 1
+    ///     def __bool__(self) -> Literal[False]:
+    ///         return False
     /// ```
     pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
         summary: "detects unsafe overrides of certain dunder methods in tuple subclasses",
