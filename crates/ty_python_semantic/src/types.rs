@@ -1903,6 +1903,7 @@ impl<'db> Type<'db> {
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
+                None,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -1910,6 +1911,7 @@ impl<'db> Type<'db> {
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
+                    None,
                 )))
             }
 
@@ -12310,6 +12312,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
+            None,
         )
     }
 
@@ -12429,6 +12432,8 @@ pub struct CallableType<'db> {
     pub(crate) signatures: CallableSignature<'db>,
 
     kind: CallableTypeKind,
+
+    materialization_kind: Option<MaterializationKind>,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -12473,6 +12478,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
+            None,
         )
     }
 
@@ -12481,6 +12487,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
+            None,
         )
     }
 
@@ -12492,6 +12499,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(Signature::new(parameters, None)),
             CallableTypeKind::ParamSpecValue,
+            None,
         )
     }
 
@@ -12521,6 +12529,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
+            self.materialization_kind(db),
         )
     }
 
@@ -12529,6 +12538,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
+            self.materialization_kind(db),
         )
     }
 
@@ -12537,7 +12547,12 @@ impl<'db> CallableType<'db> {
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
-        Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
+        Self::new(
+            db,
+            CallableSignature::bottom(),
+            CallableTypeKind::Regular,
+            None,
+        )
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -12548,6 +12563,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).normalized_impl(db, visitor),
             self.kind(db),
+            self.materialization_kind(db),
         )
     }
 
@@ -12562,6 +12578,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
+            self.materialization_kind(db),
         ))
     }
 
@@ -12572,11 +12589,34 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping {
+            // Top/Bottom materializations are fully static types already,
+            // so materializing them further does nothing.
+            if self.materialization_kind(db).is_some() {
+                return self;
+            }
+
+            // If we're materializing a callable with gradual parameters, wrap it in
+            // `Top[...]` or `Bottom[...]` instead of simplifying the parameters. This
+            // preserves the gradual nature of the type while making it a fully static type.
+            // We still materialize the return type (which is in covariant position).
+            if self.signatures(db).has_gradual_parameters() {
+                return CallableType::new(
+                    db,
+                    self.signatures(db)
+                        .materialize_return_types(db, *materialization_kind),
+                    self.kind(db),
+                    Some(*materialization_kind),
+                );
+            }
+        }
+
         CallableType::new(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
+            self.materialization_kind(db),
         )
     }
 
@@ -12606,6 +12646,59 @@ impl<'db> CallableType<'db> {
         if other.is_function_like(db) && !self.is_function_like(db) {
             return ConstraintSet::from(false);
         }
+
+        // Handle materialization kinds:
+        // - `Top[Callable[..., Any]]` is a supertype of `Callable[..., Any]` and all its materializations.
+        // - `Bottom[Callable[..., Any]]` is a subtype of `Callable[..., Any]` and all its materializations.
+        match (
+            self.materialization_kind(db),
+            other.materialization_kind(db),
+        ) {
+            // No materialization kinds: use normal signature comparison.
+            (None, None) => {}
+
+            // self <: Top[...] is true if the signatures are compatible (Top is supertype of all).
+            (_, Some(MaterializationKind::Top)) => {
+                return self.signatures(db).has_relation_to_impl(
+                    db,
+                    other.signatures(db),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                );
+            }
+
+            // Bottom[...] <: other is true if the signatures are compatible (Bottom is subtype of all).
+            (Some(MaterializationKind::Bottom), _) => {
+                return self.signatures(db).has_relation_to_impl(
+                    db,
+                    other.signatures(db),
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                );
+            }
+
+            // Top[...] <: non-Top is only true for assignability, not subtyping.
+            (Some(MaterializationKind::Top), None) => {
+                if relation.is_subtyping() {
+                    return ConstraintSet::from(false);
+                }
+            }
+
+            // non-materialized <: Bottom[...] is false (only Bottom is subtype of Bottom).
+            (None, Some(MaterializationKind::Bottom)) => {
+                return ConstraintSet::from(false);
+            }
+
+            // Top[...] <: Bottom[...] is false (Top is not a subtype of Bottom).
+            (Some(MaterializationKind::Top), Some(MaterializationKind::Bottom)) => {
+                return ConstraintSet::from(false);
+            }
+        }
+
         self.signatures(db).has_relation_to_impl(
             db,
             other.signatures(db),
@@ -12628,6 +12721,11 @@ impl<'db> CallableType<'db> {
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
+        }
+
+        // Callables with different materialization kinds are not equivalent
+        if self.materialization_kind(db) != other.materialization_kind(db) {
+            return ConstraintSet::from(false);
         }
 
         ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {

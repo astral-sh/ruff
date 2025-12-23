@@ -1576,6 +1576,7 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
+            materialization_kind: self.materialization_kind(db),
             db,
             settings,
         }
@@ -1585,23 +1586,35 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
+    materialization_kind: Option<MaterializationKind>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
+        // If this callable has a materialization kind, wrap it in Top[...] or Bottom[...]
+        let prefix_details = match self.materialization_kind {
+            None => None,
+            Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
+            Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
+        };
+        if let Some((name, form)) = prefix_details {
+            f.with_type(Type::SpecialForm(form)).write_str(name)?;
+            f.write_char('[')?;
+        }
+
         match self.signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
                     signature
                         .parameters()
                         .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)
+                        .fmt_detailed(f)?;
                 } else {
                     signature
                         .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)
+                        .fmt_detailed(f)?;
                 }
             }
             signatures => {
@@ -1621,9 +1634,13 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
                 if !self.settings.multiline {
                     f.write_char(']')?;
                 }
-                Ok(())
             }
         }
+
+        if self.materialization_kind.is_some() {
+            f.write_char(']')?;
+        }
+        Ok(())
     }
 }
 

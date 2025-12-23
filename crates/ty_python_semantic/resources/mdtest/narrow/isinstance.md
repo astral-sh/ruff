@@ -213,7 +213,7 @@ def f(x: dict[str, int] | list[str], y: object):
         reveal_type(x)  # revealed: list[str]
 
     if isinstance(y, t.Callable):
-        reveal_type(y)  # revealed: (...) -> object
+        reveal_type(y)  # revealed: Top[(...) -> object]
 ```
 
 ## Class types

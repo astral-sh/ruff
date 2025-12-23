@@ -428,6 +428,7 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            None,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -461,6 +462,7 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
+                            None,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -568,6 +570,28 @@ impl<'db> CallableSignature<'db> {
                     .and(db, || other.is_subtype_of_impl(db, self, inferable))
             }
         }
+    }
+
+    /// Returns `true` if any signature in this callable has gradual parameters (`...`).
+    pub(crate) fn has_gradual_parameters(&self) -> bool {
+        self.overloads.iter().any(|sig| sig.parameters.is_gradual())
+    }
+
+    /// Materialize only the return types of all signatures, preserving parameters as-is.
+    ///
+    /// This is used when wrapping gradual callables in `Top[...]` or `Bottom[...]` - we want
+    /// to preserve the gradual parameters but materialize the return types (which are in
+    /// covariant position).
+    pub(crate) fn materialize_return_types(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
+        Self::from_overloads(
+            self.overloads
+                .iter()
+                .map(|sig| sig.materialize_return_type(db, materialization_kind)),
+        )
     }
 }
 
@@ -729,6 +753,26 @@ impl<'db> Signature<'db> {
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
         Self::new(Parameters::object(), Some(Type::Never))
+    }
+
+    /// Materialize only the return type, preserving parameters as-is.
+    pub(crate) fn materialize_return_type(
+        &self,
+        db: &'db dyn Db,
+        materialization_kind: MaterializationKind,
+    ) -> Self {
+        Self {
+            generic_context: self.generic_context,
+            definition: self.definition,
+            parameters: self.parameters.clone(),
+            return_ty: self.return_ty.map(|ty| {
+                ty.materialize(
+                    db,
+                    materialization_kind,
+                    &ApplyTypeMappingVisitor::default(),
+                )
+            }),
+        }
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -1115,6 +1159,7 @@ impl<'db> Signature<'db> {
                         .map(|signature| Signature::new(signature.parameters().clone(), None)),
                 ),
                 CallableTypeKind::ParamSpecValue,
+                None,
             ));
             let param_spec_matches =
                 ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
@@ -1366,6 +1411,7 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(other.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
+                        None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1382,6 +1428,7 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(self.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
+                        None,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -2051,24 +2098,13 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        match type_mapping {
-            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
-            // so the "top" materialization here is the bottom materialization of the whole Signature.
-            // It might make sense to flip the materialization here instead.
-            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
-                Parameters::object()
-            }
-            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
-                Parameters::gradual_form()
-            }
-            _ => Self {
-                value: self
-                    .value
-                    .iter()
-                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect(),
-                kind: self.kind,
-            },
+        Self {
+            value: self
+                .value
+                .iter()
+                .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .collect(),
+            kind: self.kind,
         }
     }
 
