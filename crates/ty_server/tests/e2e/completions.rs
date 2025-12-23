@@ -202,6 +202,56 @@ consume(" ")
     Ok(())
 }
 
+/// Tests that string literal completions are offered for `TypedDict` key access via subscription.
+#[test]
+fn string_literal_completions_for_typed_dict_subscript_keys() -> Result<()> {
+    let workspace_root = SystemPath::new("src");
+    let foo = SystemPath::new("src/foo.py");
+    let foo_content = r#"
+from typing import TypedDict
+
+class TD(TypedDict):
+    left: int
+    right: str
+
+td: TD = {"left": 1, "right": "x"}
+
+td[" "]
+"#;
+
+    let mut server = TestServerBuilder::new()?
+        .with_initialization_options(ClientOptions::default())
+        .with_workspace(workspace_root, None)?
+        .with_file(foo, foo_content)?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.open_text_document(foo, foo_content, 1);
+    let _ = server.await_notification::<PublishDiagnostics>();
+
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(9, 5));
+    insta::assert_json_snapshot!(completions, @r#"
+    [
+      {
+        "label": "left",
+        "kind": 12,
+        "detail": "Literal[/"left/"]",
+        "sortText": "0",
+        "insertText": "left"
+      },
+      {
+        "label": "right",
+        "kind": 12,
+        "detail": "Literal[/"right/"]",
+        "sortText": "1",
+        "insertText": "right"
+      }
+    ]
+    "#);
+
+    Ok(())
+}
+
 /// Tests that disabling auto-import works.
 #[test]
 fn disable_auto_import() -> Result<()> {

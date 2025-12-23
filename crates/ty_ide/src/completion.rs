@@ -530,6 +530,8 @@ enum StringLiteralSite<'m> {
     CallArg,
     /// Cursor is inside the RHS value of an annotated assignment (`x: T = "..."`).
     AnnAssignValue { annotation: &'m ast::Expr },
+    /// Cursor is inside a subscript used to access a `TypedDict` key.
+    TypedDictKey { value: &'m ast::Expr },
 }
 
 impl<'m> Context<'m> {
@@ -717,7 +719,10 @@ impl<'m> ContextCursor<'m> {
 
     /// Determine whether we're in a syntactic place where literal suggestions make sense.
     fn string_literal_site(&self) -> Option<StringLiteralSite<'m>> {
-        // Call argument site (and keyword args, I suppose)
+        let range = TextRange::empty(self.offset);
+        let covering = self.covering_node(TextRange::empty(self.offset));
+
+        // Call argument site
         if self
             .covering_node(TextRange::empty(self.offset))
             .ancestors()
@@ -725,6 +730,17 @@ impl<'m> ContextCursor<'m> {
             .any(|node| node.is_arguments())
         {
             return Some(StringLiteralSite::CallArg);
+        }
+
+        if let Some(subscript) = covering.ancestors().find_map(|node| match node {
+            AnyNodeRef::ExprSubscript(subscript) => Some(subscript),
+            _ => None,
+        }) {
+            if subscript.slice.range().contains_range(range) {
+                return Some(StringLiteralSite::TypedDictKey {
+                    value: &subscript.value,
+                });
+            }
         }
 
         // Annotated assignment RHS: `x: T = "..."`
@@ -1199,6 +1215,10 @@ fn add_string_literal_completions<'db>(
             let model = SemanticModel::new(db, file);
             collect_annotation_site_literals(db, &model, annotation, &mut out, &mut seen_types);
         }
+        StringLiteralSite::TypedDictKey { value } => {
+            let model = SemanticModel::new(db, file);
+            collect_typed_dict_key_literals(db, &model, value, &mut out, &mut seen_types);
+        }
     }
 
     if out.is_empty() {
@@ -1288,6 +1308,20 @@ fn collect_annotation_site_literals<'db>(
     collect_string_literals_from_type(db, annotation_ty, seen_types, out);
 }
 
+fn collect_typed_dict_key_literals<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    value: &ast::Expr,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+) {
+    let Some(value_ty) = value.inferred_type(model) else {
+        return;
+    };
+
+    collect_typed_dict_literals_from_type(db, value_ty, seen_types, out);
+}
+
 fn collect_string_literals_from_type<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1314,6 +1348,41 @@ fn collect_string_literals_from_type<'db>(
         }
         Type::TypeAlias(alias) => {
             collect_string_literals_from_type(db, alias.value_type(db), seen_types, out);
+        }
+        _ => {}
+    }
+}
+
+fn collect_typed_dict_literals_from_type<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    seen_types: &mut FxHashSet<Type<'db>>,
+    out: &mut BTreeMap<&'db str, StringLiteralType<'db>>,
+) {
+    if !seen_types.insert(ty) {
+        return;
+    }
+
+    match ty {
+        Type::TypedDict(typed_dict) => {
+            for (name, _) in typed_dict.items(db) {
+                let name = name.as_str();
+                let literal = StringLiteralType::new(db, name);
+                out.entry(literal.as_str(db)).or_insert(literal);
+            }
+        }
+        Type::Union(union) => {
+            for ty in union.elements(db) {
+                collect_typed_dict_literals_from_type(db, *ty, seen_types, out);
+            }
+        }
+        Type::Intersection(intersection) => {
+            for ty in intersection.iter_positive(db) {
+                collect_typed_dict_literals_from_type(db, ty, seen_types, out);
+            }
+        }
+        Type::TypeAlias(alias) => {
+            collect_typed_dict_literals_from_type(db, alias.value_type(db), seen_types, out);
         }
         _ => {}
     }
