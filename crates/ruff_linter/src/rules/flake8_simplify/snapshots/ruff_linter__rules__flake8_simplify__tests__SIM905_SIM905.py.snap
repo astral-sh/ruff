@@ -1302,7 +1302,7 @@ help: Replace with list literal
     - 'no need' to escape
     - "swap" quote style
     - "use' ugly triple quotes""".split("\n")
-160 + [r"first", r"'no need' to escape", r'"swap" quote style', r""""use' ugly triple quotes"""]
+160 + [r"first", r"'no need' to escape", r'"swap" quote style', '"use\' ugly triple quotes']
 161 | 
 162 | # https://github.com/astral-sh/ruff/issues/19845
 163 | print("S\x1cP\x1dL\x1eI\x1fT".split())
@@ -1394,5 +1394,80 @@ SIM905 Consider using a list literal instead of `str.split`
 172 | " a b c d ".rsplit(maxsplit=2)  # [" a b", "c", "d"]
 173 | "a  b".split(maxsplit=1)  # ["a", "b"]
     | ^^^^^^^^^^^^^^^^^^^^^^^^
+174 |
+175 | # https://github.com/astral-sh/ruff/issues/19610
     |
 help: Replace with list literal
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:176:1
+    |
+175 | # https://github.com/astral-sh/ruff/issues/19610
+176 | r"1" "\n".split("1")  # [r"", "\n"]
+    | ^^^^^^^^^^^^^^^^^^^^
+177 | r"" "\"".split("1")  # ['"']
+178 | r"1" """
+    |
+help: Replace with list literal
+173 | "a  b".split(maxsplit=1)  # ["a", "b"]
+174 | 
+175 | # https://github.com/astral-sh/ruff/issues/19610
+    - r"1" "\n".split("1")  # [r"", "\n"]
+176 + [r"", '\n']  # [r"", "\n"]
+177 | r"" "\"".split("1")  # ['"']
+178 | r"1" """
+179 | """.split("1")  # [r"", "\n"]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:177:1
+    |
+175 | # https://github.com/astral-sh/ruff/issues/19610
+176 | r"1" "\n".split("1")  # [r"", "\n"]
+177 | r"" "\"".split("1")  # ['"']
+    | ^^^^^^^^^^^^^^^^^^^
+178 | r"1" """
+179 | """.split("1")  # [r"", "\n"]
+    |
+help: Replace with list literal
+174 | 
+175 | # https://github.com/astral-sh/ruff/issues/19610
+176 | r"1" "\n".split("1")  # [r"", "\n"]
+    - r"" "\"".split("1")  # ['"']
+177 + [r'"']  # ['"']
+178 | r"1" """
+179 | """.split("1")  # [r"", "\n"]
+180 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:178:1
+    |
+176 |   r"1" "\n".split("1")  # [r"", "\n"]
+177 |   r"" "\"".split("1")  # ['"']
+178 | / r"1" """
+179 | | """.split("1")  # [r"", "\n"]
+    | |______________^
+180 |   r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    |
+help: Replace with list literal
+175 | # https://github.com/astral-sh/ruff/issues/19610
+176 | r"1" "\n".split("1")  # [r"", "\n"]
+177 | r"" "\"".split("1")  # ['"']
+    - r"1" """
+    - """.split("1")  # [r"", "\n"]
+178 + [r"", '\n']  # [r"", "\n"]
+179 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+
+SIM905 [*] Consider using a list literal instead of `str.split`
+   --> SIM905.py:180:1
+    |
+178 | r"1" """
+179 | """.split("1")  # [r"", "\n"]
+180 | r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+    | ^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+help: Replace with list literal
+177 | r"" "\"".split("1")  # ['"']
+178 | r"1" """
+179 | """.split("1")  # [r"", "\n"]
+    - r"\n" "\n'\"".split("1")  # ["\\n\n'\""]
+180 + ['\\n\n\'"']  # ["\\n\n'\""]
