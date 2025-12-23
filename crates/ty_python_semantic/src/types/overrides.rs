@@ -463,10 +463,6 @@ const PROHIBITED_TUPLE_SUBCLASS_METHODS: &[&str] = &["__eq__", "__len__", "__boo
 /// Checks if a tuple subclass overrides any prohibited methods.
 pub(super) fn check_tuple_subclass<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
     let db = context.db();
-    let configuration = OverrideRulesConfig::from(context);
-    if configuration.no_rules_enabled() {
-        return;
-    }
 
     let scope = class.body_scope(db);
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
