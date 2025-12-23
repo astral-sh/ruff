@@ -29,43 +29,46 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 # Diagnostics
 
 ```
-warning[unsafe-tuple-subclass]: Invalid override of method `__eq__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__eq__`
  --> src/mdtest_snippet.py:3:9
   |
 1 | class A(tuple):
 2 |     # error: [unsafe-tuple-subclass]
 3 |     def __eq__(self, other):
-  |         ^^^^^^^^^^^^^^^^^^^ Definition is incompatible with 
+  |         ^^^^^^^^^^^^^^^^^^^ Unsafely overriding method `__eq__` in a subclass of `tuple`
 4 |         return False
   |
+help: Overriding `__eq__` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 
 ```
-warning[unsafe-tuple-subclass]: Invalid override of method `__eq__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__eq__`
   --> src/mdtest_snippet.py:8:5
    |
  6 | class B(tuple):
  7 |     # error: [unsafe-tuple-subclass]
  8 |     __eq__ = None
-   |     ^^^^^^^^^^^^^ Definition is incompatible with 
+   |     ^^^^^^^^^^^^^ Unsafely overriding method `__eq__` in a subclass of `tuple`
  9 |
 10 | class C(tuple):
    |
+help: Overriding `__eq__` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 
 ```
-warning[unsafe-tuple-subclass]: Invalid override of method `__eq__`
+warning[unsafe-tuple-subclass]: Unsafe override of method `__eq__`
   --> src/mdtest_snippet.py:12:3
    |
 10 | class C(tuple):
 11 |     # error: [unsafe-tuple-subclass]
 12 |   __eq__ = lambda self, other: False
-   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with 
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Unsafely overriding method `__eq__` in a subclass of `tuple`
    |
+help: Overriding `__eq__` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
