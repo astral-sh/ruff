@@ -2762,10 +2762,22 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for overrides of
+    /// Checks if a tuple subclass overrides any prohibited methods.
+    ///
+    /// ## Why is this bad?
+    /// We do various kinds of narrowing on tuples and tuple subclasses.
+    /// For these narrowings to be sound, we assume that tuple subclasses
+    /// do not override certain methods.
+    ///
+    /// ## Example
+    /// ```python
+    /// class Foo(tuple[int, int]):
+    ///     def __len__(self) -> int:
+    ///         return 1
+    /// ```
     pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
         summary: "detects dataclasses with invalid frozen inheritance",
-        status: LintStatus::stable("0.0.5"),
+        status: LintStatus::stable("0.0.6"),
         default_level: Level::Warn,
     }
 }

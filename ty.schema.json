@@ -1292,7 +1292,7 @@
         },
         "unsafe-tuple-subclass": {
           "title": "detects dataclasses with invalid frozen inheritance",
-          "description": "## What it does\nChecks for overrides of",
+          "description": "## What it does\nChecks if a tuple subclass overrides any prohibited methods.\n\n## Why is this bad?\nWe do various kinds of narrowing on tuples and tuple subclasses.\nFor these narrowings to be sound, we assume that tuple subclasses\ndo not override certain methods.\n\n## Example\n```python\nclass Foo(tuple[int, int]):\n    def __len__(self) -> int:\n        return 1\n```",
           "default": "warn",
           "oneOf": [
             {
