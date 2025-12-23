@@ -5,9 +5,7 @@
 use std::hash::BuildHasherDefault;
 
 use crate::lint::{LintRegistry, LintRegistryBuilder};
-use crate::suppression::{
-    IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT, UNUSED_IGNORE_COMMENT,
-};
+use crate::suppression::{IGNORE_COMMENT_UNKNOWN_RULE, INVALID_IGNORE_COMMENT};
 pub use db::Db;
 pub use diagnostic::add_inferred_python_version_hint_to_diagnostic;
 pub use program::{
@@ -19,7 +17,7 @@ pub use semantic_model::{
     Completion, HasDefinition, HasType, MemberDefinition, NameKind, SemanticModel,
 };
 pub use site_packages::{PythonEnvironment, SitePackagesPaths, SysPrefixPathOrigin};
-pub use suppression::{suppress_all, suppress_single};
+pub use suppression::{UNUSED_IGNORE_COMMENT, suppress_all, suppress_single};
 pub use ty_module_resolver::MisconfigurationMode;
 pub use types::DisplaySettings;
 pub use types::ide_support::{

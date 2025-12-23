@@ -14,7 +14,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::cancellation::{CancellationToken, CancellationTokenSource};
+use ruff_db::cancellation::{CancellationToken, CancellationTokenSource, Cancelled};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
@@ -353,7 +353,7 @@ impl MainLoop {
                         .with_cancellation_token(Some(self.cancellation_token.clone()))
                         .show_fix_diff(true);
 
-                    let diagnostics = match self.mode {
+                    let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
                             if std::env::var("TY_MEMORY_REPORT").as_deref() == Ok("mypy_primer") {
@@ -368,6 +368,8 @@ impl MainLoop {
                                         "All checks passed!".green().bold()
                                     )?;
                                 }
+
+                                Ok(result)
                             } else {
                                 let diagnostics_count = result.len();
 
@@ -383,31 +385,41 @@ impl MainLoop {
                                     )?;
                                 }
 
-                                if !self.cancellation_token.is_cancelled() && is_human_readable {
-                                    writeln!(
-                                        self.printer.stream_for_failure_summary(),
-                                        "Found {} diagnostic{}",
-                                        diagnostics_count,
-                                        if diagnostics_count > 1 { "s" } else { "" }
-                                    )?;
+                                if self.cancellation_token.is_cancelled() {
+                                    Err(Cancelled)
+                                } else {
+                                    if is_human_readable {
+                                        writeln!(
+                                            self.printer.stream_for_failure_summary(),
+                                            "Found {} diagnostic{}",
+                                            diagnostics_count,
+                                            if diagnostics_count > 1 { "s" } else { "" }
+                                        )?;
+                                    }
+
+                                    Ok(result)
                                 }
                             }
-
-                            result
                         }
                         MainLoopMode::AddIgnore => {
-                            let result = suppress_all_diagnostics(db, result);
+                            if let Ok(result) =
+                                suppress_all_diagnostics(db, result, &self.cancellation_token)
+                            {
+                                // TODO, render the remaining diagnostics
 
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_failure_summary(),
-                                    "Ignored {} diagnostic{}",
-                                    result.count,
-                                    if result.count > 1 { "s" } else { "" }
-                                )?;
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_failure_summary(),
+                                        "Added {} suppression comment{}",
+                                        result.count,
+                                        if result.count > 1 { "s" } else { "" }
+                                    )?;
+                                }
+
+                                Ok(result.diagnostics)
+                            } else {
+                                Err(Cancelled)
                             }
-
-                            result.diagnostics
                         }
                     };
 
@@ -415,12 +427,12 @@ impl MainLoop {
                         continue;
                     }
 
-                    let exit_status = if diagnostics.is_empty() {
-                        ExitStatus::Success
-                    } else {
-                        
-
-                        exit_status_from_diagnostics(&diagnostics, terminal_settings)
+                    let exit_status = match result.as_deref() {
+                        Ok([]) => ExitStatus::Success,
+                        Ok(diagnostics) => {
+                            exit_status_from_diagnostics(diagnostics, terminal_settings)
+                        }
+                        Err(Cancelled) => ExitStatus::Success,
                     };
 
                     if exit_status.is_internal_error() {

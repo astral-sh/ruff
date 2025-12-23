@@ -31,7 +31,7 @@ anyhow = { workspace = true }
 camino = { workspace = true }
 colored = { workspace = true }
 crossbeam = { workspace = true }
-get-size2 = { workspace = true }
+get-size2 = { workspace = true, features = ["ordermap"] }
 globset = { workspace = true }
 notify = { workspace = true }
 pep440_rs = { workspace = true, features = ["version-ranges"] }
@@ -50,6 +50,8 @@ tracing = { workspace = true }
 
 [dev-dependencies]
 ruff_db = { workspace = true, features = ["testing"] }
+ruff_python_trivia = { workspace = true }
+
 insta = { workspace = true, features = ["redactions", "ron"] }
 
 [features]
