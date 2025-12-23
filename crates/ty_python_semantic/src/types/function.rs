@@ -1202,6 +1202,13 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    pub(crate) fn signature_span(self, db: &dyn Db) -> Option<Span> {
+        self.literal(db)
+            .last_definition(db)
+            .spans(db)
+            .map(|spans| spans.signature)
+    }
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that

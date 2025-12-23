@@ -35,6 +35,8 @@ This means we only emit diagnostics on subclasses of fixed length tuples if the 
 `__bool__` method is annotated and it does not match the expected return type of the `__bool__` of
 the `tuple` superclass.
 
+### Regular Tuple Subclasses
+
 <!-- snapshot-diagnostics -->
 
 ```py
@@ -99,4 +101,57 @@ class L(tuple[int, ...]):
     # ok
     def __bool__(self) -> bool:
         return True
+```
+
+### Mixed Length Tuple Subclasses
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.11"
+```
+
+```py
+from typing import Literal
+
+class A(tuple[int, *tuple[int, ...]]):
+    # ok
+    def __bool__(self):
+        return False
+
+class B(tuple[int, *tuple[int, ...]]):
+    # ok
+    def __bool__(self) -> Literal[True]:
+        return True
+
+class C(tuple[int, *tuple[int, ...]]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> bool:
+        return False
+
+class D(tuple[int, *tuple[int, ...]]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> Literal[False]:
+        return False
+
+class E(tuple[*tuple[int, ...], str]):
+    # ok
+    def __bool__(self):
+        return True
+
+class F(tuple[*tuple[int, ...], str]):
+    # ok
+    def __bool__(self) -> Literal[True]:
+        return True
+
+class G(tuple[*tuple[int, ...], str]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> bool:
+        return False
+
+class H(tuple[*tuple[int, ...], str]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> Literal[False]:
+        return False
 ```
