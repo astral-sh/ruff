@@ -4918,19 +4918,17 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
     subclass_definition: Definition<'db>,
-    subclass_ty: Type<'db>,
+    subclass_function: FunctionType<'db>,
 ) {
     let db = context.db();
 
     let subclass_definition_kind = subclass_definition.kind(db);
 
-    let diagnostic_range = if let Type::FunctionLiteral(function_literal) = subclass_ty
-        && subclass_definition_kind.is_function_def()
-    {
-        signature_span(db, function_literal)
+    let diagnostic_range = if subclass_definition_kind.is_function_def() {
+        signature_span(db, subclass_function)
             .range()
             .unwrap_or_else(|| {
-                function_literal
+                subclass_function
                     .node(db, context.file(), context.module())
                     .range
             })

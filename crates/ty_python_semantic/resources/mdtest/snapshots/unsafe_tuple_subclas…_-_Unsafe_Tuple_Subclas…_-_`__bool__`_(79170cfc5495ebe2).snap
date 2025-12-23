@@ -12,54 +12,80 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 ## mdtest_snippet.py
 
 ```
- 1 | class A(tuple):
- 2 |     # error: [unsafe-tuple-subclass]
- 3 |     def __bool__(self):
- 4 |         return False
- 5 | 
- 6 | class B(tuple):
- 7 |     # error: [unsafe-tuple-subclass]
- 8 |     __bool__ = None
- 9 | 
-10 | class C(tuple):
-11 |     # error: [unsafe-tuple-subclass]
-12 |     __bool__ = lambda self: False
-13 | 
-14 | class D(tuple): ...
-15 | 
-16 | class E(D):
-17 |     # error: [unsafe-tuple-subclass]
-18 |     def __bool__(self):
-19 |         return False
+ 1 | from typing import Literal
+ 2 | 
+ 3 | class A(tuple[()]):
+ 4 |     # ok
+ 5 |     def __bool__(self):
+ 6 |         return False
+ 7 | 
+ 8 | class B(tuple[()]):
+ 9 |     # ok - tuple is always false, returns always false
+10 |     def __bool__(self) -> Literal[False]:
+11 |         return False
+12 | 
+13 | class C(tuple[()]):
+14 |     # error: [unsafe-tuple-subclass]
+15 |     def __bool__(self) -> Literal[True]:
+16 |         return True
+17 | 
+18 | class D(tuple[()]):
+19 |     # error: [unsafe-tuple-subclass]
+20 |     def __bool__(self) -> bool:
+21 |         return True
+22 | 
+23 | class E(tuple[int, int]):
+24 |     # ok
+25 |     def __bool__(self):
+26 |         return True
+27 | 
+28 | class F(tuple[int, int]):
+29 |     # error: [unsafe-tuple-subclass]
+30 |     def __bool__(self) -> Literal[False]:
+31 |         return False
+32 | 
+33 | class G(tuple[int, int]):
+34 |     # ok - tuple is always true, returns always true
+35 |     def __bool__(self) -> Literal[True]:
+36 |         return True
+37 | 
+38 | class H(tuple[int, int]):
+39 |     # error: [unsafe-tuple-subclass]
+40 |     def __bool__(self) -> bool:
+41 |         return False
+42 | 
+43 | class I(tuple[int, ...]):
+44 |     # ok - ambiguous tuple, any return is safe
+45 |     def __bool__(self):
+46 |         return False
+47 | 
+48 | class J(tuple[int, ...]):
+49 |     # ok - ambiguous tuple, any return is safe
+50 |     def __bool__(self) -> Literal[False]:
+51 |         return False
+52 | 
+53 | class K(tuple[int, ...]):
+54 |     # ok - ambiguous tuple, any return is safe
+55 |     def __bool__(self) -> Literal[True]:
+56 |         return True
+57 | 
+58 | class L(tuple[int, ...]):
+59 |     # ok - ambiguous tuple, any return is safe
+60 |     def __bool__(self) -> bool:
+61 |         return True
 ```
 
 # Diagnostics
 
 ```
 warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
- --> src/mdtest_snippet.py:3:9
-  |
-1 | class A(tuple):
-2 |     # error: [unsafe-tuple-subclass]
-3 |     def __bool__(self):
-  |         ^^^^^^^^^^^^^^
-4 |         return False
-  |
-help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
-info: rule `unsafe-tuple-subclass` is enabled by default
-
-```
-
-```
-warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
-  --> src/mdtest_snippet.py:8:5
+  --> src/mdtest_snippet.py:15:9
    |
- 6 | class B(tuple):
- 7 |     # error: [unsafe-tuple-subclass]
- 8 |     __bool__ = None
-   |     ^^^^^^^^^^^^^^^
- 9 |
-10 | class C(tuple):
+13 | class C(tuple[()]):
+14 |     # error: [unsafe-tuple-subclass]
+15 |     def __bool__(self) -> Literal[True]:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |         return True
    |
 help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
@@ -68,14 +94,13 @@ info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
-  --> src/mdtest_snippet.py:12:5
+  --> src/mdtest_snippet.py:20:9
    |
-10 | class C(tuple):
-11 |     # error: [unsafe-tuple-subclass]
-12 |     __bool__ = lambda self: False
-   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-13 |
-14 | class D(tuple): ...
+18 | class D(tuple[()]):
+19 |     # error: [unsafe-tuple-subclass]
+20 |     def __bool__(self) -> bool:
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+21 |         return True
    |
 help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default
@@ -84,13 +109,28 @@ info: rule `unsafe-tuple-subclass` is enabled by default
 
 ```
 warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
-  --> src/mdtest_snippet.py:18:9
+  --> src/mdtest_snippet.py:30:9
    |
-16 | class E(D):
-17 |     # error: [unsafe-tuple-subclass]
-18 |     def __bool__(self):
-   |         ^^^^^^^^^^^^^^
-19 |         return False
+28 | class F(tuple[int, int]):
+29 |     # error: [unsafe-tuple-subclass]
+30 |     def __bool__(self) -> Literal[False]:
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+31 |         return False
+   |
+help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
+info: rule `unsafe-tuple-subclass` is enabled by default
+
+```
+
+```
+warning[unsafe-tuple-subclass]: Unsafe override of method `__bool__` in a subclass of `tuple`
+  --> src/mdtest_snippet.py:40:9
+   |
+38 | class H(tuple[int, int]):
+39 |     # error: [unsafe-tuple-subclass]
+40 |     def __bool__(self) -> bool:
+   |         ^^^^^^^^^^^^^^^^^^^^^^
+41 |         return False
    |
 help: Overriding method `__bool__` in a subclass of `tuple` can cause unexpected behavior
 info: rule `unsafe-tuple-subclass` is enabled by default

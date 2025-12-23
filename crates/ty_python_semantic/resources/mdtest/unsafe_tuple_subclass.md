@@ -13,70 +13,84 @@ class A(tuple):
     def __eq__(self, other):
         return False
 
-class B(tuple):
-    # error: [unsafe-tuple-subclass]
-    __eq__ = None
+class B(tuple): ...
 
-class C(tuple):
-    # error: [unsafe-tuple-subclass]
-    __eq__ = lambda self, other: False
-
-class D(tuple): ...
-
-class E(D):
+class C(B):
     # error: [unsafe-tuple-subclass]
     def __eq__(self, other):
         return False
+
+class D(tuple):
+    # error: [unsafe-tuple-subclass]
+    def __ne__(self, other):
+        return False
 ```
 
-## `__len__`
-
-<!-- snapshot-diagnostics -->
-
-```py
-class A(tuple):
-    # error: [unsafe-tuple-subclass]
-    def __len__(self):
-        return 0
-
-class B(tuple):
-    # error: [unsafe-tuple-subclass]
-    __len__ = None
-
-class C(tuple):
-    # error: [unsafe-tuple-subclass]
-    __len__ = lambda self: 0
-
-class D(tuple): ...
-
-class E(D):
-    # error: [unsafe-tuple-subclass]
-    def __len__(self):
-        return 0
-```
 
 ## `__bool__`
 
 <!-- snapshot-diagnostics -->
 
 ```py
-class A(tuple):
-    # error: [unsafe-tuple-subclass]
+from typing import Literal
+
+class A(tuple[()]):
+    # ok
     def __bool__(self):
         return False
 
-class B(tuple):
-    # error: [unsafe-tuple-subclass]
-    __bool__ = None
+class B(tuple[()]):
+    # ok - tuple is always false, returns always false
+    def __bool__(self) -> Literal[False]:
+        return False
 
-class C(tuple):
+class C(tuple[()]):
     # error: [unsafe-tuple-subclass]
-    __bool__ = lambda self: False
+    def __bool__(self) -> Literal[True]:
+        return True
 
-class D(tuple): ...
-
-class E(D):
+class D(tuple[()]):
     # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> bool:
+        return True
+
+class E(tuple[int, int]):
+    # ok
+    def __bool__(self):
+        return True
+
+class F(tuple[int, int]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> Literal[False]:
+        return False
+
+class G(tuple[int, int]):
+    # ok - tuple is always true, returns always true
+    def __bool__(self) -> Literal[True]:
+        return True
+
+class H(tuple[int, int]):
+    # error: [unsafe-tuple-subclass]
+    def __bool__(self) -> bool:
+        return False
+
+class I(tuple[int, ...]):
+    # ok - ambiguous tuple, any return is safe
     def __bool__(self):
         return False
+
+class J(tuple[int, ...]):
+    # ok - ambiguous tuple, any return is safe
+    def __bool__(self) -> Literal[False]:
+        return False
+
+class K(tuple[int, ...]):
+    # ok - ambiguous tuple, any return is safe
+    def __bool__(self) -> Literal[True]:
+        return True
+
+class L(tuple[int, ...]):
+    # ok - ambiguous tuple, any return is safe
+    def __bool__(self) -> bool:
+        return True
 ```
