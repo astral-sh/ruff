@@ -1485,6 +1485,16 @@ impl std::fmt::Display for ConciseMessage<'_> {
     }
 }
 
+#[cfg(feature = "serde")]
+impl serde::Serialize for ConciseMessage<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
+    }
+}
+
 /// A diagnostic message string.
 ///
 /// This is, for all intents and purposes, equivalent to a `Box<str>`.
