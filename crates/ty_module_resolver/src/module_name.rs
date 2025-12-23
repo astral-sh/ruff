@@ -8,7 +8,8 @@ use ruff_db::files::File;
 use ruff_python_ast as ast;
 use ruff_python_stdlib::identifiers::is_identifier;
 
-use crate::{db::Db, module_resolver::file_to_module};
+use crate::db::Db;
+use crate::resolve::file_to_module;
 
 /// A module name, e.g. `foo.bar`.
 ///
@@ -47,7 +48,7 @@ impl ModuleName {
     /// ## Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").as_deref(), Some("foo.bar"));
     /// assert_eq!(ModuleName::new_static(""), None);
@@ -73,7 +74,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().components().collect::<Vec<_>>(), vec!["foo", "bar", "baz"]);
     /// ```
@@ -87,7 +88,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert_eq!(ModuleName::new_static("foo.bar").unwrap().parent(), Some(ModuleName::new_static("foo").unwrap()));
     /// assert_eq!(ModuleName::new_static("foo.bar.baz").unwrap().parent(), Some(ModuleName::new_static("foo.bar").unwrap()));
@@ -106,7 +107,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert!(ModuleName::new_static("foo.bar").unwrap().starts_with(&ModuleName::new_static("foo").unwrap()));
     ///
@@ -142,7 +143,7 @@ impl ModuleName {
     /// module name:
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// let this = ModuleName::new_static("importlib.resources").unwrap();
     /// let parent = ModuleName::new_static("importlib").unwrap();
@@ -156,7 +157,7 @@ impl ModuleName {
     /// This shows some cases where it isn't a parent:
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// let this = ModuleName::new_static("importliblib.resources").unwrap();
     /// let parent = ModuleName::new_static("importlib").unwrap();
@@ -199,7 +200,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert_eq!(&*ModuleName::from_components(["a"]).unwrap(), "a");
     /// assert_eq!(&*ModuleName::from_components(["a", "b"]).unwrap(), "a.b");
@@ -240,7 +241,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// let mut module_name = ModuleName::new_static("foo").unwrap();
     /// module_name.extend(&ModuleName::new_static("bar").unwrap());
@@ -258,7 +259,7 @@ impl ModuleName {
     /// # Examples
     ///
     /// ```
-    /// use ty_python_semantic::ModuleName;
+    /// use ty_module_resolver::ModuleName;
     ///
     /// assert_eq!(
     ///     ModuleName::new_static("foo.bar.baz").unwrap().ancestors().collect::<Vec<_>>(),
@@ -314,7 +315,7 @@ impl ModuleName {
     /// Computes the absolute module name for the package this file belongs to.
     ///
     /// i.e. this resolves `.`
-    pub(crate) fn package_for_file(
+    pub fn package_for_file(
         db: &dyn Db,
         importing_file: File,
     ) -> Result<Self, ModuleNameResolutionError> {

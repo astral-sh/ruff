@@ -21,7 +21,7 @@ use crate::document::{FileRangeExt, ToRangeExt};
 use crate::session::DocumentHandle;
 use crate::session::client::Client;
 use crate::system::{AnySystemPath, file_to_url};
-use crate::{DIAGNOSTIC_NAME, Db};
+use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
 
 pub(super) struct Diagnostics {
@@ -134,7 +134,7 @@ pub(super) fn clear_diagnostics_if_needed(
         return;
     }
 
-    clear_diagnostics(document.url(), client);
+    clear_diagnostics(document.url(), session, client);
 }
 
 /// Clears the diagnostics for the document identified by `uri`.
@@ -142,7 +142,11 @@ pub(super) fn clear_diagnostics_if_needed(
 /// This is done by notifying the client with an empty list of diagnostics for the document.
 /// For notebook cells, this clears diagnostics for the specific cell.
 /// For other document types, this clears diagnostics for the main document.
-pub(super) fn clear_diagnostics(uri: &lsp_types::Url, client: &Client) {
+pub(super) fn clear_diagnostics(uri: &lsp_types::Url, session: &Session, client: &Client) {
+    if session.global_settings().diagnostic_mode().is_off() {
+        return;
+    }
+
     client.send_notification::<PublishDiagnostics>(PublishDiagnosticsParams {
         uri: uri.clone(),
         diagnostics: vec![],
@@ -174,6 +178,10 @@ pub(super) fn publish_diagnostics_if_needed(
 /// Publishes the diagnostics for the given document snapshot using the [publish diagnostics
 /// notification].
 pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, client: &Client) {
+    if session.global_settings().diagnostic_mode().is_off() {
+        return;
+    }
+
     let db = session.project_db(document.notebook_or_file_path());
 
     let Some(diagnostics) = compute_diagnostics(db, document, session.position_encoding()) else {
@@ -215,8 +223,11 @@ pub(crate) fn publish_settings_diagnostics(
     // Note we DO NOT respect the fact that clients support pulls because these are
     // files they *specifically* won't pull diagnostics from us for, because we don't
     // claim to be an LSP for them.
-    if session.global_settings().diagnostic_mode().is_workspace() {
-        return;
+    match session.global_settings().diagnostic_mode() {
+        DiagnosticMode::Workspace | DiagnosticMode::Off => {
+            return;
+        }
+        DiagnosticMode::OpenFilesOnly => {}
     }
 
     let session_encoding = session.position_encoding();

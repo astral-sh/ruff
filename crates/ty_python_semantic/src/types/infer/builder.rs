@@ -13,6 +13,10 @@ use ruff_python_stdlib::builtins::version_builtin_was_added;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
+use ty_module_resolver::{
+    KnownModule, ModuleName, ModuleNameResolutionError, ModuleResolveMode, file_to_module,
+    resolve_module, search_paths,
+};
 
 use super::{
     DefinitionInference, DefinitionInferenceExtra, ExpressionInference, ExpressionInferenceExtra,
@@ -21,10 +25,6 @@ use super::{
     infer_unpack_types,
 };
 use crate::diagnostic::format_enumeration;
-use crate::module_name::{ModuleName, ModuleNameResolutionError};
-use crate::module_resolver::{
-    KnownModule, ModuleResolveMode, file_to_module, resolve_module, search_paths,
-};
 use crate::node_key::NodeKey;
 use crate::place::{
     ConsideredDefinitions, Definedness, LookupError, Place, PlaceAndQualifiers, TypeOrigin,
@@ -4283,7 +4283,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                         )
                                     })
                                     .and_then(|module| module.search_path(db))
-                                    .is_some_and(crate::SearchPath::is_first_party)
+                                    .is_some_and(ty_module_resolver::SearchPath::is_first_party)
                                 {
                                     diagnostic.help(format_args!(
                                         "Consider adding a `__setitem__` method to `{}`.",
@@ -7007,12 +7007,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Result<(), CallErrorKind> {
         let db = self.db();
 
+        let has_generic_context = bindings
+            .iter()
+            .flat_map(CallableBinding::overloads)
+            .any(|overload| overload.signature.generic_context.is_some());
+
         // If the type context is a union, attempt to narrow to a specific element.
         let narrow_targets: &[_] = match call_expression_tcx.annotation {
             // TODO: We could theoretically attempt to narrow to every element of
             // the power set of this union. However, this leads to an exponential
             // explosion of inference attempts, and is rarely needed in practice.
-            Some(Type::Union(union)) => union.elements(db),
+            //
+            // We only need to attempt narrowing on generic calls, otherwise the type
+            // context has no effect.
+            Some(Type::Union(union)) if has_generic_context => union.elements(db),
             _ => &[],
         };
 
@@ -7282,6 +7290,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     let inferred_ty =
                         self.infer_expression(ast_argument, TypeContext::new(Some(parameter_type)));
 
+                    // Ensure the inferred type is assignable to the declared type.
+                    //
+                    // If not, we want to avoid storing the "failed" inference attempt.
+                    if !inferred_ty.is_assignable_to(db, parameter_type) {
+                        continue;
+                    }
+
                     // Each type is a valid independent inference of the given argument, and we may require different
                     // permutations of argument types to correctly perform argument expansion during overload evaluation,
                     // so we take the intersection of all the types we inferred for each argument.
@@ -7443,13 +7458,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        self.store_expression_type(expression, ty);
+        self.store_expression_type_impl(expression, ty, tcx);
 
         ty
     }
 
     #[track_caller]
     fn store_expression_type(&mut self, expression: &ast::Expr, ty: Type<'db>) {
+        self.store_expression_type_impl(expression, ty, TypeContext::default());
+    }
+
+    #[track_caller]
+    fn store_expression_type_impl(
+        &mut self,
+        expression: &ast::Expr,
+        ty: Type<'db>,
+        tcx: TypeContext<'db>,
+    ) {
         if self.deferred_state.in_string_annotation()
             || self.inner_expression_inference_state.is_get()
         {
@@ -7478,7 +7503,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.expressions
                     .entry(expression.into())
                     .and_modify(|current| {
-                        *current = IntersectionType::from_elements(db, [*current, ty]);
+                        // Avoid storing "failed" multi-inference attempts, which can lead to
+                        // unnecessary union simplification overhead.
+                        if tcx
+                            .annotation
+                            .is_none_or(|tcx| ty.is_assignable_to(db, tcx))
+                        {
+                            *current = IntersectionType::from_elements(db, [*current, ty]);
+                        }
                     })
                     .or_insert(ty);
             }
@@ -7562,7 +7594,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     range: _,
                                     node_index: _,
                                     expression,
-                                    debug_text: _,
+                                    debug_text,
                                     conversion,
                                     format_spec,
                                 } = expression;
@@ -7581,7 +7613,10 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // (`Type::format`?) that handles the `__format__` method.
                                 // Conversion flags should be handled before calling `__format__`.
                                 // https://docs.python.org/3/library/string.html#format-string-syntax
-                                if !conversion.is_none() || format_spec.is_some() {
+                                if debug_text.is_some()
+                                    || !conversion.is_none()
+                                    || format_spec.is_some()
+                                {
                                     collector.add_expression();
                                 } else {
                                     if let Type::StringLiteral(literal) = ty.str(self.db()) {
@@ -8432,6 +8467,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             func,
             arguments,
         } = call_expression;
+
+        // Fast-path dict(...) in TypedDict context: infer keyword values against fields,
+        // then validate and return the TypedDict type.
+        if let Some(tcx) = tcx.annotation
+            && let Some(typed_dict) = tcx
+                .filter_union(self.db(), Type::is_typed_dict)
+                .as_typed_dict()
+            && callable_type
+                .as_class_literal()
+                .is_some_and(|class_literal| class_literal.is_known(self.db(), KnownClass::Dict))
+            && arguments.args.is_empty()
+            && arguments
+                .keywords
+                .iter()
+                .all(|keyword| keyword.arg.is_some())
+        {
+            let items = typed_dict.items(self.db());
+            for keyword in &arguments.keywords {
+                if let Some(arg_name) = &keyword.arg {
+                    let value_tcx = items
+                        .get(arg_name.id.as_str())
+                        .map(|field| TypeContext::new(Some(field.declared_ty)))
+                        .unwrap_or_default();
+                    self.infer_expression(&keyword.value, value_tcx);
+                }
+            }
+
+            validate_typed_dict_constructor(
+                &self.context,
+                typed_dict,
+                arguments,
+                func.as_ref().into(),
+                |expr| self.expression_type(expr),
+            );
+
+            return Type::TypedDict(typed_dict);
+        }
 
         // We don't call `Type::try_call`, because we want to perform type inference on the
         // arguments after matching them to parameters, but before checking that the argument types

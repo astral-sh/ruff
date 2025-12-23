@@ -11,9 +11,10 @@ use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
+use ty_module_resolver::{KnownModule, ModuleName};
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
-    Completion as SemanticCompletion, KnownModule, ModuleName, NameKind, SemanticModel,
+    Completion as SemanticCompletion, NameKind, SemanticModel,
     types::{CycleDetector, KnownClass, Type},
 };
 
@@ -2106,7 +2107,7 @@ mod tests {
     use insta::assert_snapshot;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
-    use ty_python_semantic::ModuleName;
+    use ty_module_resolver::ModuleName;
 
     use crate::completion::{Completion, completion};
     use crate::tests::{CursorTest, CursorTestBuilder};

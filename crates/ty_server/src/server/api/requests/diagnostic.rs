@@ -33,6 +33,12 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
         _client: &Client,
         params: DocumentDiagnosticParams,
     ) -> Result<DocumentDiagnosticReportResult> {
+        if snapshot.global_settings().diagnostic_mode().is_off() {
+            return Ok(DocumentDiagnosticReportResult::Report(
+                DocumentDiagnosticReport::Full(RelatedFullDocumentDiagnosticReport::default()),
+            ));
+        }
+
         let diagnostics = compute_diagnostics(db, snapshot.document(), snapshot.encoding());
 
         let Some(diagnostics) = diagnostics else {

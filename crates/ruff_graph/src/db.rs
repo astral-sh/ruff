@@ -7,10 +7,11 @@ use ruff_db::files::{File, Files};
 use ruff_db::system::{OsSystem, System, SystemPathBuf};
 use ruff_db::vendored::{VendoredFileSystem, VendoredFileSystemBuilder};
 use ruff_python_ast::PythonVersion;
+use ty_module_resolver::{SearchPathSettings, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
     Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SearchPathSettings, SysPrefixPathOrigin, default_lint_registry,
+    PythonVersionWithSource, SysPrefixPathOrigin, default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -82,6 +83,13 @@ impl SourceDb for ModuleDb {
 
     fn python_version(&self) -> PythonVersion {
         Program::get(self).python_version(self)
+    }
+}
+
+#[salsa::db]
+impl ty_module_resolver::Db for ModuleDb {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
     }
 }
 

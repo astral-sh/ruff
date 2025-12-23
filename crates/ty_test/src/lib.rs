@@ -17,12 +17,14 @@ use ruff_diagnostics::Applicability;
 use ruff_source_file::{LineIndex, OneIndexed};
 use std::backtrace::BacktraceStatus;
 use std::fmt::{Display, Write};
+use ty_module_resolver::{
+    Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
+};
 use ty_python_semantic::pull_types::pull_types;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
-    MisconfigurationMode, Module, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionSource, PythonVersionWithSource, SearchPath, SearchPathSettings,
-    SysPrefixPathOrigin, list_modules, resolve_module_confident,
+    MisconfigurationMode, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
 
 mod assertion;
@@ -38,7 +40,6 @@ use ty_static::EnvVars;
 /// Run `path` as a markdown test suite with given `title`.
 ///
 /// Panic on test failure, and print failure details.
-#[expect(clippy::print_stdout)]
 pub fn run(
     absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
@@ -55,6 +56,7 @@ pub fn run(
 
     let filter = std::env::var(EnvVars::MDTEST_TEST_FILTER).ok();
     let mut any_failures = false;
+    let mut assertion = String::new();
     for test in suite.tests() {
         if filter
             .as_ref()
@@ -68,7 +70,13 @@ pub fn run(
             Log::Filter(filter) => setup_logging_with_filter(filter),
         });
 
-        let result = run_test(&mut db, relative_fixture_path, snapshot_path, &test);
+        let result = run_test(
+            &mut db,
+            absolute_fixture_path,
+            relative_fixture_path,
+            snapshot_path,
+            &test,
+        );
         let inconsistencies = if result.as_ref().is_ok_and(|t| t.has_been_skipped()) {
             Ok(())
         } else {
@@ -79,7 +87,7 @@ pub fn run(
         any_failures = any_failures || this_test_failed;
 
         if this_test_failed && output_format.is_cli() {
-            println!("\n{}\n", test.name().bold().underline());
+            let _ = writeln!(assertion, "\n\n{}\n", test.name().bold().underline());
         }
 
         if let Err(failures) = result {
@@ -95,26 +103,29 @@ pub fn run(
                         OutputFormat::GitHub => absolute_fixture_path.as_str(),
                     };
 
-                    let absolute_line_number = match source_map
-                        .to_absolute_line_number(relative_line_number)
-                    {
-                        Ok(line_number) => line_number,
-                        Err(last_line_number) => {
-                            print!("{}",
-                                output_format.display_error(
-                                    file,
-                                    last_line_number,
-                                    "Found a trailing assertion comment (e.g., `# revealed:` or `# error:`) \
-                                    not followed by any statement."
-                                )
-                            );
+                    let absolute_line_number =
+                        match source_map.to_absolute_line_number(relative_line_number) {
+                            Ok(line_number) => line_number,
+                            Err(last_line_number) => {
+                                let _ = writeln!(
+                                    assertion,
+                                    "{}",
+                                    output_format.display_error(
+                                        file,
+                                        last_line_number,
+                                        "Found a trailing assertion comment \
+                                        (e.g., `# revealed:` or `# error:`) \
+                                        not followed by any statement."
+                                    )
+                                );
 
-                            continue;
-                        }
-                    };
+                                continue;
+                            }
+                        };
 
                     for failure in failures {
-                        print!(
+                        let _ = writeln!(
+                            assertion,
                             "{}",
                             output_format.display_error(file, absolute_line_number, failure)
                         );
@@ -128,10 +139,13 @@ pub fn run(
                 match output_format {
                     OutputFormat::Cli => {
                         let info = relative_fixture_path.to_string().cyan();
-                        println!("  {info} {inconsistency}");
+                        let _ = writeln!(assertion, "  {info} {inconsistency}");
                     }
                     OutputFormat::GitHub => {
-                        println!("::error file={absolute_fixture_path}::{inconsistency}");
+                        let _ = writeln!(
+                            assertion,
+                            "::error file={absolute_fixture_path}::{inconsistency}"
+                        );
                     }
                 }
             }
@@ -139,20 +153,24 @@ pub fn run(
 
         if this_test_failed && output_format.is_cli() {
             let escaped_test_name = test.name().replace('\'', "\\'");
-            println!(
-                "\nTo rerun this specific test, set the environment variable: {}='{escaped_test_name}'",
+            let _ = writeln!(
+                assertion,
+                "\nTo rerun this specific test, \
+                set the environment variable: {}='{escaped_test_name}'",
                 EnvVars::MDTEST_TEST_FILTER,
             );
-            println!(
-                "{}='{escaped_test_name}' cargo test -p ty_python_semantic --test mdtest -- {test_name}",
+            let _ = writeln!(
+                assertion,
+                "{}='{escaped_test_name}' cargo test -p ty_python_semantic \
+                --test mdtest -- {test_name}",
                 EnvVars::MDTEST_TEST_FILTER,
             );
+
+            let _ = writeln!(assertion, "\n{}", "-".repeat(50));
         }
     }
 
-    println!("\n{}\n", "-".repeat(50));
-
-    assert!(!any_failures, "Some tests failed.");
+    assert!(!any_failures, "{}", &assertion);
 
     Ok(())
 }
@@ -195,14 +213,14 @@ impl OutputFormat {
 
                 match format {
                     OutputFormat::Cli => {
-                        writeln!(
+                        write!(
                             f,
                             "  {file_line} {failure}",
                             file_line = format!("{file}:{line}").cyan()
                         )
                     }
                     OutputFormat::GitHub => {
-                        writeln!(f, "::error file={file},line={line}::{failure}")
+                        write!(f, "::error file={file},line={line}::{failure}")
                     }
                 }
             }
@@ -231,6 +249,7 @@ impl TestOutcome {
 
 fn run_test(
     db: &mut db::Db,
+    absolute_fixture_path: &Utf8Path,
     relative_fixture_path: &Utf8Path,
     snapshot_path: &Utf8Path,
     test: &parser::MarkdownTest,
@@ -276,12 +295,15 @@ fn run_test(
             "Tests with external dependencies must specify `python-platform` in the configuration",
         );
 
+        let lockfile_path = absolute_fixture_path.with_extension("lock");
+
         external_dependencies::setup_venv(
             db,
             dependencies,
             python_version,
             &python_platform,
             &venv_for_external_dependencies,
+            &lockfile_path,
         )
         .expect("Failed to setup in-memory virtual environment with dependencies");
     }

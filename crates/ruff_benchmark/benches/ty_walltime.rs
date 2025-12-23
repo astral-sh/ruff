@@ -236,30 +236,55 @@ fn run_single_threaded(bencher: Bencher, benchmark: &Benchmark) {
         });
 }
 
-#[bench(args=[&ALTAIR, &FREQTRADE, &TANJUN], sample_size=2, sample_count=3)]
-fn small(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn altair(bencher: Bencher) {
+    run_single_threaded(bencher, &ALTAIR);
 }
 
-#[bench(args=[&COLOUR_SCIENCE, &PANDAS, &STATIC_FRAME], sample_size=1, sample_count=3)]
-fn medium(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn freqtrade(bencher: Bencher) {
+    run_single_threaded(bencher, &FREQTRADE);
 }
 
-#[bench(args=[&SYMPY, &PYDANTIC], sample_size=1, sample_count=2)]
-fn large(bencher: Bencher, benchmark: &Benchmark) {
-    run_single_threaded(bencher, benchmark);
+#[bench(sample_size = 2, sample_count = 3)]
+fn tanjun(bencher: Bencher) {
+    run_single_threaded(bencher, &TANJUN);
 }
 
-#[bench(args=[&ALTAIR], sample_size=3, sample_count=8)]
-fn multithreaded(bencher: Bencher, benchmark: &Benchmark) {
+#[bench(sample_size = 2, sample_count = 3)]
+fn pydantic(bencher: Bencher) {
+    run_single_threaded(bencher, &PYDANTIC);
+}
+
+#[bench(sample_size = 1, sample_count = 3)]
+fn static_frame(bencher: Bencher) {
+    run_single_threaded(bencher, &STATIC_FRAME);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn colour_science(bencher: Bencher) {
+    run_single_threaded(bencher, &COLOUR_SCIENCE);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn pandas(bencher: Bencher) {
+    run_single_threaded(bencher, &PANDAS);
+}
+
+#[bench(sample_size = 1, sample_count = 2)]
+fn sympy(bencher: Bencher) {
+    run_single_threaded(bencher, &SYMPY);
+}
+
+#[bench(sample_size = 3, sample_count = 8)]
+fn multithreaded(bencher: Bencher) {
     let thread_pool = ThreadPoolBuilder::new().build().unwrap();
 
     bencher
-        .with_inputs(|| benchmark.setup_iteration())
+        .with_inputs(|| ALTAIR.setup_iteration())
         .bench_local_values(|db| {
             thread_pool.install(|| {
-                check_project(&db, benchmark.project.name, benchmark.max_diagnostics);
+                check_project(&db, ALTAIR.project.name, ALTAIR.max_diagnostics);
                 db
             })
         });

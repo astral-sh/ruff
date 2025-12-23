@@ -493,7 +493,7 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         """Implement next(self)."""
 
     def send(self, arg: _SendT_contra, /) -> _YieldT_co:
-        """send(arg) -> send 'arg' into generator,
+        """send(value) -> send 'value' into generator,
         return next yielded value or raise StopIteration.
         """
 

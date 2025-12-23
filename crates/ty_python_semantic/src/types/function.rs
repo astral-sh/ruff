@@ -58,7 +58,6 @@ use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
 
-use crate::module_resolver::{KnownModule, file_to_module};
 use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
 use crate::semantic_index::definition::Definition;
@@ -87,7 +86,8 @@ use crate::types::{
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
     definition_expression_type, infer_definition_types, infer_scope_types, walk_signature,
 };
-use crate::{Db, FxOrderSet, ModuleName, resolve_module};
+use crate::{Db, FxOrderSet};
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///

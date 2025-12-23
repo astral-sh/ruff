@@ -18,6 +18,7 @@ use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
+use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 use type_ordering::union_or_intersection_elements_ordering;
 
@@ -34,8 +35,6 @@ pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
-use crate::module_name::ModuleName;
-use crate::module_resolver::{KnownModule, resolve_module};
 use crate::place::{
     Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
 };
@@ -75,7 +74,7 @@ pub use crate::types::variance::TypeVarVariance;
 use crate::types::variance::VarianceInferable;
 use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
-use crate::{Db, FxOrderSet, Module, Program};
+use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
 pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
 use instance::Protocol;
@@ -967,6 +966,8 @@ impl<'db> Type<'db> {
                     self
                 } else {
                     // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
+                    // Consider the case where the order of union types is different between the previous and current cycle.
+                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
                     UnionType::from_elements_cycle_recovery(db, [previous, self])
                 }
             }
@@ -6732,6 +6733,25 @@ impl<'db> Type<'db> {
                         None
                     }
                 }
+                Type::Intersection(intersection) => {
+                    // For intersections, we iterate over each positive element and intersect
+                    // the resulting element types. Negative elements don't affect iteration.
+                    // We only fail if all elements fail to iterate; as long as at least one
+                    // element can be iterated over, we can produce a result.
+                    let mut specs_iter = intersection
+                        .positive_elements_or_object(db)
+                        .filter_map(|element| {
+                            element
+                                .try_iterate_with_mode(db, EvaluationMode::Sync)
+                                .ok()
+                        });
+                    let first_spec = specs_iter.next()?;
+                    let mut builder = TupleSpecBuilder::from(&*first_spec);
+                    for spec in specs_iter {
+                        builder = builder.intersect(db, &spec);
+                    }
+                    Some(Cow::Owned(builder.build()))
+                }
                 // N.B. These special cases aren't strictly necessary, they're just obvious optimizations
                 Type::LiteralString | Type::Dynamic(_) => Some(Cow::Owned(TupleSpec::homogeneous(ty))),
 
@@ -6754,7 +6774,6 @@ impl<'db> Type<'db> {
                 | Type::SpecialForm(_)
                 | Type::KnownInstance(_)
                 | Type::PropertyInstance(_)
-                | Type::Intersection(_)
                 | Type::AlwaysTruthy
                 | Type::AlwaysFalsy
                 | Type::IntLiteral(_)
@@ -7740,11 +7759,7 @@ impl<'db> Type<'db> {
             }
             Type::ClassLiteral(class) => class.metaclass(db),
             Type::GenericAlias(alias) => ClassType::from(alias).metaclass(db),
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of().into_class(db) {
-                None => self,
-                Some(class) => SubclassOfType::try_from_type(db, class.metaclass(db))
-                    .unwrap_or(SubclassOfType::subclass_of_unknown()),
-            },
+            Type::SubclassOf(subclass_of_ty) => subclass_of_ty.to_meta_type(db),
             Type::StringLiteral(_) | Type::LiteralString => KnownClass::Str.to_class_literal(db),
             Type::Dynamic(dynamic) => SubclassOfType::from(db, SubclassOfInner::Dynamic(dynamic)),
             // TODO intersections
@@ -9314,7 +9329,7 @@ impl<'db> TypeAndQualifiers<'db> {
 /// Error struct providing information on type(s) that were deemed to be invalid
 /// in a type expression context, and the type we should therefore fallback to
 /// for the problematic type expression.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 pub struct InvalidTypeExpressionError<'db> {
     fallback_type: Type<'db>,
     invalid_expressions: smallvec::SmallVec<[InvalidTypeExpression<'db>; 1]>,
@@ -9345,7 +9360,7 @@ impl<'db> InvalidTypeExpressionError<'db> {
 }
 
 /// Enumeration of various types that are invalid in type-expression contexts
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update)]
 enum InvalidTypeExpression<'db> {
     /// Some types always require exactly one argument when used in a type expression
     RequiresOneArgument(SpecialFormType),

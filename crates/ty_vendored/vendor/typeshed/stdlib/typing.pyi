@@ -1244,6 +1244,11 @@ class ValuesView(MappingView, Collection[_VT_co]):
     def __contains__(self, value: object) -> bool: ...
     def __iter__(self) -> Iterator[_VT_co]: ...
 
+# note for Mapping.get and MutableMapping.pop and MutableMapping.setdefault
+# In _collections_abc.py the parameters are positional-or-keyword,
+# but dict and types.MappingProxyType (the vast majority of Mapping types)
+# don't allow keyword arguments.
+
 class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
     """A Mapping is a generic container for associating key/value
     pairs.
@@ -1262,9 +1267,9 @@ class Mapping(Collection[_KT], Generic[_KT, _VT_co]):
         """D.get(k[,d]) -> D[k] if k in D, else d.  d defaults to None."""
 
     @overload
-    def get(self, key: _KT, /, default: _VT_co) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
+    def get(self, key: _KT, default: _VT_co, /) -> _VT_co: ...  # type: ignore[misc] # pyright: ignore[reportGeneralTypeIssues] # Covariant type as parameter
     @overload
-    def get(self, key: _KT, /, default: _T) -> _VT_co | _T: ...
+    def get(self, key: _KT, default: _T, /) -> _VT_co | _T: ...
     def items(self) -> ItemsView[_KT, _VT_co]:
         """D.items() -> a set-like object providing a view on D's items"""
 
@@ -1300,9 +1305,9 @@ class MutableMapping(Mapping[_KT, _VT]):
         """
 
     @overload
-    def pop(self, key: _KT, /, default: _VT) -> _VT: ...
+    def pop(self, key: _KT, default: _VT, /) -> _VT: ...
     @overload
-    def pop(self, key: _KT, /, default: _T) -> _VT | _T: ...
+    def pop(self, key: _KT, default: _T, /) -> _VT | _T: ...
     def popitem(self) -> tuple[_KT, _VT]:
         """D.popitem() -> (k, v), remove and return some (key, value) pair
         as a 2-tuple; but raise KeyError if D is empty.

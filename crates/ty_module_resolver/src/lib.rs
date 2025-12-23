@@ -1,24 +1,31 @@
 use std::iter::FusedIterator;
 
-pub use list::{all_modules, list_modules};
-pub use module::KnownModule;
-pub use module::Module;
-pub use path::{SearchPath, SearchPathValidationError};
-pub use resolver::SearchPaths;
-pub(crate) use resolver::file_to_module;
-pub use resolver::{
-    resolve_module, resolve_module_confident, resolve_real_module, resolve_real_module_confident,
-    resolve_real_shadowable_module,
-};
 use ruff_db::system::SystemPath;
 
-use crate::Db;
-pub(crate) use resolver::{ModuleResolveMode, SearchPathIterator, search_paths};
+pub use db::Db;
+pub use module::KnownModule;
+pub use module::Module;
+pub use module_name::{ModuleName, ModuleNameResolutionError};
+pub use path::{SearchPath, SearchPathError};
+pub use resolve::{
+    SearchPaths, file_to_module, resolve_module, resolve_module_confident, resolve_real_module,
+    resolve_real_module_confident, resolve_real_shadowable_module,
+};
+pub use settings::{MisconfigurationMode, SearchPathSettings, SearchPathSettingsError};
+pub use typeshed::{
+    PyVersionRange, TypeshedVersions, TypeshedVersionsParseError, vendored_typeshed_versions,
+};
 
+pub use list::{all_modules, list_modules};
+pub use resolve::{ModuleResolveMode, SearchPathIterator, search_paths};
+
+mod db;
 mod list;
 mod module;
+mod module_name;
 mod path;
-mod resolver;
+mod resolve;
+mod settings;
 mod typeshed;
 
 #[cfg(test)]

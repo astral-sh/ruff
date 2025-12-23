@@ -55,10 +55,13 @@ class TD(TypedDict):
 d1 = {"x": 1}
 d2: TD = {"x": 1}
 d3: dict[str, int] = {"x": 1}
+d4: TD = dict(x=1)
+d5: TD = dict(x="1")  # error: [invalid-argument-type]
 
 reveal_type(d1)  # revealed: dict[Unknown | str, Unknown | int]
 reveal_type(d2)  # revealed: TD
 reveal_type(d3)  # revealed: dict[str, int]
+reveal_type(d4)  # revealed: TD
 
 def _() -> TD:
     return {"x": 1}
@@ -268,8 +271,8 @@ class A:
 
 A(f(1))
 
-# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[int | None | list[Unknown]] & list[int | str | list[Unknown]] & list[list[Unknown]]`"
-# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[int | None | list[Unknown]] & list[int | str | list[Unknown]] & list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to function `__new__` is incorrect: Expected `list[int | str]`, found `list[list[Unknown]]`"
+# error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `list[int | None]`, found `list[list[Unknown]]`"
 A(f([]))
 ```
 

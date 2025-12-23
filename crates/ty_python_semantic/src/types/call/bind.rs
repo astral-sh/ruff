@@ -23,7 +23,6 @@ use smallvec::{SmallVec, smallvec, smallvec_inline};
 use super::{Argument, CallArguments, CallError, CallErrorKind, InferContext, Signature, Type};
 use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
-use crate::module_resolver::KnownModule;
 use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
@@ -54,6 +53,7 @@ use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
 use ruff_db::diagnostic::{Annotation, Diagnostic, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_python_ast::{self as ast, ArgOrKeyword, PythonVersion};
+use ty_module_resolver::KnownModule;
 
 /// Binding information for a possible union of callables. At a call site, the arguments must be
 /// compatible with _all_ of the types in the union for the call to be valid.
@@ -3016,7 +3016,19 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             tcx.filter_union(self.db, |ty| ty.class_specialization(self.db).is_some())
                 .class_specialization(self.db)?;
 
-            builder.infer(return_ty, tcx).ok()?;
+            builder
+                .infer_map(return_ty, tcx, |(_, variance, inferred_ty)| {
+                    // Avoid unnecessarily widening the return type based on a covariant
+                    // type parameter from the type context, as it can lead to argument
+                    // assignability errors if the type variable is constrained by a narrower
+                    // parameter type.
+                    if variance.is_covariant() {
+                        return None;
+                    }
+
+                    Some(inferred_ty)
+                })
+                .ok()?;
             Some(builder.type_mappings().clone())
         });
 

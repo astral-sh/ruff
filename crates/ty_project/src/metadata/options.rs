@@ -28,11 +28,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
+use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
     MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
-    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SearchPathSettings,
-    SearchPathValidationError, SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
+    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
+    SysPrefixPathOrigin,
 };
 use ty_static::EnvVars;
 
@@ -258,7 +259,7 @@ impl Options {
         system: &dyn System,
         vendored: &VendoredFileSystem,
         misconfiguration_mode: MisconfigurationMode,
-    ) -> Result<SearchPaths, SearchPathValidationError> {
+    ) -> Result<SearchPaths, SearchPathSettingsError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -875,10 +876,7 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
-
-                        ValueSource::Editor => {
-                            unreachable!("Can't configure rules from the user's editor")
-                        }
+                        ValueSource::Editor => LintSource::Editor,
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -1014,7 +1012,12 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!("Can't configure includes from the user's editor"),
+                        ValueSource::Editor => {
+                            diagnostic.sub(SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "The pattern was specified in the editor settings.",
+                            ))
+                        }
                     }
                 })?;
         }
@@ -1097,9 +1100,10 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::Editor => unreachable!(
-                            "Can't configure excludes from the user's editor"
-                        )
+                        ValueSource::Editor => diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "The pattern was specified in the editor settings",
+                        ))
                     }
                 })?;
         }
