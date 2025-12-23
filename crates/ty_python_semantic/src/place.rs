@@ -1,6 +1,8 @@
 use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{
+    KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
+};
 
 use crate::dunder_all::dunder_all_names;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -15,7 +17,7 @@ use crate::types::{
     Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
     declaration_type, todo_type,
 };
-use crate::{Db, FxOrderSet, Module, ModuleName, Program};
+use crate::{Db, FxOrderSet, Program};
 
 pub(crate) use implicit_globals::{
     module_type_implicit_global_declaration, module_type_implicit_global_symbol,
@@ -400,7 +402,7 @@ pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQua
             .ignore_possibly_undefined()
             .map(|_| found_symbol)
     };
-    resolve_module_confident(db, &ModuleName::new("__builtins__").unwrap())
+    resolve_module_confident(db, &ModuleName::new_static("__builtins__").unwrap())
         .and_then(&resolver)
         .or_else(|| resolve_module_confident(db, &KnownModule::Builtins.name()).and_then(resolver))
         .unwrap_or_default()
