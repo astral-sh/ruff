@@ -4702,7 +4702,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db, None)),
+                        Type::Callable(callable.bind_self(db, Some(instance))),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
