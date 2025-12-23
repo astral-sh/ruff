@@ -4938,9 +4938,7 @@ pub(super) fn report_unsafe_tuple_subclass<'ctx, 'db>(
         subclass_definition.full_range(db, context.module()).range()
     };
 
-    let Some(builder) = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range) else {
-        return None;
-    };
+    let builder = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range)?;
 
     let mut diagnostic = builder.into_diagnostic(format_args!(
         "Unsafe override of method `{member}` in a subclass of `tuple`"
