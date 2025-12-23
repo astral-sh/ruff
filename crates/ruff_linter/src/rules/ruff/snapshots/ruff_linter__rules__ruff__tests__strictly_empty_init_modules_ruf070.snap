@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 9
+Added: 10
 
 --- Added ---
 RUF070 Code detected
@@ -107,4 +107,16 @@ RUF070 Code detected
 21 | / def __getattr__(name):  # ok
 22 | |     return name
    | |_______________^
+23 |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:24:1
+   |
+22 |     return name
+23 |
+24 | __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
    |

@@ -20,3 +20,5 @@ def foo():
 
 def __getattr__(name):  # ok
     return name
+
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok

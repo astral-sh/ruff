@@ -100,25 +100,35 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
         //
         // This is actually going slightly beyond the upstream rule already, which only checks for
         // `Stmt::Assign`.
-        let targets = match stmt {
-            ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
-            ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-            | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
-                std::slice::from_ref(&**target)
-            }
-            _ => &[],
-        };
+        if is_assignment_to(stmt, "__all__") {
+            return;
+        }
 
-        if !targets.is_empty()
-            && targets.iter().all(|target| {
-                target
-                    .as_name_expr()
-                    .is_some_and(|name| name.id == "__all__")
-            })
-        {
+        // Allow legacy namespace packages with assignments like:
+        //
+        // ```py
+        // __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+        // ```
+        if is_assignment_to(stmt, "__path__") {
             return;
         }
     }
 
     checker.report_diagnostic(NonEmptyInitModule, stmt.range());
+}
+
+fn is_assignment_to(stmt: &ast::Stmt, name: &str) -> bool {
+    let targets = match stmt {
+        ast::Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
+        ast::Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
+        | ast::Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => {
+            std::slice::from_ref(&**target)
+        }
+        _ => &[],
+    };
+
+    !targets.is_empty()
+        && targets
+            .iter()
+            .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
 }
