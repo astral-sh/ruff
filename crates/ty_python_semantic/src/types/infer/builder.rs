@@ -24,6 +24,7 @@ use super::{
     infer_definition_types, infer_expression_types, infer_same_file_expression_type,
     infer_unpack_types,
 };
+use crate::ast_node_ref::AstNodeRef;
 use crate::diagnostic::format_enumeration;
 use crate::node_key::NodeKey;
 use crate::place::{
@@ -516,6 +517,32 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
             _ => infer_scope_types(self.db(), expr_scope).expression_type(expression),
         }
+    }
+
+    /// Get the type of an expression from any scope in the same file, using the provided type
+    /// context.
+    ///
+    /// We can't use `self.infer_expression` here because default expressions aren't registered as
+    /// standalone expressions (would panic), and because it would resolve names in the current
+    /// (possibly inner) scope instead of the enclosing scope where defaults live.
+    fn file_expression_type_with_context(
+        &self,
+        expression: &ast::Expr,
+        tcx: TypeContext<'db>,
+    ) -> Type<'db> {
+        let standalone_expression = self.index.try_expression(expression).unwrap_or_else(|| {
+            // Default expressions aren't registered as standalone expressions, so synthesize
+            // an `Expression` to allow type-context inference in the correct scope.
+            Expression::new(
+                self.db(),
+                self.file(),
+                self.index.expression_scope_id(expression),
+                AstNodeRef::new(self.module(), expression),
+                None,
+                ExpressionKind::Normal,
+            )
+        });
+        infer_same_file_expression_type(self.db(), standalone_expression, tcx, self.module())
     }
 
     /// Infers types in the given [`InferenceRegion`].
@@ -2596,12 +2623,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// default value) both belong to outer scopes. (The default value always belongs to the outer
     /// scope in which the function is defined, the annotation belongs either to the outer scope,
     /// or maybe to an intervening type-params scope, if it's a generic function.) So we don't use
-    /// `self.infer_expression` or store any expression types here, we just use `expression_ty` to
-    /// get the types of the expressions from their respective scopes.
+    /// `self.infer_expression` or store any expression types here, we just query for the types of
+    /// the expressions from their respective scopes. For default values that need type context, we
+    /// run a standalone inference in the default's own scope.
     ///
-    /// It is safe (non-cycle-causing) to use `expression_ty` here, because an outer scope can't
-    /// depend on a definition from an inner scope, so we shouldn't be in-process of inferring the
-    /// outer scope here.
+    /// It is safe (non-cycle-causing) to query the annotation type via `file_expression_type`
+    /// here, because an outer scope can't depend on a definition from an inner scope, so we
+    /// shouldn't be in-process of inferring the outer scope here.
     fn infer_parameter_definition(
         &mut self,
         parameter_with_default: &'ast ast::ParameterWithDefault,
@@ -2613,12 +2641,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             range: _,
             node_index: _,
         } = parameter_with_default;
-        let default_ty = default
-            .as_ref()
-            .map(|default| self.file_expression_type(default));
+        let default_expr = default.as_ref();
         if let Some(annotation) = parameter.annotation.as_ref() {
             let declared_ty = self.file_expression_type(annotation);
-            if let Some(default_ty) = default_ty {
+            if let Some(default_expr) = default_expr {
+                let default_expr = default_expr.as_ref();
+                let default_ty = self.file_expression_type_with_context(
+                    default_expr,
+                    TypeContext::new(Some(declared_ty)),
+                );
                 if !default_ty.is_assignable_to(self.db(), declared_ty)
                     && !((self.in_stub()
                         || self.in_function_overload_or_abstractmethod()
@@ -2648,7 +2679,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 &DeclaredAndInferredType::are_the_same_type(declared_ty),
             );
         } else {
-            let ty = if let Some(default_ty) = default_ty {
+            let ty = if let Some(default_expr) = default_expr {
+                let default_ty = self.file_expression_type(default_expr);
                 UnionType::from_elements(self.db(), [Type::unknown(), default_ty])
             } else if let Some(ty) = self.special_first_method_parameter_type(parameter) {
                 ty
