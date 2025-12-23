@@ -904,7 +904,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let Some(subscript_place_expr) = place_expr(&subscript.value)
             && let Type::StringLiteral(key_literal) = inference.expression_type(&*subscript.slice)
             && let rhs_type = inference.expression_type(&comparators[0])
-            && matches!(rhs_type, Type::StringLiteral(_) | Type::IntLiteral(_))
+            && is_supported_typeddict_tag_literal(rhs_type)
         {
             // If we have an equality constraint (either `==` on the `if` side, or `!=` on the
             // `else` side), we have to be careful. If all the matching fields in all the
@@ -1305,6 +1305,15 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
     }
 }
 
+fn is_supported_typeddict_tag_literal(ty: Type) -> bool {
+    matches!(
+        ty,
+        // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
+        // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
+        Type::StringLiteral(_) | Type::BytesLiteral(_) | Type::IntLiteral(_)
+    )
+}
+
 fn all_matching_typeddict_fields_have_literal_types<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
@@ -1312,10 +1321,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
 ) -> bool {
     let matching_field_is_literal = |typeddict: &TypedDictType<'db>| {
         if let Some(field) = typeddict.items(db).get(field_name) {
-            matches!(
-                field.declared_ty,
-                Type::StringLiteral(_) | Type::IntLiteral(_),
-            )
+            is_supported_typeddict_tag_literal(field.declared_ty)
         } else {
             true // no matching field to check
         }

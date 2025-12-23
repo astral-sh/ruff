@@ -2034,15 +2034,20 @@ class Bar(TypedDict):
     tag: Literal[42]
 
 class Baz(TypedDict):
-    tag: Literal["baz"]
+    tag: Literal[b"baz"]  # `BytesLiteral` is supported.
 
-def _(u: Foo | Bar | Baz):
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def _(u: Foo | Bar | Baz | Bing):
     if u["tag"] == "foo":
         reveal_type(u)  # revealed: Foo
     elif u["tag"] == 42:
         reveal_type(u)  # revealed: Bar
-    else:
+    elif u["tag"] == b"baz":
         reveal_type(u)  # revealed: Baz
+    else:
+        reveal_type(u)  # revealed: Bing
 ```
 
 We can descend into intersections to discover `TypedDict` types that need narrowing:
