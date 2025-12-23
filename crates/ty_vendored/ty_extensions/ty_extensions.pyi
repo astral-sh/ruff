@@ -5,6 +5,7 @@ from collections.abc import Iterable
 from enum import Enum
 from typing import (
     Any,
+    ClassVar,
     LiteralString,
     Protocol,
     _SpecialForm,
@@ -183,14 +184,13 @@ def reveal_mro(cls: type | types.GenericAlias) -> None:
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
 class NamedTupleLike(Protocol):
-    # _fields and _field_defaults are defined as properties rather than ClassVar
-    # attributes so that the protocol check is covariant. This allows concrete
-    # NamedTuple classes with precise types (e.g. tuple[str, str]) to satisfy
-    # the protocol's broader type (tuple[str, ...]).
-    @property
-    def _fields(self) -> tuple[str, ...]: ...
-    @property
-    def _field_defaults(self) -> dict[str, Any]: ...
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
+    _field_defaults: ClassVar[dict[str, Any]]
     @classmethod
     def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
