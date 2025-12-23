@@ -4519,6 +4519,7 @@ dependencies = [
  "ruff_options_metadata",
  "ruff_python_ast",
  "ruff_python_formatter",
+ "ruff_python_trivia",
  "ruff_text_size",
  "rustc-hash",
  "salsa",

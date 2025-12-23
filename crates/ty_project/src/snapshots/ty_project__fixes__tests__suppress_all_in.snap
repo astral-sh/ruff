@@ -1,0 +1,11 @@
+---
+source: crates/ty_project/src/fixes.rs
+expression: output
+---
+Added 1 suppressions
+
+## Fixed source
+
+```py
+a = b + 10  # ty:ignore[unresolved-reference]
+```

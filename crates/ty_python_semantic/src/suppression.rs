@@ -40,7 +40,7 @@ declare_lint! {
     /// ```py
     /// a = 20 / 2
     /// ```
-    pub(crate) static UNUSED_IGNORE_COMMENT = {
+    pub static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
