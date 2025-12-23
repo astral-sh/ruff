@@ -63,11 +63,11 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL,
-    UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY,
-    hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_TYPE_VARIABLE_BOUND, INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases,
+    NON_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
+    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
+    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_pop_required_field_on_typed_dict, report_duplicate_bases,
@@ -564,6 +564,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        if self.db().should_check_file(self.file()) {
+            self.check_legacy_typevars();
+        }
         // Infer deferred types for all definitions.
         for definition in std::mem::take(&mut self.deferred) {
             self.extend_definition(infer_deferred_types(self.db(), definition));
@@ -577,6 +580,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         if self.db().should_check_file(self.file()) {
             self.check_class_definitions();
             self.check_overloaded_functions(node);
+            self.check_pep695_typevars();
         }
     }
 
@@ -1302,6 +1306,131 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         );
                     }
                 }
+            }
+        }
+    }
+
+    fn check_legacy_typevars(&mut self) {
+        let typevars = self.deferred.iter().filter_map(|definition| {
+            if let DefinitionKind::Assignment(assignment) = definition.kind(self.db()) {
+                let ast::Expr::Call(call) = assignment.value(self.module()) else {
+                    return None;
+                };
+                let inference = infer_definition_types(self.db(), *definition);
+                Some((call, inference.binding_type(*definition)))
+            } else {
+                None
+            }
+        });
+
+        // The current Python type specification is that the bounds and constraints of type variables must be concrete types,
+        // and an error must occur if type variables are included.
+        for (call, ty) in typevars {
+            let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty else {
+                continue;
+            };
+            let has_typevar = |ty| {
+                any_over_type(
+                    self.db(),
+                    ty,
+                    &|ty| matches!(ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))),
+                    false,
+                )
+            };
+            match typevar.bound_or_constraints(self.db()) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound_ty)) => {
+                    let Some(bound) = call.arguments.find_keyword("bound") else {
+                        continue;
+                    };
+                    if has_typevar(bound_ty)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_BOUND, bound)
+                    {
+                        builder.into_diagnostic("Type variable bound type cannot be generic");
+                    }
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    for constraint in constraints
+                        .elements(self.db())
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, ty)| {
+                            has_typevar(*ty).then_some(call.arguments.args.get(i + 1)?)
+                        })
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)
+                        {
+                            builder.into_diagnostic(
+                                "Type variable constraint types cannot be generic",
+                            );
+                        }
+                    }
+                }
+                None => {}
+            }
+        }
+    }
+
+    fn check_pep695_typevars(&mut self) {
+        let typevars = self.declarations.iter().filter_map(|(definition, ty)| {
+            if let DefinitionKind::TypeVar(typevar) = definition.kind(self.db()) {
+                Some((typevar.node(self.module()), ty.inner_type()))
+            } else {
+                None
+            }
+        });
+
+        // The current Python type specification is that the bounds and constraints of type variables must be concrete types,
+        // and an error must occur if type variables are included.
+        for (node, ty) in typevars {
+            let Type::KnownInstance(KnownInstanceType::TypeVar(typevar)) = ty else {
+                continue;
+            };
+            let Some(bound) = node.bound.as_deref() else {
+                continue;
+            };
+            let has_typevar = |ty| {
+                any_over_type(
+                    self.db(),
+                    ty,
+                    &|ty| matches!(ty, Type::KnownInstance(KnownInstanceType::TypeVar(_))),
+                    false,
+                )
+            };
+            match typevar.bound_or_constraints(self.db()) {
+                Some(TypeVarBoundOrConstraints::UpperBound(bound_ty)) => {
+                    if has_typevar(bound_ty)
+                        && let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_BOUND, bound)
+                    {
+                        builder.into_diagnostic("Type variable bound type cannot be generic");
+                    }
+                }
+                Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
+                    let ast::Expr::Tuple(tuple) = bound else {
+                        continue;
+                    };
+                    for constraint in constraints
+                        .elements(self.db())
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(i, ty)| has_typevar(*ty).then_some(tuple.elts.get(i)?))
+                    {
+                        if let Some(builder) = self
+                            .context
+                            .report_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS, constraint)
+                        {
+                            builder.into_diagnostic(
+                                "Type variable constraint types cannot be generic",
+                            );
+                        }
+                    }
+                }
+                None => {}
             }
         }
     }
@@ -13202,6 +13331,11 @@ impl<V> VecSet<V> {
     #[inline]
     fn is_empty(&self) -> bool {
         self.0.is_empty()
+    }
+
+    #[inline]
+    fn iter(&self) -> std::slice::Iter<'_, V> {
+        self.0.iter()
     }
 
     fn into_boxed_slice(self) -> Box<[V]> {

@@ -91,6 +91,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_GUARD_DEFINITION);
     registry.register_lint(&INVALID_TYPE_GUARD_CALL);
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
+    registry.register_lint(&INVALID_TYPE_VARIABLE_BOUND);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
     registry.register_lint(&NON_SUBSCRIPTABLE);
@@ -1355,16 +1356,21 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
-    /// Checks for constrained [type variables] with only one constraint.
+    /// Checks for constrained [type variables] with only one constraint,
+    /// or that those constraints reference type variables.
     ///
     /// ## Why is this bad?
-    /// A constrained type variable must have at least two constraints.
+    /// A constrained type variable must have at least two constraints,
+    /// and the constraints must be concrete types.
     ///
     /// ## Examples
     /// ```python
     /// from typing import TypeVar
     ///
     /// T = TypeVar('T', str)  # invalid constrained TypeVar
+    ///
+    /// I = TypeVar('I', bound=int)
+    /// U = TypeVar('U', list[I], int)  # invalid constrained TypeVar
     /// ```
     ///
     /// Use instead:
@@ -1372,12 +1378,39 @@ declare_lint! {
     /// T = TypeVar('T', str, int)  # valid constrained TypeVar
     /// # or
     /// T = TypeVar('T', bound=str)  # valid bound TypeVar
+    ///
+    /// U = TypeVar('U', list[int], int)  # valid constrained Type
     /// ```
     ///
     /// [type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar
     pub(crate) static INVALID_TYPE_VARIABLE_CONSTRAINTS = {
         summary: "detects invalid type variable constraints",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for [type variables] whose bounds reference type variables.
+    ///
+    /// ## Why is this bad?
+    /// The bound of a type variable must be a concrete type.
+    ///
+    /// ## Examples
+    /// ```python
+    /// T = TypeVar('T', bound=list['T'])  # error: [invalid-type-variable-bound]
+    /// U = TypeVar('U')
+    /// T = TypeVar('T', bound=U)  # error: [invalid-type-variable-bound]
+    ///
+    /// def f[T: list[T]](): ...  # error: [invalid-type-variable-bound]
+    /// def g[U, T: U](): ...  # error: [invalid-type-variable-bound]
+    /// ```
+    ///
+    /// [type variable]: https://docs.python.org/3/library/typing.html#typing.TypeVar
+    pub(crate) static INVALID_TYPE_VARIABLE_BOUND = {
+        summary: "detects invalid type variable bounds",
+        status: LintStatus::stable("1.0.0"),
         default_level: Level::Error,
     }
 }

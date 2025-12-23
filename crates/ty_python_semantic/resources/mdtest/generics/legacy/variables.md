@@ -441,6 +441,8 @@ def constrained(x: T_constrained):
 
 ### Bounds and constraints
 
+<!-- snapshot-diagnostics -->
+
 A typevar's bounds and constraints cannot be generic, cyclic or otherwise:
 
 ```py
@@ -448,13 +450,13 @@ from typing import Any, TypeVar
 
 S = TypeVar("S")
 
-# TODO: error
+# error: [invalid-type-variable-bound]
 T = TypeVar("T", bound=list[S])
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 U = TypeVar("U", list["T"], str)
 
-# TODO: error
+# error: [invalid-type-variable-constraints]
 V = TypeVar("V", list["V"], str)
 ```
 

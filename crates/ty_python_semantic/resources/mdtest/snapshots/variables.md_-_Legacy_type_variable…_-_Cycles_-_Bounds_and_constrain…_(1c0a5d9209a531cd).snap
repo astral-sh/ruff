@@ -1,0 +1,111 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: variables.md - Legacy type variables - Cycles - Bounds and constraints
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/legacy/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any, TypeVar
+ 2 | 
+ 3 | S = TypeVar("S")
+ 4 | 
+ 5 | # error: [invalid-type-variable-bound]
+ 6 | T = TypeVar("T", bound=list[S])
+ 7 | 
+ 8 | # error: [invalid-type-variable-constraints]
+ 9 | U = TypeVar("U", list["T"], str)
+10 | 
+11 | # error: [invalid-type-variable-constraints]
+12 | V = TypeVar("V", list["V"], str)
+13 | from typing import TypeVar, Generic
+14 | 
+15 | T = TypeVar("T", bound=list["G"])
+16 | 
+17 | class G(Generic[T]):
+18 |     x: T
+19 | 
+20 | reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+21 | from typing import TypeVar, Generic
+22 | 
+23 | # error: [invalid-type-arguments]
+24 | T = TypeVar("T", bound="Node[int]")
+25 | 
+26 | class Node(Generic[T]):
+27 |     pass
+28 | 
+29 | # error: [invalid-type-arguments]
+30 | def _(n: Node[str]):
+31 |     reveal_type(n)  # revealed: Node[Unknown]
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-bound]: Type variable bound type cannot be generic
+ --> src/mdtest_snippet.py:6:18
+  |
+5 | # error: [invalid-type-variable-bound]
+6 | T = TypeVar("T", bound=list[S])
+  |                  ^^^^^^^^^^^^^
+7 |
+8 | # error: [invalid-type-variable-constraints]
+  |
+info: rule `invalid-type-variable-bound` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-constraints]: Type variable constraint types cannot be generic
+  --> src/mdtest_snippet.py:9:18
+   |
+ 8 | # error: [invalid-type-variable-constraints]
+ 9 | U = TypeVar("U", list["T"], str)
+   |                  ^^^^^^^^^
+10 |
+11 | # error: [invalid-type-variable-constraints]
+   |
+info: rule `invalid-type-variable-constraints` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `int` is not assignable to upper bound `Node[int] | Node[Unknown]` of type variable `T@Node`
+  --> src/mdtest_snippet.py:24:1
+   |
+23 | # error: [invalid-type-arguments]
+24 | T = TypeVar("T", bound="Node[int]")
+   | - Type variable defined here ^^^
+25 |
+26 | class Node(Generic[T]):
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `str` is not assignable to upper bound `Node[int] | Node[Unknown]` of type variable `T@Node`
+  --> src/mdtest_snippet.py:30:15
+   |
+29 | # error: [invalid-type-arguments]
+30 | def _(n: Node[str]):
+   |               ^^^
+31 |     reveal_type(n)  # revealed: Node[Unknown]
+   |
+  ::: src/mdtest_snippet.py:24:1
+   |
+23 | # error: [invalid-type-arguments]
+24 | T = TypeVar("T", bound="Node[int]")
+   | - Type variable defined here
+25 |
+26 | class Node(Generic[T]):
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```

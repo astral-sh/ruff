@@ -1,0 +1,164 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: variables.md - PEP 695 Generics - Cycles - Bounds and constraints
+mdtest path: crates/ty_python_semantic/resources/mdtest/generics/pep695/variables.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any
+ 2 | 
+ 3 | # error: [invalid-type-variable-bound]
+ 4 | def f[S, T: list[S]](x: S, y: T) -> S | T:
+ 5 |     return x or y
+ 6 | 
+ 7 | # error: [invalid-type-variable-bound]
+ 8 | class C[S, T: list[S]]:
+ 9 |     x: S
+10 |     y: T
+11 | 
+12 | reveal_type(C[int, list[Any]]().x)  # revealed: int
+13 | reveal_type(C[int, list[Any]]().y)  # revealed: list[Any]
+14 | 
+15 | # error: [invalid-type-variable-bound]
+16 | def g[T: list[T]](x: T) -> T:
+17 |     return x
+18 | 
+19 | # error: [invalid-type-variable-bound]
+20 | class D[T: list[T]]:
+21 |     x: T
+22 | 
+23 | reveal_type(D[list[Any]]().x)  # revealed: list[Any]
+24 | 
+25 | # error: [invalid-type-variable-constraints]
+26 | def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
+27 |     return x or y
+28 | 
+29 | # error: [invalid-type-variable-constraints]
+30 | class E[S, T: (list[S], str)]:
+31 |     x: S
+32 |     y: T
+33 | 
+34 | reveal_type(E[int, str]().x)  # revealed: int
+35 | reveal_type(E[int, str]().y)  # revealed: str
+36 | 
+37 | # error: [invalid-type-variable-constraints]
+38 | def i[T: (list[T], str)](x: T) -> T:
+39 |     return x
+40 | 
+41 | # error: [invalid-type-variable-constraints]
+42 | class F[T: (list[T], str)]:
+43 |     x: T
+44 | 
+45 | reveal_type(F[list[Any]]().x)  # revealed: list[Any]
+46 | class G[T: list[G]]:
+47 |     x: T
+48 | 
+49 | reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+50 | # error: [invalid-type-arguments]
+51 | class Node[T: "Node[int]"]:
+52 |     pass
+53 | 
+54 | # error: [invalid-type-arguments]
+55 | def _(n: Node[str]):
+56 |     reveal_type(n)  # revealed: Node[Unknown]
+```
+
+# Diagnostics
+
+```
+error[invalid-type-variable-bound]: Type variable bound type cannot be generic
+ --> src/mdtest_snippet.py:4:13
+  |
+3 | # error: [invalid-type-variable-bound]
+4 | def f[S, T: list[S]](x: S, y: T) -> S | T:
+  |             ^^^^^^^
+5 |     return x or y
+  |
+info: rule `invalid-type-variable-bound` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-bound]: Type variable bound type cannot be generic
+  --> src/mdtest_snippet.py:8:15
+   |
+ 7 | # error: [invalid-type-variable-bound]
+ 8 | class C[S, T: list[S]]:
+   |               ^^^^^^^
+ 9 |     x: S
+10 |     y: T
+   |
+info: rule `invalid-type-variable-bound` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-constraints]: Type variable constraint types cannot be generic
+  --> src/mdtest_snippet.py:26:14
+   |
+25 | # error: [invalid-type-variable-constraints]
+26 | def h[S, T: (list[S], str)](x: S, y: T) -> S | T:
+   |              ^^^^^^^
+27 |     return x or y
+   |
+info: rule `invalid-type-variable-constraints` is enabled by default
+
+```
+
+```
+error[invalid-type-variable-constraints]: Type variable constraint types cannot be generic
+  --> src/mdtest_snippet.py:30:16
+   |
+29 | # error: [invalid-type-variable-constraints]
+30 | class E[S, T: (list[S], str)]:
+   |                ^^^^^^^
+31 |     x: S
+32 |     y: T
+   |
+info: rule `invalid-type-variable-constraints` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `int` is not assignable to upper bound `Node[int] | Node[Unknown]` of type variable `T@Node`
+  --> src/mdtest_snippet.py:51:12
+   |
+49 | reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+50 | # error: [invalid-type-arguments]
+51 | class Node[T: "Node[int]"]:
+   |            -        ^^^
+   |            |
+   |            Type variable defined here
+52 |     pass
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
+
+```
+error[invalid-type-arguments]: Type `str` is not assignable to upper bound `Node[int] | Node[Unknown]` of type variable `T@Node`
+  --> src/mdtest_snippet.py:55:15
+   |
+54 | # error: [invalid-type-arguments]
+55 | def _(n: Node[str]):
+   |               ^^^
+56 |     reveal_type(n)  # revealed: Node[Unknown]
+   |
+  ::: src/mdtest_snippet.py:51:12
+   |
+49 | reveal_type(G[list[G]]().x)  # revealed: list[G[Unknown]]
+50 | # error: [invalid-type-arguments]
+51 | class Node[T: "Node[int]"]:
+   |            - Type variable defined here
+52 |     pass
+   |
+info: rule `invalid-type-arguments` is enabled by default
+
+```
