@@ -1,6 +1,8 @@
 use ruff_db::files::File;
 use ruff_python_ast::PythonVersion;
-use ty_module_resolver::{KnownModule, file_to_module, resolve_module_confident};
+use ty_module_resolver::{
+    KnownModule, Module, ModuleName, file_to_module, resolve_module_confident,
+};
 
 use crate::dunder_all::dunder_all_names;
 use crate::semantic_index::definition::{Definition, DefinitionState};
@@ -380,25 +382,29 @@ pub(crate) fn imported_symbol<'db>(
 /// and should not be used when a symbol is being explicitly imported from the `builtins` module
 /// (e.g. `from builtins import int`).
 pub(crate) fn builtins_symbol<'db>(db: &'db dyn Db, symbol: &str) -> PlaceAndQualifiers<'db> {
-    resolve_module_confident(db, &KnownModule::Builtins.name())
-        .and_then(|module| {
-            let file = module.file(db)?;
-            Some(
-                symbol_impl(
-                    db,
-                    global_scope(db, file),
-                    symbol,
-                    RequiresExplicitReExport::Yes,
-                    ConsideredDefinitions::EndOfScope,
-                )
-                .or_fall_back_to(db, || {
-                    // We're looking up in the builtins namespace and not the module, so we should
-                    // do the normal lookup in `types.ModuleType` and not the special one as in
-                    // `imported_symbol`.
-                    module_type_implicit_global_symbol(db, symbol)
-                }),
-            )
-        })
+    let resolver = |module: Module<'_>| {
+        let file = module.file(db)?;
+        let found_symbol = symbol_impl(
+            db,
+            global_scope(db, file),
+            symbol,
+            RequiresExplicitReExport::Yes,
+            ConsideredDefinitions::EndOfScope,
+        )
+        .or_fall_back_to(db, || {
+            // We're looking up in the builtins namespace and not the module, so we should
+            // do the normal lookup in `types.ModuleType` and not the special one as in
+            // `imported_symbol`.
+            module_type_implicit_global_symbol(db, symbol)
+        });
+        // If this symbol is not present in project-level builtins, search in the default ones.
+        found_symbol
+            .ignore_possibly_undefined()
+            .map(|_| found_symbol)
+    };
+    resolve_module_confident(db, &ModuleName::new_static("__builtins__").unwrap())
+        .and_then(&resolver)
+        .or_else(|| resolve_module_confident(db, &KnownModule::Builtins.name()).and_then(resolver))
         .unwrap_or_default()
 }
 

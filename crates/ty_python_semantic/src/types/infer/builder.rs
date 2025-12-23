@@ -4963,7 +4963,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             Type::ModuleLiteral(module) => {
-                if let Place::Defined(attr_ty, _, _) = module.static_member(db, attribute).place {
+                let sym = if module
+                    .module(db)
+                    .known(db)
+                    .is_some_and(KnownModule::is_builtins)
+                {
+                    builtins_symbol(db, attribute)
+                } else {
+                    module.static_member(db, attribute)
+                };
+                if let Place::Defined(attr_ty, _, _) = sym.place {
                     let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
 
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
