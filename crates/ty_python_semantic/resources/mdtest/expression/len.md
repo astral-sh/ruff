@@ -98,7 +98,7 @@ class UnknownLengthSubclassWithDunderLenOverridden(tuple[int, ...]):
 reveal_type(len(UnknownLengthSubclassWithDunderLenOverridden()))  # revealed: Literal[42]
 
 class FixedLengthSubclassWithDunderLenOverridden(tuple[int]):
-    def __len__(self) -> Literal[42]: # error: [invalid-method-override]
+    def __len__(self) -> Literal[42]:  # error: [invalid-method-override]
         return 42
 
 reveal_type(len(FixedLengthSubclassWithDunderLenOverridden((1,))))  # revealed: Literal[42]
