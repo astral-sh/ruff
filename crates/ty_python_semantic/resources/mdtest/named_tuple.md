@@ -347,7 +347,7 @@ satisfy:
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> NamedTupleLike
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(...) -> NamedTupleLike
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
@@ -359,13 +359,9 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
-NamedTuples are assignable to `NamedTupleLike`, even though the synthesized `_replace` signature
-`(*, x: int = ..., y: int = ...)` is not strictly a subtype of `(**kwargs: Any)`. We special-case
-this in protocol checking because:
-
-1. The specific `_replace` signature enables compile-time detection of invalid keyword arguments
-1. In practice, all valid calls to `_replace` on a NamedTupleLike will also work on any concrete
-    NamedTuple
+NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
+`(*args, **kwargs)`, which type checkers treat as equivalent to `...` (per the typing spec), making
+all NamedTuple implementations automatically compatible:
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -379,7 +375,7 @@ reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterabl
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
 reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 
-# Point is assignable to NamedTuple (we special-case _replace in protocol checking).
+# Point is assignable to NamedTuple.
 static_assert(is_assignable_to(Point, NamedTuple))
 
 # NamedTuple instances can be passed to functions expecting NamedTupleLike.
