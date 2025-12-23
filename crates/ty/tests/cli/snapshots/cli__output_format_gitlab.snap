@@ -15,7 +15,7 @@ exit_code: 1
 [
   {
     "check_name": "revealed-type",
-    "description": "revealed-type: Revealed type",
+    "description": "revealed-type: Revealed type: `LiteralString`",
     "severity": "info",
     "fingerprint": "979dad1e810c03b2",
     "location": {

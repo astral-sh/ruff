@@ -410,11 +410,6 @@ impl Diagnostic {
         self.id().is_invalid_syntax()
     }
 
-    /// Returns the message body to display to the user.
-    pub fn body(&self) -> &str {
-        self.primary_message()
-    }
-
     /// Returns the message of the first sub-diagnostic with a `Help` severity.
     ///
     /// Note that this is used as the fix title/suggestion for some of Ruff's output formats, but in

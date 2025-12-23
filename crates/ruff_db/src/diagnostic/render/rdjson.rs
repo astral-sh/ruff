@@ -76,7 +76,7 @@ fn diagnostic_to_rdjson<'a>(
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
 
     RdjsonDiagnostic {
-        message: diagnostic.body(),
+        message: diagnostic.concise_message().to_string(),
         location,
         code: RdjsonCode {
             value: diagnostic
@@ -155,7 +155,7 @@ struct RdjsonDiagnostic<'a> {
     code: RdjsonCode<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     location: Option<RdjsonLocation<'a>>,
-    message: &'a str,
+    message: String,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
 }

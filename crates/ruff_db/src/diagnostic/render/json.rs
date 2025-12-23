@@ -101,7 +101,7 @@ pub(super) fn diagnostic_to_json<'a>(
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
             url: diagnostic.documentation_url(),
-            message: diagnostic.body(),
+            message: diagnostic.concise_message().to_string(),
             fix,
             cell: notebook_cell_index,
             location: start_location.map(JsonLocation::from),
@@ -113,7 +113,7 @@ pub(super) fn diagnostic_to_json<'a>(
         JsonDiagnostic {
             code: diagnostic.secondary_code_or_id(),
             url: diagnostic.documentation_url(),
-            message: diagnostic.body(),
+            message: diagnostic.concise_message().to_string(),
             fix,
             cell: notebook_cell_index,
             location: Some(start_location.unwrap_or_default().into()),
@@ -226,7 +226,7 @@ pub(crate) struct JsonDiagnostic<'a> {
     filename: Option<&'a str>,
     fix: Option<JsonFix<'a>>,
     location: Option<JsonLocation>,
-    message: &'a str,
+    message: String,
     noqa_row: Option<OneIndexed>,
     url: Option<&'a str>,
 }
