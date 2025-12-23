@@ -4905,14 +4905,14 @@ pub(super) fn report_invalid_method_override<'db>(
 pub(super) fn report_unsafe_tuple_subclass<'db>(
     context: &InferContext<'db, '_>,
     member: &str,
-    member_definition: Definition<'db>,
-    member_ty: Type<'db>,
+    subclass_definition: Definition<'db>,
+    subclass_ty: Type<'db>,
 ) {
     let db = context.db();
 
-    let subclass_definition_kind = member_definition.kind(db);
+    let subclass_definition_kind = subclass_definition.kind(db);
 
-    let diagnostic_range = if let Type::FunctionLiteral(function_literal) = member_ty
+    let diagnostic_range = if let Type::FunctionLiteral(function_literal) = subclass_ty
         && subclass_definition_kind.is_function_def()
     {
         signature_span(db, function_literal)
@@ -4923,7 +4923,7 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
                     .range
             })
     } else {
-        member_definition.full_range(db, context.module()).range()
+        subclass_definition.full_range(db, context.module()).range()
     };
 
     let Some(builder) = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range) else {
@@ -4931,9 +4931,15 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
     };
 
     let mut diagnostic =
-        builder.into_diagnostic(format_args!("Invalid override of method `{member}`"));
+        builder.into_diagnostic(format_args!("Unsafe override of method `{member}`"));
 
-    diagnostic.set_primary_message("Definition is incompatible with ");
+    diagnostic.set_primary_message(format_args!(
+        "Unsafely overriding method `{member}` in a subclass of `tuple`"
+    ));
+
+    diagnostic.help(format!(
+        "Overriding `{member}` can cause unexpected behavior"
+    ));
 }
 
 pub(super) fn report_overridden_final_method<'db>(
