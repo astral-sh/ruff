@@ -1,12 +1,13 @@
 //! Generate a Markdown-compatible listing of configuration options for `pyproject.toml`.
 
+use std::borrow::Cow;
+use std::{fmt::Write, path::PathBuf};
+
 use anyhow::bail;
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
 use ruff_python_trivia::textwrap;
-use std::borrow::Cow;
-use std::{fmt::Write, path::PathBuf};
 use ty_project::metadata::Options;
 
 use crate::{
@@ -195,12 +196,12 @@ fn format_tab(tab_name: &str, header: &str, content: &str) -> String {
 /// Format the TOML header for the example usage for a given option.
 ///
 /// For example: `[tool.ty.rules]`.
-fn format_snippet(
+fn format_snippet<'a>(
     scope: Option<&str>,
-    example: &str,
+    example: &'a str,
     parents: &[Set],
     configuration: ConfigurationFile,
-) -> (String, String) {
+) -> (String, Cow<'a, str>) {
     let mut example = Cow::Borrowed(example);
 
     let header = configuration
@@ -217,18 +218,18 @@ fn format_snippet(
 
     // Ex) `[[tool.ty.xx]]`
     if example.starts_with(&format!("[[{header}")) {
-        return (String::new(), example.to_string());
+        return (String::new(), example);
     }
 
     // Ex) `[tool.ty.rules]`
     if example.starts_with(&format!("[{header}")) {
-        return (String::new(), example.to_string());
+        return (String::new(), example);
     }
 
     if header.is_empty() {
-        (String::new(), example.to_string())
+        (String::new(), example)
     } else {
-        (format!("[{header}]"), example.to_string())
+        (format!("[{header}]"), example)
     }
 }
 
