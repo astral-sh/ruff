@@ -934,7 +934,7 @@ class D(A):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.35">0.0.1-alpha.35</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-frozen-dataclass-subclass" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2264" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2266" target="_blank">View source</a>
 </small>
 
 
@@ -2703,9 +2703,11 @@ do not override certain methods.
 **Example**
 
 ```python
+from typing import Literal
+
 class Foo(tuple[int, int]):
-    def __len__(self) -> int:
-        return 1
+    def __bool__(self) -> Literal[False]:
+        return False
 ```
 
 ## `unsupported-base`
