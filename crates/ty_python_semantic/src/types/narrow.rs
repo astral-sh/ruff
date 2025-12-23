@@ -928,22 +928,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 let field_name = Name::from(key_literal.value(self.db));
                 let rhs_type = inference.expression_type(&comparators[0]);
-                let field_type = match (ops[0], is_positive) {
-                    // To avoid excluding non-`TypedDict` types, our constraints are always
-                    // expressed as a negative intersection (i.e. "you're *not* this kind of
-                    // `TypedDict`"). In these two cases, the whole constraint is going to be a
-                    // double negative, i.e. "you're *not* a `TypedDict` *without* this literal
-                    // field". As the first step of building that, we negate the right hand side.
-                    (ast::CmpOp::Eq, true) | (ast::CmpOp::NotEq, false) => {
-                        IntersectionBuilder::new(self.db)
-                            .add_negative(rhs_type)
-                            .build()
-                    }
-                    // The opposite, i.e. "you're *not* a `TypedDict` *with* this literal field".
-                    // Don't negate the right hand side.
-                    (ast::CmpOp::Eq, false) | (ast::CmpOp::NotEq, true) => rhs_type,
-                    _ => unreachable!(),
-                };
+                // To avoid excluding non-`TypedDict` types, our constraints are always
+                // expressed as a negative intersection (i.e. "you're *not* this kind of
+                // `TypedDict`"). If `constrain_with_equality` is true, the whole constraint
+                // is going to be a double negative, i.e. "you're *not* a `TypedDict`
+                // *without* this literal
+                // field". As the first step of building that, we negate the right hand side.
+                let field_type = rhs_type.negate_if(self.db, constrain_with_equality);
                 // Create the synthesized `TypedDict` with that (possibly negated) field. We don't
                 // want to constrain the mutability or required-ness of the field, so the most
                 // compatible form is not-required and read-only.
