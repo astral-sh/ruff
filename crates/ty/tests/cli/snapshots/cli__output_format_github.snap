@@ -1,0 +1,18 @@
+---
+source: crates/ty/tests/cli/main.rs
+info:
+  program: ty
+  args:
+    - check
+    - "--output-format"
+    - github
+    - "--target-version"
+    - "3.9"
+---
+success: false
+exit_code: 1
+----- stdout -----
+::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=3,col=13,endLine=3,endColumn=26::test.py:3:13: revealed-type: Revealed type
+::error title=ty (invalid-syntax),file=<temp_dir>/test.py,line=4,col=1,endLine=4,endColumn=6::test.py:4:1: invalid-syntax: Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
+
+----- stderr -----

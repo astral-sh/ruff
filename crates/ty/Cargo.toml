@@ -50,6 +50,7 @@ insta-cmd = { workspace = true }
 filetime = { workspace = true }
 regex = { workspace = true }
 tempfile = { workspace = true }
+test-case = { workspace = true }
 toml = { workspace = true }
 
 [features]

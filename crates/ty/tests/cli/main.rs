@@ -808,6 +808,32 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[test_case::test_case("concise")]
+#[test_case::test_case("full")]
+#[test_case::test_case("github")]
+#[test_case::test_case("gitlab")]
+fn output_format(output_format: &str) -> anyhow::Result<()> {
+    let case = CliTest::with_file(
+        "test.py",
+        "
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # revealed-type
+        match 42:  # invalid-syntax
+            case _: ...
+        ",
+    )?;
+
+    let snapshot = format!("output_format_{output_format}");
+
+    assert_cmd_snapshot!(
+        snapshot,
+        case.command()
+            .args(["--output-format", output_format, "--target-version", "3.9"])
+    );
+
+    Ok(())
+}
+
 pub(crate) struct CliTest {
     _temp_dir: TempDir,
     settings: Settings,
