@@ -880,7 +880,7 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
-/// Helper for `recursive_type_normalized_impl` for TypeGuardLike types.
+/// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
 fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
     guard: T,
@@ -14893,7 +14893,7 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     }
 }
 
-/// Common trait for TypeIs and TypeGuard types that share similar structure
+/// Common trait for `TypeIs` and `TypeGuard` types that share similar structure
 /// but have different semantic behaviors.
 pub(crate) trait TypeGuardLike<'db>: Copy {
     /// The name of this type guard form (for error messages and display)
@@ -14911,7 +14911,7 @@ pub(crate) trait TypeGuardLike<'db>: Copy {
     /// Create a new instance with a different return type, wrapped in Type
     fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
 
-    /// The SpecialFormType for display purposes
+    /// The `SpecialFormType` for display purposes
     fn special_form() -> SpecialFormType;
 }
 

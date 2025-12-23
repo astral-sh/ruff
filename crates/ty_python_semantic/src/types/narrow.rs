@@ -290,7 +290,7 @@ impl ClassInfoConstraintFunction {
 struct TypeGuardConstraint<'db> {
     /// If `TypeGuard[T]`, this is `Some(T)`
     typeguard: Type<'db>,
-    /// If additional constraints are applied _after_ the TypeGuard, then they
+    /// If additional constraints are applied _after_ the `TypeGuard`, then they
     /// go here
     refinement: Option<Type<'db>>,
 }

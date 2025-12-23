@@ -590,7 +590,7 @@ impl Display for ClassDisplay<'_> {
     }
 }
 
-/// Helper for displaying TypeGuardLike types (TypeIs and TypeGuard).
+/// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
 fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
     db: &'db dyn Db,
     guard: T,
