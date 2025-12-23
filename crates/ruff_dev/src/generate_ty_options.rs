@@ -3,10 +3,10 @@
 use anyhow::bail;
 use itertools::Itertools;
 use pretty_assertions::StrComparison;
-use ruff_python_trivia::textwrap;
-use std::{fmt::Write, path::PathBuf};
-
 use ruff_options_metadata::{OptionField, OptionSet, OptionsMetadata, Visit};
+use ruff_python_trivia::textwrap;
+use std::borrow::Cow;
+use std::{fmt::Write, path::PathBuf};
 use ty_project::metadata::Options;
 
 use crate::{
@@ -201,6 +201,8 @@ fn format_snippet(
     parents: &[Set],
     configuration: ConfigurationFile,
 ) -> (String, String) {
+    let mut example = Cow::Borrowed(example);
+
     let header = configuration
         .parent_table()
         .into_iter()
@@ -208,11 +210,9 @@ fn format_snippet(
         .chain(scope)
         .join(".");
 
-    // Some examples show headers which would show up in `pyproject.toml`,
+    // Rewrite examples starting with `[tool.ty]` or `[[tool.ty]]` to their `ty.toml` equivalent.
     if matches!(configuration, ConfigurationFile::TyToml) {
-        if example.contains("tool.ty") {
-            return (String::new(), example.replace("tool.ty.", ""));
-        }
+        example = example.replace("[tool.ty.", "[").into();
     }
 
     // Ex) `[[tool.ty.xx]]`
