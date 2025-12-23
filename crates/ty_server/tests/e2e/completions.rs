@@ -60,15 +60,15 @@ walktr
 fn string_literal_completions_for_calls() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
+    let foo_content = r#"
 from typing import Literal
 
-A = Literal[\"a\", \"b\", \"c\"]
+A = Literal["a", "b", "c"]
 def func(a: A):
     ...
 
-func(\" \")
-";
+func(" ")
+"#;
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default())
@@ -80,7 +80,7 @@ func(\" \")
     server.open_text_document(foo, foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>();
 
-    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 6));
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(7, 6));
     insta::assert_json_snapshot!(completions, @r#"
     [
       {
@@ -115,11 +115,11 @@ func(\" \")
 fn string_literal_completions_for_typed_assignment() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
+    let foo_content = r#"
 from typing import Literal
 
-value: Literal[\"x\", \"y\"] = \" \"
-";
+value: Literal["x", "y"] = " "
+"#;
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default())
@@ -131,7 +131,7 @@ value: Literal[\"x\", \"y\"] = \" \"
     server.open_text_document(foo, foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>();
 
-    let completions = server.completion_request(&server.file_uri(foo), Position::new(2, 28));
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(3, 28));
     insta::assert_json_snapshot!(completions, @r#"
     [
       {
@@ -159,15 +159,15 @@ value: Literal[\"x\", \"y\"] = \" \"
 fn string_literal_completions_filter_non_strings() -> Result<()> {
     let workspace_root = SystemPath::new("src");
     let foo = SystemPath::new("src/foo.py");
-    let foo_content = "\
+    let foo_content = r#"
 from typing import Literal
 
-Mixed = Literal[\"left\", 1, \"right\"]
+Mixed = Literal["left", 1, "right"]
 def consume(value: Mixed):
     ...
 
-consume(\" \")
-";
+consume(" ")
+"#;
 
     let mut server = TestServerBuilder::new()?
         .with_initialization_options(ClientOptions::default())
@@ -179,7 +179,7 @@ consume(\" \")
     server.open_text_document(foo, foo_content, 1);
     let _ = server.await_notification::<PublishDiagnostics>();
 
-    let completions = server.completion_request(&server.file_uri(foo), Position::new(6, 9));
+    let completions = server.completion_request(&server.file_uri(foo), Position::new(7, 9));
     insta::assert_json_snapshot!(completions, @r#"
     [
       {
