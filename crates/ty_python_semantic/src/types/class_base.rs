@@ -408,6 +408,14 @@ impl<'db> ClassBase<'db> {
 
         ClassBaseDisplay { db, base: self }
     }
+
+    pub fn into_class_type(self) -> Option<ClassType<'db>> {
+        if let Self::Class(v) = self {
+            Some(v)
+        } else {
+            None
+        }
+    }
 }
 
 impl<'db> From<ClassType<'db>> for ClassBase<'db> {
