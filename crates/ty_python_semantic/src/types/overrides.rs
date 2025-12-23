@@ -638,7 +638,6 @@ fn check_tuple_subclass_member<'db>(
         return;
     };
 
-    // `__eq__`, `__ne__`
     if matches!(member.name.as_str(), "__eq__" | "__ne__") {
         report_unsafe_tuple_subclass(
             context,
@@ -651,23 +650,25 @@ fn check_tuple_subclass_member<'db>(
     let mut tuple: Option<&'db TupleSpec> = None;
 
     for class in class.iter_mro(db) {
-        if let Some(class) = class.into_class_type() {
-            if !class.is_known(db, KnownClass::Tuple) {
-                continue;
-            }
+        let Some(class) = class.into_class_type() else {
+            continue;
+        };
 
-            let Some(generic_alias) = class.into_generic_alias() else {
-                continue;
-            };
-
-            let specialization = generic_alias.specialization(db);
-
-            let Some(tuple_inner) = specialization.tuple_inner(db) else {
-                continue;
-            };
-
-            tuple = Some(tuple_inner.tuple(db));
+        if !class.is_known(db, KnownClass::Tuple) {
+            continue;
         }
+
+        let Some(generic_alias) = class.into_generic_alias() else {
+            continue;
+        };
+
+        let specialization = generic_alias.specialization(db);
+
+        let Some(tuple_inner) = specialization.tuple_inner(db) else {
+            continue;
+        };
+
+        tuple = Some(tuple_inner.tuple(db));
     }
 
     let Some(tuple) = tuple else {
@@ -677,20 +678,41 @@ fn check_tuple_subclass_member<'db>(
     if member.name.as_str() == "__bool__" {
         let return_type = subclass_function.last_definition_signature(db).return_ty;
 
-        let return_type = return_type.bool(db);
+        let return_type_truthiness = return_type.bool(db);
 
-        match (tuple.truthiness(), return_type) {
-            (Truthiness::AlwaysFalse, Truthiness::AlwaysFalse) => {}
-            (Truthiness::AlwaysTrue, Truthiness::AlwaysTrue) => {}
-            (Truthiness::Ambiguous, _) => {}
-            _ => {
-                report_unsafe_tuple_subclass(
+        match (tuple.truthiness(), return_type_truthiness) {
+            (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue | Truthiness::Ambiguous) => {
+                let Some(mut diagnostic) = report_unsafe_tuple_subclass(
                     context,
                     &member.name,
                     *first_reachable_definition,
                     subclass_function,
-                );
+                ) else {
+                    return;
+                };
+
+                diagnostic.info(format_args!(
+                    "Return type `{}` is inconsistent with the inherited tuple, which is expected to be always falsy",
+                    return_type.display(db)
+                ));
             }
+            (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                let Some(mut diagnostic) = report_unsafe_tuple_subclass(
+                    context,
+                    &member.name,
+                    *first_reachable_definition,
+                    subclass_function,
+                ) else {
+                    return;
+                };
+
+                diagnostic.info(format_args!(
+                    "Return type `{}` is inconsistent with the inherited tuple, which is expected to be always truthy",
+                    return_type.display(db)
+                ));
+            }
+
+            _ => {}
         }
     }
 }

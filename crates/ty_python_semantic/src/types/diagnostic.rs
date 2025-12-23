@@ -4916,12 +4916,12 @@ pub(super) fn report_invalid_method_override<'db>(
     }
 }
 
-pub(super) fn report_unsafe_tuple_subclass<'db>(
-    context: &InferContext<'db, '_>,
+pub(super) fn report_unsafe_tuple_subclass<'ctx, 'db>(
+    context: &'ctx InferContext<'db, '_>,
     member: &str,
     subclass_definition: Definition<'db>,
     subclass_function: FunctionType<'db>,
-) {
+) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
     let db = context.db();
 
     let subclass_definition_kind = subclass_definition.kind(db);
@@ -4939,7 +4939,7 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
     };
 
     let Some(builder) = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range) else {
-        return;
+        return None;
     };
 
     let mut diagnostic = builder.into_diagnostic(format_args!(
@@ -4949,6 +4949,8 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
     diagnostic.help(format!(
         "Overriding method `{member}` in a subclass of `tuple` can cause unexpected behavior"
     ));
+
+    Some(diagnostic)
 }
 
 pub(super) fn report_overridden_final_method<'db>(
