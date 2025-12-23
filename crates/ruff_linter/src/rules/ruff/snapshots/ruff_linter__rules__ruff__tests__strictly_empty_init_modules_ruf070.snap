@@ -119,4 +119,6 @@ RUF070 Code detected
 23 |
 24 | __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |
+26 | if os.environ["FOO"] != "1":  # RUF070
    |

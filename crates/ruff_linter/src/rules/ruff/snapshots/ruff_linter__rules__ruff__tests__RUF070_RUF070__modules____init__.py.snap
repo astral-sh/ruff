@@ -29,3 +29,13 @@ RUF070 Code detected
 20 |
 21 |   def __getattr__(name):  # ok
    |
+
+RUF070 Code detected
+  --> __init__.py:26:1
+   |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+25 |
+26 | / if os.environ["FOO"] != "1":  # RUF070
+27 | |     MY_CONSTANT = 4  # ok, don't flag nested statements
+   | |___________________^
+   |

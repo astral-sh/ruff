@@ -22,3 +22,6 @@ def __getattr__(name):  # ok
     return name
 
 __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+
+if os.environ["FOO"] != "1":  # RUF070
+    MY_CONSTANT = 4  # ok, don't flag nested statements

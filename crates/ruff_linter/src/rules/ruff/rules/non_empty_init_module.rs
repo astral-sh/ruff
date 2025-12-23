@@ -71,7 +71,7 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &ast::Stmt) {
     }
 
     // Only flag top-level statements
-    if !checker.semantic().current_scope().kind.is_module() {
+    if checker.semantic().current_statement_parent().is_some() {
         return;
     }
 
