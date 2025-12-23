@@ -2776,7 +2776,7 @@ declare_lint! {
     ///         return 1
     /// ```
     pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
-        summary: "detects dataclasses with invalid frozen inheritance",
+        summary: "detects unsafe overrides of certain dunder methods in tuple subclasses",
         status: LintStatus::stable("0.0.6"),
         default_level: Level::Warn,
     }

@@ -1,7 +1,7 @@
 # Unsafe Tuple Subclass
 
-We do various kinds of narrowing on tuples and tuple subclasses. For these narrowings
-to be sound, we assume that tuple subclasses don't override certain dunder methods.
+We do various kinds of narrowing on tuples and tuple subclasses. For these narrowings to be sound,
+we assume that tuple subclasses don't override certain dunder methods.
 
 ## `__eq__`
 
@@ -19,8 +19,7 @@ class B(tuple):
 
 class C(tuple):
     # error: [unsafe-tuple-subclass]
-  __eq__ = lambda self, other: False
-
+    __eq__ = lambda self, other: False
 ```
 
 ## `__len__`
@@ -39,8 +38,7 @@ class B(tuple):
 
 class C(tuple):
     # error: [unsafe-tuple-subclass]
-  __len__ = lambda self: 0
-
+    __len__ = lambda self: 0
 ```
 
 ## `__bool__`
@@ -59,6 +57,5 @@ class B(tuple):
 
 class C(tuple):
     # error: [unsafe-tuple-subclass]
-  __bool__ = lambda self: False
-
+    __bool__ = lambda self: False
 ```
