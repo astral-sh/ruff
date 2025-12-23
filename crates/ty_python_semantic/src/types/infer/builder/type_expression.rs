@@ -1521,7 +1521,6 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .top_materialization(self.db()),
                 ),
             },
-            // TODO: deduplicate
             SpecialFormType::TypeGuard => match arguments_slice {
                 ast::Expr::Tuple(_) => {
                     self.infer_type_expression(arguments_slice);

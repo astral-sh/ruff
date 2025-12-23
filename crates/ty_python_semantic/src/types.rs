@@ -880,6 +880,26 @@ pub enum Type<'db> {
     NewTypeInstance(NewType<'db>),
 }
 
+/// Helper for `recursive_type_normalized_impl` for TypeGuardLike types.
+fn recursive_type_normalize_type_guard_like<'db, T: TypeGuardLike<'db>>(
+    db: &'db dyn Db,
+    guard: T,
+    div: Type<'db>,
+    nested: bool,
+) -> Option<Type<'db>> {
+    let ty = if nested {
+        guard
+            .return_type(db)
+            .recursive_type_normalized_impl(db, div, true)?
+    } else {
+        guard
+            .return_type(db)
+            .recursive_type_normalized_impl(db, div, true)
+            .unwrap_or(div)
+    };
+    Some(guard.with_type(db, ty))
+}
+
 #[salsa::tracked]
 impl<'db> Type<'db> {
     pub(crate) const fn any() -> Self {
@@ -1746,31 +1766,10 @@ impl<'db> Type<'db> {
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(Type::KnownInstance),
             Type::TypeIs(type_is) => {
-                let ty = if nested {
-                    type_is
-                        .return_type(db)
-                        .recursive_type_normalized_impl(db, div, true)?
-                } else {
-                    type_is
-                        .return_type(db)
-                        .recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                };
-                Some(type_is.with_type(db, ty))
+                recursive_type_normalize_type_guard_like(db, type_is, div, nested)
             }
-            // TODO: deduplicate
             Type::TypeGuard(type_guard) => {
-                let ty = if nested {
-                    type_guard
-                        .return_type(db)
-                        .recursive_type_normalized_impl(db, div, true)?
-                } else {
-                    type_guard
-                        .return_type(db)
-                        .recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                };
-                Some(type_guard.with_type(db, ty))
+                recursive_type_normalize_type_guard_like(db, type_guard, div, nested)
             }
             Type::Dynamic(dynamic) => Some(Type::Dynamic(dynamic.recursive_type_normalized())),
             Type::TypedDict(_) => {
@@ -14891,6 +14890,76 @@ impl<'db> VarianceInferable<'db> for TypeGuardType<'db> {
     // section of mdtest/generics/pep695/variance.md for details.
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         self.return_type(db).variance_of(db, typevar)
+    }
+}
+
+/// Common trait for TypeIs and TypeGuard types that share similar structure
+/// but have different semantic behaviors.
+pub(crate) trait TypeGuardLike<'db>: Copy {
+    /// The name of this type guard form (for error messages and display)
+    const FORM_NAME: &'static str;
+
+    /// Get the return type that the type guard narrows to
+    fn return_type(self, db: &'db dyn Db) -> Type<'db>;
+
+    /// Get the place info (scope and place ID) if bound
+    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)>;
+
+    /// Get the human-readable place name if bound
+    fn place_name(self, db: &'db dyn Db) -> Option<String>;
+
+    /// Create a new instance with a different return type, wrapped in Type
+    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db>;
+
+    /// The SpecialFormType for display purposes
+    fn special_form() -> SpecialFormType;
+}
+
+impl<'db> TypeGuardLike<'db> for TypeIsType<'db> {
+    const FORM_NAME: &'static str = "TypeIs";
+
+    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+        TypeIsType::return_type(self, db)
+    }
+
+    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
+        TypeIsType::place_info(self, db)
+    }
+
+    fn place_name(self, db: &'db dyn Db) -> Option<String> {
+        TypeIsType::place_name(self, db)
+    }
+
+    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        TypeIsType::with_type(self, db, ty)
+    }
+
+    fn special_form() -> SpecialFormType {
+        SpecialFormType::TypeIs
+    }
+}
+
+impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
+    const FORM_NAME: &'static str = "TypeGuard";
+
+    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
+        TypeGuardType::return_type(self, db)
+    }
+
+    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
+        TypeGuardType::place_info(self, db)
+    }
+
+    fn place_name(self, db: &'db dyn Db) -> Option<String> {
+        TypeGuardType::place_name(self, db)
+    }
+
+    fn with_type(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
+        TypeGuardType::with_type(self, db, ty)
+    }
+
+    fn special_form() -> SpecialFormType {
+        SpecialFormType::TypeGuard
     }
 }
 

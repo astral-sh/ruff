@@ -2,14 +2,10 @@ use std::cmp::Ordering;
 
 use salsa::plumbing::AsId;
 
-use crate::{
-    db::Db,
-    semantic_index::{place::ScopedPlaceId, scope::ScopeId},
-    types::bound_super::SuperOwnerKind,
-};
+use crate::{db::Db, types::bound_super::SuperOwnerKind};
 
 use super::{
-    DynamicType, TodoType, Type, TypeGuardType, TypeIsType, class_base::ClassBase,
+    DynamicType, TodoType, Type, TypeGuardLike, TypeGuardType, TypeIsType, class_base::ClassBase,
     subclass_of::SubclassOfInner,
 };
 
@@ -295,52 +291,13 @@ fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering 
     }
 }
 
-/// Trait for type guard-like types that can be ordered canonically.
-trait GuardLikeOrdering<'db>: Copy {
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)>;
-    fn place_name(self, db: &'db dyn Db) -> Option<String>;
-    fn return_type(self, db: &'db dyn Db) -> Type<'db>;
-}
-
-impl<'db> GuardLikeOrdering<'db> for TypeIsType<'db> {
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
-        TypeIsType::place_info(self, db)
-    }
-
-    fn place_name(self, db: &'db dyn Db) -> Option<String> {
-        TypeIsType::place_name(self, db)
-    }
-
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
-        TypeIsType::return_type(self, db)
-    }
-}
-
-impl<'db> GuardLikeOrdering<'db> for TypeGuardType<'db> {
-    fn place_info(self, db: &'db dyn Db) -> Option<(ScopeId<'db>, ScopedPlaceId)> {
-        TypeGuardType::place_info(self, db)
-    }
-
-    fn place_name(self, db: &'db dyn Db) -> Option<String> {
-        TypeGuardType::place_name(self, db)
-    }
-
-    fn return_type(self, db: &'db dyn Db) -> Type<'db> {
-        TypeGuardType::return_type(self, db)
-    }
-}
-
 /// Generic helper for ordering type guard-like types.
 ///
 /// The following criteria are considered, in order:
 /// * Boundness: Unbound precedes bound
 /// * Symbol name: String comparison
 /// * Guarded type: [`union_or_intersection_elements_ordering`]
-fn guard_like_ordering<'db, T: GuardLikeOrdering<'db>>(
-    db: &'db dyn Db,
-    left: T,
-    right: T,
-) -> Ordering {
+fn guard_like_ordering<'db, T: TypeGuardLike<'db>>(db: &'db dyn Db, left: T, right: T) -> Ordering {
     let (left_ty, right_ty) = (left.return_type(db), right.return_type(db));
 
     match (left.place_info(db), right.place_info(db)) {
