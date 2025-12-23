@@ -2508,7 +2508,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let is_kw_only =
-                    name == "__replace__" || name == "_replace" || kw_only.unwrap_or(false);
+                    matches!(name, "__replace__" | "_replace") || kw_only.unwrap_or(false);
 
                 // Use the alias name if provided, otherwise use the field name
                 let parameter_name =
@@ -2521,7 +2521,7 @@ impl<'db> ClassLiteral<'db> {
                 }
                 .with_annotated_type(field_ty);
 
-                if name == "__replace__" || name == "_replace" {
+                if matches!(name, "__replace__" | "_replace") {
                     // When replacing, we know there is a default value for the field
                     // (the value that is currently assigned to the field)
                     // assume this to be the declared type of the field
