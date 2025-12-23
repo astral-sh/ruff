@@ -924,12 +924,11 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             {
                 let field_name = Name::from(key_literal.value(self.db));
                 let rhs_type = inference.expression_type(&comparators[0]);
-                // To avoid excluding non-`TypedDict` types, our constraints are always
-                // expressed as a negative intersection (i.e. "you're *not* this kind of
-                // `TypedDict`"). If `constrain_with_equality` is true, the whole constraint
-                // is going to be a double negative, i.e. "you're *not* a `TypedDict`
-                // *without* this literal
-                // field". As the first step of building that, we negate the right hand side.
+                // To avoid excluding non-`TypedDict` types, our constraints are always expressed
+                // as a negative intersection (i.e. "you're *not* this kind of `TypedDict`"). If
+                // `constrain_with_equality` is true, the whole constraint is going to be a double
+                // negative, i.e. "you're *not* a `TypedDict` *without* this literal field". As the
+                // first step of building that, we negate the right hand side.
                 let field_type = rhs_type.negate_if(self.db, constrain_with_equality);
                 // Create the synthesized `TypedDict` with that (possibly negated) field. We don't
                 // want to constrain the mutability or required-ness of the field, so the most
@@ -1314,6 +1313,7 @@ fn is_supported_typeddict_tag_literal(ty: Type) -> bool {
     )
 }
 
+// See the comment above the call to this function.
 fn all_matching_typeddict_fields_have_literal_types<'db>(
     db: &'db dyn Db,
     ty: Type<'db>,
