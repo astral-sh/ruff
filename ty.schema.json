@@ -836,9 +836,19 @@
             }
           ]
         },
+        "invalid-type-variable-bound": {
+          "title": "detects invalid type variable bounds",
+          "description": "## What it does\nChecks for [type variables] whose bounds reference type variables.\n\n## Why is this bad?\nThe bound of a type variable must be a concrete type.\n\n## Examples\n```python\nT = TypeVar('T', bound=list['T'])  # error: [invalid-type-variable-bound]\nU = TypeVar('U')\nT = TypeVar('T', bound=U)  # error: [invalid-type-variable-bound]\n\ndef f[T: list[T]](): ...  # error: [invalid-type-variable-bound]\ndef g[U, T: U](): ...  # error: [invalid-type-variable-bound]\n```\n\n[type variable]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-type-variable-constraints": {
           "title": "detects invalid type variable constraints",
-          "description": "## What it does\nChecks for constrained [type variables] with only one constraint.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
+          "description": "## What it does\nChecks for constrained [type variables] with only one constraint,\nor that those constraints reference type variables.\n\n## Why is this bad?\nA constrained type variable must have at least two constraints,\nand the constraints must be concrete types.\n\n## Examples\n```python\nfrom typing import TypeVar\n\nT = TypeVar('T', str)  # invalid constrained TypeVar\n\nI = TypeVar('I', bound=int)\nU = TypeVar('U', list[I], int)  # invalid constrained TypeVar\n```\n\nUse instead:\n```python\nT = TypeVar('T', str, int)  # valid constrained TypeVar\n# or\nT = TypeVar('T', bound=str)  # valid bound TypeVar\n\nU = TypeVar('U', list[int], int)  # valid constrained Type\n```\n\n[type variables]: https://docs.python.org/3/library/typing.html#typing.TypeVar",
           "default": "error",
           "oneOf": [
             {
