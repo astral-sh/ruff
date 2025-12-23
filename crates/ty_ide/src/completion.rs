@@ -1316,7 +1316,7 @@ fn collect_string_literals_from_type<'db>(
     }
 }
 
-fn escape_for_quote<'a>(value: &'a str, quote: char) -> Cow<'a, str> {
+fn escape_for_quote(value: &str, quote: char) -> Cow<'_, str> {
     if !value.bytes().any(|b| b == b'\\' || b == quote as u8) {
         return Cow::Borrowed(value);
     }
