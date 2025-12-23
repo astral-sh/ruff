@@ -56,15 +56,17 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type preserves gradual parameters, so calling with any arguments is valid:
+The narrowed type `Top[Callable[..., object]]` represents the "infinite union" of all possible
+callable types. While such objects *are* callable (they pass `callable()`), any attempt to actually
+call them should fail because we don't know the actual signature - we can't know if any specific set
+of arguments is valid.
 
 ```py
 import typing as t
 
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
-        # Previously, `y` was incorrectly narrowed to `() -> object`, which caused
-        # false-positive "too many positional arguments" errors here.
+        # error: [call-non-callable] "Object of type `Top[(...) -> object]` is not callable"
         return y(a, b)
     return None
 ```

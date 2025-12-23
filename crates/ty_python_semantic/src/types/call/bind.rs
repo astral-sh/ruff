@@ -44,10 +44,10 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1621,6 +1621,21 @@ impl<'db> CallableBinding<'db> {
             signature = %self.signature_type.display(db),
         )
         .entered();
+
+        // If the callable is a top materialization (e.g., `Top[Callable[..., object]]`), any call
+        // should fail because we don't know the actual signature. The type IS callable (it passes
+        // `callable()`), but it represents an infinite union of all possible callable types, so
+        // there's no valid set of arguments.
+        if let Type::Callable(callable) = self.signature_type {
+            if callable.materialization_kind(db) == Some(MaterializationKind::Top) {
+                for overload in &mut self.overloads {
+                    overload
+                        .errors
+                        .push(BindingError::UnknownCallableSignature(self.signature_type));
+                }
+                return None;
+            }
+        }
 
         tracing::trace!(
             target: "ty_python_semantic::types::call::bind",
@@ -4124,6 +4139,10 @@ pub(crate) enum BindingError<'db> {
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
     UnmatchedOverload,
+    /// The callable type is a top materialization (e.g., `Top[Callable[..., object]]`), which
+    /// represents an unknown callable signature. While such types *are* callable (they pass
+    /// `callable()`), any specific call should fail because we don't know the actual signature.
+    UnknownCallableSignature(Type<'db>),
 }
 
 impl<'db> BindingError<'db> {
@@ -4551,6 +4570,23 @@ impl<'db> BindingError<'db> {
             }
 
             Self::UnmatchedOverload => {}
+
+            Self::UnknownCallableSignature(callable_ty) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                    let callable_ty_display = callable_ty.display(context.db());
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Object of type `{callable_ty_display}` is not callable"
+                    ));
+                    diag.info(
+                        "An object with an unknown callable signature is not callable, \
+                        because there is no valid set of arguments for it",
+                    );
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
         }
     }
 
