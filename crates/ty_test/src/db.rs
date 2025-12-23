@@ -344,4 +344,8 @@ impl WritableSystem for MdtestSystem {
         self.as_system()
             .create_directory_all(&self.normalize_path(path))
     }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
+    }
 }

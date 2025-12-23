@@ -1,7 +1,6 @@
 use std::ops::Deref;
 use std::sync::Arc;
 
-use ruff_diagnostics::SourceMap;
 use ruff_notebook::Notebook;
 use ruff_python_ast::PySourceType;
 use ruff_source_file::LineIndex;
@@ -90,34 +89,6 @@ impl SourceText {
     /// Returns `true` if there was an error when reading the content of the file.
     pub fn read_error(&self) -> Option<&SourceTextError> {
         self.inner.read_error.as_ref()
-    }
-
-    pub fn updated(&mut self, new_source: String, source_map: &SourceMap) {
-        let inner = Arc::make_mut(&mut self.inner);
-
-        match &mut inner.kind {
-            SourceTextKind::Text(text) => *text = new_source,
-            SourceTextKind::Notebook { notebook } => {
-                notebook.update(source_map, new_source);
-            }
-        };
-    }
-
-    pub fn to_raw_content(&self) -> std::borrow::Cow<'_, str> {
-        match &self.inner.kind {
-            SourceTextKind::Text(text) => text.as_str().into(),
-            SourceTextKind::Notebook { notebook } => {
-                let mut output = Vec::new();
-                notebook
-                    .write(&mut output)
-                    .expect("Writing to a `Vec` should not fail");
-                String::from_utf8(output)
-                    .expect(
-                        "Notebook should serialize to valid UTF-8 if the source was valid UTF-8",
-                    )
-                    .into()
-            }
-        }
     }
 }
 

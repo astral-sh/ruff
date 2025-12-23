@@ -368,6 +368,10 @@ impl WritableSystem for OsSystem {
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
         std::fs::create_dir_all(path.as_std_path())
     }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem> {
+        Box::new(self.clone())
+    }
 }
 
 impl Default for OsSystem {
