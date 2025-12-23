@@ -2134,6 +2134,10 @@ def disappointment(u: Foo | Bar):
     if "foo" in u:
         # We can't narrow the union here...
         reveal_type(u)  # revealed: Foo | Bar
+    else:
+        # ...(even though we *can* narrow it here)...
+        # TODO: This should narrow to `Bar`, because "foo" is required in `Foo`.
+        reveal_type(u)  # revealed: Foo | Bar
 
 # ...because `u` could turn out to be one of these.
 class FooBar(TypedDict):
