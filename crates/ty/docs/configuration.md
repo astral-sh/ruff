@@ -28,6 +28,34 @@ division-by-zero = "ignore"
 
 ---
 
+## `analysis`
+
+### `respect-type-ignore-comments`
+
+Whether ty should respect `type: ignore` comments.
+
+When set to `false`, `type: ignore` comments are treated like any other normal
+comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+
+Setting this option can be useful when using ty alongside other type checkers or when
+you prefer using `ty: ignore` over `type: ignore`.
+
+Defaults to `true`.
+
+**Default value**: `true`
+
+**Type**: `bool`
+
+**Example usage**:
+
+```toml title="pyproject.toml"
+[tool.ty.analysis]
+# Disable support for `type: ignore` comments
+respect-type-ignore-comments = false
+```
+
+---
+
 ## `environment`
 
 ### `extra-paths`

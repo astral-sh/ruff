@@ -3,6 +3,16 @@
   "title": "Options",
   "type": "object",
   "properties": {
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalysisOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -59,6 +69,19 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnalysisOptions": {
+      "type": "object",
+      "properties": {
+        "respect-type-ignore-comments": {
+          "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Array_of_string": {
       "type": "array",
       "items": {

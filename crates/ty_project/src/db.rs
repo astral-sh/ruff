@@ -16,7 +16,7 @@ use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
 use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program};
 
 mod changes;
 
@@ -470,6 +470,10 @@ impl SemanticDb for ProjectDatabase {
         ty_python_semantic::default_lint_registry()
     }
 
+    fn analysis_settings(&self) -> &AnalysisSettings {
+        self.project().settings(self).analysis()
+    }
+
     fn verbose(&self) -> bool {
         self.project().verbose(self)
     }
@@ -533,7 +537,9 @@ pub(crate) mod tests {
     use ruff_db::vendored::VendoredFileSystem;
     use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_python_semantic::{
+        AnalysisSettings, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    };
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -653,6 +659,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
+        }
+
+        fn analysis_settings(&self) -> &AnalysisSettings {
+            self.project().settings(self).analysis()
         }
 
         fn verbose(&self) -> bool {
