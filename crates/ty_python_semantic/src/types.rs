@@ -12658,24 +12658,30 @@ impl<'db> CallableType<'db> {
             (None, None) => {}
 
             // self <: Top[...] is true if the signatures are compatible (Top is supertype of all).
+            // Use Assignability for the comparison because:
+            // 1. Top is the fully static supertype that accepts any compatible callable
+            // 2. Gradual parameters (...) should be compatible with Top[(...)...]
+            // 3. Dynamic return types like Unknown should be compatible with any return type
             (_, Some(MaterializationKind::Top)) => {
                 return self.signatures(db).has_relation_to_impl(
                     db,
                     other.signatures(db),
                     inferable,
-                    relation,
+                    TypeRelation::Assignability,
                     relation_visitor,
                     disjointness_visitor,
                 );
             }
 
             // Bottom[...] <: other is true if the signatures are compatible (Bottom is subtype of all).
+            // Use Assignability for the same reasons as Top (symmetrically, Bottom is the minimal
+            // static subtype).
             (Some(MaterializationKind::Bottom), _) => {
                 return self.signatures(db).has_relation_to_impl(
                     db,
                     other.signatures(db),
                     inferable,
-                    relation,
+                    TypeRelation::Assignability,
                     relation_visitor,
                     disjointness_visitor,
                 );

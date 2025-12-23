@@ -6,18 +6,21 @@ The `callable()` builtin returns `TypeIs[Callable[..., object]]`, which narrows 
 intersection with `Top[Callable[..., object]]`. The `Top[...]` wrapper indicates this is a fully
 static type representing the top materialization of a gradual callable.
 
+Since all callable types are subtypes of `Top[Callable[..., object]]`, intersections with `Top[...]`
+simplify to just the original callable type.
+
 ```py
 from typing import Any, Callable
 
 def f(x: Callable[..., Any] | None):
     if callable(x):
-        # The intersection of `Callable[..., Any]` with `Top[Callable[..., object]]` preserves
-        # the gradual parameters (`...`). Previously this was incorrectly narrowed to
-        # `((...) -> Any) & (() -> object)` because the top materialization of gradual
-        # parameters was incorrectly `[]` instead of `...`.
-        reveal_type(x)  # revealed: ((...) -> Any) & (Top[(...) -> object])
+        # The intersection simplifies because `(...) -> Any` is a subtype of
+        # `Top[(...) -> object]` - all callables are subtypes of the top materialization.
+        reveal_type(x)  # revealed: (...) -> Any
     else:
-        reveal_type(x)  # revealed: (((...) -> Any) & ~(Top[(...) -> object])) | None
+        # Since `(...) -> Any` is a subtype of `Top[(...) -> object]`, the intersection
+        # with the negation is empty (Never), leaving just None.
+        reveal_type(x)  # revealed: None
 ```
 
 ## Narrowing with other callable types
@@ -27,15 +30,16 @@ from typing import Any, Callable
 
 def g(x: Callable[[int], str] | None):
     if callable(x):
-        reveal_type(x)  # revealed: ((int, /) -> str) & (Top[(...) -> object])
+        # All callables are subtypes of `Top[(...) -> object]`, so the intersection simplifies.
+        reveal_type(x)  # revealed: (int, /) -> str
     else:
-        reveal_type(x)  # revealed: (((int, /) -> str) & ~(Top[(...) -> object])) | None
+        reveal_type(x)  # revealed: None
 
 def h(x: Callable[..., int] | None):
     if callable(x):
-        reveal_type(x)  # revealed: ((...) -> int) & (Top[(...) -> object])
+        reveal_type(x)  # revealed: (...) -> int
     else:
-        reveal_type(x)  # revealed: (((...) -> int) & ~(Top[(...) -> object])) | None
+        reveal_type(x)  # revealed: None
 ```
 
 ## Narrowing from object
