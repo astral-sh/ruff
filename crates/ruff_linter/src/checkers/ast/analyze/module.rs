@@ -10,7 +10,7 @@ pub(crate) fn module(suite: &Suite, checker: &Checker) {
         flake8_bugbear::rules::f_string_docstring(checker, suite);
     }
     if checker.is_rule_enabled(Rule::UnsortedStatements) {
-        ssort::rules::organize_statements();
+        ssort::rules::organize_statements(checker, suite);
     }
     if checker.is_rule_enabled(Rule::InvalidFormatterSuppressionComment) {
         ruff::rules::ignored_formatter_suppression_comment(checker, suite);
