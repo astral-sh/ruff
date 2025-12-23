@@ -20,7 +20,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
  6 |         return False
  7 | 
  8 | class B(tuple[()]):
- 9 |     # ok - tuple is always false, returns always false
+ 9 |     # ok
 10 |     def __bool__(self) -> Literal[False]:
 11 |         return False
 12 | 
@@ -45,7 +45,7 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 31 |         return False
 32 | 
 33 | class G(tuple[int, int]):
-34 |     # ok - tuple is always true, returns always true
+34 |     # ok
 35 |     def __bool__(self) -> Literal[True]:
 36 |         return True
 37 | 
@@ -55,22 +55,22 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/unsafe_tuple_subclass.md
 41 |         return False
 42 | 
 43 | class I(tuple[int, ...]):
-44 |     # ok - ambiguous tuple, any return is safe
+44 |     # ok
 45 |     def __bool__(self):
 46 |         return False
 47 | 
 48 | class J(tuple[int, ...]):
-49 |     # ok - ambiguous tuple, any return is safe
+49 |     # ok
 50 |     def __bool__(self) -> Literal[False]:
 51 |         return False
 52 | 
 53 | class K(tuple[int, ...]):
-54 |     # ok - ambiguous tuple, any return is safe
+54 |     # ok
 55 |     def __bool__(self) -> Literal[True]:
 56 |         return True
 57 | 
 58 | class L(tuple[int, ...]):
-59 |     # ok - ambiguous tuple, any return is safe
+59 |     # ok
 60 |     def __bool__(self) -> bool:
 61 |         return True
 ```
