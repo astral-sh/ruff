@@ -7819,6 +7819,109 @@ TypedDi<CURSOR>
         );
     }
 
+    #[test]
+    fn string_literal_completions_for_calls() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    A = Literal["a", "b", "c"]
+    def func(a: A):
+        ...
+
+    func("<CURSOR>")
+    "#,
+        )
+        .type_signatures()
+        .skip_builtins()
+        .skip_auto_import()
+        .skip_keywords()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    a :: Literal["a"]
+    b :: Literal["b"]
+    c :: Literal["c"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_for_typed_assignment() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    value: Literal["x", "y"] = "<CURSOR>"
+    "#,
+        )
+        .type_signatures()
+        .skip_builtins()
+        .skip_auto_import()
+        .skip_keywords()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    x :: Literal["x"]
+    y :: Literal["y"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_filter_non_strings() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import Literal
+
+    Mixed = Literal["left", 1, "right"]
+    def consume(value: Mixed):
+        ...
+
+    consume("<CURSOR>")
+    "#,
+        )
+        .type_signatures()
+        .skip_auto_import()
+        .skip_keywords()
+        .skip_builtins()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    left :: Literal["left"]
+    right :: Literal["right"]
+    "#);
+    }
+
+    #[test]
+    fn string_literal_completions_for_typeddict_subscript_keys() {
+        let snapshot = completion_test_builder(
+            r#"
+    from typing import TypedDict
+
+    class TD(TypedDict):
+        left: int
+        right: str
+
+    td: TD = {"left": 1, "right": "x"}
+
+    td["<CURSOR>"]
+    "#,
+        )
+        .type_signatures()
+        .skip_auto_import()
+        .skip_keywords()
+        .skip_builtins()
+        .build()
+        .snapshot();
+
+        insta::assert_snapshot!(snapshot, @r#"
+    left :: Literal["left"]
+    right :: Literal["right"]
+    "#);
+    }
+
     /// A way to create a simple single-file (named `main.py`) completion test
     /// builder.
     ///
