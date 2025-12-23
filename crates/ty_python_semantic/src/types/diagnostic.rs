@@ -4942,15 +4942,12 @@ pub(super) fn report_unsafe_tuple_subclass<'db>(
         return;
     };
 
-    let mut diagnostic =
-        builder.into_diagnostic(format_args!("Unsafe override of method `{member}`"));
-
-    diagnostic.set_primary_message(format_args!(
-        "Unsafely overriding method `{member}` in a subclass of `tuple`"
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Unsafe override of method `{member}` in a subclass of `tuple`"
     ));
 
     diagnostic.help(format!(
-        "Overriding `{member}` can cause unexpected behavior"
+        "Overriding method `{member}` in a subclass of `tuple` can cause unexpected behavior"
     ));
 }
 
