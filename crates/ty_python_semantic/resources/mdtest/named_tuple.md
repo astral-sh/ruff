@@ -269,7 +269,7 @@ reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
 reveal_type(Person._fields)  # revealed: tuple[str, ...]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Person._replace)  # revealed: (self: Person, *, name: str = ..., age: int | None = ...) -> Person
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -277,6 +277,10 @@ person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
 reveal_type(person._replace(name="Bob"))  # revealed: Person
+
+# Invalid keyword arguments are detected:
+# error: [unknown-argument] "Argument `invalid` does not match any known parameter"
+person._replace(invalid=42)
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -355,8 +359,10 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
-Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
-annotated with `NamedTuple`:
+Because `_replace` is synthesized with specific keyword-only parameters (to enable error detection
+for invalid keyword arguments), NamedTuple instances are not strictly assignable to
+`NamedTupleLike`. This is a trade-off: we gain compile-time detection of invalid `_replace`
+arguments at the cost of strict protocol compatibility.
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -368,11 +374,17 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Point._replace)  # revealed: (self: Point, *, x: int = ..., y: int = ...) -> Point
 
+# Point is not assignable to NamedTuple because the synthesized `_replace` signature
+# `(*, x: int = ..., y: int = ...)` is not a subtype of `(**kwargs: Any)`. This is a
+# deliberate trade-off: detecting invalid `_replace` arguments at the cost of protocol
+# compatibility. Mypy makes the same trade-off.
+# error: [static-assert-error]
 static_assert(is_assignable_to(Point, NamedTuple))
 
-expects_named_tuple(Point(x=42, y=56))  # fine
+# error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `Point`"
+expects_named_tuple(Point(x=42, y=56))
 
 # error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `tuple[Literal[1], Literal[2]]`"
 expects_named_tuple((1, 2))
