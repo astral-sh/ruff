@@ -942,9 +942,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let synthesized_typeddict =
                     TypedDictType::Synthesized(SynthesizedTypedDictType::new(self.db, schema));
                 // As mentioned above, the synthesized `TypedDict` is always negated.
-                let intersection = IntersectionBuilder::new(self.db)
-                    .add_negative(Type::TypedDict(synthesized_typeddict))
-                    .build();
+                let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
                 let place = self.expect_place(&subscript_place_expr);
                 constraints.insert(place, intersection);
             }
