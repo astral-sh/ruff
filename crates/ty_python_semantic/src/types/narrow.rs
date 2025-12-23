@@ -1296,12 +1296,7 @@ fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) ->
                 .any(|union_member_ty| match union_member_ty {
                     Type::TypedDict(_) => true,
                     Type::Intersection(intersection) => {
-                        intersection
-                            .positive(db)
-                            .iter()
-                            .any(|intersection_member_ty| {
-                                matches!(intersection_member_ty, Type::TypedDict(_))
-                            })
+                        intersection.positive(db).iter().any(Type::is_typed_dict)
                     }
                     _ => false,
                 })
