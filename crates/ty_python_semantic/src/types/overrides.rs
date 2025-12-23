@@ -614,11 +614,14 @@ pub(super) fn check_tuple_subclass<'db>(
     let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
 
     for member in own_class_members {
-        check_tuple_member(context, &member);
+        check_tuple_subclass_member(context, &member);
     }
 }
 
-fn check_tuple_member<'db>(context: &InferContext<'db, '_>, member: &MemberWithDefinition<'db>) {
+fn check_tuple_subclass_member<'db>(
+    context: &InferContext<'db, '_>,
+    member: &MemberWithDefinition<'db>,
+) {
     let MemberWithDefinition {
         member,
         first_reachable_definition,
