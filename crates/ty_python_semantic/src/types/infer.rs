@@ -713,6 +713,9 @@ struct DefinitionInferenceExtra<'db> {
     /// String annotations found in this region
     string_annotations: FxHashSet<ExpressionNodeKey>,
 
+    /// Functions called while inferring this definition.
+    called_functions: Box<[FunctionType<'db>]>,
+
     /// The fallback type for missing expressions/bindings/declarations or recursive type inference.
     cycle_recovery: Option<Type<'db>>,
 
