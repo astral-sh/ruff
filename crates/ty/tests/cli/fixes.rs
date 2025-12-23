@@ -11,7 +11,7 @@ fn add_ignore() -> anyhow::Result<()> {
 
             x = 1 + a
 
-            if sys.versin > 3.12:
+            if sys.does_not_exist:
                 ...
 
             def test(a, b): ...
@@ -56,7 +56,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
 
             reveal_type(x)
 
-            if sys.versin > 3.12:
+            if sys.does_not_exist:
                 ...
             "#,
         ),
@@ -85,7 +85,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     6 | reveal_type(x)  # ty:ignore[undefined-reveal]
       |             ^ `Unknown`
     7 |
-    8 | if sys.versin > 3.12:  # ty:ignore[unresolved-attribute]
+    8 | if sys.does_not_exist:  # ty:ignore[unresolved-attribute]
       |
 
     error[unresolved-reference]: Name `x` used when not defined

@@ -5,8 +5,8 @@ use ruff_diagnostics::Edit;
 use ruff_python_ast::find_node::covering_node;
 use ruff_text_size::TextRange;
 use ty_project::Db;
-use ty_python_semantic::suppress_single;
 use ty_python_semantic::lint::LintId;
+use ty_python_semantic::suppress_single;
 use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
 /// A `QuickFix` Code Action
