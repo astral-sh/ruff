@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 
 use ruff_db::cancellation::{CancellationToken, Cancelled};
 use ruff_db::parsed::parsed_module;
+use ruff_db::system::{SystemPath, WritableSystem};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span},
     files::File,
@@ -9,6 +10,8 @@ use ruff_db::{
 };
 use ruff_diagnostics::{Fix, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use salsa::Setter as _;
+use thiserror::Error;
 use ty_python_semantic::{UNUSED_IGNORE_COMMENT, suppress_all};
 
 use crate::Db;
@@ -25,51 +28,49 @@ pub struct SuppressAllResult {
 ///
 /// Returns how many diagnostics were suppressed
 pub fn suppress_all_diagnostics(
-    db: &dyn Db,
+    db: &mut dyn Db,
     mut diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
 ) -> Result<SuppressAllResult, Cancelled> {
-    let system = db
-        .system()
-        .as_writable()
-        .expect("System should be writable");
+    let system = WritableSystem::dyn_clone(
+        db.system()
+            .as_writable()
+            .expect("System should be writable"),
+    );
 
-    let mut by_file: BTreeMap<File, (Vec<_>, bool)> = BTreeMap::new();
+    let has_fixable = diagnostics.iter().any(|diagnostic| {
+        diagnostic
+            .primary_span()
+            .and_then(|span| span.range())
+            .is_some()
+            && diagnostic.id().is_lint()
+    });
 
-    // Group the diagnostics by file
-    for diagnostic in &diagnostics {
-        if cancellation_token.is_cancelled() {
-            return Err(Cancelled);
-        }
+    if !has_fixable {
+        return Ok(SuppressAllResult {
+            diagnostics,
+            count: 0,
+        });
+    }
 
-        let DiagnosticId::Lint(lint_id) = diagnostic.id() else {
-            continue;
-        };
+    let mut by_file: BTreeMap<File, Vec<_>> = BTreeMap::new();
 
-        // Don't suppress unused ignore comments.
-        if lint_id == UNUSED_IGNORE_COMMENT.name() {
-            continue;
-        }
-
-        // We can't suppress diagnostics without a corresponding file or range.
-        let Some(span) = diagnostic.primary_span() else {
-            continue;
-        };
-
-        let Some(range) = span.range() else {
-            continue;
-        };
+    // Group the diagnostics by file, leave the file-agnostic diagnostics in `diagnostics`.
+    for diagnostic in diagnostics.extract_if(.., |diagnostic| diagnostic.primary_span().is_some()) {
+        let span = diagnostic
+            .primary_span()
+            .expect("should be set because `extract_if` only yields elements with a primary_span");
 
         by_file
             .entry(span.expect_ty_file())
             .or_default()
-            .0
-            .push((lint_id, range));
+            .push(diagnostic);
     }
 
-    let mut count = 0usize;
+    let mut fixed_count = 0usize;
+    let project = db.project();
 
-    for (&file, (to_suppress, fixed)) in &mut by_file {
+    for (&file, file_diagnostics) in &mut by_file {
         if cancellation_token.is_cancelled() {
             return Err(Cancelled);
         }
@@ -79,84 +80,178 @@ pub fn suppress_all_diagnostics(
                 "Skipping file `{}` with non-system path because vendored and system virtual file paths are read-only",
                 file.path(db)
             );
+
             continue;
         };
 
         let parsed = parsed_module(db, file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::debug!(
-                "Skipping file `{}` because it contains syntax errors",
-                file.path(db)
-            );
+            tracing::debug!("Skipping file `{path}` with syntax errors",);
             continue;
         }
 
-        let mut source = source_text(db, file);
+        let fixable_diagnostics: Vec<_> = file_diagnostics
+            .iter()
+            .filter_map(|diagnostic| {
+                let DiagnosticId::Lint(lint_id) = diagnostic.id() else {
+                    return None;
+                };
 
-        let count_current_file = to_suppress.len();
+                // Don't suppress unused ignore comments.
+                if lint_id == UNUSED_IGNORE_COMMENT.name() {
+                    return None;
+                }
 
-        let fixes = suppress_all(db, file, to_suppress);
-        let (new_source, source_map) = apply_fixes(db, file, fixes);
+                // We can't suppress diagnostics without a corresponding file or range.
+                let span = diagnostic.primary_span()?;
+                let range = span.range()?;
 
-        source.updated(new_source, &source_map);
+                Some((lint_id, range))
+            })
+            .collect();
 
-        let Ok(metadata) = system.path_metadata(path) else {
-            // TODO, handle error
+        if fixable_diagnostics.is_empty() {
             continue;
+        }
+
+        // Required to work around borrow checker issues.
+        let path = path.to_path_buf();
+
+        let fixes = suppress_all(db, file, &fixable_diagnostics);
+
+        // TODO: suppressions should never generate overlapping fixes but we need to handle the
+        // error case when we add support for generic fixes.
+        let FixedCode {
+            source: new_source,
+            source_map,
+        } = apply_fixes(db, file, fixes).unwrap_or_else(|fixed| fixed);
+
+        let source = source_text(db, file);
+        let new_source = match source.as_notebook() {
+            None => new_source,
+            Some(notebook) => {
+                let mut notebook = notebook.clone();
+                notebook.update(&source_map, new_source);
+
+                let mut output = Vec::new();
+
+                notebook
+                    .write(&mut output)
+                    .expect("Writing to a `Vec` should not fail");
+
+                String::from_utf8(output).expect(
+                    "Notebook should serialize to valid UTF-8 if the source was valid UTF-8",
+                )
+            }
         };
 
-        // Don't write back the changes if the file has changed in the meantime.
-        if metadata.revision() != file.revision(db) {
-            // TODO
+        // TODO, I think we still want a guard here, but provide a way to defuse it
+
+        // Verify that the fix didn't introduce any syntax errors
+        // and update the source text on file (without writing it to disk).
+        // This will be unset when the file gets updated.
+        let mut source_guard = WithSourceOverrideGuard::new(db, file, &new_source);
+        let db = source_guard.db_mut();
+        let new_parsed = parsed_module(db, file);
+        let new_parsed = new_parsed.load(db);
+
+        if new_parsed.has_syntax_errors() {
+            let mut diag = Diagnostic::new(
+                DiagnosticId::InternalError,
+                Severity::Fatal,
+                format_args!(
+                    "Adding suppressions introduced a syntax error. Reverting all changes."
+                ),
+            );
+
+            diag.add_bug_sub_diagnostics("%5BFix%20error%5D");
+            // Unfortunately, it's not possible to add the parse errors as
+            // sub diagnostics because the parse errors point into the new source but we
+            // revert the source text back to what we used to have on disk before
+            // trying to fix the file.
+
+            file_diagnostics.push(diag);
+
             continue;
         }
 
-        // TODO: Assert that there are no new syntax errors, somehow :)
-
-        // TODO: Assert that the file hasn't changed
-        // Create new source from applying fixes
-        if let Err(err) = system.write_file(path, &source.to_raw_content()) {
+        // Write the changes back to disk.
+        if let Err(err) = write_changes(db, &*system, file, &path, &new_source) {
             let mut diag = Diagnostic::new(
                 DiagnosticId::Io,
                 Severity::Error,
-                format_args!("Failed to write fixes: {err}"),
+                format_args!("Failed to write fixes to file: {err}"),
             );
+
             diag.annotate(Annotation::primary(Span::from(file)));
             diagnostics.push(diag);
+
             continue;
         }
 
-        *fixed = true;
-        count += count_current_file;
+        // If we got here then we've been successful. Re-check to get the diagnostics with the
+        // update source, update the fix count.
+        let diagnostics = project.check_file(db, file);
+        *file_diagnostics = diagnostics;
+        fixed_count += fixable_diagnostics.len();
+        // Don't restore the source or the spans in the new diagnostics will be off.
+        source_guard.defuse();
     }
 
     // Remove the now suppressed diagnostics
-    diagnostics.retain(|diagnostic| {
-        let Some(span) = diagnostic.primary_span() else {
-            return true;
-        };
-
-        if let Some((_, fixed)) = by_file.get(&span.expect_ty_file()) {
-            !fixed
-        } else {
-            true
-        }
+    diagnostics.extend(by_file.into_values().flatten());
+    diagnostics.sort_by(|left, right| {
+        left.rendering_sort_key(db)
+            .cmp(&right.rendering_sort_key(db))
     });
 
-    Ok(SuppressAllResult { diagnostics, count })
+    Ok(SuppressAllResult {
+        diagnostics,
+        count: fixed_count,
+    })
+}
+
+fn write_changes(
+    db: &dyn Db,
+    system: &dyn WritableSystem,
+    file: File,
+    path: &SystemPath,
+    new_source: &str,
+) -> Result<(), WriteChangesError> {
+    let metadata = system.path_metadata(path)?;
+
+    if metadata.revision() != file.revision(db) {
+        return Err(WriteChangesError::FileWasModified);
+    }
+
+    system.write_file(path, new_source)?;
+
+    Ok(())
+}
+
+#[derive(Debug, Error)]
+enum WriteChangesError {
+    #[error("failed to write changes to disk: {0}")]
+    Io(#[from] std::io::Error),
+
+    #[error("the file has been modified")]
+    FileWasModified,
 }
 
 /// Apply a series of fixes to `File` and returns the updated source code along with the source map.
-fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> (String, SourceMap) {
+///
+/// Returns an error if not all fixes were applied because some fixes are overlapping.
+fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode> {
     let source = source_text(db, file);
     let source = source.as_str();
 
     let mut output = String::with_capacity(source.len());
     let mut last_pos: Option<TextSize> = None;
+    let mut has_overlapping_fixes = false;
 
     let mut source_map = SourceMap::default();
 
-    fixes.sort_unstable_by_key(ruff_diagnostics::Fix::min_start);
+    fixes.sort_unstable_by_key(Fix::min_start);
 
     for fix in fixes {
         let mut edits = fix.edits().iter().peekable();
@@ -165,6 +260,7 @@ fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> (String, SourceM
         if let Some(first) = edits.peek() {
             // If this fix overlaps with a fix we've already applied, skip it.
             if last_pos.is_some_and(|last_pos| last_pos >= first.start()) {
+                has_overlapping_fixes = true;
                 continue;
             }
         }
@@ -194,7 +290,57 @@ fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> (String, SourceM
     let slice = &source[last_pos.unwrap_or_default().to_usize()..];
     output.push_str(slice);
 
-    (output, source_map)
+    let fixed = FixedCode {
+        source: output,
+        source_map,
+    };
+
+    if has_overlapping_fixes {
+        Err(fixed)
+    } else {
+        Ok(fixed)
+    }
+}
+
+struct FixedCode {
+    /// Source map that allows mapping positions in the fixed code back to positions in the original
+    /// source code (useful for mapping fixed lines back to their original notebook cells).
+    source_map: SourceMap,
+
+    /// The fixed source code
+    source: String,
+}
+
+struct WithSourceOverrideGuard<'db> {
+    db: &'db mut dyn Db,
+    file: Option<File>,
+}
+
+impl<'db> WithSourceOverrideGuard<'db> {
+    fn new(db: &'db mut dyn Db, file: File, source: &str) -> Self {
+        file.set_source_override(db).to(Some(source.into()));
+
+        Self {
+            db,
+            file: Some(file),
+        }
+    }
+
+    fn db_mut(&mut self) -> &mut dyn Db {
+        self.db
+    }
+
+    fn defuse(mut self) {
+        self.file = None;
+    }
+}
+
+impl Drop for WithSourceOverrideGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(file) = self.file.take() {
+            file.set_source_override(self.db).to(None);
+        }
+    }
 }
 
 #[cfg(test)]
@@ -368,8 +514,9 @@ mod tests {
         let diagnostics = db.project().check_file(&db, file);
         let total_diagnostics = diagnostics.len();
         let cancellation_token_source = CancellationTokenSource::new();
-        let fixes = suppress_all_diagnostics(&db, diagnostics, &cancellation_token_source.token())
-            .expect("operation never gets cancelled");
+        let fixes =
+            suppress_all_diagnostics(&mut db, diagnostics, &cancellation_token_source.token())
+                .expect("operation never gets cancelled");
 
         assert_eq!(fixes.count, total_diagnostics - fixes.diagnostics.len());
 

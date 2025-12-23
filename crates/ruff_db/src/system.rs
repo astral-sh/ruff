@@ -311,6 +311,8 @@ pub trait WritableSystem: System {
 
         Ok(Some(cache_path))
     }
+
+    fn dyn_clone(&self) -> Box<dyn WritableSystem>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]

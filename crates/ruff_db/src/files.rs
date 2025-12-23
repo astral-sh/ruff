@@ -323,6 +323,11 @@ pub struct File {
     /// the file has been deleted is to change the status to `Deleted`.
     #[default]
     status: FileStatus,
+
+    /// Allows overriding the source of a file.
+    #[default]
+    #[returns(as_deref)]
+    pub source_override: Option<Box<str>>,
 }
 
 // The Salsa heap is tracked separately.
@@ -334,6 +339,10 @@ impl File {
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
     pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
+        if let Some(source) = self.source_override(db) {
+            return Ok(source.to_string());
+        }
+
         let path = self.path(db);
 
         match path {
@@ -358,6 +367,10 @@ impl File {
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
     pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
+        if let Some(source) = self.source_override(db) {
+            return Notebook::from_source_code(source);
+        }
+
         let path = self.path(db);
 
         match path {
@@ -447,11 +460,13 @@ impl File {
         if file.status(db) != status {
             tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
+            file.set_source_override(db).to(None);
         }
 
         if file.revision(db) != revision {
             tracing::debug!("Updating the revision of `{}`", file.path(db));
             file.set_revision(db).to(revision);
+            file.set_source_override(db).to(None);
         }
 
         if file.permissions(db) != permission {

@@ -347,11 +347,6 @@ impl MainLoop {
 
                     let terminal_settings = db.project().settings(db).terminal();
                     let is_human_readable = terminal_settings.output_format.is_human_readable();
-                    let display_config = DisplayDiagnosticConfig::default()
-                        .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
-                        .with_cancellation_token(Some(self.cancellation_token.clone()))
-                        .show_fix_diff(true);
 
                     let result = match self.mode {
                         MainLoopMode::Check => {
@@ -360,57 +355,24 @@ impl MainLoop {
                                 return Ok(ExitStatus::Success);
                             }
 
-                            if result.is_empty() {
-                                if is_human_readable {
-                                    writeln!(
-                                        self.printer.stream_for_success_summary(),
-                                        "{}",
-                                        "All checks passed!".green().bold()
-                                    )?;
-                                }
+                            self.write_diagnostics(db, &result)?;
 
-                                Ok(result)
+                            if self.cancellation_token.is_cancelled() {
+                                Err(Cancelled)
                             } else {
-                                let diagnostics_count = result.len();
-
-                                let mut stdout = self.printer.stream_for_details().lock();
-
-                                // Only render diagnostics if they're going to be displayed, since doing
-                                // so is expensive.
-                                if stdout.is_enabled() {
-                                    write!(
-                                        stdout,
-                                        "{}",
-                                        DisplayDiagnostics::new(db, &display_config, &result)
-                                    )?;
-                                }
-
-                                if self.cancellation_token.is_cancelled() {
-                                    Err(Cancelled)
-                                } else {
-                                    if is_human_readable {
-                                        writeln!(
-                                            self.printer.stream_for_failure_summary(),
-                                            "Found {} diagnostic{}",
-                                            diagnostics_count,
-                                            if diagnostics_count > 1 { "s" } else { "" }
-                                        )?;
-                                    }
-
-                                    Ok(result)
-                                }
+                                Ok(result)
                             }
                         }
                         MainLoopMode::AddIgnore => {
                             if let Ok(result) =
                                 suppress_all_diagnostics(db, result, &self.cancellation_token)
                             {
-                                // TODO, render the remaining diagnostics
+                                self.write_diagnostics(db, &result.diagnostics)?;
 
                                 if is_human_readable {
                                     writeln!(
                                         self.printer.stream_for_failure_summary(),
-                                        "Added {} suppression comment{}",
+                                        "Added {} ignore comment{}",
                                         result.count,
                                         if result.count > 1 { "s" } else { "" }
                                     )?;
@@ -430,6 +392,7 @@ impl MainLoop {
                     let exit_status = match result.as_deref() {
                         Ok([]) => ExitStatus::Success,
                         Ok(diagnostics) => {
+                            let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
                         Err(Cancelled) => ExitStatus::Success,
@@ -467,6 +430,59 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+
+    fn write_diagnostics(
+        &self,
+        db: &ProjectDatabase,
+        diagnostics: &[Diagnostic],
+    ) -> anyhow::Result<()> {
+        let terminal_settings = db.project().settings(db).terminal();
+        let is_human_readable = terminal_settings.output_format.is_human_readable();
+
+        match diagnostics {
+            [] => {
+                if is_human_readable {
+                    writeln!(
+                        self.printer.stream_for_success_summary(),
+                        "{}",
+                        "All checks passed!".green().bold()
+                    )?;
+                }
+            }
+            diagnostics => {
+                let diagnostics_count = diagnostics.len();
+
+                let mut stdout = self.printer.stream_for_details().lock();
+
+                // Only render diagnostics if they're going to be displayed, since doing
+                // so is expensive.
+                if stdout.is_enabled() {
+                    let display_config = DisplayDiagnosticConfig::default()
+                        .format(terminal_settings.output_format.into())
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .with_cancellation_token(Some(self.cancellation_token.clone()))
+                        .show_fix_diff(true);
+
+                    write!(
+                        stdout,
+                        "{}",
+                        DisplayDiagnostics::new(db, &display_config, diagnostics)
+                    )?;
+                }
+
+                if !self.cancellation_token.is_cancelled() && is_human_readable {
+                    writeln!(
+                        self.printer.stream_for_failure_summary(),
+                        "Found {} diagnostic{}",
+                        diagnostics_count,
+                        if diagnostics_count > 1 { "s" } else { "" }
+                    )?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

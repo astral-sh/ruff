@@ -696,38 +696,7 @@ where
         Err(error) => {
             let message = error.to_diagnostic_message(Some(file.path(db)));
             let mut diagnostic = Diagnostic::new(DiagnosticId::Panic, Severity::Fatal, message);
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                "This indicates a bug in ty.",
-            ));
-
-            let report_message = "If you could open an issue at https://github.com/astral-sh/ty/issues/new?title=%5Bpanic%5D, we'd be very appreciative!";
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                report_message,
-            ));
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Platform: {os} {arch}",
-                    os = std::env::consts::OS,
-                    arch = std::env::consts::ARCH
-                ),
-            ));
-            if let Some(version) = ruff_db::program_version() {
-                diagnostic.sub(SubDiagnostic::new(
-                    SubDiagnosticSeverity::Info,
-                    format!("Version: {version}"),
-                ));
-            }
-
-            diagnostic.sub(SubDiagnostic::new(
-                SubDiagnosticSeverity::Info,
-                format!(
-                    "Args: {args:?}",
-                    args = std::env::args().collect::<Vec<_>>()
-                ),
-            ));
+            diagnostic.add_bug_sub_diagnostics("%5Bpanic%5D");
 
             if let Some(backtrace) = error.backtrace {
                 match backtrace.status() {
