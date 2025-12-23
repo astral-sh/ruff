@@ -2130,6 +2130,25 @@ impl<'db> ClassLiteral<'db> {
             }
         }
 
+        fn apply_self_to_callable<'d>(
+            db: &'d dyn Db,
+            ty: Type<'d>,
+            self_instance: Type<'d>,
+        ) -> Type<'d> {
+            match ty {
+                Type::Callable(callable_ty) if callable_ty.is_function_like(db) => {
+                    Type::Callable(callable_ty.apply_self(db, self_instance))
+                }
+                Type::Union(union) => union.map(db, |element| {
+                    apply_self_to_callable(db, *element, self_instance)
+                }),
+                Type::Intersection(intersection) => intersection.map_positive(db, |element| {
+                    apply_self_to_callable(db, *element, self_instance)
+                }),
+                _ => ty,
+            }
+        }
+
         let mut member = self.class_member_inner(db, None, name, policy);
 
         // We generally treat dunder attributes with `Callable` types as function-like callables.
@@ -2137,6 +2156,13 @@ impl<'db> ClassLiteral<'db> {
         if name.starts_with("__") && name.ends_with("__") {
             member = member.map_type(|ty| into_function_like_callable(db, ty));
         }
+
+        // For callable members that use `Self` type variables (e.g., synthesized methods like
+        // `_replace` on NamedTuples), replace `Self` with the instance type of this class.
+        // This ensures that when accessing `Person._replace`, we get `(self: Person, ...) -> Person`
+        // instead of `(self: Self, ...) -> Self`.
+        let self_instance = Type::instance(db, ClassType::NonGeneric(self));
+        member = member.map_type(|ty| apply_self_to_callable(db, ty, self_instance));
 
         member
     }
