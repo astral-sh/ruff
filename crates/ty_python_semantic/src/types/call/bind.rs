@@ -27,9 +27,9 @@ use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
-    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
+    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1621,6 +1621,21 @@ impl<'db> CallableBinding<'db> {
             signature = %self.signature_type.display(db),
         )
         .entered();
+
+        // If the callable is a top materialization (e.g., `Top[Callable[..., object]]`), any call
+        // should fail because we don't know the actual signature. The type IS callable (it passes
+        // `callable()`), but it represents an infinite union of all possible callable types, so
+        // there's no valid set of arguments.
+        if let Type::Callable(callable) = self.signature_type
+            && callable.is_top_materialization(db)
+        {
+            for overload in &mut self.overloads {
+                overload
+                    .errors
+                    .push(BindingError::CalledTopCallable(self.signature_type));
+            }
+            return None;
+        }
 
         tracing::trace!(
             target: "ty_python_semantic::types::call::bind",
@@ -4124,6 +4139,10 @@ pub(crate) enum BindingError<'db> {
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
     UnmatchedOverload,
+    /// The callable type is a top materialization (e.g., `Top[Callable[..., object]]`), which
+    /// represents the infinite union of all callables. While such types *are* callable (they pass
+    /// `callable()`), any specific call should fail because we don't know the actual signature.
+    CalledTopCallable(Type<'db>),
 }
 
 impl<'db> BindingError<'db> {
@@ -4551,6 +4570,24 @@ impl<'db> BindingError<'db> {
             }
 
             Self::UnmatchedOverload => {}
+
+            Self::CalledTopCallable(callable_ty) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&CALL_TOP_CALLABLE, node) {
+                    let callable_ty_display = callable_ty.display(context.db());
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Object of type `{callable_ty_display}` is not safe to call; \
+                        its signature is not known"
+                    ));
+                    diag.info(
+                        "This type includes all possible callables, so it cannot safely be called \
+                        because there is no valid set of arguments for it",
+                    );
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
         }
     }
 
@@ -4709,5 +4746,6 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         db,
         CallableSignature::single(new_signature),
         CallableTypeKind::FunctionLike,
+        false,
     )))
 }
