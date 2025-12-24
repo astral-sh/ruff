@@ -1576,7 +1576,7 @@ impl<'db> CallableType<'db> {
         DisplayCallableType {
             signatures: self.signatures(db),
             kind: self.kind(db),
-            materialization_kind: self.materialization_kind(db),
+            is_top_materialization: self.is_top_materialization(db),
             db,
             settings,
         }
@@ -1586,21 +1586,17 @@ impl<'db> CallableType<'db> {
 pub(crate) struct DisplayCallableType<'a, 'db> {
     signatures: &'a CallableSignature<'db>,
     kind: CallableTypeKind,
-    materialization_kind: Option<MaterializationKind>,
+    is_top_materialization: bool,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
 
 impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
-        // If this callable has a materialization kind, wrap it in Top[...] or Bottom[...]
-        let prefix_details = match self.materialization_kind {
-            None => None,
-            Some(MaterializationKind::Top) => Some(("Top", SpecialFormType::Top)),
-            Some(MaterializationKind::Bottom) => Some(("Bottom", SpecialFormType::Bottom)),
-        };
-        if let Some((name, form)) = prefix_details {
-            f.with_type(Type::SpecialForm(form)).write_str(name)?;
+        // If this callable is a top materialization, wrap it in Top[...]
+        if self.is_top_materialization {
+            f.with_type(Type::SpecialForm(SpecialFormType::Top))
+                .write_str("Top")?;
             f.write_char('[')?;
         }
 
@@ -1637,7 +1633,7 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
             }
         }
 
-        if self.materialization_kind.is_some() {
+        if self.is_top_materialization {
             f.write_char(']')?;
         }
         Ok(())
@@ -2248,10 +2244,9 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            // Callable types with a materialization kind (Top/Bottom) are displayed as
-            // `Top[(...) -> T]` or `Bottom[(...) -> T]`, which is already unambiguous
-            // and doesn't need additional parentheses.
-            Type::Callable(callable) if callable.materialization_kind(self.db).is_none() => {
+            // Callable types with a top materialization are displayed as `Top[(...) -> T]`,
+            // which is already unambiguous and doesn't need additional parentheses.
+            Type::Callable(callable) if !callable.is_top_materialization(self.db) => {
                 write_parentheses(f)
             }
             Type::KnownBoundMethod(_)

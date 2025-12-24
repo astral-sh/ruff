@@ -428,7 +428,7 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
-                            None,
+                            false,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -462,7 +462,7 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
-                            None,
+                            false,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1188,7 +1188,7 @@ impl<'db> Signature<'db> {
                         .map(|signature| Signature::new(signature.parameters().clone(), None)),
                 ),
                 CallableTypeKind::ParamSpecValue,
-                None,
+                false,
             ));
             let param_spec_matches =
                 ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
@@ -1440,7 +1440,7 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(other.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
-                        None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1457,7 +1457,7 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(self.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
-                        None,
+                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,

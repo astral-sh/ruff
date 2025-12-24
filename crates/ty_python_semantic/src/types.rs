@@ -1903,7 +1903,7 @@ impl<'db> Type<'db> {
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
-                None,
+                false,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -1911,7 +1911,7 @@ impl<'db> Type<'db> {
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
-                    None,
+                    false,
                 )))
             }
 
@@ -12312,7 +12312,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
-            None,
+            false,
         )
     }
 
@@ -12433,7 +12433,11 @@ pub struct CallableType<'db> {
 
     kind: CallableTypeKind,
 
-    materialization_kind: Option<MaterializationKind>,
+    /// Whether this callable is a top materialization (e.g., `Top[Callable[..., object]]`).
+    ///
+    /// Bottom materializations of gradual callables are simplified to the bottom callable
+    /// `(*args: object, **kwargs: object) -> Never`, so this is always false for them.
+    is_top_materialization: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -12478,7 +12482,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
-            None,
+            false,
         )
     }
 
@@ -12487,7 +12491,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
-            None,
+            false,
         )
     }
 
@@ -12499,7 +12503,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(Signature::new(parameters, None)),
             CallableTypeKind::ParamSpecValue,
-            None,
+            false,
         )
     }
 
@@ -12529,7 +12533,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
-            self.materialization_kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12538,7 +12542,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
-            self.materialization_kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12551,7 +12555,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::bottom(),
             CallableTypeKind::Regular,
-            None,
+            false,
         )
     }
 
@@ -12563,7 +12567,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).normalized_impl(db, visitor),
             self.kind(db),
-            self.materialization_kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12578,7 +12582,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
-            self.materialization_kind(db),
+            self.is_top_materialization(db),
         ))
     }
 
@@ -12590,24 +12594,33 @@ impl<'db> CallableType<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         if let TypeMapping::Materialize(materialization_kind) = type_mapping {
-            // Top/Bottom materializations are fully static types already,
+            // Top materializations are fully static types already,
             // so materializing them further does nothing.
-            if self.materialization_kind(db).is_some() {
+            if self.is_top_materialization(db) {
                 return self;
             }
 
-            // If we're materializing a callable with gradual parameters, wrap it in
-            // `Top[...]` or `Bottom[...]` instead of simplifying the parameters. This
-            // preserves the gradual nature of the type while making it a fully static type.
-            // We still materialize the return type (which is in covariant position).
+            // If we're materializing a callable with gradual parameters:
+            // - For Top materialization: wrap in `Top[...]` to preserve the gradual nature
+            // - For Bottom materialization: simplify to the bottom callable since
+            //   `Bottom[Callable[..., R]]` is equivalent to `(*args: object, **kwargs: object) -> Bottom[R]`
             if self.signatures(db).has_gradual_parameters() {
-                return CallableType::new(
-                    db,
-                    self.signatures(db)
-                        .materialize_return_types(db, *materialization_kind),
-                    self.kind(db),
-                    Some(*materialization_kind),
-                );
+                match materialization_kind {
+                    MaterializationKind::Top => {
+                        return CallableType::new(
+                            db,
+                            self.signatures(db)
+                                .materialize_return_types(db, *materialization_kind),
+                            self.kind(db),
+                            true,
+                        );
+                    }
+                    MaterializationKind::Bottom => {
+                        // Bottom materialization of a gradual callable simplifies to the
+                        // bottom callable: (*args: object, **kwargs: object) -> Never
+                        return CallableType::bottom(db);
+                    }
+                }
             }
         }
 
@@ -12616,7 +12629,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
-            self.materialization_kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12647,22 +12660,21 @@ impl<'db> CallableType<'db> {
             return ConstraintSet::from(false);
         }
 
-        // Handle materialization kinds:
+        // Handle top materialization:
         // - `Top[Callable[..., R]]` is a supertype of all callables with return type subtype of R.
-        // - `Bottom[Callable[..., R]]` is a subtype of all callables with return type supertype of R.
         //
-        // For Top/Bottom, we only need to compare return types because:
-        // - Top parameters are a supertype of all possible parameters
-        // - Bottom parameters are a subtype of all possible parameters
+        // For Top, we only need to compare return types because Top parameters are a supertype
+        // of all possible parameters. Bottom materializations are simplified to the bottom
+        // callable directly, so they use normal signature comparison.
         match (
-            self.materialization_kind(db),
-            other.materialization_kind(db),
+            self.is_top_materialization(db),
+            other.is_top_materialization(db),
         ) {
-            // No materialization kinds: use normal signature comparison.
-            (None, None) => {}
+            // Neither is a top materialization: use normal signature comparison.
+            (false, false) => {}
 
             // Anything <: Top[...]: just compare return types.
-            (_, Some(MaterializationKind::Top)) => {
+            (_, true) => {
                 return self.signatures(db).return_types_have_relation_to(
                     db,
                     other.signatures(db),
@@ -12673,22 +12685,9 @@ impl<'db> CallableType<'db> {
                 );
             }
 
-            // Bottom[...] <: anything: just compare return types.
-            (Some(MaterializationKind::Bottom), _) => {
-                return self.signatures(db).return_types_have_relation_to(
-                    db,
-                    other.signatures(db),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                );
-            }
-
-            // Top[...] <: non-Top and non-Bottom <: Bottom[...] are always false.
-            // Top is not a subtype of any specific callable, and nothing except Bottom
-            // is a subtype of Bottom.
-            _ => {
+            // Top[...] <: non-Top is always false.
+            // Top is not a subtype of any specific callable.
+            (true, false) => {
                 return ConstraintSet::from(false);
             }
         }
@@ -12717,8 +12716,8 @@ impl<'db> CallableType<'db> {
             return ConstraintSet::from(true);
         }
 
-        // Callables with different materialization kinds are not equivalent
-        if self.materialization_kind(db) != other.materialization_kind(db) {
+        // Callables with different top materialization status are not equivalent
+        if self.is_top_materialization(db) != other.is_top_materialization(db) {
             return ConstraintSet::from(false);
         }
 

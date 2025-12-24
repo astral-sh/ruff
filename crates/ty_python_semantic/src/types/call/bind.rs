@@ -44,10 +44,10 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MaterializationKind,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
+    enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1627,7 +1627,7 @@ impl<'db> CallableBinding<'db> {
         // `callable()`), but it represents an infinite union of all possible callable types, so
         // there's no valid set of arguments.
         if let Type::Callable(callable) = self.signature_type
-            && callable.materialization_kind(db) == Some(MaterializationKind::Top)
+            && callable.is_top_materialization(db)
         {
             for overload in &mut self.overloads {
                 overload
@@ -4746,6 +4746,6 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         db,
         CallableSignature::single(new_signature),
         CallableTypeKind::FunctionLike,
-        None,
+        false,
     )))
 }

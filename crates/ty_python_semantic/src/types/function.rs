@@ -1094,7 +1094,7 @@ impl<'db> FunctionType<'db> {
         } else {
             CallableTypeKind::FunctionLike
         };
-        CallableType::new(db, self.signature(db), kind, None)
+        CallableType::new(db, self.signature(db), kind, false)
     }
 
     /// Convert the `FunctionType` into a [`BoundMethodType`].

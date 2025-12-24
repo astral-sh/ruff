@@ -2427,7 +2427,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 db,
                                 callable.signatures(db),
                                 kind,
-                                callable.materialization_kind(db),
+                                callable.is_top_materialization(db),
                             ))),
                             Type::Union(union) => union
                                 .try_map(db, |element| propagate_callable_kind(db, *element, kind)),
