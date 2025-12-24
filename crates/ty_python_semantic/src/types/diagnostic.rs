@@ -50,6 +50,7 @@ use ty_module_resolver::{Module, ModuleName};
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
+    registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
@@ -147,6 +148,31 @@ declare_lint! {
     pub(crate) static CALL_NON_CALLABLE = {
         summary: "detects calls to non-callable objects",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all
+    /// callable types with return type `T`).
+    ///
+    /// ## Why is this bad?
+    /// When an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or
+    /// `isinstance(x, Callable)`), we know the object is callable, but we don't know its
+    /// precise signature. This type represents the set of all possible callable types
+    /// (including, e.g., functions that take no arguments and functions that require arguments),
+    /// so no specific set of arguments can be guaranteed to be valid.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f(x: object):
+    ///     if callable(x):
+    ///         x()  # We know x is callable, but not what arguments it accepts
+    /// ```
+    pub(crate) static CALL_TOP_CALLABLE = {
+        summary: "detects calls to the top callable type",
+        status: LintStatus::preview("0.0.1-alpha.1"),
         default_level: Level::Error,
     }
 }

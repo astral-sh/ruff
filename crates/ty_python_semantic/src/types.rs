@@ -12648,8 +12648,12 @@ impl<'db> CallableType<'db> {
         }
 
         // Handle materialization kinds:
-        // - `Top[Callable[..., Any]]` is a supertype of `Callable[..., Any]` and all its materializations.
-        // - `Bottom[Callable[..., Any]]` is a subtype of `Callable[..., Any]` and all its materializations.
+        // - `Top[Callable[..., R]]` is a supertype of all callables with return type subtype of R.
+        // - `Bottom[Callable[..., R]]` is a subtype of all callables with return type supertype of R.
+        //
+        // For Top/Bottom, we only need to compare return types because:
+        // - Top parameters are a supertype of all possible parameters
+        // - Bottom parameters are a subtype of all possible parameters
         match (
             self.materialization_kind(db),
             other.materialization_kind(db),
@@ -12657,50 +12661,34 @@ impl<'db> CallableType<'db> {
             // No materialization kinds: use normal signature comparison.
             (None, None) => {}
 
-            // self <: Top[...] is true if the signatures are compatible (Top is supertype of all).
-            // Use Assignability for the comparison because:
-            // 1. Top is the fully static supertype that accepts any compatible callable
-            // 2. Gradual parameters (...) should be compatible with Top[(...)...]
-            // 3. Dynamic return types like Unknown should be compatible with any return type
+            // Anything <: Top[...]: just compare return types.
             (_, Some(MaterializationKind::Top)) => {
-                return self.signatures(db).has_relation_to_impl(
+                return self.signatures(db).return_types_have_relation_to(
                     db,
                     other.signatures(db),
                     inferable,
-                    TypeRelation::Assignability,
+                    relation,
                     relation_visitor,
                     disjointness_visitor,
                 );
             }
 
-            // Bottom[...] <: other is true if the signatures are compatible (Bottom is subtype of all).
-            // Use Assignability for the same reasons as Top (symmetrically, Bottom is the minimal
-            // static subtype).
+            // Bottom[...] <: anything: just compare return types.
             (Some(MaterializationKind::Bottom), _) => {
-                return self.signatures(db).has_relation_to_impl(
+                return self.signatures(db).return_types_have_relation_to(
                     db,
                     other.signatures(db),
                     inferable,
-                    TypeRelation::Assignability,
+                    relation,
                     relation_visitor,
                     disjointness_visitor,
                 );
             }
 
-            // Top[...] <: non-Top is only true for assignability, not subtyping.
-            (Some(MaterializationKind::Top), None) => {
-                if relation.is_subtyping() {
-                    return ConstraintSet::from(false);
-                }
-            }
-
-            // non-materialized <: Bottom[...] is false (only Bottom is subtype of Bottom).
-            (None, Some(MaterializationKind::Bottom)) => {
-                return ConstraintSet::from(false);
-            }
-
-            // Top[...] <: Bottom[...] is false (Top is not a subtype of Bottom).
-            (Some(MaterializationKind::Top), Some(MaterializationKind::Bottom)) => {
+            // Top[...] <: non-Top and non-Bottom <: Bottom[...] are always false.
+            // Top is not a subtype of any specific callable, and nothing except Bottom
+            // is a subtype of Bottom.
+            _ => {
                 return ConstraintSet::from(false);
             }
         }

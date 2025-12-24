@@ -56,17 +56,17 @@ def f(x: object):
 
 ## Calling narrowed callables
 
-The narrowed type `Top[Callable[..., object]]` represents the "infinite union" of all possible
-callable types. While such objects *are* callable (they pass `callable()`), any attempt to actually
-call them should fail because we don't know the actual signature - we can't know if any specific set
-of arguments is valid.
+The narrowed type `Top[Callable[..., object]]` represents the set of all possible callable types
+(including, e.g., functions that take no arguments and functions that require arguments). While such
+objects *are* callable (they pass `callable()`), no specific set of arguments can be guaranteed to
+be valid.
 
 ```py
 import typing as t
 
 def call_with_args(y: object, a: int, b: str) -> object:
     if isinstance(y, t.Callable):
-        # error: [call-non-callable] "Object of type `Top[(...) -> object]` is not callable"
+        # error: [call-top-callable]
         return y(a, b)
     return None
 ```

@@ -27,9 +27,9 @@ use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
-    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
+    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -1631,7 +1631,7 @@ impl<'db> CallableBinding<'db> {
                 for overload in &mut self.overloads {
                     overload
                         .errors
-                        .push(BindingError::UnknownCallableSignature(self.signature_type));
+                        .push(BindingError::CalledTopCallable(self.signature_type));
                 }
                 return None;
             }
@@ -4140,9 +4140,9 @@ pub(crate) enum BindingError<'db> {
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
     UnmatchedOverload,
     /// The callable type is a top materialization (e.g., `Top[Callable[..., object]]`), which
-    /// represents an unknown callable signature. While such types *are* callable (they pass
+    /// represents the infinite union of all callables. While such types *are* callable (they pass
     /// `callable()`), any specific call should fail because we don't know the actual signature.
-    UnknownCallableSignature(Type<'db>),
+    CalledTopCallable(Type<'db>),
 }
 
 impl<'db> BindingError<'db> {
@@ -4571,15 +4571,16 @@ impl<'db> BindingError<'db> {
 
             Self::UnmatchedOverload => {}
 
-            Self::UnknownCallableSignature(callable_ty) => {
+            Self::CalledTopCallable(callable_ty) => {
                 let node = Self::get_node(node, None);
-                if let Some(builder) = context.report_lint(&CALL_NON_CALLABLE, node) {
+                if let Some(builder) = context.report_lint(&CALL_TOP_CALLABLE, node) {
                     let callable_ty_display = callable_ty.display(context.db());
                     let mut diag = builder.into_diagnostic(format_args!(
-                        "Object of type `{callable_ty_display}` is not callable"
+                        "Object of type `{callable_ty_display}` is not safe to call; \
+                        its signature is not known"
                     ));
                     diag.info(
-                        "An object with an unknown callable signature is not callable, \
+                        "This type includes all possible callables, so it cannot safely be called \
                         because there is no valid set of arguments for it",
                     );
                     if let Some(union_diag) = union_diag {

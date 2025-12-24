@@ -593,6 +593,41 @@ impl<'db> CallableSignature<'db> {
                 .map(|sig| sig.materialize_return_type(db, materialization_kind)),
         )
     }
+
+    /// Check whether the return types of this callable have the given relation to the return
+    /// types of another callable.
+    pub(crate) fn return_types_have_relation_to(
+        &self,
+        db: &'db dyn Db,
+        other: &Self,
+        inferable: InferableTypeVars<'_, 'db>,
+        relation: TypeRelation<'db>,
+        relation_visitor: &HasRelationToVisitor<'db>,
+        disjointness_visitor: &IsDisjointVisitor<'db>,
+    ) -> ConstraintSet<'db> {
+        // For each overload in self, the return type must have the relation to
+        // the return type of some overload in other.
+        self.overloads.iter().when_all(db, |self_sig| {
+            let Some(self_return_ty) = self_sig.return_ty else {
+                // No return type means Never, which is a subtype of everything
+                return ConstraintSet::from(true);
+            };
+            other.overloads.iter().when_any(db, |other_sig| {
+                let Some(other_return_ty) = other_sig.return_ty else {
+                    // other returns Never, self returns something - not a match for subtyping
+                    return ConstraintSet::from(false);
+                };
+                self_return_ty.has_relation_to_impl(
+                    db,
+                    other_return_ty,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            })
+        })
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a CallableSignature<'db> {
