@@ -128,8 +128,9 @@ pub(super) fn organize_imports_edit(
 ) -> crate::Result<Fixes> {
     let mut linter_settings = query.settings().linter.clone();
     linter_settings.rules = [
-        Rule::UnsortedImports,       // I001
-        Rule::MissingRequiredImport, // I002
+        Rule::UnsortedImports,            // I001
+        Rule::MissingRequiredImport,      // I002
+        Rule::ModuleImportNotAtTopOfFile, // E402
     ]
     .into_iter()
     .collect();
