@@ -1,7 +1,7 @@
 use ruff_python_ast::token::TokenKind;
 
 /// A bit-set of `TokenKind`s
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub(crate) struct TokenSet(u128);
 
 impl TokenSet {

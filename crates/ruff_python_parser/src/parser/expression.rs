@@ -460,8 +460,8 @@ impl<'src> Parser<'src> {
     /// field will be [`ExprContext::Invalid`].
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_name(&mut self) -> ast::ExprName {
-        let identifier = self.parse_identifier();
+    pub(super) fn parse_name(&mut self, recovery: IdentifierRecovery) -> ast::ExprName {
+        let identifier = self.parse_identifier(recovery);
 
         let ctx = if identifier.is_valid() {
             ExprContext::Load
@@ -482,7 +482,10 @@ impl<'src> Parser<'src> {
     /// For an invalid identifier, the `id` field will be an empty string.
     ///
     /// See: <https://docs.python.org/3/reference/expressions.html#atom-identifiers>
-    pub(super) fn parse_identifier(&mut self) -> ast::Identifier {
+    pub(super) fn parse_identifier(
+        &mut self,
+        keyword_recovery: IdentifierRecovery,
+    ) -> ast::Identifier {
         let range = self.current_token_range();
 
         if self.at(TokenKind::Name) {
@@ -506,7 +509,9 @@ impl<'src> Parser<'src> {
             };
         }
 
-        if self.current_token_kind().is_keyword() {
+        if self.current_token_kind().is_keyword()
+            && keyword_recovery.is_allowed_keyword(self.current_token_kind())
+        {
             // Non-soft keyword
             self.add_error(
                 ParseErrorType::OtherError(format!(
@@ -605,7 +610,7 @@ impl<'src> Parser<'src> {
                     node_index: AtomicNodeIndex::NONE,
                 })
             }
-            TokenKind::Name => Expr::Name(self.parse_name()),
+            TokenKind::Name => Expr::Name(self.parse_name(IdentifierRecovery::default())),
             TokenKind::IpyEscapeCommand => {
                 Expr::IpyEscapeCommand(self.parse_ipython_escape_command_expression())
             }
@@ -620,7 +625,7 @@ impl<'src> Parser<'src> {
 
             kind => {
                 if kind.is_keyword() {
-                    Expr::Name(self.parse_name())
+                    Expr::Name(self.parse_name(IdentifierRecovery::default()))
                 } else {
                     self.add_error(
                         ParseErrorType::ExpectedExpression,
@@ -1085,7 +1090,7 @@ impl<'src> Parser<'src> {
     ) -> ast::ExprAttribute {
         self.bump(TokenKind::Dot);
 
-        let attr = self.parse_identifier();
+        let attr = self.parse_identifier(IdentifierRecovery::default());
 
         ast::ExprAttribute {
             value: Box::new(value),
@@ -2883,6 +2888,26 @@ impl Ranged for ParsedExpr {
     #[inline]
     fn range(&self) -> TextRange {
         self.expr.range()
+    }
+}
+
+#[derive(Copy, Clone, Debug, Default)]
+pub(super) enum IdentifierRecovery {
+    /// Allow `parse_identifier` to recover by parsing a keyword token as name.
+    #[default]
+    Keywords,
+
+    /// Allow `parse_identifier` to recover by parsing a keyword token for as long as it isn't
+    /// one in the token set.
+    NoneOff(TokenSet),
+}
+
+impl IdentifierRecovery {
+    fn is_allowed_keyword(&self, token: TokenKind) -> bool {
+        match self {
+            IdentifierRecovery::Keywords => true,
+            IdentifierRecovery::NoneOff(set) => !set.contains(token),
+        }
     }
 }
 

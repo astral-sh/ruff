@@ -11,7 +11,7 @@ use crate::parser::{Parser, RecoveryContextKind, SequenceMatchPatternParentheses
 use crate::token::TokenValue;
 use crate::token_set::TokenSet;
 
-use super::expression::ExpressionContext;
+use super::expression::{ExpressionContext, IdentifierRecovery};
 
 /// The set of tokens that can start a literal pattern.
 const LITERAL_PATTERN_START_SET: TokenSet = TokenSet::new([
@@ -124,7 +124,7 @@ impl Parser<'_> {
                 self.add_error(ParseErrorType::InvalidStarPatternUsage, &lhs);
             }
 
-            let ident = self.parse_identifier();
+            let ident = self.parse_identifier(IdentifierRecovery::default());
             lhs = Pattern::MatchAs(ast::PatternMatchAs {
                 range: self.node_range(start),
                 name: Some(ident),
@@ -188,7 +188,7 @@ impl Parser<'_> {
             let mapping_item_start = parser.node_start();
 
             if parser.eat(TokenKind::DoubleStar) {
-                let identifier = parser.parse_identifier();
+                let identifier = parser.parse_identifier(IdentifierRecovery::default());
                 if rest.is_some() {
                     parser.add_error(
                         ParseErrorType::OtherError(
@@ -271,7 +271,7 @@ impl Parser<'_> {
         let start = self.node_start();
         self.bump(TokenKind::Star);
 
-        let ident = self.parse_identifier();
+        let ident = self.parse_identifier(IdentifierRecovery::default());
 
         ast::PatternMatchStar {
             range: self.node_range(start),
@@ -503,7 +503,7 @@ impl Parser<'_> {
                         //     case case.bar: ...
                         //     case type.bar: ...
                         //     case match.case.type.bar.type.case.match: ...
-                        let id = Expr::Name(self.parse_name());
+                        let id = Expr::Name(self.parse_name(IdentifierRecovery::default()));
 
                         let attribute = self.parse_attr_expr_for_match_pattern(id, start);
 
@@ -520,7 +520,7 @@ impl Parser<'_> {
                         //     case match: ...
                         // match foo:
                         //     case type: ...
-                        let ident = self.parse_identifier();
+                        let ident = self.parse_identifier(IdentifierRecovery::default());
 
                         // test_ok match_as_pattern
                         // match foo:
