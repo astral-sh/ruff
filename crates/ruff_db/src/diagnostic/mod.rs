@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -409,11 +409,6 @@ impl Diagnostic {
     /// Returns `true` if `self` is a syntax error message.
     pub fn is_invalid_syntax(&self) -> bool {
         self.id().is_invalid_syntax()
-    }
-
-    /// Returns the message body to display to the user.
-    pub fn body(&self) -> &str {
-        self.primary_message()
     }
 
     /// Returns the message of the first sub-diagnostic with a `Help` severity.
@@ -1492,6 +1487,15 @@ pub enum ConciseMessage<'a> {
     Custom(&'a str),
 }
 
+impl<'a> ConciseMessage<'a> {
+    pub fn to_str(&self) -> Cow<'a, str> {
+        match self {
+            ConciseMessage::MainDiagnostic(s) | ConciseMessage::Custom(s) => Cow::Borrowed(s),
+            ConciseMessage::Both { .. } => Cow::Owned(self.to_string()),
+        }
+    }
+}
+
 impl std::fmt::Display for ConciseMessage<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -1505,6 +1509,16 @@ impl std::fmt::Display for ConciseMessage<'_> {
                 write!(f, "{message}")
             }
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for ConciseMessage<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
     }
 }
 
