@@ -75,13 +75,16 @@ use itertools::Itertools;
 use rustc_hash::{FxHashMap, FxHashSet};
 use salsa::plumbing::AsId;
 
-use crate::types::generics::{GenericContext, InferableTypeVars, Specialization};
+use crate::types::generics::{
+    GenericContext, InferableTypeVars, PartialSpecialization, Specialization,
+};
+use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{
     TypeCollector, TypeVisitor, any_over_type, walk_type_with_recursion_guard,
 };
 use crate::types::{
-    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeVarBoundOrConstraints,
-    UnionType, walk_bound_type_var_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, IntersectionType, Type, TypeContext, TypeMapping,
+    TypeVarBoundOrConstraints, TypeVarVariance, UnionType, walk_bound_type_var_type,
 };
 use crate::{Db, FxOrderMap, FxOrderSet};
 
@@ -430,6 +433,29 @@ impl<'db> ConstraintSet<'db> {
         ConstraintSet {
             node: self.node.iff_with_offset(db, other.node),
         }
+    }
+
+    /// Returns a new constraint set that is the _existential abstraction_ of `self` for a set of
+    /// typevars. The result will return true whenever `self` returns true for _any_ assignment of
+    /// those typevars. The result will not contain any constraints that mention those typevars.
+    pub(crate) fn exists(
+        self,
+        db: &'db dyn Db,
+        bound_typevars: impl IntoIterator<Item = BoundTypeVarIdentity<'db>>,
+    ) -> Self {
+        let node = self.node.exists(db, bound_typevars);
+        Self { node }
+    }
+
+    /// Quantifies over this constraint set so that it only contains constraints that mention the
+    /// given typevar. All other typevars are quantified away.
+    pub(crate) fn retain_one(
+        self,
+        db: &'db dyn Db,
+        bound_typevar: BoundTypeVarIdentity<'db>,
+    ) -> Self {
+        let node = self.node.retain_one(db, bound_typevar);
+        Self { node }
     }
 
     /// Reduces the set of inferable typevars for this constraint set. You provide an iterator of
@@ -3038,30 +3064,59 @@ impl<'db> SequentMap<'db> {
         left_constraint: ConstrainedTypeVar<'db>,
         right_constraint: ConstrainedTypeVar<'db>,
     ) {
-        // We've structured our constraints so that a typevar's upper/lower bound can only
-        // be another typevar if the bound is "later" in our arbitrary ordering. That means
-        // we only have to check this pair of constraints in one direction — though we do
-        // have to figure out which of the two typevars is constrained, and which one is
-        // the upper/lower bound.
+        // Add sequents when the two typevars are mutually constrained directly — that is, when the
+        // lower/upper bound _is_ the typevar, not _contains_ the typevar. We've structured our
+        // constraints so that a typevar's upper/lower bound can only be another typevar if the
+        // bound is "later" in our arbitrary ordering. That means we only have to check this pair
+        // of constraints in one direction — though we do have to figure out which of the two
+        // typevars is constrained, and which one is the upper/lower bound.
         let left_typevar = left_constraint.typevar(db);
         let right_typevar = right_constraint.typevar(db);
-        let (bound_typevar, bound_constraint, constrained_typevar, constrained_constraint) =
-            if left_typevar.can_be_bound_for(db, right_typevar) {
-                (
-                    left_typevar,
-                    left_constraint,
-                    right_typevar,
-                    right_constraint,
-                )
-            } else {
-                (
-                    right_typevar,
-                    right_constraint,
-                    left_typevar,
-                    left_constraint,
-                )
-            };
+        if left_typevar.can_be_bound_for(db, right_typevar) {
+            self.add_direct_mutual_sequents_for_different_typevars(
+                db,
+                left_constraint,
+                left_typevar,
+                right_constraint,
+                right_typevar,
+            );
+        } else {
+            self.add_direct_mutual_sequents_for_different_typevars(
+                db,
+                right_constraint,
+                right_typevar,
+                left_constraint,
+                left_typevar,
+            );
+        }
 
+        // Add sequents when one of the typevars is mentioned deeply inside the bounds of the
+        // other. Because the "bound" typevar appears deeply inside of the "constrained" typevar,
+        // our constraint ordering doesn't apply, and we have to try each direction.
+        self.add_deep_mutual_sequents(
+            db,
+            left_constraint,
+            left_typevar,
+            right_constraint,
+            right_typevar,
+        );
+        self.add_deep_mutual_sequents(
+            db,
+            right_constraint,
+            right_typevar,
+            left_constraint,
+            left_typevar,
+        );
+    }
+
+    fn add_direct_mutual_sequents_for_different_typevars(
+        &mut self,
+        db: &'db dyn Db,
+        bound_constraint: ConstrainedTypeVar<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constrained_constraint: ConstrainedTypeVar<'db>,
+        constrained_typevar: BoundTypeVarInstance<'db>,
+    ) {
         // We then look for cases where the "constrained" typevar's upper and/or lower bound
         // matches the "bound" typevar. If so, we're going to add an implication sequent that
         // replaces the upper/lower bound that matched with the bound constraint's corresponding
@@ -3115,8 +3170,155 @@ impl<'db> SequentMap<'db> {
 
         let post_constraint =
             ConstrainedTypeVar::new(db, constrained_typevar, new_lower, new_upper);
-        self.add_pair_implication(db, left_constraint, right_constraint, post_constraint);
+        self.add_pair_implication(
+            db,
+            bound_constraint,
+            constrained_constraint,
+            post_constraint,
+        );
         self.enqueue_constraint(post_constraint);
+    }
+
+    fn add_deep_mutual_sequents(
+        &mut self,
+        db: &'db dyn Db,
+        bound_constraint: ConstrainedTypeVar<'db>,
+        bound_typevar: BoundTypeVarInstance<'db>,
+        constrained_constraint: ConstrainedTypeVar<'db>,
+        constrained_typevar: BoundTypeVarInstance<'db>,
+    ) {
+        let bound_lower = bound_constraint.lower(db);
+        let bound_upper = bound_constraint.upper(db);
+        let constrained_lower = constrained_constraint.lower(db);
+        let constrained_upper = constrained_constraint.upper(db);
+
+        let mut add_constraint = |post_constraint| {
+            self.add_pair_implication(
+                db,
+                bound_constraint,
+                constrained_constraint,
+                post_constraint,
+            );
+            self.enqueue_constraint(post_constraint);
+        };
+
+        match constrained_lower.variance_of(db, bound_typevar) {
+            // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
+            // do not affect the valid specializations of C.
+            TypeVarVariance::Bivariant => {}
+
+            // (Covariant[B] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[BL] ≤ C ≤ CU)
+            TypeVarVariance::Covariant => {
+                // Only substitute to create a new sequent if the substitution is interesting, and
+                // doesn't recursively contain the typevar we are substituting for.
+                if !bound_lower.is_never()
+                    && !bound_lower.is_object()
+                    && bound_lower.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                {
+                    let partial = PartialSpecialization::Single {
+                        bound_typevar,
+                        ty: bound_lower,
+                    };
+                    let new_lower = constrained_lower.apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    add_constraint(ConstrainedTypeVar::new(
+                        db,
+                        constrained_typevar,
+                        new_lower,
+                        constrained_upper,
+                    ));
+                }
+            }
+
+            // TODO
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => {}
+        }
+
+        // (Covariant[BU] ≤ C ≤ CU) ∧ (BL ≤ B ≤ BU) → (Covariant[B] ≤ C ≤ CU)
+        if let Type::TypeVar(bound_upper_typevar) = bound_upper
+            && !bound_upper_typevar.is_same_typevar_as(db, constrained_typevar)
+        {
+            if constrained_lower.variance_of(db, bound_upper_typevar) == TypeVarVariance::Covariant
+            {
+                let partial = PartialSpecialization::Single {
+                    bound_typevar: bound_upper_typevar,
+                    ty: Type::TypeVar(bound_typevar),
+                };
+                let new_lower = constrained_lower.apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                add_constraint(ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    new_lower,
+                    constrained_upper,
+                ));
+            }
+        }
+
+        match constrained_upper.variance_of(db, bound_typevar) {
+            // B does not appear in CU, or if it does, it appears bivariantly. The constraints of B
+            // do not affect the valid specializations of C.
+            TypeVarVariance::Bivariant => {}
+
+            // (CL ≤ C ≤ Covariant[B]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[BU])
+            TypeVarVariance::Covariant => {
+                // Only substitute to create a new sequent if the substitution is interesting, and
+                // doesn't recursively contain the typevar we are substituting for.
+                if !bound_upper.is_never()
+                    && !bound_upper.is_object()
+                    && bound_upper.variance_of(db, bound_typevar) == TypeVarVariance::Bivariant
+                {
+                    let partial = PartialSpecialization::Single {
+                        bound_typevar,
+                        ty: bound_upper,
+                    };
+                    let new_upper = constrained_upper.apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    add_constraint(ConstrainedTypeVar::new(
+                        db,
+                        constrained_typevar,
+                        constrained_lower,
+                        new_upper,
+                    ));
+                }
+            }
+
+            // TODO
+            TypeVarVariance::Contravariant | TypeVarVariance::Invariant => {}
+        }
+
+        // (CL ≤ C ≤ Covariant[BL]) ∧ (BL ≤ B ≤ BU) → (CL ≤ C ≤ Covariant[B])
+        if let Type::TypeVar(bound_lower_typevar) = bound_lower
+            && !bound_lower_typevar.is_same_typevar_as(db, constrained_typevar)
+        {
+            if constrained_upper.variance_of(db, bound_lower_typevar) == TypeVarVariance::Covariant
+            {
+                let partial = PartialSpecialization::Single {
+                    bound_typevar: bound_lower_typevar,
+                    ty: Type::TypeVar(bound_typevar),
+                };
+                let new_upper = constrained_upper.apply_type_mapping(
+                    db,
+                    &TypeMapping::PartialSpecialization(partial),
+                    TypeContext::default(),
+                );
+                add_constraint(ConstrainedTypeVar::new(
+                    db,
+                    constrained_typevar,
+                    constrained_lower,
+                    new_upper,
+                ));
+            }
+        }
     }
 
     fn add_mutual_sequents_for_same_typevars(

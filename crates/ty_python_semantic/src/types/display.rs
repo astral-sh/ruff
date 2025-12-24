@@ -839,8 +839,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     KnownBoundMethodType::ConstraintSetNever => {
                         return f.write_str("bound method `ConstraintSet.never`");
                     }
+                    KnownBoundMethodType::ConstraintSetExists(_) => {
+                        return f.write_str("bound method `ConstraintSet.exists`");
+                    }
                     KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(_) => {
                         return f.write_str("bound method `ConstraintSet.implies_subtype_of`");
+                    }
+                    KnownBoundMethodType::ConstraintSetRetainOne(_) => {
+                        return f.write_str("bound method `ConstraintSet.retain_one`");
                     }
                     KnownBoundMethodType::ConstraintSetSatisfies(_) => {
                         return f.write_str("bound method `ConstraintSet.satisfies`");

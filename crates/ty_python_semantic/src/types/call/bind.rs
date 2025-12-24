@@ -1255,6 +1255,25 @@ impl<'db> Bindings<'db> {
                         ));
                     }
 
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetExists(tracked)) => {
+                        let typevars: Option<Vec<_>> = overload
+                            .arguments_for_parameter(argument_types, 0)
+                            .map(|(_, ty)| {
+                                ty.as_typevar()
+                                    .map(|bound_typevar| bound_typevar.identity(db))
+                            })
+                            .collect();
+                        let Some(typevars) = typevars else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).exists(db, typevars);
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
                     Type::KnownBoundMethod(
                         KnownBoundMethodType::ConstraintSetImpliesSubtypeOf(tracked),
                     ) => {
@@ -1268,6 +1287,20 @@ impl<'db> Bindings<'db> {
                             tracked.constraints(db),
                             InferableTypeVars::None,
                         );
+                        let tracked = TrackedConstraintSet::new(db, result);
+                        overload.set_return_type(Type::KnownInstance(
+                            KnownInstanceType::ConstraintSet(tracked),
+                        ));
+                    }
+
+                    Type::KnownBoundMethod(KnownBoundMethodType::ConstraintSetRetainOne(
+                        tracked,
+                    )) => {
+                        let [Some(Type::TypeVar(typevar))] = overload.parameter_types() else {
+                            continue;
+                        };
+
+                        let result = tracked.constraints(db).retain_one(db, typevar.identity(db));
                         let tracked = TrackedConstraintSet::new(db, result);
                         overload.set_return_type(Type::KnownInstance(
                             KnownInstanceType::ConstraintSet(tracked),

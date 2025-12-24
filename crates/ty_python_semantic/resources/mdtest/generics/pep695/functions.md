@@ -494,22 +494,99 @@ reveal_type(g(f("a")))  # revealed: tuple[Literal["a"], int] | None
 
 ## Passing generic functions to generic functions
 
-```py
+`functions.pyi`:
+
+```pyi
 from typing import Callable
 
-def invoke[A, B](fn: Callable[[A], B], value: A) -> B:
-    return fn(value)
+def invoke[A, B](fn: Callable[[A], B], value: A) -> B: ...
 
-def identity[T](x: T) -> T:
-    return x
+def identity[T](x: T) -> T: ...
 
-def head[T](xs: list[T]) -> T:
-    return xs[0]
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+def head_covariant[T](xs: Covariant[T]) -> T: ...
+def lift_covariant[T](xs: T) -> Covariant[T]: ...
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+def head_contravariant[T](xs: Contravariant[T]) -> T: ...
+def lift_contravariant[T](xs: T) -> Contravariant[T]: ...
+
+class Invariant[T]:
+    mutable_attribute: T
+
+def head_invariant[T](xs: Invariant[T]) -> T: ...
+def lift_invariant[T](xs: T) -> Invariant[T]: ...
+```
+
+A simple function that passes through its parameter type unchanged:
+
+`simple.py`:
+
+```py
+from functions import invoke, identity
 
 reveal_type(invoke(identity, 1))  # revealed: Literal[1]
+```
 
-# TODO: this should be `Unknown | int`
-reveal_type(invoke(head, [1, 2, 3]))  # revealed: Unknown
+When the either the parameter or the return type is a generic alias referring to the typevar, we
+should still be able to propagate the specializations through. This should work regardless of the
+typevar's variance in the generic alias.
+
+TODO: This currently only works for the `lift` functions (TODO: and only currently for the covariant
+case). For the `lift` functions, the parameter type is a bare typevar, resulting in us inferring a
+type mapping of `A = int, B = Class[A]`. When specializing, we can substitute the mapping of `A`
+into the mapping of `B`, giving the correct return type.
+
+For the `head` functions, the parameter type is a generic alias, resulting in us inferring a type
+mapping of `A = Class[int], A = Class[B]`. At this point, the old solver is not able to unify the
+two mappings for `A`, and we have no mapping for `B`. As a result, we infer `Unknown` for the return
+type.
+
+As part of migrating to the new solver, we will generate a single constraint set combining all of
+the facts that we learn while checking the arguments. And the constraint set implementation should
+be able to unify the two assignments to `A`.
+
+`covariant.py`:
+
+```py
+from functions import invoke, Covariant, head_covariant, lift_covariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_covariant, Covariant[int]()))
+# revealed: Covariant[Literal[1]]
+reveal_type(invoke(lift_covariant, 1))
+```
+
+`contravariant.py`:
+
+```py
+from functions import invoke, Contravariant, head_contravariant, lift_contravariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_contravariant, Contravariant[int]()))
+# TODO: revealed: Contravariant[int]
+# revealed: Unknown
+reveal_type(invoke(lift_contravariant, 1))
+```
+
+`invariant.py`:
+
+```py
+from functions import invoke, Invariant, head_invariant, lift_invariant
+
+# TODO: revealed: `int`
+# revealed: Unknown
+reveal_type(invoke(head_invariant, Invariant[int]()))
+# TODO: revealed: `Invariant[int]`
+# revealed: Unknown
+reveal_type(invoke(lift_invariant, 1))
 ```
 
 ## Protocols as TypeVar bounds

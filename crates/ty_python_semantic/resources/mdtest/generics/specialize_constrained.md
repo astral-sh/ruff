@@ -416,19 +416,43 @@ def mutually_bound[T: Base, U]():
 
 ## Nested typevars
 
-A typevar's constraint can _mention_ another typevar without _constraining_ it. In this example, `U`
-must be specialized to `list[T]`, but it cannot affect what `T` is specialized to.
+The specialization of one typevar can affect the specialization of another, even if it is not a
+"top-level" type in the bounds. (That is, if it appears as inside the specialization of a generic
+class.)
 
 ```py
 from typing import Never
 from ty_extensions import ConstraintSet, generic_context
 
-def mentions[T, U]():
-    # (T@mentions ≤ int) ∧ (U@mentions = list[T@mentions])
-    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(list[T], U, list[T])
-    # TODO: revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = list[int]]
-    # revealed: ty_extensions.Specialization[T@mentions = int, U@mentions = Unknown]
-    reveal_type(generic_context(mentions).specialize_constrained(constraints))
+class Covariant[T]:
+    def get(self) -> T:
+        raise NotImplementedError
+
+class Contravariant[T]:
+    def receive(self, input: T): ...
+
+class Invariant[T]:
+    mutable_attribute: T
+
+def mentions_covariant[T, U]():
+    # (T@mentions_covariant ≤ int) ∧ (U@mentions_covariant ≤ Covariant[T@mentions_covariant])
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Never, U, Covariant[T])
+    # revealed: ty_extensions.Specialization[T@mentions_covariant = int, U@mentions_covariant = Covariant[int]]
+    reveal_type(generic_context(mentions_covariant).specialize_constrained(constraints))
+
+def mentions_contravariant[T, U]():
+    # (T@mentions_contravariant ≤ int) ∧ (Contravariant[T@mentions_contravariant] ≤ U@mentions_contravariant)
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Contravariant[T], U, object)
+    # TODO: revealed: ty_extensions.Specialization[T@mentions_contravariant = int, U@mentions_contravariant = Contravariant[int]]
+    # revealed: ty_extensions.Specialization[T@mentions_contravariant = int, U@mentions_contravariant = Unknown]
+    reveal_type(generic_context(mentions_contravariant).specialize_constrained(constraints))
+
+def mentions_invariant[T, U]():
+    # (T@mentions_invariant ≤ int) ∧ (U@mentions_invariant = Invariant[T@mentions_invariant])
+    constraints = ConstraintSet.range(Never, T, int) & ConstraintSet.range(Invariant[T], U, Invariant[T])
+    # TODO: revealed: ty_extensions.Specialization[T@mentions_invariant = int, U@mentions_invariant = Invariant[int]]
+    # revealed: ty_extensions.Specialization[T@mentions_invariant = int, U@mentions_invariant = Unknown]
+    reveal_type(generic_context(mentions_invariant).specialize_constrained(constraints))
 ```
 
 If the constraint set contains mutually recursive bounds, specialization inference will not
@@ -437,8 +461,8 @@ this case.
 
 ```py
 def divergent[T, U]():
-    # (T@divergent = list[U@divergent]) ∧ (U@divergent = list[T@divergent]))
-    constraints = ConstraintSet.range(list[U], T, list[U]) & ConstraintSet.range(list[T], U, list[T])
+    # (T@divergent = Invariant[U@divergent]) ∧ (U@divergent = Invariant[T@divergent]))
+    constraints = ConstraintSet.range(Invariant[U], T, Invariant[U]) & ConstraintSet.range(Invariant[T], U, Invariant[T])
     # revealed: None
     reveal_type(generic_context(divergent).specialize_constrained(constraints))
 ```
