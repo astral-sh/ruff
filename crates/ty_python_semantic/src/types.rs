@@ -36,8 +36,8 @@ pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening, imported_symbol,
-    known_module_symbol,
+    Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening, builtins_module_scope,
+    imported_symbol, known_module_symbol,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
@@ -9459,6 +9459,13 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
+                        write!(
+                            f,
+                            "Function `{function}` is not valid in a type expression",
+                            function = function.name(self.db)
+                        )
+                    }
                     InvalidTypeExpression::InvalidType(Type::ModuleLiteral(module), _) => write!(
                         f,
                         "Module `{module}` is not valid in a type expression",
@@ -9520,6 +9527,20 @@ impl<'db> InvalidTypeExpression<'db> {
                 "You might have meant to use a concrete TypedDict \
                 or `collections.abc.Mapping[str, object]`",
             );
+        // It would be nice if we could register `builtins.callable` as a known function,
+        // but currently doing this would require reimplementing the signature "manually"
+        // in `Type::bindings()`, which isn't worth it given that we have no other special
+        // casing for this function.
+        } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
+            && function.name(db) == "callable"
+            && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
+            && function_body_scope
+                .scope(db)
+                .parent()
+                .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
+                == builtins_module_scope(db)
+        {
+            diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
         }
     }
 }
