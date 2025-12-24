@@ -324,7 +324,7 @@ impl<'db> AllMembers<'db> {
 
                 for (symbol_id, _) in use_def_map.all_end_of_scope_symbol_declarations() {
                     let symbol_name = place_table.symbol(symbol_id).name();
-                    let Place::Defined(ty, _, _) =
+                    let Place::Defined(ty, _, _, _) =
                         imported_symbol(db, file, symbol_name, None).place
                     else {
                         continue;
@@ -493,7 +493,7 @@ impl<'db> AllMembers<'db> {
             Some(CodeGeneratorKind::TypedDict) => {}
             Some(CodeGeneratorKind::DataclassLike(_)) => {
                 for attr in SYNTHETIC_DATACLASS_ATTRIBUTES {
-                    if let Place::Defined(synthetic_member, _, _) = ty.member(db, attr).place {
+                    if let Place::Defined(synthetic_member, _, _, _) = ty.member(db, attr).place {
                         self.members.insert(Member {
                             name: Name::from(*attr),
                             ty: synthetic_member,

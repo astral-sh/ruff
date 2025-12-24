@@ -1022,7 +1022,7 @@ impl<'db> Bindings<'db> {
                             // TODO: we could emit a diagnostic here (if default is not set)
                             overload.set_return_type(
                                 match instance_ty.static_member(db, attr_name.value(db)) {
-                                    Place::Defined(ty, _, Definedness::AlwaysDefined) => {
+                                    Place::Defined(ty, _, Definedness::AlwaysDefined, _) => {
                                         if ty.is_dynamic() {
                                             // Here, we attempt to model the fact that an attribute lookup on
                                             // a dynamic type could fail
@@ -1032,7 +1032,7 @@ impl<'db> Bindings<'db> {
                                             ty
                                         }
                                     }
-                                    Place::Defined(ty, _, Definedness::PossiblyUndefined) => {
+                                    Place::Defined(ty, _, Definedness::PossiblyUndefined, _) => {
                                         union_with_default(ty)
                                     }
                                     Place::Undefined => default,
@@ -2833,7 +2833,7 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
                 )
                 .place
             {
-                Place::Defined(getitem_method, _, Definedness::AlwaysDefined) => getitem_method
+                Place::Defined(getitem_method, _, Definedness::AlwaysDefined, _) => getitem_method
                     .try_call(db, &CallArguments::positional([Type::unknown()]))
                     .ok()
                     .map_or_else(Type::unknown, |bindings| bindings.return_type(db)),
@@ -3439,7 +3439,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     )
                     .place
                 {
-                    Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
+                    Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => keys_method
                         .try_call(self.db, &CallArguments::none())
                         .ok()
                         .and_then(|bindings| {
@@ -3485,10 +3485,14 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         )
                         .place
                     {
-                        Place::Defined(keys_method, _, Definedness::AlwaysDefined) => keys_method
-                            .try_call(self.db, &CallArguments::positional([Type::unknown()]))
-                            .ok()
-                            .map_or_else(Type::unknown, |bindings| bindings.return_type(self.db)),
+                        Place::Defined(keys_method, _, Definedness::AlwaysDefined, _) => {
+                            keys_method
+                                .try_call(self.db, &CallArguments::positional([Type::unknown()]))
+                                .ok()
+                                .map_or_else(Type::unknown, |bindings| {
+                                    bindings.return_type(self.db)
+                                })
+                        }
                         _ => Type::unknown(),
                     },
                 )

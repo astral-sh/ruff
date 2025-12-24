@@ -1093,12 +1093,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut public_functions = FxIndexSet::default();
 
         for place in overloaded_function_places {
-            if let Place::Defined(Type::FunctionLiteral(function), _, Definedness::AlwaysDefined) =
-                place_from_bindings(
-                    self.db(),
-                    use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
-                )
-                .place
+            if let Place::Defined(
+                Type::FunctionLiteral(function),
+                _,
+                Definedness::AlwaysDefined,
+                _,
+            ) = place_from_bindings(
+                self.db(),
+                use_def.end_of_scope_symbol_bindings(place.as_symbol().unwrap()),
+            )
+            .place
             {
                 if function.file(self.db()) != self.file() {
                     // If the function is not in this file, we don't need to check it.
@@ -1660,7 +1664,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let AnyNodeRef::ExprAttribute(ast::ExprAttribute { value, attr, .. }) = node {
                     let value_type =
                         self.infer_maybe_standalone_expression(value, TypeContext::default());
-                    if let Place::Defined(ty, _, Definedness::AlwaysDefined) =
+                    if let Place::Defined(ty, _, Definedness::AlwaysDefined, _) =
                         value_type.member(db, attr).place
                     {
                         // TODO: also consider qualifiers on the attribute
@@ -4806,7 +4810,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                             MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
                                         ) {
                                         PlaceAndQualifiers {
-                                            place: Place::Defined(attr_ty, _, _),
+                                            place: Place::Defined(attr_ty, _, _, _),
                                             qualifiers: _,
                                         } => attr_ty.is_callable_type(),
                                         _ => false,
@@ -4880,7 +4884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 false
                             }
                             PlaceAndQualifiers {
-                                place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
+                                place: Place::Defined(meta_attr_ty, _, meta_attr_boundness, _),
                                 qualifiers,
                             } => {
                                 if invalid_assignment_to_final(self, qualifiers) {
@@ -4888,7 +4892,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
 
                                 let assignable_to_meta_attr =
-                                    if let Place::Defined(meta_dunder_set, _, _) =
+                                    if let Place::Defined(meta_dunder_set, _, _, _) =
                                         meta_attr_ty.class_member(db, "__set__".into()).place
                                     {
                                         // TODO: We could use the annotated parameter type of `__set__` as
@@ -4931,7 +4935,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 {
                                     let (assignable, boundness) = if let PlaceAndQualifiers {
                                         place:
-                                            Place::Defined(instance_attr_ty, _, instance_attr_boundness),
+                                            Place::Defined(
+                                                instance_attr_ty,
+                                                _,
+                                                instance_attr_boundness,
+                                                _,
+                                            ),
                                         qualifiers,
                                     } =
                                         object_ty.instance_member(db, attribute)
@@ -4975,7 +4984,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             } => {
                                 if let PlaceAndQualifiers {
                                     place:
-                                        Place::Defined(instance_attr_ty, _, instance_attr_boundness),
+                                        Place::Defined(instance_attr_ty, _, instance_attr_boundness, _),
                                     qualifiers,
                                 } = object_ty.instance_member(db, attribute)
                                 {
@@ -5021,7 +5030,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 match object_ty.class_member(db, attribute.into()) {
                     PlaceAndQualifiers {
-                        place: Place::Defined(meta_attr_ty, _, meta_attr_boundness),
+                        place: Place::Defined(meta_attr_ty, _, meta_attr_boundness, _),
                         qualifiers,
                     } => {
                         // We may have to perform multi-inference if the meta attribute is possibly unbound.
@@ -5032,40 +5041,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return false;
                         }
 
-                        let assignable_to_meta_attr = if let Place::Defined(meta_dunder_set, _, _) =
-                            meta_attr_ty.class_member(db, "__set__".into()).place
-                        {
-                            // TODO: We could use the annotated parameter type of `__set__` as
-                            // type context here.
-                            let dunder_set_result = meta_dunder_set.try_call(
-                                db,
-                                &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
-                            );
+                        let assignable_to_meta_attr =
+                            if let Place::Defined(meta_dunder_set, _, _, _) =
+                                meta_attr_ty.class_member(db, "__set__".into()).place
+                            {
+                                // TODO: We could use the annotated parameter type of `__set__` as
+                                // type context here.
+                                let dunder_set_result = meta_dunder_set.try_call(
+                                    db,
+                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                );
 
-                            if emit_diagnostics {
-                                if let Err(dunder_set_failure) = dunder_set_result.as_ref() {
-                                    report_bad_dunder_set_call(
-                                        &self.context,
-                                        dunder_set_failure,
-                                        attribute,
-                                        object_ty,
-                                        target,
-                                    );
+                                if emit_diagnostics {
+                                    if let Err(dunder_set_failure) = dunder_set_result.as_ref() {
+                                        report_bad_dunder_set_call(
+                                            &self.context,
+                                            dunder_set_failure,
+                                            attribute,
+                                            object_ty,
+                                            target,
+                                        );
+                                    }
                                 }
-                            }
 
-                            dunder_set_result.is_ok()
-                        } else {
-                            let value_ty =
-                                infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
-                            ensure_assignable_to(self, value_ty, meta_attr_ty)
-                        };
+                                dunder_set_result.is_ok()
+                            } else {
+                                let value_ty =
+                                    infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
+                                ensure_assignable_to(self, value_ty, meta_attr_ty)
+                            };
 
                         let assignable_to_class_attr = if meta_attr_boundness
                             == Definedness::PossiblyUndefined
                         {
                             let (assignable, boundness) =
-                                if let Place::Defined(class_attr_ty, _, class_attr_boundness) =
+                                if let Place::Defined(class_attr_ty, _, class_attr_boundness, _) =
                                     object_ty
                                         .find_name_in_mro(db, attribute)
                                         .expect("called on Type::ClassLiteral or Type::SubclassOf")
@@ -5102,7 +5112,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         ..
                     } => {
                         if let PlaceAndQualifiers {
-                            place: Place::Defined(class_attr_ty, _, class_attr_boundness),
+                            place: Place::Defined(class_attr_ty, _, class_attr_boundness, _),
                             qualifiers,
                         } = object_ty
                             .find_name_in_mro(db, attribute)
@@ -5176,7 +5186,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 } else {
                     module.static_member(db, attribute)
                 };
-                if let Place::Defined(attr_ty, _, _) = sym.place {
+                if let Place::Defined(attr_ty, _, _, _) = sym.place {
                     let value_ty = infer_value_ty(self, TypeContext::new(Some(attr_ty)));
 
                     let assignable = value_ty.is_assignable_to(db, attr_ty);
@@ -6777,7 +6787,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // First try loading the requested attribute from the module.
         if !import_is_self_referential {
             if let PlaceAndQualifiers {
-                place: Place::Defined(ty, _, boundness),
+                place: Place::Defined(ty, _, boundness, _),
                 qualifiers,
             } = module_ty.member(self.db(), name)
             {
@@ -9296,7 +9306,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         }
 
         let ty =
-            resolved_after_fallback.unwrap_with_diagnostic(|lookup_error| match lookup_error {
+            resolved_after_fallback.unwrap_with_diagnostic(db, |lookup_error| match lookup_error {
                 LookupError::Undefined(qualifiers) => {
                     self.report_unresolved_reference(name_node);
                     TypeAndQualifiers::new(Type::unknown(), TypeOrigin::Inferred, qualifiers)
@@ -9418,7 +9428,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
                 let (parent_place, _use_id) = self.infer_local_place_load(parent_expr, expr_ref);
-                if let Place::Defined(_, _, _) = parent_place {
+                if let Place::Defined(_, _, _, _) = parent_place {
                     return Place::Undefined.into();
                 }
             }
@@ -9561,7 +9571,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     });
                     // We could have `Place::Undefined` here, despite the checks above, for example if
                     // this scope contains a `del` statement but no binding or declaration.
-                    if let Place::Defined(type_, _, boundness) = local_place_and_qualifiers.place {
+                    if let Place::Defined(type_, _, boundness, _) = local_place_and_qualifiers.place
+                    {
                         nonlocal_union_builder.add_in_place(type_);
                         // `ConsideredDefinitions::AllReachable` never returns PossiblyUnbound
                         debug_assert_eq!(boundness, Definedness::AlwaysDefined);
@@ -9815,7 +9826,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ast::ExprRef::Attribute(attribute),
             );
             constraint_keys.extend(keys);
-            if let Place::Defined(ty, _, Definedness::AlwaysDefined) = resolved.place {
+            if let Place::Defined(ty, _, Definedness::AlwaysDefined, _) = resolved.place {
                 assigned_type = Some(ty);
             }
         }
@@ -9836,7 +9847,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let attr_name = &attr.id;
-        let resolved_type = fallback_place.unwrap_with_diagnostic(|lookup_err| match lookup_err {
+        let resolved_type = fallback_place.unwrap_with_diagnostic(db, |lookup_err| match lookup_err {
             LookupError::Undefined(_) => {
                 let fallback = || {
                     TypeAndQualifiers::new(
@@ -11439,7 +11450,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let contains_dunder = right.class_member(db, "__contains__".into()).place;
         let compare_result_opt = match contains_dunder {
-            Place::Defined(contains_dunder, _, Definedness::AlwaysDefined) => {
+            Place::Defined(contains_dunder, _, Definedness::AlwaysDefined, _) => {
                 // If `__contains__` is available, it is used directly for the membership test.
                 contains_dunder
                     .try_call(db, &CallArguments::positional([right, left]))
@@ -11639,7 +11650,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     ast::ExprRef::Subscript(subscript),
                 );
                 constraint_keys.extend(keys);
-                if let Place::Defined(ty, _, Definedness::AlwaysDefined) = place.place {
+                if let Place::Defined(ty, _, Definedness::AlwaysDefined, _) = place.place {
                     // Even if we can obtain the subscript type based on the assignments, we still perform default type inference
                     // (to store the expression type and to report errors).
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
@@ -12671,7 +12682,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             match dunder_class_getitem_method {
                 Place::Undefined => {}
-                Place::Defined(ty, _, boundness) => {
+                Place::Defined(ty, _, boundness, _) => {
                     if boundness == Definedness::PossiblyUndefined {
                         if let Some(builder) =
                             context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, value_node)
