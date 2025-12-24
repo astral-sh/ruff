@@ -556,7 +556,7 @@ impl TypedDictAssignmentKind {
 /// Validates assignment of a value to a specific key on a `TypedDict`.
 ///
 /// Returns true if the assignment is valid, or false otherwise.
-#[allow(clippy::too_many_arguments)]
+#[expect(clippy::too_many_arguments)]
 pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
     context: &InferContext<'db, 'ast>,
     typed_dict: TypedDictType<'db>,

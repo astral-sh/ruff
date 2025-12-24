@@ -980,11 +980,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
                 f.write_str("]")
             }
-            Type::TypedDict(TypedDictType::Class(defining_class)) => defining_class
-                .class_literal(self.db)
-                .0
-                .display_with(self.db, self.settings.clone())
-                .fmt_detailed(f),
+            Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
+                ClassType::NonGeneric(class) => class
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f),
+                ClassType::Generic(alias) => alias
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f),
+            },
             Type::TypedDict(TypedDictType::Synthesized(synthesized)) => {
                 f.set_invalid_type_annotation();
                 f.write_char('<')?;

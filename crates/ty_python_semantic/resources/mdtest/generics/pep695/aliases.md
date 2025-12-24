@@ -144,7 +144,7 @@ class Dict[T](TypedDict):
 
 type DictInt = Dict[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Dict` is already specialized"
+# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
 def _(x: DictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
