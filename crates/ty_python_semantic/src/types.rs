@@ -14491,7 +14491,7 @@ impl<'db> IntersectionType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct StringLiteralType<'db> {
     #[returns(deref)]
-    value: CompactString,
+    pub value: CompactString,
 }
 
 // The Salsa heap is tracked separately.
@@ -14501,11 +14501,6 @@ impl<'db> StringLiteralType<'db> {
     /// The length of the string, as would be returned by Python's `len()`.
     pub(crate) fn python_len(self, db: &'db dyn Db) -> usize {
         self.value(db).chars().count()
-    }
-
-    /// Returns the contents of this string literal.
-    pub fn as_str(self, db: &'db dyn Db) -> &'db str {
-        self.value(db)
     }
 }
 

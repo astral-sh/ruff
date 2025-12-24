@@ -1334,7 +1334,7 @@ fn collect_string_literals_from_type<'db>(
 
     match ty {
         Type::StringLiteral(literal) => {
-            out.entry(literal.as_str(db)).or_insert(literal);
+            out.entry(literal.value(db)).or_insert(literal);
         }
         Type::Union(union) => {
             for ty in union.elements(db) {
@@ -1368,7 +1368,7 @@ fn collect_typed_dict_literals_from_type<'db>(
             for (name, _) in typed_dict.items(db) {
                 let name = name.as_str();
                 let literal = StringLiteralType::new(db, name);
-                out.entry(literal.as_str(db)).or_insert(literal);
+                out.entry(literal.value(db)).or_insert(literal);
             }
         }
         Type::Union(union) => {
