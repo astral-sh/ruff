@@ -172,7 +172,7 @@ declare_lint! {
     /// ```
     pub(crate) static CALL_TOP_CALLABLE = {
         summary: "detects calls to the top callable type",
-        status: LintStatus::preview("0.0.1-alpha.1"),
+        status: LintStatus::stable("0.0.7"),
         default_level: Level::Error,
     }
 }

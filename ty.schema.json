@@ -356,6 +356,16 @@
             }
           ]
         },
+        "call-top-callable": {
+          "title": "detects calls to the top callable type",
+          "description": "## What it does\nChecks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all\ncallable types with return type `T`).\n\n## Why is this bad?\nWhen an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or\n`isinstance(x, Callable)`), we know the object is callable, but we don't know its\nprecise signature. This type represents the set of all possible callable types\n(including, e.g., functions that take no arguments and functions that require arguments),\nso no specific set of arguments can be guaranteed to be valid.\n\n## Examples\n```python\ndef f(x: object):\n    if callable(x):\n        x()  # We know x is callable, but not what arguments it accepts\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "conflicting-argument-forms": {
           "title": "detects when an argument is used as both a value and a type form in a call",
           "description": "## What it does\nChecks whether an argument is used as both a value and a type form in a call.\n\n## Why is this bad?\nSuch calls have confusing semantics and often indicate a logic error.\n\n## Examples\n```python\nfrom typing import reveal_type\nfrom ty_extensions import is_singleton\n\nif flag:\n    f = repr  # Expects a value\nelse:\n    f = is_singleton  # Expects a type form\n\nf(int)  # error\n```",

@@ -2855,6 +2855,7 @@ impl<'db> ClassLiteral<'db> {
                             Some(Type::none(db)),
                         )),
                         CallableTypeKind::FunctionLike,
+                        None,
                     )));
                 }
 
@@ -2880,6 +2881,7 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
+                    None,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {

@@ -1626,15 +1626,15 @@ impl<'db> CallableBinding<'db> {
         // should fail because we don't know the actual signature. The type IS callable (it passes
         // `callable()`), but it represents an infinite union of all possible callable types, so
         // there's no valid set of arguments.
-        if let Type::Callable(callable) = self.signature_type {
-            if callable.materialization_kind(db) == Some(MaterializationKind::Top) {
-                for overload in &mut self.overloads {
-                    overload
-                        .errors
-                        .push(BindingError::CalledTopCallable(self.signature_type));
-                }
-                return None;
+        if let Type::Callable(callable) = self.signature_type
+            && callable.materialization_kind(db) == Some(MaterializationKind::Top)
+        {
+            for overload in &mut self.overloads {
+                overload
+                    .errors
+                    .push(BindingError::CalledTopCallable(self.signature_type));
             }
+            return None;
         }
 
         tracing::trace!(

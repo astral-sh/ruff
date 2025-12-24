@@ -608,15 +608,9 @@ impl<'db> CallableSignature<'db> {
         // For each overload in self, the return type must have the relation to
         // the return type of some overload in other.
         self.overloads.iter().when_all(db, |self_sig| {
-            let Some(self_return_ty) = self_sig.return_ty else {
-                // No return type means Never, which is a subtype of everything
-                return ConstraintSet::from(true);
-            };
+            let self_return_ty = self_sig.return_ty.unwrap_or(Type::unknown());
             other.overloads.iter().when_any(db, |other_sig| {
-                let Some(other_return_ty) = other_sig.return_ty else {
-                    // other returns Never, self returns something - not a match for subtyping
-                    return ConstraintSet::from(false);
-                };
+                let other_return_ty = other_sig.return_ty.unwrap_or(Type::unknown());
                 self_return_ty.has_relation_to_impl(
                     db,
                     other_return_ty,

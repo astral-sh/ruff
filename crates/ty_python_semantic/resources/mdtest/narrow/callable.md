@@ -51,7 +51,7 @@ def f(x: object):
     if callable(x):
         reveal_type(x)  # revealed: Top[(...) -> object]
     else:
-        reveal_type(x)  # revealed: ~(Top[(...) -> object])
+        reveal_type(x)  # revealed: ~Top[(...) -> object]
 ```
 
 ## Calling narrowed callables

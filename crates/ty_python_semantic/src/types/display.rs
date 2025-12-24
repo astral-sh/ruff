@@ -2248,8 +2248,13 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            Type::Callable(_)
-            | Type::KnownBoundMethod(_)
+            // Callable types with a materialization kind (Top/Bottom) are displayed as
+            // `Top[(...) -> T]` or `Bottom[(...) -> T]`, which is already unambiguous
+            // and doesn't need additional parentheses.
+            Type::Callable(callable) if callable.materialization_kind(self.db).is_none() => {
+                write_parentheses(f)
+            }
+            Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),
