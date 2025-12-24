@@ -92,8 +92,6 @@ impl<'a> Importer<'a> {
 
     /// Add an import statement to the start of the file.
     pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
-        // let required_import =
-        //     Generator::new(self.stylist.indentation(), self.stylist.line_ending()).stmt(import);
         self.add_at_start(&self.source[import.range()])
     }
 
