@@ -28,7 +28,6 @@ mod doc_lines;
 mod docstrings;
 mod fix;
 pub mod fs;
-mod helpers;
 mod importer;
 pub mod line_width;
 pub mod linter;
