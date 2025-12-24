@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
+
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
@@ -72,6 +73,7 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
+        // ...and the same comments
         let first_comments = checker
             .comment_ranges()
             .comments_in_range(body_range(&current_branch, checker.locator()))
