@@ -168,7 +168,7 @@ declare_lint! {
     /// ```python
     /// def f(x: object):
     ///     if callable(x):
-    ///         x()  # We know x is callable, but not what arguments it accepts
+    ///         x()  # error: We know x is callable, but not what arguments it accepts
     /// ```
     pub(crate) static CALL_TOP_CALLABLE = {
         summary: "detects calls to the top callable type",

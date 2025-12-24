@@ -12666,42 +12666,15 @@ impl<'db> CallableType<'db> {
         // For Top, we only need to compare return types because Top parameters are a supertype
         // of all possible parameters. Bottom materializations are simplified to the bottom
         // callable directly, so they use normal signature comparison.
-        match (
-            self.is_top_materialization(db),
-            other.is_top_materialization(db),
-        ) {
-            // Neither is a top materialization: use normal signature comparison.
-            (false, false) => {}
-
-            // Anything <: Top[...]: just compare return types.
-            (_, true) => {
-                return self.signatures(db).return_types_have_relation_to(
-                    db,
-                    other.signatures(db),
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                );
-            }
-
-            // Top[...] <: non-Top: depends on whether target has gradual parameters.
-            // For assignability, Top[(...) -> R] can be assigned to (...) -> S if R <: S
-            // (where (...) represents gradual parameters).
-            // For subtyping, Top is never a subtype of any specific callable.
-            (true, false) => {
-                if !relation.is_subtyping() && other.signatures(db).has_gradual_parameters() {
-                    return self.signatures(db).return_types_have_relation_to(
-                        db,
-                        other.signatures(db),
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    );
-                }
-                return ConstraintSet::from(false);
-            }
+        if other.is_top_materialization(db) {
+            return self.signatures(db).return_types_have_relation_to(
+                db,
+                other.signatures(db),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
         }
 
         self.signatures(db).has_relation_to_impl(

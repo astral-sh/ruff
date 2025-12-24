@@ -213,7 +213,11 @@ static_assert(is_subtype_of(Bottom[Callable[..., Never]], EquivalentToBottom))
 
 # TODO: is_equivalent_to only considers types of the same kind equivalent (Callable vs ProtocolInstance),
 # so this fails even though mutual subtyping proves semantic equivalence.
-# static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))
+static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))  # error: [static-assert-error]
+
+# Top-materialized callables are not equivalent to non-top-materialized callables, even if their
+# signatures would otherwise be equivalent after materialization.
+static_assert(not is_equivalent_to(Top[Callable[..., object]], Callable[..., object]))
 ```
 
 ## Tuple

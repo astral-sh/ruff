@@ -579,9 +579,8 @@ impl<'db> CallableSignature<'db> {
 
     /// Materialize only the return types of all signatures, preserving parameters as-is.
     ///
-    /// This is used when wrapping gradual callables in `Top[...]` or `Bottom[...]` - we want
-    /// to preserve the gradual parameters but materialize the return types (which are in
-    /// covariant position).
+    /// This is used when wrapping gradual callables in `Top[...]`. We want to preserve the gradual
+    /// parameters but materialize the return types (which are in covariant position).
     pub(crate) fn materialize_return_types(
         &self,
         db: &'db dyn Db,
