@@ -658,6 +658,8 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
         r#"
         print(x)     # [unresolved-reference]
         print(4[1])  # [non-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
@@ -708,6 +710,25 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
             }
           }
         }
+      },
+      {
+        "check_name": "revealed-type",
+        "description": "revealed-type: Revealed type: `LiteralString`",
+        "severity": "info",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 5,
+              "column": 13
+            },
+            "end": {
+              "line": 5,
+              "column": 26
+            }
+          }
+        }
       }
     ]
     ----- stderr -----
@@ -723,6 +744,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
         r#"
         print(x)     # [unresolved-reference]
         print(4[1])  # [non-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
@@ -732,6 +755,7 @@ fn github_diagnostics() -> anyhow::Result<()> {
     ----- stdout -----
     ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
     ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
     ");
@@ -804,32 +828,6 @@ fn can_handle_large_binop_expressions() -> anyhow::Result<()> {
 
     ----- stderr -----
     "###);
-
-    Ok(())
-}
-
-#[test_case::test_case("concise")]
-#[test_case::test_case("full")]
-#[test_case::test_case("github")]
-#[test_case::test_case("gitlab")]
-fn output_format(output_format: &str) -> anyhow::Result<()> {
-    let case = CliTest::with_file(
-        "test.py",
-        "
-        from typing_extensions import reveal_type
-        reveal_type('str'.lower())  # revealed-type
-        match 42:  # invalid-syntax
-            case _: ...
-        ",
-    )?;
-
-    let snapshot = format!("output_format_{output_format}");
-
-    assert_cmd_snapshot!(
-        snapshot,
-        case.command()
-            .args(["--output-format", output_format, "--target-version", "3.9"])
-    );
 
     Ok(())
 }
