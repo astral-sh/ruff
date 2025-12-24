@@ -7,7 +7,7 @@ use crate::{
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        StringLiteralType, Type, TypeQualifiers,
+        Type, TypeQualifiers,
     },
 };
 
@@ -139,10 +139,7 @@ pub(crate) fn enum_metadata<'db>(
                                 let auto_value_ty = if Type::ClassLiteral(class)
                                     .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                 {
-                                    Type::StringLiteral(StringLiteralType::new(
-                                        db,
-                                        name.to_lowercase().as_str(),
-                                    ))
+                                    Type::string_literal(db, &name.to_lowercase())
                                 } else {
                                     let custom_mixins: smallvec::SmallVec<[Option<KnownClass>; 1]> =
                                         class
