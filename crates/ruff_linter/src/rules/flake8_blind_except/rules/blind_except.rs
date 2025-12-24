@@ -1,4 +1,3 @@
-use crate::rules::flake8_logging::helpers::is_logger_method_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::Truthiness;
 use ruff_python_ast::statement_visitor::{StatementVisitor, walk_stmt};
@@ -9,6 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
 /// Checks for `except` clauses that catch all exceptions.  This includes
