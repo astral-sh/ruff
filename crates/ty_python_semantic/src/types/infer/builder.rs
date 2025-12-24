@@ -77,7 +77,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
@@ -852,7 +852,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that the class's metaclass can be determined without error.
+            // (5) Check that @total_ordering has a valid ordering method in the MRO
+            if class.total_ordering(self.db()) {
+                let has_ordering_method = class
+                    .iter_mro(self.db(), None)
+                    .filter_map(super::super::class_base::ClassBase::into_class)
+                    .filter(|base_class| {
+                        !base_class
+                            .class_literal(self.db())
+                            .0
+                            .is_known(self.db(), KnownClass::Object)
+                    })
+                    .any(|base_class| {
+                        base_class
+                            .class_literal(self.db())
+                            .0
+                            .has_own_ordering_method(self.db())
+                    });
+
+                if !has_ordering_method {
+                    // Find the @total_ordering decorator to report the diagnostic at its location
+                    if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
+                        self.expression_type(&decorator.expression)
+                            .as_function_literal()
+                            .is_some_and(|function| {
+                                function.is_known(self.db(), KnownFunction::TotalOrdering)
+                            })
+                    }) {
+                        report_invalid_total_ordering(&self.context, class, decorator);
+                    }
+                }
+            }
+
+            // (6) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {

@@ -194,12 +194,12 @@ reveal_type(p1 >= p2)  # revealed: bool
 ## Missing ordering method
 
 If a class has `@total_ordering` but doesn't define any ordering method (itself or in a superclass),
-the decorator would fail at runtime. We don't synthesize methods in this case:
+a diagnostic is emitted at the decorator site:
 
 ```py
 from functools import total_ordering
 
-@total_ordering
+@total_ordering  # error: [invalid-total-ordering]
 class NoOrdering:
     def __eq__(self, other: object) -> bool:
         return True
@@ -207,7 +207,7 @@ class NoOrdering:
 n1 = NoOrdering()
 n2 = NoOrdering()
 
-# These should error because no ordering method is defined.
+# Comparison operators also error because no methods were synthesized.
 n1 <= n2  # error: [unsupported-operator]
 n1 >= n2  # error: [unsupported-operator]
 ```
