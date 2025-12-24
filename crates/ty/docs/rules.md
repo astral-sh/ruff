@@ -126,7 +126,7 @@ so no specific set of arguments can be guaranteed to be valid.
 ```python
 def f(x: object):
     if callable(x):
-        x()  # error: We know x is callable, but not what arguments it accepts
+        x()  # error: We know `x` is callable, but not what arguments it accepts
 ```
 
 ## `conflicting-argument-forms`
