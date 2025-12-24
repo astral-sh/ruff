@@ -284,7 +284,7 @@ impl OsSystem {
     fn path_exists_case_sensitive_fast(&self, path: &SystemPath) -> Option<bool> {
         // This is a more forgiving version of `dunce::simplified` that removes all `\\?\` prefixes on Windows.
         // We use this more forgiving version because we don't intend on using either path for anything other than comparison
-        // and the prefix is only relevant when passing the path to other programs and its longer than 200 something
+        // and the prefix is only relevant when passing the path to other programs and it's longer than 200 something
         // characters.
         fn simplify_ignore_verbatim(path: &SystemPath) -> &SystemPath {
             if cfg!(windows) {
@@ -298,9 +298,7 @@ impl OsSystem {
             }
         }
 
-        let simplified = simplify_ignore_verbatim(path);
-
-        let Ok(canonicalized) = simplified.as_std_path().canonicalize() else {
+        let Ok(canonicalized) = path.as_std_path().canonicalize() else {
             // The path doesn't exist or can't be accessed. The path doesn't exist.
             return Some(false);
         };
@@ -309,12 +307,13 @@ impl OsSystem {
             // The original path is valid UTF8 but the canonicalized path isn't. This definitely suggests
             // that a symlink is involved. Fall back to the slow path.
             tracing::debug!(
-                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{simplified}` is not valid UTF-8"
+                "Falling back to the slow case-sensitive path existence check because the canonicalized path of `{path}` is not valid UTF-8"
             );
             return None;
         };
 
         let simplified_canonicalized = simplify_ignore_verbatim(&canonicalized);
+        let simplified = simplify_ignore_verbatim(path);
 
         // Test if the paths differ by anything other than casing. If so, that suggests that
         // `path` pointed to a symlink (or some other none reversible path normalization happened).
