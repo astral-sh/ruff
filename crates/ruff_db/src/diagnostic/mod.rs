@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -1467,6 +1467,15 @@ pub enum ConciseMessage<'a> {
     Both { main: &'a str, annotation: &'a str },
     /// A custom concise message has been provided.
     Custom(&'a str),
+}
+
+impl<'a> ConciseMessage<'a> {
+    fn to_str(&self) -> Cow<'a, str> {
+        match self {
+            ConciseMessage::MainDiagnostic(s) | ConciseMessage::Custom(s) => Cow::Borrowed(s),
+            ConciseMessage::Both { .. } => Cow::Owned(self.to_string()),
+        }
+    }
 }
 
 impl std::fmt::Display for ConciseMessage<'_> {

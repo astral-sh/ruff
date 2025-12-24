@@ -56,7 +56,7 @@ impl<'a> JunitRenderer<'a> {
                         start_location: location,
                     } = diagnostic;
                     let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                    status.set_message(diagnostic.concise_message().to_string());
+                    status.set_message(diagnostic.concise_message().to_str());
 
                     if let Some(location) = location {
                         status.set_description(format!(
@@ -66,7 +66,7 @@ impl<'a> JunitRenderer<'a> {
                             body = diagnostic.concise_message()
                         ));
                     } else {
-                        status.set_description(diagnostic.concise_message().to_string());
+                        status.set_description(diagnostic.concise_message().to_str());
                     }
 
                     let code = diagnostic
