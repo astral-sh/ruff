@@ -83,6 +83,9 @@ pub(super) fn request(req: server::Request) -> Task {
         requests::SignatureHelpRequestHandler::METHOD => background_document_request_task::<
             requests::SignatureHelpRequestHandler,
         >(req, BackgroundSchedule::Worker),
+        requests::FormattingRequestHandler::METHOD => background_document_request_task::<
+            requests::FormattingRequestHandler,
+        >(req, BackgroundSchedule::Worker),
         requests::PrepareRenameRequestHandler::METHOD => background_document_request_task::<
             requests::PrepareRenameRequestHandler,
         >(req, BackgroundSchedule::Worker),

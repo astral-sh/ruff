@@ -9,6 +9,7 @@ mod doc_highlights;
 mod docstring;
 mod document_symbols;
 mod find_references;
+mod formatting;
 mod goto;
 mod goto_declaration;
 mod goto_definition;
@@ -32,6 +33,7 @@ pub use completion::{Completion, CompletionKind, CompletionSettings, completion}
 pub use doc_highlights::document_highlights;
 pub use document_symbols::document_symbols;
 pub use find_references::find_references;
+pub use formatting::{FormatData, FormattingOptions, FormattingPoint, FormattingRange, formatting};
 pub use goto::{goto_declaration, goto_definition, goto_type_definition};
 pub use hover::hover;
 pub use inlay_hints::{
