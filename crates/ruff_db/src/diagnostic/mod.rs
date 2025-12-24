@@ -1470,7 +1470,7 @@ pub enum ConciseMessage<'a> {
 }
 
 impl<'a> ConciseMessage<'a> {
-    fn to_str(&self) -> Cow<'a, str> {
+    pub fn to_str(&self) -> Cow<'a, str> {
         match self {
             ConciseMessage::MainDiagnostic(s) | ConciseMessage::Custom(s) => Cow::Borrowed(s),
             ConciseMessage::Both { .. } => Cow::Owned(self.to_string()),
