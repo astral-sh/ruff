@@ -336,7 +336,7 @@ class PlaygroundServer
     return {
       suggestions: completions.map((completion, i) => ({
         label: {
-          label: completion.label,
+          label: completion.name,
           detail:
             completion.module_name == null
               ? undefined
