@@ -1043,7 +1043,7 @@ def mvce(keys, values):
     ----- stdout -----
     1	C416	[*] unnecessary-comprehension
     Found 1 error.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1073,7 +1073,8 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
-        "fixable": false
+        "fixable": false,
+        "fixable_count": 0
       }
     ]
 
@@ -1106,12 +1107,61 @@ def mvce(keys, values):
         "code": "C416",
         "name": "unnecessary-comprehension",
         "count": 1,
-        "fixable": true
+        "fixable": true,
+        "fixable_count": 1
       }
     ]
 
     ----- stderr -----
     "#);
+}
+
+#[test]
+fn show_statistics_json_partial_fix() {
+    let mut cmd = RuffCheck::default()
+        .args([
+            "--select",
+            "UP035",
+            "--statistics",
+            "--output-format",
+            "json",
+        ])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from typing import List, AsyncGenerator"), @r#"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    [
+      {
+        "code": "UP035",
+        "name": "deprecated-import",
+        "count": 2,
+        "fixable": false,
+        "fixable_count": 1
+      }
+    ]
+
+    ----- stderr -----
+    "#);
+}
+
+#[test]
+fn show_statistics_partial_fix() {
+    let mut cmd = RuffCheck::default()
+        .args(["--select", "UP035", "--statistics"])
+        .build();
+    assert_cmd_snapshot!(cmd
+        .pass_stdin("from typing import List, AsyncGenerator"), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    2	UP035	[-] deprecated-import
+    Found 2 errors.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
 }
 
 #[test]
@@ -1810,7 +1860,7 @@ fn check_no_hint_for_hidden_unsafe_fixes_when_disabled() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 1 fixable with the --fix option.
+    [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
     ");
@@ -1853,7 +1903,7 @@ fn check_shows_unsafe_fixes_with_opt_in() {
     --> -:1:1
 
     Found 2 errors.
-    [*] 2 fixable with the --fix option.
+    [*] 2 fixable with the `--fix` option.
 
     ----- stderr -----
     ");

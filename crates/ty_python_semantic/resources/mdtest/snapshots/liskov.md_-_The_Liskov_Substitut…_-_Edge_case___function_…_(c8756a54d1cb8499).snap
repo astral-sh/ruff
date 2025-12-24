@@ -1,0 +1,82 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Edge case: function defined in another module and then assigned in a class body
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## foo.pyi
+
+```
+1 | def x(self, y: str): ...
+```
+
+## bar.pyi
+
+```
+ 1 | import foo
+ 2 | 
+ 3 | class A:
+ 4 |     def x(self, y: int): ...
+ 5 | 
+ 6 | class B(A):
+ 7 |     x = foo.x  # error: [invalid-method-override]
+ 8 | 
+ 9 | class C:
+10 |     x = foo.x
+11 | 
+12 | class D(C):
+13 |     def x(self, y: int): ...  # error: [invalid-method-override]
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `x`
+ --> src/bar.pyi:4:9
+  |
+3 | class A:
+4 |     def x(self, y: int): ...
+  |         --------------- `A.x` defined here
+5 |
+6 | class B(A):
+7 |     x = foo.x  # error: [invalid-method-override]
+  |     ^^^^^^^^^ Definition is incompatible with `A.x`
+8 |
+9 | class C:
+  |
+ ::: src/foo.pyi:1:5
+  |
+1 | def x(self, y: str): ...
+  |     --------------- Signature of `B.x`
+  |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```
+
+```
+error[invalid-method-override]: Invalid override of method `x`
+  --> src/bar.pyi:10:5
+   |
+ 9 | class C:
+10 |     x = foo.x
+   |     --------- `C.x` defined here
+11 |
+12 | class D(C):
+13 |     def x(self, y: int): ...  # error: [invalid-method-override]
+   |         ^^^^^^^^^^^^^^^ Definition is incompatible with `C.x`
+   |
+  ::: src/foo.pyi:1:5
+   |
+ 1 | def x(self, y: str): ...
+   |     --------------- Signature of `C.x`
+   |
+info: This violates the Liskov Substitution Principle
+info: rule `invalid-method-override` is enabled by default
+
+```

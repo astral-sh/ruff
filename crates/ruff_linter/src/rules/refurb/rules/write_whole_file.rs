@@ -2,18 +2,15 @@ use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{
     self as ast, Expr, Stmt,
-    relocate::relocate_expr,
     visitor::{self, Visitor},
 };
-
-use ruff_python_codegen::Generator;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::fix::snippet::SourceCodeSnippet;
 use crate::importer::ImportRequest;
-use crate::rules::refurb::helpers::{FileOpen, find_file_opens};
-use crate::{FixAvailability, Violation};
+use crate::rules::refurb::helpers::{FileOpen, OpenArgument, find_file_opens};
+use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
 /// Checks for uses of `open` and `write` that can be replaced by `pathlib`
@@ -45,26 +42,40 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `Path.write_text`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.write_text)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.3.6")]
-pub(crate) struct WriteWholeFile {
+pub(crate) struct WriteWholeFile<'a> {
     filename: SourceCodeSnippet,
     suggestion: SourceCodeSnippet,
+    argument: OpenArgument<'a>,
 }
 
-impl Violation for WriteWholeFile {
+impl Violation for WriteWholeFile<'_> {
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
         let filename = self.filename.truncated_display();
         let suggestion = self.suggestion.truncated_display();
-        format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+        match self.argument {
+            OpenArgument::Pathlib { .. } => {
+                format!(
+                    "`Path.open()` followed by `write()` can be replaced by `{filename}.{suggestion}`"
+                )
+            }
+            OpenArgument::Builtin { .. } => {
+                format!("`open` and `write` should be replaced by `Path({filename}).{suggestion}`")
+            }
+        }
     }
     fn fix_title(&self) -> Option<String> {
-        Some(format!(
-            "Replace with `Path({}).{}`",
-            self.filename.truncated_display(),
-            self.suggestion.truncated_display(),
-        ))
+        let filename = self.filename.truncated_display();
+        let suggestion = self.suggestion.truncated_display();
+
+        match self.argument {
+            OpenArgument::Pathlib { .. } => Some(format!("Replace with `{filename}.{suggestion}`")),
+            OpenArgument::Builtin { .. } => {
+                Some(format!("Replace with `Path({filename}).{suggestion}`"))
+            }
+        }
     }
 }
 
@@ -128,23 +139,18 @@ impl<'a> Visitor<'a> for WriteMatcher<'a, '_> {
                 .position(|open| open.is_ref(write_to))
             {
                 let open = self.candidates.remove(open);
-
                 if self.loop_counter == 0 {
-                    let suggestion = make_suggestion(&open, content, self.checker.generator());
+                    let filename_display = open.argument.display(self.checker.source());
+                    let suggestion = make_suggestion(&open, content, self.checker.locator());
 
                     let mut diagnostic = self.checker.report_diagnostic(
                         WriteWholeFile {
-                            filename: SourceCodeSnippet::from_str(
-                                &self.checker.generator().expr(open.filename),
-                            ),
+                            filename: SourceCodeSnippet::from_str(filename_display),
                             suggestion: SourceCodeSnippet::from_str(&suggestion),
+                            argument: open.argument,
                         },
                         open.item.range(),
                     );
-
-                    if !crate::preview::is_fix_write_whole_file_enabled(self.checker.settings()) {
-                        return;
-                    }
 
                     if let Some(fix) =
                         generate_fix(self.checker, &open, self.with_stmt, &suggestion)
@@ -177,27 +183,21 @@ fn match_write_call(expr: &Expr) -> Option<(&Expr, &Expr)> {
     Some((&*attr.value, call.arguments.args.first()?))
 }
 
-fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, generator: Generator) -> String {
-    let name = ast::ExprName {
-        id: open.mode.pathlib_method(),
-        ctx: ast::ExprContext::Load,
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    let mut arg = arg.clone();
-    relocate_expr(&mut arg, TextRange::default());
-    let call = ast::ExprCall {
-        func: Box::new(name.into()),
-        arguments: ast::Arguments {
-            args: Box::new([arg]),
-            keywords: open.keywords.iter().copied().cloned().collect(),
-            range: TextRange::default(),
-            node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-        },
-        range: TextRange::default(),
-        node_index: ruff_python_ast::AtomicNodeIndex::NONE,
-    };
-    generator.expr(&call.into())
+fn make_suggestion(open: &FileOpen<'_>, arg: &Expr, locator: &Locator) -> String {
+    let method_name = open.mode.pathlib_method();
+    let arg_code = locator.slice(arg.range());
+
+    if open.keywords.is_empty() {
+        format!("{method_name}({arg_code})")
+    } else {
+        format!(
+            "{method_name}({arg_code}, {})",
+            itertools::join(
+                open.keywords.iter().map(|kw| locator.slice(kw.range())),
+                ", "
+            )
+        )
+    }
 }
 
 fn generate_fix(
@@ -211,7 +211,6 @@ fn generate_fix(
     }
 
     let locator = checker.locator();
-    let filename_code = locator.slice(open.filename.range());
 
     let (import_edit, binding) = checker
         .importer()
@@ -222,7 +221,15 @@ fn generate_fix(
         )
         .ok()?;
 
-    let replacement = format!("{binding}({filename_code}).{suggestion}");
+    let target = match open.argument {
+        OpenArgument::Builtin { filename } => {
+            let filename_code = locator.slice(filename.range());
+            format!("{binding}({filename_code})")
+        }
+        OpenArgument::Pathlib { path } => locator.slice(path.range()).to_string(),
+    };
+
+    let replacement = format!("{target}.{suggestion}");
 
     let applicability = if checker.comment_ranges().intersects(with_stmt.range()) {
         Applicability::Unsafe

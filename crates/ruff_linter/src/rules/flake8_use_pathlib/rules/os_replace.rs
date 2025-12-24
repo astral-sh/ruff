@@ -1,12 +1,14 @@
+use ruff_diagnostics::Applicability;
+use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::ExprCall;
+
 use crate::checkers::ast::Checker;
 use crate::preview::is_fix_os_replace_enabled;
 use crate::rules::flake8_use_pathlib::helpers::{
     check_os_pathlib_two_arg_calls, has_unknown_keywords_or_starred_expr,
-    is_keyword_only_argument_non_default,
+    is_keyword_only_argument_non_default, is_top_level_expression_in_statement,
 };
 use crate::{FixAvailability, Violation};
-use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::ExprCall;
 
 /// ## What it does
 /// Checks for uses of `os.replace`.
@@ -41,6 +43,8 @@ use ruff_python_ast::ExprCall;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `None` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.replace`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.replace)
@@ -90,6 +94,14 @@ pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) 
             &["src", "dst", "src_dir_fd", "dst_dir_fd"],
         );
 
+    // Unsafe when the fix would delete comments or change a used return value
+    let applicability = if !is_top_level_expression_in_statement(checker) {
+        // Unsafe because the return type changes (None -> Path)
+        Applicability::Unsafe
+    } else {
+        Applicability::Safe
+    };
+
     check_os_pathlib_two_arg_calls(
         checker,
         call,
@@ -98,5 +110,6 @@ pub(crate) fn os_replace(checker: &Checker, call: &ExprCall, segments: &[&str]) 
         "dst",
         fix_enabled,
         OsReplace,
+        applicability,
     );
 }

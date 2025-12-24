@@ -7,14 +7,16 @@ pub use self::changes::ChangeResult;
 use crate::CollectReporter;
 use crate::metadata::settings::file_settings;
 use crate::{ProgressReporter, Project, ProjectMetadata};
+use get_size2::StandardTracker;
 use ruff_db::Db as SourceDb;
 use ruff_db::diagnostic::Diagnostic;
 use ruff_db::files::{File, Files};
 use ruff_db::system::System;
 use ruff_db::vendored::VendoredFileSystem;
 use salsa::{Database, Event, Setter};
+use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{Db as SemanticDb, Program};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program};
 
 mod changes;
 
@@ -129,7 +131,10 @@ impl ProjectDatabase {
     /// Returns a [`SalsaMemoryDump`] that can be use to dump Salsa memory usage information
     /// to the CLI after a typechecker run.
     pub fn salsa_memory_dump(&self) -> SalsaMemoryDump {
-        let memory_usage = <dyn salsa::Database>::memory_usage(self);
+        let memory_usage = ruff_memory_usage::attach_tracker(StandardTracker::new(), || {
+            <dyn salsa::Database>::memory_usage(self)
+        });
+
         let mut ingredients = memory_usage
             .structs
             .into_iter()
@@ -443,6 +448,13 @@ impl SalsaMemoryDump {
 }
 
 #[salsa::db]
+impl ty_module_resolver::Db for ProjectDatabase {
+    fn search_paths(&self) -> &SearchPaths {
+        Program::get(self).search_paths(self)
+    }
+}
+
+#[salsa::db]
 impl SemanticDb for ProjectDatabase {
     fn should_check_file(&self, file: File) -> bool {
         self.project
@@ -456,6 +468,10 @@ impl SemanticDb for ProjectDatabase {
 
     fn lint_registry(&self) -> &LintRegistry {
         ty_python_semantic::default_lint_registry()
+    }
+
+    fn analysis_settings(&self) -> &AnalysisSettings {
+        self.project().settings(self).analysis()
     }
 
     fn verbose(&self) -> bool {
@@ -516,11 +532,14 @@ pub(crate) mod tests {
     use std::sync::{Arc, Mutex};
 
     use ruff_db::Db as SourceDb;
-    use ruff_db::files::Files;
+    use ruff_db::files::{FileRootKind, Files};
     use ruff_db::system::{DbWithTestSystem, System, TestSystem};
     use ruff_db::vendored::VendoredFileSystem;
-    use ty_python_semantic::Program;
+    use ty_module_resolver::SearchPathSettings;
     use ty_python_semantic::lint::{LintRegistry, RuleSelection};
+    use ty_python_semantic::{
+        AnalysisSettings, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
+    };
 
     use crate::db::Db;
     use crate::{Project, ProjectMetadata};
@@ -559,6 +578,27 @@ pub(crate) mod tests {
             let project = Project::from_metadata(&db, project).unwrap();
             db.project = Some(project);
             db
+        }
+
+        pub fn init_program(&mut self) -> anyhow::Result<()> {
+            let root = self.project().root(self);
+
+            let search_paths = SearchPathSettings::new(vec![root.to_path_buf()])
+                .to_search_paths(self.system(), self.vendored())
+                .expect("Valid search path settings");
+
+            Program::from_settings(
+                self,
+                ProgramSettings {
+                    python_version: PythonVersionWithSource::default(),
+                    python_platform: PythonPlatform::default(),
+                    search_paths,
+                },
+            );
+
+            self.files().try_add_root(self, root, FileRootKind::Project);
+
+            Ok(())
         }
     }
 
@@ -601,6 +641,13 @@ pub(crate) mod tests {
     }
 
     #[salsa::db]
+    impl ty_module_resolver::Db for TestDb {
+        fn search_paths(&self) -> &ty_module_resolver::SearchPaths {
+            Program::get(self).search_paths(self)
+        }
+    }
+
+    #[salsa::db]
     impl ty_python_semantic::Db for TestDb {
         fn should_check_file(&self, file: ruff_db::files::File) -> bool {
             !file.path(self).is_vendored_path()
@@ -612,6 +659,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             ty_python_semantic::default_lint_registry()
+        }
+
+        fn analysis_settings(&self) -> &AnalysisSettings {
+            self.project().settings(self).analysis()
         }
 
         fn verbose(&self) -> bool {

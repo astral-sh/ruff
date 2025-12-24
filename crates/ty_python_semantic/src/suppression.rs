@@ -1,16 +1,26 @@
+mod add_ignore;
+mod parser;
+mod unused;
+
+use smallvec::SmallVec;
+use std::fmt;
+
+use ruff_db::diagnostic::{
+    Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Severity, Span,
+};
+use ruff_db::{files::File, parsed::parsed_module, source::source_text};
+use ruff_python_ast::token::TokenKind;
+use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+
+use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
+pub use crate::suppression::add_ignore::create_suppression_fix;
+use crate::suppression::parser::{
+    ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
+};
+use crate::suppression::unused::check_unused_suppressions;
 use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
-use ruff_db::diagnostic::{Annotation, Diagnostic, DiagnosticId, IntoDiagnosticMessage, Span};
-use ruff_db::{files::File, parsed::parsed_module, source::source_text};
-use ruff_python_parser::TokenKind;
-use ruff_python_trivia::Cursor;
-use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
-use smallvec::{SmallVec, smallvec};
-use std::error::Error;
-use std::fmt;
-use std::fmt::Formatter;
-use thiserror::Error;
 
 declare_lint! {
     /// ## What it does
@@ -91,6 +101,8 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
+    let respect_type_ignore = db.analysis_settings().respect_type_ignore_comments;
+
     let mut builder = SuppressionsBuilder::new(&source, db.lint_registry());
     let mut line_start = TextSize::default();
 
@@ -106,7 +118,10 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                 for comment in parser {
                     match comment {
                         Ok(comment) => {
-                            builder.add_comment(&comment, TextRange::new(line_start, token.end()));
+                            if comment.kind().is_type_ignore() && !respect_type_ignore {
+                                continue;
+                            }
+                            builder.add_comment(comment, TextRange::new(line_start, token.end()));
                         }
                         Err(error) => match error.kind {
                             ParseErrorKind::NotASuppression
@@ -117,6 +132,10 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
                             | ParseErrorKind::CodesMissingComma(kind)
                             | ParseErrorKind::InvalidCode(kind)
                             | ParseErrorKind::CodesMissingClosingBracket(kind) => {
+                                if kind.is_type_ignore() && !respect_type_ignore {
+                                    continue;
+                                }
+
                                 builder.add_invalid_comment(kind, error);
                             }
                         },
@@ -133,12 +152,18 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
-pub(crate) fn check_suppressions(db: &dyn Db, file: File, diagnostics: &mut TypeCheckDiagnostics) {
+pub(crate) fn check_suppressions(
+    db: &dyn Db,
+    file: File,
+    diagnostics: TypeCheckDiagnostics,
+) -> Vec<Diagnostic> {
     let mut context = CheckSuppressionsContext::new(db, file, diagnostics);
 
     check_unknown_rule(&mut context);
     check_invalid_suppression(&mut context);
     check_unused_suppressions(&mut context);
+
+    context.diagnostics.into_inner().into_diagnostics()
 }
 
 /// Checks for `ty: ignore` comments that reference unknown rules.
@@ -148,7 +173,9 @@ fn check_unknown_rule(context: &mut CheckSuppressionsContext) {
     }
 
     for unknown in &context.suppressions.unknown {
-        context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range, &unknown.reason);
+        if let Some(diag) = context.report_lint(&IGNORE_COMMENT_UNKNOWN_RULE, unknown.range) {
+            diag.into_diagnostic(&unknown.reason);
+        }
     }
 }
 
@@ -158,89 +185,12 @@ fn check_invalid_suppression(context: &mut CheckSuppressionsContext) {
     }
 
     for invalid in &context.suppressions.invalid {
-        context.report_lint(
-            &INVALID_IGNORE_COMMENT,
-            invalid.error.range,
-            format_args!(
+        if let Some(diag) = context.report_lint(&INVALID_IGNORE_COMMENT, invalid.error.range) {
+            diag.into_diagnostic(format_args!(
                 "Invalid `{kind}` comment: {reason}",
                 kind = invalid.kind,
                 reason = &invalid.error
-            ),
-        );
-    }
-}
-
-/// Checks for unused suppression comments in `file` and
-/// adds diagnostic for each of them to `diagnostics`.
-///
-/// Does nothing if the [`UNUSED_IGNORE_COMMENT`] rule is disabled.
-fn check_unused_suppressions(context: &mut CheckSuppressionsContext) {
-    if context.is_lint_disabled(&UNUSED_IGNORE_COMMENT) {
-        return;
-    }
-
-    let all = context.suppressions;
-    let mut unused = Vec::with_capacity(
-        all.file
-            .len()
-            .saturating_add(all.line.len())
-            .saturating_sub(context.diagnostics.used_len()),
-    );
-
-    // Collect all suppressions that are unused after type-checking.
-    for suppression in all {
-        if context.diagnostics.is_used(suppression.id()) {
-            continue;
-        }
-
-        // `unused-ignore-comment` diagnostics can only be suppressed by specifying a
-        // code. This is necessary because every `type: ignore` would implicitly also
-        // suppress its own unused-ignore-comment diagnostic.
-        if let Some(unused_suppression) = all
-            .lint_suppressions(suppression.range, LintId::of(&UNUSED_IGNORE_COMMENT))
-            .find(|unused_ignore_suppression| unused_ignore_suppression.target.is_lint())
-        {
-            // A `unused-ignore-comment` suppression can't ignore itself.
-            // It can only ignore other suppressions.
-            if unused_suppression.id() != suppression.id() {
-                context.diagnostics.mark_used(unused_suppression.id());
-                continue;
-            }
-        }
-
-        unused.push(suppression);
-    }
-
-    for suppression in unused {
-        // This looks silly but it's necessary to check again if a `unused-ignore-comment` is indeed unused
-        // in case the "unused" directive comes after it:
-        // ```py
-        // a = 10 / 2  # ty: ignore[unused-ignore-comment, division-by-zero]
-        // ```
-        if context.diagnostics.is_used(suppression.id()) {
-            continue;
-        }
-
-        match suppression.target {
-            SuppressionTarget::All => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused blanket `{}` directive", suppression.kind),
-            ),
-            SuppressionTarget::Lint(lint) => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!(
-                    "Unused `{kind}` directive: '{code}'",
-                    kind = suppression.kind,
-                    code = lint.name()
-                ),
-            ),
-            SuppressionTarget::Empty => context.report_unchecked(
-                &UNUSED_IGNORE_COMMENT,
-                suppression.range,
-                format_args!("Unused `{kind}` without a code", kind = suppression.kind),
-            ),
+            ));
         }
     }
 }
@@ -249,17 +199,17 @@ struct CheckSuppressionsContext<'a> {
     db: &'a dyn Db,
     file: File,
     suppressions: &'a Suppressions,
-    diagnostics: &'a mut TypeCheckDiagnostics,
+    diagnostics: std::cell::RefCell<TypeCheckDiagnostics>,
 }
 
 impl<'a> CheckSuppressionsContext<'a> {
-    fn new(db: &'a dyn Db, file: File, diagnostics: &'a mut TypeCheckDiagnostics) -> Self {
+    fn new(db: &'a dyn Db, file: File, diagnostics: TypeCheckDiagnostics) -> Self {
         let suppressions = suppressions(db, file);
         Self {
             db,
             file,
             suppressions,
-            diagnostics,
+            diagnostics: diagnostics.into(),
         }
     }
 
@@ -270,37 +220,77 @@ impl<'a> CheckSuppressionsContext<'a> {
             .is_enabled(LintId::of(lint))
     }
 
-    fn report_lint(
-        &mut self,
+    fn is_suppression_used(&self, id: FileSuppressionId) -> bool {
+        self.diagnostics.borrow().is_used(id)
+    }
+
+    fn report_lint<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: impl IntoDiagnosticMessage,
-    ) {
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
         if let Some(suppression) = self.suppressions.find_suppression(range, LintId::of(lint)) {
-            self.diagnostics.mark_used(suppression.id());
-            return;
+            self.diagnostics.borrow_mut().mark_used(suppression.id());
+            return None;
         }
 
-        self.report_unchecked(lint, range, message);
+        self.report_unchecked(lint, range)
     }
 
     /// Reports a diagnostic without checking if the lint at the given range is suppressed or marking
     /// the suppression as used.
-    fn report_unchecked(
-        &mut self,
+    fn report_unchecked<'ctx>(
+        &'ctx self,
         lint: &'static LintMetadata,
         range: TextRange,
-        message: impl IntoDiagnosticMessage,
-    ) {
-        let Some(severity) = self.db.rule_selection(self.file).severity(LintId::of(lint)) else {
-            return;
-        };
+    ) -> Option<SuppressionDiagnosticGuardBuilder<'ctx, 'a>> {
+        SuppressionDiagnosticGuardBuilder::new(self, lint, range)
+    }
+}
 
-        let id = DiagnosticId::Lint(lint.name());
-        let mut diag = Diagnostic::new(id, severity, "");
-        let span = Span::from(self.file).with_range(range);
-        diag.annotate(Annotation::primary(span).message(message));
-        self.diagnostics.push(diag);
+/// A builder for constructing a diagnostic guard.
+///
+/// This type exists to separate the phases of "check if a diagnostic should
+/// be reported" and "build the actual diagnostic."
+pub(crate) struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    ctx: &'ctx CheckSuppressionsContext<'db>,
+    id: DiagnosticId,
+    range: TextRange,
+    severity: Severity,
+}
+
+impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+    fn new(
+        ctx: &'ctx CheckSuppressionsContext<'db>,
+        lint: &'static LintMetadata,
+        range: TextRange,
+    ) -> Option<Self> {
+        let severity = ctx.db.rule_selection(ctx.file).severity(LintId::of(lint))?;
+
+        Some(Self {
+            ctx,
+            id: DiagnosticId::Lint(lint.name()),
+            severity,
+            range,
+        })
+    }
+
+    /// Create a new guard.
+    ///
+    /// This initializes a new diagnostic using the given message along with
+    /// the ID and severity used to create this builder.
+    ///
+    /// The diagnostic can be further mutated on the guard via its `DerefMut`
+    /// impl to `Diagnostic`.
+    pub(crate) fn into_diagnostic(
+        self,
+        message: impl IntoDiagnosticMessage,
+    ) -> DiagnosticGuard<'ctx> {
+        let mut diag = Diagnostic::new(self.id, self.severity, message);
+
+        let primary_span = Span::from(self.ctx.file).with_range(self.range);
+        diag.annotate(Annotation::primary(primary_span));
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }
 
@@ -403,12 +393,22 @@ pub(crate) struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
 
-    /// The range of this specific suppression.
-    /// This is the same as `comment_range` except for suppression comments that suppress multiple
-    /// codes. For those, the range is limited to the specific code.
+    /// The range of the code in this suppression.
+    ///
+    /// This is the same as the `comment_range` for the
+    /// targets [`SuppressionTarget::All`] and [`SuppressionTarget::Empty`].
     range: TextRange,
 
     /// The range of the suppression comment.
+    ///
+    /// This isn't the range of the entire comment if this is a nested comment:
+    ///
+    /// ```py
+    /// a # ty: ignore # fmt: off
+    ///   ^^^^^^^^^^^^^
+    /// ```
+    ///
+    /// It doesn't include the range of the nested `# fmt: off` comment.
     comment_range: TextRange,
 
     /// The range for which this suppression applies.
@@ -431,6 +431,34 @@ impl Suppression {
 
     pub(crate) fn id(&self) -> FileSuppressionId {
         FileSuppressionId(self.range)
+    }
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
+enum SuppressionKind {
+    TypeIgnore,
+    Ty,
+}
+
+impl SuppressionKind {
+    const fn is_type_ignore(self) -> bool {
+        matches!(self, SuppressionKind::TypeIgnore)
+    }
+
+    fn len_utf8(self) -> usize {
+        match self {
+            SuppressionKind::TypeIgnore => "type".len(),
+            SuppressionKind::Ty => "ty".len(),
+        }
+    }
+}
+
+impl fmt::Display for SuppressionKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SuppressionKind::TypeIgnore => f.write_str("type: ignore"),
+            SuppressionKind::Ty => f.write_str("ty: ignore"),
+        }
     }
 }
 
@@ -506,14 +534,15 @@ impl<'a> SuppressionsBuilder<'a> {
         }
     }
 
-    fn add_comment(&mut self, comment: &SuppressionComment, line_range: TextRange) {
+    #[expect(clippy::needless_pass_by_value)]
+    fn add_comment(&mut self, comment: SuppressionComment, line_range: TextRange) {
         // `type: ignore` comments at the start of the file apply to the entire range.
         // > A # type: ignore comment on a line by itself at the top of a file, before any docstrings,
         // > imports, or other executable code, silences all errors in the file.
         // > Blank lines and other comments, such as shebang lines and coding cookies,
         // > may precede the # type: ignore comment.
         // > https://typing.python.org/en/latest/spec/directives.html#type-ignore-comments
-        let is_file_suppression = comment.kind.is_type_ignore() && !self.seen_non_trivia_token;
+        let is_file_suppression = comment.kind().is_type_ignore() && !self.seen_non_trivia_token;
 
         let suppressed_range = if is_file_suppression {
             TextRange::new(0.into(), self.source.text_len())
@@ -529,14 +558,14 @@ impl<'a> SuppressionsBuilder<'a> {
             }
         };
 
-        match comment.codes.as_deref() {
+        match comment.codes() {
             // `type: ignore`
             None => {
                 push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
-                    kind: comment.kind,
-                    comment_range: comment.range,
-                    range: comment.range,
+                    kind: comment.kind(),
+                    comment_range: comment.range(),
+                    range: comment.range(),
                     suppressed_range,
                 });
             }
@@ -544,12 +573,12 @@ impl<'a> SuppressionsBuilder<'a> {
             // `type: ignore[..]`
             // The suppression applies to all lints if it is a `type: ignore`
             // comment. `type: ignore` apply to all lints for better mypy compatibility.
-            Some(_) if comment.kind.is_type_ignore() => {
+            Some(_) if comment.kind().is_type_ignore() => {
                 push_type_ignore_suppression(Suppression {
                     target: SuppressionTarget::All,
-                    kind: comment.kind,
-                    comment_range: comment.range,
-                    range: comment.range,
+                    kind: comment.kind(),
+                    comment_range: comment.range(),
+                    range: comment.range(),
                     suppressed_range,
                 });
             }
@@ -558,36 +587,31 @@ impl<'a> SuppressionsBuilder<'a> {
             Some([]) => {
                 self.line.push(Suppression {
                     target: SuppressionTarget::Empty,
-                    kind: comment.kind,
-                    range: comment.range,
-                    comment_range: comment.range,
+                    kind: comment.kind(),
+                    range: comment.range(),
+                    comment_range: comment.range(),
                     suppressed_range,
                 });
             }
 
             // `ty: ignore[a, b]`
             Some(codes) => {
-                for code_range in codes {
-                    let code = &self.source[*code_range];
-                    let range = if codes.len() == 1 {
-                        comment.range
-                    } else {
-                        *code_range
-                    };
+                for &code_range in codes {
+                    let code = &self.source[code_range];
 
                     match self.lint_registry.get(code) {
                         Ok(lint) => {
                             self.line.push(Suppression {
                                 target: SuppressionTarget::Lint(lint),
-                                kind: comment.kind,
-                                range,
-                                comment_range: comment.range,
+                                kind: comment.kind(),
+                                range: code_range,
+                                comment_range: comment.range(),
                                 suppressed_range,
                             });
                         }
                         Err(error) => self.unknown.push(UnknownSuppression {
-                            range,
-                            comment_range: comment.range,
+                            range: code_range,
+                            comment_range: comment.range(),
                             reason: error,
                         }),
                     }
@@ -617,543 +641,4 @@ struct UnknownSuppression {
 struct InvalidSuppression {
     kind: SuppressionKind,
     error: ParseError,
-}
-
-struct SuppressionParser<'src> {
-    cursor: Cursor<'src>,
-    range: TextRange,
-}
-
-impl<'src> SuppressionParser<'src> {
-    fn new(source: &'src str, range: TextRange) -> Self {
-        let cursor = Cursor::new(&source[range]);
-
-        Self { cursor, range }
-    }
-
-    fn parse_comment(&mut self) -> Result<SuppressionComment, ParseError> {
-        let comment_start = self.offset();
-        self.cursor.start_token();
-
-        if !self.cursor.eat_char('#') {
-            return self.syntax_error(ParseErrorKind::CommentWithoutHash);
-        }
-
-        self.eat_whitespace();
-
-        // type: ignore[code]
-        // ^^^^^^^^^^^^
-        let Some(kind) = self.eat_kind() else {
-            return Err(ParseError::new(
-                ParseErrorKind::NotASuppression,
-                TextRange::new(comment_start, self.offset()),
-            ));
-        };
-
-        let has_trailing_whitespace = self.eat_whitespace();
-
-        // type: ignore[code1, code2]
-        //             ^^^^^^
-        let codes = self.eat_codes(kind)?;
-
-        if self.cursor.is_eof() || codes.is_some() || has_trailing_whitespace {
-            // Consume the comment until its end or until the next "sub-comment" starts.
-            self.cursor.eat_while(|c| c != '#');
-            Ok(SuppressionComment {
-                kind,
-                codes,
-                range: TextRange::at(comment_start, self.cursor.token_len()),
-            })
-        } else {
-            self.syntax_error(ParseErrorKind::NoWhitespaceAfterIgnore(kind))
-        }
-    }
-
-    fn eat_kind(&mut self) -> Option<SuppressionKind> {
-        let kind = if self.cursor.as_str().starts_with("type") {
-            SuppressionKind::TypeIgnore
-        } else if self.cursor.as_str().starts_with("ty") {
-            SuppressionKind::Ty
-        } else {
-            return None;
-        };
-
-        self.cursor.skip_bytes(kind.len_utf8());
-
-        self.eat_whitespace();
-
-        if !self.cursor.eat_char(':') {
-            return None;
-        }
-
-        self.eat_whitespace();
-
-        if !self.cursor.as_str().starts_with("ignore") {
-            return None;
-        }
-
-        self.cursor.skip_bytes("ignore".len());
-
-        Some(kind)
-    }
-
-    fn eat_codes(
-        &mut self,
-        kind: SuppressionKind,
-    ) -> Result<Option<SmallVec<[TextRange; 2]>>, ParseError> {
-        if !self.cursor.eat_char('[') {
-            return Ok(None);
-        }
-
-        let mut codes: SmallVec<[TextRange; 2]> = smallvec![];
-
-        loop {
-            if self.cursor.is_eof() {
-                return self.syntax_error(ParseErrorKind::CodesMissingClosingBracket(kind));
-            }
-
-            self.eat_whitespace();
-
-            // `ty: ignore[]` or `ty: ignore[a,]`
-            if self.cursor.eat_char(']') {
-                break Ok(Some(codes));
-            }
-
-            let code_start = self.offset();
-            if !self.eat_word() {
-                return self.syntax_error(ParseErrorKind::InvalidCode(kind));
-            }
-
-            codes.push(TextRange::new(code_start, self.offset()));
-
-            self.eat_whitespace();
-
-            if !self.cursor.eat_char(',') {
-                self.eat_whitespace();
-
-                if self.cursor.eat_char(']') {
-                    break Ok(Some(codes));
-                }
-                // `ty: ignore[a b]
-                return self.syntax_error(ParseErrorKind::CodesMissingComma(kind));
-            }
-        }
-    }
-
-    fn eat_whitespace(&mut self) -> bool {
-        if self.cursor.eat_if(char::is_whitespace) {
-            self.cursor.eat_while(char::is_whitespace);
-            true
-        } else {
-            false
-        }
-    }
-
-    fn eat_word(&mut self) -> bool {
-        if self.cursor.eat_if(char::is_alphabetic) {
-            // Allow `:` for better error recovery when someone uses `lint:code` instead of just `code`.
-            self.cursor
-                .eat_while(|c| c.is_alphanumeric() || matches!(c, '_' | '-' | ':'));
-            true
-        } else {
-            false
-        }
-    }
-
-    fn syntax_error<T>(&self, kind: ParseErrorKind) -> Result<T, ParseError> {
-        let len = if self.cursor.is_eof() {
-            TextSize::default()
-        } else {
-            self.cursor.first().text_len()
-        };
-
-        Err(ParseError::new(kind, TextRange::at(self.offset(), len)))
-    }
-
-    fn offset(&self) -> TextSize {
-        self.range.start() + self.range.len() - self.cursor.text_len()
-    }
-}
-
-impl Iterator for SuppressionParser<'_> {
-    type Item = Result<SuppressionComment, ParseError>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.cursor.is_eof() {
-            return None;
-        }
-
-        match self.parse_comment() {
-            Ok(result) => Some(Ok(result)),
-            Err(error) => {
-                self.cursor.eat_while(|c| c != '#');
-                Some(Err(error))
-            }
-        }
-    }
-}
-
-/// A single parsed suppression comment.
-#[derive(Clone, Debug, Eq, PartialEq)]
-struct SuppressionComment {
-    /// The range of the suppression comment.
-    ///
-    /// This can be a sub-range of the comment token if the comment token contains multiple `#` tokens:
-    /// ```py
-    /// # fmt: off # type: ignore
-    ///            ^^^^^^^^^^^^^^
-    /// ```
-    range: TextRange,
-
-    kind: SuppressionKind,
-
-    /// The ranges of the codes in the optional `[...]`.
-    /// `None` for comments that don't specify any code.
-    ///
-    /// ```py
-    /// # type: ignore[unresolved-reference, invalid-exception-caught]
-    ///                ^^^^^^^^^^^^^^^^^^^^  ^^^^^^^^^^^^^^^^^^^^^^^^
-    /// ```
-    codes: Option<SmallVec<[TextRange; 2]>>,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-enum SuppressionKind {
-    TypeIgnore,
-    Ty,
-}
-
-impl SuppressionKind {
-    const fn is_type_ignore(self) -> bool {
-        matches!(self, SuppressionKind::TypeIgnore)
-    }
-
-    fn len_utf8(self) -> usize {
-        match self {
-            SuppressionKind::TypeIgnore => "type".len(),
-            SuppressionKind::Ty => "ty".len(),
-        }
-    }
-}
-
-impl fmt::Display for SuppressionKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        match self {
-            SuppressionKind::TypeIgnore => f.write_str("type: ignore"),
-            SuppressionKind::Ty => f.write_str("ty: ignore"),
-        }
-    }
-}
-
-#[derive(Debug, Eq, PartialEq, Clone, get_size2::GetSize)]
-struct ParseError {
-    kind: ParseErrorKind,
-
-    /// The position/range at which the parse error occurred.
-    range: TextRange,
-}
-
-impl ParseError {
-    fn new(kind: ParseErrorKind, range: TextRange) -> Self {
-        Self { kind, range }
-    }
-}
-
-impl fmt::Display for ParseError {
-    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        self.kind.fmt(f)
-    }
-}
-
-impl Error for ParseError {}
-
-#[derive(Debug, Eq, PartialEq, Clone, Error, get_size2::GetSize)]
-enum ParseErrorKind {
-    /// The comment isn't a suppression comment.
-    #[error("not a suppression comment")]
-    NotASuppression,
-
-    #[error("the comment doesn't start with a `#`")]
-    CommentWithoutHash,
-
-    /// A valid suppression `type: ignore` but it misses a whitespaces after the `ignore` keyword.
-    ///
-    /// ```py
-    /// type: ignoree
-    /// ```
-    #[error("no whitespace after `ignore`")]
-    NoWhitespaceAfterIgnore(SuppressionKind),
-
-    /// Missing comma between two codes
-    #[error("expected a comma separating the rule codes")]
-    CodesMissingComma(SuppressionKind),
-
-    /// `ty: ignore[*.*]`
-    #[error("expected a alphanumeric character or `-` or `_` as code")]
-    InvalidCode(SuppressionKind),
-
-    /// `ty: ignore[a, b`
-    #[error("expected a closing bracket")]
-    CodesMissingClosingBracket(SuppressionKind),
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::suppression::{SuppressionComment, SuppressionParser};
-    use insta::assert_debug_snapshot;
-    use ruff_text_size::{TextLen, TextRange};
-    use std::fmt;
-    use std::fmt::Formatter;
-
-    #[test]
-    fn type_ignore_no_codes() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore",
-                kind: TypeIgnore,
-                codes: [],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn type_ignore_explanation() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore I tried but couldn't figure out the proper type",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore I tried but couldn't figure out the proper type",
-                kind: TypeIgnore,
-                codes: [],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn fmt_comment_before_type_ignore() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# fmt: off   # type: ignore",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore",
-                kind: TypeIgnore,
-                codes: [],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn type_ignore_before_fmt_off() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore  # fmt: off",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore  ",
-                kind: TypeIgnore,
-                codes: [],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn multiple_type_ignore_comments() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore[a]  # type: ignore[b]",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore[a]  ",
-                kind: TypeIgnore,
-                codes: [
-                    "a",
-                ],
-            },
-            SuppressionComment {
-                text: "# type: ignore[b]",
-                kind: TypeIgnore,
-                codes: [
-                    "b",
-                ],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn invalid_type_ignore_valid_type_ignore() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore[a  # type: ignore[b]",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore[b]",
-                kind: TypeIgnore,
-                codes: [
-                    "b",
-                ],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn valid_type_ignore_invalid_type_ignore() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore[a]  # type: ignoreeee",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore[a]  ",
-                kind: TypeIgnore,
-                codes: [
-                    "a",
-                ],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn type_ignore_multiple_codes() {
-        assert_debug_snapshot!(
-            SuppressionComments::new(
-                "# type: ignore[invalid-exception-raised, invalid-exception-caught]",
-            ),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore[invalid-exception-raised, invalid-exception-caught]",
-                kind: TypeIgnore,
-                codes: [
-                    "invalid-exception-raised",
-                    "invalid-exception-caught",
-                ],
-            },
-        ]
-        "##
-        );
-    }
-
-    #[test]
-    fn type_ignore_single_code() {
-        assert_debug_snapshot!(
-            SuppressionComments::new("# type: ignore[invalid-exception-raised]",),
-            @r##"
-        [
-            SuppressionComment {
-                text: "# type: ignore[invalid-exception-raised]",
-                kind: TypeIgnore,
-                codes: [
-                    "invalid-exception-raised",
-                ],
-            },
-        ]
-        "##
-        );
-    }
-
-    struct SuppressionComments<'a> {
-        source: &'a str,
-    }
-
-    impl<'a> SuppressionComments<'a> {
-        fn new(source: &'a str) -> Self {
-            Self { source }
-        }
-    }
-
-    impl fmt::Debug for SuppressionComments<'_> {
-        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-            let mut list = f.debug_list();
-
-            for comment in SuppressionParser::new(
-                self.source,
-                TextRange::new(0.into(), self.source.text_len()),
-            )
-            .flatten()
-            {
-                list.entry(&comment.debug(self.source));
-            }
-
-            list.finish()
-        }
-    }
-
-    impl SuppressionComment {
-        fn debug<'a>(&'a self, source: &'a str) -> DebugSuppressionComment<'a> {
-            DebugSuppressionComment {
-                source,
-                comment: self,
-            }
-        }
-    }
-
-    struct DebugSuppressionComment<'a> {
-        source: &'a str,
-        comment: &'a SuppressionComment,
-    }
-
-    impl fmt::Debug for DebugSuppressionComment<'_> {
-        fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            struct DebugCodes<'a> {
-                source: &'a str,
-                codes: &'a [TextRange],
-            }
-
-            impl fmt::Debug for DebugCodes<'_> {
-                fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-                    let mut f = f.debug_list();
-
-                    for code in self.codes {
-                        f.entry(&&self.source[*code]);
-                    }
-
-                    f.finish()
-                }
-            }
-
-            f.debug_struct("SuppressionComment")
-                .field("text", &&self.source[self.comment.range])
-                .field("kind", &self.comment.kind)
-                .field(
-                    "codes",
-                    &DebugCodes {
-                        source: self.source,
-                        codes: self.comment.codes.as_deref().unwrap_or_default(),
-                    },
-                )
-                .finish()
-        }
-    }
 }

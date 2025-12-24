@@ -196,6 +196,7 @@ fn check_call_arguments(checker: &Checker, qualified_name: &QualifiedName, argum
     match qualified_name.segments() {
         ["airflow", .., "DAG" | "dag"] => {
             // with replacement
+            diagnostic_for_argument(checker, arguments, "concurrency", Some("max_active_tasks"));
             diagnostic_for_argument(checker, arguments, "fail_stop", Some("fail_fast"));
             diagnostic_for_argument(checker, arguments, "schedule_interval", Some("schedule"));
             diagnostic_for_argument(checker, arguments, "timetable", Some("schedule"));
@@ -492,6 +493,12 @@ fn check_method(checker: &Checker, call_expr: &ExprCall) {
             "collected_datasets" => Replacement::AttrName("collected_assets"),
             _ => return,
         },
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            match attr.as_str() {
+                "create_dagrun" => Replacement::None,
+                _ => return,
+            }
+        }
         ["airflow", "providers_manager", "ProvidersManager"] => match attr.as_str() {
             "initialize_providers_dataset_uri_resources" => {
                 Replacement::AttrName("initialize_providers_asset_uri_resources")

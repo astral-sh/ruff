@@ -54,7 +54,7 @@ class Small(Medium): ...
 static_assert(is_assignable_to(Any | Medium, Big))
 static_assert(is_assignable_to(Any | Medium, Medium))
 
-# `Any | Medium` is at least as large as `Medium`, so we can not assign it to `Small`:
+# `Any | Medium` is at least as large as `Medium`, so we cannot assign it to `Small`:
 static_assert(not is_assignable_to(Any | Medium, Small))
 ```
 
@@ -84,7 +84,7 @@ static_assert(is_assignable_to(Small, Intersection[Any, Medium]))
 static_assert(is_assignable_to(Medium, Intersection[Any, Medium]))
 ```
 
-`Any & Medium` is no larger than `Medium`, so we can not assign `Big` to it. There is no possible
+`Any & Medium` is no larger than `Medium`, so we cannot assign `Big` to it. There is no possible
 materialization of `Any & Medium` that would make it as big as `Big`:
 
 ```py

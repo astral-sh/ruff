@@ -1,6 +1,7 @@
-use ruff_python_ast::{self as ast, Stmt};
+use rustc_hash::FxHashSet;
 
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{self as ast, Stmt};
 use ruff_python_semantic::analyze::typing::{is_immutable_annotation, is_mutable_expr};
 use ruff_text_size::Ranged;
 
@@ -96,6 +97,9 @@ impl Violation for MutableClassDefault {
 
 /// RUF012
 pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClassDef) {
+    // Collect any `ClassVar`s we find in case they get reassigned later.
+    let mut class_var_targets = FxHashSet::default();
+
     for statement in &class_def.body {
         match statement {
             Stmt::AnnAssign(ast::StmtAnnAssign {
@@ -104,6 +108,12 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 value: Some(value),
                 ..
             }) => {
+                if let ast::Expr::Name(ast::ExprName { id, .. }) = target.as_ref() {
+                    if is_class_var_annotation(annotation, checker.semantic()) {
+                        class_var_targets.insert(id);
+                    }
+                }
+
                 if !is_special_attribute(target)
                     && is_mutable_expr(value, checker.semantic())
                     && !is_class_var_annotation(annotation, checker.semantic())
@@ -123,8 +133,12 @@ pub(crate) fn mutable_class_default(checker: &Checker, class_def: &ast::StmtClas
                 }
             }
             Stmt::Assign(ast::StmtAssign { value, targets, .. }) => {
-                if !targets.iter().all(is_special_attribute)
-                    && is_mutable_expr(value, checker.semantic())
+                if !targets.iter().all(|target| {
+                    is_special_attribute(target)
+                        || target
+                            .as_name_expr()
+                            .is_some_and(|name| class_var_targets.contains(&name.id))
+                }) && is_mutable_expr(value, checker.semantic())
                 {
                     // Avoid, e.g., Pydantic and msgspec models, which end up copying defaults on instance creation.
                     if has_default_copy_semantics(class_def, checker.semantic()) {

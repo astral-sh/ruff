@@ -32,6 +32,7 @@ use crate::rules::ruff::rules::test_rules::{self, TEST_RULES, TestRule};
 use crate::settings::types::UnsafeFixes;
 use crate::settings::{LinterSettings, TargetVersion, flags};
 use crate::source_kind::SourceKind;
+use crate::suppression::Suppressions;
 use crate::{Locator, directives, fs};
 
 pub(crate) mod float;
@@ -128,6 +129,7 @@ pub fn check_path(
     source_type: PySourceType,
     parsed: &Parsed<ModModule>,
     target_version: TargetVersion,
+    suppressions: &Suppressions,
 ) -> Vec<Diagnostic> {
     // Aggregate all diagnostics.
     let mut context = LintContext::new(path, locator.contents(), settings);
@@ -339,6 +341,7 @@ pub fn check_path(
             &directives.noqa_line_for,
             parsed.has_valid_syntax(),
             settings,
+            suppressions,
         );
         if noqa.is_enabled() {
             for index in ignored.iter().rev() {
@@ -377,6 +380,7 @@ pub fn add_noqa_to_path(
     source_kind: &SourceKind,
     source_type: PySourceType,
     settings: &LinterSettings,
+    reason: Option<&str>,
 ) -> Result<usize> {
     // Parse once.
     let target_version = settings.resolve_target_version(path);
@@ -399,6 +403,9 @@ pub fn add_noqa_to_path(
         &indexer,
     );
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let diagnostics = check_path(
         path,
@@ -413,6 +420,7 @@ pub fn add_noqa_to_path(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     // Add any missing `# noqa` pragmas.
@@ -425,6 +433,8 @@ pub fn add_noqa_to_path(
         &settings.external,
         &directives.noqa_line_for,
         stylist.line_ending(),
+        reason,
+        &suppressions,
     )
 }
 
@@ -459,6 +469,9 @@ pub fn lint_only(
         &indexer,
     );
 
+    // Parse range suppression comments
+    let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
     // Generate diagnostics.
     let diagnostics = check_path(
         path,
@@ -473,6 +486,7 @@ pub fn lint_only(
         source_type,
         &parsed,
         target_version,
+        &suppressions,
     );
 
     LinterResult {
@@ -564,6 +578,9 @@ pub fn lint_fix<'a>(
             &indexer,
         );
 
+        // Parse range suppression comments
+        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
+
         // Generate diagnostics.
         let diagnostics = check_path(
             path,
@@ -578,6 +595,7 @@ pub fn lint_fix<'a>(
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
 
         if iterations == 0 {
@@ -767,6 +785,7 @@ mod tests {
     use crate::registry::Rule;
     use crate::settings::LinterSettings;
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{TestedNotebook, assert_notebook_path, test_contents, test_snippet};
     use crate::{Locator, assert_diagnostics, directives, settings};
 
@@ -919,17 +938,6 @@ mod tests {
         Ok(())
     }
 
-    /// Wrapper around `test_contents_syntax_errors` for testing a snippet of code instead of a
-    /// file.
-    fn test_snippet_syntax_errors(contents: &str, settings: &LinterSettings) -> Vec<Diagnostic> {
-        let contents = dedent(contents);
-        test_contents_syntax_errors(
-            &SourceKind::Python(contents.to_string()),
-            Path::new("<filename>"),
-            settings,
-        )
-    }
-
     /// A custom test runner that prints syntax errors in addition to other diagnostics. Adapted
     /// from `flakes` in pyflakes/mod.rs.
     fn test_contents_syntax_errors(
@@ -953,6 +961,7 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions = Suppressions::from_tokens(settings, locator.contents(), parsed.tokens());
         let mut diagnostics = check_path(
             path,
             None,
@@ -966,251 +975,46 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         diagnostics.sort_by(Diagnostic::ruff_start_ordering);
         diagnostics
     }
 
     #[test_case(
-        "async_in_sync_error_on_310",
-        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
+        Path::new("async_comprehension_outside_async_function.py"),
+        PythonVersion::PY311
     )]
     #[test_case(
-        "async_in_sync_okay_on_311",
-        "async def f(): return [[x async for x in foo(n)] for n in range(3)]",
-        PythonVersion::PY311,
-        "AsyncComprehensionOutsideAsyncFunction"
+        Path::new("async_comprehension_outside_async_function.py"),
+        PythonVersion::PY310
     )]
-    #[test_case(
-        "async_in_sync_okay_on_310",
-        "async def test(): return [[x async for x in elements(n)] async for n in range(3)]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "deferred_function_body",
-        "
-		async def f(): [x for x in foo()] and [x async for x in foo()]
-		async def f():
-			def g(): ...
-			[x async for x in foo()]
-		",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "async_in_sync_false_positive",
-        "[x async for x in y]",
-        PythonVersion::PY310,
-        "AsyncComprehensionOutsideAsyncFunction"
-    )]
-    #[test_case(
-        "rebound_comprehension",
-        "[x:= 2 for x in range(2)]",
-        PythonVersion::PY310,
-        "ReboundComprehensionVariable"
-    )]
-    #[test_case(
-        "duplicate_type_param",
-        "class C[T, T]: pass",
-        PythonVersion::PY312,
-        "DuplicateTypeParameter"
-    )]
-    #[test_case(
-        "multiple_case_assignment",
-        "
-        match x:
-            case [a, a]:
-                pass
-            case _:
-                pass
-        ",
-        PythonVersion::PY310,
-        "MultipleCaseAssignment"
-    )]
-    #[test_case(
-        "duplicate_match_key",
-        "
-        match x:
-            case {'key': 1, 'key': 2}:
-                pass
-        ",
-        PythonVersion::PY310,
-        "DuplicateMatchKey"
-    )]
-    #[test_case(
-        "global_parameter",
-        "
-        def f(a):
-            global a
+    #[test_case(Path::new("rebound_comprehension.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_type_parameter.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("multiple_case_assignment.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_key.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("duplicate_match_class_attribute.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_star_expression.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("irrefutable_case_pattern.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("single_starred_assignment.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("write_to_debug.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("invalid_expression.py"), PythonVersion::PY312)]
+    #[test_case(Path::new("global_parameter.py"), PythonVersion::PY310)]
+    #[test_case(Path::new("annotated_global.py"), PythonVersion::PY314)]
+    fn test_semantic_errors(path: &Path, python_version: PythonVersion) -> Result<()> {
+        let snapshot = format!(
+            "semantic_syntax_error_{}_{}",
+            path.to_string_lossy(),
+            python_version
+        );
+        let path = Path::new("resources/test/fixtures/semantic_errors").join(path);
+        let contents = std::fs::read_to_string(&path)?;
+        let source_kind = SourceKind::Python(contents);
 
-        def g(a):
-            if True:
-                global a 
-
-        def h(a):
-            def inner():
-                global a 
-
-        def i(a):
-            try:
-                global a 
-            except Exception:
-                pass
-
-        def f(a):
-            a = 1
-            global a
-        
-        def f(a):
-            a = 1
-            a = 2
-            global a
-        
-        def f(a):
-            class Inner:
-                global a   # ok
-        ",
-        PythonVersion::PY310,
-        "GlobalParameter"
-    )]
-    #[test_case(
-        "duplicate_match_class_attribute",
-        "
-        match x:
-            case Point(x=1, x=2):
-                pass
-        ",
-        PythonVersion::PY310,
-        "DuplicateMatchClassAttribute"
-    )]
-    #[test_case(
-        "invalid_star_expression",
-        "
-        def func():
-            return *x
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "invalid_star_expression_for",
-        "
-        for *x in range(10):
-            pass
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "invalid_star_expression_yield",
-        "
-        def func():
-            yield *x
-        ",
-        PythonVersion::PY310,
-        "InvalidStarExpression"
-    )]
-    #[test_case(
-        "irrefutable_case_pattern_wildcard",
-        "
-        match value:
-            case _:
-                pass
-            case 1:
-                pass
-        ",
-        PythonVersion::PY310,
-        "IrrefutableCasePattern"
-    )]
-    #[test_case(
-        "irrefutable_case_pattern_capture",
-        "
-        match value:
-            case irrefutable:
-                pass
-            case 1:
-                pass
-        ",
-        PythonVersion::PY310,
-        "IrrefutableCasePattern"
-    )]
-    #[test_case(
-        "single_starred_assignment",
-        "*a = [1, 2, 3, 4]",
-        PythonVersion::PY310,
-        "SingleStarredAssignment"
-    )]
-    #[test_case(
-        "write_to_debug",
-        "
-        __debug__ = False
-        ",
-        PythonVersion::PY310,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "write_to_debug_in_function_param",
-        "
-        def process(__debug__):
-            pass
-        ",
-        PythonVersion::PY310,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "write_to_debug_class_type_param",
-        "
-        class Generic[__debug__]:
-            pass
-        ",
-        PythonVersion::PY312,
-        "WriteToDebug"
-    )]
-    #[test_case(
-        "invalid_expression_yield_in_type_param",
-        "
-        type X[T: (yield 1)] = int
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_yield_in_type_alias",
-        "
-        type Y = (yield 1)
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_walrus_in_return_annotation",
-        "
-        def f[T](x: int) -> (y := 3): return x
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    #[test_case(
-        "invalid_expression_yield_from_in_base_class",
-        "
-        class C[T]((yield from [object])):
-            pass
-        ",
-        PythonVersion::PY312,
-        "InvalidExpression"
-    )]
-    fn test_semantic_errors(
-        name: &str,
-        contents: &str,
-        python_version: PythonVersion,
-        error_type: &str,
-    ) {
-        let snapshot = format!("semantic_syntax_error_{error_type}_{name}_{python_version}");
-        let diagnostics = test_snippet_syntax_errors(
-            contents,
+        let diagnostics = test_contents_syntax_errors(
+            &source_kind,
+            &path,
             &LinterSettings {
                 rules: settings::rule_table::RuleTable::empty(),
                 unresolved_target_version: python_version.into(),
@@ -1218,7 +1022,11 @@ mod tests {
                 ..Default::default()
             },
         );
-        assert_diagnostics!(snapshot, diagnostics);
+        insta::with_settings!({filters => vec![(r"\\", "/")]}, {
+                assert_diagnostics!(format!("{snapshot}"), diagnostics);
+        });
+
+        Ok(())
     }
 
     #[test_case(PythonVersion::PY310)]
@@ -1255,6 +1063,7 @@ mod tests {
         Rule::YieldFromInAsyncFunction,
         Path::new("yield_from_in_async_function.py")
     )]
+    #[test_case(Rule::ReturnInGenerator, Path::new("return_in_generator.py"))]
     fn test_syntax_errors(rule: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let path = Path::new("resources/test/fixtures/syntax_errors").join(path);

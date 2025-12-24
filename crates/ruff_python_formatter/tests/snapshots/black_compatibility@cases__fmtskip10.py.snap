@@ -20,24 +20,16 @@ b = [c for c in "A very long string that would normally generate some kind of co
 ```diff
 --- Black
 +++ Ruff
-@@ -1,8 +1,14 @@
--def foo(): return "mock"  # fmt: skip
--if True: print("yay")  # fmt: skip
--for i in range(10): print(i)  # fmt: skip
-+def foo():
-+    return "mock"  # fmt: skip
+@@ -1,8 +1,10 @@
+ def foo(): return "mock"  # fmt: skip
 +
 +
-+if True:
-+    print("yay")  # fmt: skip
-+for i in range(10):
-+    print(i)  # fmt: skip
+ if True: print("yay")  # fmt: skip
+ for i in range(10): print(i)  # fmt: skip
  
 -j =     1 # fmt: skip
--while j < 10: j += 1  # fmt: skip
 +j =     1  # fmt: skip
-+while j < 10:
-+    j += 1  # fmt: skip
+ while j < 10: j += 1  # fmt: skip
  
 -b = [c for c in "A very long string that would normally generate some kind of collapse, since it is this long"] # fmt: skip
 +b = [c for c in "A very long string that would normally generate some kind of collapse, since it is this long"]  # fmt: skip
@@ -46,18 +38,14 @@ b = [c for c in "A very long string that would normally generate some kind of co
 ## Ruff Output
 
 ```python
-def foo():
-    return "mock"  # fmt: skip
+def foo(): return "mock"  # fmt: skip
 
 
-if True:
-    print("yay")  # fmt: skip
-for i in range(10):
-    print(i)  # fmt: skip
+if True: print("yay")  # fmt: skip
+for i in range(10): print(i)  # fmt: skip
 
 j =     1  # fmt: skip
-while j < 10:
-    j += 1  # fmt: skip
+while j < 10: j += 1  # fmt: skip
 
 b = [c for c in "A very long string that would normally generate some kind of collapse, since it is this long"]  # fmt: skip
 ```

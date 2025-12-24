@@ -1,17 +1,16 @@
 use std::sync::Arc;
 
 use crate::Db;
-use crate::module_resolver::{SearchPathValidationError, SearchPaths};
 use crate::python_platform::PythonPlatform;
 
 use ruff_db::diagnostic::Span;
 use ruff_db::files::system_path_to_file;
-use ruff_db::system::{System, SystemPath, SystemPathBuf};
-use ruff_db::vendored::VendoredFileSystem;
+use ruff_db::system::{SystemPath, SystemPathBuf};
 use ruff_python_ast::PythonVersion;
 use ruff_text_size::TextRange;
 use salsa::Durability;
 use salsa::Setter;
+use ty_module_resolver::SearchPaths;
 
 #[salsa::input(singleton, heap_size=ruff_memory_usage::heap_size)]
 pub struct Program {
@@ -22,7 +21,7 @@ pub struct Program {
     pub python_platform: PythonPlatform,
 
     #[returns(ref)]
-    pub(crate) search_paths: SearchPaths,
+    pub search_paths: SearchPaths,
 }
 
 impl Program {
@@ -113,8 +112,11 @@ pub enum PythonVersionSource {
     /// long argument (`--extra-paths`) or `--config key=value`.
     Cli,
 
-    /// The value comes from the Python VS Code extension (the selected interpreter).
-    PythonVSCodeExtension,
+    /// The value comes from the user's editor,
+    /// while it's left open if specified as a setting
+    /// or if the value was auto-discovered by the editor
+    /// (e.g., the Python environment)
+    Editor,
 
     /// We fell back to a default value because the value was not specified via the CLI or a config file.
     #[default]
@@ -157,58 +159,5 @@ impl Default for PythonVersionWithSource {
             version: PythonVersion::latest_ty(),
             source: PythonVersionSource::Default,
         }
-    }
-}
-
-/// Configures the search paths for module resolution.
-#[derive(Eq, PartialEq, Debug, Clone)]
-pub struct SearchPathSettings {
-    /// List of user-provided paths that should take first priority in the module resolution.
-    /// Examples in other type checkers are mypy's MYPYPATH environment variable,
-    /// or pyright's stubPath configuration setting.
-    pub extra_paths: Vec<SystemPathBuf>,
-
-    /// The root of the project, used for finding first-party modules.
-    pub src_roots: Vec<SystemPathBuf>,
-
-    /// Optional path to a "custom typeshed" directory on disk for us to use for standard-library types.
-    /// If this is not provided, we will fallback to our vendored typeshed stubs for the stdlib,
-    /// bundled as a zip file in the binary
-    pub custom_typeshed: Option<SystemPathBuf>,
-
-    /// List of site packages paths to use.
-    pub site_packages_paths: Vec<SystemPathBuf>,
-
-    /// Option path to the real stdlib on the system, and not some instance of typeshed.
-    ///
-    /// We should ideally only ever use this for things like goto-definition,
-    /// where typeshed isn't the right answer.
-    pub real_stdlib_path: Option<SystemPathBuf>,
-}
-
-impl SearchPathSettings {
-    pub fn new(src_roots: Vec<SystemPathBuf>) -> Self {
-        Self {
-            src_roots,
-            ..SearchPathSettings::empty()
-        }
-    }
-
-    pub fn empty() -> Self {
-        SearchPathSettings {
-            src_roots: vec![],
-            extra_paths: vec![],
-            custom_typeshed: None,
-            site_packages_paths: vec![],
-            real_stdlib_path: None,
-        }
-    }
-
-    pub fn to_search_paths(
-        &self,
-        system: &dyn System,
-        vendored: &VendoredFileSystem,
-    ) -> Result<SearchPaths, SearchPathValidationError> {
-        SearchPaths::from_settings(self, system, vendored)
     }
 }

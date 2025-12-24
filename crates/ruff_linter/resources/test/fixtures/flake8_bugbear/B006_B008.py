@@ -199,6 +199,9 @@ def bytes_okay(value=bytes(1)):
 def int_okay(value=int("12")):
     pass
 
+# Allow immutable slice()
+def slice_okay(value=slice(1,2)):
+    pass
 
 # Allow immutable complex() value
 def complex_okay(value=complex(1,2)):

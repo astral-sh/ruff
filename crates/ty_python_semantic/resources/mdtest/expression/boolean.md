@@ -78,6 +78,7 @@ python-version = "3.11"
 ```
 
 ```py
+import enum
 from typing import Literal, final
 
 reveal_type(bool(1))  # revealed: Literal[True]
@@ -129,13 +130,20 @@ class FinalClassWithNoLenOrBool: ...
 
 reveal_type(bool(FinalClassWithNoLenOrBool()))  # revealed: Literal[True]
 
-def f(x: SingleElementTupleSubclass | FinalClassOverridingLenAndNotBool | FinalClassWithNoLenOrBool):
+class EnumWithMembers(enum.Enum):
+    A = 1
+    B = 2
+
+reveal_type(bool(EnumWithMembers.A))  # revealed: Literal[True]
+
+def f(x: SingleElementTupleSubclass | FinalClassOverridingLenAndNotBool | FinalClassWithNoLenOrBool | Literal[EnumWithMembers.A]):
     reveal_type(bool(x))  # revealed: Literal[True]
 ```
 
 ## Falsy values
 
 ```py
+import enum
 from typing import final, Literal
 
 reveal_type(bool(0))  # revealed: Literal[False]
@@ -156,13 +164,23 @@ class FinalClassOverridingLenAndNotBool:
 
 reveal_type(bool(FinalClassOverridingLenAndNotBool()))  # revealed: Literal[False]
 
-def f(x: EmptyTupleSubclass | FinalClassOverridingLenAndNotBool):
+class EnumWithMembersOverridingBool(enum.Enum):
+    A = 1
+    B = 2
+
+    def __bool__(self) -> Literal[False]:
+        return False
+
+reveal_type(bool(EnumWithMembersOverridingBool.A))  # revealed: Literal[False]
+
+def f(x: EmptyTupleSubclass | FinalClassOverridingLenAndNotBool | Literal[EnumWithMembersOverridingBool.A]):
     reveal_type(bool(x))  # revealed: Literal[False]
 ```
 
 ## Ambiguous values
 
 ```py
+import enum
 from typing import Literal
 
 reveal_type(bool([]))  # revealed: bool
@@ -182,6 +200,15 @@ class NonFinalOverridingLenAndNotBool:
 # because a subclass might override `__bool__`,
 # and `__bool__` takes precedence over `__len__`
 reveal_type(bool(NonFinalOverridingLenAndNotBool()))  # revealed: bool
+
+class EnumWithMembersOverridingBool(enum.Enum):
+    A = 1
+    B = 2
+
+    def __bool__(self) -> bool:
+        return False
+
+reveal_type(bool(EnumWithMembersOverridingBool.A))  # revealed: bool
 ```
 
 ## `__bool__` returning `NoReturn`
@@ -205,7 +232,7 @@ if NotBoolable():
 class NotBoolable:
     __bool__: None = None
 
-# error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+# error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
 if NotBoolable():
     ...
 ```
@@ -217,7 +244,7 @@ def test(cond: bool):
     class NotBoolable:
         __bool__: int | None = None if cond else 3
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `NotBoolable`"
     if NotBoolable():
         ...
 ```
@@ -231,7 +258,7 @@ def test(cond: bool):
 
     a = 10 if cond else NotBoolable()
 
-    # error: [unsupported-bool-conversion] "Boolean conversion is unsupported for type `Literal[10] | NotBoolable`"
+    # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `Literal[10] | NotBoolable`"
     if a:
         ...
 ```

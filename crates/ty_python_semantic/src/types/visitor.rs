@@ -1,5 +1,3 @@
-use rustc_hash::FxHashMap;
-
 use crate::{
     Db, FxIndexSet,
     types::{
@@ -11,6 +9,7 @@ use crate::{
         class::walk_generic_alias,
         function::{FunctionType, walk_function_type},
         instance::{walk_nominal_instance_type, walk_protocol_instance_type},
+        newtype::{NewType, walk_newtype_instance_type},
         subclass_of::walk_subclass_of_type,
         walk_bound_method_type, walk_bound_type_var_type, walk_callable_type,
         walk_intersection_type, walk_known_instance_type, walk_method_wrapper_type,
@@ -18,10 +17,7 @@ use crate::{
         walk_typed_dict_type, walk_typeis_type, walk_union,
     },
 };
-use std::{
-    cell::{Cell, RefCell},
-    collections::hash_map::Entry,
-};
+use std::cell::{Cell, RefCell};
 
 /// A visitor trait that recurses into nested types.
 ///
@@ -109,6 +105,10 @@ pub(crate) trait TypeVisitor<'db> {
     fn visit_typed_dict_type(&self, db: &'db dyn Db, typed_dict: TypedDictType<'db>) {
         walk_typed_dict_type(db, typed_dict, self);
     }
+
+    fn visit_newtype_instance_type(&self, db: &'db dyn Db, newtype: NewType<'db>) {
+        walk_newtype_instance_type(db, newtype, self);
+    }
 }
 
 /// Enumeration of types that may contain other types, such as unions, intersections, and generics.
@@ -131,6 +131,7 @@ pub(super) enum NonAtomicType<'db> {
     ProtocolInstance(ProtocolInstanceType<'db>),
     TypedDict(TypedDictType<'db>),
     TypeAlias(TypeAliasType<'db>),
+    NewTypeInstance(NewType<'db>),
 }
 
 pub(super) enum TypeKind<'db> {
@@ -198,6 +199,9 @@ impl<'db> From<Type<'db>> for TypeKind<'db> {
                 TypeKind::NonAtomic(NonAtomicType::TypedDict(typed_dict))
             }
             Type::TypeAlias(alias) => TypeKind::NonAtomic(NonAtomicType::TypeAlias(alias)),
+            Type::NewTypeInstance(newtype) => {
+                TypeKind::NonAtomic(NonAtomicType::NewTypeInstance(newtype))
+            }
         }
     }
 }
@@ -239,6 +243,36 @@ pub(super) fn walk_non_atomic_type<'db, V: TypeVisitor<'db> + ?Sized>(
         NonAtomicType::TypeAlias(alias) => {
             visitor.visit_type_alias_type(db, alias);
         }
+        NonAtomicType::NewTypeInstance(newtype) => {
+            visitor.visit_newtype_instance_type(db, newtype);
+        }
+    }
+}
+
+pub(crate) fn walk_type_with_recursion_guard<'db>(
+    db: &'db dyn Db,
+    ty: Type<'db>,
+    visitor: &impl TypeVisitor<'db>,
+    recursion_guard: &TypeCollector<'db>,
+) {
+    match TypeKind::from(ty) {
+        TypeKind::Atomic => {}
+        TypeKind::NonAtomic(non_atomic_type) => {
+            if recursion_guard.type_was_already_seen(ty) {
+                // If we have already seen this type, we can skip it.
+                return;
+            }
+            walk_non_atomic_type(db, non_atomic_type, visitor);
+        }
+    }
+}
+
+#[derive(Default, Debug)]
+pub(crate) struct TypeCollector<'db>(RefCell<FxIndexSet<Type<'db>>>);
+
+impl<'db> TypeCollector<'db> {
+    pub(crate) fn type_was_already_seen(&self, ty: Type<'db>) -> bool {
+        !self.0.borrow_mut().insert(ty)
     }
 }
 
@@ -258,7 +292,7 @@ pub(super) fn any_over_type<'db>(
 ) -> bool {
     struct AnyOverTypeVisitor<'db, 'a> {
         query: &'a dyn Fn(Type<'db>) -> bool,
-        seen_types: RefCell<FxIndexSet<NonAtomicType<'db>>>,
+        recursion_guard: TypeCollector<'db>,
         found_matching_type: Cell<bool>,
         should_visit_lazy_type_attributes: bool,
     }
@@ -278,170 +312,16 @@ pub(super) fn any_over_type<'db>(
             if found {
                 return;
             }
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {}
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    if !self.seen_types.borrow_mut().insert(non_atomic_type) {
-                        // If we have already seen this type, we can skip it.
-                        return;
-                    }
-                    walk_non_atomic_type(db, non_atomic_type, self);
-                }
-            }
+            walk_type_with_recursion_guard(db, ty, self, &self.recursion_guard);
         }
     }
 
     let visitor = AnyOverTypeVisitor {
         query,
-        seen_types: RefCell::new(FxIndexSet::default()),
+        recursion_guard: TypeCollector::default(),
         found_matching_type: Cell::new(false),
         should_visit_lazy_type_attributes,
     };
     visitor.visit_type(db, ty);
     visitor.found_matching_type.get()
-}
-
-/// Returns the maximum number of layers of generic specializations for a given type.
-///
-/// For example, `int` has a depth of `0`, `list[int]` has a depth of `1`, and `list[set[int]]`
-/// has a depth of `2`. A set-theoretic type like `list[int] | list[list[int]]` has a maximum
-/// depth of `2`.
-fn specialization_depth(db: &dyn Db, ty: Type<'_>) -> usize {
-    #[derive(Debug, Default)]
-    struct SpecializationDepthVisitor<'db> {
-        seen_types: RefCell<FxHashMap<NonAtomicType<'db>, Option<usize>>>,
-        max_depth: Cell<usize>,
-    }
-
-    impl<'db> TypeVisitor<'db> for SpecializationDepthVisitor<'db> {
-        fn should_visit_lazy_type_attributes(&self) -> bool {
-            false
-        }
-
-        fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
-            match TypeKind::from(ty) {
-                TypeKind::Atomic => {
-                    if ty.is_divergent() {
-                        self.max_depth.set(usize::MAX);
-                    }
-                }
-                TypeKind::NonAtomic(non_atomic_type) => {
-                    match self.seen_types.borrow_mut().entry(non_atomic_type) {
-                        Entry::Occupied(cached_depth) => {
-                            self.max_depth
-                                .update(|current| current.max(cached_depth.get().unwrap_or(0)));
-                            return;
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert(None);
-                        }
-                    }
-
-                    let self_depth: usize =
-                        matches!(non_atomic_type, NonAtomicType::GenericAlias(_)).into();
-
-                    let previous_max_depth = self.max_depth.replace(0);
-                    walk_non_atomic_type(db, non_atomic_type, self);
-
-                    self.max_depth.update(|max_child_depth| {
-                        previous_max_depth.max(max_child_depth.saturating_add(self_depth))
-                    });
-
-                    self.seen_types
-                        .borrow_mut()
-                        .insert(non_atomic_type, Some(self.max_depth.get()));
-                }
-            }
-        }
-    }
-
-    let visitor = SpecializationDepthVisitor::default();
-    visitor.visit_type(db, ty);
-    visitor.max_depth.get()
-}
-
-pub(super) fn exceeds_max_specialization_depth(db: &dyn Db, ty: Type<'_>) -> bool {
-    // To prevent infinite recursion during type inference for infinite types, we fall back to
-    // `C[Divergent]` once a certain amount of levels of specialization have occurred. For
-    // example:
-    //
-    // ```py
-    // x = 1
-    // while random_bool():
-    //     x = [x]
-    //
-    // reveal_type(x)  # Unknown | Literal[1] | list[Divergent]
-    // ```
-    const MAX_SPECIALIZATION_DEPTH: usize = 10;
-
-    specialization_depth(db, ty) > MAX_SPECIALIZATION_DEPTH
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{db::tests::setup_db, types::KnownClass};
-
-    #[test]
-    fn test_generics_layering_depth() {
-        let db = setup_db();
-
-        let int = || KnownClass::Int.to_instance(&db);
-        let list = |element| KnownClass::List.to_specialized_instance(&db, [element]);
-        let dict = |key, value| KnownClass::Dict.to_specialized_instance(&db, [key, value]);
-        let set = |element| KnownClass::Set.to_specialized_instance(&db, [element]);
-        let str = || KnownClass::Str.to_instance(&db);
-        let bytes = || KnownClass::Bytes.to_instance(&db);
-
-        let list_of_int = list(int());
-        assert_eq!(specialization_depth(&db, list_of_int), 1);
-
-        let list_of_list_of_int = list(list_of_int);
-        assert_eq!(specialization_depth(&db, list_of_list_of_int), 2);
-
-        let list_of_list_of_list_of_int = list(list_of_list_of_int);
-        assert_eq!(specialization_depth(&db, list_of_list_of_list_of_int), 3);
-
-        assert_eq!(specialization_depth(&db, set(dict(str(), list_of_int))), 3);
-
-        assert_eq!(
-            specialization_depth(
-                &db,
-                UnionType::from_elements(&db, [list_of_list_of_list_of_int, list_of_list_of_int])
-            ),
-            3
-        );
-
-        assert_eq!(
-            specialization_depth(
-                &db,
-                UnionType::from_elements(&db, [list_of_list_of_int, list_of_list_of_list_of_int])
-            ),
-            3
-        );
-
-        assert_eq!(
-            specialization_depth(
-                &db,
-                Type::heterogeneous_tuple(&db, [Type::heterogeneous_tuple(&db, [int()])])
-            ),
-            2
-        );
-
-        assert_eq!(
-            specialization_depth(&db, Type::heterogeneous_tuple(&db, [list_of_int, str()])),
-            2
-        );
-
-        assert_eq!(
-            specialization_depth(
-                &db,
-                list(UnionType::from_elements(
-                    &db,
-                    [list(int()), list(str()), list(bytes())]
-                ))
-            ),
-            2
-        );
-    }
 }

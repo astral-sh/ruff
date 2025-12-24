@@ -1,0 +1,88 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: isinstance.md - Narrowing for `isinstance` checks - `classinfo` is an invalid PEP-604 union of types
+mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import Any, Literal, NamedTuple
+ 2 | 
+ 3 | def _(x: int | list[int] | bytes):
+ 4 |     # error: [invalid-argument-type]
+ 5 |     if isinstance(x, list[int] | int):
+ 6 |         reveal_type(x)  # revealed: int | list[int] | bytes
+ 7 |     # error: [invalid-argument-type]
+ 8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
+ 9 |         reveal_type(x)  # revealed: int | list[int] | bytes
+10 |     # error: [invalid-argument-type]
+11 |     elif isinstance(x, Any | NamedTuple | list[int]):
+12 |         reveal_type(x)  # revealed: int | list[int] | bytes
+13 |     else:
+14 |         reveal_type(x)  # revealed: int | list[int] | bytes
+```
+
+# Diagnostics
+
+```
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+ --> src/mdtest_snippet.py:5:8
+  |
+3 | def _(x: int | list[int] | bytes):
+4 |     # error: [invalid-argument-type]
+5 |     if isinstance(x, list[int] | int):
+  |        ^^^^^^^^^^^^^^---------------^
+  |                      |
+  |                      This `UnionType` instance contains non-class elements
+6 |         reveal_type(x)  # revealed: int | list[int] | bytes
+7 |     # error: [invalid-argument-type]
+  |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<class 'list[int]'>` in the union is not a class object
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:8:10
+   |
+ 6 |         reveal_type(x)  # revealed: int | list[int] | bytes
+ 7 |     # error: [invalid-argument-type]
+ 8 |     elif isinstance(x, Literal[42] | list[int] | bytes):
+   |          ^^^^^^^^^^^^^^-------------------------------^
+   |                        |
+   |                        This `UnionType` instance contains non-class elements
+ 9 |         reveal_type(x)  # revealed: int | list[int] | bytes
+10 |     # error: [invalid-argument-type]
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Elements `<special-form 'Literal[42]'>` and `<class 'list[int]'>` in the union are not class objects
+info: rule `invalid-argument-type` is enabled by default
+
+```
+
+```
+error[invalid-argument-type]: Invalid second argument to `isinstance`
+  --> src/mdtest_snippet.py:11:10
+   |
+ 9 |         reveal_type(x)  # revealed: int | list[int] | bytes
+10 |     # error: [invalid-argument-type]
+11 |     elif isinstance(x, Any | NamedTuple | list[int]):
+   |          ^^^^^^^^^^^^^^----------------------------^
+   |                        |
+   |                        This `UnionType` instance contains non-class elements
+12 |         reveal_type(x)  # revealed: int | list[int] | bytes
+13 |     else:
+   |
+info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
+info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
+info: rule `invalid-argument-type` is enabled by default
+
+```

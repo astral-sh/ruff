@@ -6,6 +6,11 @@ on:
   pull_request:
     paths:
       - "crates/ty*/**"
+      - "!crates/ty_ide/**"
+      - "!crates/ty_server/**"
+      - "!crates/ty_test/**"
+      - "!crates/ty_completion_eval/**"
+      - "!crates/ty_wasm/**"
       - "crates/ruff_db"
       - "crates/ruff_python_ast"
       - "crates/ruff_python_parser"
@@ -24,7 +29,7 @@ env:
   CARGO_TERM_COLOR: always
   RUSTUP_MAX_RETRIES: 10
   RUST_BACKTRACE: 1
-  CONFORMANCE_SUITE_COMMIT: d4f39b27a4a47aac8b6d4019e1b0b5b3156fabdc
+  CONFORMANCE_SUITE_COMMIT: 9f6d8ced7cd1c8d92687a4e9c96d7716452e471e
 
 jobs:
   typing_conformance:
@@ -45,7 +50,7 @@ jobs:
           path: typing
           persist-credentials: false
 
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           workspaces: "ruff"
 
@@ -94,21 +99,18 @@ jobs:
             touch typing_conformance_diagnostics.diff
           fi
 
-          echo ${{ github.event.number }} > pr-number
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
 
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload diff
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: typing_conformance_diagnostics_diff
           path: typing_conformance_diagnostics.diff
 
-      - name: Upload pr-number
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        with:
-          name: pr-number
-          path: pr-number
-
+      # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
+      # Make sure to update the bot if you rename the artifact.
       - name: Upload conformance suite commit
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:

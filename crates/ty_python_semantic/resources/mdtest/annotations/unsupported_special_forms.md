@@ -12,17 +12,14 @@ P = ParamSpec("P")
 Ts = TypeVarTuple("Ts")
 R_co = TypeVar("R_co", covariant=True)
 
-Alias: TypeAlias = int
-
 def f(*args: Unpack[Ts]) -> tuple[Unpack[Ts]]:
     reveal_type(args)  # revealed: tuple[@Todo(`Unpack[]` special form), ...]
-    reveal_type(Alias)  # revealed: @Todo(Support for `typing.TypeAlias`)
     return args
 
 def g() -> TypeGuard[int]: ...
 def i(callback: Callable[Concatenate[int, P], R_co], *args: P.args, **kwargs: P.kwargs) -> R_co:
-    reveal_type(args)  # revealed: tuple[@Todo(Support for `typing.ParamSpec`), ...]
-    reveal_type(kwargs)  # revealed: dict[str, @Todo(Support for `typing.ParamSpec`)]
+    reveal_type(args)  # revealed: P@i.args
+    reveal_type(kwargs)  # revealed: P@i.kwargs
     return callback(42, *args, **kwargs)
 
 class Foo:
@@ -67,8 +64,9 @@ def _(
     reveal_type(c)  # revealed: Unknown
     reveal_type(d)  # revealed: Unknown
 
+    # error: [invalid-type-form] "Variable of type `ParamSpec` is not allowed in a type expression"
     def foo(a_: e) -> None:
-        reveal_type(a_)  # revealed: @Todo(Support for `typing.ParamSpec`)
+        reveal_type(a_)  # revealed: Unknown
 ```
 
 ## Inheritance
@@ -78,6 +76,7 @@ You can't inherit from most of these. `typing.Callable` is an exception.
 ```py
 from typing import Callable
 from typing_extensions import Self, Unpack, TypeGuard, TypeIs, Concatenate, Generic
+from ty_extensions import reveal_mro
 
 class A(Self): ...  # error: [invalid-base]
 class B(Unpack): ...  # error: [invalid-base]
@@ -87,7 +86,7 @@ class E(Concatenate): ...  # error: [invalid-base]
 class F(Callable): ...
 class G(Generic): ...  # error: [invalid-base] "Cannot inherit from plain `Generic`"
 
-reveal_type(F.__mro__)  # revealed: tuple[<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>]
+reveal_mro(F)  # revealed: (<class 'F'>, @Todo(Support for Callable as a base class), <class 'object'>)
 ```
 
 ## Subscriptability

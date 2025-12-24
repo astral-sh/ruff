@@ -1,7 +1,7 @@
 use insta_cmd::assert_cmd_snapshot;
 use ruff_python_ast::PythonVersion;
 
-use crate::CliTest;
+use crate::{CliTest, site_packages_filter};
 
 /// Specifying an option on the CLI should take precedence over the same setting in the
 /// project's configuration. Here, this is tested for the Python version.
@@ -37,12 +37,13 @@ fn config_override_python_version() -> anyhow::Result<()> {
     5 | print(sys.last_exc)
       |       ^^^^^^^^^^^^
       |
-    info: Python 3.11 was assumed when accessing `last_exc`
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.11 was assumed when resolving the `last_exc` attribute
      --> pyproject.toml:3:18
       |
     2 | [tool.ty.environment]
     3 | python-version = "3.11"
-      |                  ^^^^^^ Python 3.11 assumed due to this configuration setting
+      |                  ^^^^^^ Python version configuration
       |
     info: rule `unresolved-attribute` is enabled by default
 
@@ -142,7 +143,7 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -158,14 +159,14 @@ fn config_file_annotation_showing_where_python_version_set_typing_error() -> any
       |
     2 | [tool.ty.environment]
     3 | python-version = "3.8"
-      |                  ^^^^^ Python 3.8 assumed due to this configuration setting
+      |                  ^^^^^ Python version configuration
       |
     info: rule `unresolved-reference` is enabled by default
 
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    "#);
 
     assert_cmd_snapshot!(case.command().arg("--python-version=3.9"), @r###"
     success: false
@@ -319,6 +320,231 @@ fn python_version_inferred_from_system_installation() -> anyhow::Result<()> {
 
     ----- stderr -----
     "###);
+
+    Ok(())
+}
+
+/// This attempts to simulate the tangled web of symlinks that a homebrew install has
+/// which can easily confuse us if we're ever told to use it.
+///
+/// The main thing this is regression-testing is a panic in one *extremely* specific case
+/// that you have to try really hard to hit (but vscode, hilariously, did hit).
+#[cfg(unix)]
+#[test]
+fn python_argument_trapped_in_a_symlink_factory() -> anyhow::Result<()> {
+    let case = CliTest::with_files([
+        // This is the real python binary.
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+            "",
+        ),
+        // There's a real site-packages here (although it's basically empty).
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages/foo.py",
+            "",
+        ),
+        // There's also a real site-packages here (although it's basically empty).
+        ("opt/homebrew/lib/python3.13/site-packages/bar.py", ""),
+        // This has the real stdlib, but the site-packages in this dir is a symlink.
+        (
+            "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/abc.py",
+            "",
+        ),
+        // It's important that this our faux-homebrew not be in the same dir as our working directory
+        // to reproduce the crash, don't ask me why.
+        (
+            "project/test.py",
+            "\
+import foo
+import bar
+import colorama
+",
+        ),
+    ])?;
+
+    // many python symlinks pointing to a single real python (the longest path)
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3",
+    )?;
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3",
+    )?;
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3",
+        "opt/homebrew/bin/python3",
+    )?;
+    // the "real" python's site-packages is a symlink to a different dir
+    case.write_symlink(
+        "opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages",
+        "opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages",
+    )?;
+
+    // Try all 4 pythons with absolute paths to our fauxbrew install
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `foo`
+     --> test.py:1:8
+      |
+    1 | import foo
+      |        ^^^
+    2 | import bar
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .arg("--python").arg(case.root().join("opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/bin/python3.13")), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `bar`
+     --> test.py:2:8
+      |
+    1 | import foo
+    2 | import bar
+      |        ^^^
+    3 | import colorama
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    error[unresolved-import]: Cannot resolve imported module `colorama`
+     --> test.py:3:8
+      |
+    1 | import foo
+    2 | import bar
+    3 | import colorama
+      |        ^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/project (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/opt/homebrew/Cellar/python@3.13/3.13.5/Frameworks/Python.framework/Versions/3.13/lib/python3.13/site-packages (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
+
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -546,7 +772,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -561,7 +787,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
      --> venv/pyvenv.cfg:2:11
       |
     2 | version = 3.8
-      |           ^^^ Python version inferred from virtual environment metadata file
+      |           ^^^ Virtual environment metadata
     3 | home = foo/bar/bin
       |
     info: No Python version was specified on the command line or in a configuration file
@@ -570,7 +796,7 @@ fn pyvenv_cfg_file_annotation_showing_where_python_version_set() -> anyhow::Resu
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -605,7 +831,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
         ("test.py", "aiter"),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -620,7 +846,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
      --> venv/pyvenv.cfg:4:23
       |
     4 |             version = 3.8
-      |                       ^^^ Python version inferred from virtual environment metadata file
+      |                       ^^^ Virtual environment metadata
       |
     info: No Python version was specified on the command line or in a configuration file
     info: rule `unresolved-reference` is enabled by default
@@ -628,7 +854,7 @@ fn pyvenv_cfg_file_annotation_no_trailing_newline() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -672,7 +898,7 @@ fn config_file_annotation_showing_where_python_version_set_syntax_error() -> any
       |
     2 | [project]
     3 | requires-python = ">=3.8"
-      |                   ^^^^^^^ Python 3.8 assumed due to this configuration setting
+      |                   ^^^^^^^ Python version configuration
       |
 
     Found 1 diagnostic
@@ -954,6 +1180,8 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
             import os
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
+
+            from typing import LiteralString  # added in Python 3.11
             "#,
         ),
     ])?;
@@ -969,18 +1197,40 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
     3 |
     4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
       | ^^^^^^^^^^
+    5 |
+    6 | from typing import LiteralString  # added in Python 3.11
       |
-    info: Python 3.10 was assumed when accessing `grantpt`
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.10 was assumed when resolving the `grantpt` attribute
      --> ty.toml:3:18
       |
     2 | [environment]
     3 | python-version = "3.10"
-      |                  ^^^^^^ Python 3.10 assumed due to this configuration setting
+      |                  ^^^^^^ Python version configuration
     4 | python-platform = "linux"
       |
     info: rule `unresolved-attribute` is enabled by default
 
-    Found 1 diagnostic
+    error[unresolved-import]: Module `typing` has no member `LiteralString`
+     --> main.py:6:20
+      |
+    4 | os.grantpt(1) # only available on unix, Python 3.13 or newer
+    5 |
+    6 | from typing import LiteralString  # added in Python 3.11
+      |                    ^^^^^^^^^^^^^
+      |
+    info: The member may be available on other Python versions or platforms
+    info: Python 3.10 was assumed when resolving imports
+     --> ty.toml:3:18
+      |
+    2 | [environment]
+    3 | python-version = "3.10"
+      |                  ^^^^^^ Python version configuration
+    4 | python-platform = "linux"
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 2 diagnostics
 
     ----- stderr -----
     "#);
@@ -1000,6 +1250,8 @@ fn defaults_to_a_new_python_version() -> anyhow::Result<()> {
             import os
 
             os.grantpt(1) # only available on unix, Python 3.13 or newer
+
+            from typing import LiteralString  # added in Python 3.11
             "#,
         ),
     ])?;
@@ -1654,6 +1906,278 @@ home = ./
     Ok(())
 }
 
+/// ty should include site packages from its own environment when no other environment is found.
+#[test]
+fn ty_environment_is_only_environment() -> anyhow::Result<()> {
+    let ty_venv_site_packages = if cfg!(windows) {
+        "ty-venv/Lib/site-packages"
+    } else {
+        "ty-venv/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "ty-venv/Scripts/ty.exe"
+    } else {
+        "ty-venv/bin/ty"
+    };
+
+    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+
+    let case = CliTest::with_files([
+        (ty_package_path.as_str(), "class TyEnvClass: ..."),
+        (
+            "ty-venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            "test.py",
+            r"
+            from ty_package import TyEnvClass
+            ",
+        ),
+    ])?;
+
+    let case = case.with_ty_at(ty_executable_path)?;
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+/// ty should include site packages from both its own environment and a local `.venv`. The packages
+/// from ty's environment should take precedence.
+#[test]
+fn ty_environment_and_discovered_venv() -> anyhow::Result<()> {
+    let ty_venv_site_packages = if cfg!(windows) {
+        "ty-venv/Lib/site-packages"
+    } else {
+        "ty-venv/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "ty-venv/Scripts/ty.exe"
+    } else {
+        "ty-venv/bin/ty"
+    };
+
+    let local_venv_site_packages = if cfg!(windows) {
+        ".venv/Lib/site-packages"
+    } else {
+        ".venv/lib/python3.13/site-packages"
+    };
+
+    let ty_unique_package = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+    let local_unique_package = format!("{local_venv_site_packages}/local_package/__init__.py");
+    let ty_conflicting_package = format!("{ty_venv_site_packages}/shared_package/__init__.py");
+    let local_conflicting_package =
+        format!("{local_venv_site_packages}/shared_package/__init__.py");
+
+    let case = CliTest::with_files([
+        (ty_unique_package.as_str(), "class TyEnvClass: ..."),
+        (local_unique_package.as_str(), "class LocalClass: ..."),
+        (ty_conflicting_package.as_str(), "class FromTyEnv: ..."),
+        (
+            local_conflicting_package.as_str(),
+            "class FromLocalVenv: ...",
+        ),
+        (
+            "ty-venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            ".venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            "test.py",
+            r"
+            # Should resolve from ty's environment
+            from ty_package import TyEnvClass
+            # Should resolve from local .venv
+            from local_package import LocalClass
+            # Should resolve from ty's environment (takes precedence)
+            from shared_package import FromTyEnv
+            # Should NOT resolve (shadowed by ty's environment version)
+            from shared_package import FromLocalVenv
+            ",
+        ),
+    ])?
+    .with_ty_at(ty_executable_path)?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Module `shared_package` has no member `FromLocalVenv`
+     --> test.py:9:28
+      |
+    7 | from shared_package import FromTyEnv
+    8 | # Should NOT resolve (shadowed by ty's environment version)
+    9 | from shared_package import FromLocalVenv
+      |                            ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
+/// When `VIRTUAL_ENV` is set, ty should *not* discover its own environment's site-packages.
+#[test]
+fn ty_environment_and_active_environment() -> anyhow::Result<()> {
+    let ty_venv_site_packages = if cfg!(windows) {
+        "ty-venv/Lib/site-packages"
+    } else {
+        "ty-venv/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "ty-venv/Scripts/ty.exe"
+    } else {
+        "ty-venv/bin/ty"
+    };
+
+    let active_venv_site_packages = if cfg!(windows) {
+        "active-venv/Lib/site-packages"
+    } else {
+        "active-venv/lib/python3.13/site-packages"
+    };
+
+    let ty_package_path = format!("{ty_venv_site_packages}/ty_package/__init__.py");
+    let active_package_path = format!("{active_venv_site_packages}/active_package/__init__.py");
+
+    let case = CliTest::with_files([
+        (ty_package_path.as_str(), "class TyEnvClass: ..."),
+        (
+            "ty-venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (active_package_path.as_str(), "class ActiveClass: ..."),
+        (
+            "active-venv/pyvenv.cfg",
+            r"
+            home = ./
+            version = 3.13
+            ",
+        ),
+        (
+            "test.py",
+            r"
+            from ty_package import TyEnvClass
+            from active_package import ActiveClass
+            ",
+        ),
+    ])?
+    .with_ty_at(ty_executable_path)?
+    .with_filter(&site_packages_filter("3.13"), "<site-packages>");
+
+    assert_cmd_snapshot!(
+        case.command()
+            .env("VIRTUAL_ENV", case.root().join("active-venv")),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `ty_package`
+     --> test.py:2:6
+      |
+    2 | from ty_package import TyEnvClass
+      |      ^^^^^^^^^^
+    3 | from active_package import ActiveClass
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info:   3. <temp_dir>/active-venv/<site-packages> (site-packages)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "
+    );
+
+    Ok(())
+}
+
+/// When ty is installed in a system environment rather than a virtual environment, it should
+/// not include the environment's site-packages in its search path.
+#[test]
+fn ty_environment_is_system_not_virtual() -> anyhow::Result<()> {
+    let ty_system_site_packages = if cfg!(windows) {
+        "system-python/Lib/site-packages"
+    } else {
+        "system-python/lib/python3.13/site-packages"
+    };
+
+    let ty_executable_path = if cfg!(windows) {
+        "system-python/Scripts/ty.exe"
+    } else {
+        "system-python/bin/ty"
+    };
+
+    let ty_package_path = format!("{ty_system_site_packages}/system_package/__init__.py");
+
+    let case = CliTest::with_files([
+        // Package in system Python installation (should NOT be discovered)
+        (ty_package_path.as_str(), "class SystemClass: ..."),
+        // Note: NO pyvenv.cfg - this is a system installation, not a venv
+        (
+            "test.py",
+            r"
+            from system_package import SystemClass
+            ",
+        ),
+    ])?
+    .with_ty_at(ty_executable_path)?;
+
+    assert_cmd_snapshot!(case.command(), @r###"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-import]: Cannot resolve imported module `system_package`
+     --> test.py:2:6
+      |
+    2 | from system_package import SystemClass
+      |      ^^^^^^^^^^^^^^
+      |
+    info: Searched in the following paths during module resolution:
+    info:   1. <temp_dir>/ (first-party code)
+    info:   2. vendored://stdlib (stdlib typeshed stubs vendored by ty)
+    info: make sure your Python environment is properly configured: https://docs.astral.sh/ty/modules/#python-environment
+    info: rule `unresolved-import` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    "###);
+
+    Ok(())
+}
+
 #[test]
 fn src_root_deprecation_warning() -> anyhow::Result<()> {
     let case = CliTest::with_files([
@@ -1866,14 +2390,14 @@ fn default_root_flat_layout() -> anyhow::Result<()> {
 fn default_root_tests_folder() -> anyhow::Result<()> {
     let case = CliTest::with_files([
         ("src/foo.py", "foo = 10"),
-        ("tests/bar.py", "bar = 20"),
+        ("tests/bar.py", "baz = 20"),
         (
             "tests/test_bar.py",
             r#"
             from foo import foo
-            from bar import bar
+            from bar import baz
 
-            print(f"{foo} {bar}")
+            print(f"{foo} {baz}")
             "#,
         ),
     ])?;
@@ -2176,6 +2700,54 @@ fn pythonpath_multiple_dirs_is_respected() -> anyhow::Result<()> {
 
     ----- stderr -----
     "###);
+
+    Ok(())
+}
+
+/// Test behavior when `VIRTUAL_ENV` is set but points to a non-existent path.
+#[test]
+fn missing_virtual_env() -> anyhow::Result<()> {
+    let working_venv_package1_path = if cfg!(windows) {
+        "project/.venv/Lib/site-packages/package1/__init__.py"
+    } else {
+        "project/.venv/lib/python3.13/site-packages/package1/__init__.py"
+    };
+
+    let case = CliTest::with_files([
+        (
+            "project/test.py",
+            r#"
+            from package1 import WorkingVenv
+            "#,
+        ),
+        (
+            "project/.venv/pyvenv.cfg",
+            r#"
+home = ./
+
+            "#,
+        ),
+        (
+            working_venv_package1_path,
+            r#"
+            class WorkingVenv: ...
+            "#,
+        ),
+    ])?;
+
+    assert_cmd_snapshot!(case.command()
+        .current_dir(case.root().join("project"))
+        .env("VIRTUAL_ENV", case.root().join("nonexistent-venv")), @r"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ty failed
+      Cause: Failed to discover local Python environment
+      Cause: Invalid `VIRTUAL_ENV` environment variable `<temp_dir>/nonexistent-venv`: does not point to a directory on disk
+      Cause: No such file or directory (os error 2)
+    ");
 
     Ok(())
 }

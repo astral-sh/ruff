@@ -783,7 +783,7 @@ enum CodeExampleKind<'src> {
     ///
     /// Documentation describing doctests and how they're recognized can be
     /// found as part of the Python standard library:
-    /// https://docs.python.org/3/library/doctest.html.
+    /// <https://docs.python.org/3/library/doctest.html>.
     ///
     /// (You'll likely need to read the [regex matching] used internally by the
     /// doctest module to determine more precisely how it works.)

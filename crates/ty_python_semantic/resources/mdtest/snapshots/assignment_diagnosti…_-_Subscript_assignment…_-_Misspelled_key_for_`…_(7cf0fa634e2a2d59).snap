@@ -1,0 +1,44 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Misspelled key for `TypedDict`
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypedDict
+2 | 
+3 | class Config(TypedDict):
+4 |     retries: int
+5 | 
+6 | def _(config: Config) -> None:
+7 |     config["Retries"] = 30.0  # error: [invalid-key]
+```
+
+# Diagnostics
+
+```
+error[invalid-key]: Unknown key "Retries" for TypedDict `Config`
+ --> src/mdtest_snippet.py:7:5
+  |
+6 | def _(config: Config) -> None:
+7 |     config["Retries"] = 30.0  # error: [invalid-key]
+  |     ------ ^^^^^^^^^ Did you mean "retries"?
+  |     |
+  |     TypedDict `Config`
+  |
+info: rule `invalid-key` is enabled by default
+4 |     retries: int
+5 | 
+6 | def _(config: Config) -> None:
+  -     config["Retries"] = 30.0  # error: [invalid-key]
+7 +     config["retries"] = 30.0  # error: [invalid-key]
+note: This is an unsafe fix and may change runtime behavior
+
+```

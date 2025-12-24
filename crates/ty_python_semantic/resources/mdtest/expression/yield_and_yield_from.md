@@ -26,7 +26,7 @@ def outer_generator():
 ## `yield from` with a custom iterable
 
 `yield from` can also be used with custom iterable types. In that case, the type of the `yield from`
-expression can not be determined
+expression cannot be determined
 
 ```py
 from typing import Generator, TypeVar, Generic

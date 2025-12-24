@@ -78,7 +78,7 @@ pub(crate) fn unconventional_import_alias(
     let mut diagnostic = checker.report_diagnostic(
         UnconventionalImportAlias {
             name: qualified_name,
-            asname: expected_alias.to_string(),
+            asname: expected_alias.clone(),
         },
         binding.range(),
     );

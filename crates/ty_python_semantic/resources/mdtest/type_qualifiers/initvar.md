@@ -67,7 +67,7 @@ class Person:
 
     metadata: InitVar[str] = "default"
 
-reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = Literal["default"]) -> None
+reveal_type(Person.__init__)  # revealed: (self: Person, name: str, age: int, metadata: str = "default") -> None
 
 alice = Person("Alice", 30)
 bob = Person("Bob", 25, "custom metadata")
@@ -110,6 +110,25 @@ from dataclasses import InitVar, dataclass
 @dataclass
 class Wrong:
     x: InitVar[int, str]  # error: [invalid-type-form] "Type qualifier `InitVar` expected exactly 1 argument, got 2"
+```
+
+A trailing comma in a subscript creates a single-element tuple. We need to handle this gracefully
+and emit a proper error rather than crashing (see
+[ty#1793](https://github.com/astral-sh/ty/issues/1793)).
+
+```py
+from dataclasses import InitVar, dataclass
+
+@dataclass
+class AlsoWrong:
+    # error: [invalid-type-form] "Tuple literals are not allowed in this context in a type expression: Did you mean `tuple[()]`?"
+    x: InitVar[(),]
+
+# revealed: (self: AlsoWrong, x: Unknown) -> None
+reveal_type(AlsoWrong.__init__)
+
+# error: [unresolved-attribute]
+reveal_type(AlsoWrong(42).x)  # revealed: Unknown
 ```
 
 A bare `InitVar` is not allowed according to the [type annotation grammar]:

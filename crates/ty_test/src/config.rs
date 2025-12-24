@@ -4,8 +4,12 @@
 //!
 //! ```toml
 //! log = true # or log = "ty=WARN"
+//!
 //! [environment]
 //! python-version = "3.10"
+//!
+//! [project]
+//! dependencies = ["pydantic==2.12.2"]
 //! ```
 
 use anyhow::Context;
@@ -21,10 +25,15 @@ pub(crate) struct MarkdownTestConfig {
 
     pub(crate) log: Option<Log>,
 
+    pub(crate) analysis: Option<Analysis>,
+
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
     pub(crate) system: Option<SystemKind>,
+
+    /// Project configuration for installing external dependencies.
+    pub(crate) project: Option<Project>,
 }
 
 impl MarkdownTestConfig {
@@ -50,6 +59,10 @@ impl MarkdownTestConfig {
 
     pub(crate) fn python(&self) -> Option<&SystemPath> {
         self.environment.as_ref()?.python.as_deref()
+    }
+
+    pub(crate) fn dependencies(&self) -> Option<&[String]> {
+        self.project.as_ref()?.dependencies.as_deref()
     }
 }
 
@@ -92,6 +105,13 @@ pub(crate) struct Environment {
     pub python: Option<SystemPathBuf>,
 }
 
+#[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Analysis {
+    /// Whether ty should support `type: ignore` comments.
+    pub(crate) respect_type_ignore_comments: Option<bool>,
+}
+
 #[derive(Deserialize, Debug, Clone)]
 #[serde(untagged)]
 pub(crate) enum Log {
@@ -115,4 +135,17 @@ pub(crate) enum SystemKind {
     ///
     /// This system should only be used when testing system or OS specific behavior.
     Os,
+}
+
+/// Project configuration for tests that need external dependencies.
+#[derive(Deserialize, Debug, Default, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Project {
+    /// List of Python package dependencies in `pyproject.toml` format.
+    ///
+    /// These will be installed using `uv sync` into a temporary virtual environment.
+    /// The site-packages directory will then be copied into the test's filesystem.
+    ///
+    /// Example: `dependencies = ["pydantic==2.12.2"]`
+    pub(crate) dependencies: Option<Vec<String>>,
 }

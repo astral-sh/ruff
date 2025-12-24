@@ -16,15 +16,11 @@ export default function Chrome() {
 
   const [theme, setTheme] = useTheme();
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     if (settings == null || pythonSource == null) {
       return;
     }
-
-    persist(settings, pythonSource).catch((error) =>
-      // eslint-disable-next-line no-console
-      console.error(`Failed to share playground: ${error}`),
-    );
+    await persist(settings, pythonSource);
   }, [pythonSource, settings]);
 
   if (initPromise.current == null) {

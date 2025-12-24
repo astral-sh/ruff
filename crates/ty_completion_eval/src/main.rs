@@ -15,11 +15,11 @@ use regex::bytes::Regex;
 use ruff_db::files::system_path_to_file;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
 use ty_ide::Completion;
+use ty_module_resolver::ModuleName;
 use ty_project::metadata::Options;
 use ty_project::metadata::options::EnvironmentOptions;
 use ty_project::metadata::value::RelativePathBuf;
 use ty_project::{ProjectDatabase, ProjectMetadata};
-use ty_python_semantic::ModuleName;
 
 #[derive(Debug, clap::Parser)]
 #[command(
@@ -506,8 +506,20 @@ struct CompletionAnswer {
 impl CompletionAnswer {
     /// Returns true when this answer matches the completion given.
     fn matches(&self, completion: &Completion) -> bool {
+        if let Some(ref qualified) = completion.qualified {
+            if qualified.as_str() == self.qualified() {
+                return true;
+            }
+        }
         self.symbol == completion.name.as_str()
             && self.module.as_deref() == completion.module_name.map(ModuleName::as_str)
+    }
+
+    fn qualified(&self) -> String {
+        self.module
+            .as_ref()
+            .map(|module| format!("{module}.{}", self.symbol))
+            .unwrap_or_else(|| self.symbol.clone())
     }
 }
 

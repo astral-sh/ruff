@@ -1,0 +1,96 @@
+---
+source: crates/ty_server/tests/e2e/code_actions.rs
+expression: code_actions
+---
+[
+  {
+    "title": "import typing.Literal",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 3
+          },
+          "end": {
+            "line": 0,
+            "character": 10
+          }
+        },
+        "severity": 1,
+        "code": "unresolved-reference",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unresolved-reference"
+        },
+        "source": "ty",
+        "message": "Name `Literal` used when not defined"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 0
+              },
+              "end": {
+                "line": 0,
+                "character": 0
+              }
+            },
+            "newText": "from typing import Literal\n"
+          }
+        ]
+      }
+    },
+    "isPreferred": true
+  },
+  {
+    "title": "Ignore 'unresolved-reference' for this line",
+    "kind": "quickfix",
+    "diagnostics": [
+      {
+        "range": {
+          "start": {
+            "line": 0,
+            "character": 3
+          },
+          "end": {
+            "line": 0,
+            "character": 10
+          }
+        },
+        "severity": 1,
+        "code": "unresolved-reference",
+        "codeDescription": {
+          "href": "https://ty.dev/rules#unresolved-reference"
+        },
+        "source": "ty",
+        "message": "Name `Literal` used when not defined"
+      }
+    ],
+    "edit": {
+      "changes": {
+        "file://<temp_dir>/src/foo.py": [
+          {
+            "range": {
+              "start": {
+                "line": 0,
+                "character": 17
+              },
+              "end": {
+                "line": 0,
+                "character": 17
+              }
+            },
+            "newText": "  # ty:ignore[unresolved-reference]"
+          }
+        ]
+      }
+    },
+    "isPreferred": false
+  }
+]

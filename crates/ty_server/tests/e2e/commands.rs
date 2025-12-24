@@ -9,7 +9,7 @@ fn execute_command(
     server: &mut TestServer,
     command: String,
     arguments: Vec<serde_json::Value>,
-) -> anyhow::Result<Option<serde_json::Value>> {
+) -> Option<serde_json::Value> {
     let params = ExecuteCommandParams {
         command,
         arguments,
@@ -32,10 +32,10 @@ return 42
         .with_workspace(workspace_root, None)?
         .with_file(foo, foo_content)?
         .enable_pull_diagnostics(false)
-        .build()?
-        .wait_until_workspaces_are_initialized()?;
+        .build()
+        .wait_until_workspaces_are_initialized();
 
-    let response = execute_command(&mut server, "ty.printDebugInformation".to_string(), vec![])?;
+    let response = execute_command(&mut server, "ty.printDebugInformation".to_string(), vec![]);
     let response = response.expect("expect server response");
 
     let response = response
@@ -43,10 +43,11 @@ return 42
         .expect("debug command to return a string response");
 
     insta::with_settings!({
-        filters =>vec![
-            (r"\b[0-9]+.[0-9]+MB\b","[X.XXMB]"),
-            (r"Workspace .+\)","Workspace XXX"),
-            (r"Project at .+","Project at XXX"),
+        filters => vec![
+            (r"\b[0-9]+.[0-9]+MB\b", "[X.XXMB]"),
+            (r"Workspace .+\)", "Workspace XXX"),
+            (r"Project at .+", "Project at XXX"),
+            (r"rules: \{(.|\n)+?\}\,", "rules: <RULES>,"),
     ]}, {
         insta::assert_snapshot!(response);
     });

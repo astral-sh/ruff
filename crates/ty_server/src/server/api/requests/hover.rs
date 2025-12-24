@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use crate::document::{PositionExt, ToRangeExt};
+use crate::document::{FileRangeExt, PositionExt};
 use crate::server::api::traits::{
     BackgroundDocumentRequestHandler, RequestHandler, RetriableRequestHandler,
 };
@@ -8,8 +8,6 @@ use crate::session::DocumentSnapshot;
 use crate::session::client::Client;
 use lsp_types::request::HoverRequest;
 use lsp_types::{HoverContents, HoverParams, MarkupContent, Url};
-use ruff_db::source::{line_index, source_text};
-use ruff_text_size::Ranged;
 use ty_ide::{MarkupKind, hover};
 use ty_project::ProjectDatabase;
 
@@ -37,17 +35,18 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
             return Ok(None);
         }
 
-        let Some(file) = snapshot.file(db) else {
+        let Some(file) = snapshot.to_notebook_or_file(db) else {
             return Ok(None);
         };
 
-        let source = source_text(db, file);
-        let line_index = line_index(db, file);
-        let offset = params.text_document_position_params.position.to_text_size(
-            &source,
-            &line_index,
+        let Some(offset) = params.text_document_position_params.position.to_text_size(
+            db,
+            file,
+            snapshot.url(),
             snapshot.encoding(),
-        );
+        ) else {
+            return Ok(None);
+        };
 
         let Some(range_info) = hover(db, file, offset) else {
             return Ok(None);
@@ -69,11 +68,10 @@ impl BackgroundDocumentRequestHandler for HoverRequestHandler {
                 kind: lsp_markup_kind,
                 value: contents,
             }),
-            range: Some(range_info.file_range().range().to_lsp_range(
-                &source,
-                &line_index,
-                snapshot.encoding(),
-            )),
+            range: range_info
+                .file_range()
+                .to_lsp_range(db, snapshot.encoding())
+                .map(|lsp_range| lsp_range.local_range()),
         }))
     }
 }

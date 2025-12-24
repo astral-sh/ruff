@@ -1,0 +1,53 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: assignment_diagnostics.md - Subscript assignment diagnostics - Wrong value type for all elements of a union
+mdtest path: crates/ty_python_semantic/resources/mdtest/subscript/assignment_diagnostics.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | def _(config: dict[str, int] | dict[str, str]) -> None:
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+```
+
+# Diagnostics
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, int]`
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+  |     ^^^^^^^^^^^^^^^^^^^^---
+  |                         |
+  |                         Expected value of type `int`, got `float`
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+info: rule `invalid-assignment` is enabled by default
+
+```
+
+```
+error[invalid-assignment]: Invalid subscript assignment with key of type `Literal["retries"]` and value of type `float` on object of type `dict[str, str]`
+ --> src/mdtest_snippet.py:4:5
+  |
+2 |     # error: [invalid-assignment]
+3 |     # error: [invalid-assignment]
+4 |     config["retries"] = 3.0
+  |     ^^^^^^^^^^^^^^^^^^^^---
+  |                         |
+  |                         Expected value of type `str`, got `float`
+  |
+info: The full type of the subscripted object is `dict[str, int] | dict[str, str]`
+info: rule `invalid-assignment` is enabled by default
+
+```

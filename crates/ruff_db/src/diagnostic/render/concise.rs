@@ -1,6 +1,6 @@
 use crate::diagnostic::{
     Diagnostic, DisplayDiagnosticConfig, Severity,
-    stylesheet::{DiagnosticStylesheet, fmt_styled},
+    stylesheet::{DiagnosticStylesheet, fmt_styled, fmt_with_hyperlink},
 };
 
 use super::FileResolver;
@@ -28,6 +28,10 @@ impl<'a> ConciseRenderer<'a> {
 
         let sep = fmt_styled(":", stylesheet.separator);
         for diag in diagnostics {
+            if self.config.is_canceled() {
+                return Ok(());
+            }
+
             if let Some(span) = diag.primary_span() {
                 write!(
                     f,
@@ -62,18 +66,29 @@ impl<'a> ConciseRenderer<'a> {
                 }
                 write!(f, "{sep} ")?;
             }
+
             if self.config.hide_severity {
                 if let Some(code) = diag.secondary_code() {
                     write!(
                         f,
                         "{code} ",
-                        code = fmt_styled(code, stylesheet.secondary_code)
+                        code = fmt_styled(
+                            fmt_with_hyperlink(&code, diag.documentation_url(), &stylesheet),
+                            stylesheet.secondary_code
+                        )
                     )?;
                 } else {
                     write!(
                         f,
                         "{id}: ",
-                        id = fmt_styled(diag.inner.id.as_str(), stylesheet.secondary_code)
+                        id = fmt_styled(
+                            fmt_with_hyperlink(
+                                &diag.inner.id,
+                                diag.documentation_url(),
+                                &stylesheet
+                            ),
+                            stylesheet.secondary_code
+                        )
                     )?;
                 }
                 if self.config.show_fix_status {
@@ -93,7 +108,10 @@ impl<'a> ConciseRenderer<'a> {
                     f,
                     "{severity}[{id}] ",
                     severity = fmt_styled(severity, severity_style),
-                    id = fmt_styled(diag.id(), stylesheet.emphasis)
+                    id = fmt_styled(
+                        fmt_with_hyperlink(&diag.id(), diag.documentation_url(), &stylesheet),
+                        stylesheet.emphasis
+                    )
                 )?;
             }
 

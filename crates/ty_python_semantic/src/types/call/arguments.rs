@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fmt::Display;
 
 use itertools::{Either, Itertools};
 use ruff_python_ast as ast;
@@ -66,6 +67,39 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             .collect()
     }
 
+    /// Like [`Self::from_arguments`] but fills as much typing info in as possible.
+    ///
+    /// This currently only exists for the LSP usecase, and shouldn't be used in normal
+    /// typechecking.
+    pub(crate) fn from_arguments_typed(
+        arguments: &'a ast::Arguments,
+        mut infer_argument_type: impl FnMut(Option<&ast::Expr>, &ast::Expr) -> Type<'db>,
+    ) -> Self {
+        arguments
+            .arguments_source_order()
+            .map(|arg_or_keyword| match arg_or_keyword {
+                ast::ArgOrKeyword::Arg(arg) => match arg {
+                    ast::Expr::Starred(ast::ExprStarred { value, .. }) => {
+                        let ty = infer_argument_type(Some(arg), value);
+                        (Argument::Variadic, Some(ty))
+                    }
+                    _ => {
+                        let ty = infer_argument_type(None, arg);
+                        (Argument::Positional, Some(ty))
+                    }
+                },
+                ast::ArgOrKeyword::Keyword(ast::Keyword { arg, value, .. }) => {
+                    let ty = infer_argument_type(None, value);
+                    if let Some(arg) = arg {
+                        (Argument::Keyword(&arg.id), Some(ty))
+                    } else {
+                        (Argument::Keywords, Some(ty))
+                    }
+                }
+            })
+            .collect()
+    }
+
     /// Create a [`CallArguments`] with no arguments.
     pub(crate) fn none() -> Self {
         Self::default()
@@ -115,6 +149,14 @@ impl<'a, 'db> CallArguments<'a, 'db> {
         &mut self,
     ) -> impl Iterator<Item = (Argument<'a>, &mut Option<Type<'db>>)> + '_ {
         (self.arguments.iter().copied()).zip(self.types.iter_mut())
+    }
+
+    /// Create a new [`CallArguments`] starting from the specified index.
+    pub(super) fn start_from(&self, index: usize) -> Self {
+        Self {
+            arguments: self.arguments[index..].to_vec(),
+            types: self.types[index..].to_vec(),
+        }
     }
 
     /// Returns an iterator on performing [argument type expansion].
@@ -187,7 +229,7 @@ impl<'a, 'db> CallArguments<'a, 'db> {
                 if expansion_size > MAX_EXPANSIONS {
                     tracing::debug!(
                         "Skipping argument type expansion as it would exceed the \
-                    maximum number of expansions ({MAX_EXPANSIONS})"
+                            maximum number of expansions ({MAX_EXPANSIONS})"
                     );
                     return Some(State::LimitReached(index));
                 }
@@ -221,6 +263,52 @@ impl<'a, 'db> CallArguments<'a, 'db> {
             }
             State::Expanding(ExpandingState::Expanded(expanded)) => Expansion::Expanded(expanded),
         })
+    }
+
+    pub(super) fn display(&self, db: &'db dyn Db) -> impl Display {
+        struct DisplayCallArguments<'a, 'db> {
+            call_arguments: &'a CallArguments<'a, 'db>,
+            db: &'db dyn Db,
+        }
+
+        impl std::fmt::Display for DisplayCallArguments<'_, '_> {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                f.write_str("(")?;
+                for (index, (argument, ty)) in self.call_arguments.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    match argument {
+                        Argument::Synthetic => write!(
+                            f,
+                            "self: {}",
+                            ty.unwrap_or_else(Type::unknown).display(self.db)
+                        )?,
+                        Argument::Positional => {
+                            write!(f, "{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                        Argument::Variadic => {
+                            write!(f, "*{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                        Argument::Keyword(name) => write!(
+                            f,
+                            "{}={}",
+                            name,
+                            ty.unwrap_or_else(Type::unknown).display(self.db)
+                        )?,
+                        Argument::Keywords => {
+                            write!(f, "**{}", ty.unwrap_or_else(Type::unknown).display(self.db))?;
+                        }
+                    }
+                }
+                f.write_str(")")
+            }
+        }
+
+        DisplayCallArguments {
+            call_arguments: self,
+            db,
+        }
     }
 }
 

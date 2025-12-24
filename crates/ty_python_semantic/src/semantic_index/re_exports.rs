@@ -27,10 +27,11 @@ use ruff_python_ast::{
     visitor::{Visitor, walk_expr, walk_pattern, walk_stmt},
 };
 use rustc_hash::FxHashMap;
+use ty_module_resolver::{ModuleName, resolve_module};
 
-use crate::{Db, module_name::ModuleName, resolve_module};
+use crate::Db;
 
-fn exports_cycle_initial(_db: &dyn Db, _file: File) -> Box<[Name]> {
+fn exports_cycle_initial(_db: &dyn Db, _id: salsa::Id, _file: File) -> Box<[Name]> {
     Box::default()
 }
 
@@ -39,7 +40,13 @@ pub(super) fn exported_names(db: &dyn Db, file: File) -> Box<[Name]> {
     let module = parsed_module(db, file).load(db);
     let mut finder = ExportFinder::new(db, file);
     finder.visit_body(module.suite());
-    finder.resolve_exports()
+
+    let mut exports = finder.resolve_exports();
+
+    // Sort the exports to ensure convergence regardless of hash map
+    // or insertion order. See <https://github.com/astral-sh/ty/issues/444>
+    exports.sort_unstable();
+    exports.into()
 }
 
 struct ExportFinder<'db> {
@@ -69,7 +76,7 @@ impl<'db> ExportFinder<'db> {
         }
     }
 
-    fn resolve_exports(self) -> Box<[Name]> {
+    fn resolve_exports(self) -> Vec<Name> {
         match self.dunder_all {
             DunderAll::NotPresent => self
                 .exports
@@ -244,7 +251,9 @@ impl<'db> Visitor<'db> for ExportFinder<'db> {
                             for export in
                                 ModuleName::from_import_statement(self.db, self.file, node)
                                     .ok()
-                                    .and_then(|module_name| resolve_module(self.db, &module_name))
+                                    .and_then(|module_name| {
+                                        resolve_module(self.db, self.file, &module_name)
+                                    })
                                     .iter()
                                     .flat_map(|module| {
                                         module

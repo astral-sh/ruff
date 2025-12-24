@@ -28,6 +28,7 @@ mod tests {
     use crate::settings::types::PreviewMode;
     use crate::settings::{LinterSettings, flags};
     use crate::source_kind::SourceKind;
+    use crate::suppression::Suppressions;
     use crate::test::{test_contents, test_path, test_snippet};
     use crate::{Locator, assert_diagnostics, assert_diagnostics_diff, directives};
 
@@ -166,6 +167,7 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_30.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_31.py"))]
     #[test_case(Rule::UndefinedName, Path::new("F821_32.pyi"))]
+    #[test_case(Rule::UndefinedName, Path::new("F821_33.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.pyi"))]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"))]
@@ -526,6 +528,38 @@ mod tests {
         a
         import a",
         "f401_use_in_between_imports"
+    )]
+    #[test_case(
+        r"
+        if cond:
+            import a
+            import a.b
+            a.foo()
+        ",
+        "f401_same_branch"
+    )]
+    #[test_case(
+        r"
+        try:
+            import a.b.c
+        except ImportError:
+            import argparse
+            import a
+            a.b = argparse.Namespace()
+        ",
+        "f401_different_branch"
+    )]
+    #[test_case(
+        r"
+        import mlflow.pyfunc.loaders.chat_agent
+        import mlflow.pyfunc.loaders.chat_model
+        import mlflow.pyfunc.loaders.code_model
+        from mlflow.utils.pydantic_utils import IS_PYDANTIC_V2_OR_NEWER
+
+        if IS_PYDANTIC_V2_OR_NEWER:
+            import mlflow.pyfunc.loaders.responses_agent
+        ",
+        "f401_type_checking"
     )]
     fn f401_preview_refined_submodule_handling(contents: &str, snapshot: &str) {
         let diagnostics = test_contents(
@@ -922,6 +956,8 @@ mod tests {
             &locator,
             &indexer,
         );
+        let suppressions =
+            Suppressions::from_tokens(&settings, locator.contents(), parsed.tokens());
         let mut messages = check_path(
             Path::new("<filename>"),
             None,
@@ -935,6 +971,7 @@ mod tests {
             source_type,
             &parsed,
             target_version,
+            &suppressions,
         );
         messages.sort_by(Diagnostic::ruff_start_ordering);
         let actual = messages

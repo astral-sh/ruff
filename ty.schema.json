@@ -3,6 +3,16 @@
   "title": "Options",
   "type": "object",
   "properties": {
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalysisOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -59,6 +69,19 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnalysisOptions": {
+      "type": "object",
+      "properties": {
+        "respect-type-ignore-comments": {
+          "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Array_of_string": {
       "type": "array",
       "items": {
@@ -112,7 +135,7 @@
           ]
         },
         "root": {
-          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
+          "description": "The root paths of the project, used for finding first-party modules.\n\nAccepts a list of directory paths searched in priority order (first has highest priority).\n\nIf left unspecified, ty will try to detect common project layouts and initialize `root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),\nit will also be included in the first party search path.",
           "type": [
             "array",
             "null"
@@ -222,7 +245,7 @@
       "additionalProperties": false
     },
     "OverridesOptions": {
-      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence.\n\n### Precedence\n\n- Later overrides in the array take precedence over earlier ones\n- Override rules take precedence over global rules for matching files\n\n### Examples\n\n```toml\n# Relax rules for test files\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n\n# Ignore generated files but still check important ones\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
+      "description": "Configuration override that applies to specific files based on glob patterns.\n\nAn override allows you to apply different rule configurations to specific\nfiles or directories. Multiple overrides can match the same file, with\nlater overrides take precedence. Override rules take precedence over global\nrules for matching files.\n\nFor example, to relax enforcement of rules in test files:\n\n```toml\n[[tool.ty.overrides]]\ninclude = [\"tests/**\", \"**/test_*.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"warn\"\n```\n\nOr, to ignore a rule in generated files but retain enforcement in an important file:\n\n```toml\n[[tool.ty.overrides]]\ninclude = [\"generated/**\"]\nexclude = [\"generated/important.py\"]\n\n[tool.ty.overrides.rules]\npossibly-unresolved-reference = \"ignore\"\n```",
       "type": "array",
       "items": {
         "$ref": "#/definitions/OverrideOptions"
@@ -373,6 +396,16 @@
             }
           ]
         },
+        "cyclic-type-alias-definition": {
+          "title": "detects cyclic type alias definitions",
+          "description": "## What it does\nChecks for type alias definitions that (directly or mutually) refer to themselves.\n\n## Why is it bad?\nAlthough it is permitted to define a recursive type alias, it is not meaningful\nto have a type alias whose expansion can only result in itself, and is therefore not allowed.\n\n## Examples\n```python\ntype Itself = Itself\n\ntype A = B\ntype B = A\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "deprecated": {
           "title": "detects uses of deprecated items",
           "description": "## What it does\nChecks for uses of deprecated items\n\n## Why is this bad?\nDeprecated items should no longer be used.\n\n## Examples\n```python\n@warnings.deprecated(\"use new_func instead\")\ndef old_func(): ...\n\nold_func()  # emits [deprecated] diagnostic\n```",
@@ -385,7 +418,7 @@
         },
         "division-by-zero": {
           "title": "detects division by zero",
-          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Examples\n```python\n5 / 0\n```",
+          "description": "## What it does\nIt detects division by zero.\n\n## Why is this bad?\nDividing by zero raises a `ZeroDivisionError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n5 / 0\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -415,7 +448,7 @@
         },
         "escape-character-in-forward-annotation": {
           "title": "detects forward type annotations with escape characters",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for forward annotations that contain escape characters.\n\n## Why is this bad?\nStatic analysis tools like ty can't analyze type annotations that contain escape characters.\n\n## Example\n\n```python\ndef foo() -> \"intt\\b\": ...\n```",
           "default": "error",
           "oneOf": [
             {
@@ -563,9 +596,29 @@
             }
           ]
         },
+        "invalid-explicit-override": {
+          "title": "detects methods that are decorated with `@override` but do not override any method in a superclass",
+          "description": "## What it does\nChecks for methods that are decorated with `@override` but do not override any method in a superclass.\n\n## Why is this bad?\nDecorating a method with `@override` declares to the type checker that the intention is that it should\noverride a method from a superclass.\n\n## Example\n\n```python\nfrom typing import override\n\nclass A:\n    @override\n    def foo(self): ...  # Error raised here\n\nclass B(A):\n    @override\n    def ffooo(self): ...  # Error raised here\n\nclass C:\n    @override\n    def __repr__(self): ...  # fine: overrides `object.__repr__`\n\nclass D(A):\n    @override\n    def foo(self): ...  # fine: overrides `A.foo`\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-frozen-dataclass-subclass": {
+          "title": "detects dataclasses with invalid frozen/non-frozen subclassing",
+          "description": "## What it does\nChecks for dataclasses with invalid frozen inheritance:\n- A frozen dataclass cannot inherit from a non-frozen dataclass.\n- A non-frozen dataclass cannot inherit from a frozen dataclass.\n\n## Why is this bad?\nPython raises a `TypeError` at runtime when either of these inheritance\npatterns occurs.\n\n## Example\n\n```python\nfrom dataclasses import dataclass\n\n@dataclass\nclass Base:\n    x: int\n\n@dataclass(frozen=True)\nclass Child(Base):  # Error raised here\n    y: int\n\n@dataclass(frozen=True)\nclass FrozenBase:\n    x: int\n\n@dataclass\nclass NonFrozenChild(FrozenBase):  # Error raised here\n    y: int\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-generic-class": {
           "title": "detects invalid generic classes",
-          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\n\n## Examples\n```python\nfrom typing import Generic, TypeVar\n\nT = TypeVar(\"T\")  # okay\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
+          "description": "## What it does\nChecks for the creation of invalid generic classes\n\n## Why is this bad?\nThere are several requirements that you must follow when defining a generic class.\nMany of these result in `TypeError` being raised at runtime if they are violated.\n\n## Examples\n```python\nfrom typing_extensions import Generic, TypeVar\n\nT = TypeVar(\"T\")\nU = TypeVar(\"U\", default=int)\n\n# error: class uses both PEP-695 syntax and legacy syntax\nclass C[U](Generic[T]): ...\n\n# error: type parameter with default comes before type parameter without default\nclass D(Generic[U, T]): ...\n```\n\n## References\n- [Typing spec: Generics](https://typing.python.org/en/latest/spec/generics.html#introduction)",
           "default": "error",
           "oneOf": [
             {
@@ -584,8 +637,8 @@
           ]
         },
         "invalid-key": {
-          "title": "detects invalid subscript accesses",
-          "description": "## What it does\nChecks for subscript accesses with invalid keys.\n\n## Why is this bad?\nUsing an invalid key will raise a `KeyError` at runtime.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n```",
+          "title": "detects invalid subscript accesses or TypedDict literal keys",
+          "description": "## What it does\nChecks for subscript accesses with invalid keys and `TypedDict` construction with an\nunknown key.\n\n## Why is this bad?\nSubscripting with an invalid key will raise a `KeyError` at runtime.\n\nCreating a `TypedDict` with an unknown key is likely a mistake; if the `TypedDict` is\n`closed=true` it also violates the expectations of the type.\n\n## Examples\n```python\nfrom typing import TypedDict\n\nclass Person(TypedDict):\n    name: str\n    age: int\n\nalice = Person(name=\"Alice\", age=30)\nalice[\"height\"]  # KeyError: 'height'\n\nbob: Person = { \"name\": \"Bob\", \"age\": 30 }  # typo!\n\ncarol = Person(name=\"Carol\", age=25)  # typo!\n```",
           "default": "error",
           "oneOf": [
             {
@@ -613,9 +666,29 @@
             }
           ]
         },
+        "invalid-method-override": {
+          "title": "detects method definitions that violate the Liskov Substitution Principle",
+          "description": "## What it does\nDetects method overrides that violate the [Liskov Substitution Principle] (\"LSP\").\n\nThe LSP states that an instance of a subtype should be substitutable for an instance of its supertype.\nApplied to Python, this means:\n1. All argument combinations a superclass method accepts\n   must also be accepted by an overriding subclass method.\n2. The return type of an overriding subclass method must be a subtype\n   of the return type of the superclass method.\n\n## Why is this bad?\nViolating the Liskov Substitution Principle will lead to many of ty's assumptions and\ninferences being incorrect, which will mean that it will fail to catch many possible\ntype errors in your code.\n\n## Example\n```python\nclass Super:\n    def method(self, x) -> int:\n        return 42\n\nclass Sub(Super):\n    # Liskov violation: `str` is not a subtype of `int`,\n    # but the supertype method promises to return an `int`.\n    def method(self, x) -> str:  # error: [invalid-override]\n        return \"foo\"\n\ndef accepts_super(s: Super) -> int:\n    return s.method(x=42)\n\naccepts_super(Sub())  # The result of this call is a string, but ty will infer\n                      # it to be an `int` due to the violation of the Liskov Substitution Principle.\n\nclass Sub2(Super):\n    # Liskov violation: the superclass method can be called with a `x=`\n    # keyword argument, but the subclass method does not accept it.\n    def method(self, y) -> int:  # error: [invalid-override]\n       return 42\n\naccepts_super(Sub2())  # TypeError at runtime: method() got an unexpected keyword argument 'x'\n                       # ty cannot catch this error due to the violation of the Liskov Substitution Principle.\n```\n\n## Common issues\n\n### Why does ty complain about my `__eq__` method?\n\n`__eq__` and `__ne__` methods in Python are generally expected to accept arbitrary\nobjects as their second argument, for example:\n\n```python\nclass A:\n    x: int\n\n    def __eq__(self, other: object) -> bool:\n        # gracefully handle an object of an unexpected type\n        # without raising an exception\n        if not isinstance(other, A):\n            return False\n        return self.x == other.x\n```\n\nIf `A.__eq__` here were annotated as only accepting `A` instances for its second argument,\nit would imply that you wouldn't be able to use `==` between instances of `A` and\ninstances of unrelated classes without an exception possibly being raised. While some\nclasses in Python do indeed behave this way, the strongly held convention is that it should\nbe avoided wherever possible. As part of this check, therefore, ty enforces that `__eq__`\nand `__ne__` methods accept `object` as their second argument.\n\n### Why does ty disagree with Ruff about how to write my method?\n\nRuff has several rules that will encourage you to rename a parameter, or change its type\nsignature, if it thinks you're falling into a certain anti-pattern. For example, Ruff's\n[ARG002](https://docs.astral.sh/ruff/rules/unused-method-argument/) rule recommends that an\nunused parameter should either be removed or renamed to start with `_`. Applying either of\nthese suggestions can cause ty to start reporting an `invalid-method-override` error if\nthe function in question is a method on a subclass that overrides a method on a superclass,\nand the change would cause the subclass method to no longer accept all argument combinations\nthat the superclass method accepts.\n\nThis can usually be resolved by adding [`@typing.override`][override] to your method\ndefinition. Ruff knows that a method decorated with `@typing.override` is intended to\noverride a method by the same name on a superclass, and avoids reporting rules like ARG002\nfor such methods; it knows that the changes recommended by ARG002 would violate the Liskov\nSubstitution Principle.\n\nCorrect use of `@override` is enforced by ty's `invalid-explicit-override` rule.\n\n[Liskov Substitution Principle]: https://en.wikipedia.org/wiki/Liskov_substitution_principle\n[override]: https://docs.python.org/3/library/typing.html#typing.override",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "invalid-named-tuple": {
           "title": "detects invalid `NamedTuple` class definitions",
-          "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```",
+          "description": "## What it does\nChecks for invalidly defined `NamedTuple` classes.\n\n## Why is this bad?\nAn invalidly defined `NamedTuple` class may lead to the type checker\ndrawing incorrect conclusions. It may also lead to `TypeError`s or\n`AttributeError`s at runtime.\n\n## Examples\nA class definition cannot combine `NamedTuple` with other base classes\nin multiple inheritance; doing so raises a `TypeError` at runtime. The sole\nexception to this rule is `Generic[]`, which can be used alongside `NamedTuple`\nin a class's bases list.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple, object): ...\nTypeError: can only inherit from a NamedTuple type and Generic\n```\n\nFurther, `NamedTuple` field names cannot start with an underscore:\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     _bar: int\nValueError: Field names cannot start with an underscore: '_bar'\n```\n\n`NamedTuple` classes also have certain synthesized attributes (like `_asdict`, `_make`,\n`_replace`, etc.) that cannot be overwritten. Attempting to assign to these attributes\nwithout a type annotation will raise an `AttributeError` at runtime.\n\n```pycon\n>>> from typing import NamedTuple\n>>> class Foo(NamedTuple):\n...     x: int\n...     _asdict = 42\nAttributeError: Cannot overwrite NamedTuple attribute _asdict\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-newtype": {
+          "title": "detects invalid NewType definitions",
+          "description": "## What it does\nChecks for the creation of invalid `NewType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `NewType`.\n\n## Examples\n```python\nfrom typing import NewType\n\ndef get_name() -> str: ...\n\nFoo = NewType(\"Foo\", int)        # okay\nBar = NewType(get_name(), int)   # error: The first argument to `NewType` must be a string literal\nBaz = NewType(\"Baz\", int | str)  # error: invalid base for `typing.NewType`\n```",
           "default": "error",
           "oneOf": [
             {
@@ -636,6 +709,16 @@
         "invalid-parameter-default": {
           "title": "detects default values that can't be assigned to the parameter's annotated type",
           "description": "## What it does\nChecks for default values that can't be\nassigned to the parameter's annotated type.\n\n## Why is this bad?\nThis breaks the rules of the type system and\nweakens a type checker's ability to accurately reason about your code.\n\n## Examples\n```python\ndef f(a: int = ''): ...\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-paramspec": {
+          "title": "detects invalid ParamSpec usage",
+          "description": "## What it does\nChecks for the creation of invalid `ParamSpec`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `ParamSpec`.\n\n## Examples\n```python\nfrom typing import ParamSpec\n\nP1 = ParamSpec(\"P1\")  # okay\nP2 = ParamSpec(\"S2\")  # error: ParamSpec name must match the variable it's assigned to\n```\n\n## References\n- [Typing spec: ParamSpec](https://typing.python.org/en/latest/spec/generics.html#paramspec)",
           "default": "error",
           "oneOf": [
             {
@@ -685,7 +768,7 @@
         },
         "invalid-syntax-in-forward-annotation": {
           "title": "detects invalid syntax in forward annotations",
-          "description": "TODO #14889",
+          "description": "## What it does\nChecks for string-literal annotations where the string cannot be\nparsed as a Python expression.\n\n## Why is this bad?\nType annotations are expected to be Python expressions that\ndescribe the expected type of a variable, parameter, attribute or\n`return` statement.\n\nType annotations are permitted to be string-literal expressions, in\norder to enable forward references to names not yet defined.\nHowever, it must be possible to parse the contents of that string\nliteral as a normal Python expression.\n\n## Example\n\n```python\ndef foo() -> \"intstance of C\":\n    return 42\n\nclass C: ...\n```\n\nUse instead:\n\n```python\ndef foo() -> \"C\":\n    return 42\n\nclass C: ...\n```\n\n## References\n- [Typing spec: The meaning of annotations](https://typing.python.org/en/latest/spec/annotations.html#the-meaning-of-annotations)\n- [Typing spec: String annotations](https://typing.python.org/en/latest/spec/annotations.html#string-annotations)",
           "default": "error",
           "oneOf": [
             {
@@ -696,6 +779,16 @@
         "invalid-type-alias-type": {
           "title": "detects invalid TypeAliasType definitions",
           "description": "## What it does\nChecks for the creation of invalid `TypeAliasType`s\n\n## Why is this bad?\nThere are several requirements that you must follow when creating a `TypeAliasType`.\n\n## Examples\n```python\nfrom typing import TypeAliasType\n\nIntOrStr = TypeAliasType(\"IntOrStr\", int | str)  # okay\nNewAlias = TypeAliasType(get_name(), int)        # error: TypeAliasType name must be a string literal\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "invalid-type-arguments": {
+          "title": "detects invalid type arguments in generic specialization",
+          "description": "## What it does\nChecks for invalid type arguments in explicit type specialization.\n\n## Why is this bad?\nProviding the wrong number of type arguments or type arguments that don't\nsatisfy the type variable's bounds or constraints will lead to incorrect\ntype inference and may indicate a misunderstanding of the generic type's\ninterface.\n\n## Examples\n\nUsing legacy type variables:\n```python\nfrom typing import Generic, TypeVar\n\nT1 = TypeVar('T1', int, str)\nT2 = TypeVar('T2', bound=int)\n\nclass Foo1(Generic[T1]): ...\nclass Foo2(Generic[T2]): ...\n\nFoo1[bytes]  # error: bytes does not satisfy T1's constraints\nFoo2[str]  # error: str does not satisfy T2's bound\n```\n\nUsing PEP 695 type variables:\n```python\nclass Foo[T]: ...\nclass Bar[T, U]: ...\n\nFoo[int, str]  # error: too many arguments\nBar[int]  # error: too few arguments\n```",
           "default": "error",
           "oneOf": [
             {
@@ -803,6 +896,16 @@
             }
           ]
         },
+        "override-of-final-method": {
+          "title": "detects overrides of final methods",
+          "description": "## What it does\nChecks for methods on subclasses that override superclass methods decorated with `@final`.\n\n## Why is this bad?\nDecorating a method with `@final` declares to the type checker that it should not be\noverridden on any subclass.\n\n## Example\n\n```python\nfrom typing import final\n\nclass A:\n    @final\n    def foo(self): ...\n\nclass B(A):\n    def foo(self): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
         "parameter-already-assigned": {
           "title": "detects multiple arguments for the same parameter",
           "description": "## What it does\nChecks for calls which provide more than one argument for a single parameter.\n\n## Why is this bad?\nProviding multiple values for a single parameter will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\ndef f(x: int) -> int: ...\n\nf(1, x=2)  # Error raised here\n```",
@@ -845,8 +948,8 @@
         },
         "possibly-missing-import": {
           "title": "detects possibly missing imports",
-          "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
-          "default": "warn",
+          "description": "## What it does\nChecks for imports of symbols that may be missing.\n\n## Why is this bad?\nImporting a missing module or name will raise a `ModuleNotFoundError`\nor `ImportError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Examples\n```python\n# module.py\nimport datetime\n\nif datetime.date.today().weekday() != 6:\n    a = 1\n\n# main.py\nfrom module import a  # ImportError: cannot import name 'a' from 'module'\n```",
+          "default": "ignore",
           "oneOf": [
             {
               "$ref": "#/definitions/Level"
@@ -855,7 +958,7 @@
         },
         "possibly-unresolved-reference": {
           "title": "detects references to possibly undefined names",
-          "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
+          "description": "## What it does\nChecks for references to names that are possibly not defined.\n\n## Why is this bad?\nUsing an undefined variable will raise a `NameError` at runtime.\n\n## Rule status\nThis rule is currently disabled by default because of the number of\nfalse positives it can produce.\n\n## Example\n\n```python\nfor i in range(0):\n    x = i\n\nprint(x)  # NameError: name 'x' is not defined\n```",
           "default": "ignore",
           "oneOf": [
             {
@@ -896,6 +999,16 @@
         "subclass-of-final-class": {
           "title": "detects subclasses of final classes",
           "description": "## What it does\nChecks for classes that subclass final classes.\n\n## Why is this bad?\nDecorating a class with `@final` declares to the type checker that it should not be subclassed.\n\n## Example\n\n```python\nfrom typing import final\n\n@final\nclass A: ...\nclass B(A): ...  # Error raised here\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "super-call-in-named-tuple-method": {
+          "title": "detects `super()` calls in methods of `NamedTuple` classes",
+          "description": "## What it does\nChecks for calls to `super()` inside methods of `NamedTuple` classes.\n\n## Why is this bad?\nUsing `super()` in a method of a `NamedTuple` class will raise an exception at runtime.\n\n## Examples\n```python\nfrom typing import NamedTuple\n\nclass F(NamedTuple):\n    x: int\n\n    def method(self):\n        super()  # error: super() is not supported in methods of NamedTuple classes\n```\n\n## References\n- [Python documentation: super()](https://docs.python.org/3/library/functions.html#super)",
           "default": "error",
           "oneOf": [
             {
@@ -1091,7 +1204,7 @@
           ]
         },
         "root": {
-          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nBesides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
+          "description": "The root of the project, used for finding first-party modules.\n\nIf left unspecified, ty will try to detect common project layouts and initialize `src.root` accordingly:\n\n* if a `./src` directory exists, include `.` and `./src` in the first party search path (src layout or flat)\n* if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path\n* otherwise, default to `.` (flat layout)\n\nAdditionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),\nit will also be included in the first party search path.",
           "anyOf": [
             {
               "$ref": "#/definitions/RelativePathBuf"

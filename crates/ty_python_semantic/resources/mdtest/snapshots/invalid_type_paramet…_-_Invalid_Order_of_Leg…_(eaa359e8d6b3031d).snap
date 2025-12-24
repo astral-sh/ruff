@@ -1,0 +1,190 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: invalid_type_parameter_order.md - Invalid Order of Legacy Type Parameters
+mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_type_parameter_order.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 | 
+ 3 | T1 = TypeVar("T1", default=int)
+ 4 | 
+ 5 | T2 = TypeVar("T2")
+ 6 | T3 = TypeVar("T3")
+ 7 | 
+ 8 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+ 9 | 
+10 | class SubclassMe(Generic[T1, DefaultStrT]):
+11 |     x: DefaultStrT
+12 | 
+13 | class Baz(SubclassMe[int, DefaultStrT]):
+14 |     pass
+15 | 
+16 | # error: [invalid-generic-class] "Type parameter `T2` without a default cannot follow earlier parameter `T1` with a default"
+17 | class Foo(Generic[T1, T2]):
+18 |     pass
+19 | 
+20 | class Bar(Generic[T2, T1, T3]):  # error: [invalid-generic-class]
+21 |     pass
+22 | 
+23 | class Spam(Generic[T1, T2, DefaultStrT, T3]):  # error: [invalid-generic-class]
+24 |     pass
+25 | 
+26 | class Ham(Protocol[T1, T2, DefaultStrT, T3]):  # error: [invalid-generic-class]
+27 |     pass
+28 | 
+29 | class VeryBad(
+30 |     Protocol[T1, T2, DefaultStrT, T3],  # error: [invalid-generic-class]
+31 |     Generic[T1, T2, DefaultStrT, T3],
+32 | ): ...
+```
+
+# Diagnostics
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:17:19
+   |
+16 | # error: [invalid-generic-class] "Type parameter `T2` without a default cannot follow earlier parameter `T1` with a default"
+17 | class Foo(Generic[T1, T2]):
+   |                   ^^^^^^
+   |                   |
+   |                   Type variable `T2` does not have a default
+   |                   Earlier TypeVar `T1` does
+18 |     pass
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 |
+ 5 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 6 | T3 = TypeVar("T3")
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:20:19
+   |
+18 |     pass
+19 |
+20 | class Bar(Generic[T2, T1, T3]):  # error: [invalid-generic-class]
+   |                   ^^^^^^^^^^
+   |                   |
+   |                   Type variable `T3` does not have a default
+   |                   Earlier TypeVar `T1` does
+21 |     pass
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 |
+ 5 | T2 = TypeVar("T2")
+ 6 | T3 = TypeVar("T3")
+   | ------------------ `T3` defined here
+ 7 |
+ 8 | DefaultStrT = TypeVar("DefaultStrT", default=str)
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:23:20
+   |
+21 |     pass
+22 |
+23 | class Spam(Generic[T1, T2, DefaultStrT, T3]):  # error: [invalid-generic-class]
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^
+   |                    |
+   |                    Type variables `T2` and `T3` do not have defaults
+   |                    Earlier TypeVar `T1` does
+24 |     pass
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 |
+ 5 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 6 | T3 = TypeVar("T3")
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:26:20
+   |
+24 |     pass
+25 |
+26 | class Ham(Protocol[T1, T2, DefaultStrT, T3]):  # error: [invalid-generic-class]
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^
+   |                    |
+   |                    Type variables `T2` and `T3` do not have defaults
+   |                    Earlier TypeVar `T1` does
+27 |     pass
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 |
+ 5 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 6 | T3 = TypeVar("T3")
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```
+
+```
+error[invalid-generic-class]: Type parameters without defaults cannot follow type parameters with defaults
+  --> src/mdtest_snippet.py:30:14
+   |
+29 | class VeryBad(
+30 |     Protocol[T1, T2, DefaultStrT, T3],  # error: [invalid-generic-class]
+   |              ^^^^^^^^^^^^^^^^^^^^^^^
+   |              |
+   |              Type variables `T2` and `T3` do not have defaults
+   |              Earlier TypeVar `T1` does
+31 |     Generic[T1, T2, DefaultStrT, T3],
+32 | ): ...
+   |
+  ::: src/mdtest_snippet.py:3:1
+   |
+ 1 | from typing import TypeVar, Generic, Protocol
+ 2 |
+ 3 | T1 = TypeVar("T1", default=int)
+   | ------------------------------- `T1` defined here
+ 4 |
+ 5 | T2 = TypeVar("T2")
+   | ------------------ `T2` defined here
+ 6 | T3 = TypeVar("T3")
+   |
+info: rule `invalid-generic-class` is enabled by default
+
+```

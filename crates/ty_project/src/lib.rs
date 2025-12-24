@@ -27,7 +27,6 @@ use std::iter::FusedIterator;
 use std::panic::{AssertUnwindSafe, UnwindSafe};
 use std::sync::Arc;
 use thiserror::Error;
-use tracing::error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
 use ty_python_semantic::types::check_types;
@@ -116,6 +115,10 @@ pub struct Project {
 
     #[default]
     verbose_flag: bool,
+
+    /// Whether to enforce exclusion rules even to files explicitly passed to ty on the command line.
+    #[default]
+    force_exclude_flag: bool,
 }
 
 /// A progress reporter.
@@ -124,12 +127,12 @@ pub trait ProgressReporter: Send + Sync {
     fn set_files(&mut self, files: usize);
 
     /// Report the completion of checking a given file along with its diagnostics.
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]);
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]);
 
     /// Reports settings or IO related diagnostics. The diagnostics
     /// can belong to different files or no file at all.
     /// But it's never a file for which [`Self::report_checked_file`] gets called.
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>);
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>);
 }
 
 /// Reporter that collects all diagnostics into a `Vec`.
@@ -149,7 +152,7 @@ impl CollectReporter {
 
 impl ProgressReporter for CollectReporter {
     fn set_files(&mut self, _files: usize) {}
-    fn report_checked_file(&self, _db: &dyn Db, _file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, _db: &ProjectDatabase, _file: File, diagnostics: &[Diagnostic]) {
         if diagnostics.is_empty() {
             return;
         }
@@ -160,7 +163,7 @@ impl ProgressReporter for CollectReporter {
             .extend(diagnostics.iter().map(Clone::clone));
     }
 
-    fn report_diagnostics(&mut self, _db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, _db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.0.get_mut().unwrap().extend(diagnostics);
     }
 }
@@ -379,6 +382,16 @@ impl Project {
 
     pub fn verbose(self, db: &dyn Db) -> bool {
         self.verbose_flag(db)
+    }
+
+    pub fn set_force_exclude(self, db: &mut dyn Db, force: bool) {
+        if self.force_exclude_flag(db) != force {
+            self.set_force_exclude_flag(db).to(force);
+        }
+    }
+
+    pub fn force_exclude(self, db: &dyn Db) -> bool {
+        self.force_exclude_flag(db)
     }
 
     /// Returns the paths that should be checked.
@@ -751,33 +764,19 @@ mod tests {
     use crate::ProjectMetadata;
     use crate::check_file_impl;
     use crate::db::tests::TestDb;
-    use ruff_db::Db as _;
     use ruff_db::files::system_path_to_file;
     use ruff_db::source::source_text;
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
     use ty_python_semantic::types::check_types;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {
         let project = ProjectMetadata::new(Name::new_static("test"), SystemPathBuf::from("/"));
         let mut db = TestDb::new(project);
+        db.init_program().unwrap();
         let path = SystemPath::new("test.py");
-
-        Program::from_settings(
-            &db,
-            ProgramSettings {
-                python_version: PythonVersionWithSource::default(),
-                python_platform: PythonPlatform::default(),
-                search_paths: SearchPathSettings::new(vec![SystemPathBuf::from(".")])
-                    .to_search_paths(db.system(), db.vendored())
-                    .expect("Valid search path settings"),
-            },
-        );
 
         db.write_file(path, "x = 10")?;
         let file = system_path_to_file(&db, path).unwrap();

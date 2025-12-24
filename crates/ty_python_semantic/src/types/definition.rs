@@ -1,9 +1,10 @@
+use crate::Db;
 use crate::semantic_index::definition::Definition;
-use crate::{Db, Module};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
 use ruff_db::source::source_text;
 use ruff_text_size::{TextLen, TextRange};
+use ty_module_resolver::Module;
 
 #[derive(Debug, PartialEq, Eq, Hash)]
 pub enum TypeDefinition<'db> {
@@ -12,6 +13,8 @@ pub enum TypeDefinition<'db> {
     Function(Definition<'db>),
     TypeVar(Definition<'db>),
     TypeAlias(Definition<'db>),
+    NewType(Definition<'db>),
+    SpecialForm(Definition<'db>),
 }
 
 impl TypeDefinition<'_> {
@@ -21,7 +24,9 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => {
+            | Self::TypeAlias(definition)
+            | Self::SpecialForm(definition)
+            | Self::NewType(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.focus_range(db, &module))
             }
@@ -38,7 +43,9 @@ impl TypeDefinition<'_> {
             Self::Class(definition)
             | Self::Function(definition)
             | Self::TypeVar(definition)
-            | Self::TypeAlias(definition) => {
+            | Self::TypeAlias(definition)
+            | Self::SpecialForm(definition)
+            | Self::NewType(definition) => {
                 let module = parsed_module(db, definition.file(db)).load(db);
                 Some(definition.full_range(db, &module))
             }

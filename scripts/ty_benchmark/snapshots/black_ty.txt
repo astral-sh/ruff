@@ -1,0 +1,33 @@
+src/black/__init__.py:989:13: warning[possibly-missing-attribute] Attribute `detach` may be missing on object of type `TextIOWrapper[_WrappedBuffer] | AnsiToWin32`
+src/black/__init__.py:1378:23: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Node | Leaf`
+src/black/cache.py:144:59: error[invalid-assignment] Object of type `dict[str | Unknown, tuple[@Todo(StarredExpression)] | Unknown]` is not assignable to `dict[str, tuple[int | float, int, str]]`
+src/black/handle_ipynb_magics.py:106:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
+src/black/handle_ipynb_magics.py:130:10: error[unresolved-import] Cannot resolve imported module `tokenize_rt`
+src/black/handle_ipynb_magics.py:171:10: error[unresolved-import] Cannot resolve imported module `IPython.core.inputtransformer2`
+src/black/handle_ipynb_magics.py:393:17: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:447:16: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:449:18: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:455:49: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:484:16: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:493:18: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/handle_ipynb_magics.py:495:18: error[unresolved-attribute] Object of type `expr` has no attribute `attr`
+src/black/linegen.py:222:41: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Node | Leaf`
+src/black/linegen.py:1576:9: error[invalid-assignment] Object of type `Literal[""]` is not assignable to attribute `value` on type `Leaf | Node`
+src/black/linegen.py:1577:9: error[invalid-assignment] Object of type `Literal[""]` is not assignable to attribute `value` on type `Node | Leaf`
+src/black/linegen.py:1757:25: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Node | Leaf`
+src/black/linegen.py:1795:13: error[invalid-assignment] Object of type `Literal[""]` is not assignable to attribute `value` on type `Node | Leaf`
+src/black/linegen.py:1796:13: error[invalid-assignment] Object of type `Literal[""]` is not assignable to attribute `value` on type `Node | Leaf`
+src/black/nodes.py:746:32: warning[possibly-missing-attribute] Attribute `value` may be missing on object of type `Leaf | Node`
+src/black/trans.py:297:20: error[invalid-raise] Cannot use object of type `object` as an exception cause
+src/black/trans.py:306:24: error[invalid-raise] Cannot use object of type `object` as an exception cause
+src/black/trans.py:466:20: error[invalid-return-type] Return type does not match returned value: expected `Ok[list[int]] | Err[CannotTransform]`, found `Ok[list[Unknown] & ~AlwaysFalsy]`
+src/black/trans.py:481:47: error[invalid-argument-type] Argument to bound method `_merge_string_group` is incorrect: Expected `Line`, found `object`
+src/black/trans.py:493:13: error[unresolved-attribute] Unresolved attribute `__cause__` on type `object`.
+src/black/trans.py:494:13: error[invalid-assignment] Object of type `object` is not assignable to attribute `__cause__` of type `BaseException | None`
+src/black/trans.py:980:20: error[invalid-return-type] Return type does not match returned value: expected `Ok[list[int]] | Err[CannotTransform]`, found `Ok[list[Unknown] & ~AlwaysFalsy]`
+src/black/trans.py:1107:20: error[invalid-return-type] Return type does not match returned value: expected `Ok[list[int]] | Err[CannotTransform]`, found `(Ok[None] & Top[Err[Unknown]]) | Err[CannotTransform]`
+src/blib2to3/pgen2/conv.py:35:6: error[unresolved-import] Cannot resolve imported module `pgen2`
+src/blib2to3/pgen2/conv.py:77:34: warning[possibly-missing-attribute] Attribute `groups` may be missing on object of type `Match[str] | None`
+src/blib2to3/pgen2/parse.py:367:13: warning[possibly-missing-attribute] Attribute `append` may be missing on object of type `list[Node | Leaf] | None`
+src/blib2to3/pytree.py:149:13: error[unresolved-attribute] Unresolved attribute `parent` on type `object`.
+Found 32 diagnostics

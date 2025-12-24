@@ -501,6 +501,48 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
 
+### Fluent layout for method chains
+
+At times, when developers write long chains of methods on an object, such as
+
+```python
+x = df.filter(cond).agg(func).merge(other)
+```
+
+the intent is to perform a sequence of transformations or operations
+on a fixed object of interest - in this example, the object `df`.
+Assuming the assigned expression exceeds the `line-length`, this preview
+style will format the above as:
+
+```python
+x = (
+    df
+    .filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+This deviates from the stable formatting, and also from Black, both
+of which would produce:
+
+
+```python
+x = (
+    df.filter(cond)
+    .agg(func)
+    .merge(other)
+)
+```
+
+Both the stable and preview formatting are variants of something
+called a **fluent layout**.
+
+In general, this preview style differs from the stable style
+only at the first attribute that precedes
+a call or subscript. The preview formatting breaks _before_ this attribute,
+while the stable formatting breaks _after_ the call or subscript.
+
 ## Sorting imports
 
 Currently, the Ruff formatter does not sort imports. In order to both sort imports and format,

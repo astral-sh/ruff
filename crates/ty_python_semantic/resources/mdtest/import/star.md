@@ -715,7 +715,7 @@ reveal_type(Y)  # revealed: Unknown
 
 # The `*` import is not considered a redefinition
 # of the global variable `Z` in this module, as the symbol in
-# the `a` module is in a branch that is statically known
+# the `exporter` module is in a branch that is statically known
 # to be dead code given the `python-version` configuration.
 # Thus this still reveals `Literal[True]`.
 reveal_type(Z)  # revealed: Literal[True]
@@ -1336,6 +1336,69 @@ reveal_type(g)  # revealed: Unknown
 reveal_type(h)  # revealed: Unknown
 ```
 
+## Star-imports can affect member states
+
+If a star-import pulls in a symbol that was previously defined in the importing module (e.g. `obj`),
+it can affect the state of associated member expressions (e.g. `obj.attr` or `obj[0]`). In the test
+below, note how the types of the corresponding attribute expressions change after the star import
+affects the object:
+
+`common.py`:
+
+```py
+class C:
+    attr: int | None
+```
+
+`exporter.py`:
+
+```py
+from common import C
+
+def flag() -> bool:
+    return True
+
+should_be_imported: C = C()
+
+if flag():
+    might_be_imported: C = C()
+
+if False:
+    should_not_be_imported: C = C()
+```
+
+`main.py`:
+
+```py
+from common import C
+
+should_be_imported = C()
+might_be_imported = C()
+should_not_be_imported = C()
+
+# We start with the plain attribute types:
+reveal_type(should_be_imported.attr)  # revealed: int | None
+reveal_type(might_be_imported.attr)  # revealed: int | None
+reveal_type(should_not_be_imported.attr)  # revealed: int | None
+
+# Now we narrow the types by assignment:
+should_be_imported.attr = 1
+might_be_imported.attr = 1
+should_not_be_imported.attr = 1
+
+reveal_type(should_be_imported.attr)  # revealed: Literal[1]
+reveal_type(might_be_imported.attr)  # revealed: Literal[1]
+reveal_type(should_not_be_imported.attr)  # revealed: Literal[1]
+
+# This star import adds bindings for `should_be_imported` and `might_be_imported`:
+from exporter import *
+
+# As expected, narrowing is "reset" for the first two variables, but not for the third:
+reveal_type(should_be_imported.attr)  # revealed: int | None
+reveal_type(might_be_imported.attr)  # revealed: int | None
+reveal_type(should_not_be_imported.attr)  # revealed: Literal[1]
+```
+
 ## Cyclic star imports
 
 Believe it or not, this code does *not* raise an exception at runtime!
@@ -1374,7 +1437,7 @@ are present due to `*` imports.
 import collections.abc
 
 reveal_type(collections.abc.Sequence)  # revealed: <class 'Sequence'>
-reveal_type(collections.abc.Callable)  # revealed: typing.Callable
+reveal_type(collections.abc.Callable)  # revealed: <special-form 'typing.Callable'>
 reveal_type(collections.abc.Set)  # revealed: <class 'AbstractSet'>
 ```
 

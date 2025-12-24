@@ -596,14 +596,14 @@ def f(x: object) -> str:
     return "a"
 
 reveal_type(f)  # revealed: def f(x: object) -> str
-reveal_type(f.__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(f.__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 static_assert(is_subtype_of(TypeOf[f.__get__], types.MethodWrapperType))
 reveal_type(f.__get__(None, type(f)))  # revealed: def f(x: object) -> str
 reveal_type(f.__get__(None, type(f))(1))  # revealed: str
 
 wrapper_descriptor = getattr_static(f, "__get__")
 
-reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor `__get__` of `function` objects>
+reveal_type(wrapper_descriptor)  # revealed: <wrapper-descriptor '__get__' of 'function' objects>
 reveal_type(wrapper_descriptor(f, None, type(f)))  # revealed: def f(x: object) -> str
 static_assert(is_subtype_of(TypeOf[wrapper_descriptor], types.WrapperDescriptorType))
 
@@ -696,8 +696,16 @@ reveal_type(C().instance_access)  # revealed: str
 reveal_type(C.metaclass_access)  # revealed: bytes
 
 # TODO: These should emit a diagnostic
-reveal_type(C().class_object_access)  # revealed: TailoredForClassObjectAccess
-reveal_type(C.instance_access)  # revealed: TailoredForInstanceAccess
+#
+# However, we use the return-type of `__get__` as the inferred type anyway:
+# the way to specify that the descriptor object itself is returned when the
+# attribute is accessed on the instance or the class is by overloading `__get__`.
+#
+# Using the return type of `__get__` even for `__get__` calls that have invalid
+# arguments passed to them avoids false positives in situations where there are
+# `__get__` calls that we don't sufficiently understand.
+reveal_type(C().class_object_access)  # revealed: int
+reveal_type(C.instance_access)  # revealed: str
 ```
 
 ### Descriptors with incorrect `__get__` signature
@@ -712,10 +720,28 @@ class C:
     descriptor: Descriptor = Descriptor()
 
 # TODO: This should be an error
-reveal_type(C.descriptor)  # revealed: Descriptor
+reveal_type(C.descriptor)  # revealed: int
 
 # TODO: This should be an error
-reveal_type(C().descriptor)  # revealed: Descriptor
+reveal_type(C().descriptor)  # revealed: int
+```
+
+### "Descriptors" with non-callable `__get__` attributes
+
+If `__get__` is not callable at all, the interpreter will still attempt to call the method at
+runtime, and this will raise an exception. As such, even for `__get__ = None`, we still "attempt to
+call `__get__`" on the descriptor object (leading us to infer `Unknown`):
+
+```py
+class BrokenDescriptor:
+    __get__: None = None
+
+class Foo:
+    desc: BrokenDescriptor = BrokenDescriptor()
+
+# TODO: this raises `TypeError` at runtime due to the implicit call to `__get__`;
+# we should emit a diagnostic
+reveal_type(Foo().desc)  # revealed: Unknown
 ```
 
 ### Undeclared descriptor arguments

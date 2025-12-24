@@ -254,6 +254,15 @@ impl<'a> UnparsedAssertion<'a> {
         let comment = comment.trim().strip_prefix('#')?.trim();
         let (keyword, body) = comment.split_once(':')?;
         let keyword = keyword.trim();
+
+        // Support other pragma comments coming after `error` or `revealed`, e.g.
+        // `# error: [code] # type: ignore` (nested pragma comments)
+        let body = if let Some((before_nested, _)) = body.split_once('#') {
+            before_nested
+        } else {
+            body
+        };
+
         let body = body.trim();
 
         match keyword {
@@ -493,9 +502,8 @@ mod tests {
     use ruff_db::{Db as _, files::system_path_to_file};
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     fn get_assertions(source: &str) -> InlineFileAssertions {
         let mut db = Db::setup();

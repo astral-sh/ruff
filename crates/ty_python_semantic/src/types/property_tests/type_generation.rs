@@ -1,15 +1,16 @@
+use crate::Db;
 use crate::db::tests::TestDb;
 use crate::place::{builtins_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, CallableType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter,
-    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
+    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
-use crate::{Db, module_resolver::KnownModule};
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
+use ty_module_resolver::KnownModule;
 
 /// A test representation of a type that can be transformed unambiguously into a real Type,
 /// given a db.
@@ -76,24 +77,29 @@ impl CallableParams {
     pub(crate) fn into_parameters(self, db: &TestDb) -> Parameters<'_> {
         match self {
             CallableParams::GradualForm => Parameters::gradual_form(),
-            CallableParams::List(params) => Parameters::new(params.into_iter().map(|param| {
-                let mut parameter = match param.kind {
-                    ParamKind::PositionalOnly => Parameter::positional_only(param.name),
-                    ParamKind::PositionalOrKeyword => {
-                        Parameter::positional_or_keyword(param.name.unwrap())
+            CallableParams::List(params) => Parameters::new(
+                db,
+                params.into_iter().map(|param| {
+                    let mut parameter = match param.kind {
+                        ParamKind::PositionalOnly => Parameter::positional_only(param.name),
+                        ParamKind::PositionalOrKeyword => {
+                            Parameter::positional_or_keyword(param.name.unwrap())
+                        }
+                        ParamKind::Variadic => Parameter::variadic(param.name.unwrap()),
+                        ParamKind::KeywordOnly => Parameter::keyword_only(param.name.unwrap()),
+                        ParamKind::KeywordVariadic => {
+                            Parameter::keyword_variadic(param.name.unwrap())
+                        }
+                    };
+                    if let Some(annotated_ty) = param.annotated_ty {
+                        parameter = parameter.with_annotated_type(annotated_ty.into_type(db));
                     }
-                    ParamKind::Variadic => Parameter::variadic(param.name.unwrap()),
-                    ParamKind::KeywordOnly => Parameter::keyword_only(param.name.unwrap()),
-                    ParamKind::KeywordVariadic => Parameter::keyword_variadic(param.name.unwrap()),
-                };
-                if let Some(annotated_ty) = param.annotated_ty {
-                    parameter = parameter.with_annotated_type(annotated_ty.into_type(db));
-                }
-                if let Some(default_ty) = param.default_ty {
-                    parameter = parameter.with_default_type(default_ty.into_type(db));
-                }
-                parameter
-            })),
+                    if let Some(default_ty) = param.default_ty {
+                        parameter = parameter.with_default_type(default_ty.into_type(db));
+                    }
+                    parameter
+                }),
+            ),
         }
     }
 }
@@ -229,7 +235,7 @@ impl Ty {
 
                 create_bound_method(db, function, builtins_class)
             }
-            Ty::Callable { params, returns } => CallableType::single(
+            Ty::Callable { params, returns } => Type::single_callable(
                 db,
                 Signature::new(
                     params.into_parameters(db),

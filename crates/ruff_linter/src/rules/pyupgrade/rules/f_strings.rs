@@ -6,11 +6,11 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
 use ruff_python_literal::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use ruff_python_parser::TokenKind;
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 

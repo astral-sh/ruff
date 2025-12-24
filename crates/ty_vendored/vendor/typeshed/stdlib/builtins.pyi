@@ -54,6 +54,7 @@ from typing import (  # noqa: Y022,UP035
     Any,
     BinaryIO,
     ClassVar,
+    Final,
     Generic,
     Mapping,
     MutableMapping,
@@ -254,8 +255,9 @@ class type:
     __bases__: tuple[type, ...]
     @property
     def __basicsize__(self) -> int: ...
-    @property
-    def __dict__(self) -> types.MappingProxyType[str, Any]: ...  # type: ignore[override]
+    # type.__dict__ is read-only at runtime, but that can't be expressed currently.
+    # See https://github.com/python/typeshed/issues/11033 for a discussion.
+    __dict__: Final[types.MappingProxyType[str, Any]]  # type: ignore[assignment]
     @property
     def __dictoffset__(self) -> int: ...
     @property
@@ -1833,14 +1835,22 @@ class bytes(Sequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytes object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytes object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
-        """
+            Spaces between two numbers are accepted.
+            Example: bytes.fromhex('B9 01EF') -> b'\\\\xb9\\\\x01\\\\xef'.
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2329,14 +2339,22 @@ class bytearray(MutableSequence[int]):
 
         The original string is never truncated.
         """
+    if sys.version_info >= (3, 14):
+        @classmethod
+        def fromhex(cls, string: str | ReadableBuffer, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-    @classmethod
-    def fromhex(cls, string: str, /) -> Self:
-        """Create a bytearray object from a string of hexadecimal numbers.
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
+    else:
+        @classmethod
+        def fromhex(cls, string: str, /) -> Self:
+            """Create a bytearray object from a string of hexadecimal numbers.
 
-        Spaces between two numbers are accepted.
-        Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
-        """
+            Spaces between two numbers are accepted.
+            Example: bytearray.fromhex('B9 01EF') -> bytearray(b'\\\\xb9\\\\x01\\\\xef')
+            """
 
     @staticmethod
     def maketrans(frm: ReadableBuffer, to: ReadableBuffer, /) -> bytes:
@@ -2412,7 +2430,7 @@ class bytearray(MutableSequence[int]):
             """Resize the internal buffer of bytearray to len.
 
             size
-              New size to resize to..
+              New size to resize to.
             """
 
 _IntegerFormats: TypeAlias = Literal[
@@ -2577,10 +2595,21 @@ class memoryview(Sequence[_I]):
 
     def __release_buffer__(self, buffer: memoryview, /) -> None:
         """Release the buffer object that exposes the underlying memory of the object."""
-    # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
-    # See https://github.com/python/cpython/issues/125420
-    index: ClassVar[None]  # type: ignore[assignment]
-    count: ClassVar[None]  # type: ignore[assignment]
+    if sys.version_info >= (3, 14):
+        def index(self, value: object, start: SupportsIndex = 0, stop: SupportsIndex = sys.maxsize, /) -> int:
+            """Return the index of the first occurrence of a value.
+
+            Raises ValueError if the value is not present.
+            """
+
+        def count(self, value: object, /) -> int:
+            """Count the number of occurrences of a value."""
+    else:
+        # These are inherited from the Sequence ABC, but don't actually exist on memoryview.
+        # See https://github.com/python/cpython/issues/125420
+        index: ClassVar[None]  # type: ignore[assignment]
+        count: ClassVar[None]  # type: ignore[assignment]
+
     if sys.version_info >= (3, 14):
         def __class_getitem__(cls, item: Any, /) -> GenericAlias:
             """See PEP 585"""
@@ -3355,13 +3384,6 @@ class property:
 
     def __delete__(self, instance: Any, /) -> None:
         """Delete an attribute of instance."""
-
-@final
-@type_check_only
-class _NotImplementedType(Any):
-    __call__: None
-
-NotImplemented: _NotImplementedType
 
 def abs(x: SupportsAbs[_T], /) -> _T:
     """Return the absolute value of the argument."""
@@ -4494,14 +4516,14 @@ def __build_class__(func: Callable[[], CellType | Any], name: str, /, *bases: An
     """
 
 if sys.version_info >= (3, 10):
-    from types import EllipsisType
+    from types import EllipsisType, NotImplementedType
 
     # Backwards compatibility hack for folks who relied on the ellipsis type
     # existing in typeshed in Python 3.9 and earlier.
     ellipsis = EllipsisType
 
     Ellipsis: EllipsisType
-
+    NotImplemented: NotImplementedType
 else:
     # Actually the type of Ellipsis is <type 'ellipsis'>, but since it's
     # not exposed anywhere under that name, we make it private here.
@@ -4510,6 +4532,12 @@ else:
     class ellipsis: ...
 
     Ellipsis: ellipsis
+
+    @final
+    @type_check_only
+    class _NotImplementedType(Any): ...
+
+    NotImplemented: _NotImplementedType
 
 @disjoint_base
 class BaseException:
@@ -4525,6 +4553,10 @@ class BaseException:
     def __setstate__(self, state: dict[str, Any] | None, /) -> None: ...
     def with_traceback(self, tb: TracebackType | None, /) -> Self:
         """Set self.__traceback__ to tb and return self."""
+    # Necessary for security-focused static analyzers (e.g, pysa)
+    # See https://github.com/python/typeshed/pull/14900
+    def __str__(self) -> str: ...  # noqa: Y029
+    def __repr__(self) -> str: ...  # noqa: Y029
     if sys.version_info >= (3, 11):
         # only present after add_note() is called
         __notes__: list[str]

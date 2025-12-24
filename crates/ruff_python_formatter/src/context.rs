@@ -3,7 +3,7 @@ use std::ops::{Deref, DerefMut};
 
 use ruff_formatter::{Buffer, FormatContext, GroupId, IndentWidth, SourceCode};
 use ruff_python_ast::str::Quote;
-use ruff_python_parser::Tokens;
+use ruff_python_ast::token::Tokens;
 
 use crate::PyFormatOptions;
 use crate::comments::Comments;
@@ -166,7 +166,7 @@ impl InterpolatedStringState {
         }
     }
 
-    /// Returns `true` if the interpolated string state is [`NestedInterpolatedElement`].
+    /// Returns `true` if the interpolated string state is [`Self::NestedInterpolatedElement`].
     pub(crate) fn is_nested(self) -> bool {
         matches!(self, Self::NestedInterpolatedElement(..))
     }

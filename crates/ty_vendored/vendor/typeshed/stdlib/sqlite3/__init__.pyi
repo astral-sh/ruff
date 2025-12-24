@@ -256,6 +256,7 @@ _AdaptedInputData: TypeAlias = _SqliteData | Any
 _Parameters: TypeAlias = SupportsLenAndGetItem[_AdaptedInputData] | Mapping[str, _AdaptedInputData]
 # Controls the legacy transaction handling mode of sqlite3.
 _IsolationLevel: TypeAlias = Literal["DEFERRED", "EXCLUSIVE", "IMMEDIATE"] | None
+_RowFactoryOptions: TypeAlias = type[Row] | Callable[[Cursor, Row], object] | None
 
 @type_check_only
 class _AnyParamWindowAggregateClass(Protocol):
@@ -336,7 +337,7 @@ class Connection:
         def autocommit(self) -> int: ...
         @autocommit.setter
         def autocommit(self, val: int) -> None: ...
-    row_factory: Any
+    row_factory: _RowFactoryOptions
     text_factory: Any
     if sys.version_info >= (3, 12):
         def __init__(
@@ -377,8 +378,8 @@ class Connection:
               Table name.
             column
               Column name.
-            row
-              Row index.
+            rowid
+              Row id.
             readonly
               Open the BLOB without write permissions.
             name
@@ -623,7 +624,7 @@ class Cursor:
     def description(self) -> tuple[tuple[str, None, None, None, None, None, None], ...] | MaybeNone: ...
     @property
     def lastrowid(self) -> int | None: ...
-    row_factory: Callable[[Cursor, Row], object] | None
+    row_factory: _RowFactoryOptions
     @property
     def rowcount(self) -> int: ...
     def __init__(self, cursor: Connection, /) -> None: ...

@@ -288,10 +288,12 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
         },
 
         // airflow.model..DAG
-        ["airflow", "models", .., "DAG"] => Replacement::SourceModuleMoved {
-            module: "airflow.sdk",
-            name: "DAG".to_string(),
-        },
+        ["airflow", "models", "dag", "DAG"] | ["airflow", "models", "DAG"] | ["airflow", "DAG"] => {
+            Replacement::SourceModuleMoved {
+                module: "airflow.sdk",
+                name: "DAG".to_string(),
+            }
+        }
 
         // airflow.sensors.base
         [

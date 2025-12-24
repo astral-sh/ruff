@@ -26,6 +26,7 @@ python-version = "3.12"
 
 ```py
 from __future__ import annotations
+from ty_extensions import reveal_mro
 
 class A:
     def a(self): ...
@@ -39,7 +40,7 @@ class C(B):
     def c(self): ...
     cc: int = 3
 
-reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>]
+reveal_mro(C)  # revealed: (<class 'C'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
 super(C, C()).a
 super(C, C()).b
@@ -65,7 +66,7 @@ synthesized `Protocol`s that cannot be upcast to, or interpreted as, a non-`obje
 
 ```py
 import types
-from typing_extensions import Callable, TypeIs, Literal, TypedDict
+from typing_extensions import Callable, TypeIs, Literal, NewType, TypedDict
 
 def f(): ...
 
@@ -79,6 +80,8 @@ type Alias = int
 class SomeTypedDict(TypedDict):
     x: int
     y: bytes
+
+N = NewType("N", int)
 
 # revealed: <super: <class 'object'>, FunctionType>
 reveal_type(super(object, f))
@@ -94,6 +97,8 @@ reveal_type(super(object, Alias))
 reveal_type(super(object, Foo().method))
 # revealed: <super: <class 'object'>, property>
 reveal_type(super(object, Foo.some_property))
+# revealed: <super: <class 'object'>, int>
+reveal_type(super(object, N(42)))
 
 def g(x: object) -> TypeIs[list[object]]:
     return isinstance(x, list)
@@ -169,8 +174,7 @@ class B(A):
 
     @classmethod
     def f(cls):
-        # TODO: Once `cls` is supported, this should be `<super: <class 'B'>, <class 'B'>>`
-        reveal_type(super())  # revealed: <super: <class 'B'>, Unknown>
+        reveal_type(super())  # revealed: <super: <class 'B'>, <class 'B'>>
         super().f()
 
 super(B, B(42)).__init__(42)
@@ -205,9 +209,7 @@ class BuilderMeta2(type):
     ) -> BuilderMeta2:
         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
         s = reveal_type(super())
-        # TODO: should be `BuilderMeta2` (needs https://github.com/astral-sh/ty/issues/501)
-        # revealed:  Unknown
-        return reveal_type(s.__new__(cls, name, bases, dct))
+        return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
 
 class Foo[T]:
     x: T
@@ -390,6 +392,14 @@ class E(Enum):
 reveal_type(super(E, E.X))  # revealed: <super: <class 'E'>, E>
 ```
 
+## `type[Self]`
+
+```py
+class Foo:
+    def method(self):
+        super(self.__class__, self)
+```
+
 ## Descriptor Behavior with Super
 
 Accessing attributes through `super` still invokes descriptor protocol. However, the behavior can
@@ -420,6 +430,8 @@ When the owner is a union type, `super()` is built separately for each branch, a
 super objects are combined into a union.
 
 ```py
+from ty_extensions import reveal_mro
+
 class A: ...
 
 class B:
@@ -429,8 +441,8 @@ class C(A, B): ...
 class D(B, A): ...
 
 def f(x: C | D):
-    reveal_type(C.__mro__)  # revealed: tuple[<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>]
-    reveal_type(D.__mro__)  # revealed: tuple[<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>]
+    reveal_mro(C)  # revealed: (<class 'C'>, <class 'A'>, <class 'B'>, <class 'object'>)
+    reveal_mro(D)  # revealed: (<class 'D'>, <class 'B'>, <class 'A'>, <class 'object'>)
 
     s = super(A, x)
     reveal_type(s)  # revealed: <super: <class 'A'>, C> | <super: <class 'A'>, D>
@@ -494,8 +506,8 @@ class A[T]:
         return a
 
 class B[T](A[T]):
-    def f(self, b: T) -> T:
-        return super().f(b)
+    def f(self, a: T) -> T:
+        return super().f(a)
 ```
 
 ## Invalid Usages
@@ -555,7 +567,7 @@ def f(x: int):
     super(x, x)
 
     type IntAlias = int
-    # error: [invalid-super-argument] "`typing.TypeAliasType` is not a valid class"
+    # error: [invalid-super-argument] "`TypeAliasType` is not a valid class"
     super(IntAlias, 0)
 
 # error: [invalid-super-argument] "`str` is not an instance or subclass of `<class 'int'>` in `super(<class 'int'>, str)` call"
@@ -590,15 +602,33 @@ super(object, object()).__class__
 # Not all objects valid in a class's bases list are valid as the first argument to `super()`.
 # For example, it's valid to inherit from `typing.ChainMap`, but it's not valid as the first argument to `super()`.
 #
-# error: [invalid-super-argument] "`typing.ChainMap` is not a valid class"
+# error: [invalid-super-argument] "`<special-form 'typing.ChainMap'>` is not a valid class"
 reveal_type(super(typing.ChainMap, collections.ChainMap()))  # revealed: Unknown
 
 # Meanwhile, it's not valid to inherit from unsubscripted `typing.Generic`,
 # but it *is* valid as the first argument to `super()`.
-reveal_type(super(typing.Generic, typing.SupportsInt))  # revealed: <super: typing.Generic, <class 'SupportsInt'>>
+#
+# revealed: <super: <special-form 'typing.Generic'>, <class 'SupportsInt'>>
+reveal_type(super(typing.Generic, typing.SupportsInt))
 
 def _(x: type[typing.Any], y: typing.Any):
     reveal_type(super(x, y))  # revealed: <super: Any, Any>
+```
+
+### Diagnostic when the invalid type is rendered very verbosely
+
+<!-- snapshot-diagnostics -->
+
+```py
+def coinflip() -> bool:
+    return False
+
+def f():
+    if coinflip():
+        class A: ...
+    else:
+        class A: ...
+    super(A, A())  # error: [invalid-super-argument]
 ```
 
 ### Instance Member Access via `super`

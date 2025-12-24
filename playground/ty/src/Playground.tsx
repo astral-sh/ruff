@@ -48,14 +48,11 @@ export default function Playground() {
 
   usePersistLocally(files);
 
-  const handleShare = useCallback(() => {
+  const handleShare = useCallback(async () => {
     const serialized = serializeFiles(files);
 
     if (serialized != null) {
-      persist(serialized).catch((error) => {
-        // eslint-disable-next-line no-console
-        console.error("Failed to share playground", error);
-      });
+      await persist(serialized);
     }
   }, [files]);
 
@@ -501,7 +498,7 @@ export interface InitializedPlayground {
 
 // Run once during startup. Initializes monaco, loads the wasm file, and restores the previous editor state.
 async function startPlayground(): Promise<InitializedPlayground> {
-  const ty = await import("../ty_wasm");
+  const ty = await import("ty_wasm");
   await ty.default();
   const version = ty.version();
   const monaco = await loader.init();

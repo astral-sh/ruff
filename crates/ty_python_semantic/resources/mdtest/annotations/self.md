@@ -63,6 +63,12 @@ python-version = "3.12"
 from typing import Self
 
 class A:
+    def __init__(self):
+        reveal_type(self)  # revealed: Self@__init__
+
+    def __init_subclass__(cls, default_name, **kwargs):
+        reveal_type(cls)  # revealed: type[Self@__init_subclass__]
+
     def implicit_self(self) -> Self:
         reveal_type(self)  # revealed: Self@implicit_self
 
@@ -91,8 +97,7 @@ class A:
 
     @classmethod
     def a_classmethod(cls) -> Self:
-        # TODO: This should be type[Self@bar]
-        reveal_type(cls)  # revealed: Unknown
+        reveal_type(cls)  # revealed: type[Self@a_classmethod]
         return cls()
 
     @staticmethod
@@ -116,7 +121,7 @@ A.implicit_self(1)
 Passing `self` implicitly also verifies the type:
 
 ```py
-from typing import Never
+from typing import Never, Callable
 
 class Strange:
     def can_not_be_called(self: Never) -> None: ...
@@ -139,6 +144,9 @@ The first parameter of instance methods always has type `Self`, if it is not exp
 The name `self` is not special in any way.
 
 ```py
+def some_decorator[**P, R](f: Callable[P, R]) -> Callable[P, R]:
+    return f
+
 class B:
     def name_does_not_matter(this) -> Self:
         reveal_type(this)  # revealed: Self@name_does_not_matter
@@ -153,18 +161,44 @@ class B:
         reveal_type(self)  # revealed: Self@keyword_only
         return self
 
+    @some_decorator
+    def decorated_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@decorated_method
+        return self
+
     @property
     def a_property(self) -> Self:
-        # TODO: Should reveal Self@a_property
-        reveal_type(self)  # revealed: Unknown
+        reveal_type(self)  # revealed: Self@a_property
         return self
+
+    async def async_method(self) -> Self:
+        reveal_type(self)  # revealed: Self@async_method
+        return self
+
+    @staticmethod
+    def static_method(self):
+        # The parameter can be called `self`, but it is not treated as `Self`
+        reveal_type(self)  # revealed: Unknown
+
+    @staticmethod
+    @some_decorator
+    def decorated_static_method(self):
+        reveal_type(self)  # revealed: Unknown
+    # TODO: On Python <3.10, this should ideally be rejected, because `staticmethod` objects were not callable.
+    @some_decorator
+    @staticmethod
+    def decorated_static_method_2(self):
+        reveal_type(self)  # revealed: Unknown
 
 reveal_type(B().name_does_not_matter())  # revealed: B
 reveal_type(B().positional_only(1))  # revealed: B
 reveal_type(B().keyword_only(x=1))  # revealed: B
+reveal_type(B().decorated_method())  # revealed: B
 
-# TODO: this should be B
-reveal_type(B().a_property)  # revealed: Unknown
+reveal_type(B().a_property)  # revealed: B
+
+async def _():
+    reveal_type(await B().async_method())  # revealed: B
 ```
 
 This also works for generic classes:
@@ -202,6 +236,32 @@ class C:
 reveal_type(not_a_method)  # revealed: def not_a_method(self) -> Unknown
 ```
 
+## Different occurrences of `Self` represent different types
+
+Here, both `Foo.foo` and `Bar.bar` use `Self`. When accessing a bound method, we replace any
+occurrences of `Self` with the bound `self` type. In this example, when we access `x.foo`, we only
+want to substitute the occurrences of `Self` in `Foo.foo` — that is, occurrences of `Self@foo`. The
+fact that `x` is an instance of `Foo[Self@bar]` (a completely different `Self` type) should not
+affect that subtitution. If we blindly substitute all occurrences of `Self`, we would get
+`Foo[Self@bar]` as the return type of the bound method.
+
+```py
+from typing import Self
+
+class Foo[T]:
+    def foo(self: Self) -> T:
+        raise NotImplementedError
+
+class Bar:
+    def bar(self: Self, x: Foo[Self]):
+        # revealed: bound method Foo[Self@bar].foo() -> Self@bar
+        reveal_type(x.foo)
+
+def f[U: Bar](x: Foo[U]):
+    # revealed: bound method Foo[U@f].foo() -> U@f
+    reveal_type(x.foo)
+```
+
 ## typing_extensions
 
 ```toml
@@ -221,8 +281,10 @@ reveal_type(C().method())  # revealed: C
 
 ## Class Methods
 
+### Explicit
+
 ```py
-from typing import Self, TypeVar
+from typing import Self
 
 class Shape:
     def foo(self: Self) -> Self:
@@ -230,15 +292,71 @@ class Shape:
 
     @classmethod
     def bar(cls: type[Self]) -> Self:
-        # TODO: type[Shape]
-        reveal_type(cls)  # revealed: @Todo(unsupported type[X] special form)
+        reveal_type(cls)  # revealed: type[Self@bar]
         return cls()
 
 class Circle(Shape): ...
 
 reveal_type(Shape().foo())  # revealed: Shape
-# TODO: Shape
-reveal_type(Shape.bar())  # revealed: Unknown
+reveal_type(Shape.bar())  # revealed: Shape
+
+reveal_type(Circle().foo())  # revealed: Circle
+reveal_type(Circle.bar())  # revealed: Circle
+```
+
+### Implicit
+
+```py
+from typing import Self
+
+class Shape:
+    def foo(self) -> Self:
+        return self
+
+    @classmethod
+    def bar(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@bar]
+        return cls()
+
+class Circle(Shape): ...
+
+reveal_type(Shape().foo())  # revealed: Shape
+reveal_type(Shape.bar())  # revealed: Shape
+
+reveal_type(Circle().foo())  # revealed: Circle
+reveal_type(Circle.bar())  # revealed: Circle
+```
+
+### Implicit in generic class
+
+```py
+from typing import Self
+
+class GenericShape[T]:
+    def foo(self) -> Self:
+        return self
+
+    @classmethod
+    def bar(cls) -> Self:
+        reveal_type(cls)  # revealed: type[Self@bar]
+        return cls()
+
+    @classmethod
+    def baz[U](cls, u: U) -> "GenericShape[U]":
+        reveal_type(cls)  # revealed: type[Self@baz]
+        return cls()
+
+class GenericCircle[T](GenericShape[T]): ...
+
+reveal_type(GenericShape().foo())  # revealed: GenericShape[Unknown]
+reveal_type(GenericShape.bar())  # revealed: GenericShape[Unknown]
+reveal_type(GenericShape[int].bar())  # revealed: GenericShape[int]
+reveal_type(GenericShape.baz(1))  # revealed: GenericShape[Literal[1]]
+
+reveal_type(GenericCircle().foo())  # revealed: GenericCircle[Unknown]
+reveal_type(GenericCircle.bar())  # revealed: GenericCircle[Unknown]
+reveal_type(GenericCircle[int].bar())  # revealed: GenericCircle[int]
+reveal_type(GenericCircle.baz(1))  # revealed: GenericShape[Literal[1]]
 ```
 
 ## Attributes
@@ -473,9 +591,11 @@ class C[T]():
     def f(self: Self):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: tuple[Self@f]
+# revealed: ty_extensions.GenericContext[Self@f]
+reveal_type(generic_context(C.f))
 ```
 
 Even if the `Self` annotation appears first in the nested function, it is the method that binds
@@ -489,9 +609,11 @@ class C:
     def f(self: "C"):
         def b(x: Self):
             reveal_type(x)  # revealed: Self@f
-        reveal_type(generic_context(b))  # revealed: None
+        # revealed: None
+        reveal_type(generic_context(b))
 
-reveal_type(generic_context(C.f))  # revealed: None
+# revealed: None
+reveal_type(generic_context(C.f))
 ```
 
 ## Non-positional first parameters

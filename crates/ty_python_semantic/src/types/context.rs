@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use super::{Type, TypeCheckDiagnostics, binding_type};
 
+use crate::diagnostic::DiagnosticGuard;
 use crate::lint::LintSource;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::semantic_index;
@@ -97,11 +98,13 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
     }
 
     pub(crate) fn extend(&mut self, other: &TypeCheckDiagnostics) {
-        self.diagnostics.get_mut().extend(other);
+        if !self.is_in_multi_inference() {
+            self.diagnostics.get_mut().extend(other);
+        }
     }
 
     pub(super) fn is_lint_enabled(&self, lint: &'static LintMetadata) -> bool {
-        LintDiagnosticGuardBuilder::severity_and_source(self, lint).is_some()
+        LintDiagnosticGuardBuilder::severity_and_source(self, LintId::of(lint)).is_some()
     }
 
     /// Optionally return a builder for a lint diagnostic guard.
@@ -174,8 +177,8 @@ impl<'db, 'ast> InferContext<'db, 'ast> {
         std::mem::replace(&mut self.multi_inference, multi_inference)
     }
 
-    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) {
-        self.no_type_check = no_type_check;
+    pub(super) fn set_in_no_type_check(&mut self, no_type_check: InNoTypeCheck) -> InNoTypeCheck {
+        std::mem::replace(&mut self.no_type_check, no_type_check)
     }
 
     fn is_in_no_type_check(&self) -> bool {
@@ -358,6 +361,9 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                         diag.id()
                     )
                 }
+                LintSource::Editor => {
+                    format!("rule `{}` was selected in the editor settings", diag.id())
+                }
             },
         ));
 
@@ -393,16 +399,16 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
 /// when the diagnostic is disabled or suppressed (among other reasons).
 pub(super) struct LintDiagnosticGuardBuilder<'db, 'ctx> {
     ctx: &'ctx InferContext<'db, 'ctx>,
-    id: DiagnosticId,
+    id: LintId,
     severity: Severity,
     source: LintSource,
-    primary_span: Span,
+    primary_range: TextRange,
 }
 
 impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
     fn severity_and_source(
         ctx: &'ctx InferContext<'db, 'ctx>,
-        lint: &'static LintMetadata,
+        lint: LintId,
     ) -> Option<(Severity, LintSource)> {
         // The comment below was copied from the original
         // implementation of diagnostic reporting. The code
@@ -418,10 +424,9 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         if !ctx.db.should_check_file(ctx.file) {
             return None;
         }
-        let lint_id = LintId::of(lint);
         // Skip over diagnostics if the rule
         // is disabled.
-        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint_id)?;
+        let (severity, source) = ctx.db.rule_selection(ctx.file).get(lint)?;
         // If we're not in type checking mode,
         // we can bail now.
         if ctx.is_in_no_type_check() {
@@ -441,23 +446,22 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         lint: &'static LintMetadata,
         range: TextRange,
     ) -> Option<LintDiagnosticGuardBuilder<'db, 'ctx>> {
-        let (severity, source) = Self::severity_and_source(ctx, lint)?;
+        let lint_id = LintId::of(lint);
+
+        let (severity, source) = Self::severity_and_source(ctx, lint_id)?;
 
         let suppressions = suppressions(ctx.db(), ctx.file());
-        let lint_id = LintId::of(lint);
         if let Some(suppression) = suppressions.find_suppression(range, lint_id) {
             ctx.diagnostics.borrow_mut().mark_used(suppression.id());
             return None;
         }
 
-        let id = DiagnosticId::Lint(lint.name());
-        let primary_span = Span::from(ctx.file()).with_range(range);
         Some(LintDiagnosticGuardBuilder {
             ctx,
-            id,
+            id: lint_id,
             severity,
             source,
-            primary_span,
+            primary_range: range,
         })
     }
 
@@ -475,113 +479,20 @@ impl<'db, 'ctx> LintDiagnosticGuardBuilder<'db, 'ctx> {
         self,
         message: impl std::fmt::Display,
     ) -> LintDiagnosticGuard<'db, 'ctx> {
-        let mut diag = Diagnostic::new(self.id, self.severity, message);
+        let mut diag = Diagnostic::new(DiagnosticId::Lint(self.id.name()), self.severity, message);
+        diag.set_documentation_url(Some(self.id.documentation_url()));
         // This is why `LintDiagnosticGuard::set_primary_message` exists.
         // We add the primary annotation here (because it's required), but
         // the optional message can be added later. We could accept it here
         // in this `build` method, but we already accept the main diagnostic
         // message. So the messages are likely to be quite confusable.
-        diag.annotate(Annotation::primary(self.primary_span.clone()));
+        let primary_span = Span::from(self.ctx.file()).with_range(self.primary_range);
+        diag.annotate(Annotation::primary(primary_span));
         LintDiagnosticGuard {
             ctx: self.ctx,
             source: self.source,
             diag: Some(diag),
         }
-    }
-}
-
-/// An abstraction for mutating a diagnostic.
-///
-/// Callers can build this guard by starting with
-/// `InferContext::report_diagnostic`.
-///
-/// Callers likely should use `LintDiagnosticGuard` via
-/// `InferContext::report_lint` instead. This guard is only intended for use
-/// with non-lint diagnostics. It is fundamentally lower level and easier to
-/// get things wrong by using it.
-///
-/// Unlike `LintDiagnosticGuard`, this API does not guarantee that the
-/// constructed `Diagnostic` not only has a primary annotation, but its
-/// associated file is equivalent to the file being type checked. As a result,
-/// if either is violated, then the `Drop` impl on `DiagnosticGuard` will
-/// panic.
-pub(super) struct DiagnosticGuard<'db, 'ctx> {
-    ctx: &'ctx InferContext<'db, 'ctx>,
-    /// The diagnostic that we want to report.
-    ///
-    /// This is always `Some` until the `Drop` impl.
-    diag: Option<Diagnostic>,
-}
-
-impl std::ops::Deref for DiagnosticGuard<'_, '_> {
-    type Target = Diagnostic;
-
-    fn deref(&self) -> &Diagnostic {
-        // OK because `self.diag` is only `None` within `Drop`.
-        self.diag.as_ref().unwrap()
-    }
-}
-
-/// Return a mutable borrow of the diagnostic in this guard.
-///
-/// Callers may mutate the diagnostic to add new sub-diagnostics
-/// or annotations.
-///
-/// The diagnostic is added to the typing context, if appropriate,
-/// when this guard is dropped.
-impl std::ops::DerefMut for DiagnosticGuard<'_, '_> {
-    fn deref_mut(&mut self) -> &mut Diagnostic {
-        // OK because `self.diag` is only `None` within `Drop`.
-        self.diag.as_mut().unwrap()
-    }
-}
-
-/// Finishes use of this guard.
-///
-/// This will add the diagnostic to the typing context if appropriate.
-///
-/// # Panics
-///
-/// This panics when the underlying diagnostic lacks a primary
-/// annotation, or if it has one and its file doesn't match the file
-/// being type checked.
-impl Drop for DiagnosticGuard<'_, '_> {
-    fn drop(&mut self) {
-        if std::thread::panicking() {
-            // Don't submit diagnostics when panicking because they might be incomplete.
-            return;
-        }
-
-        // OK because the only way `self.diag` is `None`
-        // is via this impl, which can only run at most
-        // once.
-        let diag = self.diag.take().unwrap();
-
-        if std::thread::panicking() {
-            // Don't submit diagnostics when panicking because they might be incomplete.
-            return;
-        }
-
-        let Some(ann) = diag.primary_annotation() else {
-            panic!(
-                "All diagnostics reported by `InferContext` must have a \
-                 primary annotation, but diagnostic {id} does not",
-                id = diag.id(),
-            );
-        };
-
-        let expected_file = self.ctx.file();
-        let got_file = ann.get_span().expect_ty_file();
-        assert_eq!(
-            expected_file,
-            got_file,
-            "All diagnostics reported by `InferContext` must have a \
-             primary annotation whose file matches the file of the \
-             current typing context, but diagnostic {id} has file \
-             {got_file:?} and we expected {expected_file:?}",
-            id = diag.id(),
-        );
-        self.ctx.diagnostics.borrow_mut().push(diag);
     }
 }
 
@@ -623,14 +534,9 @@ impl<'db, 'ctx> DiagnosticGuardBuilder<'db, 'ctx> {
     ///
     /// The diagnostic can be further mutated on the guard via its `DerefMut`
     /// impl to `Diagnostic`.
-    pub(super) fn into_diagnostic(
-        self,
-        message: impl std::fmt::Display,
-    ) -> DiagnosticGuard<'db, 'ctx> {
-        let diag = Some(Diagnostic::new(self.id, self.severity, message));
-        DiagnosticGuard {
-            ctx: self.ctx,
-            diag,
-        }
+    pub(super) fn into_diagnostic(self, message: impl std::fmt::Display) -> DiagnosticGuard<'ctx> {
+        let diag = Diagnostic::new(self.id, self.severity, message);
+
+        DiagnosticGuard::new(self.ctx.file, &self.ctx.diagnostics, diag)
     }
 }

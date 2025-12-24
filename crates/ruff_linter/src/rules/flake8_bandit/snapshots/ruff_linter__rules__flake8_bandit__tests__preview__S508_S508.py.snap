@@ -1,0 +1,104 @@
+---
+source: crates/ruff_linter/src/rules/flake8_bandit/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 8
+
+--- Added ---
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:18:46
+   |
+16 | import pysnmp.hlapi.auth
+17 |
+18 | pysnmp.hlapi.asyncio.CommunityData("public", mpModel=0)  # S508
+   |                                              ^^^^^^^^^
+19 | pysnmp.hlapi.v1arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:19:58
+   |
+18 | pysnmp.hlapi.asyncio.CommunityData("public", mpModel=0)  # S508
+19 | pysnmp.hlapi.v1arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+   |                                                          ^^^^^^^^^
+20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
+21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:20:53
+   |
+18 | pysnmp.hlapi.asyncio.CommunityData("public", mpModel=0)  # S508
+19 | pysnmp.hlapi.v1arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
+   |                                                     ^^^^^^^^^
+21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
+22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:21:45
+   |
+19 | pysnmp.hlapi.v1arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
+21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
+   |                                             ^^^^^^^^^
+22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:22:58
+   |
+20 | pysnmp.hlapi.v1arch.asyncio.CommunityData("public", mpModel=0)  # S508
+21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
+22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+   |                                                          ^^^^^^^^^
+23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
+24 | pysnmp.hlapi.v3arch.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:23:53
+   |
+21 | pysnmp.hlapi.v1arch.CommunityData("public", mpModel=0)  # S508
+22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
+   |                                                     ^^^^^^^^^
+24 | pysnmp.hlapi.v3arch.CommunityData("public", mpModel=0)  # S508
+25 | pysnmp.hlapi.auth.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:24:45
+   |
+22 | pysnmp.hlapi.v3arch.asyncio.auth.CommunityData("public", mpModel=0)  # S508
+23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
+24 | pysnmp.hlapi.v3arch.CommunityData("public", mpModel=0)  # S508
+   |                                             ^^^^^^^^^
+25 | pysnmp.hlapi.auth.CommunityData("public", mpModel=0)  # S508
+   |
+
+
+S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+  --> S508.py:25:43
+   |
+23 | pysnmp.hlapi.v3arch.asyncio.CommunityData("public", mpModel=0)  # S508
+24 | pysnmp.hlapi.v3arch.CommunityData("public", mpModel=0)  # S508
+25 | pysnmp.hlapi.auth.CommunityData("public", mpModel=0)  # S508
+   |                                           ^^^^^^^^^
+26 |
+27 | pysnmp.hlapi.asyncio.CommunityData("public", mpModel=2)  # OK
+   |

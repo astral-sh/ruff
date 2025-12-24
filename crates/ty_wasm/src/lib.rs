@@ -11,21 +11,22 @@ use ruff_db::system::{
     SystemPath, SystemPathBuf, SystemVirtualPath, WritableSystem,
 };
 use ruff_db::vendored::VendoredPath;
+use ruff_diagnostics::{Applicability, Edit};
 use ruff_notebook::Notebook;
 use ruff_python_formatter::formatted_file;
 use ruff_source_file::{LineIndex, OneIndexed, SourceLocation};
 use ruff_text_size::{Ranged, TextSize};
 use ty_ide::{
-    InlayHintSettings, MarkupKind, RangedValue, document_highlights, goto_declaration,
-    goto_definition, goto_references, goto_type_definition, hover, inlay_hints,
+    InlayHintSettings, MarkupKind, RangedValue, document_highlights, find_references,
+    goto_declaration, goto_definition, goto_type_definition, hover, inlay_hints,
 };
-use ty_ide::{NavigationTargets, signature_help};
+use ty_ide::{NavigationTarget, NavigationTargets, signature_help};
 use ty_project::metadata::options::Options;
 use ty_project::metadata::value::ValueSource;
 use ty_project::watch::{ChangeEvent, ChangedKind, CreatedKind, DeletedKind};
 use ty_project::{CheckMode, ProjectMetadata};
 use ty_project::{Db, ProjectDatabase};
-use ty_python_semantic::Program;
+use ty_python_semantic::{MisconfigurationMode, Program};
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
@@ -98,8 +99,13 @@ impl Workspace {
 
         let system = WasmSystem::new(SystemPath::new(root));
 
-        let project = ProjectMetadata::from_options(options, SystemPathBuf::from(root), None)
-            .map_err(into_error)?;
+        let project = ProjectMetadata::from_options(
+            options,
+            SystemPathBuf::from(root),
+            None,
+            MisconfigurationMode::Fail,
+        )
+        .map_err(into_error)?;
 
         let mut db = ProjectDatabase::new(project, system.clone()).map_err(into_error)?;
 
@@ -126,6 +132,7 @@ impl Workspace {
             options,
             self.db.project().root(&self.db).to_path_buf(),
             None,
+            MisconfigurationMode::Fail,
         )
         .map_err(into_error)?;
 
@@ -350,7 +357,7 @@ impl Workspace {
 
         let offset = position.to_text_size(&source, &index, self.position_encoding)?;
 
-        let Some(targets) = goto_references(&self.db, file_id.file, offset, true) else {
+        let Some(targets) = find_references(&self.db, file_id.file, offset, true) else {
             return Ok(Vec::new());
         };
 
@@ -469,7 +476,22 @@ impl Workspace {
         Ok(result
             .into_iter()
             .map(|hint| InlayHint {
-                markdown: hint.display().to_string(),
+                label: hint
+                    .label
+                    .into_parts()
+                    .into_iter()
+                    .map(|part| InlayHintLabelPart {
+                        location: part.target().map(|target| {
+                            location_link_from_navigation_target(
+                                target,
+                                &self.db,
+                                self.position_encoding,
+                                None,
+                            )
+                        }),
+                        label: part.into_text(),
+                    })
+                    .collect(),
                 position: Position::from_text_size(
                     hint.position,
                     &index,
@@ -477,6 +499,19 @@ impl Workspace {
                     self.position_encoding,
                 ),
                 kind: hint.kind.into(),
+                text_edits: hint
+                    .text_edits
+                    .into_iter()
+                    .map(|edit| TextEdit {
+                        range: Range::from_text_range(
+                            edit.range,
+                            &index,
+                            &source,
+                            self.position_encoding,
+                        ),
+                        new_text: edit.new_text,
+                    })
+                    .collect(),
             })
             .collect())
     }
@@ -525,6 +560,51 @@ impl Workspace {
             .collect::<Vec<_>>();
 
         Ok(result)
+    }
+
+    #[wasm_bindgen(js_name = "codeActions")]
+    pub fn code_actions(
+        &self,
+        file_id: &FileHandle,
+        diagnostic: &Diagnostic,
+    ) -> Option<Vec<CodeAction>> {
+        // If the diagnostic includes fixes, offer those up as options.
+        let mut actions = Vec::new();
+        if let Some(action) = diagnostic.code_action(self) {
+            actions.push(action);
+        }
+
+        // Try to find other applicable actions.
+        //
+        // This is only for actions that are messy to compute at the time of the diagnostic.
+        // For instance, suggesting imports requires finding symbols for the entire project,
+        // which is dubious when you're in the middle of resolving symbols.
+        if let Some(range) = diagnostic.inner.range() {
+            actions.extend(
+                ty_ide::code_actions(
+                    &self.db,
+                    file_id.file,
+                    range,
+                    diagnostic.inner.id().as_str(),
+                )
+                .into_iter()
+                .map(|action| CodeAction {
+                    title: action.title,
+                    preferred: action.preferred,
+                    edits: action
+                        .edits
+                        .into_iter()
+                        .map(|edit| edit_to_text_edit(self, file_id.file, &edit))
+                        .collect(),
+                }),
+            );
+        }
+
+        if actions.is_empty() {
+            None
+        } else {
+            Some(actions)
+        }
     }
 
     #[wasm_bindgen(js_name = "signatureHelp")]
@@ -639,19 +719,8 @@ fn map_targets_to_links(
 
     targets
         .into_iter()
-        .map(|target| LocationLink {
-            path: target.file().path(db).to_string(),
-            full_range: Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.full_range()),
-                position_encoding,
-            ),
-            selection_range: Some(Range::from_file_range(
-                db,
-                FileRange::new(target.file(), target.focus_range()),
-                position_encoding,
-            )),
-            origin_selection_range: Some(source_range),
+        .map(|target| {
+            location_link_from_navigation_target(&target, db, position_encoding, Some(source_range))
         })
         .collect()
 }
@@ -728,6 +797,57 @@ impl Diagnostic {
             .to_string()
             .into()
     }
+
+    /// Returns the code action for this diagnostic, if it has a fix.
+    #[wasm_bindgen(js_name = "codeAction")]
+    pub fn code_action(&self, workspace: &Workspace) -> Option<CodeAction> {
+        let fix = self
+            .inner
+            .fix()
+            .filter(|fix| fix.applies(Applicability::Unsafe))?;
+
+        let primary_span = self.inner.primary_span()?;
+        let file = primary_span.expect_ty_file();
+
+        let edits: Vec<TextEdit> = fix
+            .edits()
+            .iter()
+            .map(|edit| edit_to_text_edit(workspace, file, edit))
+            .collect();
+
+        let title = self
+            .inner
+            .first_help_text()
+            .map(ToString::to_string)
+            .unwrap_or_else(|| format!("Fix {}", self.inner.id()));
+
+        Some(CodeAction {
+            title,
+            edits,
+            preferred: true,
+        })
+    }
+}
+
+fn edit_to_text_edit(workspace: &Workspace, file: File, edit: &Edit) -> TextEdit {
+    let source = source_text(&workspace.db, file);
+    let index = line_index(&workspace.db, file);
+
+    TextEdit {
+        range: Range::from_text_range(edit.range(), &index, &source, workspace.position_encoding),
+        new_text: edit.content().unwrap_or_default().to_string(),
+    }
+}
+
+/// A code action that can be applied to fix a diagnostic.
+#[wasm_bindgen]
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CodeAction {
+    #[wasm_bindgen(getter_with_clone)]
+    pub title: String,
+    #[wasm_bindgen(getter_with_clone)]
+    pub edits: Vec<TextEdit>,
+    pub preferred: bool,
 }
 
 #[wasm_bindgen]
@@ -905,6 +1025,7 @@ impl From<PositionEncoding> for ruff_source_file::PositionEncoding {
 }
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct LocationLink {
     /// The target file path
     #[wasm_bindgen(getter_with_clone)]
@@ -916,6 +1037,24 @@ pub struct LocationLink {
     pub selection_range: Option<Range>,
     /// The range of the origin.
     pub origin_selection_range: Option<Range>,
+}
+
+fn location_link_from_navigation_target(
+    target: &NavigationTarget,
+    db: &dyn Db,
+    position_encoding: PositionEncoding,
+    source_range: Option<Range>,
+) -> LocationLink {
+    LocationLink {
+        path: target.file().path(db).to_string(),
+        full_range: Range::from_file_range(db, target.full_file_range(), position_encoding),
+        selection_range: Some(Range::from_file_range(
+            db,
+            FileRange::new(target.file(), target.focus_range()),
+            position_encoding,
+        )),
+        origin_selection_range: source_range,
+    }
 }
 
 #[wasm_bindgen]
@@ -1032,14 +1171,26 @@ impl From<ty_ide::InlayHintKind> for InlayHintKind {
 }
 
 #[wasm_bindgen]
-#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct InlayHint {
     #[wasm_bindgen(getter_with_clone)]
-    pub markdown: String,
+    pub label: Vec<InlayHintLabelPart>,
 
     pub position: Position,
 
     pub kind: InlayHintKind,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub text_edits: Vec<TextEdit>,
+}
+
+#[wasm_bindgen]
+#[derive(Clone)]
+pub struct InlayHintLabelPart {
+    #[wasm_bindgen(getter_with_clone)]
+    pub label: String,
+
+    #[wasm_bindgen(getter_with_clone)]
+    pub location: Option<LocationLink>,
 }
 
 #[wasm_bindgen]

@@ -493,7 +493,7 @@ class GeneratorType(Generator[_YieldT_co, _SendT_contra, _ReturnT_co]):
         """Implement next(self)."""
 
     def send(self, arg: _SendT_contra, /) -> _YieldT_co:
-        """send(arg) -> send 'arg' into generator,
+        """send(value) -> send 'value' into generator,
         return next yielded value or raise StopIteration.
         """
 
@@ -957,9 +957,10 @@ if sys.version_info >= (3, 10):
     class EllipsisType:
         """The type of the Ellipsis singleton."""
 
-    from builtins import _NotImplementedType
+    @final
+    class NotImplementedType(Any):
+        """The type of the NotImplemented singleton."""
 
-    NotImplementedType = _NotImplementedType
     @final
     class UnionType:
         """Represent a union type

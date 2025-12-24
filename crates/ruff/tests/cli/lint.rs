@@ -1441,6 +1441,78 @@ def function():
 }
 
 #[test]
+fn ignore_noqa() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+import os  # noqa: F401
+
+# ruff: disable[F401]
+import sys
+"#,
+    )?;
+
+    // without --ignore-noqa
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py"),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    noqa.py:5:8: F401 [*] `sys` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .args(["--preview"]),
+        @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    ");
+
+    // with --ignore-noqa --preview
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .args(["--ignore-noqa", "--preview"]),
+        @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    noqa.py:2:8: F401 [*] `os` imported but unused
+    noqa.py:5:8: F401 [*] `sys` imported but unused
+    Found 2 errors.
+    [*] 2 fixable with the `--fix` option.
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -1633,6 +1705,100 @@ def unused(x):  # noqa: ANN001, ARG001, D103
 }
 
 #[test]
+fn add_noqa_existing_file_level_noqa() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+# ruff: noqa F401
+import os
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r"
+    # ruff: noqa F401
+    import os
+    ");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_existing_range_suppression() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "ruff.toml",
+        r#"
+[lint]
+select = ["F401"]
+"#,
+    )?;
+
+    fixture.write_file(
+        "noqa.py",
+        r#"
+# ruff: disable[F401]
+import os
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .args(["--config", "ruff.toml"])
+        .arg("noqa.py")
+        .arg("--preview")
+        .args(["--add-noqa"])
+        .arg("-")
+        .pass_stdin(r#"
+
+"#), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    ");
+
+    let test_code =
+        fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
+
+    insta::assert_snapshot!(test_code, @r"
+    # ruff: disable[F401]
+    import os
+    ");
+
+    Ok(())
+}
+
+#[test]
 fn add_noqa_multiline_comment() -> Result<()> {
     let fixture = CliTest::new()?;
     fixture.write_file(
@@ -1756,6 +1922,64 @@ from foo import (  # noqa: F401
 
     ----- stderr -----
     ");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_with_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file(
+        "test.py",
+        r#"import os
+
+def foo():
+    x = 1
+"#,
+    )?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--add-noqa=TODO: fix")
+        .arg("--select=F401,F841")
+        .arg("test.py"), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+
+    ----- stderr -----
+    Added 2 noqa directives.
+    ");
+
+    let content = fs::read_to_string(fixture.root().join("test.py"))?;
+    insta::assert_snapshot!(content, @r"
+import os  # noqa: F401 TODO: fix
+
+def foo():
+    x = 1  # noqa: F841 TODO: fix
+");
+
+    Ok(())
+}
+
+#[test]
+fn add_noqa_with_newline_in_reason() -> Result<()> {
+    let fixture = CliTest::new()?;
+    fixture.write_file("test.py", "import os\n")?;
+
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--add-noqa=line1\nline2")
+        .arg("--select=F401")
+        .arg("test.py"), @r###"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: --add-noqa <reason> cannot contain newline characters
+    "###);
 
     Ok(())
 }

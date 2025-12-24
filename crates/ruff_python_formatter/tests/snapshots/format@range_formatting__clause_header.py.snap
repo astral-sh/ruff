@@ -1,7 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
 input_file: crates/ruff_python_formatter/resources/test/fixtures/ruff/range_formatting/clause_header.py
-snapshot_kind: text
 ---
 ## Input
 ```python
@@ -49,6 +48,14 @@ def  test4(<RANGE_START>   a):
 
 <RANGE_START>if b   + c :<RANGE_END>              # trailing clause header comment
     print("Not formatted"  )
+
+def test5():
+    x    =     1
+    <RANGE_START>try:
+        a;
+    finally:
+        b
+    <RANGE_END>
 ```
 
 ## Output
@@ -96,4 +103,11 @@ if a + b:  # trailing clause header comment
 
 if b + c:              # trailing clause header comment
     print("Not formatted"  )
+
+def test5():
+    x    =     1
+    try:
+        a
+    finally:
+        b
 ```

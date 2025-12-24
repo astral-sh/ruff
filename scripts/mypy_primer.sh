@@ -10,8 +10,10 @@ PRIMER_SELECTOR="$(paste -s -d'|' "${PRIMER_SELECTOR}")"
 echo "new commit"
 git rev-list --format=%s --max-count=1 "${GITHUB_SHA}"
 
-MERGE_BASE="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
-git checkout -b base_commit "${MERGE_BASE}"
+if [ -z "${BASE_REVISION:-}" ]; then
+  BASE_REVISION="$(git merge-base "${GITHUB_SHA}" "origin/${GITHUB_BASE_REF}")"
+fi
+git checkout -b base_commit "${BASE_REVISION}"
 echo "base commit"
 git rev-list --format=%s --max-count=1 base_commit
 
@@ -20,7 +22,7 @@ cd ..
 echo "Project selector: ${PRIMER_SELECTOR}"
 # Allow the exit code to be 0 or 1, only fail for actual mypy_primer crashes/bugs
 uvx \
-  --from="git+https://github.com/hauntsaninja/mypy_primer@ab5d30e2d4ecdaf7d6cc89395c7130143d6d3c82" \
+  --from="git+https://github.com/hauntsaninja/mypy_primer@a81360123447a9409ab72f6b4f9684c02a9768e7" \
   mypy_primer \
   --repo ruff \
   --type-checker ty \

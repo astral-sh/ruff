@@ -39,6 +39,14 @@ impl EnvVars {
     /// when necessary, e.g. to watch for file system changes or a dedicated UI thread.
     pub const TY_MAX_PARALLELISM: &'static str = "TY_MAX_PARALLELISM";
 
+    /// Path to a `ty.toml` configuration file to use.
+    ///
+    /// When set, ty will use this file for configuration instead of
+    /// discovering configuration files automatically.
+    ///
+    /// Equivalent to the `--config-file` command-line argument.
+    pub const TY_CONFIG_FILE: &'static str = "TY_CONFIG_FILE";
+
     /// Used to detect an activated virtual environment.
     pub const VIRTUAL_ENV: &'static str = "VIRTUAL_ENV";
 

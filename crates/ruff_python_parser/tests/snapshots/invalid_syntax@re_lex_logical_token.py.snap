@@ -296,7 +296,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 456..472,
+                            range: 456..471,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -306,7 +306,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 460..472,
+                                range: 460..471,
                                 node_index: NodeIndex(None),
                                 args: [
                                     Name(
@@ -581,7 +581,7 @@ Module(
                     test: Call(
                         ExprCall {
                             node_index: NodeIndex(None),
-                            range: 890..906,
+                            range: 890..905,
                             func: Name(
                                 ExprName {
                                     node_index: NodeIndex(None),
@@ -591,7 +591,7 @@ Module(
                                 },
                             ),
                             arguments: Arguments {
-                                range: 894..906,
+                                range: 894..905,
                                 node_index: NodeIndex(None),
                                 args: [
                                     FString(
@@ -785,7 +785,7 @@ Module(
   |
 1 | # No indentation before the function definition
 2 | if call(foo
-  |            ^ Syntax Error: Expected ')', found newline
+  |            ^ Syntax Error: Expected `)`, found newline
 3 | def bar():
 4 |     pass
   |
@@ -803,7 +803,7 @@ Module(
    |
  7 | # Indented function definition
  8 | if call(foo
-   |            ^ Syntax Error: Expected ')', found newline
+   |            ^ Syntax Error: Expected `)`, found newline
  9 |     def bar():
 10 |         pass
    |
@@ -812,7 +812,7 @@ Module(
    |
 13 | # There are multiple non-logical newlines (blank lines) in the `if` body
 14 | if call(foo
-   |            ^ Syntax Error: Expected ')', found newline
+   |            ^ Syntax Error: Expected `)`, found newline
 15 |
 16 |
 17 |     def bar():
@@ -822,7 +822,7 @@ Module(
    |
 21 | # There are trailing whitespaces in the blank line inside the `if` body
 22 | if call(foo
-   |            ^ Syntax Error: Expected ')', found newline
+   |            ^ Syntax Error: Expected `)`, found newline
 23 |         
 24 |     def bar():
 25 |         pass
@@ -832,7 +832,16 @@ Module(
    |
 28 | # The lexer is nested with multiple levels of parentheses
 29 | if call(foo, [a, b
-   |                   ^ Syntax Error: Expected ']', found NonLogicalNewline
+30 |     def bar():
+   |     ^^^ Syntax Error: Expected `]`, found `def`
+31 |         pass
+   |
+
+
+   |
+28 | # The lexer is nested with multiple levels of parentheses
+29 | if call(foo, [a, b
+   |                   ^ Syntax Error: Expected `)`, found newline
 30 |     def bar():
 31 |         pass
    |
@@ -841,7 +850,7 @@ Module(
    |
 34 | # The outer parenthesis is closed but the inner bracket isn't
 35 | if call(foo, [a, b)
-   |                   ^ Syntax Error: Expected ']', found ')'
+   |                   ^ Syntax Error: Expected `]`, found `)`
 36 |     def bar():
 37 |         pass
    |
@@ -850,18 +859,17 @@ Module(
    |
 34 | # The outer parenthesis is closed but the inner bracket isn't
 35 | if call(foo, [a, b)
-   |                    ^ Syntax Error: Expected ':', found newline
+   |                    ^ Syntax Error: Expected `:`, found newline
 36 |     def bar():
 37 |         pass
    |
 
 
    |
-41 | # test is to make sure it emits a `NonLogicalNewline` token after `b`.
 42 | if call(foo, [a,
 43 |     b
-   |      ^ Syntax Error: Expected ']', found NonLogicalNewline
 44 | )
+   | ^ Syntax Error: Expected `]`, found `)`
 45 |     def bar():
 46 |         pass
    |
@@ -871,7 +879,7 @@ Module(
 42 | if call(foo, [a,
 43 |     b
 44 | )
-   |  ^ Syntax Error: Expected ':', found newline
+   |  ^ Syntax Error: Expected `:`, found newline
 45 |     def bar():
 46 |         pass
    |
@@ -890,7 +898,7 @@ Module(
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
 51 |     def bar():
-   |     ^^^ Syntax Error: f-string: expecting '}'
+   |     ^^^ Syntax Error: f-string: expecting `}`
 52 |         pass
    |
 
@@ -898,7 +906,7 @@ Module(
    |
 49 | # F-strings uses normal list parsing, so test those as well
 50 | if call(f"hello {x
-   |                   ^ Syntax Error: Expected FStringEnd, found NonLogicalNewline
+   |                   ^ Syntax Error: Expected `)`, found newline
 51 |     def bar():
 52 |         pass
    |
@@ -923,7 +931,7 @@ Module(
    |
 55 | if call(f"hello
 56 |     def bar():
-   | ^^^^ Syntax Error: Expected ',', found indent
+   | ^^^^ Syntax Error: Expected `,`, found indent
 57 |         pass
    |
 
@@ -931,7 +939,7 @@ Module(
    |
 55 | if call(f"hello
 56 |     def bar():
-   |     ^^^ Syntax Error: Expected ')', found 'def'
+   |     ^^^ Syntax Error: Expected `)`, found `def`
 57 |         pass
    |
 

@@ -1,11 +1,13 @@
-use crate::checkers::ast::Checker;
-use crate::importer::ImportRequest;
-use crate::preview::is_fix_os_getcwd_enabled;
-use crate::{FixAvailability, Violation};
 use ruff_diagnostics::{Applicability, Edit, Fix};
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_text_size::Ranged;
+
+use crate::checkers::ast::Checker;
+use crate::importer::ImportRequest;
+use crate::preview::is_fix_os_getcwd_enabled;
+use crate::rules::flake8_use_pathlib::helpers::is_top_level_expression_in_statement;
+use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for uses of `os.getcwd` and `os.getcwdb`.
@@ -37,6 +39,8 @@ use ruff_text_size::Ranged;
 ///
 /// ## Fix Safety
 /// This rule's fix is marked as unsafe if the replacement would remove comments attached to the original expression.
+/// Additionally, the fix is marked as unsafe when the return value is used because the type changes
+/// from `str` or `bytes` to a `Path` object.
 ///
 /// ## References
 /// - [Python documentation: `Path.cwd`](https://docs.python.org/3/library/pathlib.html#pathlib.Path.cwd)
@@ -83,7 +87,10 @@ pub(crate) fn os_getcwd(checker: &Checker, call: &ExprCall, segments: &[&str]) {
                 checker.semantic(),
             )?;
 
-            let applicability = if checker.comment_ranges().intersects(range) {
+            // Unsafe when the fix would delete comments or change a used return value
+            let applicability = if checker.comment_ranges().intersects(range)
+                || !is_top_level_expression_in_statement(checker)
+            {
                 Applicability::Unsafe
             } else {
                 Applicability::Safe

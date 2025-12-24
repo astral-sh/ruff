@@ -43,7 +43,8 @@ tracing = { workspace = true }
 [dev-dependencies]
 ruff_formatter = { workspace = true }
 
-insta = { workspace = true, features = ["glob"] }
+datatest-stable = { workspace = true }
+insta = { workspace = true }
 regex = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -54,8 +55,8 @@ similar = { workspace = true }
 ignored = ["ruff_cache"]
 
 [[test]]
-name = "ruff_python_formatter_fixtures"
-path = "tests/fixtures.rs"
+name = "fixtures"
+harness = false
 test = true
 required-features = ["serde"]
 

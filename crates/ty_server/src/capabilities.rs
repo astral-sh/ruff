@@ -1,17 +1,16 @@
 use lsp_types::{
-    ClientCapabilities, CompletionOptions, DeclarationCapability, DiagnosticOptions,
-    DiagnosticServerCapabilities, HoverProviderCapability, InlayHintOptions,
-    InlayHintServerCapabilities, MarkupKind, OneOf, RenameOptions,
-    SelectionRangeProviderCapability, SemanticTokensFullOptions, SemanticTokensLegend,
-    SemanticTokensOptions, SemanticTokensServerCapabilities, ServerCapabilities,
-    SignatureHelpOptions, TextDocumentSyncCapability, TextDocumentSyncKind,
-    TextDocumentSyncOptions, TypeDefinitionProviderCapability, WorkDoneProgressOptions,
+    self as types, ClientCapabilities, CodeActionKind, CodeActionOptions, CompletionOptions,
+    DeclarationCapability, DiagnosticOptions, DiagnosticServerCapabilities,
+    HoverProviderCapability, InlayHintOptions, InlayHintServerCapabilities, MarkupKind,
+    NotebookCellSelector, NotebookSelector, OneOf, RenameOptions, SelectionRangeProviderCapability,
+    SemanticTokensFullOptions, SemanticTokensLegend, SemanticTokensOptions,
+    SemanticTokensServerCapabilities, ServerCapabilities, SignatureHelpOptions,
+    TextDocumentSyncCapability, TextDocumentSyncKind, TextDocumentSyncOptions,
+    TypeDefinitionProviderCapability, WorkDoneProgressOptions,
 };
+use std::str::FromStr;
 
 use crate::PositionEncoding;
-use crate::session::GlobalSettings;
-use lsp_types as types;
-use std::str::FromStr;
 
 bitflags::bitflags! {
     /// Represents the resolved client capabilities for the language server.
@@ -35,7 +34,19 @@ bitflags::bitflags! {
         const RELATIVE_FILE_WATCHER_SUPPORT = 1 << 13;
         const DIAGNOSTIC_DYNAMIC_REGISTRATION = 1 << 14;
         const WORKSPACE_CONFIGURATION = 1 << 15;
-        const RENAME_DYNAMIC_REGISTRATION = 1 << 16;
+        const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
+        const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
+        const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
+    }
+}
+
+impl std::fmt::Display for ResolvedClientCapabilities {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut f = f.debug_list();
+        for (name, _) in self.iter_names() {
+            f.entry(&name);
+        }
+        f.finish()
     }
 }
 
@@ -153,9 +164,19 @@ impl ResolvedClientCapabilities {
         self.contains(Self::DIAGNOSTIC_DYNAMIC_REGISTRATION)
     }
 
-    /// Returns `true` if the client supports dynamic registration for rename capabilities.
-    pub(crate) const fn supports_rename_dynamic_registration(self) -> bool {
-        self.contains(Self::RENAME_DYNAMIC_REGISTRATION)
+    /// Returns `true` if the client has related information support for diagnostics.
+    pub(crate) const fn supports_diagnostic_related_information(self) -> bool {
+        self.contains(Self::DIAGNOSTIC_RELATED_INFORMATION)
+    }
+
+    /// Returns `true` if the client supports "label details" in completion items.
+    pub(crate) const fn supports_completion_item_label_details(self) -> bool {
+        self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
+    }
+
+    /// Returns `true` if the client prefers Markdown over plain text in completion items.
+    pub(crate) const fn prefers_markdown_in_completion(self) -> bool {
+        self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
     }
 
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
@@ -196,15 +217,22 @@ impl ResolvedClientCapabilities {
             }
         }
 
-        if text_document.is_some_and(|text_document| text_document.diagnostic.is_some()) {
+        if let Some(diagnostic) =
+            text_document.and_then(|text_document| text_document.diagnostic.as_ref())
+        {
             flags |= Self::PULL_DIAGNOSTICS;
+
+            if diagnostic.dynamic_registration == Some(true) {
+                flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            }
         }
 
-        if text_document
-            .and_then(|text_document| text_document.diagnostic.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
+        if let Some(publish_diagnostics) =
+            text_document.and_then(|text_document| text_document.publish_diagnostics.as_ref())
         {
-            flags |= Self::DIAGNOSTIC_DYNAMIC_REGISTRATION;
+            if publish_diagnostics.related_information == Some(true) {
+                flags |= Self::DIAGNOSTIC_RELATED_INFORMATION;
+            }
         }
 
         if text_document
@@ -242,6 +270,24 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                Some(
+                    text_document
+                        .completion
+                        .as_ref()?
+                        .completion_item
+                        .as_ref()?
+                        .documentation_format
+                        .as_ref()?
+                        .contains(&MarkupKind::Markdown),
+                )
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }
 
         if text_document
@@ -298,13 +344,6 @@ impl ResolvedClientCapabilities {
             flags |= Self::HIERARCHICAL_DOCUMENT_SYMBOL_SUPPORT;
         }
 
-        if text_document
-            .and_then(|text_document| text_document.rename.as_ref()?.dynamic_registration)
-            .unwrap_or_default()
-        {
-            flags |= Self::RENAME_DYNAMIC_REGISTRATION;
-        }
-
         if client_capabilities
             .window
             .as_ref()
@@ -312,6 +351,15 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::WORK_DONE_PROGRESS;
+        }
+
+        if text_document
+            .and_then(|text_document| text_document.completion.as_ref())
+            .and_then(|completion| completion.completion_item.as_ref())
+            .and_then(|completion_item| completion_item.label_details_support)
+            .unwrap_or_default()
+        {
+            flags |= Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT;
         }
 
         flags
@@ -323,7 +371,6 @@ impl ResolvedClientCapabilities {
 pub(crate) fn server_capabilities(
     position_encoding: PositionEncoding,
     resolved_client_capabilities: ResolvedClientCapabilities,
-    global_settings: &GlobalSettings,
 ) -> ServerCapabilities {
     let diagnostic_provider =
         if resolved_client_capabilities.supports_diagnostic_dynamic_registration() {
@@ -331,26 +378,21 @@ pub(crate) fn server_capabilities(
             // capabilities dynamically based on the `ty.diagnosticMode` setting.
             None
         } else {
-            // Otherwise, we always advertise support for workspace diagnostics.
+            // Otherwise, we always advertise support for workspace and pull diagnostics.
             Some(DiagnosticServerCapabilities::Options(
                 server_diagnostic_options(true),
             ))
         };
 
-    let rename_provider = if resolved_client_capabilities.supports_rename_dynamic_registration() {
-        // If the client supports dynamic registration, we will register the rename capabilities
-        // dynamically based on the `ty.experimental.rename` setting.
-        None
-    } else {
-        // Otherwise, we check whether user has enabled rename support via the resolved settings
-        // from initialization options.
-        global_settings
-            .is_rename_enabled()
-            .then(|| OneOf::Right(server_rename_options()))
-    };
-
     ServerCapabilities {
         position_encoding: Some(position_encoding.into()),
+        code_action_provider: Some(types::CodeActionProviderCapability::Options(
+            CodeActionOptions {
+                code_action_kinds: Some(vec![CodeActionKind::QUICKFIX]),
+                ..CodeActionOptions::default()
+            },
+        )),
+
         execute_command_provider: Some(types::ExecuteCommandOptions {
             commands: SupportedCommand::all()
                 .map(|command| command.identifier().to_string())
@@ -372,7 +414,7 @@ pub(crate) fn server_capabilities(
         definition_provider: Some(OneOf::Left(true)),
         declaration_provider: Some(DeclarationCapability::Simple(true)),
         references_provider: Some(OneOf::Left(true)),
-        rename_provider,
+        rename_provider: Some(OneOf::Right(server_rename_options())),
         document_highlight_provider: Some(OneOf::Left(true)),
         hover_provider: Some(HoverProviderCapability::Simple(true)),
         signature_help_provider: Some(SignatureHelpOptions {
@@ -407,6 +449,16 @@ pub(crate) fn server_capabilities(
         selection_range_provider: Some(SelectionRangeProviderCapability::Simple(true)),
         document_symbol_provider: Some(OneOf::Left(true)),
         workspace_symbol_provider: Some(OneOf::Left(true)),
+        notebook_document_sync: Some(OneOf::Left(lsp_types::NotebookDocumentSyncOptions {
+            save: Some(false),
+            notebook_selector: [NotebookSelector::ByCells {
+                notebook: None,
+                cells: vec![NotebookCellSelector {
+                    language: "python".to_string(),
+                }],
+            }]
+            .to_vec(),
+        })),
         ..Default::default()
     }
 }

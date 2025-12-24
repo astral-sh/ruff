@@ -1,0 +1,34 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: typed_dict.md - `TypedDict` - Error cases - `typing.TypedDict` is not allowed in type expressions
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import TypedDict
+2 | 
+3 | # error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions"
+4 | x: TypedDict = {"name": "Alice"}
+```
+
+# Diagnostics
+
+```
+error[invalid-type-form]: The special form `typing.TypedDict` is not allowed in type expressions
+ --> src/mdtest_snippet.py:4:4
+  |
+3 | # error: [invalid-type-form] "The special form `typing.TypedDict` is not allowed in type expressions"
+4 | x: TypedDict = {"name": "Alice"}
+  |    ^^^^^^^^^
+  |
+help: You might have meant to use a concrete TypedDict or `collections.abc.Mapping[str, object]`
+info: rule `invalid-type-form` is enabled by default
+
+```

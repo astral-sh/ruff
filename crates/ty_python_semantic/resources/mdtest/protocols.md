@@ -25,10 +25,11 @@ A protocol is defined by inheriting from the `Protocol` class, which is annotate
 
 ```py
 from typing import Protocol
+from ty_extensions import reveal_mro
 
 class MyProtocol(Protocol): ...
 
-reveal_type(MyProtocol.__mro__)  # revealed: tuple[<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(MyProtocol)  # revealed: (<class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
 ```
 
 Just like for any other class base, it is an error for `Protocol` to appear multiple times in a
@@ -37,7 +38,7 @@ class's bases:
 ```py
 class Foo(Protocol, Protocol): ...  # error: [duplicate-base]
 
-reveal_type(Foo.__mro__)  # revealed: tuple[<class 'Foo'>, Unknown, <class 'object'>]
+reveal_mro(Foo)  # revealed: (<class 'Foo'>, Unknown, <class 'object'>)
 ```
 
 Protocols can also be generic, either by including `Generic[]` in the bases list, subscripting
@@ -64,7 +65,7 @@ class Bar3[T](Protocol[T]):
 
 # Note that this class definition *will* actually succeed at runtime,
 # unlike classes that combine PEP-695 type parameters with inheritance from `Generic[]`
-reveal_type(Bar3.__mro__)  # revealed: tuple[<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(Bar3)  # revealed: (<class 'Bar3[Unknown]'>, typing.Protocol, typing.Generic, <class 'object'>)
 ```
 
 It's an error to include both bare `Protocol` and subscripted `Protocol[]` in the bases list
@@ -74,8 +75,8 @@ simultaneously:
 class DuplicateBases(Protocol, Protocol[T]):  # error: [duplicate-base]
     x: T
 
-# revealed: tuple[<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>]
-reveal_type(DuplicateBases.__mro__)
+# revealed: (<class 'DuplicateBases[Unknown]'>, Unknown, <class 'object'>)
+reveal_mro(DuplicateBases)
 ```
 
 The introspection helper `typing(_extensions).is_protocol` can be used to verify whether a class is
@@ -124,8 +125,8 @@ it is not sufficient for it to have `Protocol` in its MRO.
 ```py
 class SubclassOfMyProtocol(MyProtocol): ...
 
-# revealed: tuple[<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(SubclassOfMyProtocol.__mro__)
+# revealed: (<class 'SubclassOfMyProtocol'>, <class 'MyProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(SubclassOfMyProtocol)
 
 reveal_type(is_protocol(SubclassOfMyProtocol))  # revealed: Literal[False]
 ```
@@ -143,8 +144,8 @@ class OtherProtocol(Protocol):
 
 class ComplexInheritance(SubProtocol, OtherProtocol, Protocol): ...
 
-# revealed: tuple[<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(ComplexInheritance.__mro__)
+# revealed: (<class 'ComplexInheritance'>, <class 'SubProtocol'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(ComplexInheritance)
 
 reveal_type(is_protocol(ComplexInheritance))  # revealed: Literal[True]
 ```
@@ -156,22 +157,22 @@ or `TypeError` is raised at runtime when the class is created.
 # error: [invalid-protocol] "Protocol class `Invalid` cannot inherit from non-protocol class `NotAProtocol`"
 class Invalid(NotAProtocol, Protocol): ...
 
-# revealed: tuple[<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(Invalid.__mro__)
+# revealed: (<class 'Invalid'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(Invalid)
 
 # error: [invalid-protocol] "Protocol class `AlsoInvalid` cannot inherit from non-protocol class `NotAProtocol`"
 class AlsoInvalid(MyProtocol, OtherProtocol, NotAProtocol, Protocol): ...
 
-# revealed: tuple[<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(AlsoInvalid.__mro__)
+# revealed: (<class 'AlsoInvalid'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, <class 'NotAProtocol'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(AlsoInvalid)
 
 class NotAGenericProtocol[T]: ...
 
 # error: [invalid-protocol] "Protocol class `StillInvalid` cannot inherit from non-protocol class `NotAGenericProtocol`"
 class StillInvalid(NotAGenericProtocol[int], Protocol): ...
 
-# revealed: tuple[<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>]
-reveal_type(StillInvalid.__mro__)
+# revealed: (<class 'StillInvalid'>, <class 'NotAGenericProtocol[int]'>, typing.Protocol, typing.Generic, <class 'object'>)
+reveal_mro(StillInvalid)
 ```
 
 But two exceptions to this rule are `object` and `Generic`:
@@ -188,7 +189,7 @@ T = TypeVar("T")
 # type checkers.
 class Fine(Protocol, object): ...
 
-reveal_type(Fine.__mro__)  # revealed: tuple[<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>]
+reveal_mro(Fine)  # revealed: (<class 'Fine'>, typing.Protocol, typing.Generic, <class 'object'>)
 
 class StillFine(Protocol, Generic[T], object): ...
 class EvenThis[T](Protocol, object): ...
@@ -202,8 +203,8 @@ And multiple inheritance from a mix of protocol and non-protocol classes is fine
 ```py
 class FineAndDandy(MyProtocol, OtherProtocol, NotAProtocol): ...
 
-# revealed: tuple[<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>]
-reveal_type(FineAndDandy.__mro__)
+# revealed: (<class 'FineAndDandy'>, <class 'MyProtocol'>, <class 'OtherProtocol'>, typing.Protocol, typing.Generic, <class 'NotAProtocol'>, <class 'object'>)
+reveal_mro(FineAndDandy)
 ```
 
 But if `Protocol` is not present in the bases list, the resulting class doesn't count as a protocol
@@ -254,12 +255,10 @@ And it is also an error to use `Protocol` in type expressions:
 
 def f(
     x: Protocol,  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
-    y: type[Protocol],  # TODO: should emit `[invalid-type-form]` here too
+    y: type[Protocol],  # error: [invalid-type-form] "`typing.Protocol` is not allowed in type expressions"
 ):
     reveal_type(x)  # revealed: Unknown
-
-    # TODO: should be `type[Unknown]`
-    reveal_type(y)  # revealed: @Todo(unsupported type[X] special form)
+    reveal_type(y)  # revealed: type[Unknown]
 
 # fmt: on
 ```
@@ -270,11 +269,11 @@ second argument to `issubclass()` at runtime:
 ```py
 import abc
 import typing
-from ty_extensions import TypeOf
+from ty_extensions import TypeOf, reveal_mro
 
 reveal_type(type(Protocol))  # revealed: <class '_ProtocolMeta'>
-# revealed: tuple[<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>]
-reveal_type(type(Protocol).__mro__)
+# revealed: (<class '_ProtocolMeta'>, <class 'ABCMeta'>, <class 'type'>, <class 'object'>)
+reveal_mro(type(Protocol))
 static_assert(is_subtype_of(TypeOf[Protocol], type))
 static_assert(is_subtype_of(TypeOf[Protocol], abc.ABCMeta))
 static_assert(is_subtype_of(TypeOf[Protocol], typing._ProtocolMeta))
@@ -2002,6 +2001,7 @@ python-version = "3.12"
 ```
 
 ```py
+from typing import final
 from typing_extensions import TypeVar, Self, Protocol
 from ty_extensions import is_equivalent_to, static_assert, is_assignable_to, is_subtype_of
 
@@ -2093,30 +2093,32 @@ class NominalReturningSelfNotGeneric:
     def g(self) -> "NominalReturningSelfNotGeneric":
         return self
 
+@final
+class Other: ...
+
+class NominalReturningOtherClass:
+    def g(self) -> Other:
+        raise NotImplementedError
+
 # TODO: should pass
 static_assert(is_equivalent_to(LegacyFunctionScoped, NewStyleFunctionScoped))  # error: [static-assert-error]
 
 static_assert(is_assignable_to(NominalNewStyle, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalNewStyle, LegacyFunctionScoped))
-# TODO: should pass
-static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))  # error: [static-assert-error]
-# TODO: should pass
-static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalNewStyle, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalNewStyle, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalNewStyle, UsesSelf))
 
 static_assert(is_assignable_to(NominalLegacy, NewStyleFunctionScoped))
 static_assert(is_assignable_to(NominalLegacy, LegacyFunctionScoped))
-# TODO: should pass
-static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))  # error: [static-assert-error]
-# TODO: should pass
-static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalLegacy, NewStyleFunctionScoped))
+static_assert(is_subtype_of(NominalLegacy, LegacyFunctionScoped))
 static_assert(not is_assignable_to(NominalLegacy, UsesSelf))
 
 static_assert(not is_assignable_to(NominalWithSelf, NewStyleFunctionScoped))
 static_assert(not is_assignable_to(NominalWithSelf, LegacyFunctionScoped))
 static_assert(is_assignable_to(NominalWithSelf, UsesSelf))
-# TODO: should pass
-static_assert(is_subtype_of(NominalWithSelf, UsesSelf))  # error: [static-assert-error]
+static_assert(is_subtype_of(NominalWithSelf, UsesSelf))
 
 # TODO: these should pass
 static_assert(not is_assignable_to(NominalNotGeneric, NewStyleFunctionScoped))  # error: [static-assert-error]
@@ -2128,6 +2130,8 @@ static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, LegacyFunctio
 
 # TODO: should pass
 static_assert(not is_assignable_to(NominalReturningSelfNotGeneric, UsesSelf))  # error: [static-assert-error]
+
+static_assert(not is_assignable_to(NominalReturningOtherClass, UsesSelf))
 
 # These test cases are taken from the typing conformance suite:
 class ShapeProtocolImplicitSelf(Protocol):
@@ -3006,6 +3010,31 @@ class Bar(Protocol[S]):
 z: S | Bar[S]
 ```
 
+### Recursive generic protocols with growing specializations
+
+This snippet caused a stack overflow in <https://github.com/astral-sh/ty/issues/1736> because the
+type parameter grows with each recursive call (`C[set[T]]` leads to `C[set[set[T]]]`, then
+`C[set[set[set[T]]]]`, etc.):
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Protocol
+
+class C[T](Protocol):
+    a: "C[set[T]]"
+
+def takes_c(c: C[set[int]]) -> None: ...
+def f(c: C[int]) -> None:
+    # The key thing is that we don't stack overflow while checking this.
+    # The cycle detection assumes compatibility when it detects potential
+    # infinite recursion between protocol specializations.
+    takes_c(c)
+```
+
 ### Recursive legacy generic protocol
 
 ```py
@@ -3072,18 +3101,15 @@ from typing import Protocol
 from ty_extensions import static_assert, is_subtype_of, is_equivalent_to, is_disjoint_from
 
 class HasRepr(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasRepr`)
+    # error: [invalid-method-override]
     def __repr__(self) -> object: ...
 
 class HasReprRecursive(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursive`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursive": ...
 
 class HasReprRecursiveAndFoo(Protocol):
-    # TODO: we should emit a diagnostic here complaining about a Liskov violation
-    # (it incompatibly overrides `__repr__` from `object`, a supertype of `HasReprRecursiveAndFoo`)
+    # error: [invalid-method-override]
     def __repr__(self) -> "HasReprRecursiveAndFoo": ...
     foo: int
 
@@ -3181,6 +3207,41 @@ from ty_extensions import reveal_protocol_interface
 
 # revealed: {"x": AttributeMember(`int`; ClassVar)}
 reveal_protocol_interface(Foo)
+```
+
+## Protocols generic over TypeVars bound to forward references
+
+Protocols can have TypeVars with forward reference bounds that form cycles.
+
+```py
+from typing import Any, Protocol, TypeVar
+
+T1 = TypeVar("T1", bound="A2[Any]")
+T2 = TypeVar("T2", bound="A1[Any]")
+T3 = TypeVar("T3", bound="B2[Any]")
+T4 = TypeVar("T4", bound="B1[Any]")
+
+class A1(Protocol[T1]):
+    def get_x(self): ...
+
+class A2(Protocol[T2]):
+    def get_y(self): ...
+
+class B1(A1[T3], Protocol[T3]): ...
+class B2(A2[T4], Protocol[T4]): ...
+
+# TODO should just be `B2[Any]`
+reveal_type(T3.__bound__)  # revealed: B2[Any] | @Todo(specialized non-generic class)
+
+# TODO error: [invalid-type-arguments]
+def f(x: B1[int]):
+    pass
+
+reveal_type(T4.__bound__)  # revealed: B1[Any]
+
+# error: [invalid-type-arguments]
+def g(x: B2[int]):
+    pass
 ```
 
 ## TODO

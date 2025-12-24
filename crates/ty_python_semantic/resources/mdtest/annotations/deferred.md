@@ -87,9 +87,23 @@ class Foo:
         class Baz[T: Foo]:
             pass
 
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Qux(Foo, Bar, Baz):
+            pass
+
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Quux[_T](Foo, Bar, Baz):
+            pass
+
         # error: [unresolved-reference]
         type S = a
         type T = b
+        type U = Foo
+        # error: [unresolved-reference]
+        type V = Bar
+        type W = Baz
 
     def h[T: Bar]():
         # error: [unresolved-reference]
@@ -141,9 +155,23 @@ class Foo:
         class Baz[T: Foo]:
             pass
 
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Qux(Foo, Bar, Baz):
+            pass
+
+        # error: [unresolved-reference] "Name `Foo` used when not defined"
+        # error: [unresolved-reference] "Name `Bar` used when not defined"
+        class Quux[_T](Foo, Bar, Baz):
+            pass
+
         # error: [unresolved-reference]
         type S = a
         type T = b
+        type U = Foo
+        # error: [unresolved-reference]
+        type V = Bar
+        type W = Baz
 
     def h[T: Bar]():
         # error: [unresolved-reference]
@@ -176,4 +204,94 @@ class B:
 ```pyi
 class A(B): ...
 class B: ...
+```
+
+## Default argument values
+
+### Not deferred in regular files
+
+```py
+# error: [unresolved-reference]
+def f(mode: int = ParseMode.test):
+    pass
+
+class ParseMode:
+    test = 1
+```
+
+### Deferred in stub files
+
+Forward references in default argument values are allowed in stub files.
+
+```pyi
+def f(mode: int = ParseMode.test): ...
+
+class ParseMode:
+    test: int
+```
+
+### Undefined names are still errors in stub files
+
+```pyi
+# error: [unresolved-reference]
+def f(mode: int = NeverDefined.test): ...
+```
+
+## Class keyword arguments
+
+### Not deferred in regular files
+
+```py
+# error: [unresolved-reference]
+class Foo(metaclass=SomeMeta):
+    pass
+
+class SomeMeta(type):
+    pass
+```
+
+### Deferred in stub files
+
+Forward references in class keyword arguments are allowed in stub files.
+
+```pyi
+class Foo(metaclass=SomeMeta): ...
+
+class SomeMeta(type): ...
+```
+
+### Undefined names are still errors in stub files
+
+```pyi
+# error: [unresolved-reference]
+class Foo(metaclass=NeverDefined): ...
+```
+
+## Lambda default argument values
+
+### Not deferred in regular files
+
+```py
+# error: [unresolved-reference]
+f = lambda x=Foo(): x
+
+class Foo:
+    pass
+```
+
+### Deferred in stub files
+
+Forward references in lambda default argument values are allowed in stub files.
+
+```pyi
+f = lambda x=Foo(): x
+
+class Foo: ...
+```
+
+### Undefined names are still errors in stub files
+
+```pyi
+# error: [unresolved-reference]
+f = lambda x=NeverDefined(): x
 ```

@@ -102,7 +102,7 @@ class C[T]:
         return "a"
 
 reveal_type(getattr_static(C[int], "f"))  # revealed: def f(self, x: int) -> str
-reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper `__get__` of `f`>
+reveal_type(getattr_static(C[int], "f").__get__)  # revealed: <method-wrapper '__get__' of function 'f'>
 reveal_type(getattr_static(C[int], "f").__get__(None, C[int]))  # revealed: def f(self, x: int) -> str
 # revealed: bound method C[int].f(x: int) -> str
 reveal_type(getattr_static(C[int], "f").__get__(C[int](), C[int]))
@@ -154,8 +154,10 @@ from ty_extensions import generic_context
 
 legacy.m("string", None)  # error: [invalid-argument-type]
 reveal_type(legacy.m)  # revealed: bound method Legacy[int].m[S](x: int, y: S@m) -> S@m
-reveal_type(generic_context(Legacy))  # revealed: tuple[T@Legacy]
-reveal_type(generic_context(legacy.m))  # revealed: tuple[Self@m, S@m]
+# revealed: ty_extensions.GenericContext[T@Legacy]
+reveal_type(generic_context(Legacy))
+# revealed: ty_extensions.GenericContext[Self@m, S@m]
+reveal_type(generic_context(legacy.m))
 ```
 
 With PEP 695 syntax, it is clearer that the method uses a separate typevar:
@@ -286,6 +288,43 @@ class C[T]:
     class Bad1[T]: ...
     # error: [invalid-generic-class]
     class Bad2(Iterable[T]): ...
+```
+
+## Class bases are evaluated within the type parameter scope
+
+```py
+class C[_T](
+    # error: [unresolved-reference] "Name `C` used when not defined"
+    C
+): ...
+
+# `D` in `list[D]` is resolved to be a type variable of class `D`.
+class D[D](list[D]): ...
+
+# error: [unresolved-reference] "Name `E` used when not defined"
+if E:
+    class E[_T](
+        # error: [unresolved-reference] "Name `E` used when not defined"
+        E
+    ): ...
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+F
+
+# error: [unresolved-reference] "Name `F` used when not defined"
+class F[_T](F): ...
+
+def foo():
+    class G[_T](
+        # error: [unresolved-reference] "Name `G` used when not defined"
+        G
+    ): ...
+    # error: [unresolved-reference] "Name `H` used when not defined"
+    if H:
+        class H[_T](
+            # error: [unresolved-reference] "Name `H` used when not defined"
+            H
+        ): ...
 ```
 
 ## Class scopes do not cover inner scopes

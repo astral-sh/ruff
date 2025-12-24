@@ -1,0 +1,52 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: liskov.md - The Liskov Substitution Principle - Bad override of `__eq__`
+mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | class Bad:
+2 |     x: int
+3 |     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
+4 |         return self.x == other.x
+```
+
+# Diagnostics
+
+```
+error[invalid-method-override]: Invalid override of method `__eq__`
+   --> src/mdtest_snippet.py:3:9
+    |
+  1 | class Bad:
+  2 |     x: int
+  3 |     def __eq__(self, other: "Bad") -> bool:  # error: [invalid-method-override]
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Definition is incompatible with `object.__eq__`
+  4 |         return self.x == other.x
+    |
+   ::: stdlib/builtins.pyi:142:9
+    |
+140 |     def __setattr__(self, name: str, value: Any, /) -> None: ...
+141 |     def __delattr__(self, name: str, /) -> None: ...
+142 |     def __eq__(self, value: object, /) -> bool: ...
+    |         -------------------------------------- `object.__eq__` defined here
+143 |     def __ne__(self, value: object, /) -> bool: ...
+144 |     def __str__(self) -> str: ...  # noqa: Y029
+    |
+info: This violates the Liskov Substitution Principle
+help: It is recommended for `__eq__` to work with arbitrary objects, for example:
+help
+help:     def __eq__(self, other: object) -> bool:
+help:         if not isinstance(other, Bad):
+help:             return False
+help:         return <logic to compare two `Bad` instances>
+help
+info: rule `invalid-method-override` is enabled by default
+
+```

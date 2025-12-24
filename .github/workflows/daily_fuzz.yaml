@@ -34,12 +34,12 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           persist-credentials: false
-      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6.8.0
+      - uses: astral-sh/setup-uv@1e862dfacbd1d6d858c55d9b792c756523627244 # v7.1.4
       - name: "Install Rust toolchain"
         run: rustup show
       - name: "Install mold"
         uses: rui314/setup-mold@725a8794d15fc7563f59595bd9556495c0564878 # v1
-      - uses: Swatinem/rust-cache@f13886b937689c021905a6b90929199931d60db1 # v2.8.1
+      - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
       - name: Build ruff
         # A debug build means the script runs slower once it gets started,
         # but this is outweighed by the fact that a release build takes *much* longer to compile in CI
@@ -62,7 +62,7 @@ jobs:
     name: Create an issue if the daily fuzz surfaced any bugs
     runs-on: ubuntu-latest
     needs: fuzz
-    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result == 'failure' }}
+    if: ${{ github.repository == 'astral-sh/ruff' && always() && github.event_name == 'schedule' && needs.fuzz.result != 'success' }}
     permissions:
       issues: write
     steps:

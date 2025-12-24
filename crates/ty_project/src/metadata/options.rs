@@ -28,11 +28,12 @@ use std::ops::Deref;
 use std::sync::Arc;
 use thiserror::Error;
 use ty_combine::Combine;
+use ty_module_resolver::{SearchPathSettings, SearchPathSettingsError, SearchPaths};
 use ty_python_semantic::lint::{Level, LintSource, RuleSelection};
 use ty_python_semantic::{
-    ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionFileSource,
-    PythonVersionSource, PythonVersionWithSource, SearchPathSettings, SearchPathValidationError,
-    SearchPaths, SitePackagesPaths, SysPrefixPathOrigin,
+    AnalysisSettings, MisconfigurationMode, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionFileSource, PythonVersionSource, PythonVersionWithSource, SitePackagesPaths,
+    SysPrefixPathOrigin,
 };
 use ty_static::EnvVars;
 
@@ -86,6 +87,10 @@ pub struct Options {
     #[option_group]
     pub terminal: Option<TerminalOptions>,
 
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[option_group]
+    pub analysis: Option<AnalysisOptions>,
+
     /// Override configurations for specific file patterns.
     ///
     /// Each override specifies include/exclude patterns and rule configurations
@@ -117,6 +122,7 @@ impl Options {
         project_name: &str,
         system: &dyn System,
         vendored: &VendoredFileSystem,
+        misconfiguration_mode: MisconfigurationMode,
     ) -> anyhow::Result<ProgramSettings> {
         let environment = self.environment.or_default();
 
@@ -131,9 +137,7 @@ impl Options {
                         ValueSource::File(path) => PythonVersionSource::ConfigFile(
                             PythonVersionFileSource::new(path.clone(), ranged_version.range()),
                         ),
-                        ValueSource::PythonVSCodeExtension => {
-                            PythonVersionSource::PythonVSCodeExtension
-                        }
+                        ValueSource::Editor => PythonVersionSource::Editor,
                     },
                 });
 
@@ -153,27 +157,60 @@ impl Options {
                 ValueSource::File(path) => {
                     SysPrefixPathOrigin::ConfigFileSetting(path.clone(), python_path.range())
                 }
-                ValueSource::PythonVSCodeExtension => SysPrefixPathOrigin::PythonVSCodeExtension,
+                ValueSource::Editor => SysPrefixPathOrigin::Editor,
             };
 
-            Some(PythonEnvironment::new(
-                python_path.absolute(project_root, system),
-                origin,
-                system,
-            )?)
+            PythonEnvironment::new(python_path.absolute(project_root, system), origin, system)
+                .map_err(anyhow::Error::from)
+                .map(Some)
         } else {
             PythonEnvironment::discover(project_root, system)
-                .context("Failed to discover local Python environment")?
+                .context("Failed to discover local Python environment")
         };
 
-        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+        // If in safe-mode, fallback to None if this fails instead of erroring.
+        let python_environment = match python_environment {
+            Ok(python_environment) => python_environment,
+            Err(err) => {
+                if misconfiguration_mode == MisconfigurationMode::UseDefault {
+                    tracing::debug!("Default settings failed to discover local Python environment");
+                    None
+                } else {
+                    return Err(err);
+                }
+            }
+        };
+
+        let self_site_packages = self_environment_search_paths(
             python_environment
+                .as_ref()
+                .map(ty_python_semantic::PythonEnvironment::origin)
+                .cloned(),
+            system,
+        )
+        .unwrap_or_default();
+
+        let site_packages_paths = if let Some(python_environment) = python_environment.as_ref() {
+            let site_packages_paths = python_environment
                 .site_packages_paths(system)
-                .context("Failed to discover the site-packages directory")?
+                .context("Failed to discover the site-packages directory");
+            let site_packages_paths = match site_packages_paths {
+                Ok(paths) => paths,
+                Err(err) => {
+                    if misconfiguration_mode == MisconfigurationMode::UseDefault {
+                        tracing::debug!(
+                            "Default settings failed to discover site-packages directory"
+                        );
+                        SitePackagesPaths::default()
+                    } else {
+                        return Err(err);
+                    }
+                }
+            };
+            self_site_packages.concatenate(site_packages_paths)
         } else {
             tracing::debug!("No virtual environment found");
-
-            SitePackagesPaths::default()
+            self_site_packages
         };
 
         let real_stdlib_path = python_environment.as_ref().and_then(|python_environment| {
@@ -193,6 +230,7 @@ impl Options {
             .or_else(|| site_packages_paths.python_version_from_layout())
             .unwrap_or_default();
 
+        // Safe mode is handled inside this function, so we just assume this can't fail
         let search_paths = self.to_search_paths(
             project_root,
             project_name,
@@ -200,6 +238,7 @@ impl Options {
             real_stdlib_path,
             system,
             vendored,
+            misconfiguration_mode,
         )?;
 
         tracing::info!(
@@ -214,6 +253,7 @@ impl Options {
         })
     }
 
+    #[expect(clippy::too_many_arguments)]
     fn to_search_paths(
         &self,
         project_root: &SystemPath,
@@ -222,7 +262,8 @@ impl Options {
         real_stdlib_path: Option<SystemPathBuf>,
         system: &dyn System,
         vendored: &VendoredFileSystem,
-    ) -> Result<SearchPaths, SearchPathValidationError> {
+        misconfiguration_mode: MisconfigurationMode,
+    ) -> Result<SearchPaths, SearchPathSettingsError> {
         let environment = self.environment.or_default();
         let src = self.src.or_default();
 
@@ -275,22 +316,6 @@ impl Options {
                 );
 
                 roots.push(python);
-            }
-
-            // Considering pytest test discovery conventions,
-            // we also include the `tests` directory if it exists and is not a package.
-            let tests_dir = project_root.join("tests");
-            if system.is_directory(&tests_dir)
-                && !system.is_file(&tests_dir.join("__init__.py"))
-                && !system.is_file(&tests_dir.join("__init__.pyi"))
-                && !roots.contains(&tests_dir)
-            {
-                // If the `tests` directory exists and is not a package, include it as a source root.
-                tracing::debug!(
-                    "Including `./tests` in `environment.root` because a `./tests` directory exists"
-                );
-
-                roots.push(tests_dir);
             }
 
             // The project root should always be included, and should always come
@@ -352,6 +377,7 @@ impl Options {
                 .map(|path| path.absolute(project_root, system)),
             site_packages_paths: site_packages_paths.into_vec(),
             real_stdlib_path,
+            misconfiguration_mode,
         };
 
         settings.to_search_paths(system, vendored)
@@ -413,6 +439,8 @@ impl Options {
                 color: colored::control::SHOULD_COLORIZE.should_colorize(),
             })?;
 
+        let analysis = self.analysis.or_default().to_settings();
+
         let overrides = self
             .to_overrides_settings(db, project_root, &mut diagnostics)
             .map_err(|err| ToSettingsError {
@@ -425,6 +453,7 @@ impl Options {
             rules: Arc::new(rules),
             terminal,
             src,
+            analysis,
             overrides,
         };
 
@@ -463,6 +492,42 @@ impl Options {
     }
 }
 
+/// Return the site-packages from the environment ty is installed in, as derived from ty's
+/// executable.
+///
+/// If there's an existing environment with an origin that does not allow including site-packages
+/// from ty's environment, discovery of ty's environment is skipped and [`None`] is returned.
+///
+/// Since ty may be executed from an arbitrary non-Python location, errors during discovery of ty's
+/// environment are not raised, instead [`None`] is returned.
+fn self_environment_search_paths(
+    existing_origin: Option<SysPrefixPathOrigin>,
+    system: &dyn System,
+) -> Option<SitePackagesPaths> {
+    if existing_origin.is_some_and(|origin| !origin.allows_concatenation_with_self_environment()) {
+        return None;
+    }
+
+    let Ok(exe_path) = std::env::current_exe() else {
+        return None;
+    };
+    let ty_path = SystemPath::from_std_path(exe_path.as_path())?;
+
+    let environment = PythonEnvironment::new(ty_path, SysPrefixPathOrigin::SelfEnvironment, system)
+        .inspect_err(|err| tracing::debug!("Failed to discover ty's environment: {err}"))
+        .ok()?;
+
+    let search_paths = environment
+        .site_packages_paths(system)
+        .inspect_err(|err| {
+            tracing::debug!("Failed to discover site-packages in ty's environment: {err}");
+        })
+        .ok();
+
+    tracing::debug!("Using site-packages from ty's environment");
+    search_paths
+}
+
 #[derive(
     Debug,
     Default,
@@ -488,7 +553,7 @@ pub struct EnvironmentOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./python` or `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` or `__init__.pyi` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -630,7 +695,7 @@ pub struct SrcOptions {
     /// * if a `./<project-name>/<project-name>` directory exists, include `.` and `./<project-name>` in the first party search path
     /// * otherwise, default to `.` (flat layout)
     ///
-    /// Besides, if a `./tests` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
+    /// Additionally, if a `./python` directory exists and is not a package (i.e. it does not contain an `__init__.py` file),
     /// it will also be included in the first party search path.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[option(
@@ -818,10 +883,7 @@ impl Rules {
                     let lint_source = match source {
                         ValueSource::File(_) => LintSource::File,
                         ValueSource::Cli => LintSource::Cli,
-
-                        ValueSource::PythonVSCodeExtension => {
-                            unreachable!("Can't configure rules from the Python VSCode extension")
-                        }
+                        ValueSource::Editor => LintSource::Editor,
                     };
                     if let Ok(severity) = Severity::try_from(**level) {
                         selection.enable(lint, severity, lint_source);
@@ -957,7 +1019,12 @@ fn build_include_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!("Can't configure includes from the Python VSCode extension"),
+                        ValueSource::Editor => {
+                            diagnostic.sub(SubDiagnostic::new(
+                                SubDiagnosticSeverity::Info,
+                                "The pattern was specified in the editor settings.",
+                            ))
+                        }
                     }
                 })?;
         }
@@ -1040,9 +1107,10 @@ fn build_exclude_filter(
                             SubDiagnosticSeverity::Info,
                             "The pattern was specified on the CLI",
                         )),
-                        ValueSource::PythonVSCodeExtension => unreachable!(
-                            "Can't configure excludes from the Python VSCode extension"
-                        )
+                        ValueSource::Editor => diagnostic.sub(SubDiagnostic::new(
+                            SubDiagnosticSeverity::Info,
+                            "The pattern was specified in the editor settings",
+                        ))
                     }
                 })?;
         }
@@ -1142,6 +1210,16 @@ impl From<OutputFormat> for DiagnosticFormat {
     }
 }
 
+impl Combine for OutputFormat {
+    #[inline(always)]
+    fn combine_with(&mut self, _other: Self) {}
+
+    #[inline]
+    fn combine(self, _other: Self) -> Self {
+        self
+    }
+}
+
 #[derive(
     Debug,
     Default,
@@ -1183,28 +1261,75 @@ pub struct TerminalOptions {
     pub error_on_warning: Option<bool>,
 }
 
+#[derive(
+    Debug,
+    Default,
+    Clone,
+    Eq,
+    PartialEq,
+    Combine,
+    Serialize,
+    Deserialize,
+    OptionsMetadata,
+    get_size2::GetSize,
+)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct AnalysisOptions {
+    /// Whether ty should respect `type: ignore` comments.
+    ///
+    /// When set to `false`, `type: ignore` comments are treated like any other normal
+    /// comment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).
+    ///
+    /// Setting this option can be useful when using ty alongside other type checkers or when
+    /// you prefer using `ty: ignore` over `type: ignore`.
+    ///
+    /// Defaults to `true`.
+    #[option(
+        default = r#"true"#,
+        value_type = "bool",
+        example = r#"
+        # Disable support for `type: ignore` comments
+        respect-type-ignore-comments = false
+        "#
+    )]
+    respect_type_ignore_comments: Option<bool>,
+}
+
+impl AnalysisOptions {
+    fn to_settings(&self) -> AnalysisSettings {
+        let AnalysisSettings {
+            respect_type_ignore_comments: respect_type_ignore_default,
+        } = AnalysisSettings::default();
+
+        AnalysisSettings {
+            respect_type_ignore_comments: self
+                .respect_type_ignore_comments
+                .unwrap_or(respect_type_ignore_default),
+        }
+    }
+}
+
 /// Configuration override that applies to specific files based on glob patterns.
 ///
 /// An override allows you to apply different rule configurations to specific
 /// files or directories. Multiple overrides can match the same file, with
-/// later overrides take precedence.
+/// later overrides take precedence. Override rules take precedence over global
+/// rules for matching files.
 ///
-/// ### Precedence
-///
-/// - Later overrides in the array take precedence over earlier ones
-/// - Override rules take precedence over global rules for matching files
-///
-/// ### Examples
+/// For example, to relax enforcement of rules in test files:
 ///
 /// ```toml
-/// # Relax rules for test files
 /// [[tool.ty.overrides]]
 /// include = ["tests/**", "**/test_*.py"]
 ///
 /// [tool.ty.overrides.rules]
 /// possibly-unresolved-reference = "warn"
+/// ```
 ///
-/// # Ignore generated files but still check important ones
+/// Or, to ignore a rule in generated files but retain enforcement in an important file:
+///
+/// ```toml
 /// [[tool.ty.overrides]]
 /// include = ["generated/**"]
 /// exclude = ["generated/important.py"]

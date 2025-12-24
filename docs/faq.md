@@ -454,7 +454,7 @@ Untitled.ipynb:cell_1:2:5: F841 Local variable `x` is assigned to but never used
 Untitled.ipynb:cell_2:1:1: E402 Module level import not at top of file
 Untitled.ipynb:cell_2:1:8: F401 `os` imported but unused
 Found 3 errors.
-1 potentially fixable with the --fix option.
+1 potentially fixable with the `--fix` option.
 ```
 
 ## Does Ruff support NumPy- or Google-style docstrings?

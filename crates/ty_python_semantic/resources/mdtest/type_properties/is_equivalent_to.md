@@ -607,23 +607,33 @@ module:
 `module2.py`:
 
 ```py
-import importlib
-import importlib.abc
+import imported
+import imported.abc
+```
+
+`imported/__init__.pyi`:
+
+```pyi
+```
+
+`imported/abc.pyi`:
+
+```pyi
 ```
 
 `main2.py`:
 
 ```py
-import importlib
-from module2 import importlib as other_importlib
+import imported
+from module2 import imported as other_imported
 from ty_extensions import TypeOf, static_assert, is_equivalent_to
 
-# error: [unresolved-attribute] "Module `importlib` has no member `abc`"
-reveal_type(importlib.abc)  # revealed: Unknown
+# error: [possibly-missing-attribute]
+reveal_type(imported.abc)  # revealed: Unknown
 
-reveal_type(other_importlib.abc)  # revealed: <module 'importlib.abc'>
+reveal_type(other_imported.abc)  # revealed: <module 'imported.abc'>
 
-static_assert(not is_equivalent_to(TypeOf[importlib], TypeOf[other_importlib]))
+static_assert(not is_equivalent_to(TypeOf[imported], TypeOf[other_imported]))
 ```
 
 [materializations]: https://typing.python.org/en/latest/spec/glossary.html#term-materialize

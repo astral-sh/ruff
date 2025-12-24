@@ -1,5 +1,6 @@
 use glob::PatternError;
 use ruff_notebook::{Notebook, NotebookError};
+use rustc_hash::FxHashMap;
 use std::panic::RefUnwindSafe;
 use std::sync::{Arc, Mutex};
 
@@ -20,16 +21,42 @@ use super::walk_directory::WalkDirectoryBuilder;
 ///
 /// ## Warning
 /// Don't use this system for production code. It's intended for testing only.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestSystem {
     inner: Arc<dyn WritableSystem + RefUnwindSafe + Send + Sync>,
+    /// Environment variable overrides. If a key is present here, it takes precedence
+    /// over the inner system's environment variables.
+    env_overrides: Arc<Mutex<FxHashMap<String, Option<String>>>>,
+}
+
+impl Clone for TestSystem {
+    fn clone(&self) -> Self {
+        Self {
+            inner: self.inner.clone(),
+            env_overrides: self.env_overrides.clone(),
+        }
+    }
 }
 
 impl TestSystem {
     pub fn new(inner: impl WritableSystem + RefUnwindSafe + Send + Sync + 'static) -> Self {
         Self {
             inner: Arc::new(inner),
+            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
         }
+    }
+
+    /// Sets an environment variable override. This takes precedence over the inner system.
+    pub fn set_env_var(&self, name: impl Into<String>, value: impl Into<String>) {
+        self.env_overrides
+            .lock()
+            .unwrap()
+            .insert(name.into(), Some(value.into()));
+    }
+
+    /// Removes an environment variable override, making it appear as not set.
+    pub fn remove_env_var(&self, name: impl Into<String>) {
+        self.env_overrides.lock().unwrap().insert(name.into(), None);
     }
 
     /// Returns the [`InMemorySystem`].
@@ -147,6 +174,18 @@ impl System for TestSystem {
         self.system().case_sensitivity()
     }
 
+    fn env_var(&self, name: &str) -> std::result::Result<String, std::env::VarError> {
+        // Check overrides first
+        if let Some(override_value) = self.env_overrides.lock().unwrap().get(name) {
+            return match override_value {
+                Some(value) => Ok(value.clone()),
+                None => Err(std::env::VarError::NotPresent),
+            };
+        }
+        // Fall back to inner system
+        self.system().env_var(name)
+    }
+
     fn dyn_clone(&self) -> Box<dyn System> {
         Box::new(self.clone())
     }
@@ -156,6 +195,7 @@ impl Default for TestSystem {
     fn default() -> Self {
         Self {
             inner: Arc::new(InMemorySystem::default()),
+            env_overrides: Arc::new(Mutex::new(FxHashMap::default())),
         }
     }
 }

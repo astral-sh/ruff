@@ -319,7 +319,7 @@ impl Matcher {
                         .column
                         .is_none_or(|col| col == self.column(diagnostic));
                     let message_matches = error.message_contains.is_none_or(|needle| {
-                        normalize_paths(&diagnostic.concise_message().to_string()).contains(needle)
+                        normalize_paths(&diagnostic.concise_message().to_str()).contains(needle)
                     });
                     lint_name_matches && column_matches && message_matches
                 });
@@ -345,29 +345,21 @@ impl Matcher {
                         return false;
                     };
 
-                    // reveal_type
-                    if primary_message == "Revealed type"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_type, reveal_protocol_interface
+                    if matches!(
+                        primary_message,
+                        "Revealed type" | "Revealed protocol interface"
+                    ) && primary_annotation == expected_reveal_type_message
                     {
                         return true;
                     }
 
-                    // reveal_protocol_interface
-                    if primary_message == "Revealed protocol interface"
-                        && primary_annotation == expected_reveal_type_message
+                    // reveal_when_assignable_to, reveal_when_subtype_of, reveal_mro
+                    if matches!(
+                        primary_message,
+                        "Assignability holds" | "Subtyping holds" | "Revealed MRO"
+                    ) && primary_annotation == expected_type
                     {
-                        return true;
-                    }
-
-                    // reveal_when_assignable_to
-                    if primary_message == "Assignability holds"
-                        && primary_annotation == expected_type
-                    {
-                        return true;
-                    }
-
-                    // reveal_when_subtype_of
-                    if primary_message == "Subtyping holds" && primary_annotation == expected_type {
                         return true;
                     }
 
@@ -411,9 +403,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_source_file::OneIndexed;
     use ruff_text_size::TextRange;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SearchPathSettings,
-    };
+    use ty_module_resolver::SearchPathSettings;
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
 
     struct ExpectedDiagnostic {
         id: DiagnosticId,
@@ -435,10 +426,16 @@ mod tests {
             let mut diag = if self.id == DiagnosticId::RevealedType {
                 Diagnostic::new(self.id, Severity::Error, "Revealed type")
             } else {
-                Diagnostic::new(self.id, Severity::Error, "")
+                Diagnostic::new(self.id, Severity::Error, self.message)
             };
             let span = Span::from(file).with_range(self.range);
-            diag.annotate(Annotation::primary(span).message(self.message));
+            let mut annotation = Annotation::primary(span);
+
+            if self.id == DiagnosticId::RevealedType {
+                annotation = annotation.message(self.message);
+            }
+
+            diag.annotate(annotation);
             diag
         }
     }

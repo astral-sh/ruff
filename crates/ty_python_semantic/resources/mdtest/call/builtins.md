@@ -57,7 +57,7 @@ type("Foo", Base, {})
 # error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `tuple[type, ...]`, found `tuple[Literal[1], Literal[2]]`"
 type("Foo", (1, 2), {})
 
-# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[Unknown | bytes, Unknown | int]`"
+# error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
 type("Foo", (Base,), {b"attr": 1})
 ```
 
@@ -114,6 +114,7 @@ but fall back to `bool` otherwise.
 ```py
 from enum import Enum
 from types import FunctionType
+from typing import TypeVar
 
 class Answer(Enum):
     NO = 0
@@ -137,6 +138,7 @@ reveal_type(isinstance("", int))  # revealed: bool
 
 class A: ...
 class SubclassOfA(A): ...
+class OtherSubclassOfA(A): ...
 class B: ...
 
 reveal_type(isinstance(A, type))  # revealed: Literal[True]
@@ -161,4 +163,71 @@ def _(x: A | B, y: list[int]):
     else:
         reveal_type(x)  # revealed: B & ~A
         reveal_type(isinstance(x, B))  # revealed: Literal[True]
+
+T = TypeVar("T")
+T_bound_A = TypeVar("T_bound_A", bound=A)
+T_constrained = TypeVar("T_constrained", SubclassOfA, OtherSubclassOfA)
+
+def _(
+    x: T,
+    x_bound_a: T_bound_A,
+    x_constrained_sub_a: T_constrained,
+):
+    reveal_type(isinstance(x, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x, A))  # revealed: bool
+
+    reveal_type(isinstance(x_bound_a, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x_bound_a, A))  # revealed: Literal[True]
+    reveal_type(isinstance(x_bound_a, SubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_bound_a, B))  # revealed: bool
+
+    reveal_type(isinstance(x_constrained_sub_a, object))  # revealed: Literal[True]
+    reveal_type(isinstance(x_constrained_sub_a, A))  # revealed: Literal[True]
+    reveal_type(isinstance(x_constrained_sub_a, SubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, OtherSubclassOfA))  # revealed: bool
+    reveal_type(isinstance(x_constrained_sub_a, B))  # revealed: bool
+```
+
+Certain special forms in the typing module are not instances of `type`, so are strictly-speaking
+disallowed as the second argument to `isinstance()` according to typeshed's annotations. However, at
+runtime they work fine as the second argument, and we implement that special case in ty:
+
+```py
+import typing as t
+
+# no errors emitted for any of these:
+isinstance("", t.Dict)
+isinstance("", t.List)
+isinstance("", t.Set)
+isinstance("", t.FrozenSet)
+isinstance("", t.Tuple)
+isinstance("", t.ChainMap)
+isinstance("", t.Counter)
+isinstance("", t.Deque)
+isinstance("", t.OrderedDict)
+isinstance("", t.Callable)
+isinstance("", t.Type)
+isinstance("", t.Callable | t.Deque)
+
+# `Any` is valid in `issubclass()` calls but not `isinstance()` calls
+issubclass(list, t.Any)
+issubclass(list, t.Any | t.Dict)
+```
+
+But for other special forms that are not permitted as the second argument, we still emit an error:
+
+```py
+isinstance("", t.TypeGuard)  # error: [invalid-argument-type]
+isinstance("", t.ClassVar)  # error: [invalid-argument-type]
+isinstance("", t.Final)  # error: [invalid-argument-type]
+isinstance("", t.Any)  # error: [invalid-argument-type]
+```
+
+## The builtin `NotImplemented` constant is not callable
+
+<!-- snapshot-diagnostics -->
+
+```py
+raise NotImplemented()  # error: [call-non-callable]
+raise NotImplemented("this module is not implemented yet!!!")  # error: [call-non-callable]
 ```

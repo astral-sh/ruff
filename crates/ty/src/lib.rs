@@ -5,13 +5,14 @@ mod python_version;
 mod version;
 
 pub use args::Cli;
+use ty_project::metadata::settings::TerminalSettings;
 use ty_static::EnvVars;
 
 use std::fmt::Write;
 use std::process::{ExitCode, Termination};
+use std::sync::Mutex;
 
 use anyhow::Result;
-use std::sync::Mutex;
 
 use crate::args::{CheckCommand, Command, TerminalColor};
 use crate::logging::{VerbosityLevel, setup_tracing};
@@ -21,7 +22,10 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::diagnostic::{Diagnostic, DisplayDiagnosticConfig, DisplayDiagnostics, Severity};
+use ruff_db::cancellation::{CancellationToken, CancellationTokenSource};
+use ruff_db::diagnostic::{
+    Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
+};
 use ruff_db::files::File;
 use ruff_db::max_parallelism;
 use ruff_db::system::{OsSystem, SystemPath, SystemPathBuf};
@@ -71,7 +75,7 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     let verbosity = args.verbosity.level();
     let _guard = setup_tracing(verbosity, args.color.unwrap_or_default())?;
 
-    let printer = Printer::default().with_verbosity(verbosity);
+    let printer = Printer::new(verbosity, args.no_progress);
 
     tracing::debug!("Version: {}", version::version());
 
@@ -115,9 +119,12 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
         .config_file
         .as_ref()
         .map(|path| SystemPath::absolute(path, &cwd));
+    let force_exclude = args.force_exclude();
 
     let mut project_metadata = match &config_file {
-        Some(config_file) => ProjectMetadata::from_config_file(config_file.clone(), &system)?,
+        Some(config_file) => {
+            ProjectMetadata::from_config_file(config_file.clone(), &project_path, &system)?
+        }
         None => ProjectMetadata::discover(&project_path, &system)?,
     };
 
@@ -127,11 +134,13 @@ fn run_check(args: CheckCommand) -> anyhow::Result<ExitStatus> {
     project_metadata.apply_overrides(&project_options_overrides);
 
     let mut db = ProjectDatabase::new(project_metadata, system)?;
+    let project = db.project();
 
-    db.project()
-        .set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_verbose(&mut db, verbosity >= VerbosityLevel::Verbose);
+    project.set_force_exclude(&mut db, force_exclude);
+
     if !check_paths.is_empty() {
-        db.project().set_included_paths(&mut db, check_paths);
+        project.set_included_paths(&mut db, check_paths);
     }
 
     let (main_loop, main_loop_cancellation_token) =
@@ -193,6 +202,12 @@ pub enum ExitStatus {
     InternalError = 101,
 }
 
+impl ExitStatus {
+    pub const fn is_internal_error(self) -> bool {
+        matches!(self, ExitStatus::InternalError)
+    }
+}
+
 impl Termination for ExitStatus {
     fn report(self) -> ExitCode {
         ExitCode::from(self as u8)
@@ -213,6 +228,11 @@ struct MainLoop {
     printer: Printer,
 
     project_options_overrides: ProjectOptionsOverrides,
+
+    /// Cancellation token that gets set by Ctrl+C.
+    /// Used for long-running operations on the main thread. Operations on background threads
+    /// use Salsa's cancellation mechanism.
+    cancellation_token: CancellationToken,
 }
 
 impl MainLoop {
@@ -222,6 +242,9 @@ impl MainLoop {
     ) -> (Self, MainLoopCancellationToken) {
         let (sender, receiver) = crossbeam_channel::bounded(10);
 
+        let cancellation_token_source = CancellationTokenSource::new();
+        let cancellation_token = cancellation_token_source.token();
+
         (
             Self {
                 sender: sender.clone(),
@@ -229,8 +252,12 @@ impl MainLoop {
                 watcher: None,
                 project_options_overrides,
                 printer,
+                cancellation_token,
             },
-            MainLoopCancellationToken { sender },
+            MainLoopCancellationToken {
+                sender,
+                source: cancellation_token_source,
+            },
         )
     }
 
@@ -264,9 +291,6 @@ impl MainLoop {
         let mut revision = 0u64;
 
         while let Ok(message) = self.receiver.recv() {
-            if self.watcher.is_some() {
-                Printer::clear_screen()?;
-            }
             match message {
                 MainLoopMessage::CheckWorkspace => {
                     let db = db.clone();
@@ -280,7 +304,7 @@ impl MainLoop {
 
                         match salsa::Cancelled::catch(|| {
                             db.check_with_reporter(&mut reporter);
-                            reporter.bar.finish();
+                            reporter.bar.finish_and_clear();
                             reporter.collector.into_sorted(&db)
                         }) {
                             Ok(result) => {
@@ -304,7 +328,9 @@ impl MainLoop {
                     let terminal_settings = db.project().settings(db).terminal();
                     let display_config = DisplayDiagnosticConfig::default()
                         .format(terminal_settings.output_format.into())
-                        .color(colored::control::SHOULD_COLORIZE.should_colorize());
+                        .color(colored::control::SHOULD_COLORIZE.should_colorize())
+                        .with_cancellation_token(Some(self.cancellation_token.clone()))
+                        .show_fix_diff(true);
 
                     if check_revision == revision {
                         if db.project().files(db).is_empty() {
@@ -334,11 +360,8 @@ impl MainLoop {
                             let diagnostics_count = result.len();
 
                             let mut stdout = self.printer.stream_for_details().lock();
-                            let max_severity = result
-                                .iter()
-                                .map(Diagnostic::severity)
-                                .max()
-                                .unwrap_or(Severity::Info);
+                            let exit_status =
+                                exit_status_from_diagnostics(&result, terminal_settings);
 
                             // Only render diagnostics if they're going to be displayed, since doing
                             // so is expensive.
@@ -350,34 +373,25 @@ impl MainLoop {
                                 )?;
                             }
 
-                            if is_human_readable {
-                                writeln!(
-                                    self.printer.stream_for_failure_summary(),
-                                    "Found {} diagnostic{}",
-                                    diagnostics_count,
-                                    if diagnostics_count > 1 { "s" } else { "" }
-                                )?;
-                            }
+                            if !self.cancellation_token.is_cancelled() {
+                                if is_human_readable {
+                                    writeln!(
+                                        self.printer.stream_for_failure_summary(),
+                                        "Found {} diagnostic{}",
+                                        diagnostics_count,
+                                        if diagnostics_count > 1 { "s" } else { "" }
+                                    )?;
+                                }
 
-                            if max_severity.is_fatal() {
-                                tracing::warn!(
-                                    "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
-                                );
+                                if exit_status.is_internal_error() {
+                                    tracing::warn!(
+                                        "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
+                                    );
+                                }
                             }
 
                             if self.watcher.is_none() {
-                                return Ok(match max_severity {
-                                    Severity::Info => ExitStatus::Success,
-                                    Severity::Warning => {
-                                        if terminal_settings.error_on_warning {
-                                            ExitStatus::Failure
-                                        } else {
-                                            ExitStatus::Success
-                                        }
-                                    }
-                                    Severity::Error => ExitStatus::Failure,
-                                    Severity::Fatal => ExitStatus::InternalError,
-                                });
+                                return Ok(exit_status);
                             }
                         }
                     } else {
@@ -388,12 +402,15 @@ impl MainLoop {
                 }
 
                 MainLoopMessage::ApplyChanges(changes) => {
+                    Printer::clear_screen()?;
+
                     revision += 1;
                     // Automatically cancels any pending queries and waits for them to complete.
                     db.apply_changes(changes, Some(&self.project_options_overrides));
                     if let Some(watcher) = self.watcher.as_mut() {
                         watcher.update(db);
                     }
+
                     self.sender.send(MainLoopMessage::CheckWorkspace).unwrap();
                 }
                 MainLoopMessage::Exit => {
@@ -407,6 +424,40 @@ impl MainLoop {
         }
 
         Ok(ExitStatus::Success)
+    }
+}
+
+fn exit_status_from_diagnostics(
+    diagnostics: &[Diagnostic],
+    terminal_settings: &TerminalSettings,
+) -> ExitStatus {
+    if diagnostics.is_empty() {
+        return ExitStatus::Success;
+    }
+
+    let mut max_severity = Severity::Info;
+    let mut io_error = false;
+
+    for diagnostic in diagnostics {
+        max_severity = max_severity.max(diagnostic.severity());
+        io_error = io_error || matches!(diagnostic.id(), DiagnosticId::Io);
+    }
+
+    if !max_severity.is_fatal() && io_error {
+        return ExitStatus::Error;
+    }
+
+    match max_severity {
+        Severity::Info => ExitStatus::Success,
+        Severity::Warning => {
+            if terminal_settings.error_on_warning {
+                ExitStatus::Failure
+            } else {
+                ExitStatus::Success
+            }
+        }
+        Severity::Error => ExitStatus::Failure,
+        Severity::Fatal => ExitStatus::InternalError,
     }
 }
 
@@ -450,12 +501,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
         self.bar.set_draw_target(self.printer.progress_target());
     }
 
-    fn report_checked_file(&self, db: &dyn Db, file: File, diagnostics: &[Diagnostic]) {
+    fn report_checked_file(&self, db: &ProjectDatabase, file: File, diagnostics: &[Diagnostic]) {
         self.collector.report_checked_file(db, file, diagnostics);
         self.bar.inc(1);
     }
 
-    fn report_diagnostics(&mut self, db: &dyn Db, diagnostics: Vec<Diagnostic>) {
+    fn report_diagnostics(&mut self, db: &ProjectDatabase, diagnostics: Vec<Diagnostic>) {
         self.collector.report_diagnostics(db, diagnostics);
     }
 }
@@ -463,10 +514,12 @@ impl ty_project::ProgressReporter for IndicatifReporter {
 #[derive(Debug)]
 struct MainLoopCancellationToken {
     sender: crossbeam_channel::Sender<MainLoopMessage>,
+    source: CancellationTokenSource,
 }
 
 impl MainLoopCancellationToken {
     fn stop(self) {
+        self.source.cancel();
         self.sender.send(MainLoopMessage::Exit).unwrap();
     }
 }

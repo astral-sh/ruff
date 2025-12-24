@@ -64,6 +64,7 @@ mod tests {
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_0.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_1.py"))]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037_2.pyi"))]
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"))]
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015_1.py"))]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"))]
@@ -98,6 +99,7 @@ mod tests {
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_many_empty_lines.py"))]
     #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"))]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_0.py"))]
+    #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029_2.py"))]
     #[test_case(Rule::UnnecessaryClassParentheses, Path::new("UP039.py"))]
     #[test_case(Rule::UnnecessaryDefaultTypeArgs, Path::new("UP043.py"))]
     #[test_case(Rule::UnnecessaryEncodeUTF8, Path::new("UP012.py"))]
@@ -111,7 +113,7 @@ mod tests {
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
-    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_0.py"))]
     #[test_case(Rule::PrivateTypeParameter, Path::new("UP049_1.py"))]
     #[test_case(Rule::UselessClassMetaclassType, Path::new("UP050.py"))]
@@ -120,6 +122,22 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyupgrade").join(path).as_path(),
             &settings::LinterSettings::for_rule(rule_code),
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_2.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_1.py"))]
+    fn rules_not_applied_default_typevar_backported(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = path.to_string_lossy().to_string();
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                preview: PreviewMode::Enabled,
+                unresolved_target_version: PythonVersion::PY312.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
         )?;
         assert_diagnostics!(snapshot, diagnostics);
         Ok(())
@@ -140,11 +158,25 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Rule::QuotedAnnotation, Path::new("UP037_3.py"))]
+    fn rules_py313(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("rules_py313__{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("pyupgrade").join(path).as_path(),
+            &settings::LinterSettings {
+                unresolved_target_version: PythonVersion::PY313.into(),
+                ..settings::LinterSettings::for_rule(rule_code)
+            },
+        )?;
+        assert_diagnostics!(snapshot, diagnostics);
+        Ok(())
+    }
+
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.py"))]
     #[test_case(Rule::NonPEP695TypeAlias, Path::new("UP040.pyi"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_0.py"))]
     #[test_case(Rule::NonPEP695GenericClass, Path::new("UP046_1.py"))]
-    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047.py"))]
+    #[test_case(Rule::NonPEP695GenericFunction, Path::new("UP047_0.py"))]
     fn type_var_default_preview(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}__preview_diff", path.to_string_lossy());
         assert_diagnostics_diff!(

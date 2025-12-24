@@ -116,6 +116,10 @@ impl LintMetadata {
         self.documentation_lines().join("\n")
     }
 
+    pub fn documentation_url(&self) -> String {
+        lint_documentation_url(self.name())
+    }
+
     pub fn default_level(&self) -> Level {
         self.default_level
     }
@@ -131,6 +135,10 @@ impl LintMetadata {
     pub fn line(&self) -> u32 {
         self.line
     }
+}
+
+pub fn lint_documentation_url(lint_name: LintName) -> String {
+    format!("https://ty.dev/rules#{lint_name}")
 }
 
 #[doc(hidden)]
@@ -607,4 +615,7 @@ pub enum LintSource {
 
     /// The rule was enabled in a configuration file.
     File,
+
+    /// The rule was enabled from the configuration in the editor.
+    Editor,
 }
