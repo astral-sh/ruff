@@ -1,10 +1,10 @@
-use crate::rules::flake8_logging::helpers::is_logger_method_name;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::ExprCall;
 use ruff_python_semantic::Modules;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_logging::helpers::is_logger_method_name;
 
 /// ## What it does
 /// Checks for usages of the following `logging` top-level functions:
