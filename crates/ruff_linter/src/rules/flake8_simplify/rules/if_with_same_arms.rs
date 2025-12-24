@@ -1,7 +1,6 @@
 use std::borrow::Cow;
 
 use anyhow::Result;
-use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableStmt;
 use ruff_python_ast::stmt_if::{IfElifBranch, if_elif_branches};
@@ -33,18 +32,6 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// Use instead:
 /// ```python
 /// if x == 1 or x == 2:
-///     print("Hello")
-/// ```
-///
-/// ## Fix safety
-/// This rule's fix is marked as unsafe if there are different comments
-/// in the branches, as comments may be removed when merging the branches.
-///
-/// For example, the fix would be marked as unsafe in the following case:
-/// ```python
-/// if x == 1:  # we preserve comments, too!
-///     print("Hello")
-/// elif x == 2:  # but not on the second branch
 ///     print("Hello")
 /// ```
 #[derive(ViolationMetadata)]
@@ -85,11 +72,6 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             continue;
         }
 
-        let mut diagnostic = checker.report_diagnostic(
-            IfWithSameArms,
-            TextRange::new(current_branch.start(), following_branch.end()),
-        );
-
         let first_comments = checker
             .comment_ranges()
             .comments_in_range(body_range(&current_branch, checker.locator()))
@@ -100,6 +82,14 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
             .comments_in_range(body_range(following_branch, checker.locator()))
             .iter()
             .map(|range| checker.locator().slice(*range));
+        if !first_comments.eq(second_comments) {
+            continue;
+        }
+
+        let mut diagnostic = checker.report_diagnostic(
+            IfWithSameArms,
+            TextRange::new(current_branch.start(), following_branch.end()),
+        );
 
         diagnostic.try_set_fix(|| {
             merge_branches(
@@ -108,7 +98,6 @@ pub(crate) fn if_with_same_arms(checker: &Checker, stmt_if: &ast::StmtIf) {
                 following_branch,
                 checker.locator(),
                 checker.tokens(),
-                first_comments.eq(second_comments),
             )
         });
     }
@@ -121,7 +110,6 @@ fn merge_branches(
     following_branch: &IfElifBranch,
     locator: &Locator,
     tokens: &ruff_python_ast::token::Tokens,
-    branches_comments_identical: bool,
 ) -> Result<Fix> {
     // Identify the colon (`:`) at the end of the current branch's test.
     let Some(current_branch_colon) =
@@ -174,14 +162,9 @@ fn merge_branches(
             None
         };
 
-    Ok(Fix::applicable_edits(
+    Ok(Fix::safe_edits(
         deletion_edit,
         parenthesize_edit.into_iter().chain(Some(insertion_edit)),
-        if branches_comments_identical {
-            Applicability::Safe
-        } else {
-            Applicability::Unsafe
-        },
     ))
 }
 

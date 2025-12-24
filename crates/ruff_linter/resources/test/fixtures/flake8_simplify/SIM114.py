@@ -4,9 +4,9 @@ if a:
 elif c:
     b
 
-if a:  # we preserve comments, too!
+if a:  # ignore merging
     b
-elif c:  # but not on the second branch
+elif c:  # if comments are different
     b
 
 if x == 1:
@@ -135,9 +135,9 @@ def func():
         return 3
 
 
-if a:  # we preserve comments, too!
+if a:  # ignore merging
     b
-elif c:  # but not on the second branch
+elif c:  # if comments are different
     b
 
 
@@ -157,3 +157,12 @@ elif True:
     print(1)
 else:
     print(2)
+
+if x > 0 and (
+    x > 10 # comment 1
+    or x < 100 # comment 2
+): # comment 3
+    print(1)
+# comment 4
+elif c:
+    print(1)
