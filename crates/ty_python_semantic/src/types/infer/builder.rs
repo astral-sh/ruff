@@ -8791,9 +8791,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 }
                             } else {
                                 // Key not found, report error with suggestion and return early
-                                let key_ty = Type::StringLiteral(
-                                    crate::types::StringLiteralType::new(self.db(), key),
-                                );
+                                let key_ty = Type::string_literal(self.db(), key);
                                 report_invalid_key_on_typed_dict(
                                     &self.context,
                                     first_arg.into(),

@@ -1,4 +1,4 @@
-use compact_str::{CompactString, ToCompactString};
+use compact_str::CompactString;
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
@@ -5224,11 +5224,7 @@ impl<'db> Type<'db> {
                     && Type::ClassLiteral(enum_literal.enum_class(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
-                Place::bound(Type::StringLiteral(StringLiteralType::new(
-                    db,
-                    enum_literal.name(db).as_str(),
-                )))
-                .into()
+                Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
             }
 
             Type::EnumLiteral(enum_literal)
@@ -8388,10 +8384,9 @@ impl<'db> Type<'db> {
                 ),
             ),
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
-            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
-                db,
-                known_instance.repr(db).to_compact_string(),
-            )),
+            Type::KnownInstance(known_instance) => {
+                Type::string_literal(db, &known_instance.repr(db).to_string())
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -8410,10 +8405,9 @@ impl<'db> Type<'db> {
             }
             Type::LiteralString => Type::LiteralString,
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
-            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
-                db,
-                known_instance.repr(db).to_compact_string(),
-            )),
+            Type::KnownInstance(known_instance) => {
+                Type::string_literal(db, &known_instance.repr(db).to_string())
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }

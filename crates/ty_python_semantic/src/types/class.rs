@@ -39,9 +39,9 @@ use crate::types::{
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
     IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
-    declaration_type, determine_upper_bound,
+    NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
+    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
+    determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2773,7 +2773,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let overloads = writeable_fields.map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2803,7 +2803,7 @@ impl<'db> ClassLiteral<'db> {
 
                 // Add (key -> value type) overloads for all TypedDict items ("fields"):
                 let overloads = fields.iter().map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2861,7 +2861,7 @@ impl<'db> ClassLiteral<'db> {
 
                 // Otherwise, add overloads for all deletable fields.
                 let overloads = deletable_fields.map(|(name, _field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2889,8 +2889,7 @@ impl<'db> ClassLiteral<'db> {
                     .fields(db, specialization, field_policy)
                     .iter()
                     .flat_map(|(name, field)| {
-                        let key_type =
-                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                        let key_type = Type::string_literal(db, name);
 
                         // For a required key, `.get()` always returns the value type. For a non-required key,
                         // `.get()` returns the union of the value type and the type of the default argument
@@ -3002,8 +3001,7 @@ impl<'db> ClassLiteral<'db> {
                         !field.is_required()
                     })
                     .flat_map(|(name, field)| {
-                        let key_type =
-                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                        let key_type = Type::string_literal(db, name);
 
                         // TODO: Similar to above: consider merging these two overloads into one
 
@@ -3057,7 +3055,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "setdefault") => {
                 let fields = self.fields(db, specialization, field_policy);
                 let overloads = fields.iter().map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     // `setdefault` always returns the field type
                     Signature::new(
