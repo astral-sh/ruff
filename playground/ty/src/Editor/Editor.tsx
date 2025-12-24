@@ -336,7 +336,7 @@ class PlaygroundServer
     return {
       suggestions: completions.map((completion, i) => ({
         label: {
-          label: completion.label,
+          label: completion.name,
           detail:
             completion.module_name == null
               ? undefined
@@ -348,7 +348,7 @@ class PlaygroundServer
           completion.kind == null
             ? CompletionItemKind.Variable
             : mapCompletionKind(completion.kind),
-        insertText: completion.insert_text ?? completion.label,
+        insertText: completion.insert_text ?? completion.name,
         additionalTextEdits: completion.additional_text_edits?.map(
           (edit: TextEdit) => ({
             range: tyRangeToMonacoRange(edit.range),
