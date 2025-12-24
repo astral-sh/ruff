@@ -1,0 +1,50 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+---
+mdtest name: attributes.md - Attributes - Diagnostic for function attribute accessed on `Callable` type
+mdtest path: crates/ty_python_semantic/resources/mdtest/attributes.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+1 | from typing import Callable
+2 | 
+3 | def f(x: Callable):
+4 |     x.__name__  # error: [unresolved-attribute]
+5 |     x.__annotate__  # error: [unresolved-attribute]
+```
+
+# Diagnostics
+
+```
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__name__`
+ --> src/mdtest_snippet.py:4:5
+  |
+3 | def f(x: Callable):
+4 |     x.__name__  # error: [unresolved-attribute]
+  |     ^^^^^^^^^^
+5 |     x.__annotate__  # error: [unresolved-attribute]
+  |
+help: Function objects have a `__name__` attribute, but not all callable objects are functions
+info: rule `unresolved-attribute` is enabled by default
+
+```
+
+```
+error[unresolved-attribute]: Object of type `(...) -> Unknown` has no attribute `__annotate__`
+ --> src/mdtest_snippet.py:5:5
+  |
+3 | def f(x: Callable):
+4 |     x.__name__  # error: [unresolved-attribute]
+5 |     x.__annotate__  # error: [unresolved-attribute]
+  |     ^^^^^^^^^^^^^^
+  |
+help: Function objects have an `__annotate__` attribute, but not all callable objects are functions
+info: rule `unresolved-attribute` is enabled by default
+
+```

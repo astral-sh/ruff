@@ -9846,154 +9846,183 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         });
 
         let attr_name = &attr.id;
-        let resolved_type = fallback_place.unwrap_with_diagnostic(db, |lookup_err| match lookup_err {
-            LookupError::Undefined(_) => {
-                let fallback = || {
-                    TypeAndQualifiers::new(
-                        Type::unknown(),
-                        TypeOrigin::Inferred,
-                        TypeQualifiers::empty(),
-                    )
-                };
+        let resolved_type =
+            fallback_place.unwrap_with_diagnostic(db, |lookup_err| match lookup_err {
+                LookupError::Undefined(_) => {
+                    let fallback = || {
+                        TypeAndQualifiers::new(
+                            Type::unknown(),
+                            TypeOrigin::Inferred,
+                            TypeQualifiers::empty(),
+                        )
+                    };
 
-                if !self.is_reachable(attribute) {
-                    return fallback();
-                }
-
-                let bound_on_instance = match value_type {
-                    Type::ClassLiteral(class) => {
-                        !class.instance_member(db, None, attr).is_undefined()
+                    if !self.is_reachable(attribute) {
+                        return fallback();
                     }
-                    Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
-                        match subclass_of.subclass_of() {
-                            SubclassOfInner::Class(class) => {
-                                !class.instance_member(db, attr).is_undefined()
-                            }
-                            SubclassOfInner::Dynamic(_) => unreachable!(
-                                "Attribute lookup on a dynamic `SubclassOf` type \
+
+                    let bound_on_instance = match value_type {
+                        Type::ClassLiteral(class) => {
+                            !class.instance_member(db, None, attr).is_undefined()
+                        }
+                        Type::SubclassOf(subclass_of @ SubclassOfType { .. }) => {
+                            match subclass_of.subclass_of() {
+                                SubclassOfInner::Class(class) => {
+                                    !class.instance_member(db, attr).is_undefined()
+                                }
+                                SubclassOfInner::Dynamic(_) => unreachable!(
+                                    "Attribute lookup on a dynamic `SubclassOf` type \
                                     should always return a bound symbol"
-                            ),
-                            SubclassOfInner::TypeVar(_) => false,
-                        }
-                    }
-                    _ => false,
-                };
-
-                if let Type::ModuleLiteral(module) = value_type {
-                    let module = module.module(db);
-                    let module_name = module.name(db);
-                    if module.kind(db).is_package()
-                        && let Some(relative_submodule) = ModuleName::new(attr_name)
-                    {
-                        let mut maybe_submodule_name = module_name.clone();
-                        maybe_submodule_name.extend(&relative_submodule);
-                        if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
-                            if let Some(builder) = self
-                                .context
-                                .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
-                            {
-                                let mut diag = builder.into_diagnostic(format_args!(
-                                    "Submodule `{attr_name}` may not be available as an attribute \
-                                    on module `{module_name}`"
-                                ));
-                                diag.help(format_args!(
-                                    "Consider explicitly importing `{maybe_submodule_name}`"
-                                ));
+                                ),
+                                SubclassOfInner::TypeVar(_) => false,
                             }
-                            return fallback();
                         }
-                    }
-                }
+                        _ => false,
+                    };
 
-                if let Type::SpecialForm(special_form) = value_type {
-                    if let Some(builder) =
-                        self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
-                    {
-                        let mut diag = builder.into_diagnostic(format_args!(
-                            "Special form `{special_form}` has no attribute `{attr_name}`",
-                        ));
-                        if let Ok(defined_type) = value_type.in_type_expression(
-                            db,
-                            self.scope(),
-                            self.typevar_binding_context,
-                        ) && !defined_type.member(db, attr_name).place.is_undefined()
+                    if let Type::ModuleLiteral(module) = value_type {
+                        let module = module.module(db);
+                        let module_name = module.name(db);
+                        if module.kind(db).is_package()
+                            && let Some(relative_submodule) = ModuleName::new(attr_name)
                         {
-                            diag.help(format_args!(
-                                "Objects with type `{ty}` have a{maybe_n} `{attr_name}` attribute, but the symbol \
-                                `{special_form}` does not itself inhabit the type `{ty}`",
-                                maybe_n = if attr_name.starts_with(['a', 'e', 'i', 'o', 'u']) {
-                                    "n"
-                                } else {
-                                    ""
-                                },
-                                ty = defined_type.display(self.db())
-                            ));
-                            if is_dotted_name(value) {
-                                let source = &source_text(self.db(), self.file())[value.range()];
-                                diag.help(format_args!(
-                                    "This error may indicate that `{source}` was defined as \
-                                    `{source} = {special_form}` when `{source}: {special_form}` \
-                                    was intended"
-                                ));
+                            let mut maybe_submodule_name = module_name.clone();
+                            maybe_submodule_name.extend(&relative_submodule);
+                            if resolve_module(db, self.file(), &maybe_submodule_name).is_some() {
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&POSSIBLY_MISSING_ATTRIBUTE, attribute)
+                                {
+                                    let mut diag = builder.into_diagnostic(format_args!(
+                                        "Submodule `{attr_name}` may not be available as an \
+                                        attribute on module `{module_name}`"
+                                    ));
+                                    diag.help(format_args!(
+                                        "Consider explicitly importing `{maybe_submodule_name}`"
+                                    ));
+                                }
+                                return fallback();
                             }
                         }
                     }
-                    return fallback();
-                }
 
-                let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
-                else {
-                    return fallback();
-                };
+                    if let Type::SpecialForm(special_form) = value_type {
+                        if let Some(builder) =
+                            self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                        {
+                            let mut diag = builder.into_diagnostic(format_args!(
+                                "Special form `{special_form}` has no attribute `{attr_name}`",
+                            ));
+                            if let Ok(defined_type) = value_type.in_type_expression(
+                                db,
+                                self.scope(),
+                                self.typevar_binding_context,
+                            ) && !defined_type.member(db, attr_name).place.is_undefined()
+                            {
+                                diag.help(format_args!(
+                                    "Objects with type `{ty}` have a{maybe_n} `{attr_name}` \
+                                    attribute, but the symbol `{special_form}` \
+                                    does not itself inhabit the type `{ty}`",
+                                    maybe_n = if attr_name.starts_with(['a', 'e', 'i', 'o', 'u']) {
+                                        "n"
+                                    } else {
+                                        ""
+                                    },
+                                    ty = defined_type.display(self.db())
+                                ));
+                                if is_dotted_name(value) {
+                                    let source =
+                                        &source_text(self.db(), self.file())[value.range()];
+                                    diag.help(format_args!(
+                                        "This error may indicate that `{source}` was defined as \
+                                        `{source} = {special_form}` when \
+                                        `{source}: {special_form}` was intended"
+                                    ));
+                                }
+                            }
+                        }
+                        return fallback();
+                    }
 
-                if bound_on_instance {
-                    builder.into_diagnostic(format_args!(
-                        "Attribute `{attr_name}` can only be accessed on instances, \
+                    let Some(builder) = self.context.report_lint(&UNRESOLVED_ATTRIBUTE, attribute)
+                    else {
+                        return fallback();
+                    };
+
+                    if bound_on_instance {
+                        builder.into_diagnostic(format_args!(
+                            "Attribute `{attr_name}` can only be accessed on instances, \
                             not on the class object `{}` itself.",
-                        value_type.display(db)
-                    ));
-                    return fallback();
+                            value_type.display(db)
+                        ));
+                        return fallback();
+                    }
+
+                    let mut diagnostic = match value_type {
+                        Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
+                            "Module `{module_name}` has no member `{attr_name}`",
+                            module_name = module.module(db).name(db),
+                        )),
+                        Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
+                            "Class `{}` has no attribute `{attr_name}`",
+                            class.name(db),
+                        )),
+                        Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
+                            "Class `{}` has no attribute `{attr_name}`",
+                            alias.display(db),
+                        )),
+                        Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
+                            "Function `{}` has no attribute `{attr_name}`",
+                            function.name(db),
+                        )),
+                        _ => builder.into_diagnostic(format_args!(
+                            "Object of type `{}` has no attribute `{attr_name}`",
+                            value_type.display(db),
+                        )),
+                    };
+
+                    if value_type.is_callable_type()
+                        && KnownClass::FunctionType
+                            .to_instance(db)
+                            .member(db, attr_name)
+                            .place
+                            .is_definitely_bound()
+                    {
+                        diagnostic.help(format_args!(
+                            "Function objects have a{maybe_n} `{attr_name}` attribute, \
+                            but not all callable objects are functions",
+                            maybe_n = if attr_name
+                                .trim_start_matches('_')
+                                .starts_with(['a', 'e', 'i', 'o', 'u'])
+                            {
+                                "n"
+                            } else {
+                                ""
+                            },
+                        ));
+                    } else {
+                        hint_if_stdlib_attribute_exists_on_other_versions(
+                            db,
+                            diagnostic,
+                            value_type,
+                            attr_name,
+                            &format!("resolving the `{attr_name}` attribute"),
+                        );
+                    }
+
+                    fallback()
                 }
+                LookupError::PossiblyUndefined(type_when_bound) => {
+                    report_possibly_missing_attribute(
+                        &self.context,
+                        attribute,
+                        &attr.id,
+                        value_type,
+                    );
 
-                let diagnostic = match value_type {
-                    Type::ModuleLiteral(module) => builder.into_diagnostic(format_args!(
-                        "Module `{module_name}` has no member `{attr_name}`",
-                        module_name = module.module(db).name(db),
-                    )),
-                    Type::ClassLiteral(class) => builder.into_diagnostic(format_args!(
-                        "Class `{}` has no attribute `{attr_name}`",
-                        class.name(db),
-                    )),
-                    Type::GenericAlias(alias) => builder.into_diagnostic(format_args!(
-                        "Class `{}` has no attribute `{attr_name}`",
-                        alias.display(db),
-                    )),
-                    Type::FunctionLiteral(function) => builder.into_diagnostic(format_args!(
-                        "Function `{}` has no attribute `{attr_name}`",
-                        function.name(db),
-                    )),
-                    _ => builder.into_diagnostic(format_args!(
-                        "Object of type `{}` has no attribute `{attr_name}`",
-                        value_type.display(db),
-                    )),
-                };
-
-                hint_if_stdlib_attribute_exists_on_other_versions(
-                    db,
-                    diagnostic,
-                    value_type,
-                    attr_name,
-                    &format!("resolving the `{attr_name}` attribute"),
-                );
-
-                fallback()
-            }
-            LookupError::PossiblyUndefined(type_when_bound) => {
-                report_possibly_missing_attribute(&self.context, attribute, &attr.id, value_type);
-
-                type_when_bound
-            }
-        });
+                    type_when_bound
+                }
+            });
 
         let resolved_type = resolved_type.inner_type();
 
