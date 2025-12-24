@@ -3723,6 +3723,66 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
     }
 }
 
+/// Enum representing the reason why a key cannot be deleted from a `TypedDict`.
+#[derive(Copy, Clone)]
+pub(crate) enum TypedDictDeleteErrorKind {
+    /// The key exists but is required (not `NotRequired`)
+    RequiredKey,
+    /// The key does not exist in the `TypedDict`
+    UnknownKey,
+}
+
+pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+    field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
+    error_kind: TypedDictDeleteErrorKind,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
+        return;
+    };
+
+    let typed_dict_name = typed_dict_ty.display(db);
+
+    let mut diagnostic = match error_kind {
+        TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
+            "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
+            "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+    };
+
+    // Add sub-diagnostic pointing to where the field is defined (if available)
+    if let Some(field) = field
+        && let Some(declaration) = field.first_declaration()
+    {
+        let file = declaration.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
+        sub.annotate(
+            Annotation::secondary(
+                Span::from(file).with_range(declaration.full_range(db, &module).range()),
+            )
+            .message(format_args!(
+                "`{field_name}` declared as required here; consider making it `NotRequired`"
+            )),
+        );
+        diagnostic.sub(sub);
+    }
+
+    // Add hint about how to allow deletion
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey) {
+        diagnostic.info(
+            "Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted",
+        );
+    }
+}
+
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,

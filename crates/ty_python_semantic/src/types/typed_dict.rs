@@ -612,7 +612,7 @@ pub(super) fn validate_typed_dict_key_assignment<'db, 'ast>(
         };
 
     let add_item_definition_subdiagnostic = |diagnostic: &mut Diagnostic, message| {
-        if let Some(declaration) = item.first_declaration {
+        if let Some(declaration) = item.first_declaration() {
             let file = declaration.file(db);
             let module = parsed_module(db, file).load(db);
 
@@ -970,6 +970,10 @@ impl<'db> TypedDictField<'db> {
 
     pub(crate) const fn is_read_only(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::READ_ONLY)
+    }
+
+    pub(crate) const fn first_declaration(&self) -> Option<Definition<'db>> {
+        self.first_declaration
     }
 
     pub(crate) fn apply_type_mapping_impl<'a>(
