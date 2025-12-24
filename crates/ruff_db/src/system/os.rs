@@ -275,9 +275,9 @@ impl OsSystem {
     /// instead of at least one system call for each component between `path` and `prefix`.
     ///
     /// However, using `canonicalize` to resolve the path's casing doesn't work in two cases:
-    /// * if `path` is a symlink because `canonicalize` then returns the symlink's target and not the symlink's source path.
-    /// * on Windows: If `path` is a mapped network drive because `canonicalize` then returns the UNC path
-    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` then returns `\\?\UNC\server\share`).
+    /// * if `path` is a symlink, `canonicalize` returns the symlink's target and not the symlink's source path.
+    /// * on Windows: If `path` is a mapped network drive, `canonicalize` returns the UNC path
+    ///   (e.g. `Z:\` is mapped to `\\server\share` and `canonicalize` returns `\\?\UNC\server\share`).
     ///
     /// Symlinks and mapped network drives should be rare enough that this fast path is worth trying first,
     /// even if it comes at a cost for those rare use cases.
