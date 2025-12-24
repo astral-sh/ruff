@@ -10,7 +10,7 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::error::StarTupleKind;
-use crate::parser::expression::{EXPR_SET, IdentifierRecovery, ParsedExpr};
+use crate::parser::expression::{EXPR_SET, ParsedExpr};
 use crate::parser::progress::ParserProgress;
 use crate::parser::{
     FunctionKind, Parser, RecoveryContext, RecoveryContextKind, WithItemKind, helpers,
@@ -704,7 +704,7 @@ impl<'src> Parser<'src> {
 
         let name = match style {
             ImportStyle::Import => self.parse_dotted_name(),
-            ImportStyle::ImportFrom => self.parse_identifier(IdentifierRecovery::default()),
+            ImportStyle::ImportFrom => self.parse_identifier(),
         };
 
         let asname = if self.eat(TokenKind::As) {
@@ -713,7 +713,7 @@ impl<'src> Parser<'src> {
                 // import foo as match
                 // import bar as case
                 // import baz as type
-                Some(self.parse_identifier(IdentifierRecovery::default()))
+                Some(self.parse_identifier())
             } else {
                 // test_err import_alias_missing_asname
                 // import x as
@@ -741,10 +741,7 @@ impl<'src> Parser<'src> {
     fn parse_dotted_name(&mut self) -> ast::Identifier {
         let start = self.node_start();
 
-        let mut dotted_name: CompactString = self
-            .parse_identifier(IdentifierRecovery::default())
-            .id
-            .into();
+        let mut dotted_name: CompactString = self.parse_identifier().id.into();
         let mut progress = ParserProgress::default();
 
         while self.eat(TokenKind::Dot) {
@@ -754,7 +751,7 @@ impl<'src> Parser<'src> {
             // import a..b
             // import a...b
             dotted_name.push('.');
-            dotted_name.push_str(&self.parse_identifier(IdentifierRecovery::default()));
+            dotted_name.push_str(&self.parse_identifier());
         }
 
         // test_ok dotted_name_normalized_spaces
@@ -883,10 +880,10 @@ impl<'src> Parser<'src> {
 
         // test_err global_stmt_expression
         // global x + 1
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::Identifiers, |parser| {
-                parser.parse_identifier(IdentifierRecovery::default())
-            });
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::Identifiers,
+            Parser::parse_identifier,
+        );
 
         if names.is_empty() {
             // test_err global_stmt_empty
@@ -924,10 +921,10 @@ impl<'src> Parser<'src> {
         // test_err nonlocal_stmt_expression
         // def _():
         //     nonlocal x + 1
-        let names = self
-            .parse_comma_separated_list_into_vec(RecoveryContextKind::Identifiers, |parser| {
-                parser.parse_identifier(IdentifierRecovery::default())
-            });
+        let names = self.parse_comma_separated_list_into_vec(
+            RecoveryContextKind::Identifiers,
+            Parser::parse_identifier,
+        );
 
         if names.is_empty() {
             // test_err nonlocal_stmt_empty
@@ -975,7 +972,7 @@ impl<'src> Parser<'src> {
             type_range,
         );
 
-        let mut name = Expr::Name(self.parse_name(IdentifierRecovery::default()));
+        let mut name = Expr::Name(self.parse_name());
         helpers::set_expr_ctx(&mut name, ExprContext::Store);
 
         let type_params = self.try_parse_type_params();
@@ -1691,7 +1688,7 @@ impl<'src> Parser<'src> {
                 // except Exception as match: ...
                 // except Exception as case: ...
                 // except Exception as type: ...
-                Some(self.parse_identifier(IdentifierRecovery::default()))
+                Some(self.parse_identifier())
             } else {
                 // test_err except_stmt_missing_as_name
                 // try:
@@ -1912,7 +1909,7 @@ impl<'src> Parser<'src> {
         // test_err function_def_missing_identifier
         // def (): ...
         // def () -> int: ...
-        let name = self.parse_identifier(IdentifierRecovery::default());
+        let name = self.parse_identifier();
 
         // test_err function_def_unclosed_type_param_list
         // def foo[T1, *T2(a, b):
@@ -2041,7 +2038,7 @@ impl<'src> Parser<'src> {
         // class : ...
         // class (): ...
         // class (metaclass=ABC): ...
-        let name = self.parse_identifier(IdentifierRecovery::default());
+        let name = self.parse_identifier();
 
         // test_err class_def_unclosed_type_param_list
         // class Foo[T1, *T2(a, b):
@@ -2793,11 +2790,7 @@ impl<'src> Parser<'src> {
             self.bump(TokenKind::At);
 
             let parsed_expr = if self.at(TokenKind::Def) || self.at(TokenKind::Class) {
-                Expr::Name(self.parse_name(IdentifierRecovery::NoneOff(TokenSet::new([
-                    TokenKind::Def,
-                    TokenKind::Class,
-                ]))))
-                .into()
+                Expr::Name(self.parse_missing_name()).into()
             } else {
                 self.parse_named_expression_or_higher(ExpressionContext::default())
             };
@@ -3028,7 +3021,7 @@ impl<'src> Parser<'src> {
         function_kind: FunctionKind,
         allow_star_annotation: AllowStarAnnotation,
     ) -> ast::Parameter {
-        let name = self.parse_identifier(IdentifierRecovery::default());
+        let name = self.parse_identifier();
 
         // Annotations are only allowed for function definition. For lambda expression,
         // the `:` token would indicate its body.
@@ -3504,7 +3497,7 @@ impl<'src> Parser<'src> {
         // type X[T, *Ts] = int
         // type X[T, *Ts = int] = int
         if self.eat(TokenKind::Star) {
-            let name = self.parse_identifier(IdentifierRecovery::default());
+            let name = self.parse_identifier();
 
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
@@ -3549,7 +3542,7 @@ impl<'src> Parser<'src> {
         // type X[T, **P] = int
         // type X[T, **P = int] = int
         } else if self.eat(TokenKind::DoubleStar) {
-            let name = self.parse_identifier(IdentifierRecovery::default());
+            let name = self.parse_identifier();
 
             let default = if self.eat(TokenKind::Equal) {
                 if self.at_expr() {
@@ -3589,7 +3582,7 @@ impl<'src> Parser<'src> {
             // type X[T: (int, int) = int] = int
             // type X[T: int = int, U: (int, int) = int] = int
         } else {
-            let name = self.parse_identifier(IdentifierRecovery::default());
+            let name = self.parse_identifier();
 
             let bound = if self.eat(TokenKind::Colon) {
                 if self.at_expr() {
