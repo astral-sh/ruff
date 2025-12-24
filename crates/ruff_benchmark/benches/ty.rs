@@ -221,7 +221,7 @@ fn setup_micro_case(code: &str) -> Case {
     let file_path = "src/test.py";
     fs.write_file_all(
         SystemPathBuf::from(file_path),
-        ruff_python_trivia::textwrap::dedent(code),
+        &*ruff_python_trivia::textwrap::dedent(code),
     )
     .unwrap();
 

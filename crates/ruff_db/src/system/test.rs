@@ -205,8 +205,8 @@ impl WritableSystem for TestSystem {
         self.system().create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
-        self.system().write_file(path, content)
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
+        self.system().write_file_bytes(path, content)
     }
 
     fn create_directory_all(&self, path: &SystemPath) -> Result<()> {
@@ -287,7 +287,11 @@ pub trait DbWithTestSystem: Db + Sized {
     ///
     /// ## Panics
     /// If the db isn't using the [`InMemorySystem`].
-    fn write_virtual_file(&mut self, path: impl AsRef<SystemVirtualPath>, content: impl ToString) {
+    fn write_virtual_file(
+        &mut self,
+        path: impl AsRef<SystemVirtualPath>,
+        content: impl AsRef<[u8]>,
+    ) {
         let path = path.as_ref();
         self.test_system()
             .memory_file_system()
@@ -453,7 +457,7 @@ impl WritableSystem for InMemorySystem {
         self.memory_fs.create_new_file(path)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         self.memory_fs.write_file(path, content)
     }
 

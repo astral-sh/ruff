@@ -438,6 +438,38 @@ mod tests {
     }
 
     #[test]
+    fn add_ignore_line_continuation_empty_lines() {
+        let test = CodeActionTest::with_source(
+            r#"b = bbbbb \
+    [  ccc # test
+
+        + <START>ddd<END>  \
+
+    ] # test
+        "#,
+        );
+
+        assert_snapshot!(test.code_actions(&UNRESOLVED_REFERENCE), @r"
+        info[code-action]: Ignore 'unresolved-reference' for this line
+         --> main.py:4:11
+          |
+        2 |     [  ccc # test
+        3 |
+        4 |         + ddd  \
+          |           ^^^
+        5 |
+        6 |     ] # test
+          |
+        2 |     [  ccc # test
+        3 | 
+        4 |         + ddd  \
+          - 
+        5 +   # ty:ignore[unresolved-reference]
+        6 |     ] # test
+        ");
+    }
+
+    #[test]
     fn undefined_reveal_type() {
         let test = CodeActionTest::with_source(
             r#"

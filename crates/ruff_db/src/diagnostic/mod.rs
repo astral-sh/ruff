@@ -1057,6 +1057,13 @@ impl DiagnosticId {
         matches!(self, DiagnosticId::Lint(_))
     }
 
+    pub const fn as_lint(&self) -> Option<LintName> {
+        match self {
+            DiagnosticId::Lint(name) => Some(*name),
+            _ => None,
+        }
+    }
+
     /// Returns `true` if this `DiagnosticId` represents a lint with the given name.
     pub fn is_lint_named(&self, name: &str) -> bool {
         matches!(self, DiagnosticId::Lint(self_name) if self_name == name)

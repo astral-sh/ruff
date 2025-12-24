@@ -361,7 +361,7 @@ impl WritableSystem for OsSystem {
         std::fs::File::create_new(path).map(drop)
     }
 
-    fn write_file(&self, path: &SystemPath, content: &str) -> Result<()> {
+    fn write_file_bytes(&self, path: &SystemPath, content: &[u8]) -> Result<()> {
         std::fs::write(path.as_std_path(), content)
     }
 
