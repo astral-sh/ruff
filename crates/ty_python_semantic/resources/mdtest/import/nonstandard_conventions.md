@@ -647,8 +647,8 @@ reveal_type(mypackage.imported.X)  # revealed: int
 
 ## `from` Import of Other Package's Submodule
 
-`from mypackage import submodule` from outside the package is not modeled as a side-effect on
-`mypackage`, even in the importing file (this could be changed!).
+`from mypackage import submodule` and `from mypackage.submodule import not_a_submodule` from outside
+the package are both modeled as a side-effects on `mypackage`.
 
 ### In Stub
 
@@ -663,18 +663,28 @@ reveal_type(mypackage.imported.X)  # revealed: int
 X: int = 42
 ```
 
+`package2/__init__.pyi`:
+
+```pyi
+```
+
+`package2/submodule.pyi`:
+
+```pyi
+not_a_submodule: int
+```
+
 `main.py`:
 
 ```py
 import mypackage
+import package2
 from mypackage import imported
+from package2.submodule import not_a_submodule
 
 reveal_type(imported.X)  # revealed: int
-
-# TODO: this would be nice to support, but it's dangerous with available_submodule_attributes
-# for details, see: https://github.com/astral-sh/ty/issues/1488
-# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
+reveal_type(package2.submodule.not_a_submodule)  # revealed: int
 ```
 
 ### In Non-Stub
@@ -690,17 +700,28 @@ reveal_type(mypackage.imported.X)  # revealed: Unknown
 X: int = 42
 ```
 
+`package2/__init__.py`:
+
+```py
+```
+
+`package2/submodule.py`:
+
+```py
+not_a_submodule: int
+```
+
 `main.py`:
 
 ```py
 import mypackage
+import package2
 from mypackage import imported
+from package2.submodule import not_a_submodule
 
 reveal_type(imported.X)  # revealed: int
-
-# TODO: this would be nice to support, as it works at runtime
-# error: [possibly-missing-attribute] "Submodule `imported` may not be available"
-reveal_type(mypackage.imported.X)  # revealed: Unknown
+reveal_type(mypackage.imported.X)  # revealed: int
+reveal_type(package2.submodule.not_a_submodule)  # revealed: int
 ```
 
 ## `from` Import of Sibling Module
@@ -857,6 +878,51 @@ def funcmod(x: int) -> int:
 from mypackage import funcmod
 
 x = funcmod(1)
+```
+
+## A Tale of Two Modules
+
+This is a nonsensical regression test for some incredibly cursed interaction in `ty` where we get
+confused about `mypackage.conflicted`. The worst part is that resolving an import
+`from typing import <anything that resolves>` is load-bearing, and `typing` seems to be special
+here. There is no known reason why `typing` should be special here.
+
+### In Stub
+
+`mypackage/__init__.py`:
+
+```py
+from .conflicted.b import x
+```
+
+`mypackage/conflicted/__init__.py`:
+
+`mypackage/conflicted/other1/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`mypackage/conflicted/b/__init__.py`:
+
+```py
+x: int = 1
+```
+
+`mypackage/conflicted/b/c/__init__.py`:
+
+```py
+y: int = 2
+```
+
+`main.py`:
+
+```py
+from typing import TYPE_CHECKING
+from mypackage.conflicted.other1 import x as x1
+import mypackage.conflicted.b.c
+
+reveal_type(mypackage.conflicted.b.c.y)  # revealed: int
 ```
 
 ## Re-export Nameclash Problems In Functions

@@ -116,3 +116,43 @@ b = 1
 
 ```py
 ```
+
+## Submodule is loaded in a non-global scope
+
+We recognise submodules as being available as attributes even if they are loaded in a function
+scope. The function might never be executed, which means that the submodule might never be loaded;
+however, we prefer to prioritise avoiding false positives over catching all possible errors here.
+
+`a/b.py`:
+
+```py
+```
+
+`a/c.py`:
+
+```py
+d = 42
+```
+
+`a/e/f.py`:
+
+```py
+```
+
+`main.py`:
+
+```py
+import a
+
+def f():
+    import a.b
+    from a.c import d
+    from a.e import f
+
+f()
+
+reveal_type(a.b)  # revealed: <module 'a.b'>
+reveal_type(a.c)  # revealed: <module 'a.c'>
+reveal_type(a.e)  # revealed: <module 'a.e'>
+reveal_type(a.e.f)  # revealed: <module 'a.e.f'>
+```
