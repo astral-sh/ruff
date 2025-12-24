@@ -12685,9 +12685,21 @@ impl<'db> CallableType<'db> {
                 );
             }
 
-            // Top[...] <: non-Top is always false.
-            // Top is not a subtype of any specific callable.
+            // Top[...] <: non-Top: depends on whether target has gradual parameters.
+            // For assignability, Top[(...) -> R] can be assigned to (...) -> S if R <: S
+            // (where (...) represents gradual parameters).
+            // For subtyping, Top is never a subtype of any specific callable.
             (true, false) => {
+                if !relation.is_subtyping() && other.signatures(db).has_gradual_parameters() {
+                    return self.signatures(db).return_types_have_relation_to(
+                        db,
+                        other.signatures(db),
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                }
                 return ConstraintSet::from(false);
             }
         }

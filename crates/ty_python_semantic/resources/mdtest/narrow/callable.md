@@ -70,3 +70,23 @@ def call_with_args(y: object, a: int, b: str) -> object:
         return y(a, b)
     return None
 ```
+
+## Assignability of narrowed callables
+
+A narrowed callable `Top[Callable[..., object]]` should be assignable to `Callable[..., Any]`. This
+is important for decorators and other patterns where we need to pass the narrowed callable to
+functions expecting gradual callables.
+
+```py
+from typing import Any, Callable, TypeVar
+
+F = TypeVar("F", bound=Callable[..., Any])
+
+def wrap(f: F) -> F:
+    return f
+
+def f(x: object):
+    if callable(x):
+        # x has type `Top[(...) -> object]`, which should be assignable to `Callable[..., Any]`
+        wrap(x)
+```
