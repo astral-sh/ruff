@@ -442,8 +442,18 @@ impl Workspace {
                         new_text: edit.content().map(ToString::to_string).unwrap_or_default(),
                     }
                 });
+
+                let name = comp.insert.as_deref().unwrap_or(&comp.name).to_string();
+                let import_suffix = comp
+                    .module_name
+                    .and_then(|name| import_edit.is_some().then(|| format!(" (import {name})")));
+
+                let label = import_suffix
+                    .map(|suffix| format!("{name}{suffix}"))
+                    .unwrap_or_else(|| name);
+
                 Completion {
-                    name: comp.name.into(),
+                    label,
                     kind,
                     detail: type_display,
                     module_name: comp.module_name.map(ToString::to_string),
@@ -1070,7 +1080,7 @@ pub struct Hover {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Completion {
     #[wasm_bindgen(getter_with_clone)]
-    pub name: String,
+    pub label: String,
     pub kind: Option<CompletionKind>,
     #[wasm_bindgen(getter_with_clone)]
     pub insert_text: Option<String>,

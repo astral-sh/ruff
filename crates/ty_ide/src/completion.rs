@@ -48,6 +48,7 @@ pub fn completion<'db>(
         }
         ContextKind::NonImport(ref non_import) => {
             let model = SemanticModel::new(db, file);
+            dbg!(&non_import.target);
             let (semantic_completions, scoped) = match non_import.target {
                 CompletionTargetAst::ObjectDot { expr } => {
                     (model.attribute_completions(expr), None)
@@ -520,7 +521,7 @@ impl<'m> Context<'m> {
             ContextKind::Import(import)
         } else {
             let target_token = CompletionTargetTokens::find(&cursor)?;
-            let target = target_token.ast(&cursor)?;
+            let target = dbg!(target_token.ast(&cursor)?);
             ContextKind::NonImport(ContextNonImport { target })
         };
 
@@ -559,6 +560,7 @@ impl<'m> Context<'m> {
 /// The lifetime parameter `'m` refers to the shorter of the following
 /// lifetimes: the parsed module the cursor is in and the actual bytes
 /// making up the source file containing the cursor.
+
 struct ContextCursor<'m> {
     /// The parsed module containing the cursor.
     parsed: &'m ParsedModuleRef,
@@ -1461,7 +1463,7 @@ impl<'t> CompletionTargetTokens<'t> {
                 }
             }
             CompletionTargetTokens::Generic { token } => {
-                let node = cursor.covering_node(token.range()).node();
+                let node = dbg!(cursor.covering_node(dbg!(token.range()))).node();
                 Some(CompletionTargetAst::Scoped(ScopedTarget { node }))
             }
             CompletionTargetTokens::Unknown => {
@@ -6684,6 +6686,19 @@ def func():
         .not_contains("await")
         .not_contains("raise")
         .not_contains("False");
+    }
+
+    #[test]
+    fn decorator_without_class_or_function() {
+        completion_test_builder(
+            "\
+from dataclasses import dataclass
+
+@dataclass(froz<CURSOR>
+",
+        )
+        .build()
+        .contains("frozen");
     }
 
     #[test]
