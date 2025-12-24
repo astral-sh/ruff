@@ -1089,6 +1089,8 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let kind = if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
+        } else if self.is_staticmethod(db) {
+            CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
         };

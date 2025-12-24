@@ -4687,6 +4687,11 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         match self {
+            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
+                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
+                // The underlying function is returned as-is, without binding self.
+                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            }
             Type::Callable(callable)
                 if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
             {
@@ -12387,6 +12392,10 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
+    /// A callable type that represents a staticmethod. These callables do not bind `self`
+    /// when accessed as attributes on instances - they return the underlying function as-is.
+    StaticMethodLike,
+
     /// A callable type that we believe represents a classmethod (i.e. it will unconditionally bind
     /// the first argument on `__get__`).
     ClassMethodLike,
@@ -12489,6 +12498,10 @@ impl<'db> CallableType<'db> {
 
     pub(crate) fn is_classmethod_like(self, db: &'db dyn Db) -> bool {
         matches!(self.kind(db), CallableTypeKind::ClassMethodLike)
+    }
+
+    pub(crate) fn is_staticmethod_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
     }
 
     pub(crate) fn bind_self(
