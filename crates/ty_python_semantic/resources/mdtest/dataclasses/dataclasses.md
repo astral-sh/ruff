@@ -583,7 +583,7 @@ from module import NotFrozenBase
 
 @final
 @dataclass(frozen=True)
-@total_ordering
+@total_ordering  # error: [invalid-total-ordering]
 class FrozenChild(NotFrozenBase):  # error: [invalid-frozen-dataclass-subclass]
     y: str
 ```

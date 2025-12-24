@@ -77,7 +77,7 @@ use crate::types::diagnostic::{
     report_invalid_exception_caught, report_invalid_exception_cause,
     report_invalid_exception_raised, report_invalid_exception_tuple_caught,
     report_invalid_generator_function_return_type, report_invalid_key_on_typed_dict,
-    report_invalid_or_unsupported_base, report_invalid_return_type,
+    report_invalid_or_unsupported_base, report_invalid_return_type, report_invalid_total_ordering,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_named_tuple_field_with_leading_underscore,
     report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
@@ -852,7 +852,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (5) Check that the class's metaclass can be determined without error.
+            // (5) Check that @total_ordering has a valid ordering method in the MRO
+            if class.total_ordering(self.db()) {
+                let has_ordering_method = class
+                    .iter_mro(self.db(), None)
+                    .filter_map(super::super::class_base::ClassBase::into_class)
+                    .filter(|base_class| {
+                        !base_class
+                            .class_literal(self.db())
+                            .0
+                            .is_known(self.db(), KnownClass::Object)
+                    })
+                    .any(|base_class| {
+                        base_class
+                            .class_literal(self.db())
+                            .0
+                            .has_own_ordering_method(self.db())
+                    });
+
+                if !has_ordering_method {
+                    // Find the @total_ordering decorator to report the diagnostic at its location
+                    if let Some(decorator) = class_node.decorator_list.iter().find(|decorator| {
+                        self.expression_type(&decorator.expression)
+                            .as_function_literal()
+                            .is_some_and(|function| {
+                                function.is_known(self.db(), KnownFunction::TotalOrdering)
+                            })
+                    }) {
+                        report_invalid_total_ordering(&self.context, class, decorator);
+                    }
+                }
+            }
+
+            // (6) Check that the class's metaclass can be determined without error.
             if let Err(metaclass_error) = class.try_metaclass(self.db()) {
                 match metaclass_error.reason() {
                     MetaclassErrorKind::Cycle => {
@@ -2916,7 +2948,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_check_only = false;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
-        let mut total_ordering = false;
+        let mut total_ordering_decorator: Option<&ast::Decorator> = None;
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
@@ -2931,7 +2963,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_function_literal()
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::TotalOrdering))
             {
-                total_ordering = true;
+                total_ordering_decorator = Some(decorator);
                 continue;
             }
 
@@ -2998,23 +3030,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )
         };
 
+        let total_ordering = total_ordering_decorator.is_some();
+
         let ty = match (maybe_known_class, &*name.id) {
             (None, "NamedTuple") if in_typing_module() => {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
             (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
-            _ => Type::from(ClassLiteral::new(
-                self.db(),
-                name.id.clone(),
-                body_scope,
-                maybe_known_class,
-                deprecated,
-                type_check_only,
-                dataclass_params,
-                dataclass_transformer_params,
-                total_ordering,
-                has_own_ordering_method,
-            )),
+            _ => {
+                let class_literal = ClassLiteral::new(
+                    self.db(),
+                    name.id.clone(),
+                    body_scope,
+                    maybe_known_class,
+                    deprecated,
+                    type_check_only,
+                    dataclass_params,
+                    dataclass_transformer_params,
+                    total_ordering,
+                    has_own_ordering_method,
+                );
+
+                Type::from(class_literal)
+            }
         };
 
         self.add_declaration_with_binding(
