@@ -95,6 +95,7 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
+use crate::types::member::class_member;
 use crate::types::mro::MroErrorKind;
 use crate::types::newtype::NewType;
 use crate::types::subclass_of::SubclassOfInner;
@@ -2864,6 +2865,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let mut type_check_only = false;
         let mut dataclass_params = None;
         let mut dataclass_transformer_params = None;
+        let mut total_ordering = false;
         for decorator in decorator_list {
             let decorator_ty = self.infer_decorator(decorator);
             if decorator_ty
@@ -2871,6 +2873,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .is_some_and(|function| function.is_known(self.db(), KnownFunction::Dataclass))
             {
                 dataclass_params = Some(DataclassParams::default_params(self.db()));
+                continue;
+            }
+
+            if decorator_ty
+                .as_function_literal()
+                .is_some_and(|function| function.is_known(self.db(), KnownFunction::TotalOrdering))
+            {
+                total_ordering = true;
                 continue;
             }
 
@@ -2938,6 +2948,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db(), self.file());
 
+        // Check if the class defines any ordering method in its body.
+        // This is used by @total_ordering to determine if synthesis is valid.
+        let has_own_ordering_method = ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .any(|method| !class_member(self.db(), body_scope, method).is_undefined());
+
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
         let in_typing_module = || {
@@ -2961,6 +2977,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 type_check_only,
                 dataclass_params,
                 dataclass_transformer_params,
+                total_ordering,
+                has_own_ordering_method,
             )),
         };
 

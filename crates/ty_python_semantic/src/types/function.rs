@@ -1413,6 +1413,10 @@ pub enum KnownFunction {
     /// `dataclasses.field`
     Field,
 
+    /// `functools.total_ordering`
+    #[strum(serialize = "total_ordering")]
+    TotalOrdering,
+
     /// `inspect.getattr_static`
     GetattrStatic,
 
@@ -1501,6 +1505,7 @@ impl KnownFunction {
             Self::Dataclass | Self::Field => {
                 matches!(module, KnownModule::Dataclasses)
             }
+            Self::TotalOrdering => module.is_functools(),
             Self::GetattrStatic => module.is_inspect(),
             Self::IsAssignableTo
             | Self::IsDisjointFrom
@@ -2068,6 +2073,7 @@ pub(crate) mod tests {
 
                 KnownFunction::ImportModule => KnownModule::ImportLib,
                 KnownFunction::NamedTuple => KnownModule::Collections,
+                KnownFunction::TotalOrdering => KnownModule::Functools,
             };
 
             let function_definition = known_module_symbol(&db, module, function_name)
