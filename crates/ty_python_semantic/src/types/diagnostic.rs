@@ -2385,10 +2385,17 @@ pub(super) fn report_non_subscriptable(
     let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot subscript object of type `{}` with no `{method}` method",
-        non_subscriptable_ty.display(context.db())
-    ));
+    if method == "__delitem__" {
+        builder.into_diagnostic(format_args!(
+            "Cannot delete subscript on object of type `{}` with no `{method}` method",
+            non_subscriptable_ty.display(context.db())
+        ));
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot subscript object of type `{}` with no `{method}` method",
+            non_subscriptable_ty.display(context.db())
+        ));
+    }
 }
 
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {

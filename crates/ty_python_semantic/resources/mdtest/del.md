@@ -171,6 +171,8 @@ reveal_type(c.x)  # revealed: int
 
 ## Delete items
 
+### Basic item deletion
+
 Deleting an item also invalidates the narrowing by the assignment, but accessing the item itself is
 still valid.
 
@@ -189,3 +191,69 @@ def f(l: list[int]):
     del l[0]
     reveal_type(l[0])  # revealed: int
 ```
+
+### `__delitem__` without `__getitem__`
+
+A class or protocol that only defines `__delitem__` (without `__getitem__`) should still support
+item deletion. The `__delitem__` method is independent of `__getitem__`.
+
+```py
+from typing import Protocol, TypeVar
+
+KT = TypeVar("KT")
+
+class CanDelItem(Protocol[KT]):
+    def __delitem__(self, k: KT, /) -> None: ...
+
+def f(x: CanDelItem[int], k: int):
+    # This should be valid - the object has __delitem__
+    del x[k]
+
+class OnlyDelItem:
+    def __delitem__(self, key: int) -> None:
+        pass
+
+d = OnlyDelItem()
+del d[0]  # OK
+
+# error: [non-subscriptable] "Cannot subscript object of type `OnlyDelItem` with no `__getitem__` method"
+d[0]
+```
+
+### `__getitem__` without `__delitem__`
+
+A class that only defines `__getitem__` (without `__delitem__`) should not support item deletion.
+
+```py
+class OnlyGetItem:
+    def __getitem__(self, key: int) -> str:
+        return "value"
+
+g = OnlyGetItem()
+reveal_type(g[0])  # revealed: str
+
+# error: [non-subscriptable] "Cannot delete subscript on object of type `OnlyGetItem` with no `__delitem__` method"
+del g[0]
+```
+
+### TypedDict deletion
+
+Deleting a required key from a TypedDict is a type error because it would make the object no longer
+a valid instance of that TypedDict type.
+
+```py
+from typing_extensions import TypedDict
+
+class Movie(TypedDict):
+    name: str
+    year: int
+
+m: Movie = {"name": "Blade Runner", "year": 1982}
+
+# error: [invalid-argument-type]
+del m["name"]
+```
+
+TODO: Deletion of `NotRequired` keys (or keys in `total=False` TypedDicts) should be allowed, but ty
+currently uses the typeshed stub `__delitem__(k: Never)` which rejects all deletions. See
+mypy/pyright behavior for reference.
