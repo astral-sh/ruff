@@ -14,6 +14,7 @@ use crate::diagnostic::{Span, UnifiedFile};
 use crate::file_revision::FileRevision;
 use crate::files::file_root::FileRoots;
 use crate::files::private::FileStatus;
+use crate::source::SourceText;
 use crate::system::{SystemPath, SystemPathBuf, SystemVirtualPath, SystemVirtualPathBuf};
 use crate::vendored::{VendoredPath, VendoredPathBuf};
 use crate::{Db, FxDashMap, vendored};
@@ -324,10 +325,16 @@ pub struct File {
     #[default]
     status: FileStatus,
 
-    /// Allows overriding the source of a file.
+    /// Overrides the result of [`source_text`](crate::source::source_text).
+    ///
+    /// This is useful when running queries after modifying a file's content but
+    /// before the content is written to disk. For example, to verify that the applied fixes
+    /// didn't introduce any new errors.
+    ///
+    /// The override gets automatically removed the next time the file changes.
     #[default]
-    #[returns(as_deref)]
-    pub source_override: Option<Box<str>>,
+    #[returns(ref)]
+    pub source_text_override: Option<SourceText>,
 }
 
 // The Salsa heap is tracked separately.
@@ -339,10 +346,6 @@ impl File {
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
     pub fn read_to_string(&self, db: &dyn Db) -> crate::system::Result<String> {
-        if let Some(source) = self.source_override(db) {
-            return Ok(source.to_string());
-        }
-
         let path = self.path(db);
 
         match path {
@@ -367,10 +370,6 @@ impl File {
     /// Reading the same file multiple times isn't guaranteed to return the same content. It's possible
     /// that the file has been modified in between the reads.
     pub fn read_to_notebook(&self, db: &dyn Db) -> Result<Notebook, NotebookError> {
-        if let Some(source) = self.source_override(db) {
-            return Notebook::from_source_code(source);
-        }
-
         let path = self.path(db);
 
         match path {
@@ -457,21 +456,27 @@ impl File {
             _ => (FileStatus::NotFound, FileRevision::zero(), None),
         };
 
+        let mut clear_override = false;
+
         if file.status(db) != status {
             tracing::debug!("Updating the status of `{}`", file.path(db));
             file.set_status(db).to(status);
-            file.set_source_override(db).to(None);
+            clear_override = true;
         }
 
         if file.revision(db) != revision {
             tracing::debug!("Updating the revision of `{}`", file.path(db));
             file.set_revision(db).to(revision);
-            file.set_source_override(db).to(None);
+            clear_override = true;
         }
 
         if file.permissions(db) != permission {
             tracing::debug!("Updating the permissions of `{}`", file.path(db));
             file.set_permissions(db).to(permission);
+        }
+
+        if clear_override && file.source_text_override(db).is_some() {
+            file.set_source_text_override(db).to(None);
         }
     }
 

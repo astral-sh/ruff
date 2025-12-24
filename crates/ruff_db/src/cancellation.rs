@@ -51,13 +51,14 @@ impl CancellationToken {
     }
 }
 
+/// The operation was canceled by the provided [`CancellationToken`].
 #[derive(Debug)]
-pub struct Cancelled;
+pub struct Canceled;
 
-impl std::error::Error for Cancelled {}
+impl std::error::Error for Canceled {}
 
-impl std::fmt::Display for Cancelled {
+impl std::fmt::Display for Canceled {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str("operation was cancelled")
+        f.write_str("operation was canceled")
     }
 }

@@ -107,6 +107,7 @@ fn add_ignore_unfixable() -> anyhow::Result<()> {
     Added 5 ignore comments
 
     ----- stderr -----
+    WARN Skipping file `<temp_dir>/has_syntax_error.py` with syntax errors
     ");
 
     Ok(())

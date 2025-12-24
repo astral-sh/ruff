@@ -1,23 +1,27 @@
-use std::collections::BTreeMap;
-
-use ruff_db::cancellation::{CancellationToken, Cancelled};
+use ruff_db::cancellation::{Canceled, CancellationToken};
+use ruff_db::diagnostic::{DisplayDiagnosticConfig, DisplayDiagnostics};
 use ruff_db::parsed::parsed_module;
+use ruff_db::source::SourceText;
 use ruff_db::system::{SystemPath, WritableSystem};
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, DiagnosticId, Severity, Span},
     files::File,
     source::source_text,
 };
-use ruff_diagnostics::{Fix, SourceMap};
+use ruff_diagnostics::{Fix, IsolationLevel, SourceMap};
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
+use rustc_hash::FxHashSet;
 use salsa::Setter as _;
+use std::collections::BTreeMap;
 use thiserror::Error;
 use ty_python_semantic::{UNUSED_IGNORE_COMMENT, suppress_all};
 
 use crate::Db;
 
 pub struct SuppressAllResult {
-    /// The non-lint diagnostics that can't be suppressed.
+    /// The non-lint diagnostics that can't be suppressed or the diagnostics of files
+    /// that couldn't be suppressed (because ty failed to write the result back to disk,
+    /// or the file contains syntax errors).
     pub diagnostics: Vec<Diagnostic>,
 
     /// The number of diagnostics that were suppressed.
@@ -26,12 +30,15 @@ pub struct SuppressAllResult {
 
 /// Adds suppressions to all lint diagnostics and writes the changed files back to disk.
 ///
-/// Returns how many diagnostics were suppressed
+/// Returns how many diagnostics were suppressed along the remaining, non-suppressed diagnostics.
+///
+/// ## Panics
+/// If the `db`'s system isn't [writable](WritableSystem).
 pub fn suppress_all_diagnostics(
     db: &mut dyn Db,
     mut diagnostics: Vec<Diagnostic>,
     cancellation_token: &CancellationToken,
-) -> Result<SuppressAllResult, Cancelled> {
+) -> Result<SuppressAllResult, Canceled> {
     let system = WritableSystem::dyn_clone(
         db.system()
             .as_writable()
@@ -44,8 +51,10 @@ pub fn suppress_all_diagnostics(
             .and_then(|span| span.range())
             .is_some()
             && diagnostic.id().is_lint()
+            && diagnostic.id() != DiagnosticId::Lint(UNUSED_IGNORE_COMMENT.name())
     });
 
+    // Early return if there are no diagnostics that can be suppressed to avoid all the heavy work below.
     if !has_fixable {
         return Ok(SuppressAllResult {
             diagnostics,
@@ -70,9 +79,10 @@ pub fn suppress_all_diagnostics(
     let mut fixed_count = 0usize;
     let project = db.project();
 
+    // Try to suppress all lint-diagnostics in the given file.
     for (&file, file_diagnostics) in &mut by_file {
         if cancellation_token.is_cancelled() {
-            return Err(Cancelled);
+            return Err(Canceled);
         }
 
         let Some(path) = file.path(db).as_system_path() else {
@@ -86,16 +96,14 @@ pub fn suppress_all_diagnostics(
 
         let parsed = parsed_module(db, file);
         if parsed.load(db).has_syntax_errors() {
-            tracing::debug!("Skipping file `{path}` with syntax errors",);
+            tracing::warn!("Skipping file `{path}` with syntax errors",);
             continue;
         }
 
         let fixable_diagnostics: Vec<_> = file_diagnostics
             .iter()
             .filter_map(|diagnostic| {
-                let DiagnosticId::Lint(lint_id) = diagnostic.id() else {
-                    return None;
-                };
+                let lint_id = diagnostic.id().as_lint()?;
 
                 // Don't suppress unused ignore comments.
                 if lint_id == UNUSED_IGNORE_COMMENT.name() {
@@ -111,47 +119,36 @@ pub fn suppress_all_diagnostics(
             .collect();
 
         if fixable_diagnostics.is_empty() {
+            tracing::debug!(
+                "Skipping file `{path}` because it contains no suppressable diagnostics"
+            );
             continue;
         }
 
+        tracing::debug!(
+            "Suppressing {} diagnostics in `{path}`.",
+            fixable_diagnostics.len()
+        );
+
         // Required to work around borrow checker issues.
         let path = path.to_path_buf();
-
         let fixes = suppress_all(db, file, &fixable_diagnostics);
+        let source = source_text(db, file);
 
-        // TODO: suppressions should never generate overlapping fixes but we need to handle the
-        // error case when we add support for generic fixes.
+        // TODO: Handle overlapping fixes when adding support for `--fix` by iterating until all fixes
+        // were successfully applied. We don't need to do that for suppressions because suppression fixes
+        // should never overlap (and, if they were, the worst outcome is that some suppressions are missing).
         let FixedCode {
             source: new_source,
             source_map,
-        } = apply_fixes(db, file, fixes).unwrap_or_else(|fixed| fixed);
+        } = apply_fixes(&source, fixes).unwrap_or_else(|fixed| fixed);
 
-        let source = source_text(db, file);
-        let new_source = match source.as_notebook() {
-            None => new_source,
-            Some(notebook) => {
-                let mut notebook = notebook.clone();
-                notebook.update(&source_map, new_source);
+        let new_source = source.with_text(new_source, &source_map);
 
-                let mut output = Vec::new();
-
-                notebook
-                    .write(&mut output)
-                    .expect("Writing to a `Vec` should not fail");
-
-                String::from_utf8(output).expect(
-                    "Notebook should serialize to valid UTF-8 if the source was valid UTF-8",
-                )
-            }
-        };
-
-        // TODO, I think we still want a guard here, but provide a way to defuse it
-
-        // Verify that the fix didn't introduce any syntax errors
-        // and update the source text on file (without writing it to disk).
-        // This will be unset when the file gets updated.
-        let mut source_guard = WithSourceOverrideGuard::new(db, file, &new_source);
-        let db = source_guard.db_mut();
+        // Verify that the fix didn't introduce any syntax errors by overriding
+        // the source text for `file`.
+        let mut source_guard = WithUpdatedSourceGuard::new(db, file, &source, new_source.clone());
+        let db = source_guard.db();
         let new_parsed = parsed_module(db, file);
         let new_parsed = new_parsed.load(db);
 
@@ -164,11 +161,30 @@ pub fn suppress_all_diagnostics(
                 ),
             );
 
+            let mut file_annotation = Annotation::primary(Span::from(file));
+            file_annotation.hide_snippet(true);
+            diag.annotate(file_annotation);
+
+            let parse_diagnostics: Vec<_> = new_parsed
+                .errors()
+                .iter()
+                .map(|error| {
+                    Diagnostic::invalid_syntax(Span::from(file), &error.error, error.location)
+                })
+                .collect();
+
             diag.add_bug_sub_diagnostics("%5BFix%20error%5D");
-            // Unfortunately, it's not possible to add the parse errors as
-            // sub diagnostics because the parse errors point into the new source but we
-            // revert the source text back to what we used to have on disk before
-            // trying to fix the file.
+
+            let file_db: &dyn ruff_db::Db = db;
+
+            diag.info(format_args!(
+                "Introduced syntax errors:\n\n{}",
+                DisplayDiagnostics::new(
+                    &file_db,
+                    &DisplayDiagnosticConfig::default(),
+                    &parse_diagnostics
+                )
+            ));
 
             file_diagnostics.push(diag);
 
@@ -191,14 +207,24 @@ pub fn suppress_all_diagnostics(
 
         // If we got here then we've been successful. Re-check to get the diagnostics with the
         // update source, update the fix count.
-        let diagnostics = project.check_file(db, file);
-        *file_diagnostics = diagnostics;
+
+        if fixable_diagnostics.len() == file_diagnostics.len() {
+            file_diagnostics.clear();
+        } else {
+            // If there are any other file level diagnostics, call `check_file` to re-compute them
+            // with updated ranges.
+            let diagnostics = project.check_file(db, file);
+            *file_diagnostics = diagnostics;
+        }
+
         fixed_count += fixable_diagnostics.len();
-        // Don't restore the source or the spans in the new diagnostics will be off.
+        // Don't restore the source text or we risk a panic when rendering the diagnostics
+        // if reading any of the fixed files fails (for whatever reason).
+        // The override will get removed on the next `File::sync_path` call.
         source_guard.defuse();
     }
 
-    // Remove the now suppressed diagnostics
+    // Stitch the remaining diagnostics back together.
     diagnostics.extend(by_file.into_values().flatten());
     diagnostics.sort_by(|left, right| {
         left.rendering_sort_key(db)
@@ -216,7 +242,7 @@ fn write_changes(
     system: &dyn WritableSystem,
     file: File,
     path: &SystemPath,
-    new_source: &str,
+    new_source: &SourceText,
 ) -> Result<(), WriteChangesError> {
     let metadata = system.path_metadata(path)?;
 
@@ -224,7 +250,7 @@ fn write_changes(
         return Err(WriteChangesError::FileWasModified);
     }
 
-    system.write_file(path, new_source)?;
+    system.write_file_bytes(path, &new_source.to_bytes())?;
 
     Ok(())
 }
@@ -241,13 +267,11 @@ enum WriteChangesError {
 /// Apply a series of fixes to `File` and returns the updated source code along with the source map.
 ///
 /// Returns an error if not all fixes were applied because some fixes are overlapping.
-fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode> {
-    let source = source_text(db, file);
-    let source = source.as_str();
-
+fn apply_fixes(source: &str, mut fixes: Vec<Fix>) -> Result<FixedCode, FixedCode> {
     let mut output = String::with_capacity(source.len());
     let mut last_pos: Option<TextSize> = None;
     let mut has_overlapping_fixes = false;
+    let mut isolated: FxHashSet<u32> = FxHashSet::default();
 
     let mut source_map = SourceMap::default();
 
@@ -258,6 +282,15 @@ fn apply_fixes(db: &dyn Db, file: File, mut fixes: Vec<Fix>) -> Result<FixedCode
 
         // If the fix contains at least one new edit, enforce isolation and positional requirements.
         if let Some(first) = edits.peek() {
+            // If this fix requires isolation, and we've already applied another fix in the
+            // same isolation group, skip it.
+            if let IsolationLevel::Group(id) = fix.isolation() {
+                if !isolated.insert(id) {
+                    has_overlapping_fixes = true;
+                    continue;
+                }
+            }
+
             // If this fix overlaps with a fix we've already applied, skip it.
             if last_pos.is_some_and(|last_pos| last_pos >= first.start()) {
                 has_overlapping_fixes = true;
@@ -311,34 +344,49 @@ struct FixedCode {
     source: String,
 }
 
-struct WithSourceOverrideGuard<'db> {
+/// Guard that sets [`File::set_source_text_override`] and guarantees to restore the original source
+/// text unless the guard is explicitly defused.
+struct WithUpdatedSourceGuard<'db> {
     db: &'db mut dyn Db,
-    file: Option<File>,
+    file: File,
+    old_source: Option<SourceText>,
 }
 
-impl<'db> WithSourceOverrideGuard<'db> {
-    fn new(db: &'db mut dyn Db, file: File, source: &str) -> Self {
-        file.set_source_override(db).to(Some(source.into()));
-
+impl<'db> WithUpdatedSourceGuard<'db> {
+    fn new(
+        db: &'db mut dyn Db,
+        file: File,
+        old_source: &SourceText,
+        new_source: SourceText,
+    ) -> Self {
+        file.set_source_text_override(db).to(Some(new_source));
         Self {
             db,
-            file: Some(file),
+            file,
+            old_source: Some(old_source.clone()),
         }
     }
 
-    fn db_mut(&mut self) -> &mut dyn Db {
-        self.db
+    fn defuse(&mut self) {
+        self.old_source = None;
     }
 
-    fn defuse(mut self) {
-        self.file = None;
+    fn db(&mut self) -> &mut dyn Db {
+        self.db
     }
 }
 
-impl Drop for WithSourceOverrideGuard<'_> {
+impl Drop for WithUpdatedSourceGuard<'_> {
     fn drop(&mut self) {
-        if let Some(file) = self.file.take() {
-            file.set_source_override(self.db).to(None);
+        if let Some(old_source) = self.old_source.take() {
+            // We don't set `source_text_override` to `None` here because setting the value
+            // invalidates the `source_text` query and there's the chance that reading the file's content
+            // will fail this time (e.g. because the file was deleted), resulting in ty panicking
+            // when trying to render any diagnostic for that file (because all offsets now point nowhere).
+            // The override will be cleared by `File::sync_path`, the next time the revision changes.
+            self.file
+                .set_source_text_override(self.db)
+                .to(Some(old_source));
         }
     }
 }
@@ -485,6 +533,123 @@ mod tests {
           |        ^
           |
         ");
+    }
+
+    #[test]
+    fn arguments() {
+        assert_snapshot!(
+            suppress_all_in(r#"
+                def test(a, b):
+                    pass
+
+
+                test(
+                    a = 10,
+                    c = "unknown"
+                )
+                "#
+        ),
+         @r#"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        def test(a, b):
+            pass
+
+
+        test(
+            a = 10,
+            c = "unknown"  # ty:ignore[unknown-argument]
+        )  # ty:ignore[missing-argument]
+        ```
+        "#);
+    }
+
+    #[test]
+    fn return_type() {
+        assert_snapshot!(
+            suppress_all_in(r#"class A:
+    def test(self, b: int) -> str:
+        return "test"
+
+
+class B(A):
+    def test(
+        self,
+        b: str
+    ) -> A.b:
+        pass"#
+        ),
+         @r#"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        class A:
+            def test(self, b: int) -> str:
+                return "test"
+
+
+        class B(A):
+            def test(
+                self,
+                b: str
+            ) -> A.b:  # ty:ignore[invalid-method-override, unresolved-attribute]
+                pass
+        ```
+        "#);
+    }
+
+    #[test]
+    fn existing_ty_ignore() {
+        assert_snapshot!(
+            suppress_all_in(r#"class A:
+    def test(self, b: int) -> str:
+        return "test"
+
+
+class B(A):
+    def test(  # ty:ignore[unresolved-reference]
+        self,
+        b: str
+    ) -> A.b:
+        pass"#
+        ),
+         @r#"
+        Added 2 suppressions
+
+        ## Fixed source
+
+        ```py
+        class A:
+            def test(self, b: int) -> str:
+                return "test"
+
+
+        class B(A):
+            def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+                self,
+                b: str
+            ) -> A.b:  # ty:ignore[unresolved-attribute]
+                pass
+        ```
+
+        ## Diagnostics after applying fixes
+
+        warning[unused-ignore-comment]: Unused `ty: ignore` directive: 'unresolved-reference'
+         --> test.py:7:28
+          |
+        6 | class B(A):
+        7 |     def test(  # ty:ignore[unresolved-reference, invalid-method-override]
+          |                            ^^^^^^^^^^^^^^^^^^^^
+        8 |         self,
+        9 |         b: str
+          |
+        help: Remove the unused suppression code
+        "#);
     }
 
     #[track_caller]

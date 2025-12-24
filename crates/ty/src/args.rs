@@ -54,6 +54,7 @@ pub(crate) struct CheckCommand {
     )]
     pub paths: Vec<SystemPathBuf>,
 
+    /// Adds `ty: ignore` comments to suppress all rule diagnostics.
     #[arg(long)]
     pub(crate) add_ignore: bool,
 

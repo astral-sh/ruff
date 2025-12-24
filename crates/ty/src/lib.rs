@@ -14,7 +14,7 @@ use clap::{CommandFactory, Parser};
 use colored::Colorize;
 use crossbeam::channel as crossbeam_channel;
 use rayon::ThreadPoolBuilder;
-use ruff_db::cancellation::{CancellationToken, CancellationTokenSource, Cancelled};
+use ruff_db::cancellation::{Canceled, CancellationToken, CancellationTokenSource};
 use ruff_db::diagnostic::{
     Diagnostic, DiagnosticId, DisplayDiagnosticConfig, DisplayDiagnostics, Severity,
 };
@@ -345,9 +345,6 @@ impl MainLoop {
                         tracing::warn!("No python files found under the given path(s)");
                     }
 
-                    let terminal_settings = db.project().settings(db).terminal();
-                    let is_human_readable = terminal_settings.output_format.is_human_readable();
-
                     let result = match self.mode {
                         MainLoopMode::Check => {
                             // TODO: We should have an official flag to silence workspace diagnostics.
@@ -358,7 +355,7 @@ impl MainLoop {
                             self.write_diagnostics(db, &result)?;
 
                             if self.cancellation_token.is_cancelled() {
-                                Err(Cancelled)
+                                Err(Canceled)
                             } else {
                                 Ok(result)
                             }
@@ -368,6 +365,10 @@ impl MainLoop {
                                 suppress_all_diagnostics(db, result, &self.cancellation_token)
                             {
                                 self.write_diagnostics(db, &result.diagnostics)?;
+
+                                let terminal_settings = db.project().settings(db).terminal();
+                                let is_human_readable =
+                                    terminal_settings.output_format.is_human_readable();
 
                                 if is_human_readable {
                                     writeln!(
@@ -380,14 +381,10 @@ impl MainLoop {
 
                                 Ok(result.diagnostics)
                             } else {
-                                Err(Cancelled)
+                                Err(Canceled)
                             }
                         }
                     };
-
-                    if self.watcher.is_some() {
-                        continue;
-                    }
 
                     let exit_status = match result.as_deref() {
                         Ok([]) => ExitStatus::Success,
@@ -395,13 +392,17 @@ impl MainLoop {
                             let terminal_settings = db.project().settings(db).terminal();
                             exit_status_from_diagnostics(diagnostics, terminal_settings)
                         }
-                        Err(Cancelled) => ExitStatus::Success,
+                        Err(Canceled) => ExitStatus::Success,
                     };
 
                     if exit_status.is_internal_error() {
                         tracing::warn!(
                             "A fatal error occurred while checking some files. Not all project files were analyzed. See the diagnostics list above for details."
                         );
+                    }
+
+                    if self.watcher.is_some() {
+                        continue;
                     }
 
                     return Ok(exit_status);
