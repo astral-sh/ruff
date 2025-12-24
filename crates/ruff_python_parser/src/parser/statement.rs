@@ -2929,7 +2929,7 @@ impl<'src> Parser<'src> {
                 let range = self.node_range(start);
 
                 ast::StmtFunctionDef {
-                    node_index: Default::default(),
+                    node_index: AtomicNodeIndex::default(),
                     range,
                     is_async: false,
                     decorator_list: decorators,

@@ -348,7 +348,7 @@ class PlaygroundServer
           completion.kind == null
             ? CompletionItemKind.Variable
             : mapCompletionKind(completion.kind),
-        insertText: completion.insert_text ?? completion.name,
+        insertText: completion.insert_text ?? undefined,
         additionalTextEdits: completion.additional_text_edits?.map(
           (edit: TextEdit) => ({
             range: tyRangeToMonacoRange(edit.range),
