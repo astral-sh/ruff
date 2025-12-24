@@ -895,7 +895,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && let rhs_ty = inference.expression_type(&comparators[0])
             && rhs_ty.is_singleton(self.db)
         {
-            let dominated = is_positive == (ops[0] == ast::CmpOp::Is);
+            let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
             let filtered: Vec<_> = union
                 .elements(self.db)
                 .iter()
@@ -903,8 +903,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     elem.as_nominal_instance()
                         .and_then(|inst| inst.tuple_spec(self.db))
                         .and_then(|spec| spec.py_index(self.db, index).ok())
-                        .filter(|el_ty| !el_ty.is_union())
-                        .is_none_or(|el_ty| el_ty.is_disjoint_from(self.db, rhs_ty) != dominated)
+                        .is_none_or(|el_ty| {
+                            if is_positive_check {
+                                // `is X` context: keep tuples where element could be X
+                                !el_ty.is_disjoint_from(self.db, rhs_ty)
+                            } else {
+                                // `is not X` context: keep tuples where element is not always X
+                                !el_ty.is_subtype_of(self.db, rhs_ty)
+                            }
+                        })
                 })
                 .copied()
                 .collect();

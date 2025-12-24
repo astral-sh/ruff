@@ -197,10 +197,14 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
 
     n = 0
     if t1[n] is not None:
-        # Non-literal subscript narrowing are currently not supported, as well as mypy, pyright
+        # Narrowing the individual element type with a non-literal subscript is not supported
         reveal_type(t1[0])  # revealed: int | None
         reveal_type(t1[n])  # revealed: int | None
         reveal_type(t1[1])  # revealed: int | None
+
+    # However, we can still discriminate between tuples in a union using a variable index:
+    if t2[n] is not None:
+        reveal_type(t2)  # revealed: tuple[int, int]
 
     if t2[0] is not None:
         reveal_type(t2)  # revealed: tuple[int, int]
@@ -267,6 +271,12 @@ def _(t8: tuple[int, int, int] | tuple[None, None]):
     # error: [index-out-of-bounds] "Index 2 is out of bounds for tuple `tuple[None, None]` with length 2"
     if t8[2] is not None:
         reveal_type(t8)  # revealed: tuple[int, int, int] | tuple[None, None]
+
+def _(t9: tuple[int | None, str] | tuple[str, int]):
+    # When the element type is a union (like `int | None`), we can't filter
+    # out the tuple.
+    if t9[0] is not None:
+        reveal_type(t9)  # revealed: tuple[int | None, str] | tuple[str, int]
 ```
 
 ### String subscript
