@@ -375,17 +375,15 @@ class Parent:
 
 class Child(Parent):
     def copy(self) -> Self:
-        # super().copy() should return Self@copy, not Child
         result = super().copy()
         reveal_type(result)  # revealed: Self@copy
         return result
 
-# When called on concrete types, Self is substituted correctly
+# When called on concrete types, Self is substituted correctly.
 reveal_type(Child().copy())  # revealed: Child
 ```
 
-TODO: The same should apply to classmethods with `Self` return types, but this isn't fully working yet.
-The call to `super().create()` incorrectly fails with a type variable constraint error.
+The same applies to classmethods with `Self` return types:
 
 ```py
 from typing import Self
@@ -398,13 +396,11 @@ class Parent:
 class Child(Parent):
     @classmethod
     def create(cls) -> Self:
-        # TODO: super().create() should return Self@create, not error
-        # error: [invalid-argument-type]
         result = super().create()
-        reveal_type(result)  # revealed: Unknown
+        reveal_type(result)  # revealed: Self@create
         return result
 
-# When called on concrete types, Self is substituted correctly
+# When called on concrete types, Self is substituted correctly.
 reveal_type(Child.create())  # revealed: Child
 ```
 
