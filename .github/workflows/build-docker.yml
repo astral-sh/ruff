@@ -20,6 +20,12 @@ on:
 env:
   RUFF_BASE_IMG: ghcr.io/${{ github.repository_owner }}/ruff
 
+permissions:
+  contents: read
+  # TODO(zanieb): Ideally, this would be `read` on dry-run but that will require
+  # significant changes to the workflow.
+  packages: write # zizmor: ignore[excessive-permissions]
+
 jobs:
   docker-build:
     name: Build Docker image (ghcr.io/astral-sh/ruff) for ${{ matrix.platform }}
