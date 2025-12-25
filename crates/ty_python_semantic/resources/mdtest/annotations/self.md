@@ -384,6 +384,30 @@ class Child(Parent):
 reveal_type(Child().copy())  # revealed: Child
 ```
 
+TODO: The same should apply to classmethods with `Self` return types, but this isn't fully working yet.
+The call to `super().create()` incorrectly fails with a type variable constraint error.
+
+```py
+from typing import Self
+
+class Parent:
+    @classmethod
+    def create(cls) -> Self:
+        return cls()
+
+class Child(Parent):
+    @classmethod
+    def create(cls) -> Self:
+        # TODO: super().create() should return Self@create, not error
+        # error: [invalid-argument-type]
+        result = super().create()
+        reveal_type(result)  # revealed: Unknown
+        return result
+
+# When called on concrete types, Self is substituted correctly
+reveal_type(Child.create())  # revealed: Child
+```
+
 ## Attributes
 
 TODO: The use of `Self` to annotate the `next_node` attribute should be
