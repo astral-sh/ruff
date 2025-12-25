@@ -174,8 +174,7 @@ class B(A):
 
     @classmethod
     def f(cls):
-        reveal_type(super())  # revealed: <super: <class 'B'>, Self@f>
-        # error: [invalid-argument-type]
+        reveal_type(super())  # revealed: <super: <class 'B'>, type[Self@f]>
         super().f()
 
 super(B, B(42)).__init__(42)
