@@ -7,7 +7,7 @@ source: crates/ruff_python_parser/tests/fixtures.rs
 Module(
     ModModule {
         node_index: NodeIndex(None),
-        range: 0..57,
+        range: 0..70,
         body: [
             FunctionDef(
                 StmtFunctionDef {
@@ -177,11 +177,10 @@ Module(
                     ],
                 },
             ),
-            FunctionDef(
-                StmtFunctionDef {
+            ClassDef(
+                StmtClassDef {
                     node_index: NodeIndex(None),
-                    range: 51..56,
-                    is_async: false,
+                    range: 51..69,
                     decorator_list: [
                         Decorator {
                             range: 51..56,
@@ -195,23 +194,26 @@ Module(
                                 },
                             ),
                         },
+                        Decorator {
+                            range: 57..58,
+                            node_index: NodeIndex(None),
+                            expression: Name(
+                                ExprName {
+                                    node_index: NodeIndex(None),
+                                    range: 58..58,
+                                    id: Name(""),
+                                    ctx: Invalid,
+                                },
+                            ),
+                        },
                     ],
                     name: Identifier {
-                        id: Name(""),
-                        range: 56..56,
+                        id: Name("Test"),
+                        range: 65..69,
                         node_index: NodeIndex(None),
                     },
                     type_params: None,
-                    parameters: Parameters {
-                        range: 56..56,
-                        node_index: NodeIndex(None),
-                        posonlyargs: [],
-                        args: [],
-                        vararg: None,
-                        kwonlyargs: [],
-                        kwarg: None,
-                    },
-                    returns: None,
+                    arguments: None,
                     body: [],
                 },
             ),
@@ -256,11 +258,22 @@ Module(
   |   ^ Syntax Error: Expected an expression
 5 | def foo(): ...
 6 | @test
+7 | @
   |
 
 
   |
 5 | def foo(): ...
 6 | @test
-  |      ^ Syntax Error: Expected class, function definition or async function definition after decorator
+7 | @
+  |  ^ Syntax Error: Expected an expression
+8 | class Test
+  |
+
+
+  |
+6 | @test
+7 | @
+8 | class Test
+  |           ^ Syntax Error: Expected `:`, found newline
   |

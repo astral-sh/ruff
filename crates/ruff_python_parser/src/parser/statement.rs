@@ -2783,6 +2783,8 @@ impl<'src> Parser<'src> {
         // @@
         // def foo(): ...
         // @test
+        // @
+        // class Test
         while self.at(TokenKind::At) {
             progress.assert_progressing(self);
 
