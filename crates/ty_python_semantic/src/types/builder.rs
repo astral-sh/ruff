@@ -342,7 +342,7 @@ impl<'db> UnionBuilder<'db> {
                 // between themselves, only against pre-existing elements. However, we only apply this
                 // optimization when not in cycle recovery AND the union's recursively_defined status
                 // matches the builder's, ensuring we're in a consistent context.
-                let batch_start = if !self.cycle_recovery
+                let mut batch_start = if !self.cycle_recovery
                     && self.recursively_defined == union.recursively_defined(self.db)
                 {
                     Some(self.elements.len())
@@ -350,6 +350,9 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
                 for element in new_elements {
+                    if self.unpack_aliases && matches!(element, Type::TypeAlias(_)) {
+                        batch_start = None;
+                    }
                     self.add_in_place_impl(*element, seen_aliases, batch_start);
                 }
                 self.recursively_defined = self
