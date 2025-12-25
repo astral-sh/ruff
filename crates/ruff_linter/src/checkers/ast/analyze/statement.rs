@@ -1476,6 +1476,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             if checker.is_rule_enabled(Rule::NonPEP695TypeAlias) {
                 pyupgrade::rules::non_pep695_type_alias_type(checker, assign);
             }
+            if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
+                pylint::rules::swap_with_temporary_variable(checker, stmt);
+            }
         }
         Stmt::AnnAssign(
             assign_stmt @ ast::StmtAnnAssign {
@@ -1524,6 +1527,9 @@ pub(crate) fn statement(stmt: &Stmt, checker: &mut Checker) {
             }
             if checker.is_rule_enabled(Rule::UnsortedDunderAll) {
                 ruff::rules::sort_dunder_all_ann_assign(checker, assign_stmt);
+            }
+            if checker.is_rule_enabled(Rule::SwapWithTemporaryVariable) {
+                pylint::rules::swap_with_temporary_variable(checker, stmt);
             }
             if checker.source_type.is_stub() {
                 if let Some(value) = value {
