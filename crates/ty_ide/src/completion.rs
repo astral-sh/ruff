@@ -6687,6 +6687,19 @@ def func():
     }
 
     #[test]
+    fn decorator_without_class_or_function() {
+        completion_test_builder(
+            "\
+from dataclasses import dataclass
+
+@dataclass(froz<CURSOR>
+",
+        )
+        .build()
+        .contains("frozen");
+    }
+
+    #[test]
     fn statement_keywords_in_if_body() {
         completion_test_builder(
             "\
