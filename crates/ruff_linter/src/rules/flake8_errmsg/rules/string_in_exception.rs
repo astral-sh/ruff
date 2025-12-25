@@ -47,6 +47,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked as unsafe because:
+/// - Comments associated with the exception argument may not be reliably matched
+///   to their original code positions after the fix is applied.
+/// - The introduced `msg` variable may shadow an existing variable in the same
+///   scope, potentially changing program behavior.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct RawStringInException;
@@ -103,6 +110,13 @@ impl Violation for RawStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked as unsafe because:
+/// - Comments associated with the exception argument may not be reliably matched
+///   to their original code positions after the fix is applied.
+/// - The introduced `msg` variable may shadow an existing variable in the same
+///   scope, potentially changing program behavior.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct FStringInException;
@@ -160,6 +174,13 @@ impl Violation for FStringInException {
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+///
+/// ## Fix safety
+/// This fix is marked as unsafe because:
+/// - Comments associated with the exception argument may not be reliably matched
+///   to their original code positions after the fix is applied.
+/// - The introduced `msg` variable may shadow an existing variable in the same
+///   scope, potentially changing program behavior.
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct DotFormatInException;
