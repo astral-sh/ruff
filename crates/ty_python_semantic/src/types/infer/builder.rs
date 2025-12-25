@@ -328,6 +328,15 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         module: &'ast ParsedModuleRef,
     ) -> Self {
         let scope = region.scope(db);
+        let file = scope.file(db);
+
+        // In stub files, all expressions are evaluated in deferred mode to allow
+        // forward references. This matches Pyright's behavior.
+        let deferred_state = if file.is_stub(db) {
+            DeferredExpressionState::Deferred
+        } else {
+            DeferredExpressionState::None
+        };
 
         Self {
             context: InferContext::new(db, scope, module),
@@ -336,7 +345,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             scope,
             return_types_and_ranges: vec![],
             called_functions: FxIndexSet::default(),
-            deferred_state: DeferredExpressionState::None,
+            deferred_state,
             multi_inference_state: MultiInferenceState::Panic,
             inner_expression_inference_state: InnerExpressionInferenceState::Infer,
             expressions: FxHashMap::default(),
@@ -1960,9 +1969,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         self.infer_type_parameters(type_params);
 
         if let Some(arguments) = class.arguments.as_deref() {
-            let in_stub = self.in_stub();
-            let previous_deferred_state =
-                std::mem::replace(&mut self.deferred_state, in_stub.into());
             let mut call_arguments =
                 CallArguments::from_arguments(arguments, |argument, splatted_value| {
                     let ty = self.infer_expression(splatted_value, TypeContext::default());
@@ -1973,7 +1979,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 });
             let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
             self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
-            self.deferred_state = previous_deferred_state;
         }
 
         self.typevar_binding_context = previous_typevar_binding_context;
@@ -6146,13 +6151,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 self.dataclass_field_specifiers = specifiers;
             }
 
-            // We defer the r.h.s. of PEP-613 `TypeAlias` assignments in stub files.
-            let previous_deferred_state = self.deferred_state;
-
-            if is_pep_613_type_alias && self.in_stub() {
-                self.deferred_state = DeferredExpressionState::Deferred;
-            }
-
             // This might be a PEP-613 type alias (`OptionalList: TypeAlias = list[T] | None`). Use
             // the definition of `OptionalList` as the binding context while inferring the
             // RHS (`list[T] | None`), in order to bind `T` to `OptionalList`.
@@ -6164,8 +6162,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             );
 
             self.typevar_binding_context = previous_typevar_binding_context;
-
-            self.deferred_state = previous_deferred_state;
 
             self.dataclass_field_specifiers.clear();
 
