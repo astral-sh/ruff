@@ -58,6 +58,13 @@ use crate::checkers::ast::Checker;
 ///         return square(self.value)
 /// ```
 ///
+/// ## Options
+///
+/// This rule only applies to regular methods, not static or class methods.
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// ## References
 /// - [Python documentation: `functools.lru_cache`](https://docs.python.org/3/library/functools.html#functools.lru_cache)
 /// - [Python documentation: `functools.cache`](https://docs.python.org/3/library/functools.html#functools.cache)
