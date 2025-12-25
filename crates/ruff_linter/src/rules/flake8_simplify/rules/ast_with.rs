@@ -49,7 +49,7 @@ use crate::{FixAvailability, Violation};
 /// The rule will consult these two settings when deciding if a fix can be provided:
 ///
 /// - `lint.pycodestyle.max-line-length`
-/// - `lint.tab-size`
+/// - `indent-width`
 ///
 /// Lines that would exceed the configured line length will not be fixed automatically.
 ///

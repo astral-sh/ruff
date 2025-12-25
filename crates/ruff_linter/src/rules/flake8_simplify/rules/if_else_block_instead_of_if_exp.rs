@@ -58,7 +58,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## Options
 ///
 /// - `lint.pycodestyle.max-line-length`
-/// - `lint.tab-size`
+/// - `indent-width`
 ///
 /// ## References
 /// - [Python documentation: Conditional expressions](https://docs.python.org/3/reference/expressions.html#conditional-expressions)

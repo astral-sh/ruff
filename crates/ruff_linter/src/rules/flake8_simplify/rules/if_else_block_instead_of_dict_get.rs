@@ -56,7 +56,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// configured line length, as determined by these options:
 ///
 /// - `lint.pycodestyle.max-line-length`
-/// - `lint.tab-size`
+/// - `indent-width`
 ///
 /// ## References
 /// - [Python documentation: Mapping Types](https://docs.python.org/3/library/stdtypes.html#mapping-types-dict)

@@ -46,7 +46,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// line length, as determined by these options:
 ///
 /// - `lint.pycodestyle.max-line-length`
-/// - `lint.tab-size`
+/// - `indent-width`
 ///
 /// ## References
 /// - [Python documentation: `any`](https://docs.python.org/3/library/functions.html#any)
