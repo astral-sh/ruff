@@ -5,7 +5,7 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
 use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
@@ -921,7 +921,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
                     if type_alias.specialization(self.db()).is_some() {
                         if let Some(builder) =
-                            self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                         {
                             let mut diagnostic =
                                 builder.into_diagnostic("Cannot subscript non-generic type alias");
@@ -951,7 +951,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.infer_type_expression(slice);
 
                             if let Some(builder) =
-                                self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                                self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                             {
                                 let value_type = type_alias.raw_value_type(self.db());
                                 let mut diagnostic = builder

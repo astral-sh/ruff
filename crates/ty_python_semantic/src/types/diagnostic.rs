@@ -94,7 +94,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&INVALID_TYPE_VARIABLE_CONSTRAINTS);
     registry.register_lint(&MISSING_ARGUMENT);
     registry.register_lint(&NO_MATCHING_OVERLOAD);
-    registry.register_lint(&NON_SUBSCRIPTABLE);
+    registry.register_lint(&NOT_SUBSCRIPTABLE);
     registry.register_lint(&NOT_ITERABLE);
     registry.register_lint(&UNSUPPORTED_BOOL_CONVERSION);
     registry.register_lint(&PARAMETER_ALREADY_ASSIGNED);
@@ -1461,7 +1461,7 @@ declare_lint! {
     /// ```python
     /// 4[1]  # TypeError: 'int' object is not subscriptable
     /// ```
-    pub(crate) static NON_SUBSCRIPTABLE = {
+    pub(crate) static NOT_SUBSCRIPTABLE = {
         summary: "detects subscripting objects that do not support subscripting",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Error,
@@ -2402,24 +2402,24 @@ pub(super) fn report_index_out_of_bounds(
 }
 
 /// Emit a diagnostic declaring that a type does not support subscripting.
-pub(super) fn report_non_subscriptable(
+pub(super) fn report_not_subscriptable(
     context: &InferContext,
     node: &ast::ExprSubscript,
-    non_subscriptable_ty: Type,
+    not_subscriptable_ty: Type,
     method: &str,
 ) {
-    let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
+    let Some(builder) = context.report_lint(&NOT_SUBSCRIPTABLE, node) else {
         return;
     };
     if method == "__delitem__" {
         builder.into_diagnostic(format_args!(
             "Cannot delete subscript on object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(context.db())
         ));
     } else {
         builder.into_diagnostic(format_args!(
             "Cannot subscript object of type `{}` with no `{method}` method",
-            non_subscriptable_ty.display(context.db())
+            not_subscriptable_ty.display(context.db())
         ));
     }
 }

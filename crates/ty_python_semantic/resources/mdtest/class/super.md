@@ -667,6 +667,6 @@ class B(A): ...
 
 reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
-# error: [non-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
+# error: [not-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
 super(B, B())[0]
 ```

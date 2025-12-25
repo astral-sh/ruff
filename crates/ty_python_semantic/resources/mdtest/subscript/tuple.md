@@ -416,7 +416,7 @@ def test2(val: tuple[str, None] | list[int | float]):
 
 ```py
 def test3(val: tuple[str] | tuple[int] | int):
-    # error: [non-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
+    # error: [not-subscriptable] "Cannot subscript object of type `int` with no `__getitem__` method"
     reveal_type(val[0])  # revealed: str | int | Unknown
 ```
 

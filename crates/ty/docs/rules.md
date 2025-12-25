@@ -2005,30 +2005,6 @@ def func(x: bool): ...
 func("string")  # error: [no-matching-overload]
 ```
 
-## `non-subscriptable`
-
-<small>
-Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
-Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
-<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20non-subscriptable" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1453" target="_blank">View source</a>
-</small>
-
-
-**What it does**
-
-Checks for subscripting objects that do not support subscripting.
-
-**Why is this bad?**
-
-Subscripting an object that does not support it will raise a `TypeError` at runtime.
-
-**Examples**
-
-```python
-4[1]  # TypeError: 'int' object is not subscriptable
-```
-
 ## `not-iterable`
 
 <small>
@@ -2053,6 +2029,30 @@ Iterating over an object that is not iterable will raise a `TypeError` at runtim
 ```python
 for i in 34:  # TypeError: 'int' object is not iterable
     pass
+```
+
+## `not-subscriptable`
+
+<small>
+Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
+Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.1">0.0.1-alpha.1</a> ·
+<a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20not-subscriptable" target="_blank">Related issues</a> ·
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L1453" target="_blank">View source</a>
+</small>
+
+
+**What it does**
+
+Checks for subscripting objects that do not support subscripting.
+
+**Why is this bad?**
+
+Subscripting an object that does not support it will raise a `TypeError` at runtime.
+
+**Examples**
+
+```python
+4[1]  # TypeError: 'int' object is not subscriptable
 ```
 
 ## `override-of-final-method`

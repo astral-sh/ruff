@@ -916,9 +916,9 @@ torch/_dynamo/eval_frame.py:1954:9: error[unresolved-attribute] Module `torch._C
 torch/_dynamo/eval_frame.py:2228:22: warning[possibly-missing-attribute] Submodule `traceback` may not be available as an attribute on module `torch.fx`
 torch/_dynamo/external_utils.py:103:59: error[unresolved-attribute] Module `torch` has no member `as_tensor`
 torch/_dynamo/functional_export.py:372:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["dynamo_flat_name_to_original_fqn"]` and `Unknown | Tensor | Module`
-torch/_dynamo/functional_export.py:374:70: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
+torch/_dynamo/functional_export.py:374:70: error[not-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
 torch/_dynamo/functional_export.py:379:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["dynamo_compile_id"]` and `Unknown | Tensor | Module`
-torch/_dynamo/functional_export.py:381:55: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
+torch/_dynamo/functional_export.py:381:55: error[not-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
 torch/_dynamo/functional_export.py:512:13: error[unresolved-attribute] Cannot assign object of type `int` to attribute `num_inputs` on type `Self@__init__` with custom `__setattr__` method.
 torch/_dynamo/functional_export.py:513:13: error[unresolved-attribute] Cannot assign object of type `None` to attribute `gm_inputs` on type `Self@__init__` with custom `__setattr__` method.
 torch/_dynamo/functional_export.py:521:17: error[unresolved-attribute] Cannot assign object of type `tuple[Unknown, ...]` to attribute `gm_inputs` on type `Self@forward` with custom `__setattr__` method.
@@ -1954,7 +1954,7 @@ torch/_dynamo/variables/user_defined.py:808:25: error[unresolved-attribute] Modu
 torch/_dynamo/variables/user_defined.py:814:39: error[unresolved-attribute] Module `torch` has no member `Stream`
 torch/_dynamo/variables/user_defined.py:842:41: error[unresolved-attribute] Module `torch` has no member `Event`
 torch/_dynamo/variables/user_defined.py:1147:45: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `~_local`
-torch/_dynamo/variables/user_defined.py:1208:21: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/_dynamo/variables/user_defined.py:1208:21: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
 torch/_dynamo/variables/user_defined.py:1211:36: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `object`
 torch/_dynamo/variables/user_defined.py:1246:9: error[invalid-method-override] Invalid override of method `call_function`: Definition is incompatible with `VariableTracker.call_function`
 torch/_dynamo/variables/user_defined.py:1262:25: warning[possibly-missing-attribute] Submodule `_contextlib` may not be available as an attribute on module `torch.utils`
@@ -2001,7 +2001,7 @@ torch/_dynamo/variables/user_defined.py:2147:16: warning[possibly-missing-attrib
 torch/_dynamo/variables/user_defined.py:2153:16: warning[possibly-missing-attribute] Attribute `install_dict_keys_match_guard` may be missing on object of type `Unknown | None | VariableTracker`
 torch/_dynamo/variables/user_defined.py:2156:16: warning[possibly-missing-attribute] Attribute `install_dict_contains_guard` may be missing on object of type `Unknown | None | VariableTracker`
 torch/_dynamo/variables/user_defined.py:2194:12: error[unresolved-attribute] Object of type `type` has no attribute `__iter__`
-torch/_dynamo/variables/user_defined.py:2227:21: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/_dynamo/variables/user_defined.py:2227:21: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/_dynamo/variables/user_defined.py:2247:12: error[unresolved-attribute] Object of type `type` has no attribute `__iter__`
 torch/_dynamo/variables/user_defined.py:2267:30: error[unresolved-attribute] Object of type `type` has no attribute `get`
 torch/_export/__init__.py:137:14: warning[possibly-missing-attribute] Submodule `_export` may not be available as an attribute on module `torch`
@@ -2442,7 +2442,7 @@ torch/_functorch/_aot_autograd/frontend_utils.py:50:30: error[unresolved-attribu
 torch/_functorch/_aot_autograd/frontend_utils.py:71:35: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
 torch/_functorch/_aot_autograd/frontend_utils.py:116:26: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
 torch/_functorch/_aot_autograd/frontend_utils.py:156:16: error[unsupported-operator] Operator `in` is not supported between objects of type `str` and `Tensor | Module`
-torch/_functorch/_aot_autograd/frontend_utils.py:157:18: error[non-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
+torch/_functorch/_aot_autograd/frontend_utils.py:157:18: error[not-subscriptable] Cannot subscript object of type `Module` with no `__getitem__` method
 torch/_functorch/_aot_autograd/functional_utils.py:75:12: error[unresolved-attribute] Module `torch` has no member `_from_functional_tensor`
 torch/_functorch/_aot_autograd/functional_utils.py:119:16: error[unresolved-attribute] Module `torch` has no member `_functionalize_are_all_mutations_hidden_from_autograd`
 torch/_functorch/_aot_autograd/functional_utils.py:133:16: error[unresolved-attribute] Module `torch` has no member `_functionalize_are_all_mutations_under_no_grad_or_inference_mode`
@@ -2510,8 +2510,8 @@ torch/_functorch/_aot_autograd/runtime_wrappers.py:492:9: error[invalid-method-o
 torch/_functorch/_aot_autograd/runtime_wrappers.py:574:27: warning[possibly-missing-attribute] Submodule `_guards` may not be available as an attribute on module `torch`
 torch/_functorch/_aot_autograd/runtime_wrappers.py:674:9: error[invalid-method-override] Invalid override of method `post_compile`: Definition is incompatible with `CompilerWrapper.post_compile`
 torch/_functorch/_aot_autograd/runtime_wrappers.py:712:9: error[invalid-method-override] Invalid override of method `post_compile`: Definition is incompatible with `CompilerWrapper.post_compile`
-torch/_functorch/_aot_autograd/runtime_wrappers.py:966:39: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/_functorch/_aot_autograd/runtime_wrappers.py:969:39: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/_functorch/_aot_autograd/runtime_wrappers.py:966:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/_functorch/_aot_autograd/runtime_wrappers.py:969:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/_functorch/_aot_autograd/runtime_wrappers.py:1487:30: error[unresolved-attribute] Module `torch` has no member `empty`
 torch/_functorch/_aot_autograd/runtime_wrappers.py:1592:13: warning[possibly-missing-attribute] Submodule `_functorch` may not be available as an attribute on module `torch._C`
 torch/_functorch/_aot_autograd/runtime_wrappers.py:1798:9: error[unresolved-attribute] Module `torch` has no member `is_grad_enabled`
@@ -3018,7 +3018,7 @@ torch/_higher_order_ops/triton_kernel_wrap.py:397:22: error[unresolved-import] C
 torch/_higher_order_ops/triton_kernel_wrap.py:398:22: error[unresolved-import] Cannot resolve imported module `triton.runtime.jit`
 torch/_higher_order_ops/triton_kernel_wrap.py:412:22: error[unresolved-import] Cannot resolve imported module `triton.runtime.jit`
 torch/_higher_order_ops/triton_kernel_wrap.py:419:18: error[unresolved-import] Cannot resolve imported module `triton._utils`
-torch/_higher_order_ops/triton_kernel_wrap.py:434:37: error[non-subscriptable] Cannot subscript object of type `(...) -> Unknown` with no `__getitem__` method
+torch/_higher_order_ops/triton_kernel_wrap.py:434:37: error[not-subscriptable] Cannot subscript object of type `(...) -> Unknown` with no `__getitem__` method
 torch/_higher_order_ops/triton_kernel_wrap.py:790:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo(StarredExpression)]` and value of type `None` on object of type `dict[tuple[Any], Any]`
 torch/_higher_order_ops/triton_kernel_wrap.py:791:13: error[invalid-assignment] Invalid subscript assignment with key of type `tuple[str, @Todo(StarredExpression)]` and value of type `Any` on object of type `dict[tuple[Any], Any]`
 torch/_higher_order_ops/triton_kernel_wrap.py:792:12: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[tuple[Any], Any].__getitem__(key: tuple[Any], /) -> Any` cannot be called with key of type `tuple[str, @Todo(StarredExpression)]` on object of type `dict[tuple[Any], Any]`
@@ -3030,8 +3030,8 @@ torch/_higher_order_ops/triton_kernel_wrap.py:1080:13: error[invalid-argument-ty
 torch/_higher_order_ops/triton_kernel_wrap.py:1095:22: error[unresolved-import] Cannot resolve imported module `triton.tools.experimental_descriptor`
 torch/_higher_order_ops/triton_kernel_wrap.py:1115:22: error[unresolved-import] Cannot resolve imported module `triton.tools.tensor_descriptor`
 torch/_higher_order_ops/triton_kernel_wrap.py:1131:17: warning[possibly-missing-attribute] Attribute `arg_names` may be missing on object of type `Unknown | Autotuner | JITFunction`
-torch/_higher_order_ops/triton_kernel_wrap.py:1140:5: error[non-subscriptable] Cannot subscript object of type `Autotuner` with no `__getitem__` method
-torch/_higher_order_ops/triton_kernel_wrap.py:1140:5: error[non-subscriptable] Cannot subscript object of type `JITFunction` with no `__getitem__` method
+torch/_higher_order_ops/triton_kernel_wrap.py:1140:5: error[not-subscriptable] Cannot subscript object of type `Autotuner` with no `__getitem__` method
+torch/_higher_order_ops/triton_kernel_wrap.py:1140:5: error[not-subscriptable] Cannot subscript object of type `JITFunction` with no `__getitem__` method
 torch/_higher_order_ops/triton_kernel_wrap.py:1186:14: error[unresolved-attribute] Object of type `(...) -> Any` has no attribute `__name__`
 torch/_higher_order_ops/triton_kernel_wrap.py:1536:14: error[unresolved-import] Cannot resolve imported module `triton.runtime.autotuner`
 torch/_higher_order_ops/triton_kernel_wrap.py:1546:9: error[invalid-assignment] Object of type `tuple[int | Expr | SymInt, ...] | ((dict[str, int], /) -> tuple[int, ...]) | None` is not assignable to attribute `grid` on type `TraceableTritonKernelWrapper | TritonKernelVariable`
@@ -3042,8 +3042,8 @@ torch/_higher_order_ops/triton_kernel_wrap.py:1651:14: error[unresolved-import] 
 torch/_higher_order_ops/triton_kernel_wrap.py:1887:41: warning[possibly-missing-attribute] Attribute `arg_names` may be missing on object of type `Unknown | Autotuner | JITFunction`
 torch/_higher_order_ops/triton_kernel_wrap.py:2019:16: error[invalid-return-type] Return type does not match returned value: expected `tuple[int | Expr | SymInt, ...]`, found `tuple[object, ...]`
 torch/_higher_order_ops/triton_kernel_wrap.py:2097:20: warning[possibly-missing-attribute] Attribute `run` may be missing on object of type `(Unknown & ~None) | Autotuner | JITFunction`
-torch/_higher_order_ops/triton_kernel_wrap.py:2109:20: error[non-subscriptable] Cannot subscript object of type `Autotuner` with no `__getitem__` method
-torch/_higher_order_ops/triton_kernel_wrap.py:2109:20: error[non-subscriptable] Cannot subscript object of type `JITFunction` with no `__getitem__` method
+torch/_higher_order_ops/triton_kernel_wrap.py:2109:20: error[not-subscriptable] Cannot subscript object of type `Autotuner` with no `__getitem__` method
+torch/_higher_order_ops/triton_kernel_wrap.py:2109:20: error[not-subscriptable] Cannot subscript object of type `JITFunction` with no `__getitem__` method
 torch/_higher_order_ops/utils.py:52:10: error[unresolved-attribute] Module `torch._C` has no member `_AutoDispatchBelowAutograd`
 torch/_higher_order_ops/utils.py:55:12: error[unresolved-attribute] Module `torch` has no member `is_grad_enabled`
 torch/_higher_order_ops/utils.py:59:26: warning[possibly-missing-attribute] Submodule `_functions` may not be available as an attribute on module `torch._C`
@@ -3705,7 +3705,7 @@ torch/_inductor/codegen/cpp_grouped_gemm_template.py:251:17: error[invalid-assig
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:257:17: error[invalid-assignment] Invalid subscript assignment with key of type `int` and value of type `IRNode` on object of type `list[_T@normalize_shapes]`
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:302:20: error[invalid-return-type] Return type does not match returned value: expected `tuple[list[_T@preprocessor], _U@preprocessor]`, found `tuple[list[IRNode], Layout]`
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:303:71: error[invalid-argument-type] Argument to function `reorder_and_filter` is incorrect: Expected `list[IRNode]`, found `list[_T@preprocessor]`
-torch/_inductor/codegen/cpp_grouped_gemm_template.py:374:16: error[non-subscriptable] Cannot subscript object of type `Literal[False]` with no `__getitem__` method
+torch/_inductor/codegen/cpp_grouped_gemm_template.py:374:16: error[not-subscriptable] Cannot subscript object of type `Literal[False]` with no `__getitem__` method
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:403:26: warning[possibly-missing-attribute] Attribute `get_dtype` may be missing on object of type `Unknown | IRNode | Sequence[IRNode]`
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:415:25: warning[possibly-missing-attribute] Submodule `_cpu` may not be available as an attribute on module `torch._C`
 torch/_inductor/codegen/cpp_grouped_gemm_template.py:418:25: warning[possibly-missing-attribute] Submodule `_cpu` may not be available as an attribute on module `torch._C`
@@ -6677,7 +6677,7 @@ torch/_inductor/ir.py:2048:20: error[unresolved-attribute] Module `torch` has no
 torch/_inductor/ir.py:2053:20: error[unresolved-attribute] Module `torch` has no member `dtype`
 torch/_inductor/ir.py:2058:25: error[invalid-assignment] Object of type `tuple[(((Sequence[Expr], Sequence[Expr], /) -> OpsValue) & (() -> object)) | (Sequence[(Sequence[Expr], Sequence[Expr], /) -> OpsValue] & (() -> object))]` is not assignable to `((Sequence[Expr], Sequence[Expr], /) -> OpsValue) | Sequence[(Sequence[Expr], Sequence[Expr], /) -> OpsValue]`
 torch/_inductor/ir.py:2061:16: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `((Sequence[Expr], Sequence[Expr], /) -> OpsValue) | Sequence[(Sequence[Expr], Sequence[Expr], /) -> OpsValue]`
-torch/_inductor/ir.py:2062:22: error[non-subscriptable] Cannot subscript object of type `(Sequence[Expr], Sequence[Expr], /) -> OpsValue` with no `__getitem__` method
+torch/_inductor/ir.py:2062:22: error[not-subscriptable] Cannot subscript object of type `(Sequence[Expr], Sequence[Expr], /) -> OpsValue` with no `__getitem__` method
 torch/_inductor/ir.py:2068:63: error[not-iterable] Object of type `((Sequence[Expr], Sequence[Expr], /) -> OpsValue) | Sequence[(Sequence[Expr], Sequence[Expr], /) -> OpsValue]` may not be iterable
 torch/_inductor/ir.py:2080:9: error[invalid-assignment] Property `output_index` defined in `Self@__init__` is read-only
 torch/_inductor/ir.py:2104:17: error[unresolved-attribute] Module `torch` has no member `device`
@@ -7417,7 +7417,7 @@ torch/_inductor/memory.py:687:9: error[invalid-assignment] Invalid subscript ass
 torch/_inductor/memory.py:944:54: error[unresolved-attribute] Object of type `(...) -> list[BaseSchedulerNode]` has no attribute `__name__`
 torch/_inductor/memory.py:946:50: error[unresolved-attribute] Object of type `(...) -> list[BaseSchedulerNode]` has no attribute `__name__`
 torch/_inductor/memory.py:948:61: error[unresolved-attribute] Object of type `(...) -> list[BaseSchedulerNode]` has no attribute `__name__`
-torch/_inductor/mkldnn_ir.py:87:25: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/_inductor/mkldnn_ir.py:87:25: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/_inductor/mkldnn_ir.py:181:37: error[invalid-assignment] Object of type `list[Expr]` is not assignable to `list[int] | tuple[int, ...]`
 torch/_inductor/mkldnn_ir.py:216:35: error[invalid-argument-type] Argument to function `convert_shape_to_inductor` is incorrect: Expected `Iterable[int | SymInt]`, found `list[int] | tuple[Unknown | int, ...] | list[Expr]`
 torch/_inductor/mkldnn_ir.py:414:17: error[invalid-assignment] Object of type `IRNode` is not assignable to `TensorBox`
@@ -8476,12 +8476,12 @@ torch/_meta_registrations.py:2371:18: error[invalid-assignment] Object of type `
 torch/_meta_registrations.py:2377:19: error[invalid-assignment] Object of type `list[Unknown | int | (list[int] & SymInt)]` is not assignable to `list[int] | int`
 torch/_meta_registrations.py:2383:20: error[invalid-assignment] Object of type `list[Unknown | int | (list[int] & SymInt)]` is not assignable to `list[int] | int`
 torch/_meta_registrations.py:2391:35: error[invalid-assignment] Object of type `list[Unknown | (int & ~AlwaysFalsy) | (list[int] & SymInt & ~AlwaysFalsy)]` is not assignable to `list[int] | None`
-torch/_meta_registrations.py:2404:21: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-torch/_meta_registrations.py:2406:21: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-torch/_meta_registrations.py:2409:21: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-torch/_meta_registrations.py:2416:35: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-torch/_meta_registrations.py:2416:47: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-torch/_meta_registrations.py:2416:76: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2404:21: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2406:21: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2409:21: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2416:35: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2416:47: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+torch/_meta_registrations.py:2416:76: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 torch/_meta_registrations.py:2431:62: error[unresolved-attribute] Module `torch` has no member `channels_last`
 torch/_meta_registrations.py:2455:20: error[unresolved-attribute] Module `torch` has no member `channels_last`
 torch/_meta_registrations.py:2456:53: error[unresolved-attribute] Module `torch` has no member `contiguous_format`
@@ -10571,13 +10571,13 @@ torch/_numpy/_funcs_impl.py:1107:8: error[unresolved-attribute] Object of type `
 torch/_numpy/_funcs_impl.py:1108:16: error[unresolved-attribute] Object of type `ArrayLike@fill_diagonal` has no attribute `shape`
 torch/_numpy/_funcs_impl.py:1108:29: error[unresolved-attribute] Object of type `ArrayLike@fill_diagonal` has no attribute `shape`
 torch/_numpy/_funcs_impl.py:1112:20: error[unresolved-attribute] Object of type `ArrayLike@fill_diagonal` has no attribute `diagonal`
-torch/_numpy/_funcs_impl.py:1113:24: error[non-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1113:24: error[not-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1116:26: error[unresolved-attribute] Object of type `ArrayLike@fill_diagonal` has no attribute `shape`
 torch/_numpy/_funcs_impl.py:1117:19: error[unresolved-attribute] Module `torch` has no member `arange`
 torch/_numpy/_funcs_impl.py:1120:13: error[invalid-assignment] Cannot assign to a subscript on an object of type `ArrayLike@fill_diagonal`
-torch/_numpy/_funcs_impl.py:1120:48: error[non-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1120:48: error[not-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1124:9: error[invalid-assignment] Cannot assign to a subscript on an object of type `ArrayLike@fill_diagonal`
-torch/_numpy/_funcs_impl.py:1124:18: error[non-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1124:18: error[not-subscriptable] Cannot subscript object of type `ArrayLike@fill_diagonal` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1124:24: error[unresolved-attribute] Object of type `ArrayLike@fill_diagonal` has no attribute `shape`
 torch/_numpy/_funcs_impl.py:1139:24: error[unresolved-attribute] Module `torch` has no member `float16`
 torch/_numpy/_funcs_impl.py:1140:24: error[unresolved-attribute] Module `torch` has no member `bool`
@@ -10657,21 +10657,21 @@ torch/_numpy/_funcs_impl.py:1616:13: error[unresolved-attribute] Object of type 
 torch/_numpy/_funcs_impl.py:1617:17: error[unresolved-attribute] Module `torch` has no member `float64`
 torch/_numpy/_funcs_impl.py:1620:12: warning[possibly-missing-attribute] Attribute `shape` may be missing on object of type `ArrayLike@gradient | Unknown`
 torch/_numpy/_funcs_impl.py:1626:15: error[unresolved-attribute] Module `torch` has no member `empty_like`
-torch/_numpy/_funcs_impl.py:1638:35: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1638:54: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1653:21: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1653:44: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1653:67: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1663:35: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1663:54: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1670:35: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1670:54: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1690:21: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1690:44: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1690:67: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1709:21: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1709:44: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
-torch/_numpy/_funcs_impl.py:1709:67: error[non-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1638:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1638:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1653:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1653:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1653:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1663:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1663:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1670:35: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1670:54: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1690:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1690:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1690:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1709:21: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1709:44: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
+torch/_numpy/_funcs_impl.py:1709:67: error[not-subscriptable] Cannot subscript object of type `ArrayLike@gradient` with no `__getitem__` method
 torch/_numpy/_funcs_impl.py:1730:8: error[unresolved-attribute] Object of type `ArrayLike@round` has no attribute `is_floating_point`
 torch/_numpy/_funcs_impl.py:1731:18: error[unresolved-attribute] Module `torch` has no member `round`
 torch/_numpy/_funcs_impl.py:1732:10: error[unresolved-attribute] Object of type `ArrayLike@round` has no attribute `is_complex`
@@ -10985,7 +10985,7 @@ torch/_numpy/random.py:180:17: error[unresolved-attribute] Module `torch` has no
 torch/_numpy/random.py:180:29: warning[possibly-missing-attribute] Attribute `dtype` may be missing on object of type `(ArrayLike@choice & ~None) | Unknown`
 torch/_numpy/random.py:181:12: warning[possibly-missing-attribute] Attribute `sum` may be missing on object of type `(ArrayLike@choice & ~None) | Unknown`
 torch/_numpy/random.py:185:15: error[unresolved-attribute] Module `torch` has no member `multinomial`
-torch/_numpy/random.py:190:15: error[non-subscriptable] Cannot subscript object of type `ArrayLike@choice` with no `__getitem__` method
+torch/_numpy/random.py:190:15: error[not-subscriptable] Cannot subscript object of type `ArrayLike@choice` with no `__getitem__` method
 torch/_numpy/testing/utils.py:24:26: error[unresolved-import] Module `torch._numpy` has no member `arange`
 torch/_numpy/testing/utils.py:24:57: error[unresolved-import] Module `torch._numpy` has no member `empty`
 torch/_numpy/testing/utils.py:24:73: error[unresolved-import] Module `torch._numpy` has no member `intp`
@@ -15499,7 +15499,7 @@ torch/ao/quantization/pt2e/_numeric_debugger.py:116:38: error[invalid-argument-t
 torch/ao/quantization/pt2e/_numeric_debugger.py:137:9: error[unresolved-attribute] Cannot assign object of type `str | None` to attribute `node_name` on type `Self@__init__` with custom `__setattr__` method.
 torch/ao/quantization/pt2e/_numeric_debugger.py:138:9: error[unresolved-attribute] Cannot assign object of type `object` to attribute `nn_module_stack` on type `Self@__init__` with custom `__setattr__` method.
 torch/ao/quantization/pt2e/_numeric_debugger.py:139:9: error[unresolved-attribute] Cannot assign object of type `int` to attribute `debug_handle` on type `Self@__init__` with custom `__setattr__` method.
-torch/ao/quantization/pt2e/_numeric_debugger.py:265:25: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/ao/quantization/pt2e/_numeric_debugger.py:265:25: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
 torch/ao/quantization/pt2e/export_utils.py:66:27: error[unresolved-attribute] Module `torch` has no member `randn`
 torch/ao/quantization/pt2e/export_utils.py:140:9: error[unresolved-attribute] Module `torch` has no member `randn`
 torch/ao/quantization/pt2e/export_utils.py:141:9: error[unresolved-attribute] Module `torch` has no member `randn`
@@ -16917,7 +16917,7 @@ torch/distributed/_local_tensor/__init__.py:1269:36: error[unresolved-attribute]
 torch/distributed/_local_tensor/__init__.py:1489:59: error[unresolved-attribute] Module `torch` has no member `int64`
 torch/distributed/_local_tensor/__init__.py:1499:60: error[unresolved-attribute] Module `torch` has no member `int64`
 torch/distributed/_local_tensor/__init__.py:1512:55: error[unresolved-attribute] Module `torch` has no member `int64`
-torch/distributed/_local_tensor/__init__.py:1727:28: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/_local_tensor/__init__.py:1727:28: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
 torch/distributed/_local_tensor/__init__.py:1734:29: error[unresolved-attribute] Module `torch` has no member `tensor`
 torch/distributed/_local_tensor/__init__.py:1735:39: error[unresolved-attribute] Module `torch` has no member `uint64`
 torch/distributed/_local_tensor/__init__.py:1736:20: error[unresolved-attribute] Module `torch` has no member `uint8`
@@ -16983,18 +16983,18 @@ torch/distributed/_shard/sharded_tensor/_ops/binary_cmp.py:71:19: error[unresolv
 torch/distributed/_shard/sharded_tensor/_ops/binary_cmp.py:73:23: error[unresolved-attribute] Module `torch` has no member `equal`
 torch/distributed/_shard/sharded_tensor/_ops/binary_cmp.py:76:19: error[unresolved-attribute] Module `torch` has no member `allclose`
 torch/distributed/_shard/sharded_tensor/_ops/binary_cmp.py:78:23: error[unresolved-attribute] Module `torch` has no member `allclose`
-torch/distributed/_shard/sharded_tensor/_ops/init.py:24:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:27:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:30:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:50:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:53:12: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:56:11: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:88:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:91:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:94:12: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:97:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:117:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-torch/distributed/_shard/sharded_tensor/_ops/init.py:120:11: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:24:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:27:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:30:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:50:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:53:12: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:56:11: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:88:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:91:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:94:12: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:97:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:117:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/_shard/sharded_tensor/_ops/init.py:120:11: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/distributed/_shard/sharded_tensor/_ops/init.py:128:5: error[unresolved-attribute] Module `torch` has no member `full_like`
 torch/distributed/_shard/sharded_tensor/_ops/init.py:129:5: error[unresolved-attribute] Module `torch` has no member `empty_like`
 torch/distributed/_shard/sharded_tensor/_ops/init.py:130:5: error[unresolved-attribute] Module `torch` has no member `zeros_like`
@@ -17346,9 +17346,9 @@ torch/distributed/_tools/fsdp2_mem_tracker.py:107:31: error[unresolved-attribute
 torch/distributed/_tools/fsdp2_mem_tracker.py:109:38: error[unresolved-attribute] Module `torch` has no member `device`
 torch/distributed/_tools/fsdp2_mem_tracker.py:239:28: error[invalid-assignment] Object of type `tuple[@Todo, ...]` is not assignable to `_P@_fsdp_state_pre_forward.args`
 torch/distributed/_tools/fsdp2_mem_tracker.py:239:28: error[invalid-assignment] Object of type `dict[str, Any]` is not assignable to `_P@_fsdp_state_pre_forward.kwargs`
-torch/distributed/_tools/fsdp2_mem_tracker.py:538:19: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
-torch/distributed/_tools/fsdp2_mem_tracker.py:555:29: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
-torch/distributed/_tools/fsdp2_mem_tracker.py:566:28: error[non-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
+torch/distributed/_tools/fsdp2_mem_tracker.py:538:19: error[not-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
+torch/distributed/_tools/fsdp2_mem_tracker.py:555:29: error[not-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
+torch/distributed/_tools/fsdp2_mem_tracker.py:566:28: error[not-subscriptable] Cannot subscript object of type `EllipsisType` with no `__getitem__` method
 torch/distributed/_tools/ilp_utils.py:83:10: error[unresolved-attribute] Module `torch` has no member `device`
 torch/distributed/_tools/ilp_utils.py:105:48: error[invalid-assignment] Object of type `dict[str | Unknown, dict[Unknown | str, Unknown | int | float] | Unknown]` is not assignable to `dict[str, ModRuntime]`
 torch/distributed/_tools/mem_tracker.py:121:31: error[unresolved-attribute] Module `torch` has no member `device`
@@ -17664,7 +17664,7 @@ torch/distributed/checkpoint/filesystem.py:187:39: error[unresolved-attribute] M
 torch/distributed/checkpoint/filesystem.py:342:27: error[unresolved-attribute] Module `torch` has no member `device`
 torch/distributed/checkpoint/filesystem.py:390:35: error[unresolved-attribute] Module `torch._C` has no member `_get_privateuse1_backend_name`
 torch/distributed/checkpoint/format_utils.py:106:29: warning[possibly-missing-attribute] Member `distributed_c10d` may be missing on module `torch.distributed`
-torch/distributed/checkpoint/format_utils.py:108:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/distributed/checkpoint/format_utils.py:108:26: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/distributed/checkpoint/format_utils.py:110:26: error[unresolved-attribute] Module `torch` has no member `empty_like`
 torch/distributed/checkpoint/format_utils.py:112:13: warning[possibly-missing-attribute] Member `broadcast` may be missing on module `torch.distributed`
 torch/distributed/checkpoint/format_utils.py:129:9: error[invalid-method-override] Invalid override of method `set_up_storage_reader`: Definition is incompatible with `StorageReader.set_up_storage_reader`
@@ -18912,13 +18912,13 @@ torch/distributed/tensor/_ops/_mask_buffer.py:20:20: error[unresolved-attribute]
 torch/distributed/tensor/_ops/_math_ops.py:10:43: warning[possibly-missing-import] Member `DeviceMesh` of module `torch.distributed.device_mesh` may be missing
 torch/distributed/tensor/_ops/_math_ops.py:912:57: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/distributed/tensor/_ops/_math_ops.py:1058:57: error[unresolved-attribute] Module `torch` has no member `Size`
-torch/distributed/tensor/_ops/_math_ops.py:1108:58: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/tensor/_ops/_math_ops.py:1108:58: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
 torch/distributed/tensor/_ops/_math_ops.py:1125:29: error[unresolved-attribute] Object of type `~None` has no attribute `strategies`
 torch/distributed/tensor/_ops/_math_ops.py:1127:53: error[unresolved-attribute] Object of type `~None` has no attribute `strategies`
-torch/distributed/tensor/_ops/_math_ops.py:1164:57: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
-torch/distributed/tensor/_ops/_math_ops.py:1170:16: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
-torch/distributed/tensor/_ops/_math_ops.py:1194:59: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
-torch/distributed/tensor/_ops/_math_ops.py:1196:20: error[non-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/tensor/_ops/_math_ops.py:1164:57: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/tensor/_ops/_math_ops.py:1170:16: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/tensor/_ops/_math_ops.py:1194:59: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
+torch/distributed/tensor/_ops/_math_ops.py:1196:20: error[not-subscriptable] Cannot subscript object of type `object` with no `__getitem__` method
 torch/distributed/tensor/_ops/_matrix_ops.py:8:43: warning[possibly-missing-import] Member `DeviceMesh` of module `torch.distributed.device_mesh` may be missing
 torch/distributed/tensor/_ops/_matrix_ops.py:114:20: error[unresolved-attribute] Module `torch` has no member `Size`
 torch/distributed/tensor/_ops/_matrix_ops.py:1095:31: error[unresolved-attribute] Module `torch` has no member `Size`
@@ -20426,9 +20426,9 @@ torch/fx/passes/split_module.py:285:9: error[unresolved-attribute] Module `torch
 torch/fx/passes/split_module.py:329:31: error[unresolved-attribute] Module `torch._C` has no member `_set_grad_enabled`
 torch/fx/passes/split_module.py:355:24: error[invalid-assignment] Object of type `dict[Node | Unknown, list[int] | Unknown]` is not assignable to `OrderedDict[Node, set[int]]`
 torch/fx/passes/split_module.py:357:20: error[invalid-assignment] Object of type `dict[Node | Unknown, list[int] | Unknown]` is not assignable to `OrderedDict[Node, set[int]]`
-torch/fx/passes/split_module.py:422:28: error[non-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
-torch/fx/passes/split_module.py:424:22: error[non-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
-torch/fx/passes/split_module.py:524:22: error[non-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
+torch/fx/passes/split_module.py:422:28: error[not-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
+torch/fx/passes/split_module.py:424:22: error[not-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
+torch/fx/passes/split_module.py:524:22: error[not-subscriptable] Cannot subscript object of type `set[int]` with no `__getitem__` method
 torch/fx/passes/tools_common.py:73:24: error[unresolved-attribute] Object of type `((...) -> Any) | str` has no attribute `__name__`
 torch/fx/passes/tools_common.py:75:38: error[invalid-argument-type] Argument to function `_get_qualified_name` is incorrect: Expected `(...) -> Any`, found `((...) -> Any) | str`
 torch/fx/passes/tools_common.py:318:5: error[unresolved-attribute] Cannot assign object of type `Graph` to attribute `graph` on type `GraphModule` with custom `__setattr__` method.
@@ -24299,7 +24299,7 @@ torch/sparse/_triton_ops.py:1271:9: error[unresolved-attribute] Module `torch` h
 torch/sparse/_triton_ops.py:1272:9: error[unresolved-attribute] Module `torch` has no member `float64`
 torch/sparse/_triton_ops.py:1273:9: error[unresolved-attribute] Module `torch` has no member `int8`
 torch/sparse/_triton_ops.py:1274:9: error[unresolved-attribute] Module `torch` has no member `int32`
-torch/sparse/_triton_ops.py:1302:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/sparse/_triton_ops.py:1302:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/sparse/_triton_ops.py:1341:12: error[unresolved-import] Cannot resolve imported module `triton`
 torch/sparse/_triton_ops.py:1342:12: error[unresolved-import] Cannot resolve imported module `triton.language`
 torch/sparse/_triton_ops.py:1633:29: error[unresolved-attribute] Module `torch` has no member `half`
@@ -25133,13 +25133,13 @@ torch/utils/data/datapipes/dataframe/dataframes.py:133:9: warning[possibly-missi
 torch/utils/data/datapipes/dataframe/dataframes.py:143:9: warning[possibly-missing-attribute] Attribute `append` may be missing on object of type `Unknown | list[Unknown] | None`
 torch/utils/data/datapipes/dataframe/dataframes.py:148:20: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | list[Unknown] | None`
 torch/utils/data/datapipes/dataframe/dataframes.py:148:57: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | list[Unknown] | None`
-torch/utils/data/datapipes/dataframe/dataframes.py:153:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/utils/data/datapipes/dataframe/dataframes.py:153:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/utils/data/datapipes/dataframe/dataframes.py:155:19: error[not-iterable] Object of type `Unknown | list[Unknown] | None` may not be iterable
 torch/utils/data/datapipes/dataframe/dataframes.py:188:9: warning[possibly-missing-attribute] Attribute `append` may be missing on object of type `Unknown | list[Unknown] | None`
-torch/utils/data/datapipes/dataframe/dataframes.py:287:9: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/utils/data/datapipes/dataframe/dataframes.py:287:9: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/utils/data/datapipes/dataframe/dataframes.py:289:19: error[not-iterable] Object of type `Unknown | list[Unknown] | None` may not be iterable
 torch/utils/data/datapipes/dataframe/dataframes.py:389:41: error[invalid-assignment] Object of type `dict[str, list[Any] | Unknown | None]` is not assignable to `dict[str, list[Any]]`
-torch/utils/data/datapipes/dataframe/dataframes.py:405:35: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+torch/utils/data/datapipes/dataframe/dataframes.py:405:35: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 torch/utils/data/datapipes/dataframe/dataframes.py:470:30: error[no-matching-overload] No overload of function `iter` matches arguments
 torch/utils/data/datapipes/datapipe.py:139:16: error[invalid-return-type] Return type does not match returned value: expected `Iterator[_T_co@IterDataPipe]`, found `Self@__iter__`
 torch/utils/data/datapipes/datapipe.py:426:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `Dataset.__getitem__`

@@ -472,9 +472,9 @@ pandas/core/frame.py:2378:21: warning[possibly-missing-attribute] Attribute `get
 pandas/core/frame.py:2399:23: warning[possibly-missing-attribute] Attribute `drop` may be missing on object of type `None | Index`
 pandas/core/frame.py:2401:37: error[invalid-argument-type] Argument to function `arrays_to_mgr` is incorrect: Expected `Index`, found `None | Index`
 pandas/core/frame.py:2541:20: error[unsupported-operator] Operator `in` is not supported between objects of type `Hashable` and `Unknown | None`
-pandas/core/frame.py:2542:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/frame.py:2542:37: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/core/frame.py:2543:22: error[unsupported-operator] Operator `in` is not supported between objects of type `int` and `Unknown | None`
-pandas/core/frame.py:2544:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/frame.py:2544:37: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/core/frame.py:4106:9: error[invalid-method-override] Invalid override of method `__getitem__`: Definition is incompatible with `NDFrame.__getitem__`
 pandas/core/frame.py:4647:29: error[no-matching-overload] No overload of function `tile` matches arguments
 pandas/core/frame.py:5232:32: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | tuple[Unknown & ~None] | tuple[()]`
@@ -498,7 +498,7 @@ pandas/core/generic.py:6523:16: warning[redundant-cast] Value is already of type
 pandas/core/generic.py:7154:25: error[invalid-assignment] Cannot assign to a subscript on an object of type `Self@fillna`
 pandas/core/generic.py:7164:33: error[invalid-assignment] Cannot assign to a subscript on an object of type `Self@fillna`
 pandas/core/generic.py:7571:26: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None | bool`
-pandas/core/generic.py:7621:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/core/generic.py:7621:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/core/generic.py:7622:36: warning[possibly-missing-attribute] Attribute `keys` may be missing on object of type `Unknown | None`
 pandas/core/generic.py:7636:65: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `Unknown | None`
 pandas/core/generic.py:7646:43: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
@@ -588,7 +588,7 @@ pandas/core/indexing.py:1593:6: error[invalid-argument-type] Argument to functio
 pandas/core/indexing.py:1637:31: warning[possibly-missing-attribute] Attribute `_reduce` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[Unknown]]`
 pandas/core/indexing.py:1638:31: warning[possibly-missing-attribute] Attribute `_reduce` may be missing on object of type `Unknown | ndarray[tuple[Any, ...], dtype[Unknown]]`
 pandas/core/indexing.py:1785:36: error[invalid-argument-type] Argument to bound method `_validate_integer` is incorrect: Expected `int | integer[Any]`, found `object`
-pandas/core/indexing.py:2019:60: error[non-subscriptable] Cannot subscript object of type `Hashable` with no `__getitem__` method
+pandas/core/indexing.py:2019:60: error[not-subscriptable] Cannot subscript object of type `Hashable` with no `__getitem__` method
 pandas/core/indexing.py:2033:45: error[invalid-argument-type] Argument to bound method `_setitem_single_column` is incorrect: Expected `int`, found `Hashable`
 pandas/core/indexing.py:2381:32: error[index-out-of-bounds] Index 1 is out of bounds for tuple `tuple[(Unknown & slice[object, object, object]) | (Unknown & ndarray[tuple[object, ...], dtype[object]]) | (Unknown & Top[list[Unknown]]) | (Unknown & Index)]` with length 1
 pandas/core/indexing.py:2382:21: error[index-out-of-bounds] Index 1 is out of bounds for tuple `tuple[(Unknown & slice[object, object, object]) | (Unknown & ndarray[tuple[object, ...], dtype[object]]) | (Unknown & Top[list[Unknown]]) | (Unknown & Index)]` with length 1
@@ -828,8 +828,8 @@ pandas/io/formats/printing.py:439:20: error[unsupported-operator] Operator `+` i
 pandas/io/formats/printing.py:448:20: error[unsupported-operator] Operator `+` is unsupported between objects of type `Unknown | tuple[str, ...] | str` and `LiteralString`
 pandas/io/formats/printing.py:452:53: error[invalid-argument-type] Argument to function `_extend_line` is incorrect: Expected `str`, found `Unknown | tuple[str, ...] | str`
 pandas/io/formats/style.py:2591:38: error[invalid-argument-type] Argument to bound method `set_table_styles` is incorrect: Expected `dict[Any, list[CSSDict]] | list[CSSDict] | None`, found `list[CSSDict] | list[Unknown | dict[Unknown | str, Unknown | str]] | list[Unknown]`
-pandas/io/formats/style.py:2711:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-pandas/io/formats/style.py:2711:63: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/formats/style.py:2711:23: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/formats/style.py:2711:63: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/io/formats/style.py:2713:28: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str | list[tuple[str, str | int | float]]] | Unknown]` is not assignable to `dict[Any, list[CSSDict]] | list[CSSDict] | None`
 pandas/io/formats/style.py:2723:28: error[invalid-assignment] Object of type `list[dict[Unknown | str, Unknown | str | list[tuple[str, str | int | float]]] | Unknown]` is not assignable to `dict[Any, list[CSSDict]] | list[CSSDict] | None`
 pandas/io/formats/style.py:2732:13: warning[possibly-missing-attribute] Attribute `extend` may be missing on object of type `(Unknown & ~None) | dict[Any, list[CSSDict]] | list[CSSDict]`
@@ -886,7 +886,7 @@ pandas/io/parsers/python_parser.py:736:57: error[invalid-argument-type] Argument
 pandas/io/parsers/readers.py:1574:41: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `(@Todo & ~Literal[False] & ~_NoDefault) | None`
 pandas/io/pytables.py:483:8: error[unsupported-operator] Operator `<=` is not supported between two objects of type `Unknown | None | int`
 pandas/io/pytables.py:487:11: error[unsupported-operator] Operator `>` is not supported between objects of type `Unknown | None | int` and `Literal[1]`
-pandas/io/pytables.py:639:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/pytables.py:639:30: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/io/pytables.py:702:20: error[invalid-return-type] Return type does not match returned value: expected `list[str]`, found `list[Unknown | None | str]`
 pandas/io/pytables.py:1941:55: error[invalid-argument-type] Argument to bound method `_create_storer` is incorrect: Expected `str`, found `Unknown | None`
 pandas/io/pytables.py:2091:15: error[unsupported-operator] Operator `<` is not supported between two objects of type `Unknown | None | Literal[0]`
@@ -906,7 +906,7 @@ pandas/io/pytables.py:2749:17: error[invalid-argument-type] Argument to function
 pandas/io/pytables.py:2841:20: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int, int]`, found `tuple[int, ...]`
 pandas/io/pytables.py:3118:35: error[invalid-argument-type] Argument to bound method `write_array` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series`, found `Unknown | None`
 pandas/io/pytables.py:3146:41: error[invalid-argument-type] Argument to bound method `write_array` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series`, found `Unknown | None`
-pandas/io/pytables.py:3184:16: error[non-subscriptable] Cannot subscript object of type `Node` with no `__getitem__` method
+pandas/io/pytables.py:3184:16: error[not-subscriptable] Cannot subscript object of type `Node` with no `__getitem__` method
 pandas/io/pytables.py:3289:45: error[invalid-argument-type] Argument to bound method `write_array_empty` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`, found `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]] | Index | Series | Unknown`
 pandas/io/pytables.py:3333:41: error[invalid-argument-type] Argument to bound method `write_array_empty` is incorrect: Expected `ExtensionArray | ndarray[tuple[Any, ...], dtype[Any]]`, found `(ExtensionArray & ~BaseStringArray) | (ndarray[tuple[Any, ...], dtype[Any]] & ~BaseStringArray) | (Index & ~BaseStringArray) | (Series & ~BaseStringArray) | (Unknown & ~BaseStringArray)`
 pandas/io/pytables.py:3666:24: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
@@ -930,11 +930,11 @@ pandas/io/sql.py:1250:41: warning[possibly-missing-attribute] Attribute `index` 
 pandas/io/sql.py:1254:18: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
 pandas/io/sql.py:1254:55: warning[possibly-missing-attribute] Attribute `iloc` may be missing on object of type `Unknown | None | DataFrame`
 pandas/io/sql.py:1255:32: warning[possibly-missing-attribute] Attribute `columns` may be missing on object of type `Unknown | None | DataFrame`
-pandas/io/sql.py:1311:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/sql.py:1311:26: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/io/sql.py:1320:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 pandas/io/sql.py:1333:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 pandas/io/sql.py:1336:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
-pandas/io/sql.py:1340:41: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/io/sql.py:1340:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/io/sql.py:1342:21: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 pandas/io/sql.py:1346:25: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 pandas/io/sql.py:1914:33: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `ExtensionDtype | str | dtype[Any] | ... omitted 4 union elements`
@@ -953,7 +953,7 @@ pandas/plotting/_matplotlib/boxplot.py:278:9: warning[possibly-missing-attribute
 pandas/plotting/_matplotlib/boxplot.py:280:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
 pandas/plotting/_matplotlib/boxplot.py:282:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
 pandas/plotting/_matplotlib/boxplot.py:284:9: warning[possibly-missing-attribute] Submodule `artist` may not be available as an attribute on module `matplotlib`
-pandas/plotting/_matplotlib/boxplot.py:338:14: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+pandas/plotting/_matplotlib/boxplot.py:338:14: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 pandas/plotting/_matplotlib/boxplot.py:338:27: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | list[Unknown | None]`
 pandas/plotting/_matplotlib/converter.py:78:12: error[invalid-return-type] Return type does not match returned value: expected `list[tuple[type, type[DateConverter]]]`, found `list[Unknown | tuple[<class 'Timestamp'>, <class 'DatetimeConverter'>] | tuple[<class 'Period'>, <class 'PeriodConverter'>] | ... omitted 4 union elements]`
 pandas/plotting/_matplotlib/converter.py:157:9: error[invalid-method-override] Invalid override of method `convert`: Definition is incompatible with `ConversionInterface.convert`
