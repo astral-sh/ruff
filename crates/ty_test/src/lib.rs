@@ -20,12 +20,12 @@ use std::fmt::{Display, Write};
 use ty_module_resolver::{
     Module, SearchPath, SearchPathSettings, list_modules, resolve_module_confident,
 };
-use ty_python_semantic::pull_types::pull_types;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, check_types};
 use ty_python_semantic::{
     MisconfigurationMode, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
     PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin,
 };
+use ty_python_types::pull_types::pull_types;
+use ty_python_types::types::{UNDEFINED_REVEAL, check_types};
 
 mod assertion;
 mod config;

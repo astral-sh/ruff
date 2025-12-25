@@ -19,14 +19,14 @@ use crate::semantic_index::symbol::ScopedSymbolId;
 
 // A scoped identifier for each `Predicate` in a scope.
 #[derive(Clone, Debug, Copy, PartialOrd, Ord, PartialEq, Eq, Hash, get_size2::GetSize)]
-pub(crate) struct ScopedPredicateId(u32);
+pub struct ScopedPredicateId(u32);
 
 impl ScopedPredicateId {
     /// A special ID that is used for an "always true" predicate.
-    pub(crate) const ALWAYS_TRUE: ScopedPredicateId = ScopedPredicateId(0xffff_ffff);
+    pub const ALWAYS_TRUE: ScopedPredicateId = ScopedPredicateId(0xffff_ffff);
 
     /// A special ID that is used for an "always false" predicate.
-    pub(crate) const ALWAYS_FALSE: ScopedPredicateId = ScopedPredicateId(0xffff_fffe);
+    pub const ALWAYS_FALSE: ScopedPredicateId = ScopedPredicateId(0xffff_fffe);
 
     const SMALLEST_TERMINAL: ScopedPredicateId = Self::ALWAYS_FALSE;
 
@@ -35,7 +35,7 @@ impl ScopedPredicateId {
     }
 
     #[cfg(test)]
-    pub(crate) fn as_u32(self) -> u32 {
+    pub fn as_u32(self) -> u32 {
         self.0
     }
 }
@@ -56,10 +56,10 @@ impl Idx for ScopedPredicateId {
 }
 
 // A collection of predicates for a given scope.
-pub(crate) type Predicates<'db> = IndexVec<ScopedPredicateId, Predicate<'db>>;
+pub type Predicates<'db> = IndexVec<ScopedPredicateId, Predicate<'db>>;
 
 #[derive(Debug, Default)]
-pub(crate) struct PredicatesBuilder<'db> {
+pub struct PredicatesBuilder<'db> {
     predicates: IndexVec<ScopedPredicateId, Predicate<'db>>,
 }
 
@@ -78,13 +78,13 @@ impl<'db> PredicatesBuilder<'db> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct Predicate<'db> {
-    pub(crate) node: PredicateNode<'db>,
-    pub(crate) is_positive: bool,
+pub struct Predicate<'db> {
+    pub node: PredicateNode<'db>,
+    pub is_positive: bool,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum PredicateOrLiteral<'db> {
+pub enum PredicateOrLiteral<'db> {
     Literal(bool),
     Predicate(Predicate<'db>),
 }
@@ -104,13 +104,13 @@ impl PredicateOrLiteral<'_> {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) struct CallableAndCallExpr<'db> {
-    pub(crate) callable: Expression<'db>,
-    pub(crate) call_expr: Expression<'db>,
+pub struct CallableAndCallExpr<'db> {
+    pub callable: Expression<'db>,
+    pub call_expr: Expression<'db>,
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum PredicateNode<'db> {
+pub enum PredicateNode<'db> {
     Expression(Expression<'db>),
     ReturnsNever(CallableAndCallExpr<'db>),
     Pattern(PatternPredicate<'db>),
@@ -118,20 +118,20 @@ pub(crate) enum PredicateNode<'db> {
 }
 
 #[derive(Debug, Clone, Copy, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum ClassPatternKind {
+pub enum ClassPatternKind {
     Irrefutable,
     Refutable,
 }
 
 impl ClassPatternKind {
-    pub(crate) fn is_irrefutable(self) -> bool {
+    pub fn is_irrefutable(self) -> bool {
         matches!(self, ClassPatternKind::Irrefutable)
     }
 }
 
 /// Pattern kinds for which we support type narrowing and/or static reachability analysis.
 #[derive(Debug, Clone, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum PatternPredicateKind<'db> {
+pub enum PatternPredicateKind<'db> {
     Singleton(Singleton),
     Value(Expression<'db>),
     Or(Vec<PatternPredicateKind<'db>>),
@@ -141,27 +141,27 @@ pub(crate) enum PatternPredicateKind<'db> {
 }
 
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct PatternPredicate<'db> {
-    pub(crate) file: File,
+pub struct PatternPredicate<'db> {
+    pub file: File,
 
-    pub(crate) file_scope: FileScopeId,
+    pub file_scope: FileScopeId,
 
-    pub(crate) subject: Expression<'db>,
+    pub subject: Expression<'db>,
 
     #[returns(ref)]
-    pub(crate) kind: PatternPredicateKind<'db>,
+    pub kind: PatternPredicateKind<'db>,
 
-    pub(crate) guard: Option<Expression<'db>>,
+    pub guard: Option<Expression<'db>>,
 
     /// A reference to the pattern of the previous match case
-    pub(crate) previous_predicate: Option<Box<PatternPredicate<'db>>>,
+    pub previous_predicate: Option<Box<PatternPredicate<'db>>>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for PatternPredicate<'_> {}
 
 impl<'db> PatternPredicate<'db> {
-    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+    pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.file_scope(db).to_scope_id(db, self.file(db))
     }
 }
@@ -207,8 +207,8 @@ impl<'db> PatternPredicate<'db> {
 ///
 /// [Truthiness]: [crate::types::Truthiness]
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct StarImportPlaceholderPredicate<'db> {
-    pub(crate) importing_file: File,
+pub struct StarImportPlaceholderPredicate<'db> {
+    pub importing_file: File,
 
     /// Each symbol imported by a `*` import has a separate predicate associated with it:
     /// this field identifies which symbol that is.
@@ -219,16 +219,16 @@ pub(crate) struct StarImportPlaceholderPredicate<'db> {
     /// for valid `*`-import definitions, and valid `*`-import definitions can only ever
     /// exist in the global scope; thus, we know that the `symbol_id` here will be relative
     /// to the global scope of the importing file.
-    pub(crate) symbol_id: ScopedSymbolId,
+    pub symbol_id: ScopedSymbolId,
 
-    pub(crate) referenced_file: File,
+    pub referenced_file: File,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for StarImportPlaceholderPredicate<'_> {}
 
 impl<'db> StarImportPlaceholderPredicate<'db> {
-    pub(crate) fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+    pub fn scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         // See doc-comment above [`StarImportPlaceholderPredicate::symbol_id`]:
         // valid `*`-import definitions can only take place in the global scope.
         global_scope(db, self.importing_file(db))

@@ -20,7 +20,7 @@ use ruff_python_ast::{
     visitor::source_order::{SourceOrderVisitor, TraversalSignal},
 };
 use ruff_text_size::{Ranged, TextRange};
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_types::{ImportAliasResolution, SemanticModel};
 
 /// Mode for references search behavior
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

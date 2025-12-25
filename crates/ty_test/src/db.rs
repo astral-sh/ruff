@@ -14,7 +14,8 @@ use std::sync::Arc;
 use tempfile::TempDir;
 use ty_module_resolver::SearchPaths;
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
-use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program, default_lint_registry};
+use ty_python_semantic::{AnalysisSettings, Db as SemanticDb, Program};
+use ty_python_types::default_lint_registry;
 
 use crate::config::Analysis;
 

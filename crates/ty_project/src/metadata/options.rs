@@ -1666,7 +1666,7 @@ mod schema {
         fn json_schema(generator: &mut schemars::SchemaGenerator) -> schemars::Schema {
             use serde_json::{Map, Value};
 
-            let registry = ty_python_semantic::default_lint_registry();
+            let registry = ty_python_types::default_lint_registry();
             let level_schema = generator.subschema_for::<super::Level>();
 
             let properties: Map<String, Value> = registry

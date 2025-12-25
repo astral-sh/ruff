@@ -467,7 +467,7 @@ impl SemanticDb for ProjectDatabase {
     }
 
     fn lint_registry(&self) -> &LintRegistry {
-        ty_python_semantic::default_lint_registry()
+        ty_python_types::default_lint_registry()
     }
 
     fn analysis_settings(&self) -> &AnalysisSettings {
@@ -658,7 +658,7 @@ pub(crate) mod tests {
         }
 
         fn lint_registry(&self) -> &LintRegistry {
-            ty_python_semantic::default_lint_registry()
+            ty_python_types::default_lint_registry()
         }
 
         fn analysis_settings(&self) -> &AnalysisSettings {

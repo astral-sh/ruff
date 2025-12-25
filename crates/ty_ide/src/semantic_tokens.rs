@@ -44,10 +44,10 @@ use ruff_python_ast::{
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 use std::ops::Deref;
 use ty_python_semantic::semantic_index::definition::Definition;
-use ty_python_semantic::types::TypeVarKind;
-use ty_python_semantic::{
-    HasType, SemanticModel, semantic_index::definition::DefinitionKind, types::Type,
-    types::ide_support::definition_for_name,
+use ty_python_semantic::semantic_index::definition::DefinitionKind;
+use ty_python_types::types::TypeVarKind;
+use ty_python_types::{
+    HasType, SemanticModel, types::Type, types::ide_support::definition_for_name,
 };
 
 /// Semantic token types supported by the language server.
@@ -272,7 +272,7 @@ impl<'db> SemanticTokenVisitor<'db> {
         let definition = definition_for_name(
             self.model,
             name,
-            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            ty_python_types::ImportAliasResolution::ResolveAliases,
         );
 
         if let Some(definition) = definition {

@@ -12,12 +12,12 @@ use ruff_python_ast::token::{TokenKind, Tokens};
 use ruff_python_ast::{self as ast, AnyNodeRef};
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use ty_python_semantic::ResolvedDefinition;
-use ty_python_semantic::types::Type;
-use ty_python_semantic::types::ide_support::{
+use ty_python_types::ResolvedDefinition;
+use ty_python_types::types::Type;
+use ty_python_types::types::ide_support::{
     call_signature_details, call_type_simplified_by_overloads, definitions_for_keyword_argument,
 };
-use ty_python_semantic::{
+use ty_python_types::{
     HasDefinition, HasType, ImportAliasResolution, SemanticModel, definitions_for_imported_symbol,
     definitions_for_name,
 };
@@ -228,15 +228,15 @@ impl<'db> Definitions<'db> {
     pub(crate) fn from_ty(db: &'db dyn crate::Db, ty: Type<'db>) -> Option<Self> {
         let ty_def = ty.definition(db)?;
         let resolved = match ty_def {
-            ty_python_semantic::types::TypeDefinition::Module(module) => {
+            ty_python_types::types::TypeDefinition::Module(module) => {
                 ResolvedDefinition::Module(module.file(db)?)
             }
-            ty_python_semantic::types::TypeDefinition::Class(definition)
-            | ty_python_semantic::types::TypeDefinition::Function(definition)
-            | ty_python_semantic::types::TypeDefinition::TypeVar(definition)
-            | ty_python_semantic::types::TypeDefinition::TypeAlias(definition)
-            | ty_python_semantic::types::TypeDefinition::SpecialForm(definition)
-            | ty_python_semantic::types::TypeDefinition::NewType(definition) => {
+            ty_python_types::types::TypeDefinition::Class(definition)
+            | ty_python_types::types::TypeDefinition::Function(definition)
+            | ty_python_types::types::TypeDefinition::TypeVar(definition)
+            | ty_python_types::types::TypeDefinition::TypeAlias(definition)
+            | ty_python_types::types::TypeDefinition::SpecialForm(definition)
+            | ty_python_types::types::TypeDefinition::NewType(definition) => {
                 ResolvedDefinition::Definition(definition)
             }
         };
@@ -338,11 +338,11 @@ impl GotoTarget<'_> {
                 }
             }
             GotoTarget::BinOp { expression, .. } => {
-                let (_, ty) = ty_python_semantic::definitions_for_bin_op(model, expression)?;
+                let (_, ty) = ty_python_types::definitions_for_bin_op(model, expression)?;
                 Some(ty)
             }
             GotoTarget::UnaryOp { expression, .. } => {
-                let (_, ty) = ty_python_semantic::definitions_for_unary_op(model, expression)?;
+                let (_, ty) = ty_python_types::definitions_for_unary_op(model, expression)?;
                 Some(ty)
             }
             // TODO: Support identifier targets
@@ -526,15 +526,14 @@ impl GotoTarget<'_> {
             }
 
             GotoTarget::BinOp { expression, .. } => {
-                let (definitions, _) =
-                    ty_python_semantic::definitions_for_bin_op(model, expression)?;
+                let (definitions, _) = ty_python_types::definitions_for_bin_op(model, expression)?;
 
                 Some(definitions)
             }
 
             GotoTarget::UnaryOp { expression, .. } => {
                 let (definitions, _) =
-                    ty_python_semantic::definitions_for_unary_op(model, expression)?;
+                    ty_python_types::definitions_for_unary_op(model, expression)?;
 
                 Some(definitions)
             }
@@ -939,12 +938,12 @@ impl Ranged for GotoTarget<'_> {
 /// Converts a collection of `ResolvedDefinition` items into `NavigationTarget` items.
 fn convert_resolved_definitions_to_targets<'db>(
     db: &'db dyn ty_python_semantic::Db,
-    definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+    definitions: Vec<ty_python_types::ResolvedDefinition<'db>>,
 ) -> Vec<crate::NavigationTarget> {
     definitions
         .into_iter()
         .map(|resolved_definition| match resolved_definition {
-            ty_python_semantic::ResolvedDefinition::Definition(definition) => {
+            ty_python_types::ResolvedDefinition::Definition(definition) => {
                 // Get the parsed module for range calculation
                 let definition_file = definition.file(db);
                 let module = ruff_db::parsed::parsed_module(db, definition_file).load(db);
@@ -959,11 +958,11 @@ fn convert_resolved_definitions_to_targets<'db>(
                     full_range: full_range.range(),
                 }
             }
-            ty_python_semantic::ResolvedDefinition::Module(file) => {
+            ty_python_types::ResolvedDefinition::Module(file) => {
                 // For modules, navigate to the start of the file
                 crate::NavigationTarget::new(file, TextRange::default())
             }
-            ty_python_semantic::ResolvedDefinition::FileWithRange(file_range) => {
+            ty_python_types::ResolvedDefinition::FileWithRange(file_range) => {
                 // For file ranges, navigate to the specific range within the file
                 crate::NavigationTarget::from(file_range)
             }
@@ -984,9 +983,9 @@ fn definitions_for_expression<'db>(
             expression.into(),
             alias_resolution,
         )),
-        ast::ExprRef::Attribute(attribute) => Some(ty_python_semantic::definitions_for_attribute(
-            model, attribute,
-        )),
+        ast::ExprRef::Attribute(attribute) => {
+            Some(ty_python_types::definitions_for_attribute(model, attribute))
+        }
         _ => None,
     }
 }
@@ -1007,7 +1006,7 @@ fn definitions_for_callable<'db>(
 fn definitions_to_navigation_targets<'db>(
     db: &dyn ty_python_semantic::Db,
     stub_mapper: Option<&StubMapper<'db>>,
-    mut definitions: Vec<ty_python_semantic::ResolvedDefinition<'db>>,
+    mut definitions: Vec<ty_python_types::ResolvedDefinition<'db>>,
 ) -> Option<crate::NavigationTargets> {
     if let Some(mapper) = stub_mapper {
         definitions = mapper.map_definitions(definitions);

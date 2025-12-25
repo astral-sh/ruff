@@ -3,7 +3,7 @@ use crate::{Db, HasNavigationTargets, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::SemanticModel;
+use ty_python_types::SemanticModel;
 
 pub fn goto_type_definition(
     db: &dyn Db,

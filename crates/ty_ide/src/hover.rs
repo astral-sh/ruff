@@ -6,8 +6,8 @@ use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
 use std::fmt;
 use std::fmt::Formatter;
-use ty_python_semantic::types::{KnownInstanceType, Type, TypeVarVariance};
-use ty_python_semantic::{DisplaySettings, SemanticModel};
+use ty_python_types::types::{KnownInstanceType, Type, TypeVarVariance};
+use ty_python_types::{DisplaySettings, SemanticModel};
 
 pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Hover<'_>>> {
     let parsed = parsed_module(db, file).load(db);
@@ -23,7 +23,7 @@ pub fn hover(db: &dyn Db, file: File, offset: TextSize) -> Option<RangedValue<Ho
     let docs = goto_target
         .get_definition_targets(
             &model,
-            ty_python_semantic::ImportAliasResolution::ResolveAliases,
+            ty_python_types::ImportAliasResolution::ResolveAliases,
         )
         .and_then(|definitions| definitions.docstring(db))
         .map(HoverContent::Docstring);

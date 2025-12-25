@@ -3,7 +3,7 @@ use crate::references::{ReferencesMode, references};
 use crate::{Db, ReferenceTarget};
 use ruff_db::files::File;
 use ruff_text_size::TextSize;
-use ty_python_semantic::SemanticModel;
+use ty_python_types::SemanticModel;
 
 /// Find all references to a symbol at the given position.
 /// Search for references across all files in the project.
