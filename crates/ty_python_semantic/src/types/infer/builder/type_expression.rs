@@ -1593,8 +1593,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     let mut argument_elements = arguments_as_tuple
                         .as_ref()
-                        .map(|tup| Either::Left(tup.all_elements().copied()))
-                        .unwrap_or(Either::Right(std::iter::once(arguments)));
+                        .map(|tup| tup.all_elements())
+                        .unwrap_or(std::slice::from_ref(&arguments))
+                        .iter()
+                        .copied();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
                         Type::StringLiteral(_)

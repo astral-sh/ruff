@@ -10025,7 +10025,7 @@ impl<'db> TypeVarInstance<'db> {
                     .map_or_else(Parameters::unknown, |tuple_spec| {
                         Parameters::new(
                             db,
-                            tuple_spec.all_elements().map(|ty| {
+                            tuple_spec.all_elements().iter().map(|ty| {
                                 Parameter::positional_only(None).with_annotated_type(*ty)
                             }),
                         )

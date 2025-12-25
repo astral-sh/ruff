@@ -349,6 +349,7 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
                         .all_elements()
+                        .iter()
                         .any(|element| is_expandable_type(db, *element)),
                     Tuple::Variable(_) => false,
                 })
@@ -381,6 +382,7 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                     Tuple::Fixed(fixed_length_tuple) => {
                         let expanded = fixed_length_tuple
                             .all_elements()
+                            .iter()
                             .map(|element| {
                                 if let Some(expanded) = expand_type(db, *element) {
                                     Either::Left(expanded.into_iter())

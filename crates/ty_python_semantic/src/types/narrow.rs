@@ -216,6 +216,7 @@ impl ClassInfoConstraintFunction {
                     db,
                     tuple
                         .all_elements()
+                        .iter()
                         .map(|element| self.generate_constraint(db, *element)),
                 )
             }),

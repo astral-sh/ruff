@@ -4351,6 +4351,7 @@ pub(super) fn report_unsupported_comparison<'db>(
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
                 .elements()
+                .iter()
                 .zip(rhs_spec.elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {

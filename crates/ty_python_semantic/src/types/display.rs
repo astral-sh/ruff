@@ -238,7 +238,7 @@ impl<'a, 'b, 'db> TypeWriter<'a, 'b, 'db> {
     }
 }
 
-impl std::fmt::Write for TypeWriter<'_, '_, '_> {
+impl Write for TypeWriter<'_, '_, '_> {
     fn write_str(&mut self, val: &str) -> fmt::Result {
         match self {
             TypeWriter::Formatter(formatter) => formatter.write_str(val),
@@ -246,7 +246,7 @@ impl std::fmt::Write for TypeWriter<'_, '_, '_> {
         }
     }
 }
-impl std::fmt::Write for TypeDetailsWriter<'_> {
+impl Write for TypeDetailsWriter<'_> {
     fn write_str(&mut self, val: &str) -> fmt::Result {
         self.label.write_str(val)
     }
@@ -424,7 +424,7 @@ enum AmbiguityState<'db> {
     RequiresFileAndLineNumber,
 }
 
-impl<'db> super::visitor::TypeVisitor<'db> for AmbiguousClassCollector<'db> {
+impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn should_visit_lazy_type_attributes(&self) -> bool {
         false
     }
@@ -1103,14 +1103,14 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
             // S is included if there is either a prefix or a suffix. The initial `tuple[` and
             // trailing `]` are printed elsewhere. The `yyy, ...` is printed no matter what.)
             TupleSpec::Variable(tuple) => {
-                if !tuple.prefix.is_empty() {
+                if !tuple.prefix_elements().is_empty() {
                     tuple
-                        .prefix
+                        .prefix_elements()
                         .display_with(self.db, self.settings.singleline())
                         .fmt_detailed(f)?;
                     f.write_str(", ")?;
                 }
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_char('*')?;
                     // Might as well link the type again here too
                     f.with_type(KnownClass::Tuple.to_class_literal(self.db))
@@ -1118,17 +1118,17 @@ impl<'db> FmtDetailed<'db> for DisplayTuple<'_, 'db> {
                     f.write_char('[')?;
                 }
                 tuple
-                    .variable
+                    .variable()
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ...")?;
-                if !tuple.prefix.is_empty() || !tuple.suffix.is_empty() {
+                if !tuple.prefix_elements().is_empty() || !tuple.suffix_elements().is_empty() {
                     f.write_str("]")?;
                 }
-                if !tuple.suffix.is_empty() {
+                if !tuple.suffix_elements().is_empty() {
                     f.write_str(", ")?;
                     tuple
-                        .suffix
+                        .suffix_elements()
                         .display_with(self.db, self.settings.singleline())
                         .fmt_detailed(f)?;
                 }
