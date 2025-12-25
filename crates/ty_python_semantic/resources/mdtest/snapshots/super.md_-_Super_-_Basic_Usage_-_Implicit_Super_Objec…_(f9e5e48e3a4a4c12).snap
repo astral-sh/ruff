@@ -28,160 +28,134 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md
  13 | 
  14 |     @classmethod
  15 |     def f(cls):
- 16 |         reveal_type(super())  # revealed: <super: <class 'B'>, Self@f>
- 17 |         # error: [invalid-argument-type]
- 18 |         super().f()
- 19 | 
- 20 | super(B, B(42)).__init__(42)
- 21 | super(B, B).f()
- 22 | import enum
- 23 | from typing import Any, Self, Never, Protocol, Callable
- 24 | from ty_extensions import Intersection
- 25 | 
- 26 | class BuilderMeta(type):
- 27 |     def __new__(
- 28 |         cls: type[Any],
- 29 |         name: str,
- 30 |         bases: tuple[type, ...],
- 31 |         dct: dict[str, Any],
- 32 |     ) -> BuilderMeta:
- 33 |         # revealed: <super: <class 'BuilderMeta'>, Any>
- 34 |         s = reveal_type(super())
- 35 |         # revealed: Any
- 36 |         return reveal_type(s.__new__(cls, name, bases, dct))
- 37 | 
- 38 | class BuilderMeta2(type):
- 39 |     def __new__(
- 40 |         cls: type[BuilderMeta2],
- 41 |         name: str,
- 42 |         bases: tuple[type, ...],
- 43 |         dct: dict[str, Any],
- 44 |     ) -> BuilderMeta2:
- 45 |         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
- 46 |         s = reveal_type(super())
- 47 |         return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
- 48 | 
- 49 | class Foo[T]:
- 50 |     x: T
- 51 | 
- 52 |     def method(self: Any):
- 53 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
- 54 | 
- 55 |         if isinstance(self, Foo):
- 56 |             reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
- 57 | 
- 58 |     def method2(self: Foo[T]):
- 59 |         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
- 60 |         reveal_type(super())
- 61 | 
- 62 |     def method3(self: Foo):
- 63 |         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
- 64 |         reveal_type(super())
- 65 | 
- 66 |     def method4(self: Self):
- 67 |         # revealed: <super: <class 'Foo'>, Self@method4>
- 68 |         reveal_type(super())
- 69 | 
- 70 |     def method5[S: Foo[int]](self: S, other: S) -> S:
- 71 |         # revealed: <super: <class 'Foo'>, S@method5>
- 72 |         reveal_type(super())
- 73 |         return self
- 74 | 
- 75 |     def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
- 76 |         # error: [invalid-super-argument]
- 77 |         # revealed: Unknown
- 78 |         reveal_type(super())
- 79 |         return self
- 80 | 
- 81 |     def method7[S](self: S, other: S) -> S:
- 82 |         # error: [invalid-super-argument]
- 83 |         # revealed: Unknown
- 84 |         reveal_type(super())
- 85 |         return self
- 86 | 
- 87 |     def method8[S: int](self: S, other: S) -> S:
- 88 |         # error: [invalid-super-argument]
- 89 |         # revealed: Unknown
- 90 |         reveal_type(super())
- 91 |         return self
- 92 | 
- 93 |     def method9[S: (int, str)](self: S, other: S) -> S:
- 94 |         # error: [invalid-super-argument]
- 95 |         # revealed: Unknown
- 96 |         reveal_type(super())
- 97 |         return self
- 98 | 
- 99 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:
-100 |         # revealed: <super: <class 'Foo'>, S@method10>
-101 |         reveal_type(super())
-102 |         return self
-103 | 
-104 | type Alias = Bar
-105 | 
-106 | class Bar:
-107 |     def method(self: Alias):
-108 |         # revealed: <super: <class 'Bar'>, Bar>
-109 |         reveal_type(super())
-110 | 
-111 |     def pls_dont_call_me(self: Never):
-112 |         # revealed: <super: <class 'Bar'>, Unknown>
-113 |         reveal_type(super())
-114 | 
-115 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
-116 |         # revealed: <super: <class 'Bar'>, Bar>
-117 |         reveal_type(super())
-118 | 
-119 | class P(Protocol):
-120 |     def method(self: P):
-121 |         # revealed: <super: <class 'P'>, P>
-122 |         reveal_type(super())
-123 | 
-124 | class E(enum.Enum):
-125 |     X = 1
-126 | 
-127 |     def method(self: E):
-128 |         match self:
-129 |             case E.X:
-130 |                 # revealed: <super: <class 'E'>, E>
-131 |                 reveal_type(super())
+ 16 |         reveal_type(super())  # revealed: <super: <class 'B'>, type[Self@f]>
+ 17 |         super().f()
+ 18 | 
+ 19 | super(B, B(42)).__init__(42)
+ 20 | super(B, B).f()
+ 21 | import enum
+ 22 | from typing import Any, Self, Never, Protocol, Callable
+ 23 | from ty_extensions import Intersection
+ 24 | 
+ 25 | class BuilderMeta(type):
+ 26 |     def __new__(
+ 27 |         cls: type[Any],
+ 28 |         name: str,
+ 29 |         bases: tuple[type, ...],
+ 30 |         dct: dict[str, Any],
+ 31 |     ) -> BuilderMeta:
+ 32 |         # revealed: <super: <class 'BuilderMeta'>, Any>
+ 33 |         s = reveal_type(super())
+ 34 |         # revealed: Any
+ 35 |         return reveal_type(s.__new__(cls, name, bases, dct))
+ 36 | 
+ 37 | class BuilderMeta2(type):
+ 38 |     def __new__(
+ 39 |         cls: type[BuilderMeta2],
+ 40 |         name: str,
+ 41 |         bases: tuple[type, ...],
+ 42 |         dct: dict[str, Any],
+ 43 |     ) -> BuilderMeta2:
+ 44 |         # revealed: <super: <class 'BuilderMeta2'>, <class 'BuilderMeta2'>>
+ 45 |         s = reveal_type(super())
+ 46 |         return reveal_type(s.__new__(cls, name, bases, dct))  # revealed: BuilderMeta2
+ 47 | 
+ 48 | class Foo[T]:
+ 49 |     x: T
+ 50 | 
+ 51 |     def method(self: Any):
+ 52 |         reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+ 53 | 
+ 54 |         if isinstance(self, Foo):
+ 55 |             reveal_type(super())  # revealed: <super: <class 'Foo'>, Any>
+ 56 | 
+ 57 |     def method2(self: Foo[T]):
+ 58 |         # revealed: <super: <class 'Foo'>, Foo[T@Foo]>
+ 59 |         reveal_type(super())
+ 60 | 
+ 61 |     def method3(self: Foo):
+ 62 |         # revealed: <super: <class 'Foo'>, Foo[Unknown]>
+ 63 |         reveal_type(super())
+ 64 | 
+ 65 |     def method4(self: Self):
+ 66 |         # revealed: <super: <class 'Foo'>, Self@method4>
+ 67 |         reveal_type(super())
+ 68 | 
+ 69 |     def method5[S: Foo[int]](self: S, other: S) -> S:
+ 70 |         # revealed: <super: <class 'Foo'>, S@method5>
+ 71 |         reveal_type(super())
+ 72 |         return self
+ 73 | 
+ 74 |     def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
+ 75 |         # error: [invalid-super-argument]
+ 76 |         # revealed: Unknown
+ 77 |         reveal_type(super())
+ 78 |         return self
+ 79 | 
+ 80 |     def method7[S](self: S, other: S) -> S:
+ 81 |         # error: [invalid-super-argument]
+ 82 |         # revealed: Unknown
+ 83 |         reveal_type(super())
+ 84 |         return self
+ 85 | 
+ 86 |     def method8[S: int](self: S, other: S) -> S:
+ 87 |         # error: [invalid-super-argument]
+ 88 |         # revealed: Unknown
+ 89 |         reveal_type(super())
+ 90 |         return self
+ 91 | 
+ 92 |     def method9[S: (int, str)](self: S, other: S) -> S:
+ 93 |         # error: [invalid-super-argument]
+ 94 |         # revealed: Unknown
+ 95 |         reveal_type(super())
+ 96 |         return self
+ 97 | 
+ 98 |     def method10[S: Callable[..., str]](self: S, other: S) -> S:
+ 99 |         # revealed: <super: <class 'Foo'>, S@method10>
+100 |         reveal_type(super())
+101 |         return self
+102 | 
+103 | type Alias = Bar
+104 | 
+105 | class Bar:
+106 |     def method(self: Alias):
+107 |         # revealed: <super: <class 'Bar'>, Bar>
+108 |         reveal_type(super())
+109 | 
+110 |     def pls_dont_call_me(self: Never):
+111 |         # revealed: <super: <class 'Bar'>, Unknown>
+112 |         reveal_type(super())
+113 | 
+114 |     def only_call_me_on_callable_subclasses(self: Intersection[Bar, Callable[..., object]]):
+115 |         # revealed: <super: <class 'Bar'>, Bar>
+116 |         reveal_type(super())
+117 | 
+118 | class P(Protocol):
+119 |     def method(self: P):
+120 |         # revealed: <super: <class 'P'>, P>
+121 |         reveal_type(super())
+122 | 
+123 | class E(enum.Enum):
+124 |     X = 1
+125 | 
+126 |     def method(self: E):
+127 |         match self:
+128 |             case E.X:
+129 |                 # revealed: <super: <class 'E'>, E>
+130 |                 reveal_type(super())
 ```
 
 # Diagnostics
 
 ```
-error[invalid-argument-type]: Argument to bound method `f` is incorrect
-  --> src/mdtest_snippet.py:18:9
-   |
-16 |         reveal_type(super())  # revealed: <super: <class 'B'>, Self@f>
-17 |         # error: [invalid-argument-type]
-18 |         super().f()
-   |         ^^^^^^^^^^^ Expected `type[A]`, found `type[Self@f]`
-19 |
-20 | super(B, B(42)).__init__(42)
-   |
-info: Method defined here
- --> src/mdtest_snippet.py:6:9
-  |
-4 |     def __init__(self, a: int): ...
-5 |     @classmethod
-6 |     def f(cls): ...
-  |         ^ --- Parameter declared here
-7 |
-8 | class B(A):
-  |
-info: rule `invalid-argument-type` is enabled by default
-
-```
-
-```
 error[invalid-super-argument]: `S@method6` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method6)` call
-  --> src/mdtest_snippet.py:78:21
+  --> src/mdtest_snippet.py:77:21
    |
-76 |         # error: [invalid-super-argument]
-77 |         # revealed: Unknown
-78 |         reveal_type(super())
+75 |         # error: [invalid-super-argument]
+76 |         # revealed: Unknown
+77 |         reveal_type(super())
    |                     ^^^^^^^
-79 |         return self
+78 |         return self
    |
 info: rule `invalid-super-argument` is enabled by default
 
@@ -189,13 +163,13 @@ info: rule `invalid-super-argument` is enabled by default
 
 ```
 error[invalid-super-argument]: `S@method7` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method7)` call
-  --> src/mdtest_snippet.py:84:21
+  --> src/mdtest_snippet.py:83:21
    |
-82 |         # error: [invalid-super-argument]
-83 |         # revealed: Unknown
-84 |         reveal_type(super())
+81 |         # error: [invalid-super-argument]
+82 |         # revealed: Unknown
+83 |         reveal_type(super())
    |                     ^^^^^^^
-85 |         return self
+84 |         return self
    |
 info: rule `invalid-super-argument` is enabled by default
 
@@ -203,13 +177,13 @@ info: rule `invalid-super-argument` is enabled by default
 
 ```
 error[invalid-super-argument]: `S@method8` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method8)` call
-  --> src/mdtest_snippet.py:90:21
+  --> src/mdtest_snippet.py:89:21
    |
-88 |         # error: [invalid-super-argument]
-89 |         # revealed: Unknown
-90 |         reveal_type(super())
+87 |         # error: [invalid-super-argument]
+88 |         # revealed: Unknown
+89 |         reveal_type(super())
    |                     ^^^^^^^
-91 |         return self
+90 |         return self
    |
 info: rule `invalid-super-argument` is enabled by default
 
@@ -217,13 +191,13 @@ info: rule `invalid-super-argument` is enabled by default
 
 ```
 error[invalid-super-argument]: `S@method9` is not an instance or subclass of `<class 'Foo'>` in `super(<class 'Foo'>, S@method9)` call
-  --> src/mdtest_snippet.py:96:21
+  --> src/mdtest_snippet.py:95:21
    |
-94 |         # error: [invalid-super-argument]
-95 |         # revealed: Unknown
-96 |         reveal_type(super())
+93 |         # error: [invalid-super-argument]
+94 |         # revealed: Unknown
+95 |         reveal_type(super())
    |                     ^^^^^^^
-97 |         return self
+96 |         return self
    |
 info: rule `invalid-super-argument` is enabled by default
 
