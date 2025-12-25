@@ -25,6 +25,7 @@ ruff_text_size = { workspace = true }
 ruff_python_literal = { workspace = true }
 ruff_python_trivia = { workspace = true }
 ty_module_resolver = { workspace = true }
+ty_combine = { workspace = true }
 ty_static = { workspace = true }
 
 anyhow = { workspace = true }
