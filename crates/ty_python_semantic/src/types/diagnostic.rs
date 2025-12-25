@@ -3532,7 +3532,7 @@ fn report_unsupported_base(
         base_type.display(db)
     ));
     diagnostic.info(format_args!(
-        "ty cannot resolve a consistent MRO for class `{}` due to this base",
+        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
         class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
