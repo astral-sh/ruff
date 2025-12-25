@@ -10889,25 +10889,37 @@ impl<'db> UnionTypeInstance<'db> {
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Type<'db> {
-        let value_expr_types = value_expr_types.into_iter().collect::<Box<_>>();
-
-        let mut builder = UnionBuilder::new(db);
-        for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
-                Ok(ty) => builder.add_in_place(ty),
-                Err(error) => {
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
-                    ));
+        fn from_value_expression_types_impl<'db>(
+            db: &'db dyn Db,
+            value_expr_types: Box<[Type<'db>]>,
+            scope_id: ScopeId<'db>,
+            typevar_binding_context: Option<Definition<'db>>,
+        ) -> Type<'db> {
+            let mut builder = UnionBuilder::new(db);
+            for ty in &value_expr_types {
+                match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+                    Ok(ty) => builder.add_in_place(ty),
+                    Err(error) => {
+                        return Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        ));
+                    }
                 }
             }
+
+            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+                db,
+                Some(value_expr_types),
+                Ok(builder.build()),
+            )))
         }
 
-        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+        from_value_expression_types_impl(
             db,
-            Some(value_expr_types),
-            Ok(builder.build()),
-        )))
+            value_expr_types.into_iter().collect(),
+            scope_id,
+            typevar_binding_context,
+        )
     }
 
     /// Get the types of the elements of this union as they would appear in a value

@@ -563,38 +563,46 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        let mut types = self.fill_in_defaults(db, types);
-        let len = types.len();
-        loop {
-            let mut any_changed = false;
-            for i in 0..len {
-                let partial = PartialSpecialization {
-                    generic_context: self,
-                    types: &types,
-                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                    // check if the result is self-referential after we're done applying the
-                    // partial specialization. But when we apply a paramspec, we don't use the
-                    // callable that it maps to directly; we create a new callable that reuses
-                    // parts of it. That means we can't look for the previous type directly.
-                    // Instead we use this to skip specializing the type in itself in the first
-                    // place.
-                    skip: Some(i),
-                };
-                let updated = types[i].apply_type_mapping(
-                    db,
-                    &TypeMapping::PartialSpecialization(partial),
-                    TypeContext::default(),
-                );
-                if updated != types[i] {
-                    types[i] = updated;
-                    any_changed = true;
+        fn specialize_recursive_impl<'db>(
+            db: &'db dyn Db,
+            context: GenericContext<'db>,
+            mut types: Box<[Type<'db>]>,
+        ) -> Specialization<'db> {
+            let len = types.len();
+            loop {
+                let mut any_changed = false;
+                for i in 0..len {
+                    let partial = PartialSpecialization {
+                        generic_context: context,
+                        types: &types,
+                        // Don't recursively substitute type[i] in itself. Ideally, we could instead
+                        // check if the result is self-referential after we're done applying the
+                        // partial specialization. But when we apply a paramspec, we don't use the
+                        // callable that it maps to directly; we create a new callable that reuses
+                        // parts of it. That means we can't look for the previous type directly.
+                        // Instead we use this to skip specializing the type in itself in the first
+                        // place.
+                        skip: Some(i),
+                    };
+                    let updated = types[i].apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    if updated != types[i] {
+                        types[i] = updated;
+                        any_changed = true;
+                    }
+                }
+
+                if !any_changed {
+                    return Specialization::new(db, context, types, None, None);
                 }
             }
-
-            if !any_changed {
-                return Specialization::new(db, self, types, None, None);
-            }
         }
+
+        let types = self.fill_in_defaults(db, types);
+        specialize_recursive_impl(db, self, types)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -614,7 +622,7 @@ impl<'db> GenericContext<'db> {
     {
         let types = types.into_iter();
         let variables = self.variables(db);
-        assert!(self.len(db) == types.len());
+        assert_eq!(self.len(db), types.len());
 
         // Typevars can have other typevars as their default values, e.g.
         //

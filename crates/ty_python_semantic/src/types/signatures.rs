@@ -1841,32 +1841,37 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let mut kind = ParametersKind::Standard;
-        if let [p1, p2] = value.as_slice()
-            && p1.is_variadic()
-            && p2.is_keyword_variadic()
-        {
-            match (p1.annotated_type(), p2.annotated_type()) {
-                (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
-                    kind = ParametersKind::Gradual;
-                }
-                (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
-                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
-                        args_typevar.paramspec_attr(db),
-                        kwargs_typevar.paramspec_attr(db),
-                    ) {
-                        let typevar = args_typevar.without_paramspec_attr(db);
-                        if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
-                        {
-                            kind = ParametersKind::ParamSpec(typevar);
+        fn new_impl<'db>(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Parameters<'db> {
+            let mut kind = ParametersKind::Standard;
+            if let [p1, p2] = value.as_slice()
+                && p1.is_variadic()
+                && p2.is_keyword_variadic()
+            {
+                match (p1.annotated_type(), p2.annotated_type()) {
+                    (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                        kind = ParametersKind::Gradual;
+                    }
+                    (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                        if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                            args_typevar.paramspec_attr(db),
+                            kwargs_typevar.paramspec_attr(db),
+                        ) {
+                            let typevar = args_typevar.without_paramspec_attr(db);
+                            if typevar
+                                .is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
+                            {
+                                kind = ParametersKind::ParamSpec(typevar);
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
+            Parameters { value, kind }
         }
-        Self { value, kind }
+
+        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        new_impl(db, value)
     }
 
     /// Create an empty parameter list.
