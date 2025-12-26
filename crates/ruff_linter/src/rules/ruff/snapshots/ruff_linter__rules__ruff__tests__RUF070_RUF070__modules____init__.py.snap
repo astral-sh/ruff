@@ -41,3 +41,11 @@ RUF070 Code detected
 28 |
 29 |   if TYPE_CHECKING:  # ok
    |
+
+RUF070 Code detected
+  --> __init__.py:48:1
+   |
+47 | # non-`extend_path` assignments are not allowed
+48 | __path__ = 5  # RUF070
+   | ^^^^^^^^^^^^
+   |

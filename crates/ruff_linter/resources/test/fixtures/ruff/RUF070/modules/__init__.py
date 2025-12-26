@@ -38,3 +38,11 @@ __version__ = "1.2.3"  # ok
 
 def __dir__():  # ok
     return ["foo"]
+
+import pkgutil
+
+__path__ = pkgutil.extend_path(__path__, __name__)  # ok
+__path__ = unknown.extend_path(__path__, __name__)  # also ok
+
+# non-`extend_path` assignments are not allowed
+__path__ = 5  # RUF070
