@@ -8,6 +8,11 @@ class Semicolon:
     x=2;x=3 # fmt: skip
     x=4
 
+class SemicolonLogicalLine:
+    x=1;
+    x=2;x=3 # fmt: skip
+    x=4
+
 class ManySemicolonOneLine:
     x=1
     x=2;x=3;x=4 # fmt: skip
