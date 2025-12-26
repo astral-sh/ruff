@@ -7934,7 +7934,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let mut annotated_elt_tys = annotated_tuple
             .as_ref()
-            .map(|tuple| tuple.all_elements())
+            .map(Tuple::all_elements)
             .unwrap_or_default()
             .iter()
             .copied();

@@ -850,10 +850,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                         .copied()
                         .skip(prefix_length)
                         .chain(std::iter::once(self.variable()))
-                        .chain(self.suffix_elements()[..suffix_overflow].iter().copied()),
+                        .chain(self.suffix_elements().iter().take(suffix_overflow).copied()),
                 );
                 let suffix = std::iter::repeat_n(self.variable(), suffix_underflow)
-                    .chain(self.suffix_elements()[suffix_overflow..].iter().copied());
+                    .chain(self.suffix_elements().iter().skip(suffix_overflow).copied());
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
         }
@@ -863,12 +863,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
     fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> TupleSpec<'db> {
         let prefix = self
             .prenormalized_prefix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Box<_>>();
+            .map(|ty| ty.normalized_impl(db, visitor));
         let suffix = self
             .prenormalized_suffix_elements(db, None)
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .collect::<Box<_>>();
+            .map(|ty| ty.normalized_impl(db, visitor));
         let variable = self.variable().normalized_impl(db, visitor);
         TupleSpec::Variable(Self::new(prefix, variable, suffix))
     }
@@ -880,32 +878,32 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         nested: bool,
     ) -> Option<Self> {
         let prefix = if nested {
-            self.prefix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                .collect::<Option<Box<_>>>()?
+            Either::Left(
+                self.prefix_elements()
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                    .collect::<Option<Box<_>>>()?
+                    .into_iter(),
+            )
         } else {
-            self.prefix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Box<_>>()
+            Either::Right(self.prefix_elements().iter().map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div)
+            }))
         };
         let suffix = if nested {
-            self.suffix_elements()
-                .iter()
-                .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                .collect::<Option<Box<_>>>()?
+            Either::Left(
+                self.suffix_elements()
+                    .iter()
+                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
+                    .collect::<Option<Box<_>>>()?
+                    .into_iter(),
+            )
         } else {
-            self.suffix_elements()
-                .iter()
-                .map(|ty| {
-                    ty.recursive_type_normalized_impl(db, div, true)
-                        .unwrap_or(div)
-                })
-                .collect::<Box<_>>()
+            Either::Right(self.suffix_elements().iter().map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div)
+            }))
         };
         let variable = if nested {
             self.variable()
