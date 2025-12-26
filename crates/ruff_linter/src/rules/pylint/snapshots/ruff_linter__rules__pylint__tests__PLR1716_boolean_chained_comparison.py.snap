@@ -411,7 +411,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 134 |   # more involved examples (all should error and fix)
 135 | / a < ( # sneaky comment
 136 | |     b
-137 | |   # more comments 
+137 | |   # more comments
 138 | | ) and b < c
     | |___________^
 139 |
@@ -420,7 +420,7 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 help: Use a single compare expression
 135 | a < ( # sneaky comment
 136 | 	b
-137 |   # more comments 
+137 |   # more comments
     - ) and b < c
 138 + ) < c
 139 | 
@@ -461,6 +461,8 @@ PLR1716 [*] Contains chained boolean comparison that can be simplified
 147 |
 148 | a < (b) and (((b)) < c)
     | ^^^^^^^^^^^^^^^^^^^^^^
+149 |
+150 | # ----------------------------------------------------------
     |
 help: Use a single compare expression
 145 |     and ((c<d))
@@ -468,3 +470,39 @@ help: Use a single compare expression
 147 | 
     - a < (b) and (((b)) < c)
 148 + (a < (b) < c)
+149 | 
+150 | # ----------------------------------------------------------
+151 | # examples where the expression could be simplified, but
+
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:159:4
+    |
+157 | b = int(input())
+158 | c = int(input())
+159 | if b > a and c >= b:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^
+160 |     pass
+    |
+help: Use a single compare expression
+
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:165:4
+    |
+163 | b = int(input())
+164 | c = int(input())
+165 | if a < b and c >= b:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^
+166 |     pass
+    |
+help: Use a single compare expression
+
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:171:4
+    |
+169 | b = int(input())
+170 | c = int(input())
+171 | if b >= a and b <= c:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^^
+172 |     pass
+    |
+help: Use a single compare expression
