@@ -20,7 +20,7 @@ use crate::preview::{
 };
 use crate::statement::trailing_semicolon;
 use crate::verbatim::{
-    verbatim_text, write_suppressed_statements_starting_with_leading_comment,
+    LogicalLinesIter, verbatim_text, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -1056,17 +1056,27 @@ fn compute_next_skip_range(statements: &[Stmt], f: &mut PyFormatter) -> Option<S
     // The following logic advances backwards from the skip comment
     // to the start of the logical line that it is on
     while let Some(stmt) = lookback.next_if(|stmt| {
+        // This is a cheap check for the common case, e.g. this:
+        // ```
+        // x=1 ;x=2 # fmt: skip
+        //   ^
+        // ```
+        // and even this:
+        // ```
+        // x=['1'
+        // ] ;x=2 # fmt: skip
+        // ^
+        // ```
         stmt.end() >= line_start
-            ||
-            // This more expensive check occurs in the rarer
-            // situation where there is a line continuation token
-            // allowing the semicolon to lie on the next physical line, e.g.
-            // ```
-            // x=1 \
-            // ;x=2 # fmt: skip
-            // ```
-            trailing_semicolon(AnyNodeRef::from(*stmt), source)
-                .is_some_and(|rng| rng.end() >= line_start)
+            || LogicalLinesIter::new(
+                f.context()
+                    .tokens()
+                    .in_range(TextRange::new(stmt.end(), last_statement_in_skip.start()))
+                    .iter(),
+                TextRange::new(stmt.end(), last_statement_in_skip.start()),
+            )
+            .next()
+            .is_some_and(|line| line.is_ok_and(|ln| ln.end() >= line_start))
     }) {
         // If the statement takes up multiple physical lines,
         // keep going from the start of _that_ line

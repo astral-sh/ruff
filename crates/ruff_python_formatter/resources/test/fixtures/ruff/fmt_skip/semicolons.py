@@ -43,10 +43,34 @@ class MultiLineSemicolon:
         '2',
     ]; x=2 # fmt: skip
 
-class LineBreakSemicolon:
+class LineContinuationSemicolonAfter:
     x=1
     x = ['a']\
     ; y=1 # fmt: skip
+
+class LineContinuationSemicolonBefore:
+    x=1
+    x = ['a']; \
+    y=1 # fmt: skip
+
+class LineContinuationSemicolonAndNewline:
+    x=1
+    x = ['a']; \
+
+    y=1 # fmt: skip
+
+class LineContinuationSemicolonAndNewlineAndComment:
+    x=1
+    x = ['a']; \
+    # 1
+    y=1 # fmt: skip
+
+class RepeatedLineContinuation:
+    x=1
+    x = ['a']; \
+    \
+    \
+    y=1 # fmt: skip
 
 class MultiLineSemicolonComments:
     x=1
