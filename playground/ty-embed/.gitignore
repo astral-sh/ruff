@@ -1,0 +1,5 @@
+node_modules
+dist
+ty_wasm
+.DS_Store
+*.log
