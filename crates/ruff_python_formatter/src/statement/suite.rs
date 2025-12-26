@@ -1075,7 +1075,7 @@ fn compute_next_skip_range(statements: &[Stmt], f: &mut PyFormatter) -> Option<S
         // ];x=2 # fmt: skip
         // ```
         if stmt.start() < line_start {
-            line_start = source.line_start(stmt.start())
+            line_start = source.line_start(stmt.start());
         }
         start = stmt.start();
     }
