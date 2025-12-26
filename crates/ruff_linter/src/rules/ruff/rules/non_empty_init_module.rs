@@ -56,12 +56,18 @@ use crate::{Violation, checkers::ast::Checker};
 /// - [`flake8-empty-init-modules`](https://github.com/samueljsb/flake8-empty-init-modules/)
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.11")]
-pub(crate) struct NonEmptyInitModule;
+pub(crate) struct NonEmptyInitModule {
+    strictly_empty_init_modules: bool,
+}
 
 impl Violation for NonEmptyInitModule {
     #[derive_message_formats]
     fn message(&self) -> String {
-        "Code detected".to_string()
+        if self.strictly_empty_init_modules {
+            "`__init__` module should not contain any code".to_string()
+        } else {
+            "`__init__` module should only contain docstrings and re-exports".to_string()
+        }
     }
 }
 
@@ -78,7 +84,9 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
         return;
     }
 
-    if !checker.settings().ruff.strictly_empty_init_modules {
+    let strictly_empty_init_modules = checker.settings().ruff.strictly_empty_init_modules;
+
+    if !strictly_empty_init_modules {
         if semantic.in_pep_257_docstring() {
             return;
         }
@@ -129,7 +137,12 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
         }
     }
 
-    checker.report_diagnostic(NonEmptyInitModule, stmt.range());
+    checker.report_diagnostic(
+        NonEmptyInitModule {
+            strictly_empty_init_modules,
+        },
+        stmt.range(),
+    );
 }
 
 /// Any assignment statement, including plain assignment, annotated assignments, and augmented
