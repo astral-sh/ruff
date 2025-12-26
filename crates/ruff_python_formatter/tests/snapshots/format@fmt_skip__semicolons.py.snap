@@ -159,8 +159,8 @@ class MultiLineSemicolon:
 
 class LineBreakSemicolon:
     x = 1
-    x = ["a"]
-    y=1  # fmt: skip
+    x = ['a']\
+    ; y=1  # fmt: skip
 
 
 class MultiLineSemicolonComments:
@@ -191,13 +191,11 @@ class FirstStatementNewlines:
 
 
 class ChainingSemicolons:
-    x = [
-        "1",
-        "2",
-        "3",
-    ]
-    x = 1
     x=[
+        '1',
+        '2',
+        '3',
+    ];x=1;x=[
         '1',
         '2',
         '3'

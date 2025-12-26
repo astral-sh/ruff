@@ -33,9 +33,7 @@ def foo(): x=[
 '''Module docstring
 multiple lines'''  # 1 # fmt: skip # 2
 
-import a
-import b
-from c import (
+import a;import b; from c import (
         x,y,z
     ); import f  # fmt: skip
 

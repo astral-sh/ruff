@@ -5,11 +5,8 @@ use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
-use ruff_source_file::LineRanges;
-use ruff_text_size::{Ranged, TextRange};
-use rustc_hash::FxHashMap;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
-use crate::comments::node_key::NodeRefEqualityKey;
 use crate::comments::{
     Comments, LeadingDanglingTrailingComments, has_skip_comment, leading_comments,
     trailing_comments,
@@ -101,8 +98,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source = f.context().source();
         let source_type = f.options().source_type();
 
-        let skip_data = SkipData::from_suite(statements, &comments, source);
-
         let mut iter = statements.iter();
         let Some(first) = iter.next() else {
             return Ok(());
@@ -158,21 +153,22 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let first_comments = comments.leading_dangling_trailing(first);
 
-        let (mut preceding, mut empty_line_after_docstring) = if let Some(SkipDatum {
-            last_statement_key,
+        let (mut preceding, mut empty_line_after_docstring) = if let Some(SkipSignal {
             verbatim_range,
-        }) = skip_data.get(first)
+            last_statement_end,
+        }) =
+            skip_range(first.statement(), iter.clone(), f)
         {
             comments.mark_verbatim_node_comments_formatted(first.into());
 
-            let preceding = if last_statement_key == NodeRefEqualityKey::from_ref(first.into()) {
+            let preceding = if first.end() == last_statement_end {
                 first.statement()
             } else {
                 loop {
                     if let Some(nxt) = iter.next() {
                         comments.mark_verbatim_node_comments_formatted(nxt.into());
 
-                        if last_statement_key == NodeRefEqualityKey::from_ref(nxt.into()) {
+                        if nxt.end() == last_statement_end {
                             break nxt;
                         }
                     }
@@ -438,24 +434,23 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            if let Some(SkipDatum {
-                last_statement_key,
+            if let Some(SkipSignal {
                 verbatim_range,
-            }) = skip_data.get(following)
+                last_statement_end,
+            }) = skip_range(following, iter.clone(), f)
             {
                 comments.mark_verbatim_node_comments_formatted(following.into());
 
                 let first_comments = following_comments;
 
-                preceding = if last_statement_key == NodeRefEqualityKey::from_ref(following.into())
-                {
+                preceding = if following.end() == last_statement_end {
                     following
                 } else {
                     loop {
                         if let Some(nxt) = iter.next() {
                             comments.mark_verbatim_node_comments_formatted(nxt.into());
 
-                            if last_statement_key == NodeRefEqualityKey::from_ref(nxt.into()) {
+                            if nxt.end() == last_statement_end {
                                 break nxt;
                             }
                         }
@@ -1018,96 +1013,58 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
     }
 }
 
-/// Contains ranges where formatting should be skipped, along
-/// with pointers to the first and last statement in the range.
-///
-/// Organized as a mapping from the key of the first skipped statement
-/// to the datum of the pair consisting of the last skipped statement
-/// and the range to write verbatim.
-struct SkipData<'a>(FxHashMap<NodeRefEqualityKey<'a>, SkipDatum<'a>>);
-
-#[derive(Clone, Copy)]
-struct SkipDatum<'a> {
-    last_statement_key: NodeRefEqualityKey<'a>,
+struct SkipSignal {
     verbatim_range: TextRange,
+    last_statement_end: TextSize,
 }
 
-impl<'a> SkipData<'a> {
-    /// Returns the range to be skipped and the [`NodeRefEqualityKey`]
-    /// associated with the last statement in the range whose formatting
-    /// is skipped.
-    fn get(&self, node: impl Into<AnyNodeRef<'a>>) -> Option<SkipDatum<'a>> {
-        self.0
-            .get(&NodeRefEqualityKey::from_ref(node.into()))
-            .copied()
-    }
-}
+fn skip_range(
+    first: &Stmt,
+    mut statements: std::slice::Iter<'_, Stmt>,
+    f: &mut PyFormatter,
+) -> Option<SkipSignal> {
+    let comments = f.context().comments().clone();
+    let source = f.context().source();
 
-impl<'a> SkipData<'a> {
-    /// Extracts which blocks of statements in the suite should have
-    /// their formatting skipped.
-    ///
-    /// The rule is as follows: a given `fmt: skip` statement will
-    /// suppress formatting for the range consisting of statements
-    /// that end on the line containing the skip directive.
-    ///
-    /// For example,
-    ///
-    /// ```python
-    /// x=1;y=[
-    /// '2'
-    /// ];z=3 # fmt: skip
-    /// ```
-    ///
-    /// will format the assignment to `x` but not the assignment to
-    /// `y` or `z`:
-    ///
-    /// ```python
-    /// x = 1
-    /// y=[
-    /// '2'
-    /// ];z=3 # fmt: skip
-    /// ```
-    fn from_suite(value: &'a Suite, comments: &Comments, source: &'a str) -> Self {
-        let mut iter = value.iter().rev().peekable();
-        // While technically `NodeRefEqualityKey` has interior mutability,
-        // the implementation of `Hash` and `Eq` is based only on the address
-        // so it is okay to use this as a key.
-        #[expect(clippy::mutable_key_type)]
-        let mut skipped: FxHashMap<NodeRefEqualityKey<'a>, SkipDatum<'a>> = FxHashMap::default();
+    // Early returns if first statement has skip comment or no
+    // trailing semicolon
+    if has_skip_comment(comments.trailing(first), source) {
+        let start = first.start();
+        let end = if let Some(semi) = trailing_semicolon(first.into(), source) {
+            semi.end()
+        } else {
+            first.end()
+        };
+        return Some(SkipSignal {
+            verbatim_range: TextRange::new(start, end),
+            last_statement_end: first.end(),
+        });
+    };
 
-        while let Some(stmt) = iter.next() {
-            if has_skip_comment(comments.trailing(stmt), source) {
-                let last_statement_key = NodeRefEqualityKey::from_ref(stmt.into());
-                let end = trailing_semicolon(stmt.into(), source)
-                    .map_or_else(|| stmt.end(), ruff_text_size::TextRange::end);
+    if trailing_semicolon(first.into(), source).is_none() {
+        return None;
+    };
 
-                let line_start = source.line_start(stmt.start());
-
-                let mut first_statement_key = last_statement_key;
-                let mut start = stmt.start();
-
-                while let Some(&nxt) = iter.peek()
-                    && nxt.end() >= line_start
-                {
-                    start = nxt.start();
-                    first_statement_key = NodeRefEqualityKey::from_ref(nxt.into());
-                    iter.next();
-                }
-
-                let verbatim_range = TextRange::new(start, end);
-
-                skipped.insert(
-                    first_statement_key,
-                    SkipDatum {
-                        last_statement_key,
-                        verbatim_range,
-                    },
-                );
-            }
+    while let Some(stmt) = statements.next() {
+        if has_skip_comment(comments.trailing(stmt), source) {
+            let start = first.start();
+            let end = if let Some(semi) = trailing_semicolon(stmt.into(), source) {
+                semi.end()
+            } else {
+                stmt.end()
+            };
+            return Some(SkipSignal {
+                verbatim_range: TextRange::new(start, end),
+                last_statement_end: stmt.end(),
+            });
+        } else if trailing_semicolon(stmt.into(), source).is_some() {
+            continue;
+        } else {
+            break;
         }
-        Self(skipped)
     }
+
+    None
 }
 
 #[cfg(test)]
