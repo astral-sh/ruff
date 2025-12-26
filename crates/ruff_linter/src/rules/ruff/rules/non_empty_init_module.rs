@@ -74,7 +74,7 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     let semantic = checker.semantic();
 
     // Only flag top-level statements
-    if semantic.current_statement_parent().is_some() {
+    if !semantic.at_top_level() {
         return;
     }
 
