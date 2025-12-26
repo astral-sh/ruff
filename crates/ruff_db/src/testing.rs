@@ -37,7 +37,7 @@ pub fn assert_const_function_query_was_not_run<Db, Q, QDb, R>(
 
     let event = events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+            db.ingredient_debug_name(database_key.ingredient_index(db.zalsa())) == query_name
         } else {
             false
         }
@@ -89,7 +89,7 @@ where
 
     let event = events.iter().find(|event| {
         if let salsa::EventKind::WillExecute { database_key } = event.kind {
-            db.ingredient_debug_name(database_key.ingredient_index()) == query_name
+            db.ingredient_debug_name(database_key.ingredient_index(db.zalsa())) == query_name
                 && database_key.key_index() == input.as_id()
         } else {
             false
