@@ -18,7 +18,7 @@ use ruff_python_semantic::{
     ImportedName, MemberNameImport, ModuleNameImport, NameImport, SemanticModel,
 };
 use ruff_python_trivia::textwrap::indent;
-use ruff_text_size::{Ranged, TextSize};
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::cst::matchers::{match_aliases, match_import_from, match_statement};
 use crate::fix;
@@ -91,8 +91,9 @@ impl<'a> Importer<'a> {
     }
 
     /// Add a statement to the start of the file.
-    pub(crate) fn add_at_start(&self, text: &str) -> Edit {
-        Insertion::start_of_file(self.python_ast, self.source, self.stylist, None).into_edit(text)
+    pub(crate) fn add_at_start(&self, text: &str, within_range: Option<TextRange>) -> Edit {
+        Insertion::start_of_file(self.python_ast, self.source, self.stylist, within_range)
+            .into_edit(text)
     }
 
     /// Move an existing import to the top-level, thereby making it available at runtime.
