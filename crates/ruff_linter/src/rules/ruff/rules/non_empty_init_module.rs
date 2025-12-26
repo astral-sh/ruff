@@ -71,7 +71,7 @@ impl Violation for NonEmptyInitModule {
     }
 }
 
-/// RUF070
+/// RUF067
 pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     if !checker.in_init_module() {
         return;

@@ -3498,7 +3498,7 @@ pub struct RuffOptions {
     )]
     pub allowed_markup_calls: Option<Vec<String>>,
     /// Whether to require `__init__.py` files to contain no code at all, including imports and
-    /// docstrings (see `RUF070`).
+    /// docstrings (see `RUF067`).
     #[option(
         default = r#"false"#,
         value_type = "bool",

@@ -119,8 +119,8 @@ mod tests {
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_0.py"))]
     #[test_case(Rule::RedirectedNOQA, Path::new("RUF101_1.py"))]
     #[test_case(Rule::InvalidRuleCode, Path::new("RUF102.py"))]
-    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF070/modules/__init__.py"))]
-    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF070/modules/okay.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/__init__.py"))]
+    #[test_case(Rule::NonEmptyInitModule, Path::new("RUF067/modules/okay.py"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -720,9 +720,9 @@ mod tests {
     }
 
     #[test]
-    fn strictly_empty_init_modules_ruf070() -> Result<()> {
+    fn strictly_empty_init_modules_ruf067() -> Result<()> {
         assert_diagnostics_diff!(
-            Path::new("ruff/RUF070/modules/__init__.py"),
+            Path::new("ruff/RUF067/modules/__init__.py"),
             &LinterSettings {
                 ruff: super::settings::Settings {
                     strictly_empty_init_modules: false,
