@@ -33,6 +33,13 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ```python
 /// import numpy
 /// ```
+///
+/// ## Options
+///
+/// The rule will emit a diagnostic but not a fix if the import is required by the `isort`
+/// configuration option:
+///
+/// - `lint.isort.required-imports`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.156")]
 pub(crate) struct UselessImportAlias {
