@@ -428,7 +428,6 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
-                            false,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -462,7 +461,6 @@ impl<'db> CallableSignature<'db> {
                                 |signature| Signature::new(signature.parameters().clone(), None),
                             )),
                             CallableTypeKind::ParamSpecValue,
-                            false,
                         ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -570,56 +568,6 @@ impl<'db> CallableSignature<'db> {
                     .and(db, || other.is_subtype_of_impl(db, self, inferable))
             }
         }
-    }
-
-    /// Returns `true` if any signature in this callable has gradual parameters (`...`).
-    pub(crate) fn has_gradual_parameters(&self) -> bool {
-        self.overloads.iter().any(|sig| sig.parameters.is_gradual())
-    }
-
-    /// Materialize only the return types of all signatures, preserving parameters as-is.
-    ///
-    /// This is used when wrapping gradual callables in `Top[...]`. We want to preserve the gradual
-    /// parameters but materialize the return types (which are in covariant position).
-    pub(crate) fn materialize_return_types(
-        &self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self::from_overloads(
-            self.overloads
-                .iter()
-                .map(|sig| sig.materialize_return_type(db, materialization_kind)),
-        )
-    }
-
-    /// Check whether the return types of this callable have the given relation to the return
-    /// types of another callable.
-    pub(crate) fn return_types_have_relation_to(
-        &self,
-        db: &'db dyn Db,
-        other: &Self,
-        inferable: InferableTypeVars<'_, 'db>,
-        relation: TypeRelation<'db>,
-        relation_visitor: &HasRelationToVisitor<'db>,
-        disjointness_visitor: &IsDisjointVisitor<'db>,
-    ) -> ConstraintSet<'db> {
-        // For each overload in self, the return type must have the relation to
-        // the return type of some overload in other.
-        self.overloads.iter().when_all(db, |self_sig| {
-            let self_return_ty = self_sig.return_ty.unwrap_or(Type::unknown());
-            other.overloads.iter().when_any(db, |other_sig| {
-                let other_return_ty = other_sig.return_ty.unwrap_or(Type::unknown());
-                self_return_ty.has_relation_to_impl(
-                    db,
-                    other_return_ty,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            })
-        })
     }
 }
 
@@ -780,27 +728,7 @@ impl<'db> Signature<'db> {
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
-        Self::new(Parameters::object(), Some(Type::Never))
-    }
-
-    /// Materialize only the return type, preserving parameters as-is.
-    pub(crate) fn materialize_return_type(
-        &self,
-        db: &'db dyn Db,
-        materialization_kind: MaterializationKind,
-    ) -> Self {
-        Self {
-            generic_context: self.generic_context,
-            definition: self.definition,
-            parameters: self.parameters.clone(),
-            return_ty: self.return_ty.map(|ty| {
-                ty.materialize(
-                    db,
-                    materialization_kind,
-                    &ApplyTypeMappingVisitor::default(),
-                )
-            }),
-        }
+        Self::new(Parameters::bottom(), Some(Type::Never))
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -887,12 +815,9 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            parameters: self.parameters.apply_type_mapping_impl(
-                db,
-                &type_mapping.flip(),
-                tcx,
-                visitor,
-            ),
+            parameters: self
+                .parameters
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
@@ -1187,7 +1112,6 @@ impl<'db> Signature<'db> {
                         .map(|signature| Signature::new(signature.parameters().clone(), None)),
                 ),
                 CallableTypeKind::ParamSpecValue,
-                false,
             ));
             let param_spec_matches =
                 ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
@@ -1404,6 +1328,14 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(true);
         }
 
+        // The top signature is supertype of (and assignable from) all other signatures. It is a
+        // subtype of no signature except itself, and assignable only to the gradual signature.
+        if other.parameters.is_top() {
+            return ConstraintSet::from(true);
+        } else if self.parameters.is_top() && !other.parameters.is_gradual() {
+            return ConstraintSet::from(false);
+        }
+
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
@@ -1439,7 +1371,6 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(other.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1456,7 +1387,6 @@ impl<'db> Signature<'db> {
                         db,
                         CallableSignature::single(Signature::new(self.parameters.clone(), None)),
                         CallableTypeKind::ParamSpecValue,
-                        false,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
@@ -1815,6 +1745,10 @@ pub(crate) enum ParametersKind<'db> {
     /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     Gradual,
 
+    /// Represents the "top" parameters: top materialization of Gradual parameters, or infinite
+    /// union of all possible parameter signatures.
+    Top,
+
     /// Represents a parameter list containing a `ParamSpec` as the only parameter.
     ///
     /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
@@ -1894,6 +1828,10 @@ impl<'db> Parameters<'db> {
         matches!(self.kind, ParametersKind::Gradual)
     }
 
+    pub(crate) const fn is_top(&self) -> bool {
+        matches!(self.kind, ParametersKind::Top)
+    }
+
     pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
         match self.kind {
             ParametersKind::ParamSpec(bound_typevar) => Some(bound_typevar),
@@ -1963,8 +1901,24 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    /// Return parameters that represents `(*args: object, **kwargs: object)`.
-    pub(crate) fn object() -> Self {
+    /// Return the "top" parameters (infinite union of all possible parameters).
+    pub(crate) fn top() -> Self {
+        Self {
+            // We always emit `called-top-callable` for any call to the top callable (based on the
+            // `kind` below), so we otherwise give it the most permissive signature`(*object,
+            // **object)`, so that we avoid emitting any other errors about arity mismatches.
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    .with_annotated_type(Type::object()),
+            ],
+            kind: ParametersKind::Top,
+        }
+    }
+
+    /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
+    /// (accepts any call, so subtype of all other signatures.)
+    pub(crate) fn bottom() -> Self {
         Self {
             value: vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
@@ -2131,11 +2085,29 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping
+            && self.kind == ParametersKind::Gradual
+        {
+            match materialization_kind {
+                MaterializationKind::Bottom => {
+                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
+                    // which accepts any call and is thus a subtype of all other parameters.
+                    return Parameters::bottom();
+                }
+                MaterializationKind::Top => {
+                    return Parameters::top();
+                }
+            }
+        }
+
+        // Parameters are in contravariant position, so we need to flip the type mapping.
+        let type_mapping = type_mapping.flip();
+
         Self {
             value: self
                 .value
                 .iter()
-                .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
+                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
                 .collect(),
             kind: self.kind,
         }

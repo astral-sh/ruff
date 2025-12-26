@@ -43,7 +43,7 @@ def _(top_callable: Top[Callable[[Any], None]]):
     reveal_type(top_callable)  # revealed: (Never, /) -> None
 ```
 
-The invariant position is replaced with an unresolved type variable.
+The invariant position cannot simplify, and is represented with the `Top` special form.
 
 ```py
 def _(top_list: Top[list[Any]]):
@@ -70,8 +70,7 @@ def _(bottom_callable: Bottom[Callable[[Any, Unknown], None]]):
     reveal_type(bottom_callable)  # revealed: (object, object, /) -> None
 ```
 
-The invariant position is replaced in the same way as the top materialization, with an unresolved
-type variable.
+The invariant position cannot simplify, and is represented with the `Bottom` special form.
 
 ```py
 def _(bottom_list: Bottom[list[Any]]):
@@ -182,8 +181,8 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
 
 For callables with gradual parameters (the `...` form), the top materialization preserves the
 gradual form since we cannot know what parameters are required. The bottom materialization
-simplifies to the bottom callable `(*args: object, **kwargs: object) -> Never` since this is the
-most specific type that is a subtype of all possible callable materializations.
+simplifies to the bottom parameters `(*args: object, **kwargs: object)` since this is the most
+specific type that is a subtype of all possible parameter materializations.
 
 ```toml
 [environment]
@@ -198,7 +197,7 @@ type GradualCallable = Callable[..., Any]
 
 def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
     # The top materialization keeps the gradual parameters wrapped
-    reveal_type(top)  # revealed: Top[(...) -> object]
+    reveal_type(top)  # revealed: (Top[...]) -> object
 
     # The bottom materialization simplifies to the fully static bottom callable
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> Never
@@ -218,6 +217,35 @@ static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom)
 # Top-materialized callables are not equivalent to non-top-materialized callables, even if their
 # signatures would otherwise be equivalent after materialization.
 static_assert(not is_equivalent_to(Top[Callable[..., object]], Callable[..., object]))
+```
+
+Gradual parameters can be top- and bottom-materialized even if the return type is not `Any`:
+
+```py
+type GradualParams = Callable[..., int]
+
+def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
+    reveal_type(top)  # revealed: (Top[...]) -> int
+
+    reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
+```
+
+Materializing an overloaded callable materializes each overload separately.
+
+```py
+from typing import overload
+from ty_extensions import CallableTypeOf
+
+@overload
+def f(x: int) -> Any: ...
+@overload
+def f(*args: Any, **kwargs: Any) -> str: ...
+def f(*args: object, **kwargs: object) -> object:
+    pass
+
+def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
+    reveal_type(top)  # revealed: Overload[(x: int) -> object, (Top[...]) -> str]
+    reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
 
 ## Tuple
