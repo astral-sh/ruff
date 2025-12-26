@@ -7,6 +7,9 @@ python-version = "3.12"
 
 There are certain places where we promote literals to their common supertype.
 
+We also promote `float` to `int | float` and `complex` to `int | float | complex`,
+even when not in a type annotation.
+
 ## All literal types are promotable
 
 ```py
@@ -31,6 +34,9 @@ def _(
     reveal_type(promote(lit3))  # revealed: list[bool]
     reveal_type(promote(lit4))  # revealed: list[bytes]
     reveal_type(promote(lit5))  # revealed: list[MyEnum]
+
+reveal_type(promote(3.14))  # revealed: list[int | float]
+reveal_type(promote(3.14j))  # revealed: list[int | float | complex]
 ```
 
 Function types are also promoted to their `Callable` form:
