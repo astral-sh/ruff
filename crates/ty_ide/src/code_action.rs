@@ -7,7 +7,7 @@ use ruff_text_size::TextRange;
 use ty_project::Db;
 use ty_python_semantic::create_suppression_fix;
 use ty_python_semantic::lint::LintId;
-use ty_python_semantic::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
+use ty_python_types::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
 /// A `QuickFix` Code Action
 #[derive(Debug, Clone)]
@@ -87,10 +87,8 @@ mod tests {
     use ruff_python_trivia::textwrap::dedent;
     use ruff_text_size::{TextRange, TextSize};
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        lint::LintMetadata,
-        types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE},
-    };
+    use ty_python_semantic::lint::LintMetadata;
+    use ty_python_types::types::{UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
 
     #[test]
     fn add_ignore() {

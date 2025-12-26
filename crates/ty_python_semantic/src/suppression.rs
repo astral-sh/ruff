@@ -19,7 +19,6 @@ use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };
 use crate::suppression::unused::check_unused_suppressions;
-use crate::types::TypeCheckDiagnostics;
 use crate::{Db, declare_lint, lint::LintId};
 
 declare_lint! {
@@ -97,7 +96,7 @@ declare_lint! {
 }
 
 #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
-pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
+pub fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     let parsed = parsed_module(db, file).load(db);
     let source = source_text(db, file);
 
@@ -152,7 +151,7 @@ pub(crate) fn suppressions(db: &dyn Db, file: File) -> Suppressions {
     builder.finish()
 }
 
-pub(crate) fn check_suppressions(
+pub fn check_suppressions(
     db: &dyn Db,
     file: File,
     diagnostics: TypeCheckDiagnostics,
@@ -252,7 +251,7 @@ impl<'a> CheckSuppressionsContext<'a> {
 ///
 /// This type exists to separate the phases of "check if a diagnostic should
 /// be reported" and "build the actual diagnostic."
-pub(crate) struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
+pub struct SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
     ctx: &'ctx CheckSuppressionsContext<'db>,
     id: DiagnosticId,
     range: TextRange,
@@ -296,7 +295,7 @@ impl<'ctx, 'db> SuppressionDiagnosticGuardBuilder<'ctx, 'db> {
 
 /// The suppressions of a single file.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
-pub(crate) struct Suppressions {
+pub struct Suppressions {
     /// Suppressions that apply to the entire file.
     ///
     /// The suppressions are sorted by [`Suppression::comment_range`] and the [`Suppression::suppressed_range`]
@@ -320,7 +319,7 @@ pub(crate) struct Suppressions {
 }
 
 impl Suppressions {
-    pub(crate) fn find_suppression(&self, range: TextRange, id: LintId) -> Option<&Suppression> {
+    pub fn find_suppression(&self, range: TextRange, id: LintId) -> Option<&Suppression> {
         self.lint_suppressions(range, id).next()
     }
 
@@ -371,7 +370,7 @@ impl Suppressions {
     }
 }
 
-pub(crate) type SuppressionsIter<'a> =
+pub type SuppressionsIter<'a> =
     std::iter::Chain<std::slice::Iter<'a, Suppression>, std::slice::Iter<'a, Suppression>>;
 
 impl<'a> IntoIterator for &'a Suppressions {
@@ -389,7 +388,7 @@ impl<'a> IntoIterator for &'a Suppressions {
 /// create multiple suppressions: one for every code.
 /// They all share the same `comment_range`.
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
-pub(crate) struct Suppression {
+pub struct Suppression {
     target: SuppressionTarget,
     kind: SuppressionKind,
 
@@ -429,7 +428,7 @@ impl Suppression {
         }
     }
 
-    pub(crate) fn id(&self) -> FileSuppressionId {
+    pub fn id(&self) -> FileSuppressionId {
         FileSuppressionId(self.range)
     }
 }
@@ -469,7 +468,90 @@ impl fmt::Display for SuppressionKind {
 /// This is unique enough because it is its exact
 /// location in the source.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, get_size2::GetSize)]
-pub(crate) struct FileSuppressionId(TextRange);
+pub struct FileSuppressionId(TextRange);
+
+/// A collection of type check diagnostics.
+///
+/// This struct is kept in `ty_python_semantic` to avoid circular dependencies,
+/// since it's used by the suppression system.
+#[derive(Default, Eq, PartialEq, get_size2::GetSize)]
+pub struct TypeCheckDiagnostics {
+    diagnostics: Vec<Diagnostic>,
+    used_suppressions: rustc_hash::FxHashSet<FileSuppressionId>,
+}
+
+impl TypeCheckDiagnostics {
+    pub fn push(&mut self, diagnostic: Diagnostic) {
+        self.diagnostics.push(diagnostic);
+    }
+
+    pub fn extend(&mut self, other: &TypeCheckDiagnostics) {
+        self.diagnostics.extend_from_slice(&other.diagnostics);
+        self.used_suppressions.extend(&other.used_suppressions);
+    }
+
+    pub fn extend_diagnostics(&mut self, diagnostics: impl IntoIterator<Item = Diagnostic>) {
+        self.diagnostics.extend(diagnostics);
+    }
+
+    pub fn mark_used(&mut self, suppression_id: FileSuppressionId) {
+        self.used_suppressions.insert(suppression_id);
+    }
+
+    pub fn is_used(&self, suppression_id: FileSuppressionId) -> bool {
+        self.used_suppressions.contains(&suppression_id)
+    }
+
+    pub fn used_len(&self) -> usize {
+        self.used_suppressions.len()
+    }
+
+    pub fn shrink_to_fit(&mut self) {
+        self.used_suppressions.shrink_to_fit();
+        self.diagnostics.shrink_to_fit();
+    }
+
+    pub fn into_diagnostics(self) -> Vec<Diagnostic> {
+        self.diagnostics
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.diagnostics.is_empty() && self.used_suppressions.is_empty()
+    }
+
+    pub fn iter(&self) -> std::slice::Iter<'_, Diagnostic> {
+        self.diagnostics().iter()
+    }
+
+    fn diagnostics(&self) -> &[Diagnostic] {
+        self.diagnostics.as_slice()
+    }
+}
+
+impl std::fmt::Debug for TypeCheckDiagnostics {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.diagnostics().fmt(f)
+    }
+}
+
+impl IntoIterator for TypeCheckDiagnostics {
+    type Item = Diagnostic;
+    type IntoIter = std::vec::IntoIter<Diagnostic>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_diagnostics().into_iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a TypeCheckDiagnostics {
+    type Item = &'a Diagnostic;
+    type IntoIter = std::slice::Iter<'a, Diagnostic>;
+
+    #[inline]
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 enum SuppressionTarget {

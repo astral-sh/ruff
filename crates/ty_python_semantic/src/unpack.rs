@@ -27,51 +27,47 @@ use crate::semantic_index::scope::{FileScopeId, ScopeId};
 /// * a field of a type that is a return type of a cross-module query
 /// * an argument of a cross-module query
 #[salsa::tracked(debug, heap_size=ruff_memory_usage::heap_size)]
-pub(crate) struct Unpack<'db> {
-    pub(crate) file: File,
+pub struct Unpack<'db> {
+    pub file: File,
 
-    pub(crate) value_file_scope: FileScopeId,
+    pub value_file_scope: FileScopeId,
 
-    pub(crate) target_file_scope: FileScopeId,
+    pub target_file_scope: FileScopeId,
 
     /// The target expression that is being unpacked. For example, in `(a, b) = (1, 2)`, the target
     /// expression is `(a, b)`.
     #[no_eq]
     #[tracked]
     #[returns(ref)]
-    pub(crate) _target: AstNodeRef<ast::Expr>,
+    pub _target: AstNodeRef<ast::Expr>,
 
     /// The ingredient representing the value expression of the unpacking. For example, in
     /// `(a, b) = (1, 2)`, the value expression is `(1, 2)`.
-    pub(crate) value: UnpackValue<'db>,
+    pub value: UnpackValue<'db>,
 }
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Unpack<'_> {}
 
 impl<'db> Unpack<'db> {
-    pub(crate) fn target<'ast>(
-        self,
-        db: &'db dyn Db,
-        parsed: &'ast ParsedModuleRef,
-    ) -> &'ast ast::Expr {
+    pub fn target<'ast>(self, db: &'db dyn Db, parsed: &'ast ParsedModuleRef) -> &'ast ast::Expr {
         self._target(db).node(parsed)
     }
 
     /// Returns the scope where the unpack target expression belongs to.
-    pub(crate) fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
+    pub fn target_scope(self, db: &'db dyn Db) -> ScopeId<'db> {
         self.target_file_scope(db).to_scope_id(db, self.file(db))
     }
 
     /// Returns the range of the unpack target expression.
-    pub(crate) fn range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
+    pub fn range(self, db: &'db dyn Db, module: &ParsedModuleRef) -> TextRange {
         self.target(db, module).range()
     }
 }
 
 /// The expression that is being unpacked.
 #[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) struct UnpackValue<'db> {
+pub struct UnpackValue<'db> {
     /// The kind of unpack expression
     kind: UnpackKind,
     /// The expression we are unpacking
@@ -79,17 +75,17 @@ pub(crate) struct UnpackValue<'db> {
 }
 
 impl<'db> UnpackValue<'db> {
-    pub(crate) fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
+    pub fn new(kind: UnpackKind, expression: Expression<'db>) -> Self {
         Self { kind, expression }
     }
 
     /// Returns the underlying [`Expression`] that is being unpacked.
-    pub(crate) const fn expression(self) -> Expression<'db> {
+    pub const fn expression(self) -> Expression<'db> {
         self.expression
     }
 
     /// Returns the expression as an [`AnyNodeRef`].
-    pub(crate) fn as_any_node_ref<'ast>(
+    pub fn as_any_node_ref<'ast>(
         self,
         db: &'db dyn Db,
         module: &'ast ParsedModuleRef,
@@ -97,19 +93,19 @@ impl<'db> UnpackValue<'db> {
         self.expression().node_ref(db, module).into()
     }
 
-    pub(crate) const fn kind(self) -> UnpackKind {
+    pub const fn kind(self) -> UnpackKind {
         self.kind
     }
 }
 
 #[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum EvaluationMode {
+pub enum EvaluationMode {
     Sync,
     Async,
 }
 
 impl EvaluationMode {
-    pub(crate) const fn from_is_async(is_async: bool) -> Self {
+    pub const fn from_is_async(is_async: bool) -> Self {
         if is_async {
             EvaluationMode::Async
         } else {
@@ -117,13 +113,13 @@ impl EvaluationMode {
         }
     }
 
-    pub(crate) const fn is_async(self) -> bool {
+    pub const fn is_async(self) -> bool {
         matches!(self, EvaluationMode::Async)
     }
 }
 
 #[derive(Clone, Copy, Debug, Hash, salsa::Update, get_size2::GetSize)]
-pub(crate) enum UnpackKind {
+pub enum UnpackKind {
     /// An iterable expression like the one in a `for` loop or a comprehension.
     Iterable { mode: EvaluationMode },
     /// An context manager expression like the one in a `with` statement.
@@ -134,7 +130,7 @@ pub(crate) enum UnpackKind {
 
 /// The position of the target element in an unpacking.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, salsa::Update, get_size2::GetSize)]
-pub(crate) enum UnpackPosition {
+pub enum UnpackPosition {
     /// The target element is in the first position of the unpacking.
     First,
     /// The target element is in the position other than the first position of the unpacking.

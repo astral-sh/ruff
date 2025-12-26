@@ -1,6 +1,6 @@
 use itertools::Either;
 use ruff_db::system::SystemPathBuf;
-use ty_python_semantic::{ResolvedDefinition, map_stub_definition};
+use ty_python_types::{ResolvedDefinition, map_stub_definition};
 
 use crate::cached_vendored_root;
 

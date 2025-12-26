@@ -70,7 +70,7 @@ use ruff_index::{IndexVec, newtype_index};
 /// A handle to an association list. Use [`ListStorage`] to access its elements, and
 /// [`ListBuilder`] to construct other lists based on this one.
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
-pub(crate) struct List<K, V = ()> {
+pub struct List<K, V = ()> {
     last: Option<ListCellId>,
     _phantom: PhantomData<(K, V)>,
 }

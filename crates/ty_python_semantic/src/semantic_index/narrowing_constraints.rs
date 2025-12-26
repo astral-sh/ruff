@@ -38,10 +38,10 @@ use crate::semantic_index::scope::FileScopeId;
 /// A constraint is a list of [`Predicate`]s that each constrain the type of the binding's place.
 ///
 /// [`Predicate`]: crate::semantic_index::predicate::Predicate
-pub(crate) type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredicate>;
+pub type ScopedNarrowingConstraint = List<ScopedNarrowingConstraintPredicate>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub(crate) enum ConstraintKey {
+pub enum ConstraintKey {
     NarrowingConstraint(ScopedNarrowingConstraint),
     NestedScope(FileScopeId),
     UseId(ScopedUseId),
@@ -56,11 +56,11 @@ pub(crate) enum ConstraintKey {
 ///
 /// [`Predicate`]: crate::semantic_index::predicate::Predicate
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd, get_size2::GetSize)]
-pub(crate) struct ScopedNarrowingConstraintPredicate(ScopedPredicateId);
+pub struct ScopedNarrowingConstraintPredicate(ScopedPredicateId);
 
 impl ScopedNarrowingConstraintPredicate {
     /// Returns (the ID of) the `Predicate`
-    pub(crate) fn predicate(self) -> ScopedPredicateId {
+    pub fn predicate(self) -> ScopedPredicateId {
         self.0
     }
 }
@@ -73,7 +73,7 @@ impl From<ScopedPredicateId> for ScopedNarrowingConstraintPredicate {
 
 /// A collection of narrowing constraints for a given scope.
 #[derive(Debug, Eq, PartialEq, get_size2::GetSize)]
-pub(crate) struct NarrowingConstraints {
+pub struct NarrowingConstraints {
     lists: ListStorage<ScopedNarrowingConstraintPredicate>,
 }
 
@@ -82,19 +82,19 @@ pub(crate) struct NarrowingConstraints {
 
 /// A builder for creating narrowing constraints.
 #[derive(Debug, Default, Eq, PartialEq)]
-pub(crate) struct NarrowingConstraintsBuilder {
+pub struct NarrowingConstraintsBuilder {
     lists: ListBuilder<ScopedNarrowingConstraintPredicate>,
 }
 
 impl NarrowingConstraintsBuilder {
-    pub(crate) fn build(self) -> NarrowingConstraints {
+    pub fn build(self) -> NarrowingConstraints {
         NarrowingConstraints {
             lists: self.lists.build(),
         }
     }
 
     /// Adds a predicate to an existing narrowing constraint.
-    pub(crate) fn add_predicate_to_constraint(
+    pub fn add_predicate_to_constraint(
         &mut self,
         constraint: ScopedNarrowingConstraint,
         predicate: ScopedNarrowingConstraintPredicate,
@@ -104,7 +104,7 @@ impl NarrowingConstraintsBuilder {
 
     /// Returns the intersection of two narrowing constraints. The result contains the predicates
     /// that appear in both inputs.
-    pub(crate) fn intersect_constraints(
+    pub fn intersect_constraints(
         &mut self,
         a: ScopedNarrowingConstraint,
         b: ScopedNarrowingConstraint,
@@ -137,7 +137,7 @@ mod tests {
     use super::*;
 
     impl ScopedNarrowingConstraintPredicate {
-        pub(crate) fn as_u32(self) -> u32 {
+        pub fn as_u32(self) -> u32 {
             self.0.as_u32()
         }
     }

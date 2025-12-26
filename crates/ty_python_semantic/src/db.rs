@@ -20,19 +20,19 @@ pub trait Db: ModuleResolverDb {
     fn verbose(&self) -> bool;
 }
 
-#[cfg(test)]
-pub(crate) mod tests {
+#[cfg(any(test, feature = "testing"))]
+pub mod tests {
     use std::sync::{Arc, Mutex};
 
     use crate::program::Program;
     use crate::{
         AnalysisSettings, ProgramSettings, PythonPlatform, PythonVersionSource,
-        PythonVersionWithSource, default_lint_registry,
+        PythonVersionWithSource,
     };
     use ty_module_resolver::SearchPathSettings;
 
     use super::Db;
-    use crate::lint::{LintRegistry, RuleSelection};
+    use crate::lint::{LintRegistry, LintRegistryBuilder, RuleSelection};
     use anyhow::Context;
     use ruff_db::Db as SourceDb;
     use ruff_db::files::{File, Files};
@@ -46,21 +46,44 @@ pub(crate) mod tests {
 
     type Events = Arc<Mutex<Vec<salsa::Event>>>;
 
+    /// A default lint registry containing only the suppression lints.
+    /// Full lint registry should be obtained from `ty_python_types`.
+    fn test_lint_registry() -> &'static LintRegistry {
+        static REGISTRY: std::sync::LazyLock<LintRegistry> = std::sync::LazyLock::new(|| {
+            let mut builder = LintRegistryBuilder::default();
+            crate::register_suppression_lints(&mut builder);
+            builder.build()
+        });
+        &REGISTRY
+    }
+
     #[salsa::db]
     #[derive(Clone)]
-    pub(crate) struct TestDb {
+    pub struct TestDb {
         storage: salsa::Storage<Self>,
         files: Files,
         system: TestSystem,
         vendored: VendoredFileSystem,
         events: Events,
         rule_selection: Arc<RuleSelection>,
+        lint_registry: Arc<LintRegistry>,
         analysis_settings: Arc<AnalysisSettings>,
     }
 
+    impl Default for TestDb {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl TestDb {
-        pub(crate) fn new() -> Self {
+        pub fn new() -> Self {
+            Self::with_vendored(ty_vendored::file_system().clone())
+        }
+
+        pub fn with_vendored(vendored: VendoredFileSystem) -> Self {
             let events = Events::default();
+            let lint_registry = test_lint_registry();
             Self {
                 storage: salsa::Storage::new(Some(Box::new({
                     let events = events.clone();
@@ -71,16 +94,17 @@ pub(crate) mod tests {
                     }
                 }))),
                 system: TestSystem::default(),
-                vendored: ty_vendored::file_system().clone(),
+                vendored,
                 events,
                 files: Files::default(),
-                rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
+                rule_selection: Arc::new(RuleSelection::from_registry(lint_registry)),
+                lint_registry: Arc::new(lint_registry.clone()),
                 analysis_settings: AnalysisSettings::default().into(),
             }
         }
 
         /// Takes the salsa events.
-        pub(crate) fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
+        pub fn take_salsa_events(&mut self) -> Vec<salsa::Event> {
             let mut events = self.events.lock().unwrap();
 
             std::mem::take(&mut *events)
@@ -90,7 +114,7 @@ pub(crate) mod tests {
         ///
         /// ## Panics
         /// If there are any pending salsa snapshots.
-        pub(crate) fn clear_salsa_events(&mut self) {
+        pub fn clear_salsa_events(&mut self) {
             self.take_salsa_events();
         }
     }
@@ -135,7 +159,7 @@ pub(crate) mod tests {
         }
 
         fn lint_registry(&self) -> &LintRegistry {
-            default_lint_registry()
+            &self.lint_registry
         }
 
         fn analysis_settings(&self) -> &AnalysisSettings {
@@ -157,7 +181,7 @@ pub(crate) mod tests {
     #[salsa::db]
     impl salsa::Database for TestDb {}
 
-    pub(crate) struct TestDbBuilder<'a> {
+    pub struct TestDbBuilder<'a> {
         /// Target Python version
         python_version: PythonVersion,
         /// Target Python platform
@@ -166,8 +190,14 @@ pub(crate) mod tests {
         files: Vec<(&'a str, &'a str)>,
     }
 
+    impl Default for TestDbBuilder<'_> {
+        fn default() -> Self {
+            Self::new()
+        }
+    }
+
     impl<'a> TestDbBuilder<'a> {
-        pub(crate) fn new() -> Self {
+        pub fn new() -> Self {
             Self {
                 python_version: PythonVersion::default(),
                 python_platform: PythonPlatform::default(),
@@ -175,12 +205,14 @@ pub(crate) mod tests {
             }
         }
 
-        pub(crate) fn with_python_version(mut self, version: PythonVersion) -> Self {
+        #[must_use]
+        pub fn with_python_version(mut self, version: PythonVersion) -> Self {
             self.python_version = version;
             self
         }
 
-        pub(crate) fn with_file(
+        #[must_use]
+        pub fn with_file(
             mut self,
             path: &'a (impl AsRef<SystemPath> + ?Sized),
             content: &'a str,
@@ -189,7 +221,7 @@ pub(crate) mod tests {
             self
         }
 
-        pub(crate) fn build(self) -> anyhow::Result<TestDb> {
+        pub fn build(self) -> anyhow::Result<TestDb> {
             let mut db = TestDb::new();
 
             let src_root = SystemPathBuf::from("/src");
@@ -216,7 +248,7 @@ pub(crate) mod tests {
         }
     }
 
-    pub(crate) fn setup_db() -> TestDb {
+    pub fn setup_db() -> TestDb {
         TestDbBuilder::new().build().expect("valid TestDb setup")
     }
 }

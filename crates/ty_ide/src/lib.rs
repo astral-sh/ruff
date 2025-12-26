@@ -57,7 +57,7 @@ use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use std::ops::{Deref, DerefMut};
 use ty_project::Db;
-use ty_python_semantic::types::{Type, TypeDefinition};
+use ty_python_types::types::{Type, TypeDefinition};
 
 /// Information associated with a text range.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]

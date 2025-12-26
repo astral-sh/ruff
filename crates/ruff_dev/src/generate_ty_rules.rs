@@ -52,7 +52,7 @@ pub(crate) fn main(args: &Args) -> Result<()> {
 }
 
 fn generate_markdown() -> String {
-    let registry = ty_python_semantic::default_lint_registry();
+    let registry = ty_python_types::default_lint_registry();
 
     let mut output = String::new();
 

@@ -32,8 +32,8 @@ use ruff_text_size::{Ranged, TextRange, TextSize};
 use ty_module_resolver::ModuleName;
 use ty_project::Db;
 use ty_python_semantic::semantic_index::definition::DefinitionKind;
-use ty_python_semantic::types::Type;
-use ty_python_semantic::{MemberDefinition, SemanticModel};
+use ty_python_types::types::Type;
+use ty_python_types::{MemberDefinition, SemanticModel};
 
 pub(crate) struct Importer<'a> {
     /// The ty Salsa database.
@@ -883,9 +883,8 @@ mod tests {
     use ruff_text_size::TextSize;
     use ty_module_resolver::SearchPathSettings;
     use ty_project::ProjectMetadata;
-    use ty_python_semantic::{
-        Program, ProgramSettings, PythonPlatform, PythonVersionWithSource, SemanticModel,
-    };
+    use ty_python_semantic::{Program, ProgramSettings, PythonPlatform, PythonVersionWithSource};
+    use ty_python_types::SemanticModel;
 
     use super::*;
 

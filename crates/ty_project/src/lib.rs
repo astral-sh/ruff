@@ -29,7 +29,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use ty_python_semantic::add_inferred_python_version_hint_to_diagnostic;
 use ty_python_semantic::lint::RuleSelection;
-use ty_python_semantic::types::check_types;
+use ty_python_types::types::check_types;
 
 mod db;
 mod files;
@@ -769,7 +769,7 @@ mod tests {
     use ruff_db::system::{DbWithTestSystem, DbWithWritableSystem as _, SystemPath, SystemPathBuf};
     use ruff_db::testing::assert_function_query_was_not_run;
     use ruff_python_ast::name::Name;
-    use ty_python_semantic::types::check_types;
+    use ty_python_types::types::check_types;
 
     #[test]
     fn check_file_skips_type_checking_when_file_cant_be_read() -> ruff_db::system::Result<()> {

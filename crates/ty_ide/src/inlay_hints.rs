@@ -6,9 +6,9 @@ use ruff_db::parsed::parsed_module;
 use ruff_python_ast::visitor::source_order::{self, SourceOrderVisitor, TraversalSignal};
 use ruff_python_ast::{AnyNodeRef, ArgOrKeyword, Expr, ExprUnaryOp, Stmt, UnaryOp};
 use ruff_text_size::{Ranged, TextRange, TextSize};
-use ty_python_semantic::types::ide_support::inlay_hint_call_argument_details;
-use ty_python_semantic::types::{Type, TypeDetail};
-use ty_python_semantic::{HasType, SemanticModel};
+use ty_python_types::types::ide_support::inlay_hint_call_argument_details;
+use ty_python_types::types::{Type, TypeDetail};
+use ty_python_types::{HasType, SemanticModel};
 
 #[derive(Debug, Clone)]
 pub struct InlayHint {

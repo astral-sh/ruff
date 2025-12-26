@@ -3,7 +3,7 @@ use crate::{Db, NavigationTargets, RangedValue};
 use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::parsed_module;
 use ruff_text_size::{Ranged, TextSize};
-use ty_python_semantic::{ImportAliasResolution, SemanticModel};
+use ty_python_types::{ImportAliasResolution, SemanticModel};
 
 /// Navigate to the declaration of a symbol.
 ///

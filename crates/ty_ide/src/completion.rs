@@ -12,11 +12,8 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, ModuleName};
-use ty_python_semantic::types::UnionType;
-use ty_python_semantic::{
-    Completion as SemanticCompletion, NameKind, SemanticModel,
-    types::{CycleDetector, KnownClass, Type},
-};
+use ty_python_types::types::{CycleDetector, KnownClass, Type, UnionType};
+use ty_python_types::{Completion as SemanticCompletion, NameKind, SemanticModel};
 
 use crate::docstring::Docstring;
 use crate::goto::Definitions;

@@ -7,9 +7,9 @@ use itertools::Either;
 use crate::Db;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct OutOfBoundsError;
+pub struct OutOfBoundsError;
 
-pub(crate) trait PyIndex<'db> {
+pub trait PyIndex<'db> {
     type Item: 'db;
 
     fn py_index(self, db: &'db dyn Db, index: i32) -> Result<Self::Item, OutOfBoundsError>;
@@ -41,13 +41,13 @@ enum Position {
     AfterEnd,
 }
 
-pub(crate) enum Nth {
+pub enum Nth {
     FromStart(usize),
     FromEnd(usize),
 }
 
 impl Nth {
-    pub(crate) fn from_index(index: i32) -> Self {
+    pub fn from_index(index: i32) -> Self {
         if index >= 0 {
             Nth::FromStart(from_nonnegative_i32(index))
         } else {
@@ -105,9 +105,9 @@ where
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub(crate) struct StepSizeZeroError;
+pub struct StepSizeZeroError;
 
-pub(crate) trait PySlice<'db> {
+pub trait PySlice<'db> {
     type Item: 'db;
 
     fn py_slice(
