@@ -12,6 +12,16 @@ RUF070 Code detected
    |
 
 RUF070 Code detected
+  --> __init__.py:13:1
+   |
+12 | MY_CONSTANT = 5
+13 | """This is an important constant."""
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+14 |
+15 | os.environ["FOO"] = 1
+   |
+
+RUF070 Code detected
   --> __init__.py:15:1
    |
 13 | """This is an important constant."""

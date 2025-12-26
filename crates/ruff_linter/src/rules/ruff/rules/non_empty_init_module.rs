@@ -79,7 +79,7 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     }
 
     if !checker.settings().ruff.strictly_empty_init_modules {
-        if semantic.in_pep_257_docstring() || semantic.in_attribute_docstring() {
+        if semantic.in_pep_257_docstring() {
             return;
         }
 
