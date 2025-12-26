@@ -5,6 +5,7 @@ use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
+use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
@@ -99,6 +100,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let source_type = f.options().source_type();
 
         let mut iter = statements.iter();
+        let mut next_skip_range = compute_next_skip_range(statements.as_slice(), f);
+
         let Some(first) = iter.next() else {
             return Ok(());
         };
@@ -156,8 +159,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let (mut preceding, mut empty_line_after_docstring) = if let Some(SkipSignal {
             verbatim_range,
             last_statement_end,
-        }) =
-            skip_range(first.statement(), iter.clone(), f)
+        }) = next_skip_range
+            && first.start() == verbatim_range.start()
         {
             comments.mark_verbatim_node_comments_formatted(first.into());
 
@@ -194,6 +197,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 matches!(self.kind, SuiteKind::TopLevel | SuiteKind::Class)
                     && DocstringStmt::try_from_statement(preceding, self.kind, f.context())
                         .is_some();
+            // Compute the next skip range
+            next_skip_range = compute_next_skip_range(iter.as_slice(), f);
             (preceding, empty_line_after_docstring)
         } else if first_comments
             .leading
@@ -437,7 +442,8 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
             if let Some(SkipSignal {
                 verbatim_range,
                 last_statement_end,
-            }) = skip_range(following, iter.clone(), f)
+            }) = next_skip_range
+                && following.start() == verbatim_range.start()
             {
                 comments.mark_verbatim_node_comments_formatted(following.into());
 
@@ -470,6 +476,9 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                         trailing_comments(preceding_comments.trailing)
                     ]
                 )?;
+
+                // Compute next skip range
+                next_skip_range = compute_next_skip_range(iter.as_slice(), f);
             } else if following_comments
                 .leading
                 .iter()
@@ -1018,50 +1027,63 @@ struct SkipSignal {
     last_statement_end: TextSize,
 }
 
-fn skip_range(
-    first: &Stmt,
-    statements: std::slice::Iter<'_, Stmt>,
-    f: &mut PyFormatter,
-) -> Option<SkipSignal> {
+fn compute_next_skip_range(statements: &[Stmt], f: &mut PyFormatter) -> Option<SkipSignal> {
     let comments = f.context().comments().clone();
     let source = f.context().source();
 
-    // Early returns if first statement has skip comment or no
-    // trailing semicolon
-    if has_skip_comment(comments.trailing(first), source) {
-        let start = first.start();
-        let end = if let Some(semi) = trailing_semicolon(first.into(), source) {
-            semi.end()
-        } else {
-            first.end()
-        };
-        return Some(SkipSignal {
-            verbatim_range: TextRange::new(start, end),
-            last_statement_end: first.end(),
-        });
-    }
+    // Find the next skip comment
+    let statements_until_skip = {
+        let skip_position = statements
+            .iter()
+            .position(|stmt| has_skip_comment(comments.trailing(stmt), source))?;
+        &statements[..=skip_position]
+    };
 
-    trailing_semicolon(first.into(), source)?;
+    let last_statement_in_skip = &statements_until_skip[statements_until_skip.len() - 1];
 
-    for stmt in statements {
-        if has_skip_comment(comments.trailing(stmt), source) {
-            let start = first.start();
-            let end = if let Some(semi) = trailing_semicolon(stmt.into(), source) {
-                semi.end()
-            } else {
-                stmt.end()
-            };
-            return Some(SkipSignal {
-                verbatim_range: TextRange::new(start, end),
-                last_statement_end: stmt.end(),
-            });
-        } else if trailing_semicolon(stmt.into(), source).is_some() {
-            continue;
+    let end = trailing_semicolon(last_statement_in_skip.into(), source).map_or_else(
+        || last_statement_in_skip.end(),
+        ruff_text_size::TextRange::end,
+    );
+
+    let mut start = last_statement_in_skip.start();
+
+    let mut line_start =
+        source.line_start(statements_until_skip[statements_until_skip.len() - 1].start());
+
+    let mut lookback = statements_until_skip.iter().rev().peekable();
+
+    // The following logic advances backwards from the skip comment
+    // to the start of the logical line that it is on
+    while let Some(stmt) = lookback.next_if(|stmt| {
+        stmt.end() >= line_start
+            ||
+            // This more expensive check occurs in the rarer
+            // situation where there is a line continuation token
+            // allowing the semicolon to lie on the next physical line, e.g.
+            // ```
+            // x=1 \
+            // ;x=2 # fmt: skip
+            // ```
+            trailing_semicolon(AnyNodeRef::from(*stmt), source)
+                .is_some_and(|rng| rng.end() >= line_start)
+    }) {
+        // If the statement takes up multiple physical lines,
+        // keep going from the start of _that_ line
+        // ```python
+        // x= ['1',
+        // ];x=2 # fmt: skip
+        // ```
+        if stmt.start() < line_start {
+            line_start = source.line_start(stmt.start())
         }
-        break;
+        start = stmt.start();
     }
 
-    None
+    Some(SkipSignal {
+        verbatim_range: TextRange::new(start, end),
+        last_statement_end: last_statement_in_skip.end(),
+    })
 }
 
 #[cfg(test)]
