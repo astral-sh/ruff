@@ -454,10 +454,22 @@ class PlaygroundServer
     return {
       dispose: () => {},
       hints: inlayHints.map((hint) => ({
-        label: hint.label.map((part) => ({
-          label: part.label,
-          // As of 2025-09-23, location isn't supported by Monaco which is why we don't set it
-        })),
+        label: hint.label.map((part) => {
+          const locationLink = part.location
+            ? this.mapNavigationTarget(part.location)
+            : undefined;
+
+          return {
+            label: part.label,
+            // Range cannot be `undefined`.
+            location: locationLink?.targetSelectionRange
+              ? {
+                  uri: locationLink.uri,
+                  range: locationLink.targetSelectionRange,
+                }
+              : undefined,
+          };
+        }),
         position: {
           lineNumber: hint.position.line,
           column: hint.position.column,
