@@ -7,8 +7,8 @@ python-version = "3.12"
 
 There are certain places where we promote literals to their common supertype.
 
-We also promote `float` to `int | float` and `complex` to `int | float | complex`,
-even when not in a type annotation.
+We also promote `float` to `int | float` and `complex` to `int | float | complex`, even when not in
+a type annotation.
 
 ## All literal types are promotable
 
