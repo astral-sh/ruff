@@ -1867,12 +1867,17 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                 range: _,
                                 node_index: _,
                             } = keyword;
+                            dbg!(keyword);
                             if let Some(id) = arg {
                                 if matches!(&**id, "bound" | "default") {
                                     self.visit_type_definition(value);
                                 } else {
                                     self.visit_non_type_definition(value);
                                 }
+                            } else {
+                                // The only case when a keyword argument is None is when using **kwargs, since there is no explicit 'arg' name for it.
+                                // Ex: typing.TypeVar(*args, **kwargs)
+                                self.visit_non_type_definition(value);
                             }
                         }
                     }
