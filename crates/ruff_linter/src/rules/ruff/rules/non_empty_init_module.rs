@@ -35,8 +35,8 @@ use crate::{Violation, checkers::ast::Checker};
 /// __all__ = ["MyClass"]
 /// ```
 ///
-/// When [`lint.ruff.strictly-empty-init-modules`] is enabled, all code, including imports, docstrings, and `__all__`, will be
-/// flagged:
+/// When [`lint.ruff.strictly-empty-init-modules`] is enabled, all code, including imports,
+/// docstrings, and assignments to dunder variables like `__all__`, will be flagged:
 ///
 /// ```python
 /// from submodule import MyClass
