@@ -93,25 +93,31 @@ impl<'db> DisplaySettings<'db> {
         I: IntoIterator<Item = T>,
         T: Into<Type<'db>>,
     {
+        fn build_display_settings<'db>(
+            collector: &AmbiguousClassCollector<'db>,
+        ) -> DisplaySettings<'db> {
+            DisplaySettings {
+                qualified: Rc::new(
+                    collector
+                        .class_names
+                        .borrow()
+                        .iter()
+                        .filter_map(|(name, ambiguity)| {
+                            Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
+                        })
+                        .collect(),
+                ),
+                ..DisplaySettings::default()
+            }
+        }
+
         let collector = AmbiguousClassCollector::default();
 
         for ty in types {
             collector.visit_type(db, ty.into());
         }
 
-        Self {
-            qualified: Rc::new(
-                collector
-                    .class_names
-                    .borrow()
-                    .iter()
-                    .filter_map(|(name, ambiguity)| {
-                        Some((*name, QualificationLevel::from_ambiguity_state(ambiguity)?))
-                    })
-                    .collect(),
-            ),
-            ..Self::default()
-        }
+        build_display_settings(&collector)
     }
 }
 
