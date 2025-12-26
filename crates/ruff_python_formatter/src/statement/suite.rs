@@ -1020,7 +1020,7 @@ struct SkipSignal {
 
 fn skip_range(
     first: &Stmt,
-    mut statements: std::slice::Iter<'_, Stmt>,
+    statements: std::slice::Iter<'_, Stmt>,
     f: &mut PyFormatter,
 ) -> Option<SkipSignal> {
     let comments = f.context().comments().clone();
@@ -1039,13 +1039,11 @@ fn skip_range(
             verbatim_range: TextRange::new(start, end),
             last_statement_end: first.end(),
         });
-    };
+    }
 
-    if trailing_semicolon(first.into(), source).is_none() {
-        return None;
-    };
+    trailing_semicolon(first.into(), source)?;
 
-    while let Some(stmt) = statements.next() {
+    for stmt in statements {
         if has_skip_comment(comments.trailing(stmt), source) {
             let start = first.start();
             let end = if let Some(semi) = trailing_semicolon(stmt.into(), source) {
@@ -1059,9 +1057,8 @@ fn skip_range(
             });
         } else if trailing_semicolon(stmt.into(), source).is_some() {
             continue;
-        } else {
-            break;
         }
+        break;
     }
 
     None
