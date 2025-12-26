@@ -65,7 +65,7 @@ pub(crate) fn format_stdin(
     };
 
     // Format the file.
-    match format_source_code(path, cli.range, settings, source_type, mode) {
+    match format_source_code(path, &cli.ranges, settings, source_type, mode) {
         Ok(result) => match mode {
             FormatMode::Write => Ok(ExitStatus::Success),
             FormatMode::Check | FormatMode::Diff => {
@@ -86,7 +86,7 @@ pub(crate) fn format_stdin(
 /// Format source code read from `stdin`.
 fn format_source_code(
     path: Option<&Path>,
-    range: Option<FormatRange>,
+    ranges: &[FormatRange],
     settings: &FormatterSettings,
     source_type: PySourceType,
     mode: FormatMode,
@@ -104,7 +104,7 @@ fn format_source_code(
     };
 
     // Format the source.
-    let formatted = format_source(&source_kind, source_type, path, settings, range)?;
+    let formatted = format_source(&source_kind, source_type, path, settings, ranges)?;
 
     match &formatted {
         FormattedSource::Formatted(formatted) => match mode {
