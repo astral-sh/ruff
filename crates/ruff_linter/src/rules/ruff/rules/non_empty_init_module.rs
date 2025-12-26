@@ -1,5 +1,5 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{self as ast, Stmt};
+use ruff_python_ast::{self as ast, Expr, Stmt};
 use ruff_python_semantic::analyze::typing::is_type_checking_block;
 use ruff_text_size::Ranged;
 
@@ -96,44 +96,123 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
             _ => {}
         }
 
-        // Allow assignments to `__all__`.
-        //
-        // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could
-        // also append or extend `__all__`.
-        //
-        // This is actually going slightly beyond the upstream rule already, which only checks for
-        // `Stmt::Assign`.
-        if is_assignment_to(stmt, "__all__") {
-            return;
-        }
+        if let Some(assignment) = Assignment::from_stmt(stmt) {
+            // Allow assignments to `__all__`.
+            //
+            // TODO(brent) should we allow additional cases here? Beyond simple assignments, you could
+            // also append or extend `__all__`.
+            //
+            // This is actually going slightly beyond the upstream rule already, which only checks for
+            // `Stmt::Assign`.
+            if assignment.is_assignment_to("__all__") {
+                return;
+            }
 
-        // Allow legacy namespace packages with assignments like:
-        //
-        // ```py
-        // __path__ = __import__('pkgutil').extend_path(__path__, __name__)
-        // ```
-        if is_assignment_to(stmt, "__path__") {
-            return;
-        }
+            // Allow legacy namespace packages with assignments like:
+            //
+            // ```py
+            // __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+            // ```
+            if assignment.is_assignment_to("__path__") && assignment.is_pkgutil_extend_path() {
+                return;
+            }
 
-        // Allow assignments to `__version__`.
-        if is_assignment_to(stmt, "__version__") {
-            return;
+            // Allow assignments to `__version__`.
+            if assignment.is_assignment_to("__version__") {
+                return;
+            }
         }
     }
 
     checker.report_diagnostic(NonEmptyInitModule, stmt.range());
 }
 
-fn is_assignment_to(stmt: &Stmt, name: &str) -> bool {
-    let targets = match stmt {
-        Stmt::Assign(ast::StmtAssign { targets, .. }) => targets.as_slice(),
-        Stmt::AnnAssign(ast::StmtAnnAssign { target, .. })
-        | Stmt::AugAssign(ast::StmtAugAssign { target, .. }) => std::slice::from_ref(&**target),
-        _ => return false,
-    };
+/// Any assignment statement, including plain assignment, annotated assignments, and augmented
+/// assignments.
+struct Assignment<'a> {
+    targets: &'a [Expr],
+    value: Option<&'a Expr>,
+}
 
-    targets
-        .iter()
-        .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
+impl<'a> Assignment<'a> {
+    fn from_stmt(stmt: &'a Stmt) -> Option<Self> {
+        let (targets, value) = match stmt {
+            Stmt::Assign(ast::StmtAssign { targets, value, .. }) => {
+                (targets.as_slice(), Some(&**value))
+            }
+            Stmt::AnnAssign(ast::StmtAnnAssign { target, value, .. }) => {
+                (std::slice::from_ref(&**target), value.as_deref())
+            }
+            Stmt::AugAssign(ast::StmtAugAssign { target, value, .. }) => {
+                (std::slice::from_ref(&**target), Some(&**value))
+            }
+            _ => return None,
+        };
+
+        Some(Self { targets, value })
+    }
+
+    /// Returns whether all of the assignment targets match `name`.
+    ///
+    /// For example, both of the following would be allowed for a `name` of `__all__`:
+    ///
+    /// ```py
+    /// __all__ = ["foo"]
+    /// __all__ = __all__ = ["foo"]
+    /// ```
+    ///
+    /// but not:
+    ///
+    /// ```py
+    /// __all__ = another_list = ["foo"]
+    /// ```
+    fn is_assignment_to(&self, name: &str) -> bool {
+        self.targets
+            .iter()
+            .all(|target| target.as_name_expr().is_some_and(|expr| expr.id == name))
+    }
+
+    /// Returns `true` if the value being assigned is a call to `pkgutil.extend_path`.
+    ///
+    /// For example, both of the following would return true:
+    ///
+    /// ```py
+    /// __path__ = __import__('pkgutil').extend_path(__path__, __name__)
+    /// __path__ = other.extend_path(__path__, __name__)
+    /// ```
+    ///
+    /// We're intentionally a bit less strict here, not requiring that the receiver of the
+    /// `extend_path` call is the typical `__import__('pkgutil')` or `pkgutil`.
+    fn is_pkgutil_extend_path(&self) -> bool {
+        let Some(Expr::Call(ast::ExprCall {
+            func: extend_func,
+            arguments: extend_arguments,
+            ..
+        })) = self.value
+        else {
+            return false;
+        };
+
+        let Expr::Attribute(ast::ExprAttribute {
+            attr: maybe_extend_path,
+            ..
+        }) = &**extend_func
+        else {
+            return false;
+        };
+
+        // Test that this is an `extend_path(__path__, __name__)` call
+        if maybe_extend_path != "extend_path" {
+            return false;
+        }
+
+        let Some(Expr::Name(path)) = extend_arguments.find_argument_value("path", 0) else {
+            return false;
+        };
+        let Some(Expr::Name(name)) = extend_arguments.find_argument_value("name", 1) else {
+            return false;
+        };
+
+        path.id() == "__path__" && name.id() == "__name__"
+    }
 }
