@@ -48,4 +48,6 @@ RUF070 Code detected
 47 | # non-`extend_path` assignments are not allowed
 48 | __path__ = 5  # RUF070
    | ^^^^^^^^^^^^
+49 |
+50 | # also allow `__author__`
    |

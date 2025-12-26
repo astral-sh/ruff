@@ -46,3 +46,6 @@ __path__ = unknown.extend_path(__path__, __name__)  # also ok
 
 # non-`extend_path` assignments are not allowed
 __path__ = 5  # RUF070
+
+# also allow `__author__`
+__author__ = "The Author"  # ok

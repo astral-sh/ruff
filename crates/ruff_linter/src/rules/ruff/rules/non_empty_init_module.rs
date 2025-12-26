@@ -121,6 +121,11 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
             if assignment.is_assignment_to("__version__") {
                 return;
             }
+
+            // Allow assignments to `__author__`.
+            if assignment.is_assignment_to("__author__") {
+                return;
+            }
         }
     }
 

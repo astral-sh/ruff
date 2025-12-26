@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 
 --- Summary ---
 Removed: 0
-Added: 18
+Added: 19
 
 --- Added ---
 RUF070 Code detected
@@ -218,4 +218,13 @@ RUF070 Code detected
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 46 |
 47 | # non-`extend_path` assignments are not allowed
+   |
+
+
+RUF070 Code detected
+  --> __init__.py:51:1
+   |
+50 | # also allow `__author__`
+51 | __author__ = "The Author"  # ok
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^
    |
