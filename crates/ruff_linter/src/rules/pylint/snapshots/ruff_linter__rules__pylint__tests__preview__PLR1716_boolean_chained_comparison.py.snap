@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+--- Linter settings ---
+-linter.preview = disabled
++linter.preview = enabled
+
+--- Summary ---
+Removed: 0
+Added: 3
+
+--- Added ---
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:159:4
+    |
+157 | b = int(input())
+158 | c = int(input())
+159 | if b > a and c >= b:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^
+160 |     pass
+    |
+help: Use a single compare expression. For example, 'x > 3 and 7 >= x' could be simplified to '3 < x <= 7'.
+
+
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:165:4
+    |
+163 | b = int(input())
+164 | c = int(input())
+165 | if a < b and c >= b:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^
+166 |     pass
+    |
+help: Use a single compare expression. For example, '3 > x and 7 >= x' could be simplified to '3 < x <= 7'.
+
+
+PLR1716 Contains chained boolean comparison that can be simplified
+   --> boolean_chained_comparison.py:171:4
+    |
+169 | b = int(input())
+170 | c = int(input())
+171 | if b >= a and b <= c:  # [boolean-chained-comparison]
+    |    ^^^^^^^^^^^^^^^^^
+172 |     pass
+    |
+help: Use a single compare expression. For example, 'x > 3 and x <= 7' could be simplified to '3 < x <= 7'.
