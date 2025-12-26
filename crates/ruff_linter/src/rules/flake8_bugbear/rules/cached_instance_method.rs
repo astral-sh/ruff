@@ -60,7 +60,8 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Options
 ///
-/// This rule only applies to regular methods, not static or class methods.
+/// This rule only applies to regular methods, not static or class methods. You can customize how
+/// Ruff categorizes methods with the following options:
 ///
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`

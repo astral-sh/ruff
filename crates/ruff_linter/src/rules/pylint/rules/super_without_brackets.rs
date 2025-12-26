@@ -49,6 +49,9 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 ///
 /// ## Options
 ///
+/// This rule applies to regular, static, and class methods. You can customize how Ruff categorizes
+/// methods with the following options:
+///
 /// - `lint.pep8-naming.classmethod-decorators`
 /// - `lint.pep8-naming.staticmethod-decorators`
 #[derive(ViolationMetadata)]
