@@ -184,6 +184,12 @@ pub struct WorkspaceOptions {
     ///
     /// This is relevant only for VS Code and is populated by the ty VS Code extension.
     pub python_extension: Option<PythonExtension>,
+
+    /// If `true` or [`None`], show syntax errors as diagnostics.
+    ///
+    /// This is useful when using ty with other language servers, allowing the user to refer
+    /// to syntax errors from only one source.
+    show_syntax_errors: Option<bool>,
 }
 
 impl WorkspaceOptions {
