@@ -189,20 +189,24 @@ impl<'db> CallableSignature<'db> {
                                 type_mapping.update_signature_generic_context(db, context)
                             }),
                             definition: signature.definition,
-                            parameters: Parameters::new(
-                                db,
-                                prefix_parameters
-                                    .iter()
-                                    .map(|param| {
-                                        param.apply_type_mapping_impl(
-                                            db,
-                                            type_mapping,
-                                            tcx,
-                                            visitor,
-                                        )
-                                    })
-                                    .chain(signature.parameters().iter().cloned()),
-                            ),
+                            parameters: if signature.parameters().is_top() {
+                                signature.parameters().clone()
+                            } else {
+                                Parameters::new(
+                                    db,
+                                    prefix_parameters
+                                        .iter()
+                                        .map(|param| {
+                                            param.apply_type_mapping_impl(
+                                                db,
+                                                type_mapping,
+                                                tcx,
+                                                visitor,
+                                            )
+                                        })
+                                        .chain(signature.parameters().iter().cloned()),
+                                )
+                            },
                             return_ty: self_signature.return_ty.map(|ty| {
                                 ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                             }),

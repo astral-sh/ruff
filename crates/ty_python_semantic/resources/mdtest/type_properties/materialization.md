@@ -248,6 +248,17 @@ def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
     reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
 
+The top callable can be represented in a `ParamSpec`:
+
+```py
+def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
+    return f
+
+def _(top: Top[Callable[..., None]]):
+    revealed = takes_paramspec(top)
+    reveal_type(revealed)  # revealed: (Top[...]) -> None
+```
+
 ## Tuple
 
 All positions in a tuple are covariant.
