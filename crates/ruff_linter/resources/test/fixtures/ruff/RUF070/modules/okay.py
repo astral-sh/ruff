@@ -20,3 +20,35 @@ os.environ["FOO"] = 1
 
 def foo():
     return Path("foo.py")
+
+def __getattr__(name):  # ok
+    return name
+
+__path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+
+if os.environ["FOO"] != "1":  # RUF070
+    MY_CONSTANT = 4  # ok, don't flag nested statements
+
+if TYPE_CHECKING:  # ok
+    MY_CONSTANT = 3
+
+import typing
+
+if typing.TYPE_CHECKING: # ok
+    MY_CONSTANT = 2
+
+__version__ = "1.2.3"  # ok
+
+def __dir__():  # ok
+    return ["foo"]
+
+import pkgutil
+
+__path__ = pkgutil.extend_path(__path__, __name__)  # ok
+__path__ = unknown.extend_path(__path__, __name__)  # also ok
+
+# non-`extend_path` assignments are not allowed
+__path__ = 5  # RUF070
+
+# also allow `__author__`
+__author__ = "The Author"  # ok
