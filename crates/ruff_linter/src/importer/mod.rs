@@ -90,11 +90,6 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Add an import statement to the start of the file.
-    pub(crate) fn add_import_at_start(&self, import: &Stmt) -> Edit {
-        self.add_at_start(&self.source[import.range()])
-    }
-
     /// Add a statement to the start of the file.
     pub(crate) fn add_at_start(&self, text: &str) -> Edit {
         Insertion::start_of_file(self.python_ast, self.source, self.stylist, None).into_edit(text)
