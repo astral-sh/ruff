@@ -953,11 +953,9 @@ impl<'db> ClassType<'db> {
                                             std::iter::once(variable_length_tuple.variable())
                                                 .chain(
                                                     variable_length_tuple
-                                                        .prefix_elements()
-                                                        .iter()
+                                                        .iter_prefix_elements()
                                                         .rev()
-                                                        .take(one_based_index)
-                                                        .copied(),
+                                                        .take(one_based_index),
                                                 ),
                                         );
                                         element_type_to_indices
@@ -989,10 +987,8 @@ impl<'db> ClassType<'db> {
                                             std::iter::once(variable_length_tuple.variable())
                                                 .chain(
                                                     variable_length_tuple
-                                                        .suffix_elements()
-                                                        .iter()
-                                                        .take(index + 1)
-                                                        .copied(),
+                                                        .iter_suffix_elements()
+                                                        .take(index + 1),
                                                 ),
                                         );
                                         element_type_to_indices

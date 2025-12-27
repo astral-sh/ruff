@@ -20,6 +20,7 @@ use std::cmp::Ordering;
 use std::hash::Hash;
 
 use itertools::{Either, EitherOrBoth, Itertools};
+use smallvec::{SmallVec, smallvec_inline};
 
 use crate::semantic_index::definition::Definition;
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
@@ -641,15 +642,19 @@ impl<'db> PySlice<'db> for FixedLengthTuple<Type<'db>> {
 /// types, use [`TupleSpec`], which defines some additional type-specific methods.
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize, salsa::Update)]
 pub struct VariableLengthTuple<T> {
-    pub(crate) elements: Box<[T]>,
+    pub(crate) elements: smallvec::SmallVec<[T; 1]>,
     variable_index: usize,
 }
 
 impl<T> VariableLengthTuple<T> {
     /// Creates a new tuple spec containing zero or more elements of a given type, with no prefix
     /// or suffix.
-    fn homogeneous(ty: T) -> Tuple<T> {
-        Self::mixed([], ty, [])
+    const fn homogeneous(ty: T) -> Self {
+        let elements = smallvec_inline![ty];
+        Self {
+            elements,
+            variable_index: 0,
+        }
     }
 
     fn mixed(
@@ -660,13 +665,18 @@ impl<T> VariableLengthTuple<T> {
         Tuple::Variable(Self::new(prefix, variable, suffix))
     }
 
-    fn try_new(
-        prefix: impl IntoIterator<Item = Option<T>> + ExactSizeIterator,
-        variable: T,
-        suffix: impl IntoIterator<Item = Option<T>> + ExactSizeIterator,
-    ) -> Option<Self> {
+    fn try_new<P, S>(prefix: P, variable: T, suffix: S) -> Option<Self>
+    where
+        P: IntoIterator<Item = Option<T>>,
+        P::IntoIter: ExactSizeIterator,
+        S: IntoIterator<Item = Option<T>>,
+        S::IntoIter: ExactSizeIterator,
+    {
+        let prefix = prefix.into_iter();
+        let suffix = suffix.into_iter();
+
         let mut elements =
-            Vec::with_capacity(prefix.len().saturating_add(suffix.len()).saturating_add(1));
+            SmallVec::with_capacity(prefix.len().saturating_add(suffix.len()).saturating_add(1));
 
         for element in prefix {
             elements.push(element?);
@@ -680,7 +690,7 @@ impl<T> VariableLengthTuple<T> {
         }
 
         Some(Self {
-            elements: elements.into_boxed_slice(),
+            elements,
             variable_index,
         })
     }
@@ -690,7 +700,7 @@ impl<T> VariableLengthTuple<T> {
         variable: T,
         suffix: impl IntoIterator<Item = T>,
     ) -> Self {
-        let mut elements = Vec::new();
+        let mut elements = SmallVec::new_const();
         elements.extend(prefix);
 
         let variable_index = elements.len();
@@ -698,19 +708,19 @@ impl<T> VariableLengthTuple<T> {
         elements.extend(suffix);
 
         Self {
-            elements: elements.into_boxed_slice(),
+            elements,
             variable_index,
         }
     }
 
-    pub(crate) const fn variable(&self) -> T
+    pub(crate) fn variable(&self) -> T
     where
         T: Copy,
     {
         self.elements[self.variable_index]
     }
 
-    pub(crate) const fn variable_element(&self) -> &T {
+    pub(crate) fn variable_element(&self) -> &T {
         &self.elements[self.variable_index]
     }
 
@@ -1284,8 +1294,8 @@ pub enum Tuple<T> {
 }
 
 impl<T> Tuple<T> {
-    pub(crate) fn homogeneous(element: T) -> Self {
-        VariableLengthTuple::homogeneous(element)
+    pub(crate) const fn homogeneous(element: T) -> Self {
+        Self::Variable(VariableLengthTuple::homogeneous(element))
     }
 
     pub(crate) fn heterogeneous(elements: impl IntoIterator<Item = T>) -> Self {
