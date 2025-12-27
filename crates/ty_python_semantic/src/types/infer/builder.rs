@@ -51,7 +51,7 @@ use crate::semantic_index::{
 };
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
-use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
+use crate::types::call::{Argument, Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -932,7 +932,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (6) If the class is generic, verify that its generic context does not violate any of
+            // (6) Check that the class arguments matches the arguments of the
+            // base class `__init_subclass__` method.
+            if let Some(args) = class_node.arguments.as_deref() {
+                let call_args: CallArguments = args
+                    .keywords
+                    .iter()
+                    .filter_map(|keyword| match keyword.arg.as_ref() {
+                        // We mimic the runtime behaviour and discard the metaclass argument
+                        Some(name) if name.id.as_str() == "metaclass" => None,
+                        Some(name) => {
+                            let ty = self.expression_type(&keyword.value);
+                            Some((Argument::Keyword(name.id.as_str()), Some(ty)))
+                        }
+                        None => {
+                            let ty = self.expression_type(&keyword.value);
+                            Some((Argument::Keywords, Some(ty)))
+                        }
+                    })
+                    .collect();
+
+                let init_subclass_type = class
+                    .class_member_from_mro(
+                        self.db(),
+                        "__init_subclass__",
+                        MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
+                        // skip(1) to skip the current class and only consider base classes.
+                        class.iter_mro(self.db(), None).skip(1),
+                    )
+                    .ignore_possibly_undefined();
+
+                if let Some(init_subclass) = init_subclass_type {
+                    let call_args = call_args.with_self(Some(Type::from(class)));
+                    if let Err(CallError(CallErrorKind::BindingError, bindings)) =
+                        init_subclass.try_call(self.db(), &call_args)
+                    {
+                        bindings.report_diagnostics(&self.context, class_node.into());
+                    }
+                }
+            }
+
+            // (7) If the class is generic, verify that its generic context does not violate any of
             // the typevar scoping rules.
             if let (Some(legacy), Some(inherited)) = (
                 class.legacy_generic_context(self.db()),
@@ -1011,7 +1051,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (7) Check that a dataclass does not have more than one `KW_ONLY`.
+            // (8) Check that a dataclass does not have more than one `KW_ONLY`.
             if let Some(field_policy @ CodeGeneratorKind::DataclassLike(_)) =
                 CodeGeneratorKind::from_class(self.db(), class, None)
             {
@@ -1046,7 +1086,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (8) Check for violations of the Liskov Substitution Principle,
+            // (9) Check for violations of the Liskov Substitution Principle,
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
