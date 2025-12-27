@@ -100,6 +100,38 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+### Declared `_value_` annotation
+
+If a `_value_` annotation is defined on an `Enum` class, all enum member values must be compatible
+with the declared type:
+
+```pyi
+from enum import Enum
+
+class Color(Enum):
+    _value_: int
+    RED = 1
+    GREEN = "green"  # error: [invalid-assignment]
+    BLUE = ...
+    YELLOW = None  # error: [invalid-assignment]
+```
+
+Reassigning `_value_` inside `__init__` is allowed, but reassignment must still conform to the
+declared `_value_` type annotation:
+
+```py
+from enum import Enum
+
+class Planet(Enum):
+    _value_: str
+
+    def __init__(self, value: int, mass: float, radius: float):
+        self._value_ = value  # error: [invalid-assignment]
+
+    MERCURY = (1, 3.303e23, 2.4397e6)
+    SATURN = "saturn"  # error: [invalid-assignment]
+```
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
