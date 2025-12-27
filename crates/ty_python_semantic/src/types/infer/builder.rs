@@ -47,7 +47,7 @@ use crate::semantic_index::scope::{
 };
 use crate::semantic_index::symbol::{ScopedSymbolId, Symbol};
 use crate::semantic_index::{
-    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table,
+    ApplicableConstraints, EnclosingSnapshotResult, SemanticIndex, place_table, use_def_map,
 };
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
@@ -105,15 +105,7 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind, ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, enums, infer_scope_types, todo_type
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -1046,7 +1038,47 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // (8) Check for violations of the Liskov Substitution Principle,
+            // (8) If this class is an Enum and defines a `_value_` annotation, ensure
+            // all enum members have values compatible with the declared `_value_` type.
+            if enums::is_enum_class_by_inheritance(self.db(), class) {
+                let scope_id = class.body_scope(self.db());
+                let table = place_table(self.db(), scope_id);
+                let use_def = use_def_map(self.db(), scope_id);
+
+                if let Some(value_symbol) = table.symbol_id("_value_") {
+                    let declarations = use_def.end_of_scope_symbol_declarations(value_symbol);
+                    let declared_place = place_from_declarations(self.db(), declarations).ignore_conflicting_declarations();
+
+                    if let Some(attr_ty) = declared_place.ignore_possibly_undefined() {
+                        if let Some(metadata) = enums::enum_metadata(self.db(), class) {
+                            for (member_name, member_ty) in &metadata.members {
+                                if let Some(member_symbol) = table.symbol_id(member_name.as_str()) {
+                                    let bindings = use_def.end_of_scope_symbol_bindings(member_symbol);
+                                    for binding in bindings {
+                                        if let Some(definition) = binding.binding.definition() {
+                                            if let DefinitionKind::Assignment(assign) = definition.kind(self.db()) {
+                                                let value = assign.value(self.module());
+                                                if !member_ty.is_assignable_to(self.db(), attr_ty) {
+                                                    report_invalid_attribute_assignment(
+                                                        &self.context,
+                                                        value.into(),
+                                                        attr_ty,
+                                                        *member_ty,
+                                                        member_name.as_str(),
+                                                    );
+                                                }
+                                            }
+                                            break;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // (9) Check for violations of the Liskov Substitution Principle,
             // and for violations of other rules relating to invalid overrides of some sort.
             overrides::check_class(&self.context, class);
 
