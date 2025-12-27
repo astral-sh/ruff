@@ -1600,10 +1600,16 @@ impl<'db> FmtDetailed<'db> for DisplayCallableType<'_, 'db> {
         match self.signatures.overloads.as_slice() {
             [signature] => {
                 if matches!(self.kind, CallableTypeKind::ParamSpecValue) {
+                    if signature.parameters().is_top() {
+                        f.write_str("Top[")?;
+                    }
                     signature
                         .parameters()
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
+                    if signature.parameters().is_top() {
+                        f.write_str("]")?;
+                    }
                 } else {
                     signature
                         .display_with(self.db, self.settings.clone())
