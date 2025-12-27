@@ -100,14 +100,16 @@ impl Diagnostics {
                 self.items
                     .iter()
                     .filter_map(|diagnostic| {
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.encoding,
-                            client_capabilities,
-                            global_settings,
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.encoding,
+                                client_capabilities,
+                                global_settings,
+                            )?
+                            .1,
                         )
-                        .map(|(_, diagnostic)| diagnostic)
                     })
                     .collect(),
             )
@@ -249,60 +251,73 @@ pub(crate) fn publish_settings_diagnostics(
         DiagnosticMode::OpenFilesOnly => {}
     }
 
-    let global_settings = session.global_settings().clone();
-
     let session_encoding = session.position_encoding();
     let client_capabilities = session.client_capabilities();
-    let state = session.project_state_mut(&AnySystemPath::System(path));
-    let db = &state.db;
-    let project = db.project();
-    let settings_diagnostics = project.check_settings(db);
 
-    // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
-    // These will both almost always be empty so this function will almost always be a no-op.
-    if settings_diagnostics.is_empty() && state.untracked_files_with_pushed_diagnostics.is_empty() {
-        return;
-    }
+    let project_path = AnySystemPath::System(path);
 
-    // Group diagnostics by URL
-    let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
-    for diagnostic in settings_diagnostics {
-        if let Some(span) = diagnostic.primary_span() {
-            let file = span.expect_ty_file();
-            let Some(url) = file_to_url(db, file) else {
-                tracing::debug!("Failed to convert file to URL at {}", file.path(db));
-                continue;
-            };
-            diagnostics_by_url.entry(url).or_default().push(diagnostic);
+    let (mut diagnostics_by_url, old_untracked) = {
+        let state = session.project_state_mut(&project_path);
+        let db = &state.db;
+        let project = db.project();
+        let settings_diagnostics = project.check_settings(db);
+
+        // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
+        // These will both almost always be empty so this function will almost always be a no-op.
+        if settings_diagnostics.is_empty()
+            && state.untracked_files_with_pushed_diagnostics.is_empty()
+        {
+            return;
         }
-    }
 
-    // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
-    // the next time we publish settings diagnostics!
-    let old_untracked = std::mem::replace(
-        &mut state.untracked_files_with_pushed_diagnostics,
-        diagnostics_by_url.keys().cloned().collect(),
-    );
+        // Group diagnostics by URL
+        let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+        for diagnostic in settings_diagnostics {
+            if let Some(span) = diagnostic.primary_span() {
+                let file = span.expect_ty_file();
+                let Some(url) = file_to_url(db, file) else {
+                    tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                    continue;
+                };
+                diagnostics_by_url.entry(url).or_default().push(diagnostic);
+            }
+        }
+
+        // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
+        // the next time we publish settings diagnostics!
+        let old_untracked = std::mem::replace(
+            &mut state.untracked_files_with_pushed_diagnostics,
+            diagnostics_by_url.keys().cloned().collect(),
+        );
+
+        (diagnostics_by_url, old_untracked)
+    };
 
     // Add empty diagnostics for any files that had diagnostics before but don't now.
     // This will clear them (either the file is no longer relevant to us or fixed!)
     for url in old_untracked {
         diagnostics_by_url.entry(url).or_default();
     }
+
+    let db = session.project_db(&project_path);
+    let global_settings = session.global_settings();
+
     // Send the settings diagnostics!
     for (url, file_diagnostics) in diagnostics_by_url {
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
             .filter_map(|diagnostic| {
-                to_lsp_diagnostic(
-                    db,
-                    &diagnostic,
-                    session_encoding,
-                    client_capabilities,
-                    &global_settings,
+                Some(
+                    to_lsp_diagnostic(
+                        db,
+                        &diagnostic,
+                        session_encoding,
+                        client_capabilities,
+                        global_settings,
+                    )?
+                    .1,
                 )
-                .map(|(_, diagnostic)| diagnostic)
             })
             .collect::<Vec<_>>();
 

@@ -412,14 +412,16 @@ impl<'a> ResponseWriter<'a> {
                 let lsp_diagnostics = diagnostics
                     .iter()
                     .filter_map(|diagnostic| {
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.position_encoding,
-                            self.client_capabilities,
-                            self.global_settings,
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.position_encoding,
+                                self.client_capabilities,
+                                self.global_settings,
+                            )?
+                            .1,
                         )
-                        .map(|(_, diagnostic)| diagnostic)
                     })
                     .collect::<Vec<_>>();
 
