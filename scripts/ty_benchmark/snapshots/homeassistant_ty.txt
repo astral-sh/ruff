@@ -30,8 +30,8 @@ homeassistant/components/acmeda/cover.py:60:24: error[unsupported-operator] Oper
 homeassistant/components/acmeda/cover.py:71:24: error[unsupported-operator] Operator `-` is unsupported between objects of type `Literal[100]` and `Unknown | None`
 homeassistant/components/acmeda/hub.py:64:9: error[invalid-assignment] Object of type `None` is not assignable to attribute `api` of type `Hub`
 homeassistant/components/actron_air/__init__.py:30:19: error[invalid-assignment] Object of type `list[dict[str, Any]]` is not assignable to `list[ActronAirACSystem]`
-homeassistant/components/actron_air/__init__.py:42:64: error[not-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
-homeassistant/components/actron_air/__init__.py:44:29: error[not-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
+homeassistant/components/actron_air/__init__.py:42:64: error[non-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
+homeassistant/components/actron_air/__init__.py:44:29: error[non-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
 homeassistant/components/actron_air/climate.py:59:16: error[unresolved-attribute] Object of type `ActronAirACSystem` has no attribute `ac_system`
 homeassistant/components/actron_air/climate.py:64:25: error[unresolved-attribute] Object of type `ActronAirACSystem` has no attribute `remote_zone_info`
 homeassistant/components/actron_air/climate.py:117:18: warning[possibly-missing-attribute] Attribute `system_name` may be missing on object of type `ActronAirACSystem | None`
@@ -51,7 +51,7 @@ homeassistant/components/actron_air/climate.py:177:54: error[invalid-argument-ty
 homeassistant/components/actron_air/climate.py:182:15: warning[possibly-missing-attribute] Attribute `set_temperature` may be missing on object of type `ActronAirUserAirconSettings | None`
 homeassistant/components/actron_air/climate.py:182:65: error[invalid-argument-type] Argument to bound method `set_temperature` is incorrect: Expected `int | float`, found `Any | None`
 homeassistant/components/actron_air/climate.py:227:16: warning[possibly-missing-attribute] Attribute `zones` may be missing on object of type `Unknown | ActronAirACSystem`
-homeassistant/components/actron_air/coordinator.py:55:30: error[not-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
+homeassistant/components/actron_air/coordinator.py:55:30: error[non-subscriptable] Cannot subscript object of type `ActronAirACSystem` with no `__getitem__` method
 homeassistant/components/actron_air/coordinator.py:60:15: error[invalid-method-override] Invalid override of method `_async_update_data`: Definition is incompatible with `DataUpdateCoordinator._async_update_data`
 homeassistant/components/actron_air/coordinator.py:65:16: error[invalid-return-type] Return type does not match returned value: expected `ActronAirStatus`, found `Unknown | ActronAirStatus | None`
 homeassistant/components/adguard/entity.py:63:25: error[invalid-argument-type] Invalid argument to key "identifiers" with declared type `set[tuple[str, str]]` on TypedDict `DeviceInfo`: value of type `set[Unknown | tuple[str, Unknown | str, Unknown | int, Unknown | str]]`
@@ -188,7 +188,7 @@ homeassistant/components/arest/sensor.py:172:39: error[call-non-callable] Object
 homeassistant/components/arris_tg2492lg/device_tracker.py:6:6: error[unresolved-import] Cannot resolve imported module `arris_tg2492lg`
 homeassistant/components/arve/coordinator.py:49:15: error[invalid-method-override] Invalid override of method `_async_update_data`: Definition is incompatible with `DataUpdateCoordinator._async_update_data`
 homeassistant/components/arve/entity.py:47:13: error[unsupported-operator] Operator `in` is not supported between objects of type `Unknown | str` and `Unknown | ArveSensProData`
-homeassistant/components/arve/entity.py:53:16: error[not-subscriptable] Cannot subscript object of type `ArveSensProData` with no `__getitem__` method
+homeassistant/components/arve/entity.py:53:16: error[non-subscriptable] Cannot subscript object of type `ArveSensProData` with no `__getitem__` method
 homeassistant/components/assist_pipeline/select.py:90:13: error[invalid-argument-type] Argument to function `replace` is incorrect: Argument type `Unknown | SelectEntityDescription` does not satisfy upper bound `DataclassInstance` of type variable `_DataclassT`
 homeassistant/components/assist_pipeline/vad.py:52:28: error[invalid-type-form] Variable of type `def bytes(self) -> Unknown` is not allowed in a type expression
 homeassistant/components/assist_pipeline/vad.py:61:24: error[invalid-type-form] Variable of type `def bytes(self) -> Unknown` is not allowed in a type expression
@@ -210,12 +210,12 @@ homeassistant/components/atag/climate.py:86:54: error[invalid-argument-type] Arg
 homeassistant/components/atag/climate.py:91:15: warning[possibly-missing-attribute] Attribute `set_hvac_mode` may be missing on object of type `Unknown | None | Climate`
 homeassistant/components/atag/climate.py:96:15: warning[possibly-missing-attribute] Attribute `set_preset_mode` may be missing on object of type `Unknown | None | Climate`
 homeassistant/components/atag/config_flow.py:16:37: warning[possibly-missing-attribute] Submodule `const` may not be available as an attribute on module `pyatag`
-homeassistant/components/atag/sensor.py:45:12: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/atag/sensor.py:49:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/atag/sensor.py:50:12: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/atag/sensor.py:57:53: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/atag/sensor.py:64:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/atag/sensor.py:69:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:45:12: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:49:39: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:50:12: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:57:53: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:64:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/atag/sensor.py:69:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/atag/water_heater.py:42:16: warning[possibly-missing-attribute] Attribute `temperature` may be missing on object of type `Unknown | None | DHW`
 homeassistant/components/atag/water_heater.py:47:21: warning[possibly-missing-attribute] Attribute `current_operation` may be missing on object of type `Unknown | None | DHW`
 homeassistant/components/atag/water_heater.py:52:18: warning[possibly-missing-attribute] Attribute `set_temp` may be missing on object of type `Unknown | None | DHW`
@@ -484,9 +484,9 @@ homeassistant/components/concord232/binary_sensor.py:68:9: error[unresolved-attr
 homeassistant/components/concord232/binary_sensor.py:69:9: error[unresolved-attribute] Unresolved attribute `last_zone_update` on type `Client`.
 homeassistant/components/concord232/binary_sensor.py:80:5: error[unresolved-attribute] Object of type `Client` has no attribute `zones`
 homeassistant/components/concord232/binary_sensor.py:82:17: error[unresolved-attribute] Object of type `Client` has no attribute `zones`
-homeassistant/components/concord232/binary_sensor.py:129:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/concord232/binary_sensor.py:135:21: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/concord232/binary_sensor.py:144:52: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/concord232/binary_sensor.py:129:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/concord232/binary_sensor.py:135:21: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/concord232/binary_sensor.py:144:52: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/control4/config_flow.py:133:24: warning[possibly-missing-attribute] Attribute `split` may be missing on object of type `Unknown | None`
 homeassistant/components/control4/config_flow.py:138:21: error[invalid-argument-type] Argument to bound method `async_create_entry` is incorrect: Expected `str`, found `Unknown | None`
 homeassistant/components/conversation/chat_log.py:93:16: warning[possibly-missing-attribute] Attribute `content` may be missing on object of type `SystemContent | UserContent | AssistantContent | ToolResultContent`
@@ -607,8 +607,8 @@ homeassistant/components/drop_connect/config_flow.py:51:39: error[invalid-argume
 homeassistant/components/dunehd/media_player.py:109:23: warning[possibly-missing-attribute] Attribute `volume_up` may be missing on object of type `Unknown | DuneHDPlayer`
 homeassistant/components/dunehd/media_player.py:113:23: warning[possibly-missing-attribute] Attribute `volume_down` may be missing on object of type `Unknown | DuneHDPlayer`
 homeassistant/components/duotecno/entity.py:62:34: error[unresolved-attribute] Object of type `(...) -> Awaitable[None]` has no attribute `__name__`
-homeassistant/components/dwd_weather_warnings/coordinator.py:70:21: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/dwd_weather_warnings/coordinator.py:71:21: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/dwd_weather_warnings/coordinator.py:70:21: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/dwd_weather_warnings/coordinator.py:71:21: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/dwd_weather_warnings/sensor.py:120:40: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None | list[Unknown]`
 homeassistant/components/dwd_weather_warnings/sensor.py:122:37: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown]`
 homeassistant/components/dynalite/bridge.py:60:53: error[unresolved-attribute] Object of type `DynaliteBaseDevice & ~AlwaysFalsy` has no attribute `unique_id`
@@ -620,9 +620,9 @@ homeassistant/components/ebox/sensor.py:12:6: error[unresolved-import] Cannot re
 homeassistant/components/ebusd/__init__.py:5:8: error[unresolved-import] Cannot resolve imported module `ebusdpy`
 homeassistant/components/ecoal_boiler/__init__.py:5:6: error[unresolved-import] Cannot resolve imported module `ecoaliface.simple`
 homeassistant/components/ecobee/__init__.py:75:35: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["API_KEY"]` on object of type `str`
-homeassistant/components/ecobee/__init__.py:75:35: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ecobee/__init__.py:75:35: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ecobee/__init__.py:76:41: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["REFRESH_TOKEN"]` on object of type `str`
-homeassistant/components/ecobee/__init__.py:76:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ecobee/__init__.py:76:41: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ecobee/binary_sensor.py:25:28: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
 homeassistant/components/ecobee/binary_sensor.py:27:25: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["capability"]` on object of type `str`
 homeassistant/components/ecobee/binary_sensor.py:31:53: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["name"]` on object of type `str`
@@ -682,9 +682,9 @@ homeassistant/components/ecobee/switch.py:47:48: error[invalid-argument-type] Ar
 homeassistant/components/ecobee/switch.py:133:36: error[invalid-argument-type] Argument to bound method `set_hvac_mode` is incorrect: Expected `str`, found `Unknown | None`
 homeassistant/components/ecobee/weather.py:48:28: error[invalid-argument-type] Argument to function `len` is incorrect: Expected `Sized`, found `Unknown | None`
 homeassistant/components/ecobee/weather.py:51:44: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["name"]` on object of type `str`
-homeassistant/components/ecobee/weather.py:78:24: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ecobee/weather.py:78:24: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ecobee/weather.py:170:12: error[unsupported-operator] Operator `not in` is not supported between objects of type `Literal["forecasts"]` and `Unknown | None`
-homeassistant/components/ecobee/weather.py:176:42: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ecobee/weather.py:176:42: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/econet/climate.py:68:30: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Thermostat`, found `Equipment`
 homeassistant/components/econet/sensor.py:125:16: warning[possibly-missing-attribute] Attribute `energy_type` may be missing on object of type `Unknown | Equipment`
 homeassistant/components/econet/switch.py:29:33: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Thermostat`, found `Equipment`
@@ -775,8 +775,8 @@ homeassistant/components/eufy/__init__.py:3:8: error[unresolved-import] Cannot r
 homeassistant/components/eufy/light.py:7:8: error[unresolved-import] Cannot resolve imported module `lakeside`
 homeassistant/components/eufy/light.py:95:20: error[unsupported-operator] Operator `*` is unsupported between objects of type `Unknown | None | Literal[100]` and `Literal[255]`
 homeassistant/components/eufy/light.py:102:16: error[unsupported-operator] Operator `*` is unsupported between objects of type `Unknown | None` and `Literal[3800]`
-homeassistant/components/eufy/light.py:149:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/eufy/light.py:149:30: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/eufy/light.py:149:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/eufy/light.py:149:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/eufy/switch.py:7:8: error[unresolved-import] Cannot resolve imported module `lakeside`
 homeassistant/components/evohome/entity.py:171:21: error[unsupported-operator] Operator `<` is not supported between objects of type `(Unknown & ~None) | datetime | int | float | str` and `datetime`
 homeassistant/components/evohome/storage.py:116:13: error[unsupported-operator] Operator `|=` is unsupported between objects of type `dict[str, object]` and `SessionIdEntryT`
@@ -824,7 +824,7 @@ homeassistant/components/fireservicerota/config_flow.py:93:53: error[invalid-arg
 homeassistant/components/fireservicerota/config_flow.py:94:53: warning[possibly-missing-attribute] Attribute `entry_id` may be missing on object of type `ConfigEntry[Any] | None`
 homeassistant/components/firmata/board.py:113:9: error[invalid-assignment] Object of type `None` is not assignable to attribute `api` of type `PymataExpress`
 homeassistant/components/firmata/board.py:131:13: error[unsupported-operator] Operator `+=` is unsupported between objects of type `int` and `Unknown | None | int`
-homeassistant/components/fivem/config_flow.py:35:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/fivem/config_flow.py:35:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/fixer/sensor.py:9:6: error[unresolved-import] Cannot resolve imported module `fixerio`
 homeassistant/components/fixer/sensor.py:10:6: error[unresolved-import] Cannot resolve imported module `fixerio.exceptions`
 homeassistant/components/fleetgo/device_tracker.py:8:6: error[unresolved-import] Cannot resolve imported module `ritassist`
@@ -846,10 +846,10 @@ homeassistant/components/flux_led/util.py:114:16: error[invalid-return-type] Ret
 homeassistant/components/flux_led/util.py:115:12: error[invalid-return-type] Return type does not match returned value: expected `tuple[int, int, int, int, int]`, found `tuple[@Todo(StarredExpression), int, int]`
 homeassistant/components/foobot/sensor.py:120:9: error[unresolved-attribute] Object of type `object` has no attribute `ClientConnectorError`
 homeassistant/components/foobot/sensor.py:177:13: error[unresolved-attribute] Object of type `object` has no attribute `ClientConnectorError`
-homeassistant/components/forked_daapd/media_player.py:182:37: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/forked_daapd/media_player.py:187:12: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/forked_daapd/media_player.py:194:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/forked_daapd/media_player.py:199:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/forked_daapd/media_player.py:182:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/forked_daapd/media_player.py:187:12: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/forked_daapd/media_player.py:194:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/forked_daapd/media_player.py:199:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/forked_daapd/media_player.py:388:30: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown, (s: slice[Any, Any, Any], /) -> list[Unknown]]` cannot be called with key of type `Literal["items"]` on object of type `list[Unknown]`
 homeassistant/components/forked_daapd/media_player.py:388:30: error[not-iterable] Object of type `Unknown | str | int | list[Unknown]` may not be iterable
 homeassistant/components/forked_daapd/media_player.py:389:20: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["id"]` on object of type `str`
@@ -884,7 +884,7 @@ homeassistant/components/forked_daapd/media_player.py:729:38: error[unsupported-
 homeassistant/components/forked_daapd/media_player.py:734:34: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown, (s: slice[Any, Any, Any], /) -> list[Unknown]]` cannot be called with key of type `Literal["item_id"]` on object of type `list[Unknown]`
 homeassistant/components/forked_daapd/media_player.py:747:13: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> Unknown, (s: slice[Any, Any, Any], /) -> list[Unknown]]` cannot be called with key of type `Literal["items"]` on object of type `list[Unknown]`
 homeassistant/components/forked_daapd/media_player.py:747:13: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["length_ms"]` on object of type `str`
-homeassistant/components/forked_daapd/media_player.py:747:13: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/components/forked_daapd/media_player.py:747:13: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 homeassistant/components/forked_daapd/media_player.py:876:19: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
 homeassistant/components/fortios/device_tracker.py:12:6: error[unresolved-import] Cannot resolve imported module `fortiosapi`
 homeassistant/components/free_mobile/notify.py:8:6: error[unresolved-import] Cannot resolve imported module `freesms`
@@ -915,19 +915,19 @@ homeassistant/components/gardena_bluetooth/valve.py:78:38: error[invalid-argumen
 homeassistant/components/gc100/__init__.py:5:8: error[unresolved-import] Cannot resolve imported module `gc100`
 homeassistant/components/gdacs/diagnostics.py:26:33: error[invalid-assignment] Object of type `StatusUpdate | None` is not assignable to `StatusUpdate`
 homeassistant/components/gdacs/geo_location.py:148:36: error[invalid-argument-type] Argument to bound method `_update_from_feed` is incorrect: Expected `GdacsFeedEntry`, found `(Unknown & ~AlwaysFalsy) | (FeedEntry & ~AlwaysFalsy)`
-homeassistant/components/gdacs/geo_location.py:163:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/gdacs/geo_location.py:164:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/gdacs/geo_location.py:163:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/gdacs/geo_location.py:164:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/generic_hygrostat/__init__.py:136:36: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/generic_thermostat/__init__.py:63:36: error[invalid-key] Unknown key "changes" for TypedDict `_EventEntityRegistryUpdatedData_CreateRemove`: Unknown key "changes"
 homeassistant/components/geniushub/__init__.py:176:13: error[unresolved-attribute] Object of type `object` has no attribute `ClientConnectorError`
-homeassistant/components/geo_json_events/geo_location.py:109:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/geo_json_events/geo_location.py:110:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/geo_json_events/geo_location.py:109:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/geo_json_events/geo_location.py:110:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/geo_json_events/manager.py:91:16: error[invalid-return-type] Return type does not match returned value: expected `GenericFeedEntry | None`, found `Unknown | None | FeedEntry`
 homeassistant/components/geofency/device_tracker.py:71:9: error[invalid-assignment] Object of type `DeviceInfo` is not assignable to attribute `_attr_device_info` of type `None`
 homeassistant/components/geofency/device_tracker.py:98:9: error[call-non-callable] Object of type `None` is not callable
 homeassistant/components/geonetnz_quakes/__init__.py:139:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `datetime`, found `timedelta`
-homeassistant/components/geonetnz_quakes/geo_location.py:146:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/geonetnz_quakes/geo_location.py:147:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/geonetnz_quakes/geo_location.py:146:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/geonetnz_quakes/geo_location.py:147:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/github/__init__.py:26:9: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `dict[GitHubClientKwarg, Any]`, found `Literal["HomeAssistant/2026.1.0.dev0 aiohttp/3.13.2 Python/3.14"]`
 homeassistant/components/github/config_flow.py:41:46: error[invalid-argument-type] Argument to bound method `starred` is incorrect: Expected `dict[GitHubRequestKwarg, Any]`, found `dict[str, Any]`
 homeassistant/components/github/config_flow.py:46:25: error[invalid-argument-type] Argument to bound method `starred` is incorrect: Expected `dict[GitHubRequestKwarg, Any]`, found `dict[str, Any]`
@@ -948,7 +948,7 @@ homeassistant/components/github/config_flow.py:140:17: error[invalid-argument-ty
 homeassistant/components/github/config_flow.py:165:13: error[invalid-argument-type] Argument to bound method `async_show_progress` is incorrect: Expected `Mapping[str, str] | None`, found `dict[Unknown | str, Unknown | str | None]`
 homeassistant/components/github/config_flow.py:183:62: error[invalid-argument-type] Argument to function `get_repositories` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/github/coordinator.py:132:15: error[invalid-method-override] Invalid override of method `_async_update_data`: Definition is incompatible with `DataUpdateCoordinator._async_update_data`
-homeassistant/components/github/coordinator.py:149:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/github/coordinator.py:149:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/github/coordinator.py:166:13: error[invalid-argument-type] Argument to bound method `subscribe` is incorrect: Expected `(() -> Awaitable[None]) | None`, found `def _handle_error(error: GitHubException) -> CoroutineType[Any, Any, None]`
 homeassistant/components/github/diagnostics.py:28:9: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `dict[GitHubClientKwarg, Any]`, found `Literal["HomeAssistant/2026.1.0.dev0 aiohttp/3.13.2 Python/3.14"]`
 homeassistant/components/github/diagnostics.py:36:30: warning[possibly-missing-attribute] Attribute `as_dict` may be missing on object of type `GitHubRateLimitModel | None`
@@ -1041,8 +1041,8 @@ homeassistant/components/google_weather/config_flow.py:134:21: error[invalid-arg
 homeassistant/components/google_weather/weather.py:248:16: error[invalid-return-type] Return type does not match returned value: expected `list[Forecast] | None`, found `list[dict[Unknown | str, Unknown | str | None | int | float] | Unknown]`
 homeassistant/components/google_weather/weather.py:290:16: error[invalid-return-type] Return type does not match returned value: expected `list[Forecast] | None`, found `list[dict[Unknown | str, Unknown | str | None | int | float] | Unknown]`
 homeassistant/components/google_wifi/sensor.py:199:20: error[unsupported-operator] Operator `in` is not supported between objects of type `str` and `Unknown | None`
-homeassistant/components/google_wifi/sensor.py:200:36: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/google_wifi/sensor.py:217:59: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/google_wifi/sensor.py:200:36: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/google_wifi/sensor.py:217:59: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/govee_ble/sensor.py:137:16: error[invalid-return-type] Return type does not match returned value: expected `bool`, found `bool | (ModelInfo & ~AlwaysTruthy & ~AlwaysFalsy)`
 homeassistant/components/govee_light_local/__init__.py:37:34: error[invalid-type-form] List literals are not allowed in this context in a type expression: Did you mean `list[Event]`?
 homeassistant/components/govee_light_local/coordinator.py:102:15: error[missing-argument] No argument provided for required parameter `scene` of bound method `set_scene`
@@ -1061,7 +1061,7 @@ homeassistant/components/gree/climate.py:189:9: error[invalid-assignment] Object
 homeassistant/components/gree/climate.py:261:9: error[invalid-assignment] Object of type `Unknown | FanSpeed | None` is not assignable to attribute `fan_speed` on type `Unknown | Device`
 homeassistant/components/greenwave/light.py:10:8: error[unresolved-import] Cannot resolve imported module `greenwavereality`
 homeassistant/components/group/sensor.py:705:20: error[invalid-return-type] Return type does not match returned value: expected `set[str | None]`, found `set[type[StrEnum] | str | None]`
-homeassistant/components/growatt_server/config_flow.py:228:40: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/growatt_server/config_flow.py:228:40: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/growatt_server/config_flow.py:230:9: error[no-matching-overload] No overload of bound method `update` matches arguments
 homeassistant/components/growatt_server/coordinator.py:94:30: warning[possibly-missing-attribute] Attribute `plant_energy_overview` may be missing on object of type `Unknown | GrowattApi`
 homeassistant/components/growatt_server/coordinator.py:112:31: warning[possibly-missing-attribute] Attribute `min_detail` may be missing on object of type `Unknown | GrowattApi`
@@ -1428,7 +1428,7 @@ homeassistant/components/hue/v1/light.py:164:57: warning[possibly-missing-attrib
 homeassistant/components/hue/v1/light.py:199:57: warning[possibly-missing-attribute] Attribute `update` may be missing on object of type `Unknown | Groups | None | GroupsController`
 homeassistant/components/hue/v1/light.py:227:24: error[not-iterable] Object of type `Unknown | Groups | None | GroupsController` may not be iterable
 homeassistant/components/hue/v1/light.py:228:21: error[invalid-argument-type] Method `__getitem__` of type `bound method GroupsController.__getitem__(id: str) -> Room | GroupedLight` cannot be called with key of type `Unknown | Room | GroupedLight` on object of type `GroupsController`
-homeassistant/components/hue/v1/light.py:228:21: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/hue/v1/light.py:228:21: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/hue/v1/light.py:231:29: warning[possibly-missing-attribute] Attribute `lights` may be missing on object of type `Unknown | Room | GroupedLight`
 homeassistant/components/hue/v1/light.py:232:35: warning[possibly-missing-attribute] Attribute `name` may be missing on object of type `Unknown | Room | GroupedLight`
 homeassistant/components/hue/v1/light.py:236:34: error[invalid-argument-type] Argument to bound method `remove` is incorrect: Expected `() -> None`, found `None`
@@ -1458,7 +1458,7 @@ homeassistant/components/hue/v2/binary_sensor.py:126:54: error[invalid-argument-
 homeassistant/components/hue/v2/binary_sensor.py:169:46: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `HueResource`, found `GroupedMotion`
 homeassistant/components/hue/v2/binary_sensor.py:174:35: warning[possibly-missing-attribute] Attribute `id` may be missing on object of type `ServiceGroup | Room | BridgeHome | None`
 homeassistant/components/hue/v2/binary_sensor.py:210:46: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `HueResource`, found `SecurityAreaMotion`
-homeassistant/components/hue/v2/binary_sensor.py:216:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/hue/v2/binary_sensor.py:216:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/hue/v2/binary_sensor.py:226:13: warning[possibly-missing-attribute] Attribute `subscribe` may be missing on object of type `Unknown | Config | None | ConfigController`
 homeassistant/components/hue/v2/binary_sensor.py:227:17: error[invalid-argument-type] Argument to bound method `subscribe` is incorrect: Expected `(EventType, dict[Unknown, Unknown] | None, /) -> None`, found `bound method Self@async_added_to_hass._handle_event(event_type: EventType, resource: Light | DevicePower | GroupedLight | LightLevel | Motion) -> None`
 homeassistant/components/hue/v2/binary_sensor.py:275:16: warning[possibly-missing-attribute] Attribute `state` may be missing on object of type `ContactReport | None`
@@ -1667,8 +1667,8 @@ homeassistant/components/icloud/services.py:105:16: error[invalid-return-type] R
 homeassistant/components/idteck_prox/__init__.py:7:6: error[unresolved-import] Cannot resolve imported module `rfk101py.rfk101py`
 homeassistant/components/iglo/light.py:7:6: error[unresolved-import] Cannot resolve imported module `iglo`
 homeassistant/components/iglo/light.py:8:6: error[unresolved-import] Cannot resolve imported module `iglo.lamp`
-homeassistant/components/ign_sismologia/geo_location.py:205:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/ign_sismologia/geo_location.py:206:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ign_sismologia/geo_location.py:205:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/ign_sismologia/geo_location.py:206:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/ign_sismologia/geo_location.py:221:20: error[invalid-return-type] Return type does not match returned value: expected `str | None`, found `(Unknown & ~AlwaysFalsy) | (int & ~AlwaysFalsy) | (float & ~AlwaysFalsy)`
 homeassistant/components/ihc/__init__.py:5:6: error[unresolved-import] Cannot resolve imported module `ihcsdk.ihccontroller`
 homeassistant/components/ihc/binary_sensor.py:5:6: error[unresolved-import] Cannot resolve imported module `ihcsdk.ihccontroller`
@@ -1751,8 +1751,8 @@ homeassistant/components/isy994/__init__.py:134:33: error[invalid-argument-type]
 homeassistant/components/isy994/__init__.py:135:36: error[invalid-argument-type] Argument to function `_categorize_programs` is incorrect: Expected `Programs`, found `Programs | None`
 homeassistant/components/isy994/__init__.py:137:8: warning[possibly-missing-attribute] Attribute `children` may be missing on object of type `Variables | None`
 homeassistant/components/isy994/__init__.py:142:30: warning[possibly-missing-attribute] Attribute `children` may be missing on object of type `Variables | None`
-homeassistant/components/isy994/__init__.py:143:28: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/isy994/__init__.py:143:28: error[not-subscriptable] Cannot subscript object of type `Variable` with no `__getitem__` method
+homeassistant/components/isy994/__init__.py:143:28: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/isy994/__init__.py:143:28: error[non-subscriptable] Cannot subscript object of type `Variable` with no `__getitem__` method
 homeassistant/components/isy994/__init__.py:146:11: warning[possibly-missing-attribute] Attribute `nobjs` may be missing on object of type `NetworkResources | None`
 homeassistant/components/isy994/__init__.py:150:25: warning[possibly-missing-attribute] Attribute `nobjs` may be missing on object of type `NetworkResources | None`
 homeassistant/components/isy994/__init__.py:169:9: warning[possibly-missing-attribute] Attribute `stop` may be missing on object of type `WebSocketClient | None`
@@ -1776,7 +1776,7 @@ homeassistant/components/isy994/button.py:160:15: warning[possibly-missing-attri
 homeassistant/components/isy994/climate.py:72:29: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Node`, found `Node | Group`
 homeassistant/components/isy994/climate.py:72:47: error[invalid-argument-type] Argument to bound method `get` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/isy994/climate.py:95:21: warning[possibly-missing-attribute] Attribute `uom` may be missing on object of type `Node | Program | Variable`
-homeassistant/components/isy994/climate.py:97:25: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/isy994/climate.py:97:25: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/isy994/climate.py:97:25: warning[possibly-missing-attribute] Attribute `uom` may be missing on object of type `Node | Program | Variable`
 homeassistant/components/isy994/climate.py:102:24: warning[possibly-missing-attribute] Attribute `aux_properties` may be missing on object of type `Node | Program | Variable`
 homeassistant/components/isy994/climate.py:113:29: warning[possibly-missing-attribute] Attribute `aux_properties` may be missing on object of type `Node | Program | Variable`
@@ -1908,9 +1908,9 @@ homeassistant/components/joaoapps_join/notify.py:7:6: error[unresolved-import] C
 homeassistant/components/justnimbus/sensor.py:138:16: error[unresolved-attribute] Object of type `SensorEntityDescription` has no attribute `value_fn`
 homeassistant/components/kaiterra/api_data.py:7:6: error[unresolved-import] Cannot resolve imported module `kaiterra_async_client`
 homeassistant/components/keba/__init__.py:6:6: error[unresolved-import] Cannot resolve imported module `keba_kecontact.connection`
-homeassistant/components/keba/__init__.py:231:23: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/keba/__init__.py:232:24: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/keba/__init__.py:233:23: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/keba/__init__.py:231:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/keba/__init__.py:232:24: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/keba/__init__.py:233:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/keenetic_ndms2/config_flow.py:75:21: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `(str & ~AlwaysFalsy) | (bytes & ~AlwaysFalsy) | Any`
 homeassistant/components/keenetic_ndms2/device_tracker.py:56:29: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `str | None`
 homeassistant/components/keenetic_ndms2/device_tracker.py:57:29: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `None`
@@ -1959,7 +1959,7 @@ homeassistant/components/kodi/media_player.py:323:27: warning[possibly-missing-a
 homeassistant/components/konnected/panel.py:136:16: warning[possibly-missing-attribute] Attribute `ClientError` may be missing on object of type `Unknown | None | Client`
 homeassistant/components/konnected/panel.py:191:16: warning[possibly-missing-attribute] Attribute `ClientError` may be missing on object of type `Unknown | None | Client`
 homeassistant/components/konnected/panel.py:320:28: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/konnected/panel.py:356:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/konnected/panel.py:356:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/konnected/panel.py:361:26: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
 homeassistant/components/konnected/panel.py:363:26: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
 homeassistant/components/konnected/panel.py:364:28: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
@@ -2079,10 +2079,10 @@ homeassistant/components/lifx/config_flow.py:233:25: error[invalid-assignment] O
 homeassistant/components/lifx/coordinator.py:139:27: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `str`, found `Unknown | None | str`
 homeassistant/components/lifx/coordinator.py:147:52: error[invalid-argument-type] Argument to function `infrared_brightness_value_to_option` is incorrect: Expected `int`, found `Unknown | None`
 homeassistant/components/lifx/coordinator.py:162:13: error[invalid-argument-type] Argument to function `get_real_mac_addr` is incorrect: Expected `str`, found `Unknown | None | str`
-homeassistant/components/lifx/coordinator.py:200:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/coordinator.py:201:27: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/coordinator.py:202:27: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/coordinator.py:203:23: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/coordinator.py:200:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/coordinator.py:201:27: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/coordinator.py:202:27: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/coordinator.py:203:23: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lifx/coordinator.py:209:48: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
 homeassistant/components/lifx/coordinator.py:210:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `int`
 homeassistant/components/lifx/coordinator.py:210:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
@@ -2091,17 +2091,17 @@ homeassistant/components/lifx/coordinator.py:294:33: error[invalid-argument-type
 homeassistant/components/lifx/coordinator.py:385:47: error[unresolved-attribute] Object of type `Message` has no attribute `signal`
 homeassistant/components/lifx/coordinator.py:388:34: error[invalid-argument-type] Method `__getitem__` of type `bound method <class 'FirmwareEffect'>.__getitem__[_EnumMemberT](name: str) -> _EnumMemberT@__getitem__` cannot be called with key of type `Unknown | None` on object of type `<class 'FirmwareEffect'>`
 homeassistant/components/lifx/light.py:155:16: error[unsupported-operator] Operator `/` is unsupported between objects of type `Unknown | int | None` and `Literal[65535]`
-homeassistant/components/lifx/light.py:156:43: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:161:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:156:43: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:161:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lifx/light.py:315:34: error[invalid-argument-type] Argument to function `merge_hsbk` is incorrect: Expected `list[int | float | None]`, found `Unknown | None`
-homeassistant/components/lifx/light.py:383:19: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:383:19: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lifx/light.py:389:26: error[not-iterable] Object of type `None` is not iterable
-homeassistant/components/lifx/light.py:426:26: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:427:37: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:429:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:429:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:433:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lifx/light.py:447:36: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:426:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:427:37: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:429:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:429:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:433:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lifx/light.py:447:36: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lifx/light.py:488:42: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
 homeassistant/components/lifx/light.py:489:17: error[invalid-assignment] Cannot assign to a subscript on an object of type `None`
 homeassistant/components/lifx/light.py:492:42: error[invalid-argument-type] Argument to function `__new__` is incorrect: Expected `Iterable[Unknown]`, found `Unknown | None | list[Unknown | None]`
@@ -2165,8 +2165,8 @@ homeassistant/components/lookin/__init__.py:81:78: error[invalid-argument-type] 
 homeassistant/components/lookin/__init__.py:82:20: error[invalid-return-type] Return type does not match returned value: expected `LookinUDPSubscriptions`, found `LookinUDPSubscriptions | None`
 homeassistant/components/lookin/__init__.py:157:33: error[invalid-argument-type] Argument to bound method `update_from_value` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/lookin/climate.py:183:13: error[invalid-argument-type] Argument to bound method `update_conditioner` is incorrect: Expected `str`, found `str | None | Unknown`
-homeassistant/components/lookin/climate.py:204:52: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/lookin/climate.py:205:49: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lookin/climate.py:204:52: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/lookin/climate.py:205:49: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/lookin/climate.py:217:42: error[invalid-argument-type] Argument to bound method `update_from_status` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/lookin/entity.py:161:34: error[invalid-argument-type] Argument to bound method `_update_from_status` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/lookin/entity.py:175:34: error[invalid-argument-type] Argument to bound method `_update_from_status` is incorrect: Expected `str`, found `str | None`
@@ -2311,7 +2311,7 @@ homeassistant/components/mill/climate.py:203:19: warning[possibly-missing-attrib
 homeassistant/components/mill/climate.py:206:19: warning[possibly-missing-attribute] Attribute `set_operation_mode_off` may be missing on object of type `Unknown | Mill | Mill`
 homeassistant/components/mill/entity.py:33:25: error[invalid-argument-type] Invalid argument to key "identifiers" with declared type `set[tuple[str, str]]` on TypedDict `DeviceInfo`: value of type `set[Unknown | tuple[str, str | None]]`
 homeassistant/components/mill/entity.py:43:27: error[invalid-argument-type] Method `__getitem__` of type `bound method dict[str, Any].__getitem__(key: str, /) -> Any` cannot be called with key of type `Unknown | str | None` on object of type `dict[str, Any]`
-homeassistant/components/mill/number.py:56:35: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/mill/number.py:56:35: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/mill/number.py:63:15: warning[possibly-missing-attribute] Attribute `max_heating_power` may be missing on object of type `Unknown | Mill | Mill`
 homeassistant/components/mill/number.py:63:71: error[invalid-argument-type] Argument to bound method `max_heating_power` is incorrect: Expected `str`, found `Unknown | str | None`
 homeassistant/components/mill/sensor.py:221:19: warning[possibly-missing-attribute] Attribute `mac_address` may be missing on object of type `Unknown | Mill | Mill`
@@ -2562,7 +2562,7 @@ homeassistant/components/nmap_tracker/__init__.py:331:27: error[no-matching-over
 homeassistant/components/nmap_tracker/__init__.py:418:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Unknown` and `Unknown | None`
 homeassistant/components/nmap_tracker/__init__.py:430:50: error[invalid-argument-type] Argument to function `human_readable_name` is incorrect: Expected `str`, found `(Unknown & ~AlwaysFalsy) | str | None`
 homeassistant/components/nmap_tracker/__init__.py:432:54: error[invalid-argument-type] Argument is incorrect: Expected `str`, found `(Unknown & ~AlwaysFalsy) | str | None`
-homeassistant/components/nmbs/sensor.py:272:19: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/nmbs/sensor.py:272:19: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/noaa_tides/sensor.py:9:8: error[unresolved-import] Cannot resolve imported module `noaa_coops`
 homeassistant/components/nobo_hub/config_flow.py:169:38: warning[possibly-missing-attribute] Attribute `items` may be missing on object of type `dict[str, Any] | None`
 homeassistant/components/notify_events/notify.py:76:61: error[invalid-argument-type] Argument to bound method `add_image_from_url` is incorrect: Expected `str`, found `None | Unknown`
@@ -2579,8 +2579,8 @@ homeassistant/components/notify_events/notify.py:93:56: error[invalid-argument-t
 homeassistant/components/notify_events/notify.py:93:67: error[invalid-argument-type] Argument to bound method `add_file` is incorrect: Expected `str`, found `None | Unknown`
 homeassistant/components/nsw_fuel_station/__init__.py:64:13: error[invalid-argument-type] Argument is incorrect: Expected `dict[tuple[int, str], int | float]`, found `dict[tuple[Unknown | int | None, Unknown | str] | Unknown, Unknown | int | float]`
 homeassistant/components/nsw_rural_fire_service_feed/geo_location.py:166:16: error[invalid-return-type] Return type does not match returned value: expected `NswRuralFireServiceIncidentsFeedEntry | None`, found `Unknown | None | FeedEntry`
-homeassistant/components/nsw_rural_fire_service_feed/geo_location.py:249:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/nsw_rural_fire_service_feed/geo_location.py:250:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/nsw_rural_fire_service_feed/geo_location.py:249:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/nsw_rural_fire_service_feed/geo_location.py:250:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/nuki/binary_sensor.py:60:38: warning[possibly-missing-attribute] Attribute `is_door_sensor_activated` may be missing on object of type `Unknown | NukiDevice`
 homeassistant/components/nuki/binary_sensor.py:65:16: warning[possibly-missing-attribute] Attribute `door_sensor_state` may be missing on object of type `Unknown | NukiDevice`
 homeassistant/components/nuki/binary_sensor.py:70:16: warning[possibly-missing-attribute] Attribute `door_sensor_state_name` may be missing on object of type `Unknown | NukiDevice`
@@ -2595,8 +2595,8 @@ homeassistant/components/nws/config_flow.py:45:12: error[invalid-return-type] Re
 homeassistant/components/nws/weather.py:323:31: error[invalid-argument-type] Argument to bound method `_forecast` is incorrect: Expected `list[dict[str, Any]]`, found `Unknown | list[dict[str, Any]] | None`
 homeassistant/components/nws/weather.py:328:31: error[invalid-argument-type] Argument to bound method `_forecast` is incorrect: Expected `list[dict[str, Any]]`, found `Unknown | list[dict[str, Any]] | None`
 homeassistant/components/oasa_telematics/sensor.py:9:8: error[unresolved-import] Cannot resolve imported module `oasatelematics`
-homeassistant/components/oasa_telematics/sensor.py:120:34: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/oasa_telematics/sensor.py:121:33: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/oasa_telematics/sensor.py:120:34: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/oasa_telematics/sensor.py:121:33: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/obihai/connectivity.py:62:13: error[invalid-assignment] Object of type `PyObihai | None` is not assignable to attribute `pyobihai` of type `PyObihai`
 homeassistant/components/obihai/connectivity.py:68:9: error[invalid-assignment] Object of type `dict[str, Any]` is not assignable to attribute `services` of type `list[Unknown]`
 homeassistant/components/obihai/connectivity.py:69:9: error[invalid-assignment] Object of type `dict[str, Any]` is not assignable to attribute `line_services` of type `list[Unknown]`
@@ -2757,8 +2757,8 @@ homeassistant/components/owntracks/__init__.py:148:9: error[invalid-assignment] 
 homeassistant/components/owntracks/device_tracker.py:83:16: error[invalid-return-type] Return type does not match returned value: expected `int | None`, found `Unknown | None | tuple[Any | None, Any | None]`
 homeassistant/components/owntracks/device_tracker.py:88:16: error[invalid-return-type] Return type does not match returned value: expected `dict[str, Any] | None`, found `Unknown | None | tuple[Any | None, Any | None]`
 homeassistant/components/owntracks/device_tracker.py:93:16: error[invalid-return-type] Return type does not match returned value: expected `int | float`, found `Unknown | tuple[Any | None, Any | None] | None`
-homeassistant/components/owntracks/device_tracker.py:100:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/owntracks/device_tracker.py:109:20: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/owntracks/device_tracker.py:100:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/owntracks/device_tracker.py:109:20: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/owntracks/device_tracker.py:116:16: error[invalid-return-type] Return type does not match returned value: expected `str | None`, found `Unknown | None | tuple[Any | None, Any | None]`
 homeassistant/components/owntracks/device_tracker.py:121:16: error[invalid-return-type] Return type does not match returned value: expected `SourceType`, found `Unknown | tuple[Any | None, Any | None] | None`
 homeassistant/components/owntracks/device_tracker.py:128:35: error[invalid-assignment] Invalid assignment to key "name" with declared type `str | None` on TypedDict `DeviceInfo`: value of type `Unknown | tuple[Any | None, Any | None] | None`
@@ -2909,10 +2909,10 @@ homeassistant/components/plex/server.py:403:27: warning[possibly-missing-attribu
 homeassistant/components/plex/server.py:563:16: warning[possibly-missing-attribute] Attribute `friendlyName` may be missing on object of type `Unknown | None | PlexServer`
 homeassistant/components/plex/server.py:568:16: warning[possibly-missing-attribute] Attribute `machineIdentifier` may be missing on object of type `Unknown | None | PlexServer`
 homeassistant/components/plex/server.py:573:16: warning[possibly-missing-attribute] Attribute `_baseurl` may be missing on object of type `Unknown | None | PlexServer`
-homeassistant/components/plex/server.py:578:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/plex/server.py:583:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/plex/server.py:588:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/plex/server.py:593:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/plex/server.py:578:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/plex/server.py:583:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/plex/server.py:588:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/plex/server.py:593:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/plex/server.py:598:16: warning[possibly-missing-attribute] Attribute `library` may be missing on object of type `Unknown | None | PlexServer`
 homeassistant/components/plex/server.py:602:16: warning[possibly-missing-attribute] Attribute `playlist` may be missing on object of type `Unknown | None | PlexServer`
 homeassistant/components/plex/server.py:606:16: warning[possibly-missing-attribute] Attribute `playlists` may be missing on object of type `Unknown | None | PlexServer`
@@ -2940,8 +2940,8 @@ homeassistant/components/pushsafer/notify.py:88:57: error[invalid-argument-type]
 homeassistant/components/pushsafer/notify.py:136:23: error[not-iterable] Object of type `list[Unknown | str] | Unknown | None` may not be iterable
 homeassistant/components/qbus/climate.py:108:12: error[unsupported-operator] Operator `not in` is not supported between objects of type `str` and `list[str] | None`
 homeassistant/components/qbus/climate.py:114:32: error[no-matching-overload] No overload of bound method `join` matches arguments
-homeassistant/components/qld_bushfire/geo_location.py:215:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/qld_bushfire/geo_location.py:216:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/qld_bushfire/geo_location.py:215:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/qld_bushfire/geo_location.py:216:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/qrcode/image_processing.py:8:6: error[unresolved-import] Cannot resolve imported module `pyzbar`
 homeassistant/components/qvr_pro/__init__.py:5:6: error[unresolved-import] Cannot resolve imported module `pyqvrpro`
 homeassistant/components/qvr_pro/__init__.py:6:6: error[unresolved-import] Cannot resolve imported module `pyqvrpro.client`
@@ -3063,9 +3063,9 @@ homeassistant/components/ring/entity.py:190:16: error[invalid-return-type] Retur
 homeassistant/components/ring/switch.py:103:38: error[invalid-argument-type] Argument is incorrect: Expected `<special form 'typing.Self'>`, found `RingSwitchEntityDescription[Any]`
 homeassistant/components/ring/switch.py:124:57: error[invalid-argument-type] Argument is incorrect: Expected `<special form 'typing.Self'>`, found `RingSwitchEntityDescription[RingDeviceT@RingSwitch]`
 homeassistant/components/ripple/sensor.py:7:6: error[unresolved-import] Cannot resolve imported module `pyripple`
-homeassistant/components/risco/config_flow.py:272:51: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/components/risco/config_flow.py:272:51: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 homeassistant/components/risco/config_flow.py:294:32: warning[possibly-missing-attribute] Attribute `values` may be missing on object of type `Unknown | int | dict[Unknown | str, Unknown | AlarmControlPanelState] | dict[Unknown | AlarmControlPanelState, Unknown | str]`
-homeassistant/components/risco/config_flow.py:300:20: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/components/risco/config_flow.py:300:20: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
 homeassistant/components/risco/config_flow.py:302:23: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | int | dict[Unknown | str, Unknown | AlarmControlPanelState] | dict[Unknown | AlarmControlPanelState, Unknown | str]`
 homeassistant/components/risco/switch.py:57:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Zone`, found `Zone`
 homeassistant/components/risco/switch.py:91:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Zone`, found `Zone`
@@ -3354,7 +3354,7 @@ homeassistant/components/subaru/__init__.py:60:13: error[invalid-argument-type] 
 homeassistant/components/subaru/config_flow.py:128:13: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `None`
 homeassistant/components/supla/__init__.py:9:6: error[unresolved-import] Cannot resolve imported module `asyncpysupla`
 homeassistant/components/swiss_hydrological_data/sensor.py:8:6: error[unresolved-import] Cannot resolve imported module `swisshydrodata`
-homeassistant/components/swiss_hydrological_data/sensor.py:106:19: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/swiss_hydrological_data/sensor.py:106:19: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/swiss_public_transport/coordinator.py:114:23: error[invalid-argument-type] Invalid argument to key "start" with declared type `str` on TypedDict `DataConnection`: value of type `Unknown | None`
 homeassistant/components/swiss_public_transport/coordinator.py:115:29: error[invalid-argument-type] Invalid argument to key "destination" with declared type `str` on TypedDict `DataConnection`: value of type `Unknown | None`
 homeassistant/components/switchbot/__init__.py:218:9: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `SwitchbotDevice`, found `Unknown | SwitchbotCeilingLight | SwitchbotCurtain | ... omitted 14 union elements`
@@ -3397,7 +3397,7 @@ homeassistant/components/syncthing/__init__.py:155:20: warning[possibly-missing-
 homeassistant/components/syncthing/__init__.py:174:16: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `aiosyncthing`
 homeassistant/components/syncthing/config_flow.py:36:12: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `aiosyncthing`
 homeassistant/components/syncthing/sensor.py:36:12: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `aiosyncthing`
-homeassistant/components/syncthing/sensor.py:111:16: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/syncthing/sensor.py:111:16: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/syncthing/sensor.py:127:16: warning[possibly-missing-attribute] Submodule `exceptions` may not be available as an attribute on module `aiosyncthing`
 homeassistant/components/synology_dsm/entity.py:154:9: error[unsupported-operator] Operator `+=` is unsupported between objects of type `None` and `str`
 homeassistant/components/synology_srm/device_tracker.py:7:8: error[unresolved-import] Cannot resolve imported module `synology_srm`
@@ -3457,11 +3457,11 @@ homeassistant/components/tesla_fleet/climate.py:49:60: error[invalid-argument-ty
 homeassistant/components/tesla_fleet/climate.py:55:30: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `Scope`, found `list[Scope]`
 homeassistant/components/tesla_fleet/climate.py:125:38: warning[possibly-missing-attribute] Attribute `auto_conditioning_start` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/climate.py:134:38: warning[possibly-missing-attribute] Attribute `auto_conditioning_stop` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
-homeassistant/components/tesla_fleet/climate.py:137:34: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tesla_fleet/climate.py:137:34: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tesla_fleet/climate.py:152:13: warning[possibly-missing-attribute] Attribute `set_temps` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/climate.py:176:13: warning[possibly-missing-attribute] Attribute `set_climate_keeper_mode` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/climate.py:177:37: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | list[Unknown | str] | list[str] | None`
-homeassistant/components/tesla_fleet/climate.py:181:27: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tesla_fleet/climate.py:181:27: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tesla_fleet/climate.py:295:38: warning[possibly-missing-attribute] Attribute `set_cop_temp` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/climate.py:312:17: warning[possibly-missing-attribute] Attribute `set_cabin_overheat_protection` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/climate.py:316:17: warning[possibly-missing-attribute] Attribute `set_cabin_overheat_protection` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
@@ -3469,15 +3469,15 @@ homeassistant/components/tesla_fleet/climate.py:320:17: warning[possibly-missing
 homeassistant/components/tesla_fleet/coordinator.py:184:17: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:186:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["after"]` and `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:187:62: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["after"]` on object of type `str`
-homeassistant/components/tesla_fleet/coordinator.py:187:62: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tesla_fleet/coordinator.py:187:62: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tesla_fleet/coordinator.py:246:17: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:248:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["after"]` and `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:249:62: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["after"]` on object of type `str`
-homeassistant/components/tesla_fleet/coordinator.py:249:62: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tesla_fleet/coordinator.py:249:62: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tesla_fleet/coordinator.py:309:17: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:311:16: error[unsupported-operator] Operator `in` is not supported between objects of type `Literal["after"]` and `dict[Unknown, Unknown] | str | None`
 homeassistant/components/tesla_fleet/coordinator.py:312:62: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["after"]` on object of type `str`
-homeassistant/components/tesla_fleet/coordinator.py:312:62: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tesla_fleet/coordinator.py:312:62: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tesla_fleet/cover.py:84:13: warning[possibly-missing-attribute] Attribute `window_control` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/cover.py:93:13: warning[possibly-missing-attribute] Attribute `window_control` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
 homeassistant/components/tesla_fleet/cover.py:124:38: warning[possibly-missing-attribute] Attribute `charge_port_door_open` may be missing on object of type `Unknown | VehicleFleet | EnergySite`
@@ -3515,11 +3515,11 @@ homeassistant/components/tesla_wall_connector/binary_sensor.py:80:16: error[unre
 homeassistant/components/tesla_wall_connector/config_flow.py:36:38: error[unresolved-attribute] Object of type `dict[Unknown, Unknown]` has no attribute `serial_number`
 homeassistant/components/tesla_wall_connector/config_flow.py:72:30: error[unresolved-attribute] Object of type `dict[Unknown, Unknown]` has no attribute `serial_number`
 homeassistant/components/teslemetry/__init__.py:112:19: warning[possibly-missing-attribute] Attribute `create` may be missing on object of type `Unknown | Vehicles`
-homeassistant/components/teslemetry/climate.py:117:34: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/teslemetry/climate.py:118:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/teslemetry/climate.py:117:34: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/teslemetry/climate.py:118:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/teslemetry/climate.py:154:37: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `Unknown | list[Unknown | str] | list[str] | None`
-homeassistant/components/teslemetry/climate.py:158:27: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/teslemetry/climate.py:175:24: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/teslemetry/climate.py:158:27: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/teslemetry/climate.py:175:24: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/teslemetry/services.py:163:76: error[invalid-argument-type] Argument to bound method `set_scheduled_charging` is incorrect: Expected `int`, found `None | int`
 homeassistant/components/teslemetry/services.py:223:17: error[invalid-argument-type] Argument to bound method `set_scheduled_departure` is incorrect: Expected `int`, found `None | int`
 homeassistant/components/teslemetry/services.py:226:17: error[invalid-argument-type] Argument to bound method `set_scheduled_departure` is incorrect: Expected `int`, found `None | int`
@@ -3528,7 +3528,7 @@ homeassistant/components/teslemetry/services.py:282:50: error[invalid-argument-t
 homeassistant/components/teslemetry/services.py:286:52: error[invalid-argument-type] Argument to bound method `speed_limit_deactivate` is incorrect: Expected `str | int`, found `Unknown | None`
 homeassistant/components/teslemetry/services.py:309:43: error[invalid-argument-type] Argument to bound method `time_of_use_settings` is incorrect: Expected `dict[str, Any]`, found `Unknown | None`
 homeassistant/components/tessie/climate.py:135:43: warning[possibly-missing-attribute] Attribute `index` may be missing on object of type `list[Unknown] | list[str] | None`
-homeassistant/components/tessie/climate.py:144:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/tessie/climate.py:144:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/tfiac/climate.py:10:6: error[unresolved-import] Cannot resolve imported module `pytfiac`
 homeassistant/components/thermopro/button.py:91:21: error[invalid-argument-type] Argument to bound method `__init__` is incorrect: Expected `str`, found `str | None`
 homeassistant/components/thermoworks_smoke/sensor.py:12:6: error[unresolved-import] Cannot resolve imported module `stringcase`
@@ -3683,10 +3683,10 @@ homeassistant/components/twilio_call/notify.py:63:28: warning[possibly-missing-a
 homeassistant/components/twinkly/coordinator.py:97:13: error[invalid-argument-type] Argument is incorrect: Expected `bool`, found `Unknown | bool | None`
 homeassistant/components/twitter/notify.py:13:6: error[unresolved-import] Cannot resolve imported module `TwitterAPI`
 homeassistant/components/ubus/device_tracker.py:8:6: error[unresolved-import] Cannot resolve imported module `openwrt.ubus`
-homeassistant/components/ukraine_alarm/config_flow.py:68:27: error[not-subscriptable] Cannot subscript object of type `ClientResponse` with no `__getitem__` method
+homeassistant/components/ukraine_alarm/config_flow.py:68:27: error[non-subscriptable] Cannot subscript object of type `ClientResponse` with no `__getitem__` method
 homeassistant/components/ukraine_alarm/config_flow.py:103:46: error[invalid-argument-type] Argument to function `_find` is incorrect: Expected `list[dict[str, Any]]`, found `@Todo | list[dict[str, Any]] | None`
 homeassistant/components/ukraine_alarm/config_flow.py:120:45: error[invalid-argument-type] Argument to function `_make_regions_object` is incorrect: Expected `list[dict[str, Any]]`, found `@Todo | list[dict[str, Any]] | None`
-homeassistant/components/ukraine_alarm/coordinator.py:56:22: error[not-subscriptable] Cannot subscript object of type `ClientResponse` with no `__getitem__` method
+homeassistant/components/ukraine_alarm/coordinator.py:56:22: error[non-subscriptable] Cannot subscript object of type `ClientResponse` with no `__getitem__` method
 homeassistant/components/unifi_direct/device_tracker.py:8:6: error[unresolved-import] Cannot resolve imported module `unifi_ap`
 homeassistant/components/unifiled/light.py:8:6: error[unresolved-import] Cannot resolve imported module `unifiled`
 homeassistant/components/unifiprotect/button.py:90:9: error[invalid-argument-type] Argument is incorrect: Expected `ButtonDeviceClass | None`, found `Literal["unifiprotect__chime_button"]`
@@ -3699,8 +3699,8 @@ homeassistant/components/upcloud/entity.py:75:13: error[unresolved-attribute] Ob
 homeassistant/components/upcloud/entity.py:75:33: error[unresolved-attribute] Object of type `Server` has no attribute `state`
 homeassistant/components/usage_prediction/__init__.py:64:16: error[invalid-return-type] Return type does not match returned value: expected `EntityUsagePredictions`, found `object`
 homeassistant/components/usgs_earthquakes_feed/geo_location.py:185:16: error[invalid-return-type] Return type does not match returned value: expected `UsgsEarthquakeHazardsProgramFeedEntry | None`, found `Unknown | None | FeedEntry`
-homeassistant/components/usgs_earthquakes_feed/geo_location.py:264:31: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/usgs_earthquakes_feed/geo_location.py:265:32: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/usgs_earthquakes_feed/geo_location.py:264:31: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/usgs_earthquakes_feed/geo_location.py:265:32: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/utility_meter/sensor.py:383:9: error[invalid-assignment] Object of type `Unknown | None` is not assignable to attribute `entity_id` of type `str`
 homeassistant/components/vasttrafik/sensor.py:8:8: error[unresolved-import] Cannot resolve imported module `vasttrafik`
 homeassistant/components/vegehub/__init__.py:59:61: error[invalid-argument-type] Argument to function `get_webhook_handler` is incorrect: Expected `VegeHubCoordinator`, found `VegeHub`
@@ -3900,7 +3900,7 @@ homeassistant/components/webostv/media_player.py:134:29: error[unresolved-attrib
 homeassistant/components/webostv/media_player.py:145:29: error[unresolved-attribute] Object of type `(...) -> Coroutine[Any, Any, _R@cmd]` has no attribute `__name__`
 homeassistant/components/websocket_api/connection.py:282:27: warning[possibly-missing-attribute] Submodule `humanize` may not be available as an attribute on module `voluptuous`
 homeassistant/components/websocket_api/decorators.py:37:40: error[unresolved-attribute] Object of type `AsyncWebSocketCommandHandler` has no attribute `__name__`
-homeassistant/components/websocket_api/decorators.py:142:19: error[not-subscriptable] Cannot subscript object of type `All` with no `__getitem__` method
+homeassistant/components/websocket_api/decorators.py:142:19: error[non-subscriptable] Cannot subscript object of type `All` with no `__getitem__` method
 homeassistant/components/websocket_api/decorators.py:144:19: warning[possibly-missing-attribute] Attribute `validators` may be missing on object of type `VolDictType | All`
 homeassistant/components/websocket_api/http.py:117:23: warning[possibly-missing-attribute] Attribute `isEnabledFor` may be missing on object of type `Unknown | WebSocketAdapter | None`
 homeassistant/components/websocket_api/http.py:148:17: warning[possibly-missing-attribute] Attribute `debug` may be missing on object of type `Unknown | WebSocketAdapter | None`
@@ -3991,16 +3991,16 @@ homeassistant/components/wiz/sensor.py:82:35: warning[possibly-missing-attribute
 homeassistant/components/wiz/sensor.py:94:22: warning[possibly-missing-attribute] Attribute `get_power` may be missing on object of type `Unknown | PilotParser | None`
 homeassistant/components/wiz/switch.py:25:8: warning[possibly-missing-attribute] Attribute `bulb_type` may be missing on object of type `BulbType | None`
 homeassistant/components/worldtidesinfo/sensor.py:58:8: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/worldtidesinfo/sensor.py:88:26: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:89:42: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:90:40: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:91:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:92:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:93:27: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:94:42: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:95:40: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:96:41: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/worldtidesinfo/sensor.py:97:39: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:88:26: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:89:42: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:90:40: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:91:41: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:92:39: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:93:27: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:94:42: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:95:40: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:96:41: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/worldtidesinfo/sensor.py:97:39: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/xbox/browse_media.py:33:12: error[missing-argument] No argument provided for required parameter `cls`
 homeassistant/components/xbox/browse_media.py:35:9: error[invalid-argument-type] Argument is incorrect: Expected `type`, found `Literal[MediaClass.APP]`
 homeassistant/components/xbox/browse_media.py:35:9: error[parameter-already-assigned] Multiple values provided for parameter `cls`
@@ -4032,15 +4032,15 @@ homeassistant/components/xiaomi_miio/switch.py:891:47: warning[possibly-missing-
 homeassistant/components/xiaomi_miio/switch.py:900:48: warning[possibly-missing-attribute] Attribute `set_wifi_led` may be missing on object of type `AirConditioningCompanionV3 | ChuangmiPlug | PowerStrip`
 homeassistant/components/xiaomi_tv/media_player.py:7:8: error[unresolved-import] Cannot resolve imported module `pymitv`
 homeassistant/components/xmpp/notify.py:243:16: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/xmpp/notify.py:244:55: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/xmpp/notify.py:245:50: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:244:55: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:245:50: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/xmpp/notify.py:248:18: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/xmpp/notify.py:249:55: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:249:55: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/xmpp/notify.py:250:18: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/xmpp/notify.py:251:56: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
-homeassistant/components/xmpp/notify.py:252:50: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:251:56: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:252:50: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/xmpp/notify.py:255:18: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
-homeassistant/components/xmpp/notify.py:256:56: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/components/xmpp/notify.py:256:56: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/components/xmpp/notify.py:276:33: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
 homeassistant/components/xmpp/notify.py:291:16: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
 homeassistant/components/xmpp/notify.py:293:53: warning[possibly-missing-attribute] Attribute `get` may be missing on object of type `Unknown | None`
@@ -4418,65 +4418,65 @@ homeassistant/helpers/storage.py:410:13: error[invalid-assignment] Cannot assign
 homeassistant/helpers/storage.py:410:13: error[invalid-assignment] Invalid subscript assignment with key of type `Literal["minor_version"]` and value of type `Literal[1]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:413:13: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:413:13: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["version"]` on object of type `str`
-homeassistant/helpers/storage.py:413:13: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:413:13: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:413:13: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:413:13: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:413:13: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:413:13: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:414:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["minor_version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:414:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["minor_version"]` on object of type `str`
-homeassistant/helpers/storage.py:414:17: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:414:17: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:414:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:414:17: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:414:17: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:414:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:416:22: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["data"]` on object of type `str`
 homeassistant/helpers/storage.py:416:22: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["data"]` on object of type `list[JsonValueType]`
-homeassistant/helpers/storage.py:416:22: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:416:22: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:416:22: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:416:22: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:416:22: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:416:22: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:421:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:421:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["version"]` on object of type `str`
-homeassistant/helpers/storage.py:421:17: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:421:17: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:421:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:421:17: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:421:17: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:421:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:422:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["minor_version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:422:17: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["minor_version"]` on object of type `str`
-homeassistant/helpers/storage.py:422:17: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:422:17: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:422:17: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:422:17: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:422:17: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:422:17: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:427:32: error[missing-argument] No argument provided for required parameter `old_data` of bound method `_async_migrate_func`
 homeassistant/helpers/storage.py:427:57: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:427:57: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["version"]` on object of type `str`
-homeassistant/helpers/storage.py:427:57: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:427:57: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:427:57: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:57: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:57: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:57: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:427:74: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["data"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:427:74: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["data"]` on object of type `str`
-homeassistant/helpers/storage.py:427:74: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:427:74: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:427:74: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:74: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:74: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:427:74: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:431:25: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:431:25: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["version"]` on object of type `str`
-homeassistant/helpers/storage.py:431:25: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:25: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:25: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:25: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:25: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:25: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:431:42: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["minor_version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:431:42: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["minor_version"]` on object of type `str`
-homeassistant/helpers/storage.py:431:42: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:42: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:42: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:42: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:42: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:42: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:431:65: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["data"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:431:65: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["data"]` on object of type `str`
-homeassistant/helpers/storage.py:431:65: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:65: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:431:65: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:65: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:65: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:431:65: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:434:24: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["version"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:434:24: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["version"]` on object of type `str`
-homeassistant/helpers/storage.py:434:24: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:434:24: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:434:24: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:434:24: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:434:24: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:434:24: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:436:30: error[invalid-argument-type] Method `__getitem__` of type `Overload[(i: SupportsIndex, /) -> dict[str, Any] | list[JsonValueType] | str | ... omitted 3 union elements, (s: slice[Any, Any, Any], /) -> list[JsonValueType]]` cannot be called with key of type `Literal["data"]` on object of type `list[JsonValueType]`
 homeassistant/helpers/storage.py:436:30: error[invalid-argument-type] Method `__getitem__` of type `Overload[(key: SupportsIndex | slice[Any, Any, Any], /) -> LiteralString, (key: SupportsIndex | slice[Any, Any, Any], /) -> str]` cannot be called with key of type `Literal["data"]` on object of type `str`
-homeassistant/helpers/storage.py:436:30: error[not-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
-homeassistant/helpers/storage.py:436:30: error[not-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
-homeassistant/helpers/storage.py:436:30: error[not-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
+homeassistant/helpers/storage.py:436:30: error[non-subscriptable] Cannot subscript object of type `int` with no `__getitem__` method
+homeassistant/helpers/storage.py:436:30: error[non-subscriptable] Cannot subscript object of type `float` with no `__getitem__` method
+homeassistant/helpers/storage.py:436:30: error[non-subscriptable] Cannot subscript object of type `None` with no `__getitem__` method
 homeassistant/helpers/storage.py:437:35: error[invalid-argument-type] Argument to bound method `async_save` is incorrect: Argument type `Unknown | dict[str, Any] | list[Any] | ... omitted 4 union elements` does not satisfy upper bound `Mapping[str, Any] | Sequence[Any]` of type variable `_T`
 homeassistant/helpers/storage.py:437:35: error[invalid-argument-type] Argument to bound method `async_save` is incorrect: Expected `_T@Store`, found `Unknown | dict[str, Any] | list[Any] | ... omitted 4 union elements`
 homeassistant/helpers/template/__init__.py:599:13: warning[possibly-missing-attribute] Attribute `loop` may be missing on object of type `Unknown | HomeAssistant | None`
