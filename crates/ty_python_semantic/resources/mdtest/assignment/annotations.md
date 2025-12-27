@@ -402,40 +402,48 @@ python-version = "3.12"
 `generic_list.py`:
 
 ```py
-from typing import Literal
+from typing import Literal, Sequence
 
 def f[T](x: T) -> list[T]:
     return [x]
 
-a = f("a")
-reveal_type(a)  # revealed: list[str]
+x1 = f("a")
+reveal_type(x1)  # revealed: list[str]
 
-b: list[int | Literal["a"]] = f("a")
-reveal_type(b)  # revealed: list[int | Literal["a"]]
+x2: list[int | Literal["a"]] = f("a")
+reveal_type(x2)  # revealed: list[int | Literal["a"]]
 
-c: list[int | str] = f("a")
-reveal_type(c)  # revealed: list[int | str]
+x3: list[int | str] = f("a")
+reveal_type(x3)  # revealed: list[int | str]
 
-d: list[int | tuple[int, int]] = f((1, 2))
-reveal_type(d)  # revealed: list[int | tuple[int, int]]
+x4: list[int | tuple[int, int]] = f((1, 2))
+reveal_type(x4)  # revealed: list[int | tuple[int, int]]
 
-e: list[int] = f(True)
-reveal_type(e)  # revealed: list[int]
+x5: list[int] = f(True)
+reveal_type(x5)  # revealed: list[int]
 
 # error: [invalid-assignment] "Object of type `list[int | str]` is not assignable to `list[int]`"
-g: list[int] = f("a")
+x6: list[int] = f("a")
 
 # error: [invalid-assignment] "Object of type `list[str]` is not assignable to `tuple[int]`"
-h: tuple[int] = f("a")
+x7: tuple[int] = f("a")
 
 def f2[T: int](x: T) -> T:
     return x
 
-i: int = f2(True)
-reveal_type(i)  # revealed: Literal[True]
+x8: int = f2(True)
+reveal_type(x8)  # revealed: Literal[True]
 
-j: int | str = f2(True)
-reveal_type(j)  # revealed: Literal[True]
+x9: int | str = f2(True)
+reveal_type(x9)  # revealed: Literal[True]
+
+# TODO: We could choose a concrete type here.
+x10: list[int | str] | list[int | None] = [1, 2, 3]
+reveal_type(x10)  # revealed: list[Unknown | int]
+
+# TODO: And here similarly.
+x11: Sequence[int | str] | Sequence[int | None] = [1, 2, 3]
+reveal_type(x11)  # revealed: list[Unknown | int]
 ```
 
 A function's arguments are also inferred using the type context:
@@ -608,6 +616,73 @@ class X[T]:
 
 x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
+```
+
+## Declared type preference sees through subtyping
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+Similarly, if the inferred type is a subtype of the declared type, we prefer declared type
+assignments that are in non-covariant position.
+
+```py
+from collections import defaultdict
+from typing import Any, Iterable, Literal, MutableSequence, Sequence
+
+x1: Sequence[Any] = [1, 2, 3]
+reveal_type(x1)  # revealed: list[int]
+
+x2: MutableSequence[Any] = [1, 2, 3]
+reveal_type(x2)  # revealed: list[Any]
+
+x3: Iterable[Any] = [1, 2, 3]
+reveal_type(x3)  # revealed: list[int]
+
+x4: Iterable[Iterable[Any]] = [[1, 2, 3]]
+reveal_type(x4)  # revealed: list[list[int]]
+
+x5: list[Iterable[Any]] = [[1, 2, 3]]
+reveal_type(x5)  # revealed: list[Iterable[Any]]
+
+x6: Iterable[list[Any]] = [[1, 2, 3]]
+reveal_type(x6)  # revealed: list[list[Any]]
+
+class X[T]:
+    value: T
+
+    def __init__(self, value: T): ...
+
+class A[T](X[T]): ...
+
+def a[T](value: T) -> A[T]:
+    return A(value)
+
+x7: A[object] = A(1)
+reveal_type(x7)  # revealed: A[object]
+
+x8: X[object] = A(1)
+reveal_type(x8)  # revealed: A[object]
+
+x9: X[object] | None = A(1)
+reveal_type(x9)  # revealed: A[object]
+
+x10: X[object] | None = a(1)
+reveal_type(x10)  # revealed: A[object]
+
+def f[T](x: T) -> list[list[T]]:
+    return [[x]]
+
+x11: Sequence[Sequence[Any]] = f(1)
+reveal_type(x11)  # revealed: list[list[int]]
+
+x12: Sequence[list[Any]] = f(1)
+reveal_type(x12)  # revealed: list[list[Any]]
+
+x13: dict[int, dict[str, int]] = defaultdict(dict)
+reveal_type(x13)  # revealed: defaultdict[int, dict[str, int]]
 ```
 
 ## Narrow generic unions
