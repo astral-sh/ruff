@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_linter/src/rules/flake8_blind_except/mod.rs
-assertion_line: 41
 ---
 BLE001 Do not catch blind exception: `BaseException`
   --> BLE.py:25:8

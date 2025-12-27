@@ -105,6 +105,56 @@ BLE001 Do not catch blind exception: `Exception`
    |
 
 BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:104:8
+    |
+102 | try:
+103 |     pass
+104 | except Exception as e:
+    |        ^^^^^^^^^
+105 |     logging.debug("...", exc_info=e)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:110:8
+    |
+108 | try:
+109 |     pass
+110 | except Exception:
+    |        ^^^^^^^^^
+111 |     logging.info("...", exc_info=True)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:115:8
+    |
+113 | try:
+114 |     pass
+115 | except Exception as e:
+    |        ^^^^^^^^^
+116 |     logging.warn("...", exc_info=e)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:121:8
+    |
+119 | try:
+120 |     pass
+121 | except Exception:
+    |        ^^^^^^^^^
+122 |     logging.warning("...", exc_info=True)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
+   --> BLE.py:127:8
+    |
+125 | try:
+126 |     pass
+127 | except Exception as e:
+    |        ^^^^^^^^^
+128 |     logging.log(logging.INFO, "...", exc_info=e)
+    |
+
+BLE001 Do not catch blind exception: `Exception`
    --> BLE.py:134:8
     |
 132 | try:
