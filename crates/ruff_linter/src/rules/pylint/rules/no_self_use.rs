@@ -49,6 +49,13 @@ use crate::rules::flake8_unused_arguments::rules::is_not_implemented_stub_with_v
 ///         print("Greetings friend!")
 /// ```
 ///
+/// ## Options
+///
+/// The rule will not trigger on methods that are already marked as static or class methods.
+///
+/// - `lint.pep8-naming.classmethod-decorators`
+/// - `lint.pep8-naming.staticmethod-decorators`
+///
 /// [override]: https://docs.python.org/3/library/typing.html#typing.override
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "v0.0.286")]

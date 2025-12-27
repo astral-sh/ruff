@@ -178,6 +178,48 @@ def _(top: Top[C3], bottom: Bottom[C3]) -> None:
     reveal_type(bottom)
 ```
 
+## Callable with gradual parameters
+
+For callables with gradual parameters (the `...` form), the top materialization preserves the
+gradual form since we cannot know what parameters are required. The bottom materialization
+simplifies to the bottom callable `(*args: object, **kwargs: object) -> Never` since this is the
+most specific type that is a subtype of all possible callable materializations.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Any, Callable, Never, Protocol
+from ty_extensions import Bottom, Top, is_equivalent_to, is_subtype_of, static_assert
+
+type GradualCallable = Callable[..., Any]
+
+def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
+    # The top materialization keeps the gradual parameters wrapped
+    reveal_type(top)  # revealed: Top[(...) -> object]
+
+    # The bottom materialization simplifies to the fully static bottom callable
+    reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> Never
+
+# The bottom materialization of a gradual callable is a subtype of (and supertype of)
+# a protocol with `__call__(self, *args: object, **kwargs: object) -> Never`
+class EquivalentToBottom(Protocol):
+    def __call__(self, *args: object, **kwargs: object) -> Never: ...
+
+static_assert(is_subtype_of(EquivalentToBottom, Bottom[Callable[..., Never]]))
+static_assert(is_subtype_of(Bottom[Callable[..., Never]], EquivalentToBottom))
+
+# TODO: is_equivalent_to only considers types of the same kind equivalent (Callable vs ProtocolInstance),
+# so this fails even though mutual subtyping proves semantic equivalence.
+static_assert(is_equivalent_to(Bottom[Callable[..., Never]], EquivalentToBottom))  # error: [static-assert-error]
+
+# Top-materialized callables are not equivalent to non-top-materialized callables, even if their
+# signatures would otherwise be equivalent after materialization.
+static_assert(not is_equivalent_to(Top[Callable[..., object]], Callable[..., object]))
+```
+
 ## Tuple
 
 All positions in a tuple are covariant.

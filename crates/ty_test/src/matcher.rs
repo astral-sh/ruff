@@ -319,7 +319,7 @@ impl Matcher {
                         .column
                         .is_none_or(|col| col == self.column(diagnostic));
                     let message_matches = error.message_contains.is_none_or(|needle| {
-                        normalize_paths(&diagnostic.concise_message().to_string()).contains(needle)
+                        normalize_paths(&diagnostic.concise_message().to_str()).contains(needle)
                     });
                     lint_name_matches && column_matches && message_matches
                 });

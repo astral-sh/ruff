@@ -241,7 +241,7 @@ impl Workspace {
                 let range = msg.range().unwrap_or_default();
                 ExpandedMessage {
                     code: msg.secondary_code_or_id().to_string(),
-                    message: msg.body().to_string(),
+                    message: msg.concise_message().to_string(),
                     start_location: source_code
                         .source_location(range.start(), self.position_encoding)
                         .into(),

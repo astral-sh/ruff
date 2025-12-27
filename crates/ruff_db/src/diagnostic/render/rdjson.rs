@@ -5,7 +5,7 @@ use ruff_diagnostics::{Edit, Fix};
 use ruff_source_file::{LineColumn, SourceCode};
 use ruff_text_size::Ranged;
 
-use crate::diagnostic::Diagnostic;
+use crate::diagnostic::{ConciseMessage, Diagnostic};
 
 use super::FileResolver;
 
@@ -76,7 +76,7 @@ fn diagnostic_to_rdjson<'a>(
     let edits = diagnostic.fix().map(Fix::edits).unwrap_or_default();
 
     RdjsonDiagnostic {
-        message: diagnostic.body(),
+        message: diagnostic.concise_message(),
         location,
         code: RdjsonCode {
             value: diagnostic
@@ -155,7 +155,7 @@ struct RdjsonDiagnostic<'a> {
     code: RdjsonCode<'a>,
     #[serde(skip_serializing_if = "Option::is_none")]
     location: Option<RdjsonLocation<'a>>,
-    message: &'a str,
+    message: ConciseMessage<'a>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     suggestions: Vec<RdjsonSuggestion<'a>>,
 }

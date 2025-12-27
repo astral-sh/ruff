@@ -24,6 +24,16 @@ string = "hello"
 reveal_type(f"{string!r}")  # revealed: str
 ```
 
+## Debug Specifier
+
+The `=` specifier causes the expression text and value to be included in the output:
+
+```py
+# f"{1=}" evaluates to "1=1", but we fall back to `str` for now
+reveal_type(f"{1=}")  # revealed: str
+reveal_type(f"value: {42=}")  # revealed: str
+```
+
 ## Format Specifiers
 
 ```py

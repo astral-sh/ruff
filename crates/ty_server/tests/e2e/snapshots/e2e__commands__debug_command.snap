@@ -150,6 +150,9 @@ Settings: Settings {
             },
         },
     },
+    analysis: AnalysisSettings {
+        respect_type_ignore_comments: true,
+    },
     overrides: [],
 }
 

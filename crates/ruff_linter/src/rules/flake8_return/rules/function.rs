@@ -55,6 +55,12 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 /// ## Fix safety
 /// This rule's fix is marked as unsafe for cases in which comments would be
 /// dropped from the `return` statement.
+///
+/// ## Options
+///
+/// This rule ignores functions marked as properties.
+///
+/// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.154")]
 pub(crate) struct UnnecessaryReturnNone;

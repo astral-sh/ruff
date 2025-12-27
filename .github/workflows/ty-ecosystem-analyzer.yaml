@@ -4,7 +4,13 @@ permissions: {}
 
 on:
   pull_request:
-    types: [labeled]
+    # The default for `pull_request` is to trigger on `synchronize`, `opened` and `reopened`.
+    # We also add `labeled` here so that the workflow triggers when a label is initially added.
+    types:
+      - labeled
+      - synchronize
+      - opened
+      - reopened
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref_name }}-${{ github.event.pull_request.number || github.sha }}
@@ -23,7 +29,7 @@ jobs:
     name: Compute diagnostic diff
     runs-on: ${{ github.repository == 'astral-sh/ruff' && 'depot-ubuntu-22.04-32' || 'ubuntu-latest' }}
     timeout-minutes: 20
-    if: contains(github.event.label.name, 'ecosystem-analyzer')
+    if: contains( github.event.pull_request.labels.*.name, 'ecosystem-analyzer')
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:

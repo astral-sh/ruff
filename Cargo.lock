@@ -4391,7 +4391,6 @@ dependencies = [
  "ordermap",
  "ruff_db",
  "ruff_python_ast",
- "ty_python_semantic",
 ]
 
 [[package]]
@@ -4559,6 +4558,7 @@ dependencies = [
  "test-case",
  "thiserror 2.0.17",
  "tracing",
+ "ty_combine",
  "ty_module_resolver",
  "ty_static",
  "ty_test",

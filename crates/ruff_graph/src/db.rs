@@ -10,8 +10,8 @@ use ruff_python_ast::PythonVersion;
 use ty_module_resolver::{SearchPathSettings, SearchPaths};
 use ty_python_semantic::lint::{LintRegistry, RuleSelection};
 use ty_python_semantic::{
-    Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform, PythonVersionSource,
-    PythonVersionWithSource, SysPrefixPathOrigin, default_lint_registry,
+    AnalysisSettings, Db, Program, ProgramSettings, PythonEnvironment, PythonPlatform,
+    PythonVersionSource, PythonVersionWithSource, SysPrefixPathOrigin, default_lint_registry,
 };
 
 static EMPTY_VENDORED: std::sync::LazyLock<VendoredFileSystem> = std::sync::LazyLock::new(|| {
@@ -27,6 +27,7 @@ pub struct ModuleDb {
     files: Files,
     system: OsSystem,
     rule_selection: Arc<RuleSelection>,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl ModuleDb {
@@ -109,6 +110,10 @@ impl Db for ModuleDb {
 
     fn verbose(&self) -> bool {
         false
+    }
+
+    fn analysis_settings(&self) -> &AnalysisSettings {
+        &self.analysis_settings
     }
 }
 

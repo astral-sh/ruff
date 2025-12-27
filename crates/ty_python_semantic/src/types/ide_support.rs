@@ -514,7 +514,7 @@ pub fn call_signature_details<'db>(
         // Extract signature details from all callable bindings
         bindings
             .into_iter()
-            .flat_map(std::iter::IntoIterator::into_iter)
+            .flatten()
             .map(|binding| {
                 let argument_to_parameter_mapping = binding.argument_matches().to_vec();
                 let signature = binding.signature;
@@ -623,7 +623,7 @@ pub fn definitions_for_bin_op<'db>(
 
     let definitions: Vec<_> = bindings
         .into_iter()
-        .flat_map(std::iter::IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,
@@ -681,7 +681,7 @@ pub fn definitions_for_unary_op<'db>(
 
     let definitions = bindings
         .into_iter()
-        .flat_map(std::iter::IntoIterator::into_iter)
+        .flatten()
         .filter_map(|binding| {
             Some(ResolvedDefinition::Definition(
                 binding.signature.definition?,

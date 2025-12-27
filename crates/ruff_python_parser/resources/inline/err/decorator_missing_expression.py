@@ -3,3 +3,6 @@
 def foo(): ...
 @@
 def foo(): ...
+@test
+@
+class Test

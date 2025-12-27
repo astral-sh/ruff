@@ -334,7 +334,7 @@ impl<'a> SarifResult<'a> {
             rule_id: RuleCode::from(diagnostic),
             level: "error".to_string(),
             message: SarifMessage {
-                text: diagnostic.body().to_string(),
+                text: diagnostic.concise_message().to_string(),
             },
             fixes: Self::fix(diagnostic, &uri).into_iter().collect(),
             locations: vec![SarifLocation {

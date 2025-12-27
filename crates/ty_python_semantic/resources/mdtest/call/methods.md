@@ -588,6 +588,31 @@ reveal_type(C.f2(1))  # revealed: str
 reveal_type(C().f2(1))  # revealed: str
 ```
 
+When a `@staticmethod` is decorated with `@contextmanager`, accessing it from an instance should not
+bind `self`:
+
+```py
+from contextlib import contextmanager
+from collections.abc import Iterator
+
+class D:
+    @staticmethod
+    @contextmanager
+    def ctx(num: int) -> Iterator[int]:
+        yield num
+
+    def use_ctx(self) -> None:
+        # Accessing via self should not bind self
+        with self.ctx(10) as x:
+            reveal_type(x)  # revealed: int
+
+# Accessing via class works
+reveal_type(D.ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+
+# Accessing via instance should also work (no self-binding)
+reveal_type(D().ctx(5))  # revealed: _GeneratorContextManager[int, None, None]
+```
+
 ### `__new__`
 
 `__new__` is an implicit `@staticmethod`; accessing it on an instance does not bind the `cls`

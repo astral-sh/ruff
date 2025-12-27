@@ -184,12 +184,26 @@ def reveal_mro(cls: type | types.GenericAlias) -> None:
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
 class NamedTupleLike(Protocol):
-    # from typing.NamedTuple stub
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
     _field_defaults: ClassVar[dict[str, Any]]
-    _fields: ClassVar[tuple[str, ...]]
     @classmethod
     def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
-    def _replace(self, /, **kwargs) -> Self: ...
+
+    # Positional arguments aren't actually accepted by these methods at runtime,
+    # but adding the `*args` parameters means that all `NamedTuple` classes
+    # are understood as assignable to this protocol due to the special case
+    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
+    #
+    # > If the input signature in a function definition includes both a
+    # > `*args` and `**kwargs` parameter and both are typed as `Any`
+    # > (explicitly or implicitly because it has no annotation), a type
+    # > checker should treat this as the equivalent of `...`.
+    def _replace(self, *args, **kwargs) -> Self: ...
     if sys.version_info >= (3, 13):
-        def __replace__(self, **kwargs) -> Self: ...
+        def __replace__(self, *args, **kwargs) -> Self: ...

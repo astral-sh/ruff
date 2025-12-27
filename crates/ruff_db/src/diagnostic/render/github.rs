@@ -87,7 +87,7 @@ impl<'a> GithubRenderer<'a> {
                 write!(f, "{id}:", id = diagnostic.id())?;
             }
 
-            writeln!(f, " {}", diagnostic.body())?;
+            writeln!(f, " {}", diagnostic.concise_message())?;
         }
 
         Ok(())

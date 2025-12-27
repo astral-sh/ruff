@@ -50,6 +50,7 @@ use ty_module_resolver::{Module, ModuleName};
 pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&AMBIGUOUS_PROTOCOL_MEMBER);
     registry.register_lint(&CALL_NON_CALLABLE);
+    registry.register_lint(&CALL_TOP_CALLABLE);
     registry.register_lint(&POSSIBLY_MISSING_IMPLICIT_CALL);
     registry.register_lint(&CONFLICTING_ARGUMENT_FORMS);
     registry.register_lint(&CONFLICTING_DECLARATIONS);
@@ -148,6 +149,31 @@ declare_lint! {
     pub(crate) static CALL_NON_CALLABLE = {
         summary: "detects calls to non-callable objects",
         status: LintStatus::stable("0.0.1-alpha.1"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Checks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all
+    /// callable types with return type `T`).
+    ///
+    /// ## Why is this bad?
+    /// When an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or
+    /// `isinstance(x, Callable)`), we know the object is callable, but we don't know its
+    /// precise signature. This type represents the set of all possible callable types
+    /// (including, e.g., functions that take no arguments and functions that require arguments),
+    /// so no specific set of arguments can be guaranteed to be valid.
+    ///
+    /// ## Examples
+    /// ```python
+    /// def f(x: object):
+    ///     if callable(x):
+    ///         x()  # error: We know `x` is callable, but not what arguments it accepts
+    /// ```
+    pub(crate) static CALL_TOP_CALLABLE = {
+        summary: "detects calls to the top callable type",
+        status: LintStatus::stable("0.0.7"),
         default_level: Level::Error,
     }
 }
@@ -2409,10 +2435,17 @@ pub(super) fn report_non_subscriptable(
     let Some(builder) = context.report_lint(&NON_SUBSCRIPTABLE, node) else {
         return;
     };
-    builder.into_diagnostic(format_args!(
-        "Cannot subscript object of type `{}` with no `{method}` method",
-        non_subscriptable_ty.display(context.db())
-    ));
+    if method == "__delitem__" {
+        builder.into_diagnostic(format_args!(
+            "Cannot delete subscript on object of type `{}` with no `{method}` method",
+            non_subscriptable_ty.display(context.db())
+        ));
+    } else {
+        builder.into_diagnostic(format_args!(
+            "Cannot subscript object of type `{}` with no `{method}` method",
+            non_subscriptable_ty.display(context.db())
+        ));
+    }
 }
 
 pub(super) fn report_slice_step_size_zero(context: &InferContext, node: AnyNodeRef) {
@@ -3523,7 +3556,7 @@ fn report_unsupported_base(
         base_type.display(db)
     ));
     diagnostic.info(format_args!(
-        "ty cannot resolve a consistent MRO for class `{}` due to this base",
+        "ty cannot resolve a consistent method resolution order (MRO) for class `{}` due to this base",
         class.name(db)
     ));
     diagnostic.info("Only class objects or `Any` are supported as class bases");
@@ -3740,6 +3773,66 @@ pub(crate) fn report_cannot_pop_required_field_on_typed_dict<'db>(
     }
 }
 
+/// Enum representing the reason why a key cannot be deleted from a `TypedDict`.
+#[derive(Copy, Clone)]
+pub(crate) enum TypedDictDeleteErrorKind {
+    /// The key exists but is required (not `NotRequired`)
+    RequiredKey,
+    /// The key does not exist in the `TypedDict`
+    UnknownKey,
+}
+
+pub(crate) fn report_cannot_delete_typed_dict_key<'db>(
+    context: &InferContext<'db, '_>,
+    key_node: AnyNodeRef,
+    typed_dict_ty: Type<'db>,
+    field_name: &str,
+    field: Option<&crate::types::typed_dict::TypedDictField<'db>>,
+    error_kind: TypedDictDeleteErrorKind,
+) {
+    let db = context.db();
+    let Some(builder) = context.report_lint(&INVALID_ARGUMENT_TYPE, key_node) else {
+        return;
+    };
+
+    let typed_dict_name = typed_dict_ty.display(db);
+
+    let mut diagnostic = match error_kind {
+        TypedDictDeleteErrorKind::RequiredKey => builder.into_diagnostic(format_args!(
+            "Cannot delete required key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+        TypedDictDeleteErrorKind::UnknownKey => builder.into_diagnostic(format_args!(
+            "Cannot delete unknown key \"{field_name}\" from TypedDict `{typed_dict_name}`"
+        )),
+    };
+
+    // Add sub-diagnostic pointing to where the field is defined (if available)
+    if let Some(field) = field
+        && let Some(declaration) = field.first_declaration()
+    {
+        let file = declaration.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        let mut sub = SubDiagnostic::new(SubDiagnosticSeverity::Info, "Field defined here");
+        sub.annotate(
+            Annotation::secondary(
+                Span::from(file).with_range(declaration.full_range(db, &module).range()),
+            )
+            .message(format_args!(
+                "`{field_name}` declared as required here; consider making it `NotRequired`"
+            )),
+        );
+        diagnostic.sub(sub);
+    }
+
+    // Add hint about how to allow deletion
+    if matches!(error_kind, TypedDictDeleteErrorKind::RequiredKey) {
+        diagnostic.info(
+            "Only keys marked as `NotRequired` (or in a TypedDict with `total=False`) can be deleted",
+        );
+    }
+}
+
 pub(crate) fn report_invalid_type_param_order<'db>(
     context: &InferContext<'db, '_>,
     class: ClassLiteral<'db>,
@@ -3918,8 +4011,9 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _) = class_member(subclass)
-        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _) =
+    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _, _) =
+        class_member(subclass)
+        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _, _) =
             class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)

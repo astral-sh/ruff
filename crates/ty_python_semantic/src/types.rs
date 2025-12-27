@@ -1,4 +1,4 @@
-use compact_str::{CompactString, ToCompactString};
+use compact_str::CompactString;
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
@@ -36,7 +36,8 @@ pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
-    Definedness, Place, PlaceAndQualifiers, TypeOrigin, imported_symbol, known_module_symbol,
+    Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening, builtins_module_scope,
+    imported_symbol, known_module_symbol,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
 use crate::semantic_index::place::ScopedPlaceId;
@@ -965,7 +966,10 @@ impl<'db> Type<'db> {
                 if has_divergent_type_in_cycle(previous) && !has_divergent_type_in_cycle(self) {
                     self
                 } else {
-                    UnionType::from_elements_cycle_recovery(db, [self, previous])
+                    // The current type is unioned to the previous type. Unioning in the reverse order can cause the fixed-point iterations to converge slowly or even fail.
+                    // Consider the case where the order of union types is different between the previous and current cycle.
+                    // We should use the previous union type as the base and only add new element types in this cycle, if any.
+                    UnionType::from_elements_cycle_recovery(db, [previous, self])
                 }
             }
         }
@@ -1852,7 +1856,7 @@ impl<'db> Type<'db> {
                     )
                     .place;
 
-                if let Place::Defined(ty, _, Definedness::AlwaysDefined) = call_symbol {
+                if let Place::Defined(ty, _, Definedness::AlwaysDefined, _) = call_symbol {
                     ty.try_upcast_to_callable(db)
                 } else {
                     None
@@ -1899,6 +1903,7 @@ impl<'db> Type<'db> {
                 db,
                 CallableSignature::from_overloads(method.signatures(db)),
                 CallableTypeKind::Regular,
+                false,
             ))),
 
             Type::WrapperDescriptor(wrapper_descriptor) => {
@@ -1906,6 +1911,7 @@ impl<'db> Type<'db> {
                     db,
                     CallableSignature::from_overloads(wrapper_descriptor.signatures(db)),
                     CallableTypeKind::Regular,
+                    false,
                 )))
             }
 
@@ -3674,13 +3680,14 @@ impl<'db> Type<'db> {
                 disjointness_visitor.visit((self, other), || {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
-                            Place::Defined(attribute_type, _, _) => member.has_disjoint_type_from(
-                                db,
-                                attribute_type,
-                                inferable,
-                                disjointness_visitor,
-                                relation_visitor,
-                            ),
+                            Place::Defined(attribute_type, _, _, _) => member
+                                .has_disjoint_type_from(
+                                    db,
+                                    attribute_type,
+                                    inferable,
+                                    disjointness_visitor,
+                                    relation_visitor,
+                                ),
                             Place::Undefined => ConstraintSet::from(false),
                         }
                     })
@@ -4651,9 +4658,10 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name).place
-        } else if let place @ Place::Defined(_, _, _) = self.class_member(db, name.into()).place {
+        } else if let place @ Place::Defined(_, _, _, _) = self.class_member(db, name.into()).place
+        {
             place
-        } else if let Some(place @ Place::Defined(_, _, _)) =
+        } else if let Some(place @ Place::Defined(_, _, _, _)) =
             self.find_name_in_mro(db, name).map(|inner| inner.place)
         {
             place
@@ -4684,6 +4692,11 @@ impl<'db> Type<'db> {
             owner.display(db)
         );
         match self {
+            Type::Callable(callable) if callable.is_staticmethod_like(db) => {
+                // For "staticmethod-like" callables, model the behavior of `staticmethod.__get__`.
+                // The underlying function is returned as-is, without binding self.
+                return Some((self, AttributeKind::NormalOrNonDataDescriptor));
+            }
             Type::Callable(callable)
                 if callable.is_function_like(db) || callable.is_classmethod_like(db) =>
             {
@@ -4699,7 +4712,7 @@ impl<'db> Type<'db> {
                     Some((self, AttributeKind::NormalOrNonDataDescriptor))
                 } else {
                     Some((
-                        Type::Callable(callable.bind_self(db, None)),
+                        Type::Callable(callable.bind_self(db, Some(instance))),
                         AttributeKind::NormalOrNonDataDescriptor,
                     ))
                 };
@@ -4709,7 +4722,7 @@ impl<'db> Type<'db> {
 
         let descr_get = self.class_member(db, "__get__".into()).place;
 
-        if let Place::Defined(descr_get, _, descr_get_boundness) = descr_get {
+        if let Place::Defined(descr_get, _, descr_get_boundness, _) = descr_get {
             let return_ty = descr_get
                 .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|bindings| {
@@ -4754,12 +4767,12 @@ impl<'db> Type<'db> {
             //
             // The same is true for `Never`.
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Dynamic(_) | Type::Never, _, _),
+                place: Place::Defined(Type::Dynamic(_) | Type::Never, _, _, _),
                 qualifiers: _,
             } => (attribute, AttributeKind::DataDescriptor),
 
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Union(union), origin, boundness),
+                place: Place::Defined(Type::Union(union), origin, boundness, widening),
                 qualifiers,
             } => (
                 union
@@ -4769,6 +4782,7 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             boundness,
+                            widening,
                         )
                     })
                     .with_qualifiers(qualifiers),
@@ -4784,7 +4798,7 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Intersection(intersection), origin, boundness),
+                place: Place::Defined(Type::Intersection(intersection), origin, boundness, widening),
                 qualifiers,
             } => (
                 intersection
@@ -4794,6 +4808,7 @@ impl<'db> Type<'db> {
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
                             boundness,
+                            widening,
                         )
                     })
                     .with_qualifiers(qualifiers),
@@ -4802,14 +4817,14 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Defined(attribute_ty, origin, boundness),
+                place: Place::Defined(attribute_ty, origin, boundness, widening),
                 qualifiers: _,
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
                     (
-                        Place::Defined(return_ty, origin, boundness).into(),
+                        Place::Defined(return_ty, origin, boundness, widening).into(),
                         attribute_kind,
                     )
                 } else {
@@ -4902,14 +4917,14 @@ impl<'db> Type<'db> {
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Defined(_, _, _), _, Place::Undefined) => {
+            (meta_attr @ Place::Defined(_, _, _, _), _, Place::Undefined) => {
                 meta_attr.with_qualifiers(meta_attr_qualifiers)
             }
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
             (
-                meta_attr @ Place::Defined(_, _, Definedness::AlwaysDefined),
+                meta_attr @ Place::Defined(_, _, Definedness::AlwaysDefined, _),
                 AttributeKind::DataDescriptor,
                 _,
             ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
@@ -4918,13 +4933,14 @@ impl<'db> Type<'db> {
             // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
-                Place::Defined(meta_attr_ty, meta_origin, Definedness::PossiblyUndefined),
+                Place::Defined(meta_attr_ty, meta_origin, Definedness::PossiblyUndefined, _),
                 AttributeKind::DataDescriptor,
-                Place::Defined(fallback_ty, fallback_origin, fallback_boundness),
+                Place::Defined(fallback_ty, fallback_origin, fallback_boundness, fallback_widening),
             ) => Place::Defined(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 meta_origin.merge(fallback_origin),
                 fallback_boundness,
+                fallback_widening,
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -4937,9 +4953,9 @@ impl<'db> Type<'db> {
             // would require us to statically infer if an instance attribute is always set, which
             // is something we currently don't attempt to do.
             (
-                Place::Defined(_, _, _),
+                Place::Defined(_, _, _, _),
                 AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ Place::Defined(_, _, Definedness::AlwaysDefined),
+                fallback @ Place::Defined(_, _, Definedness::AlwaysDefined, _),
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 fallback.with_qualifiers(fallback_qualifiers)
             }
@@ -4948,13 +4964,14 @@ impl<'db> Type<'db> {
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
             // not completely shadow the non-data descriptor, so we build a union of the two.
             (
-                Place::Defined(meta_attr_ty, meta_origin, meta_attr_boundness),
+                Place::Defined(meta_attr_ty, meta_origin, meta_attr_boundness, _),
                 AttributeKind::NormalOrNonDataDescriptor,
-                Place::Defined(fallback_ty, fallback_origin, fallback_boundness),
+                Place::Defined(fallback_ty, fallback_origin, fallback_boundness, fallback_widening),
             ) => Place::Defined(
                 UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
                 meta_origin.merge(fallback_origin),
                 meta_attr_boundness.max(fallback_boundness),
+                fallback_widening,
             )
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
@@ -5207,11 +5224,7 @@ impl<'db> Type<'db> {
                     && Type::ClassLiteral(enum_literal.enum_class(db))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
-                Place::bound(Type::StringLiteral(StringLiteralType::new(
-                    db,
-                    enum_literal.name(db).as_str(),
-                )))
-                .into()
+                Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
             }
 
             Type::EnumLiteral(enum_literal)
@@ -5322,11 +5335,11 @@ impl<'db> Type<'db> {
 
                 match result {
                     member @ PlaceAndQualifiers {
-                        place: Place::Defined(_, _, Definedness::AlwaysDefined),
+                        place: Place::Defined(_, _, Definedness::AlwaysDefined, _),
                         qualifiers: _,
                     } => member,
                     member @ PlaceAndQualifiers {
-                        place: Place::Defined(_, _, Definedness::PossiblyUndefined),
+                        place: Place::Defined(_, _, Definedness::PossiblyUndefined, _),
                         qualifiers: _,
                     } => member
                         .or_fall_back_to(db, custom_getattribute_result)
@@ -6453,7 +6466,7 @@ impl<'db> Type<'db> {
                     )
                     .place
                 {
-                    Place::Defined(dunder_callable, _, boundness) => {
+                    Place::Defined(dunder_callable, _, boundness, _) => {
                         let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
@@ -6601,7 +6614,7 @@ impl<'db> Type<'db> {
             )
             .place
         {
-            Place::Defined(dunder_callable, _, boundness) => {
+            Place::Defined(dunder_callable, _, boundness, _) => {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
@@ -7204,7 +7217,7 @@ impl<'db> Type<'db> {
 
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
-                Place::Defined(new_method, _, boundness) => {
+                Place::Defined(new_method, _, boundness, _) => {
                     let argument_types = argument_types.with_self(Some(self_type));
                     let result = new_method
                         .bindings(db)
@@ -7232,7 +7245,7 @@ impl<'db> Type<'db> {
                 .place
             {
                 Place::Undefined => Err(CallDunderError::MethodNotAvailable),
-                Place::Defined(dunder_callable, _, boundness) => {
+                Place::Defined(dunder_callable, _, boundness, _) => {
                     let bindings = dunder_callable
                         .bindings(db)
                         .with_constructor_instance_type(init_ty);
@@ -7935,6 +7948,14 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::PromoteLiterals(PromoteLiteralsMode::On)) => {
+                match instance.known_class(db) {
+                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
+                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    _ => instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                }
+            }
+
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
@@ -8371,10 +8392,9 @@ impl<'db> Type<'db> {
                 ),
             ),
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
-            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
-                db,
-                known_instance.repr(db).to_compact_string(),
-            )),
+            Type::KnownInstance(known_instance) => {
+                Type::string_literal(db, &known_instance.repr(db).to_string())
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -8393,10 +8413,9 @@ impl<'db> Type<'db> {
             }
             Type::LiteralString => Type::LiteralString,
             Type::SpecialForm(special_form) => Type::string_literal(db, &special_form.to_string()),
-            Type::KnownInstance(known_instance) => Type::StringLiteral(StringLiteralType::new(
-                db,
-                known_instance.repr(db).to_compact_string(),
-            )),
+            Type::KnownInstance(known_instance) => {
+                Type::string_literal(db, &known_instance.repr(db).to_string())
+            }
             // TODO: handle more complex types
             _ => KnownClass::Str.to_instance(db),
         }
@@ -9442,6 +9461,13 @@ impl<'db> InvalidTypeExpression<'db> {
                         "Type qualifier `{qualifier}` is not allowed in type expressions \
                         (only in annotation expressions, and only with exactly one argument)",
                     ),
+                    InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) => {
+                        write!(
+                            f,
+                            "Function `{function}` is not valid in a type expression",
+                            function = function.name(self.db)
+                        )
+                    }
                     InvalidTypeExpression::InvalidType(Type::ModuleLiteral(module), _) => write!(
                         f,
                         "Module `{module}` is not valid in a type expression",
@@ -9503,6 +9529,20 @@ impl<'db> InvalidTypeExpression<'db> {
                 "You might have meant to use a concrete TypedDict \
                 or `collections.abc.Mapping[str, object]`",
             );
+        // It would be nice if we could register `builtins.callable` as a known function,
+        // but currently doing this would require reimplementing the signature "manually"
+        // in `Type::bindings()`, which isn't worth it given that we have no other special
+        // casing for this function.
+        } else if let InvalidTypeExpression::InvalidType(Type::FunctionLiteral(function), _) = self
+            && function.name(db) == "callable"
+            && let function_body_scope = function.literal(db).last_definition(db).body_scope(db)
+            && function_body_scope
+                .scope(db)
+                .parent()
+                .map(|parent| parent.to_scope_id(db, function_body_scope.file(db)))
+                == builtins_module_scope(db)
+        {
+            diagnostic.set_primary_message("Did you mean `collections.abc.Callable`?");
         }
     }
 }
@@ -10648,7 +10688,7 @@ impl<'db> TypeVarConstraints<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness) => {
+                Place::Defined(ty_member, member_origin, member_boundness, _) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -10671,6 +10711,7 @@ impl<'db> TypeVarConstraints<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
+                    Widening::None,
                 )
             },
             qualifiers,
@@ -10856,25 +10897,37 @@ impl<'db> UnionTypeInstance<'db> {
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Type<'db> {
-        let value_expr_types = value_expr_types.into_iter().collect::<Box<_>>();
-
-        let mut builder = UnionBuilder::new(db);
-        for ty in &value_expr_types {
-            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
-                Ok(ty) => builder.add_in_place(ty),
-                Err(error) => {
-                    return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
-                    ));
+        fn from_value_expression_types_impl<'db>(
+            db: &'db dyn Db,
+            value_expr_types: Box<[Type<'db>]>,
+            scope_id: ScopeId<'db>,
+            typevar_binding_context: Option<Definition<'db>>,
+        ) -> Type<'db> {
+            let mut builder = UnionBuilder::new(db);
+            for ty in &value_expr_types {
+                match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+                    Ok(ty) => builder.add_in_place(ty),
+                    Err(error) => {
+                        return Type::KnownInstance(KnownInstanceType::UnionType(
+                            UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        ));
+                    }
                 }
             }
+
+            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+                db,
+                Some(value_expr_types),
+                Ok(builder.build()),
+            )))
         }
 
-        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+        from_value_expression_types_impl(
             db,
-            Some(value_expr_types),
-            Ok(builder.build()),
-        )))
+            value_expr_types.into_iter().collect(),
+            scope_id,
+            typevar_binding_context,
+        )
     }
 
     /// Get the types of the elements of this union as they would appear in a value
@@ -11785,7 +11838,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, parameter_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result()
+                    .into_lookup_result(context.db())
                     .ok()
                     .and_then(|quals| quals.inner_type().parameter_span(context.db(), None))
                 {
@@ -11813,7 +11866,7 @@ impl<'db> BoolError<'db> {
                 );
                 if let Some((func_span, return_type_span)) = not_boolable_type
                     .member(context.db(), "__bool__")
-                    .into_lookup_result()
+                    .into_lookup_result(context.db())
                     .ok()
                     .and_then(|quals| quals.inner_type().function_spans(context.db()))
                     .and_then(|spans| Some((spans.name, spans.return_type?)))
@@ -12294,6 +12347,7 @@ impl<'db> BoundMethodType<'db> {
                     .map(|signature| signature.bind_self(db, Some(self_instance))),
             ),
             CallableTypeKind::FunctionLike,
+            false,
         )
     }
 
@@ -12384,6 +12438,10 @@ pub enum CallableTypeKind {
     /// instances, i.e. they bind `self`.
     FunctionLike,
 
+    /// A callable type that represents a staticmethod. These callables do not bind `self`
+    /// when accessed as attributes on instances - they return the underlying function as-is.
+    StaticMethodLike,
+
     /// A callable type that we believe represents a classmethod (i.e. it will unconditionally bind
     /// the first argument on `__get__`).
     ClassMethodLike,
@@ -12409,6 +12467,12 @@ pub struct CallableType<'db> {
     pub(crate) signatures: CallableSignature<'db>,
 
     kind: CallableTypeKind,
+
+    /// Whether this callable is a top materialization (e.g., `Top[Callable[..., object]]`).
+    ///
+    /// Bottom materializations of gradual callables are simplified to the bottom callable
+    /// `(*args: object, **kwargs: object) -> Never`, so this is always false for them.
+    is_top_materialization: bool,
 }
 
 pub(super) fn walk_callable_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -12453,6 +12517,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::Regular,
+            false,
         )
     }
 
@@ -12461,6 +12526,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(signature),
             CallableTypeKind::FunctionLike,
+            false,
         )
     }
 
@@ -12472,6 +12538,7 @@ impl<'db> CallableType<'db> {
             db,
             CallableSignature::single(Signature::new(parameters, None)),
             CallableTypeKind::ParamSpecValue,
+            false,
         )
     }
 
@@ -12488,6 +12555,10 @@ impl<'db> CallableType<'db> {
         matches!(self.kind(db), CallableTypeKind::ClassMethodLike)
     }
 
+    pub(crate) fn is_staticmethod_like(self, db: &'db dyn Db) -> bool {
+        matches!(self.kind(db), CallableTypeKind::StaticMethodLike)
+    }
+
     pub(crate) fn bind_self(
         self,
         db: &'db dyn Db,
@@ -12497,6 +12568,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).bind_self(db, self_type),
             self.kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12505,6 +12577,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).apply_self(db, self_type),
             self.kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12513,7 +12586,12 @@ impl<'db> CallableType<'db> {
     /// Specifically, this represents a callable type with a single signature:
     /// `(*args: object, **kwargs: object) -> Never`.
     pub(crate) fn bottom(db: &'db dyn Db) -> CallableType<'db> {
-        Self::new(db, CallableSignature::bottom(), CallableTypeKind::Regular)
+        Self::new(
+            db,
+            CallableSignature::bottom(),
+            CallableTypeKind::Regular,
+            false,
+        )
     }
 
     /// Return a "normalized" version of this `Callable` type.
@@ -12524,6 +12602,7 @@ impl<'db> CallableType<'db> {
             db,
             self.signatures(db).normalized_impl(db, visitor),
             self.kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12538,6 +12617,7 @@ impl<'db> CallableType<'db> {
             self.signatures(db)
                 .recursive_type_normalized_impl(db, div, nested)?,
             self.kind(db),
+            self.is_top_materialization(db),
         ))
     }
 
@@ -12548,11 +12628,43 @@ impl<'db> CallableType<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping {
+            // Top materializations are fully static types already,
+            // so materializing them further does nothing.
+            if self.is_top_materialization(db) {
+                return self;
+            }
+
+            // If we're materializing a callable with gradual parameters:
+            // - For Top materialization: wrap in `Top[...]` to preserve the gradual nature
+            // - For Bottom materialization: simplify to the bottom callable since
+            //   `Bottom[Callable[..., R]]` is equivalent to `(*args: object, **kwargs: object) -> Bottom[R]`
+            if self.signatures(db).has_gradual_parameters() {
+                match materialization_kind {
+                    MaterializationKind::Top => {
+                        return CallableType::new(
+                            db,
+                            self.signatures(db)
+                                .materialize_return_types(db, *materialization_kind),
+                            self.kind(db),
+                            true,
+                        );
+                    }
+                    MaterializationKind::Bottom => {
+                        // Bottom materialization of a gradual callable simplifies to the
+                        // bottom callable: (*args: object, **kwargs: object) -> Never
+                        return CallableType::bottom(db);
+                    }
+                }
+            }
+        }
+
         CallableType::new(
             db,
             self.signatures(db)
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             self.kind(db),
+            self.is_top_materialization(db),
         )
     }
 
@@ -12582,6 +12694,24 @@ impl<'db> CallableType<'db> {
         if other.is_function_like(db) && !self.is_function_like(db) {
             return ConstraintSet::from(false);
         }
+
+        // Handle top materialization:
+        // - `Top[Callable[..., R]]` is a supertype of all callables with return type subtype of R.
+        //
+        // For Top, we only need to compare return types because Top parameters are a supertype
+        // of all possible parameters. Bottom materializations are simplified to the bottom
+        // callable directly, so they use normal signature comparison.
+        if other.is_top_materialization(db) {
+            return self.signatures(db).return_types_have_relation_to(
+                db,
+                other.signatures(db),
+                inferable,
+                relation,
+                relation_visitor,
+                disjointness_visitor,
+            );
+        }
+
         self.signatures(db).has_relation_to_impl(
             db,
             other.signatures(db),
@@ -12604,6 +12734,11 @@ impl<'db> CallableType<'db> {
     ) -> ConstraintSet<'db> {
         if self == other {
             return ConstraintSet::from(true);
+        }
+
+        // Callables with different top materialization status are not equivalent
+        if self.is_top_materialization(db) != other.is_top_materialization(db) {
+            return ConstraintSet::from(false);
         }
 
         ConstraintSet::from(self.is_function_like(db) == other.is_function_like(db)).and(db, || {
@@ -13429,14 +13564,15 @@ impl<'db> ModuleLiteralType<'db> {
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
-            if let Place::Defined(getattr_type, origin, boundness) = getattr_symbol.place {
+            if let Place::Defined(getattr_type, origin, boundness, widening) = getattr_symbol.place
+            {
                 // If we found a __getattr__ function, try to call it with the name argument
                 if let Ok(outcome) = getattr_type.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 ) {
                     return PlaceAndQualifiers {
-                        place: Place::Defined(outcome.return_type(db), origin, boundness),
+                        place: Place::Defined(outcome.return_type(db), origin, boundness, widening),
                         qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
                     };
                 }
@@ -13956,7 +14092,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness) => {
+                Place::Defined(ty_member, member_origin, member_boundness, _) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -13981,6 +14117,7 @@ impl<'db> UnionType<'db> {
                 } else {
                     Definedness::AlwaysDefined
                 },
+                Widening::None,
             )
         }
     }
@@ -14006,7 +14143,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness) => {
+                Place::Defined(ty_member, member_origin, member_boundness, _) => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -14031,6 +14168,7 @@ impl<'db> UnionType<'db> {
                     } else {
                         Definedness::AlwaysDefined
                     },
+                    Widening::None,
                 )
             },
             qualifiers,
@@ -14383,7 +14521,7 @@ impl<'db> IntersectionType<'db> {
             let ty_member = transform_fn(&ty);
             match ty_member {
                 Place::Undefined => {}
-                Place::Defined(ty_member, member_origin, member_boundness) => {
+                Place::Defined(ty_member, member_origin, member_boundness, _) => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
                     if member_boundness == Definedness::AlwaysDefined {
@@ -14406,6 +14544,7 @@ impl<'db> IntersectionType<'db> {
                 } else {
                     Definedness::PossiblyUndefined
                 },
+                Widening::None,
             )
         }
     }
@@ -14429,7 +14568,7 @@ impl<'db> IntersectionType<'db> {
             qualifiers |= new_qualifiers;
             match member {
                 Place::Undefined => {}
-                Place::Defined(ty_member, member_origin, member_boundness) => {
+                Place::Defined(ty_member, member_origin, member_boundness, _) => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
                     if member_boundness == Definedness::AlwaysDefined {
@@ -14453,6 +14592,7 @@ impl<'db> IntersectionType<'db> {
                     } else {
                         Definedness::PossiblyUndefined
                     },
+                    Widening::None,
                 )
             },
             qualifiers,

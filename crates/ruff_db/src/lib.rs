@@ -12,6 +12,7 @@ use std::hash::BuildHasherDefault;
 use std::num::NonZeroUsize;
 use ty_static::EnvVars;
 
+pub mod cancellation;
 pub mod diagnostic;
 pub mod display;
 pub mod file_revision;

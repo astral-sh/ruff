@@ -28,6 +28,10 @@ impl<'a> ConciseRenderer<'a> {
 
         let sep = fmt_styled(":", stylesheet.separator);
         for diag in diagnostics {
+            if self.config.is_canceled() {
+                return Ok(());
+            }
+
             if let Some(span) = diag.primary_span() {
                 write!(
                     f,

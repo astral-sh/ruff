@@ -501,7 +501,7 @@ If you want Ruff to split an f-string across multiple lines, ensure there's a li
 [self-documenting f-string]: https://realpython.com/python-f-strings/#self-documenting-expressions-for-debugging
 [configured quote style]: settings.md/#format_quote-style
 
-#### Fluent layout for method chains
+### Fluent layout for method chains
 
 At times, when developers write long chains of methods on an object, such as
 

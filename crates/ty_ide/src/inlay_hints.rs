@@ -2204,7 +2204,7 @@ mod tests {
 
         assert_snapshot!(test.inlay_hints(), @r#"
         a[: list[Unknown | int]] = [1, 2]
-        b[: list[Unknown | float]] = [1.0, 2.0]
+        b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
         d[: list[Unknown | None]] = [None, None]
         e[: list[Unknown | str]] = ["hel", "lo"]
@@ -2229,7 +2229,7 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |     ^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2247,7 +2247,7 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |          ^^^^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2265,7 +2265,7 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |                    ^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2281,7 +2281,7 @@ mod tests {
          --> main2.py:3:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |     ^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2300,8 +2300,27 @@ mod tests {
          --> main2.py:3:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |          ^^^^^^^
+        4 | c[: list[Unknown | bool]] = [True, False]
+        5 | d[: list[Unknown | None]] = [None, None]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | a[: list[Unknown | int]] = [1, 2]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                    ^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2315,11 +2334,11 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:26
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
-          |                    ^^^^^
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                          ^^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2336,7 +2355,7 @@ mod tests {
          --> main2.py:4:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |     ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2356,7 +2375,7 @@ mod tests {
          --> main2.py:4:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |          ^^^^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2376,7 +2395,7 @@ mod tests {
          --> main2.py:4:20
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |                    ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2394,7 +2413,7 @@ mod tests {
         info: Source
          --> main2.py:5:5
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |     ^^^^
@@ -2414,7 +2433,7 @@ mod tests {
         info: Source
          --> main2.py:5:10
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |          ^^^^^^^
@@ -2434,7 +2453,7 @@ mod tests {
         info: Source
          --> main2.py:5:20
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |                    ^^^^
@@ -2885,7 +2904,7 @@ mod tests {
         info: Source
 
         a: list[Unknown | int] = [1, 2]
-        b: list[Unknown | float] = [1.0, 2.0]
+        b: list[Unknown | int | float] = [1.0, 2.0]
         c: list[Unknown | bool] = [True, False]
         d: list[Unknown | None] = [None, None]
         e: list[Unknown | str] = ["hel", "lo"]
