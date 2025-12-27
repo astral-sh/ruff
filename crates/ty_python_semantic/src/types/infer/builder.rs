@@ -10205,6 +10205,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 op,
             ),
 
+            (Type::NewTypeInstance(newtype), rhs, _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                newtype.concrete_base_type(self.db()),
+                rhs,
+                op,
+            ),
+
+            (lhs, Type::NewTypeInstance(newtype), _) => self.infer_binary_expression_type(
+                node,
+                emitted_division_by_zero_diagnostic,
+                lhs,
+                newtype.concrete_base_type(self.db()),
+                op,
+            ),
+
             // Non-todo Anys take precedence over Todos (as if we fix this `Todo` in the future,
             // the result would then become Any or Unknown, respectively).
             (div @ Type::Dynamic(DynamicType::Divergent(_)), _, _)
@@ -10540,8 +10556,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::TypedDict(_),
                 Type::FunctionLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::Callable(..)
@@ -10570,8 +10585,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
-                | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::TypedDict(_),
                 op,
             ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
                 .map(|outcome| outcome.return_type(self.db()))
@@ -11000,6 +11014,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     left,
                     op,
                     alias.value_type(self.db()),
+                    range,
+                    visitor,
+                )
+            })),
+
+            (Type::NewTypeInstance(newtype), right) => Some(
+                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+                    newtype.concrete_base_type(self.db()),
+                    op,
+                    right,
+                    range,
+                    visitor,
+                )
+            })),
+
+            (left, Type::NewTypeInstance(newtype)) => Some(
+                visitor.visit((left, op, right), || { self.infer_binary_type_comparison(
+                    left,
+                    op,
+                    newtype.concrete_base_type(self.db()),
                     range,
                     visitor,
                 )
