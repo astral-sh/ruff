@@ -16,16 +16,17 @@ use crate::{
         symbol::ScopedSymbolId, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, ClassType, KnownClass, Type,
+        ClassBase, ClassLiteral, ClassType, KnownClass, Truthiness, Type,
         class::CodeGeneratorKind,
         context::InferContext,
         diagnostic::{
             INVALID_EXPLICIT_OVERRIDE, INVALID_METHOD_OVERRIDE, INVALID_NAMED_TUPLE,
             OVERRIDE_OF_FINAL_METHOD, report_invalid_method_override,
-            report_overridden_final_method,
+            report_overridden_final_method, report_unsafe_tuple_subclass,
         },
         function::{FunctionDecorators, FunctionType, KnownFunction},
         list_members::{Member, MemberWithDefinition, all_end_of_scope_members},
+        tuple::TupleSpec,
     },
 };
 
@@ -455,5 +456,117 @@ fn extract_underlying_functions<'db>(
             }
         }
         _ => None,
+    }
+}
+
+/// Checks if a tuple subclass overrides any prohibited methods.
+///
+/// Here we assume that `class` is a subclass of `tuple`.
+pub(super) fn check_tuple_subclass<'db>(context: &InferContext<'db, '_>, class: ClassLiteral<'db>) {
+    let db = context.db();
+
+    let class_specialized = class.identity_specialization(db);
+    let scope = class.body_scope(db);
+    let own_class_members: FxHashSet<_> = all_end_of_scope_members(db, scope).collect();
+
+    for member in own_class_members {
+        check_tuple_subclass_member(context, class_specialized, &member);
+    }
+}
+
+fn check_tuple_subclass_member<'db>(
+    context: &InferContext<'db, '_>,
+    class: ClassType<'db>,
+    member: &MemberWithDefinition<'db>,
+) {
+    let db = context.db();
+
+    let MemberWithDefinition {
+        member,
+        first_reachable_definition,
+    } = member;
+
+    let Type::FunctionLiteral(subclass_function) = member.ty else {
+        return;
+    };
+
+    if matches!(member.name.as_str(), "__eq__" | "__ne__") {
+        report_unsafe_tuple_subclass(
+            context,
+            &member.name,
+            *first_reachable_definition,
+            subclass_function,
+        );
+    }
+
+    let mut tuple: Option<&'db TupleSpec> = None;
+
+    for class in class.iter_mro(db) {
+        let Some(class) = class.into_class() else {
+            continue;
+        };
+
+        if !class.is_known(db, KnownClass::Tuple) {
+            continue;
+        }
+
+        let Some(generic_alias) = class.into_generic_alias() else {
+            continue;
+        };
+
+        let specialization = generic_alias.specialization(db);
+
+        let Some(tuple_inner) = specialization.tuple_inner(db) else {
+            continue;
+        };
+
+        tuple = Some(tuple_inner.tuple(db));
+    }
+
+    let Some(tuple) = tuple else {
+        return;
+    };
+
+    if member.name.as_str() == "__bool__" {
+        let Some(return_type) = subclass_function.last_definition_signature(db).return_ty else {
+            return;
+        };
+
+        let return_type_truthiness = return_type.bool(db);
+
+        match (tuple.truthiness(), return_type_truthiness) {
+            (Truthiness::AlwaysFalse, Truthiness::AlwaysTrue | Truthiness::Ambiguous) => {
+                let Some(mut diagnostic) = report_unsafe_tuple_subclass(
+                    context,
+                    &member.name,
+                    *first_reachable_definition,
+                    subclass_function,
+                ) else {
+                    return;
+                };
+
+                diagnostic.info(format_args!(
+                    "Return type `{}` is inconsistent with the inherited tuple, which is expected to be always falsy",
+                    return_type.display(db)
+                ));
+            }
+            (Truthiness::AlwaysTrue, Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                let Some(mut diagnostic) = report_unsafe_tuple_subclass(
+                    context,
+                    &member.name,
+                    *first_reachable_definition,
+                    subclass_function,
+                ) else {
+                    return;
+                };
+
+                diagnostic.info(format_args!(
+                    "Return type `{}` is inconsistent with the inherited tuple, which is expected to be always truthy",
+                    return_type.display(db)
+                ));
+            }
+
+            _ => {}
+        }
     }
 }

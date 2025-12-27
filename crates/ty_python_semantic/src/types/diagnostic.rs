@@ -121,6 +121,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
+    registry.register_lint(&UNSAFE_TUPLE_SUBCLASS);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
     registry.register_lint(&INVALID_FROZEN_DATACLASS_SUBCLASS);
@@ -2267,6 +2268,29 @@ declare_lint! {
 
 declare_lint! {
     /// ## What it does
+    /// Checks if a tuple subclass overrides any prohibited methods.
+    ///
+    /// ## Why is this bad?
+    /// We do various kinds of narrowing on tuples and tuple subclasses.
+    /// For these narrowings to be sound, we assume that tuple subclasses
+    /// do not override certain methods.
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import Literal
+    ///
+    /// class Foo(tuple[int, int]):
+    ///     def __bool__(self) -> Literal[False]:
+    ///         return False
+    /// ```
+    pub(crate) static UNSAFE_TUPLE_SUBCLASS = {
+        summary: "detects unsafe overrides of certain dunder methods in tuple subclasses",
+        status: LintStatus::stable("0.0.6"),
+        default_level: Level::Warn,
+    }
+}
+declare_lint! {
+    /// ## What it does
     /// Checks for dataclasses with invalid frozen inheritance:
     /// - A frozen dataclass cannot inherit from a non-frozen dataclass.
     /// - A non-frozen dataclass cannot inherit from a frozen dataclass.
@@ -3941,16 +3965,8 @@ pub(super) fn report_invalid_method_override<'db>(
 ) {
     let db = context.db();
 
-    let signature_span = |function: FunctionType<'db>| {
-        function
-            .literal(db)
-            .last_definition(db)
-            .spans(db)
-            .map(|spans| spans.signature)
-    };
-
     let subclass_definition_kind = subclass_definition.kind(db);
-    let subclass_definition_signature_span = signature_span(subclass_function);
+    let subclass_definition_signature_span = subclass_function.signature_span(db);
 
     // If the function was originally defined elsewhere and simply assigned
     // in the body of the class here, we cannot use the range associated with the `FunctionType`
@@ -4039,8 +4055,8 @@ pub(super) fn report_invalid_method_override<'db>(
                 );
 
                 let superclass_function_span = match superclass_type {
-                    Type::FunctionLiteral(function) => signature_span(function),
-                    Type::BoundMethod(method) => signature_span(method.function(db)),
+                    Type::FunctionLiteral(function) => function.signature_span(db),
+                    Type::BoundMethod(method) => method.function(db).signature_span(db),
                     _ => None,
                 };
 
@@ -4115,6 +4131,43 @@ pub(super) fn report_invalid_method_override<'db>(
             diagnostic.help(subdiag);
         }
     }
+}
+
+pub(super) fn report_unsafe_tuple_subclass<'ctx, 'db>(
+    context: &'ctx InferContext<'db, '_>,
+    member: &str,
+    subclass_definition: Definition<'db>,
+    subclass_function: FunctionType<'db>,
+) -> Option<LintDiagnosticGuard<'ctx, 'db>> {
+    let db = context.db();
+
+    let subclass_definition_kind = subclass_definition.kind(db);
+
+    let diagnostic_range = if subclass_definition_kind.is_function_def() {
+        subclass_function
+            .signature_span(db)
+            .as_ref()
+            .and_then(Span::range)
+            .unwrap_or_else(|| {
+                subclass_function
+                    .node(db, context.file(), context.module())
+                    .range
+            })
+    } else {
+        subclass_definition.full_range(db, context.module()).range()
+    };
+
+    let builder = context.report_lint(&UNSAFE_TUPLE_SUBCLASS, diagnostic_range)?;
+
+    let mut diagnostic = builder.into_diagnostic(format_args!(
+        "Unsafe override of method `{member}` in a subclass of `tuple`"
+    ));
+
+    diagnostic.help(format!(
+        "Overriding method `{member}` in a subclass of `tuple` can cause unexpected behavior"
+    ));
+
+    Some(diagnostic)
 }
 
 pub(super) fn report_overridden_final_method<'db>(
