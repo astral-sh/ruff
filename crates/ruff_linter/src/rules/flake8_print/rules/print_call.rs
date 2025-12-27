@@ -36,13 +36,16 @@ use crate::{Fix, FixAvailability, Violation};
 /// ```python
 /// import logging
 ///
-/// logging.basicConfig(level=logging.INFO)
 /// logger = logging.getLogger(__name__)
 ///
 ///
 /// def sum_less_than_four(a, b):
 ///     logger.debug("Calling sum_less_than_four")
 ///     return a + b < 4
+///
+///
+/// def main():
+///     logging.basicConfig(level=logging.INFO)
 /// ```
 ///
 /// ## Fix safety
