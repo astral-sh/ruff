@@ -770,7 +770,7 @@ impl Format<PyFormatContext<'_>> for FormatVerbatimStatementRange {
     }
 }
 
-struct LogicalLinesIter<'a> {
+pub(crate) struct LogicalLinesIter<'a> {
     tokens: Iter<'a, AstToken>,
     // The end of the last logical line
     last_line_end: TextSize,
@@ -779,7 +779,7 @@ struct LogicalLinesIter<'a> {
 }
 
 impl<'a> LogicalLinesIter<'a> {
-    fn new(tokens: Iter<'a, AstToken>, verbatim_range: TextRange) -> Self {
+    pub(crate) fn new(tokens: Iter<'a, AstToken>, verbatim_range: TextRange) -> Self {
         Self {
             tokens,
             last_line_end: verbatim_range.start(),
@@ -845,7 +845,7 @@ impl Iterator for LogicalLinesIter<'_> {
 impl FusedIterator for LogicalLinesIter<'_> {}
 
 /// A logical line or a comment (or form feed only) line
-struct LogicalLine {
+pub(crate) struct LogicalLine {
     /// The range of this lines content (excluding the trailing newline)
     content_range: TextRange,
     /// Does this logical line have a trailing newline or does it just happen to be the last line.
