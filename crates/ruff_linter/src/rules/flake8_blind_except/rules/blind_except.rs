@@ -180,6 +180,15 @@ impl<'a> StatementVisitor<'a> for ReraiseVisitor<'a> {
     }
 }
 
+/// Returns `true` if the `exc_info` keyword argument is truthy.
+fn is_exc_info_enabled(arguments: &ast::Arguments, semantic: &SemanticModel) -> bool {
+    arguments.find_keyword("exc_info").is_some_and(|keyword| {
+        Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
+            .into_bool()
+            .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+    })
+}
+
 /// A visitor to detect whether the exception was logged.
 struct LogExceptionVisitor<'a> {
     semantic: &'a SemanticModel<'a>,
@@ -224,13 +233,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 if match attr.as_str() {
                                     "exception" => true,
                                     _ if is_logger_method_name(attr) => {
-                                        arguments.find_keyword("exc_info").is_some_and(|keyword| {
-                                            Truthiness::from_expr(&keyword.value, |id| {
-                                                self.semantic.has_builtin_binding(id)
-                                            })
-                                            .into_bool()
-                                            .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
-                                        })
+                                        is_exc_info_enabled(arguments, self.semantic)
                                     }
                                     _ => false,
                                 } {
@@ -243,13 +246,7 @@ impl<'a> StatementVisitor<'a> for LogExceptionVisitor<'a> {
                                 |qualified_name| match qualified_name.segments() {
                                     ["logging", "exception"] => true,
                                     ["logging", method] if is_logger_method_name(method) => {
-                                        arguments.find_keyword("exc_info").is_some_and(|keyword| {
-                                            Truthiness::from_expr(&keyword.value, |id| {
-                                                self.semantic.has_builtin_binding(id)
-                                            })
-                                            .into_bool()
-                                            .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
-                                        })
+                                        is_exc_info_enabled(arguments, self.semantic)
                                     }
                                     _ => false,
                                 },

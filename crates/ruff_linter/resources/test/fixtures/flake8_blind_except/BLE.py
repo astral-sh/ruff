@@ -85,14 +85,7 @@ except Exception:
 try:
     pass
 except Exception:
-    logging.exception("...")
-
-
-try:
-    pass
-except Exception:
     logging.error("...", exc_info=True)
-
 
 try:
     pass
@@ -103,54 +96,7 @@ except Exception as e:
 try:
     pass
 except Exception:
-    logging.critical("...")
-
-
-try:
-    pass
-except Exception:
-    logging.critical("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.critical("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    logging.critical("...", exc_info=True)
-
-
-try:
-    pass
-except Exception as e:
-    logging.critical("...", exc_info=e)
-
-try:
-    pass
-except Exception:
-    logging.debug("...")
-
-
-try:
-    pass
-except Exception:
-    logging.debug("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.debug("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    logging.debug("...", exc_info=True)
+    logging.exception("...")
 
 
 try:
@@ -162,49 +108,12 @@ except Exception as e:
 try:
     pass
 except Exception:
-    logging.info("...")
-
-
-try:
-    pass
-except Exception:
-    logging.info("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.info("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
     logging.info("...", exc_info=True)
-
 
 try:
     pass
 except Exception as e:
-    logging.info("...", exc_info=e)
-
-
-try:
-    pass
-except Exception:
-    logging.warning("...")
-
-
-try:
-    pass
-except Exception:
-    logging.warning("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.warning("...", exc_info=None)
+    logging.warn("...", exc_info=e)
 
 
 try:
@@ -216,69 +125,9 @@ except Exception:
 try:
     pass
 except Exception as e:
-    logging.warning("...", exc_info=e)
-
-try:
-    pass
-except Exception:
-    logging.warn("...")
-
-
-try:
-    pass
-except Exception:
-    logging.warn("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.warn("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    logging.warn("...", exc_info=True)
-
-
-try:
-    pass
-except Exception as e:
-    logging.warn("...", exc_info=e)
-
-
-try:
-    pass
-except Exception:
-    logging.log(logging.INFO, "...")
-
-
-try:
-    pass
-except Exception:
-    logging.log(logging.INFO, "...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    logging.log(logging.INFO, "...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    logging.log(logging.INFO, "...", exc_info=True)
-
-
-try:
-    pass
-except Exception as e:
     logging.log(logging.INFO, "...", exc_info=e)
 
-
-from logging import critical, error, exception, debug, info, warning, log, warn
+from logging import critical, error, exception
 
 try:
     pass
@@ -331,168 +180,6 @@ try:
     pass
 except Exception:
     critical("...", exc_info=True)
-
-
-try:
-    pass
-except Exception:
-    debug("...")
-
-
-try:
-    pass
-except Exception:
-    debug("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    debug("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    debug("...", exc_info=True)
-
-
-try:
-    pass
-except Exception:
-    info("...")
-
-
-try:
-    pass
-except Exception:
-    info("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    info("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    info("...", exc_info=True)
-
-
-try:
-    pass
-except Exception:
-    warning("...")
-
-
-try:
-    pass
-except Exception:
-    warning("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    warning("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    warning("...", exc_info=True)
-
-
-try:
-    pass
-except Exception:
-    warn("...")
-
-
-try:
-    pass
-except Exception:
-    warn("...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    warn("...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    warn("...", exc_info=True)
-
-
-try:
-    pass
-except Exception:
-    log(logging.INFO, "...")
-
-
-try:
-    pass
-except Exception:
-    log(logging.INFO, "...", exc_info=False)
-
-
-try:
-    pass
-except Exception:
-    log(logging.INFO, "...", exc_info=None)
-
-
-try:
-    pass
-except Exception:
-    log(logging.INFO, "...", exc_info=True)
-
-
-try:
-    pass
-except Exception as e:
-    log(logging.INFO, "...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    debug("...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    info("...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    warning("...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    warn("...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    error("...", exc_info=e)
-
-
-try:
-    pass
-except Exception as e:
-    critical("...", exc_info=e)
 
 
 try:
