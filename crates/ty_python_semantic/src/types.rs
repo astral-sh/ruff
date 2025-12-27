@@ -10878,7 +10878,7 @@ pub struct UnionTypeInstance<'db> {
     /// the elements as type expressions. Use `value_expression_types` to get the
     /// corresponding value expression types.
     #[returns(ref)]
-    _value_expr_types: Option<Box<[Type<'db>]>>,
+    _value_expr_types: Option<[Type<'db>; 2]>,
 
     /// The type of the full union, which can be used when this `UnionType` instance
     /// is used in a type expression context. For `int | str`, this would contain
@@ -10893,41 +10893,27 @@ impl get_size2::GetSize for UnionTypeInstance<'_> {}
 impl<'db> UnionTypeInstance<'db> {
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
-        value_expr_types: impl IntoIterator<Item = Type<'db>>,
+        value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Type<'db> {
-        fn from_value_expression_types_impl<'db>(
-            db: &'db dyn Db,
-            value_expr_types: Box<[Type<'db>]>,
-            scope_id: ScopeId<'db>,
-            typevar_binding_context: Option<Definition<'db>>,
-        ) -> Type<'db> {
-            let mut builder = UnionBuilder::new(db);
-            for ty in &value_expr_types {
-                match ty.in_type_expression(db, scope_id, typevar_binding_context) {
-                    Ok(ty) => builder.add_in_place(ty),
-                    Err(error) => {
-                        return Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
-                        ));
-                    }
+        let mut builder = UnionBuilder::new(db);
+        for ty in &value_expr_types {
+            match ty.in_type_expression(db, scope_id, typevar_binding_context) {
+                Ok(ty) => builder.add_in_place(ty),
+                Err(error) => {
+                    return Type::KnownInstance(KnownInstanceType::UnionType(
+                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                    ));
                 }
             }
-
-            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
-                db,
-                Some(value_expr_types),
-                Ok(builder.build()),
-            )))
         }
 
-        from_value_expression_types_impl(
+        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
             db,
-            value_expr_types.into_iter().collect(),
-            scope_id,
-            typevar_binding_context,
-        )
+            Some(value_expr_types),
+            Ok(builder.build()),
+        )))
     }
 
     /// Get the types of the elements of this union as they would appear in a value
@@ -10961,12 +10947,13 @@ impl<'db> UnionTypeInstance<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let value_expr_types = self._value_expr_types(db).as_ref().map(|types| {
-            types
-                .iter()
-                .map(|ty| ty.normalized_impl(db, visitor))
-                .collect::<Box<_>>()
+        let value_expr_types = self._value_expr_types(db).map(|[first, second]| {
+            [
+                first.normalized_impl(db, visitor),
+                second.normalized_impl(db, visitor),
+            ]
         });
+
         let union_type = self
             .union_type(db)
             .clone()
@@ -10984,21 +10971,18 @@ impl<'db> UnionTypeInstance<'db> {
         // The `Divergent` elimination rules are different within union types.
         // See `UnionType::recursive_type_normalized_impl` for details.
         let value_expr_types = match self._value_expr_types(db).as_ref() {
-            Some(types) if nested => Some(
-                types
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
-                    .collect::<Option<Box<_>>>()?,
-            ),
-            Some(types) => Some(
-                types
-                    .iter()
-                    .map(|ty| {
-                        ty.recursive_type_normalized_impl(db, div, nested)
-                            .unwrap_or(div)
-                    })
-                    .collect::<Box<_>>(),
-            ),
+            Some([first, second]) if nested => Some([
+                first.recursive_type_normalized_impl(db, div, nested)?,
+                second.recursive_type_normalized_impl(db, div, nested)?,
+            ]),
+            Some([first, second]) => Some([
+                first
+                    .recursive_type_normalized_impl(db, div, nested)
+                    .unwrap_or(div),
+                second
+                    .recursive_type_normalized_impl(db, div, nested)
+                    .unwrap_or(div),
+            ]),
             None => None,
         };
         let union_type = match self.union_type(db).clone() {
