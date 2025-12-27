@@ -215,9 +215,8 @@ impl ClassInfoConstraintFunction {
                 UnionType::try_from_elements(
                     db,
                     tuple
-                        .all_elements()
-                        .iter()
-                        .map(|element| self.generate_constraint(db, *element)),
+                        .iter_all_elements()
+                        .map(|element| self.generate_constraint(db, element)),
                 )
             }),
 

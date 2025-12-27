@@ -140,8 +140,8 @@ pub(super) fn walk_tuple_type<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>
     tuple: TupleType<'db>,
     visitor: &V,
 ) {
-    for element in tuple.tuple(db).all_elements() {
-        visitor.visit_type(db, *element);
+    for element in tuple.tuple(db).iter_all_elements() {
+        visitor.visit_type(db, element);
     }
 }
 
@@ -163,10 +163,8 @@ impl<'db> TupleType<'db> {
             if tuple.variable().is_never() {
                 let tuple = TupleSpec::Fixed(FixedLengthTuple::from_elements(
                     tuple
-                        .prefix_elements()
-                        .iter()
-                        .chain(tuple.suffix_elements())
-                        .copied(),
+                        .iter_prefix_elements()
+                        .chain(tuple.iter_suffix_elements()),
                 ));
                 return Some(TupleType::new_internal::<_, TupleSpec<'db>>(db, tuple));
             }
@@ -374,12 +372,15 @@ impl<T> FixedLengthTuple<T> {
         self.0
     }
 
-    pub(crate) fn elements(&self) -> &[T] {
+    pub(crate) fn all_elements(&self) -> &[T] {
         &self.0
     }
 
-    pub(crate) fn all_elements(&self) -> &[T] {
-        &self.0
+    pub(crate) fn iter_all_elements(&self) -> impl DoubleEndedIterator<Item = T>
+    where
+        T: Copy,
+    {
+        self.0.iter().copied()
     }
 
     pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
@@ -413,7 +414,7 @@ impl<'db> FixedLengthTuple<Type<'db>> {
 
                 // Extract rhs values into the prefix, then into the starred target, then into the
                 // suffix.
-                let mut elements = self.elements().iter().copied();
+                let mut elements = self.iter_all_elements();
                 let prefix: Vec<_> = elements.by_ref().take(prefix).collect();
                 let variable =
                     UnionType::from_elements_leave_aliases(db, elements.by_ref().take(variable));
@@ -476,9 +477,8 @@ impl<'db> FixedLengthTuple<Type<'db>> {
             None => Either::Right(std::iter::repeat(TypeContext::default())),
             Some(tuple) => Either::Left(
                 tuple
-                    .all_elements()
-                    .iter()
-                    .map(|tcx| TypeContext::new(Some(*tcx))),
+                    .iter_all_elements()
+                    .map(|tcx| TypeContext::new(Some(tcx))),
             ),
         };
 
@@ -551,13 +551,13 @@ impl<'db> FixedLengthTuple<Type<'db>> {
                         return result;
                     }
                 }
-                for other_ty in other.suffix_elements().iter().rev() {
+                for other_ty in other.iter_suffix_elements().rev() {
                     let Some(self_ty) = self_iter.next_back() else {
                         return ConstraintSet::from(false);
                     };
                     let element_constraints = self_ty.has_relation_to_impl(
                         db,
-                        *other_ty,
+                        other_ty,
                         inferable,
                         relation,
                         relation_visitor,
@@ -660,6 +660,31 @@ impl<T> VariableLengthTuple<T> {
         Tuple::Variable(Self::new(prefix, variable, suffix))
     }
 
+    fn try_new(
+        prefix: impl IntoIterator<Item = Option<T>> + ExactSizeIterator,
+        variable: T,
+        suffix: impl IntoIterator<Item = Option<T>> + ExactSizeIterator,
+    ) -> Option<Self> {
+        let mut elements =
+            Vec::with_capacity(prefix.len().saturating_add(suffix.len()).saturating_add(1));
+
+        for element in prefix {
+            elements.push(element?);
+        }
+
+        let variable_index = elements.len();
+        elements.push(variable);
+
+        for element in suffix {
+            elements.push(element?);
+        }
+
+        Some(Self {
+            elements: elements.into_boxed_slice(),
+            variable_index,
+        })
+    }
+
     fn new(
         prefix: impl IntoIterator<Item = T>,
         variable: T,
@@ -697,12 +722,26 @@ impl<T> VariableLengthTuple<T> {
         &self.elements[..self.variable_index]
     }
 
+    pub(crate) fn iter_prefix_elements(&self) -> impl DoubleEndedIterator<Item = T>
+    where
+        T: Copy,
+    {
+        self.prefix_elements().iter().copied()
+    }
+
     pub(crate) fn prefix_elements_mut(&mut self) -> &mut [T] {
         &mut self.elements[..self.variable_index]
     }
 
     pub(crate) fn suffix_elements(&self) -> &[T] {
         &self.elements[self.suffix_offset()..]
+    }
+
+    pub(crate) fn iter_suffix_elements(&self) -> impl DoubleEndedIterator<Item = T>
+    where
+        T: Copy,
+    {
+        self.suffix_elements().iter().copied()
     }
 
     pub(crate) fn suffix_elements_mut(&mut self) -> &mut [T] {
@@ -772,14 +811,10 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let variable = variable.unwrap_or(self.variable());
-        self.prefix_elements()
-            .iter()
-            .chain(
-                self.suffix_elements()
-                    .iter()
-                    .take_while(move |element| element.is_equivalent_to(db, variable)),
-            )
-            .copied()
+        self.iter_prefix_elements().chain(
+            self.iter_suffix_elements()
+                .take_while(move |element| element.is_equivalent_to(db, variable)),
+        )
     }
 
     /// Returns the suffix of the prenormalization of this tuple.
@@ -807,10 +842,8 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         variable: Option<Type<'db>>,
     ) -> impl Iterator<Item = Type<'db>> + 'a {
         let variable = variable.unwrap_or(self.variable());
-        self.suffix_elements()
-            .iter()
+        self.iter_suffix_elements()
             .skip_while(move |element| element.is_equivalent_to(db, variable))
-            .copied()
     }
 
     fn resize(
@@ -826,9 +859,9 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                     return Err(ResizeTupleError::TooManyValues);
                 };
                 Ok(Tuple::Fixed(FixedLengthTuple::from_elements(
-                    (self.prefix_elements().iter().copied())
+                    (self.iter_prefix_elements())
                         .chain(std::iter::repeat_n(self.variable(), variable_count))
-                        .chain(self.suffix_elements().iter().copied()),
+                        .chain(self.iter_suffix_elements()),
                 )))
             }
 
@@ -841,19 +874,17 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 let self_suffix_length = self.suffix_elements().len();
                 let suffix_overflow = self_suffix_length.saturating_sub(suffix_length);
                 let suffix_underflow = suffix_length.saturating_sub(self_suffix_length);
-                let prefix = (self.prefix_elements().iter().copied().take(prefix_length))
+                let prefix = (self.iter_prefix_elements().take(prefix_length))
                     .chain(std::iter::repeat_n(self.variable(), prefix_underflow));
                 let variable = UnionType::from_elements_leave_aliases(
                     db,
-                    self.prefix_elements()
-                        .iter()
-                        .copied()
+                    self.iter_prefix_elements()
                         .skip(prefix_length)
                         .chain(std::iter::once(self.variable()))
-                        .chain(self.suffix_elements().iter().take(suffix_overflow).copied()),
+                        .chain(self.iter_suffix_elements().take(suffix_overflow)),
                 );
                 let suffix = std::iter::repeat_n(self.variable(), suffix_underflow)
-                    .chain(self.suffix_elements().iter().skip(suffix_overflow).copied());
+                    .chain(self.iter_suffix_elements().skip(suffix_overflow));
                 Ok(VariableLengthTuple::mixed(prefix, variable, suffix))
             }
         }
@@ -877,43 +908,40 @@ impl<'db> VariableLengthTuple<Type<'db>> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let prefix = if nested {
-            Either::Left(
-                self.prefix_elements()
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                    .collect::<Option<Box<_>>>()?
-                    .into_iter(),
-            )
+        if nested {
+            let prefix = self
+                .prefix_elements()
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+
+            let variable = self
+                .variable()
+                .recursive_type_normalized_impl(db, div, true)?;
+
+            let suffix = self
+                .suffix_elements()
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, true));
+
+            Self::try_new(prefix, variable, suffix)
         } else {
-            Either::Right(self.prefix_elements().iter().map(|ty| {
+            let prefix = self.prefix_elements().iter().map(|ty| {
                 ty.recursive_type_normalized_impl(db, div, true)
                     .unwrap_or(div)
-            }))
-        };
-        let suffix = if nested {
-            Either::Left(
-                self.suffix_elements()
-                    .iter()
-                    .map(|ty| ty.recursive_type_normalized_impl(db, div, true))
-                    .collect::<Option<Box<_>>>()?
-                    .into_iter(),
-            )
-        } else {
-            Either::Right(self.suffix_elements().iter().map(|ty| {
-                ty.recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div)
-            }))
-        };
-        let variable = if nested {
-            self.variable()
-                .recursive_type_normalized_impl(db, div, true)?
-        } else {
-            self.variable()
+            });
+
+            let variable = self
+                .variable()
                 .recursive_type_normalized_impl(db, div, true)
-                .unwrap_or(div)
-        };
-        Some(Self::new(prefix, variable, suffix))
+                .unwrap_or(div);
+
+            let suffix = self.suffix_elements().iter().map(|ty| {
+                ty.recursive_type_normalized_impl(db, div, true)
+                    .unwrap_or(div)
+            });
+
+            Some(Self::new(prefix, variable, suffix))
+        }
     }
 
     fn apply_type_mapping_impl<'a>(
@@ -981,7 +1009,7 @@ impl<'db> VariableLengthTuple<Type<'db>> {
                 // tuple's prefix and suffix, and each of those elements must pairwise satisfy the
                 // relation.
                 let mut result = ConstraintSet::from(true);
-                let mut other_iter = other.elements().iter().copied();
+                let mut other_iter = other.iter_all_elements();
                 for self_ty in self.prenormalized_prefix_elements(db, None) {
                     let Some(other_ty) = other_iter.next() else {
                         return ConstraintSet::from(false);
@@ -1278,7 +1306,7 @@ impl<T> Tuple<T> {
     /// Returns an iterator of all of the fixed-length element types of this tuple.
     pub(crate) fn fixed_elements(&self) -> impl Iterator<Item = &T> + '_ {
         match self {
-            Tuple::Fixed(tuple) => Either::Left(tuple.elements().iter()),
+            Tuple::Fixed(tuple) => Either::Left(tuple.all_elements().iter()),
             Tuple::Variable(tuple) => Either::Right(tuple.fixed_elements()),
         }
     }
@@ -1290,6 +1318,13 @@ impl<T> Tuple<T> {
             Tuple::Fixed(tuple) => tuple.all_elements(),
             Tuple::Variable(tuple) => tuple.all_elements(),
         }
+    }
+
+    pub(crate) fn iter_all_elements(&self) -> impl DoubleEndedIterator<Item = T> + '_
+    where
+        T: Copy,
+    {
+        self.all_elements().iter().copied()
     }
 
     pub(crate) fn into_all_elements_with_kind(self) -> impl Iterator<Item = TupleElement<T>> {
@@ -1509,8 +1544,8 @@ impl<'db> Tuple<Type<'db>> {
         match (self, other) {
             (Tuple::Fixed(self_tuple), Tuple::Fixed(other_tuple)) => any_disjoint(
                 db,
-                self_tuple.elements(),
-                other_tuple.elements(),
+                self_tuple.all_elements(),
+                other_tuple.all_elements(),
                 inferable,
                 disjointness_visitor,
                 relation_visitor,
@@ -1544,7 +1579,7 @@ impl<'db> Tuple<Type<'db>> {
             (Tuple::Fixed(fixed), Tuple::Variable(variable))
             | (Tuple::Variable(variable), Tuple::Fixed(fixed)) => any_disjoint(
                 db,
-                fixed.elements(),
+                fixed.all_elements(),
                 variable.prefix_elements(),
                 inferable,
                 disjointness_visitor,
@@ -1554,7 +1589,7 @@ impl<'db> Tuple<Type<'db>> {
             .or(db, || {
                 any_disjoint(
                     db,
-                    fixed.elements(),
+                    fixed.all_elements(),
                     variable.suffix_elements(),
                     inferable,
                     disjointness_visitor,
@@ -1706,7 +1741,7 @@ impl<'db> TupleUnpacker<'db> {
 impl<'db> FixedLengthTuple<UnionBuilder<'db>> {
     fn unpack_tuple(&mut self, values: &FixedLengthTuple<Type<'db>>) {
         // We have already verified above that the two tuples have the same length.
-        for (target, value) in self.0.iter_mut().zip(values.elements().iter().copied()) {
+        for (target, value) in self.0.iter_mut().zip(values.iter_all_elements()) {
             target.add_in_place(value);
         }
     }
@@ -1716,14 +1751,14 @@ impl<'db> VariableLengthTuple<UnionBuilder<'db>> {
     fn unpack_tuple(&mut self, db: &'db dyn Db, values: &VariableLengthTuple<Type<'db>>) {
         // We have already verified above that the two tuples have the same length.
         for (target, value) in
-            (self.prefix_elements_mut().iter_mut()).zip(values.prefix_elements().iter().copied())
+            (self.prefix_elements_mut().iter_mut()).zip(values.iter_prefix_elements())
         {
             target.add_in_place(value);
         }
         self.variable_element_mut()
             .add_in_place(KnownClass::List.to_specialized_instance(db, [values.variable()]));
         for (target, value) in
-            (self.suffix_elements_mut().iter_mut()).zip(values.suffix_elements().iter().copied())
+            (self.suffix_elements_mut().iter_mut()).zip(values.iter_suffix_elements())
         {
             target.add_in_place(value);
         }
@@ -1840,7 +1875,7 @@ impl<'db> TupleSpecBuilder<'db> {
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
                 if our_elements.len() == new_elements.len() =>
             {
-                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
                     *existing = UnionType::from_elements_leave_aliases(db, [*existing, *new]);
                 }
                 self
@@ -1878,7 +1913,7 @@ impl<'db> TupleSpecBuilder<'db> {
             (TupleSpecBuilder::Fixed(our_elements), TupleSpec::Fixed(new_elements))
                 if our_elements.len() == new_elements.len() =>
             {
-                for (existing, new) in our_elements.iter_mut().zip(new_elements.elements()) {
+                for (existing, new) in our_elements.iter_mut().zip(new_elements.all_elements()) {
                     *existing = IntersectionType::from_elements(db, [*existing, *new]);
                 }
                 return self;

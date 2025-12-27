@@ -10025,9 +10025,9 @@ impl<'db> TypeVarInstance<'db> {
                     .map_or_else(Parameters::unknown, |tuple_spec| {
                         Parameters::new(
                             db,
-                            tuple_spec.all_elements().iter().map(|ty| {
-                                Parameter::positional_only(None).with_annotated_type(*ty)
-                            }),
+                            tuple_spec
+                                .iter_all_elements()
+                                .map(|ty| Parameter::positional_only(None).with_annotated_type(ty)),
                         )
                     }),
                 Type::Dynamic(dynamic) => match dynamic {

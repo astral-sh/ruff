@@ -11349,7 +11349,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut any_eq = false;
                             let mut any_ambiguous = false;
 
-                            for ty in rhs_tuple.all_elements().iter().copied() {
+                            for ty in rhs_tuple.iter_all_elements() {
                                 let eq_result = self.infer_binary_type_comparison(
                                 left,
                                 ast::CmpOp::Eq,
@@ -11540,8 +11540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.elements().iter().copied();
-        let right_iter = right.elements().iter().copied();
+        let left_iter = left.iter_all_elements();
+        let right_iter = right.iter_all_elements();
 
         let mut builder = UnionBuilder::new(self.db());
 

@@ -4350,9 +4350,9 @@ pub(super) fn report_unsupported_comparison<'db>(
             && let Some(TupleSpec::Fixed(rhs_spec)) = right_ty.tuple_instance_spec(db).as_deref()
             && lhs_spec.len() == rhs_spec.len()
             && let Some(position) = lhs_spec
-                .elements()
+                .all_elements()
                 .iter()
-                .zip(rhs_spec.elements())
+                .zip(rhs_spec.all_elements())
                 .position(|tup| tup == (&error.left_ty, &error.right_ty))
         {
             if error.left_ty == error.right_ty {
