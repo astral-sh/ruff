@@ -912,8 +912,10 @@ impl<'db> ClassType<'db> {
                             TupleSpec::Fixed(fixed_length_tuple) => {
                                 let tuple_length = fixed_length_tuple.len();
 
-                                for (index, ty) in fixed_length_tuple.elements().enumerate() {
-                                    let entry = element_type_to_indices.entry(*ty).or_default();
+                                for (index, ty) in
+                                    fixed_length_tuple.iter_all_elements().enumerate()
+                                {
+                                    let entry = element_type_to_indices.entry(ty).or_default();
                                     if let Ok(index) = i64::try_from(index) {
                                         entry.push(index);
                                     }
@@ -933,7 +935,9 @@ impl<'db> ClassType<'db> {
                             //    __getitem__(self, index: Literal[-3], /) -> float | str
                             //
                             TupleSpec::Variable(variable_length_tuple) => {
-                                for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
+                                for (index, ty) in
+                                    variable_length_tuple.prefix_elements().iter().enumerate()
+                                {
                                     if let Ok(index) = i64::try_from(index) {
                                         element_type_to_indices.entry(*ty).or_default().push(index);
                                     }
@@ -941,18 +945,18 @@ impl<'db> ClassType<'db> {
                                     let one_based_index = index + 1;
 
                                     if let Ok(i) = i64::try_from(
-                                        variable_length_tuple.suffix.len() + one_based_index,
+                                        variable_length_tuple.suffix_elements().len()
+                                            + one_based_index,
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .prefix
-                                                    .iter()
-                                                    .rev()
-                                                    .take(one_based_index)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .iter_prefix_elements()
+                                                        .rev()
+                                                        .take(one_based_index),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -961,30 +965,31 @@ impl<'db> ClassType<'db> {
                                     }
                                 }
 
-                                for (index, ty) in
-                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                for (index, ty) in variable_length_tuple
+                                    .iter_suffix_elements()
+                                    .rev()
+                                    .enumerate()
                                 {
                                     if let Some(index) =
                                         index.checked_add(1).and_then(|i| i64::try_from(i).ok())
                                     {
                                         element_type_to_indices
-                                            .entry(*ty)
+                                            .entry(ty)
                                             .or_default()
                                             .push(0 - index);
                                     }
 
-                                    if let Ok(i) =
-                                        i64::try_from(variable_length_tuple.prefix.len() + index)
-                                    {
+                                    if let Ok(i) = i64::try_from(
+                                        variable_length_tuple.prefix_elements().len() + index,
+                                    ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .suffix
-                                                    .iter()
-                                                    .take(index + 1)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .iter_suffix_elements()
+                                                        .take(index + 1),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1080,10 +1085,10 @@ impl<'db> ClassType<'db> {
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
                             // If the tuple has no length restrictions,
                             // any iterable is allowed as long as the iterable has the correct element type.
-                            let mut tuple_elements = tuple.all_elements();
+                            let mut tuple_elements = tuple.iter_all_elements();
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable
-                                    .to_specialized_instance(db, [*tuple_elements.next().unwrap()]),
+                                    .to_specialized_instance(db, [tuple_elements.next().unwrap()]),
                             );
                             assert_eq!(
                                 tuple_elements.next(),

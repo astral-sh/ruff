@@ -3284,7 +3284,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let mut builder = UnionBuilder::new(self.db());
             let mut invalid_elements = vec![];
 
-            for (index, element) in tuple_spec.all_elements().enumerate() {
+            for (index, element) in tuple_spec.all_elements().iter().enumerate() {
                 builder = builder.add(
                     if element.is_assignable_to(self.db(), type_base_exception) {
                         element.to_instance(self.db()).expect(
@@ -5248,7 +5248,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 if let Some(tuple_spec) =
                     assigned_ty.and_then(|ty| ty.tuple_instance_spec(self.db()))
                 {
-                    let assigned_tys = tuple_spec.all_elements().copied().collect::<Vec<_>>();
+                    let assigned_tys = tuple_spec.all_elements().to_vec();
 
                     for (i, element) in elts.iter().enumerate() {
                         match assigned_tys.get(i).copied() {
@@ -7932,11 +7932,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .ok()
             });
 
-        let mut annotated_elt_tys = annotated_tuple.as_ref().map(Tuple::all_elements);
+        let mut annotated_elt_tys = annotated_tuple
+            .as_ref()
+            .map(Tuple::all_elements)
+            .unwrap_or_default()
+            .iter()
+            .copied();
 
         let db = self.db();
         let element_types = elts.iter().map(|element| {
-            let annotated_elt_ty = annotated_elt_tys.as_mut().and_then(Iterator::next).copied();
+            let annotated_elt_ty = annotated_elt_tys.next();
             self.infer_expression(element, TypeContext::new(annotated_elt_ty))
         });
 
@@ -9201,10 +9206,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 return;
             };
 
-            let Some(builder) = self
-                .context
-                .report_lint(&crate::types::diagnostic::DEPRECATED, ranged)
-            else {
+            let Some(builder) = self.context.report_lint(&diagnostic::DEPRECATED, ranged) else {
                 return;
             };
 
@@ -11347,7 +11349,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             let mut any_eq = false;
                             let mut any_ambiguous = false;
 
-                            for ty in rhs_tuple.all_elements().copied() {
+                            for ty in rhs_tuple.iter_all_elements() {
                                 let eq_result = self.infer_binary_type_comparison(
                                 left,
                                 ast::CmpOp::Eq,
@@ -11538,8 +11540,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Ok(Type::unknown());
         };
 
-        let left_iter = left.elements().copied();
-        let right_iter = right.elements().copied();
+        let left_iter = left.iter_all_elements();
+        let right_iter = right.iter_all_elements();
 
         let mut builder = UnionBuilder::new(self.db());
 

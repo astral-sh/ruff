@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -2754,24 +2754,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             None => VariadicArgumentType::None,
         };
 
-        let (mut argument_types, length, variable_element) = match &variadic_type {
-            VariadicArgumentType::ParamSpec(paramspec) => (
-                Either::Right(std::iter::empty()),
-                TupleLength::unknown(),
-                Some(*paramspec),
-            ),
+        let (argument_types, length, variable_element) = match &variadic_type {
+            VariadicArgumentType::ParamSpec(paramspec) => {
+                ([].as_slice(), TupleLength::unknown(), Some(*paramspec))
+            }
             VariadicArgumentType::Other(tuple) => (
-                Either::Left(tuple.all_elements().copied()),
+                tuple.all_elements(),
                 tuple.len(),
                 tuple.variable_element().copied(),
             ),
-            VariadicArgumentType::None => (
-                Either::Right(std::iter::empty()),
-                TupleLength::unknown(),
-                None,
-            ),
+            VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
         };
 
+        let mut argument_types = argument_types.iter().copied();
         let is_variable = length.is_variable();
 
         // We must be able to match up the fixed-length portion of the argument with positional
