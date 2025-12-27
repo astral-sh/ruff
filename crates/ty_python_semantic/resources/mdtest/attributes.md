@@ -1867,7 +1867,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
+        # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]

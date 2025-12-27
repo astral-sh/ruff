@@ -205,7 +205,7 @@ class C:
         return str(key)
 
     def f(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getitem__`"
+        # error: [invalid-assignment]
         self.__getitem__ = None
 
 # This is still fine, and simply calls the `__getitem__` method on the class

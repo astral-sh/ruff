@@ -2452,29 +2452,25 @@ fn report_invalid_assignment_with_message<'db, 'ctx: 'db, T: Ranged>(
     message: std::fmt::Arguments,
 ) -> Option<LintDiagnosticGuard<'db, 'ctx>> {
     let builder = context.report_lint(&INVALID_ASSIGNMENT, node)?;
+
+    let mut diag = builder.into_diagnostic(message);
+
     match target_ty {
         Type::ClassLiteral(class) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of class `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of class `{}`, add an annotation to make it explicit if this is intentional",
                 class.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
         Type::FunctionLiteral(function) => {
-            let mut diag = builder.into_diagnostic(format_args!(
-                "Implicit shadowing of function `{}`",
+            diag.info(format_args!(
+                "Implicit shadowing of function `{}`, add an annotation to make it explicit if this is intentional",
                 function.name(context.db()),
             ));
-            diag.info("Annotate to make it explicit if this is intentional");
-            Some(diag)
         }
-
-        _ => {
-            let diag = builder.into_diagnostic(message);
-            Some(diag)
-        }
+        _ => {}
     }
+    Some(diag)
 }
 
 pub(super) fn report_invalid_assignment<'db>(
