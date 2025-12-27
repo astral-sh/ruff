@@ -1689,6 +1689,10 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         // When we exit this function, write a marker signaling we're ending a signature
         let mut f = f.with_detail(TypeDetail::SignatureEnd);
 
+        if self.parameters.is_top() {
+            f.write_str("Top[")?;
+        }
+
         // If we're multiline printing and a name hasn't been emitted, try to
         // remember what the name was by checking if we have a definition
         if self.settings.multiline
@@ -1710,7 +1714,13 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
         f.write_str(" -> ")?;
         return_ty
             .display_with(self.db, self.settings.singleline())
-            .fmt_detailed(&mut f)
+            .fmt_detailed(&mut f)?;
+
+        if self.parameters.is_top() {
+            f.write_str("]")?;
+        }
+
+        Ok(())
     }
 }
 
@@ -1819,13 +1829,11 @@ impl<'db> FmtDetailed<'db> for DisplayParameters<'_, 'db> {
                     f.write_char('/')?;
                 }
             }
-            ParametersKind::Gradual => {
+            ParametersKind::Gradual | ParametersKind::Top => {
                 // We represent gradual form as `...` in the signature, internally the parameters still
-                // contain `(*args, **kwargs)` parameters.
+                // contain `(*args, **kwargs)` parameters. (Top parameters are displayed the same
+                // as gradual parameters, we just wrap the entire signature in `Top[]`.)
                 f.write_str("...")?;
-            }
-            ParametersKind::Top => {
-                f.write_str("Top[...]")?;
             }
             ParametersKind::ParamSpec(typevar) => {
                 write!(f, "**{}", typevar.name(self.db))?;
@@ -2241,8 +2249,15 @@ impl<'db> FmtDetailed<'db> for DisplayMaybeParenthesizedType<'db> {
             f.write_char(')')
         };
         match self.ty {
-            Type::Callable(_)
-            | Type::KnownBoundMethod(_)
+            Type::Callable(callable)
+                if callable.signatures(self.db).overloads.len() == 1
+                    && !callable.signatures(self.db).overloads[0]
+                        .parameters()
+                        .is_top() =>
+            {
+                write_parentheses(f)
+            }
+            Type::KnownBoundMethod(_)
             | Type::FunctionLiteral(_)
             | Type::BoundMethod(_)
             | Type::Union(_) => write_parentheses(f),

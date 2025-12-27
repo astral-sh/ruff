@@ -203,7 +203,7 @@ type GradualCallable = Callable[..., Any]
 
 def _(top: Top[GradualCallable], bottom: Bottom[GradualCallable]) -> None:
     # The top materialization keeps the gradual parameters wrapped
-    reveal_type(top)  # revealed: (Top[...]) -> object
+    reveal_type(top)  # revealed: Top[(...) -> object]
 
     # The bottom materialization simplifies to the fully static bottom callable
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> Never
@@ -231,7 +231,7 @@ Gradual parameters can be top- and bottom-materialized even if the return type i
 type GradualParams = Callable[..., int]
 
 def _(top: Top[GradualParams], bottom: Bottom[GradualParams]) -> None:
-    reveal_type(top)  # revealed: (Top[...]) -> int
+    reveal_type(top)  # revealed: Top[(...) -> int]
 
     reveal_type(bottom)  # revealed: (*args: object, **kwargs: object) -> int
 ```
@@ -250,7 +250,7 @@ def f(*args: object, **kwargs: object) -> object:
     pass
 
 def _(top: Top[CallableTypeOf[f]], bottom: Bottom[CallableTypeOf[f]]):
-    reveal_type(top)  # revealed: Overload[(x: int) -> object, (Top[...]) -> str]
+    reveal_type(top)  # revealed: Overload[(x: int) -> object, Top[(...) -> str]]
     reveal_type(bottom)  # revealed: Overload[(x: int) -> Never, (*args: object, **kwargs: object) -> str]
 ```
 
@@ -262,7 +262,7 @@ def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
 
 def _(top: Top[Callable[..., None]]):
     revealed = takes_paramspec(top)
-    reveal_type(revealed)  # revealed: (Top[...]) -> None
+    reveal_type(revealed)  # revealed: Top[(...) -> None]
 ```
 
 The top callable is not a subtype of `(*object, **object) -> object`:
