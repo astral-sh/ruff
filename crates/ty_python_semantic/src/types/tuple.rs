@@ -689,6 +689,8 @@ impl<T> VariableLengthTuple<T> {
             elements.push(element?);
         }
 
+        elements.shrink_to_fit();
+
         Some(Self {
             elements,
             variable_index,
@@ -706,6 +708,21 @@ impl<T> VariableLengthTuple<T> {
         let variable_index = elements.len();
         elements.push(variable);
         elements.extend(suffix);
+        elements.shrink_to_fit();
+
+        Self {
+            elements,
+            variable_index,
+        }
+    }
+
+    fn new_from_vec(prefix: Vec<T>, variable: T, suffix: Vec<T>) -> Self {
+        let mut elements = SmallVec::from_vec(prefix);
+
+        let variable_index = elements.len();
+        elements.push(variable);
+        elements.extend(suffix);
+        elements.shrink_to_fit();
 
         Self {
             elements,
@@ -1998,7 +2015,7 @@ impl<'db> TupleSpecBuilder<'db> {
                 prefix,
                 variable,
                 suffix,
-            } => TupleSpec::Variable(VariableLengthTuple::new(prefix, variable, suffix)),
+            } => TupleSpec::Variable(VariableLengthTuple::new_from_vec(prefix, variable, suffix)),
         }
     }
 }
