@@ -990,6 +990,5 @@ fn protocol_bind_self<'db>(
         db,
         callable.signatures(db).bind_self(db, self_type),
         CallableTypeKind::Regular,
-        callable.is_top_materialization(db),
     )
 }

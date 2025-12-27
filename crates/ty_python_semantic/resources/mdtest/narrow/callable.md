@@ -45,8 +45,6 @@ def h(x: Callable[..., int] | None):
 ## Narrowing from object
 
 ```py
-from typing import Callable
-
 def f(x: object):
     if callable(x):
         reveal_type(x)  # revealed: Top[(...) -> object]

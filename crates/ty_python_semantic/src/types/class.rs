@@ -1056,7 +1056,6 @@ impl<'db> ClassType<'db> {
                             db,
                             getitem_signature,
                             CallableTypeKind::FunctionLike,
-                            false,
                         ));
                         Member::definitely_declared(getitem_type)
                     })
@@ -1224,7 +1223,6 @@ impl<'db> ClassType<'db> {
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
                 CallableTypeKind::FunctionLike,
-                false,
             );
 
             if returns_non_subclass {
@@ -1295,7 +1293,6 @@ impl<'db> ClassType<'db> {
                     db,
                     synthesized_dunder_init_signature,
                     CallableTypeKind::FunctionLike,
-                    false,
                 ))
             } else {
                 None
@@ -2128,7 +2125,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     callable_ty.signatures(db),
                     CallableTypeKind::FunctionLike,
-                    callable_ty.is_top_materialization(db),
                 )),
                 Type::Union(union) => {
                     union.map(db, |element| into_function_like_callable(db, *element))
@@ -2773,7 +2769,6 @@ impl<'db> ClassLiteral<'db> {
                             Some(Type::none(db)),
                         )),
                         CallableTypeKind::FunctionLike,
-                        false,
                     )));
                 }
 
@@ -2800,7 +2795,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__getitem__") => {
@@ -2828,7 +2822,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "__delitem__") => {
@@ -2860,7 +2853,6 @@ impl<'db> ClassLiteral<'db> {
                             Some(Type::none(db)),
                         )),
                         CallableTypeKind::FunctionLike,
-                        false,
                     )));
                 }
 
@@ -2886,7 +2878,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "get") => {
@@ -2994,7 +2985,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "pop") => {
@@ -3054,7 +3044,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "setdefault") => {
@@ -3083,7 +3072,6 @@ impl<'db> ClassLiteral<'db> {
                     db,
                     CallableSignature::from_overloads(overloads),
                     CallableTypeKind::FunctionLike,
-                    false,
                 )))
             }
             (CodeGeneratorKind::TypedDict, "update") => {
