@@ -12,6 +12,7 @@ use std::str::FromStr;
 use anyhow::{Context, Result, anyhow};
 use glob::{GlobError, Paths, PatternError, glob};
 use itertools::Itertools;
+use log::debug;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use shellexpand;
@@ -54,6 +55,8 @@ use crate::options::{
     McCabeOptions, Options, Pep8NamingOptions, PyUpgradeOptions, PycodestyleOptions,
     PydoclintOptions, PydocstyleOptions, PyflakesOptions, PylintOptions, RuffOptions,
 };
+use crate::pyproject;
+use crate::resolver::ConfigurationOrigin;
 use crate::settings::{
     EXCLUDE, FileResolverSettings, FormatterSettings, INCLUDE, INCLUDE_PREVIEW, LineEnding,
     Settings,
@@ -625,6 +628,23 @@ impl Configuration {
             format: self.format.combine(config.format),
             analyze: self.analyze.combine(config.analyze),
         }
+    }
+
+    #[must_use]
+    pub fn apply_fallbacks(
+        mut self,
+        origin: ConfigurationOrigin,
+        initial_config_path: &Path,
+    ) -> Self {
+        if matches!(origin, ConfigurationOrigin::Ancestor) {
+            self.target_version = self.target_version.or_else(|| {
+                let dir = initial_config_path.parent()?;
+                let fallback = pyproject::find_fallback_target_version(dir)?;
+                debug!("Derived `target-version` from `requires-python`: {fallback:?}");
+                Some(fallback.into())
+            });
+        }
+        self
     }
 }
 
