@@ -1278,8 +1278,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             if checker.is_rule_enabled(Rule::Airflow3SuggestedUpdate) {
                 airflow::rules::airflow_3_0_suggested_update_expr(checker, expr);
             }
-            if checker.is_rule_enabled(Rule::Airflow3FunctionSignatureChange) {
-                airflow::rules::airflow_3_function_signature_change_expr(checker, expr);
+            if checker.is_rule_enabled(Rule::Airflow3IncompatibleFunctionSignature) {
+                airflow::rules::airflow_3_function_signature_change(checker, expr);
             }
             if checker.is_rule_enabled(Rule::UnnecessaryCastToInt) {
                 ruff::rules::unnecessary_cast_to_int(checker, call);
