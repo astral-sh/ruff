@@ -30,10 +30,10 @@ class D(tuple):
 
 ## `__bool__`
 
-We should only emit diagnostics for overrides of `__bool__` if we can be sure that it is invalid.
-This means we only emit diagnostics on subclasses of fixed length tuples if the return type of the
-`__bool__` method is annotated and it does not match the expected return type of the `__bool__` of
-the `tuple` superclass.
+We only emit diagnostics for overrides of `__bool__` when we are sure that it is an invalid
+override. This means we only emit diagnostics on subclasses of fixed length tuples if the return
+type of the `__bool__` method is annotated and it does not match the expected return type of the
+`__bool__` method of the `tuple` superclass.
 
 ### Regular Tuple Subclasses
 
