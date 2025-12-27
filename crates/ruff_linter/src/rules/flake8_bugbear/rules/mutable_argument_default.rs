@@ -79,7 +79,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: Default Argument Values](https://docs.python.org/3/tutorial/controlflow.html#default-argument-values)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.92")]
+#[violation_metadata(stable_since = "v0.0.92", safety = "unsafe")]
 pub(crate) struct MutableArgumentDefault;
 
 impl Violation for MutableArgumentDefault {

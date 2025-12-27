@@ -36,7 +36,7 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///
 /// [PEP 646]: https://peps.python.org/pep-0646/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", safety = "unsafe")]
 pub(crate) struct NonPEP646Unpack;
 
 impl Violation for NonPEP646Unpack {

@@ -390,6 +390,7 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
     let mut rule_group_match_arms = quote!();
     let mut rule_file_match_arms = quote!();
     let mut rule_line_match_arms = quote!();
+    let mut rule_applicability_match_arms = quote!();
 
     for Rule {
         name, attrs, path, ..
@@ -415,6 +416,9 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
         );
         rule_line_match_arms.extend(
             quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::line(),},
+        );
+        rule_applicability_match_arms.extend(
+            quote! {#(#attrs)* Self::#name => <#path as crate::ViolationMetadata>::applicability(),},
         );
     }
 
@@ -462,6 +466,10 @@ fn register_rules<'a>(input: impl Iterator<Item = &'a Rule>) -> TokenStream {
 
             pub fn line(&self) -> u32 {
                 match self { #rule_line_match_arms }
+            }
+
+            pub fn applicability(&self) -> crate::Applicability {
+                match self { #rule_applicability_match_arms }
             }
         }
     }

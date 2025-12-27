@@ -84,7 +84,7 @@ use super::{
 /// [UP047]: https://docs.astral.sh/ruff/rules/non-pep695-generic-function/
 /// [UP049]: https://docs.astral.sh/ruff/rules/private-type-parameter/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.283")]
+#[violation_metadata(stable_since = "v0.0.283", safety = "unsafe")]
 pub(crate) struct NonPEP695TypeAlias {
     name: String,
     type_alias_kind: TypeAliasKind,
