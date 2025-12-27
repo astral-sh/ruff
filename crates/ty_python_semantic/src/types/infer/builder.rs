@@ -8583,6 +8583,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         callable_type: Type<'db>,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
+        fn report_missing_implicit_constructor_call<'db>(
+            context: &InferContext<'db, '_>,
+            db: &'db dyn Db,
+            callable_type: Type<'db>,
+            call_expression: &ast::ExprCall,
+            bindings: &Bindings<'db>,
+        ) {
+            if bindings.has_implicit_dunder_new_is_possibly_unbound() {
+                if let Some(builder) =
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, call_expression)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Method `__new__` on type `{}` may be missing.",
+                        callable_type.display(db),
+                    ));
+                }
+            }
+
+            if bindings.has_implicit_dunder_init_is_possibly_unbound() {
+                if let Some(builder) =
+                    context.report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, call_expression)
+                {
+                    builder.into_diagnostic(format_args!(
+                        "Method `__init__` on type `{}` may be missing.",
+                        callable_type.display(db),
+                    ));
+                }
+            }
+        }
+
         let ast::ExprCall {
             range: _,
             node_index: _,
@@ -8745,112 +8775,56 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
             }
 
-            // For class literals we model the entire class instantiation logic, so it is handled
-            // in a separate function. For some known classes we have manual signatures defined and use
-            // the `try_call` path below.
-            // TODO: it should be possible to move these special cases into the `try_call_constructor`
-            // path instead, or even remove some entirely once we support overloads fully.
-            let has_special_cased_constructor = matches!(
-                class.known(self.db()),
-                Some(
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                        | KnownClass::Super
-                        | KnownClass::TypeAliasType
-                        | KnownClass::Deprecated
-                )
-            ) || (
-                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-                // in `ClassType::own_class_member()`).
-                class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || CodeGeneratorKind::TypedDict.matches(
-                self.db(),
-                class.class_literal(self.db()).0,
-                class.class_literal(self.db()).1,
-            );
-
-            // temporary special-casing for all subclasses of `enum.Enum`
-            // until we support the functional syntax for creating enum classes
-            if !has_special_cased_constructor
-                && KnownClass::Enum
-                    .to_class_literal(self.db())
-                    .to_class_type(self.db())
-                    .is_none_or(|enum_class| !class.is_subclass_of(self.db(), enum_class))
-            {
-                // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
-                // is done in `infer_legacy_typevar`, `infer_paramspec`, and
-                // `infer_newtype_expression`, and doesn't use the full call-binding machinery. If
-                // we reach here, it means that someone is trying to instantiate one of these in an
-                // invalid context.
-                match class.known(self.db()) {
-                    Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar) => {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "A `TypeVar` definition must be a simple variable assignment",
-                            );
-                        }
-                    }
-                    Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec) => {
-                        if let Some(builder) = self
-                            .context
-                            .report_lint(&INVALID_PARAMSPEC, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "A `ParamSpec` definition must be a simple variable assignment",
-                            );
-                        }
-                    }
-                    Some(KnownClass::NewType) => {
-                        if let Some(builder) =
-                            self.context.report_lint(&INVALID_NEWTYPE, call_expression)
-                        {
-                            builder.into_diagnostic(
-                                "A `NewType` definition must be a simple variable assignment",
-                            );
-                        }
-                    }
-                    _ => {}
-                }
-
-                let db = self.db();
-                let infer_call_arguments = |bindings: Option<Bindings<'db>>| {
-                    if let Some(bindings) = bindings {
-                        let bindings = bindings.match_parameters(self.db(), &call_arguments);
-                        self.infer_all_argument_types(
-                            arguments,
-                            &mut call_arguments,
-                            &bindings,
-                            tcx,
-                            MultiInferenceState::Intersect,
+            // Inference of correctly-placed `TypeVar`, `ParamSpec`, and `NewType` definitions
+            // is done in `infer_legacy_typevar`, `infer_paramspec`, and
+            // `infer_newtype_expression`, and doesn't use the full call-binding machinery. If
+            // we reach here, it means that someone is trying to instantiate one of these in an
+            // invalid context.
+            match class.known(self.db()) {
+                Some(KnownClass::TypeVar | KnownClass::ExtensionsTypeVar) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_LEGACY_TYPE_VARIABLE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `TypeVar` definition must be a simple variable assignment",
                         );
-                    } else {
-                        let argument_forms = vec![Some(ParameterForm::Value); call_arguments.len()];
-                        self.infer_argument_types(arguments, &mut call_arguments, &argument_forms);
                     }
-
-                    call_arguments
-                };
-
-                return callable_type
-                    .try_call_constructor(db, infer_call_arguments, tcx)
-                    .unwrap_or_else(|err| {
-                        err.report_diagnostic(&self.context, callable_type, call_expression.into());
-                        err.return_type()
-                    });
+                }
+                Some(KnownClass::ParamSpec | KnownClass::ExtensionsParamSpec) => {
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_PARAMSPEC, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `ParamSpec` definition must be a simple variable assignment",
+                        );
+                    }
+                }
+                Some(KnownClass::NewType) => {
+                    if let Some(builder) =
+                        self.context.report_lint(&INVALID_NEWTYPE, call_expression)
+                    {
+                        builder.into_diagnostic(
+                            "A `NewType` definition must be a simple variable assignment",
+                        );
+                    }
+                }
+                _ => {}
             }
         }
 
         let mut bindings = callable_type
             .bindings(self.db())
             .match_parameters(self.db(), &call_arguments);
+
+        report_missing_implicit_constructor_call(
+            &self.context,
+            self.db(),
+            callable_type,
+            call_expression,
+            &bindings,
+        );
 
         let bindings_result =
             self.infer_and_check_argument_types(arguments, &mut call_arguments, &mut bindings, tcx);
