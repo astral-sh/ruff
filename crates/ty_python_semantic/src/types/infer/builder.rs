@@ -63,7 +63,7 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NON_SUBSCRIPTABLE,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NOT_SUBSCRIPTABLE,
     POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
     SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
     UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
@@ -80,7 +80,7 @@ use crate::types::diagnostic::{
     report_invalid_or_unsupported_base, report_invalid_return_type,
     report_invalid_type_checking_constant, report_invalid_type_param_order,
     report_named_tuple_field_with_leading_underscore,
-    report_namedtuple_field_without_default_after_field_with_default, report_non_subscriptable,
+    report_namedtuple_field_without_default_after_field_with_default, report_not_subscriptable,
     report_possibly_missing_attribute, report_possibly_unresolved_reference,
     report_rebound_typevar, report_slice_step_size_zero, report_unsupported_augmented_assignment,
     report_unsupported_binary_operation, report_unsupported_comparison,
@@ -4372,7 +4372,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             }
                         }
                         CallDunderError::MethodNotAvailable => {
-                            report_non_subscriptable(
+                            report_not_subscriptable(
                                 &self.context,
                                 target,
                                 object_ty,
@@ -12191,7 +12191,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Type parameter list cannot be empty, so if we reach here, `value_ty` is not a generic type.
                 if let Some(builder) = self
                     .context
-                    .report_lint(&NON_SUBSCRIPTABLE, &*subscript.value)
+                    .report_lint(&NOT_SUBSCRIPTABLE, &*subscript.value)
                 {
                     let mut diagnostic =
                         builder.into_diagnostic("Cannot subscript non-generic type");
@@ -12449,7 +12449,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 _,
             ) if alias.generic_context(db).is_none() => {
                 debug_assert!(alias.specialization(db).is_none());
-                if let Some(builder) = self.context.report_lint(&NON_SUBSCRIPTABLE, subscript) {
+                if let Some(builder) = self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript) {
                     let value_type = alias.raw_value_type(db);
                     let mut diagnostic =
                         builder.into_diagnostic("Cannot subscript non-generic type alias");
@@ -12658,11 +12658,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 .as_class_literal()
                 .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
             {
-                report_non_subscriptable(context, subscript, value_ty, "__class_getitem__");
+                report_not_subscriptable(context, subscript, value_ty, "__class_getitem__");
             }
         } else {
             if expr_context != ExprContext::Store {
-                report_non_subscriptable(context, subscript, value_ty, "__getitem__");
+                report_not_subscriptable(context, subscript, value_ty, "__getitem__");
             }
         }
 
