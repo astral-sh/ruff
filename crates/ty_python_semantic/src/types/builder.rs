@@ -340,8 +340,12 @@ impl<'db> UnionBuilder<'db> {
                 // Capture the current element count to avoid comparing union elements against each other.
                 // The union has already been simplified, so its elements don't need redundancy checks
                 // between themselves, only against pre-existing elements. However, we only apply this
-                // optimization when not in cycle recovery AND the union's recursively_defined status
-                // matches the builder's, ensuring we're in a consistent context.
+                // optimization when:
+                // 1. Not in cycle recovery AND
+                // 2. The union's recursively_defined status matches the builder's.
+                //
+                // We also disable it when we encounter type variables, as they need redundancy checks
+                // for proper instantiation.
                 let mut batch_start = if !self.cycle_recovery
                     && self.recursively_defined == union.recursively_defined(self.db)
                 {
@@ -350,7 +354,10 @@ impl<'db> UnionBuilder<'db> {
                     None
                 };
                 for element in new_elements {
-                    if self.unpack_aliases && matches!(element, Type::TypeAlias(_)) {
+                    // Disable batch optimization when we encounter aliases or type variables.
+                    if self.unpack_aliases && matches!(element, Type::TypeAlias(_))
+                        || element.has_typevar(self.db)
+                    {
                         batch_start = None;
                     }
                     self.add_in_place_impl(*element, seen_aliases, batch_start);
