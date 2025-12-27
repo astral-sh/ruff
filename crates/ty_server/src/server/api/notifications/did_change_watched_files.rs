@@ -81,12 +81,7 @@ impl SyncNotificationHandler for DidChangeWatchedFiles {
             tracing::debug!("Applying changes to `{root}`");
 
             session.apply_changes(&AnySystemPath::System(root.clone()), changes);
-            publish_settings_diagnostics(
-                session,
-                client,
-                root,
-                session.global_settings().show_syntax_errors(),
-            );
+            publish_settings_diagnostics(session, client, root);
         }
 
         let client_capabilities = session.client_capabilities();

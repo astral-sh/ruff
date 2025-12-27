@@ -73,12 +73,15 @@ impl Diagnostics {
             }
 
             for diagnostic in &self.items {
-                if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
+                let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
+                    db,
+                    diagnostic,
+                    self.encoding,
+                    client_capabilities,
+                    global_settings,
+                ) else {
                     continue;
-                }
-
-                let (url, lsp_diagnostic) =
-                    to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities);
+                };
 
                 let Some(url) = url else {
                     tracing::warn!("Unable to find notebook cell");
@@ -97,19 +100,14 @@ impl Diagnostics {
                 self.items
                     .iter()
                     .filter_map(|diagnostic| {
-                        if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
-                            None
-                        } else {
-                            Some(
-                                to_lsp_diagnostic(
-                                    db,
-                                    diagnostic,
-                                    self.encoding,
-                                    client_capabilities,
-                                )
-                                .1,
-                            )
-                        }
+                        to_lsp_diagnostic(
+                            db,
+                            diagnostic,
+                            self.encoding,
+                            client_capabilities,
+                            global_settings,
+                        )
+                        .map(|(_, diagnostic)| diagnostic)
                     })
                     .collect(),
             )
@@ -238,7 +236,6 @@ pub(crate) fn publish_settings_diagnostics(
     session: &mut Session,
     client: &Client,
     path: SystemPathBuf,
-    show_syntax_errors: bool,
 ) {
     // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
     //
@@ -251,6 +248,8 @@ pub(crate) fn publish_settings_diagnostics(
         }
         DiagnosticMode::OpenFilesOnly => {}
     }
+
+    let global_settings = session.global_settings().clone();
 
     let session_encoding = session.position_encoding();
     let client_capabilities = session.client_capabilities();
@@ -296,13 +295,14 @@ pub(crate) fn publish_settings_diagnostics(
         let lsp_diagnostics = file_diagnostics
             .into_iter()
             .filter_map(|diagnostic| {
-                if diagnostic.is_invalid_syntax() && !show_syntax_errors {
-                    None
-                } else {
-                    Some(
-                        to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1,
-                    )
-                }
+                to_lsp_diagnostic(
+                    db,
+                    &diagnostic,
+                    session_encoding,
+                    client_capabilities,
+                    &global_settings,
+                )
+                .map(|(_, diagnostic)| diagnostic)
             })
             .collect::<Vec<_>>();
 
@@ -343,7 +343,12 @@ pub(super) fn to_lsp_diagnostic(
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
     client_capabilities: ResolvedClientCapabilities,
-) -> (Option<lsp_types::Url>, Diagnostic) {
+    global_settings: &GlobalSettings,
+) -> Option<(Option<lsp_types::Url>, Diagnostic)> {
+    if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
+        return None;
+    }
+
     let supports_related_information =
         client_capabilities.supports_diagnostic_related_information();
 
@@ -416,7 +421,7 @@ pub(super) fn to_lsp_diagnostic(
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
-    (
+    Some((
         url,
         Diagnostic {
             range,
@@ -442,7 +447,7 @@ pub(super) fn to_lsp_diagnostic(
             related_information,
             data: serde_json::to_value(data).ok(),
         },
-    )
+    ))
 }
 
 /// Converts an [`Annotation`] to a [`DiagnosticRelatedInformation`].
