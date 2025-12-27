@@ -84,9 +84,29 @@ def foo(
             Some(ClientOptions::default().with_show_syntax_errors(false)),
         )?
         .with_file(foo, foo_content)?
+        .with_initialization_options(
+            ClientOptions::default()
+                .with_show_syntax_errors(false)
+                .with_diagnostic_mode(DiagnosticMode::Workspace),
+        )
         .enable_pull_diagnostics(true)
         .build()
         .wait_until_workspaces_are_initialized();
+
+    let workspace_diagnostics = server.workspace_diagnostic_request(None, None);
+    assert_compact_json_snapshot!(workspace_diagnostics, @r#"
+    {
+      "items": [
+        {
+          "kind": "full",
+          "uri": "file://<temp_dir>/src/foo.py",
+          "version": null,
+          "resultId": "[RESULT_ID]",
+          "items": []
+        }
+      ]
+    }
+    "#);
 
     server.open_text_document(foo, foo_content, 1);
     let diagnostics = server.document_diagnostic_request(foo, None);
