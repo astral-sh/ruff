@@ -1,4 +1,4 @@
 //! Rules from [ssort](https://pypi.org/project/ssort).
 
-mod graph;
+mod dependencies;
 pub(crate) mod rules;

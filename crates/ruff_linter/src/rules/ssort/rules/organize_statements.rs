@@ -4,7 +4,7 @@ use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::{Checker, LintContext};
-use crate::rules::ssort::graph::{Node, build_dependency_graph, topological_sort};
+use crate::rules::ssort::dependencies::{Dependencies, Node};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -79,40 +79,36 @@ impl Violation for UnsortedStatements {
 /// * `context` - The linting context.
 /// * `locator` - The locator for the source code.
 fn organize_suite(suite: &[Stmt], context: &LintContext, locator: &Locator) {
-    // Collect all function and class definitions into a nodes vector
+    // Collect all statements marking only functions and classes as movable
     let nodes: Vec<Node> = suite
         .iter()
         .enumerate()
-        .filter_map(|(idx, stmt)| {
-            match stmt {
-                Stmt::FunctionDef(def) => Some(Node {
-                    index: idx,
-                    name: &def.name,
-                    stmt,
-                }),
-                // TODO: Support sorting inside classes
-                Stmt::ClassDef(def) => Some(Node {
-                    index: idx,
-                    name: &def.name,
-                    stmt,
-                }),
+        .map(|(index, stmt)| {
+            let name = match stmt {
+                Stmt::FunctionDef(def) => Some(&def.name.id),
+                Stmt::ClassDef(def) => Some(&def.name.id),
                 _ => None,
+            };
+            Node {
+                index,
+                name,
+                stmt,
+                movable: name.is_some(),
             }
         })
         .collect();
 
-    // Return early if there won't be any changes
-    if nodes.len() < 2 {
+    // Return early if there are fewer than 2 movable nodes
+    if nodes.iter().filter(|node| node.movable).count() < 2 {
         return;
     }
 
-    // Build a dependency graph and sort the nodes topologically to find the correct order
-    let edges = build_dependency_graph(&nodes);
-    let Ok(sorted) = topological_sort(&nodes, &edges) else {
-        return;
-    };
-
     // Check if the order has changed compared to the original order
+    let dependencies = Dependencies::from_nodes(&nodes);
+    let sorted = match dependencies.dependency_order(&nodes) {
+        Ok(sorted) => sorted,
+        Err(_) => return,
+    };
     if sorted
         .iter()
         .enumerate()
@@ -121,20 +117,20 @@ fn organize_suite(suite: &[Stmt], context: &LintContext, locator: &Locator) {
         return;
     }
 
-    // Build a replacement string from the sorted statements
+    // Build a replacement string from the sorted nodes
     let mut replacement = String::new();
     for (i, &node_idx) in sorted.iter().enumerate() {
         replacement.push_str(locator.slice(suite[node_idx].range()));
 
         // Add two newlines between statements but not at the end
-        if i < sorted.len() - 1 {
+        if i < nodes.len() - 1 {
             replacement.push_str("\n\n");
         }
     }
 
     // Report the violation and suggest a fix
-    let start = suite[nodes.first().unwrap().index].range().start();
-    let end = suite[nodes.last().unwrap().index].range().end();
+    let start = suite.first().unwrap().range().start();
+    let end = suite.last().unwrap().range().end();
     let mut diagnostic = context.report_diagnostic(UnsortedStatements, TextRange::new(start, end));
     diagnostic.set_fix(Fix::safe_edit(Edit::replacement(replacement, start, end)));
 }
