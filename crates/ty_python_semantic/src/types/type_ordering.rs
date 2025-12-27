@@ -184,6 +184,16 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
+                (
+                    SuperOwnerKind::InstanceTypeVar(left) | SuperOwnerKind::ClassTypeVar(left),
+                    SuperOwnerKind::InstanceTypeVar(right) | SuperOwnerKind::ClassTypeVar(right),
+                ) => left.cmp(&right),
+                (SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_), _) => {
+                    Ordering::Less
+                }
+                (_, SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_)) => {
+                    Ordering::Greater
+                }
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
