@@ -1905,7 +1905,24 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    /// Return the "top" parameters (infinite union of all possible parameters).
+    /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
+    /// (accepts any call, so subtype of all other signatures.)
+    pub(crate) fn bottom() -> Self {
+        Self {
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    .with_annotated_type(Type::object()),
+            ],
+            kind: ParametersKind::Standard,
+        }
+    }
+
+    /// Return the "top" parameters (infinite union of all possible parameters), which cannot
+    /// accept any call, since there is no possible call that satisfies all possible parameter
+    /// signatures. This is not `(*Never, **Never)`, which is equivalent to no parameters at all
+    /// and still accepts the empty call `()`; it has to be represented instead as a special
+    /// `ParametersKind`.
     pub(crate) fn top() -> Self {
         Self {
             // We always emit `called-top-callable` for any call to the top callable (based on the
@@ -1917,19 +1934,6 @@ impl<'db> Parameters<'db> {
                     .with_annotated_type(Type::object()),
             ],
             kind: ParametersKind::Top,
-        }
-    }
-
-    /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
-    /// (accepts any call, so subtype of all other signatures.)
-    pub(crate) fn bottom() -> Self {
-        Self {
-            value: vec![
-                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
-                Parameter::keyword_variadic(Name::new_static("kwargs"))
-                    .with_annotated_type(Type::object()),
-            ],
-            kind: ParametersKind::Standard,
         }
     }
 

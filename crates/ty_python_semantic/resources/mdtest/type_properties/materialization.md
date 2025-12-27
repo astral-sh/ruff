@@ -70,7 +70,13 @@ def _(bottom_callable: Bottom[Callable[[Any, Unknown], None]]):
     reveal_type(bottom_callable)  # revealed: (object, object, /) -> None
 ```
 
-The invariant position cannot simplify, and is represented with the `Bottom` special form.
+The invariant position is represented with the `Bottom` special form.
+
+There is an argument that `Bottom[list[Any]]` should simplify to `Never`, since it is the infinite
+intersection of all possible materializations of `list[Any]`, and (due to invariance) these
+materializations are disjoint types. But currently we do not make this simplification: there doesn't
+seem to be any compelling need for it, and allowing more gradual types to materialize to `Never` has
+undesirable implications for mutual assignability of seemingly-unrelated gradual types.
 
 ```py
 def _(bottom_list: Bottom[list[Any]]):
@@ -257,6 +263,18 @@ def takes_paramspec[**P](f: Callable[P, None]) -> Callable[P, None]:
 def _(top: Top[Callable[..., None]]):
     revealed = takes_paramspec(top)
     reveal_type(revealed)  # revealed: (Top[...]) -> None
+```
+
+The top callable is not a subtype of `(*object, **object) -> object`:
+
+```py
+type TopCallable = Top[Callable[..., Any]]
+
+@staticmethod
+def takes_objects(*args: object, **kwargs: object) -> object:
+    pass
+
+static_assert(not is_subtype_of(TopCallable, CallableTypeOf[takes_objects]))
 ```
 
 ## Tuple
