@@ -389,7 +389,7 @@ impl<'db> BoundSuperType<'db> {
                     None => delegate_with_error_mapped(Type::object(), Some(type_var)),
                 };
             }
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => {
+            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
             Type::IntLiteral(_) => return delegate_to(KnownClass::Int.to_instance(db)),

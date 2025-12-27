@@ -282,7 +282,8 @@ impl<'db> AllMembers<'db> {
             | Type::SpecialForm(_)
             | Type::KnownInstance(_)
             | Type::BoundSuper(_)
-            | Type::TypeIs(_) => match ty.to_meta_type(db) {
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_) => match ty.to_meta_type(db) {
                 Type::ClassLiteral(class_literal) => {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
