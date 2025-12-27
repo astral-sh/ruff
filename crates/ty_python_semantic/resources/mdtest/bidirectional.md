@@ -297,6 +297,28 @@ def _(flag: bool):
     reveal_type(x2)  # revealed: list[int | None]
 ```
 
+## Dunder Calls
+
+The key and value parameters types are used as type context for `__setitem__` dunder calls:
+
+```py
+from typing import TypedDict
+
+class Bar(TypedDict):
+    baz: float
+
+def _(x: dict[str, Bar]):
+    x["bar"] = reveal_type({"baz": 2})  # revealed: Bar
+
+class X:
+    def __setitem__(self, key: Bar, value: Bar):
+        ...
+
+def _(x: X):
+    # revealed: Bar
+    x[reveal_type({"baz": 1})] = reveal_type({"baz": 2}) # revealed: Bar
+```
+
 ## Multi-inference diagnostics
 
 ```toml
