@@ -131,6 +131,34 @@ def _(x: object):
         pass
 ```
 
+```py
+from typing_extensions import TypeIs
+
+def is_int(val: object) -> TypeIs[int]:
+    return isinstance(val, int)
+
+class A:
+    def is_int(self, val: object) -> TypeIs[int]:
+        return isinstance(val, int)
+
+    @classmethod
+    def is_int2(cls, val: object) -> TypeIs[int]:
+        return isinstance(val, int)
+
+def _(x: object):
+    if is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A().is_int(x):
+        reveal_type(x)  # revealed: int
+
+    if A().is_int2(x):
+        reveal_type(x)  # revealed: int
+
+    if A.is_int2(x):
+        reveal_type(x)  # revealed: int
+```
+
 ## Arguments to special forms
 
 `TypeGuard` and `TypeIs` accept exactly one type argument.
