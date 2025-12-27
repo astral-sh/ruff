@@ -14,7 +14,7 @@ use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
 use crate::diagnostic::DiagnosticGuard;
 use crate::lint::{GetLintError, Level, LintMetadata, LintRegistry, LintStatus};
-pub use crate::suppression::add_ignore::create_suppression_fix;
+pub use crate::suppression::add_ignore::{suppress_all, suppress_single};
 use crate::suppression::parser::{
     ParseError, ParseErrorKind, SuppressionComment, SuppressionParser,
 };
@@ -40,7 +40,7 @@ declare_lint! {
     /// ```py
     /// a = 20 / 2
     /// ```
-    pub(crate) static UNUSED_IGNORE_COMMENT = {
+    pub static UNUSED_IGNORE_COMMENT = {
         summary: "detects unused `type: ignore` comments",
         status: LintStatus::stable("0.0.1-alpha.1"),
         default_level: Level::Ignore,
@@ -362,7 +362,7 @@ impl Suppressions {
                 // Don't use intersect to avoid that suppressions on inner-expression
                 // ignore errors for outer expressions
                 suppression.suppressed_range.contains(range.start())
-                    || suppression.suppressed_range.contains(range.end())
+                    || suppression.suppressed_range.contains_inclusive(range.end())
             })
     }
 
