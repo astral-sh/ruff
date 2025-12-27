@@ -1,0 +1,21 @@
+---
+source: crates/ty_server/tests/e2e/publish_diagnostics.rs
+expression: diagnostics
+---
+PublishDiagnosticsParams {
+    uri: Url {
+        scheme: "file",
+        cannot_be_a_base: false,
+        username: "",
+        password: None,
+        host: None,
+        port: None,
+        path: "<temp_dir>/src/foo.py",
+        query: None,
+        fragment: None,
+    },
+    diagnostics: [],
+    version: Some(
+        1,
+    ),
+}

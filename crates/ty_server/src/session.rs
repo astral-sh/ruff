@@ -470,6 +470,8 @@ impl Session {
                 warn_about_unknown_options(client, Some(&url), unknown_options);
             }
 
+            let show_syntax_errors = global.show_syntax_errors.unwrap_or(true);
+
             combined_global_options.combine_with(Some(global));
 
             let Ok(root) = url.to_file_path() else {
@@ -571,7 +573,7 @@ impl Session {
                 },
             );
 
-            publish_settings_diagnostics(self, client, root);
+            publish_settings_diagnostics(self, client, root, show_syntax_errors);
         }
 
         if let Some(global_options) = combined_global_options {

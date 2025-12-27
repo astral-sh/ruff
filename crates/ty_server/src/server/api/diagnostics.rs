@@ -18,8 +18,8 @@ use ty_project::{Db as _, ProjectDatabase};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
-use crate::session::DocumentHandle;
 use crate::session::client::Client;
+use crate::session::{DocumentHandle, GlobalSettings};
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
@@ -61,6 +61,7 @@ impl Diagnostics {
         &self,
         db: &ProjectDatabase,
         client_capabilities: ResolvedClientCapabilities,
+        global_settings: &GlobalSettings,
     ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
@@ -72,6 +73,10 @@ impl Diagnostics {
             }
 
             for diagnostic in &self.items {
+                if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
+                    continue;
+                }
+
                 let (url, lsp_diagnostic) =
                     to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities);
 
@@ -91,8 +96,20 @@ impl Diagnostics {
             LspDiagnostics::TextDocument(
                 self.items
                     .iter()
-                    .map(|diagnostic| {
-                        to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities).1
+                    .filter_map(|diagnostic| {
+                        if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
+                            None
+                        } else {
+                            Some(
+                                to_lsp_diagnostic(
+                                    db,
+                                    diagnostic,
+                                    self.encoding,
+                                    client_capabilities,
+                                )
+                                .1,
+                            )
+                        }
                     })
                     .collect(),
             )
@@ -197,7 +214,11 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         });
     };
 
-    match diagnostics.to_lsp_diagnostics(db, session.client_capabilities()) {
+    match diagnostics.to_lsp_diagnostics(
+        db,
+        session.client_capabilities(),
+        session.global_settings(),
+    ) {
         LspDiagnostics::TextDocument(diagnostics) => {
             publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
@@ -217,6 +238,7 @@ pub(crate) fn publish_settings_diagnostics(
     session: &mut Session,
     client: &Client,
     path: SystemPathBuf,
+    show_syntax_errors: bool,
 ) {
     // Don't publish settings diagnostics for workspace that are already doing full diagnostics.
     //
@@ -273,8 +295,14 @@ pub(crate) fn publish_settings_diagnostics(
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .map(|diagnostic| {
-                to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1
+            .filter_map(|diagnostic| {
+                if diagnostic.is_invalid_syntax() && !show_syntax_errors {
+                    None
+                } else {
+                    Some(
+                        to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1,
+                    )
+                }
             })
             .collect::<Vec<_>>();
 
