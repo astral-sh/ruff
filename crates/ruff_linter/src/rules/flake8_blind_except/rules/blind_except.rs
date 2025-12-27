@@ -8,7 +8,7 @@ use ruff_text_size::Ranged;
 
 use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::preview::is_ble001_exc_info_supression_enabled;
+use crate::preview::is_ble001_exc_info_suppression_enabled;
 use crate::rules::flake8_logging::helpers::is_logger_method_name;
 use crate::settings::LinterSettings;
 
@@ -193,7 +193,7 @@ fn is_exc_info_enabled(
     semantic: &SemanticModel,
     settings: &LinterSettings,
 ) -> bool {
-    if is_ble001_exc_info_supression_enabled(settings)
+    if is_ble001_exc_info_suppression_enabled(settings)
         || matches!(method_name, "error" | "critical")
     {
         arguments.find_keyword("exc_info").is_some_and(|keyword| {

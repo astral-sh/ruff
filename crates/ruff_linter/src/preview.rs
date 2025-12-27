@@ -298,6 +298,6 @@ pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> 
 }
 
 // https://github.com/astral-sh/ruff/pull/22057
-pub(crate) const fn is_ble001_exc_info_supression_enabled(settings: &LinterSettings) -> bool {
+pub(crate) const fn is_ble001_exc_info_suppression_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
