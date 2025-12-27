@@ -85,14 +85,47 @@ except Exception:
 try:
     pass
 except Exception:
-    logging.exception("...")
+    logging.error("...", exc_info=True)
+
+try:
+    pass
+except Exception as e:
+    logging.error("...", exc_info=e)
 
 
 try:
     pass
 except Exception:
-    logging.error("...", exc_info=True)
+    logging.exception("...")
 
+
+try:
+    pass
+except Exception as e:
+    logging.debug("...", exc_info=e)
+
+
+try:
+    pass
+except Exception:
+    logging.info("...", exc_info=True)
+
+try:
+    pass
+except Exception as e:
+    logging.warn("...", exc_info=e)
+
+
+try:
+    pass
+except Exception:
+    logging.warning("...", exc_info=True)
+
+
+try:
+    pass
+except Exception as e:
+    logging.log(logging.INFO, "...", exc_info=e)
 
 from logging import critical, error, exception
 
