@@ -17,6 +17,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   mkdocs:
     runs-on: ubuntu-latest
