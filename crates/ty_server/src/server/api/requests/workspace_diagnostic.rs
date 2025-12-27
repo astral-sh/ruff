@@ -208,7 +208,7 @@ struct WorkspaceDiagnosticsProgressReporter<'a> {
     state: Mutex<ProgressReporterState<'a>>,
 }
 
-impl<'a, 'b> WorkspaceDiagnosticsProgressReporter<'a> {
+impl<'a> WorkspaceDiagnosticsProgressReporter<'a> {
     fn new(work_done: LazyWorkDoneProgress, response: ResponseWriter<'a>) -> Self {
         Self {
             state: Mutex::new(ProgressReporterState {
