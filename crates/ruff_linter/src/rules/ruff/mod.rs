@@ -333,6 +333,25 @@ mod tests {
     }
 
     #[test]
+    fn range_suppressions_full() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/suppressions.py"),
+            &settings::LinterSettings::for_rules(vec![
+                Rule::UnusedVariable,
+                Rule::AmbiguousVariableName,
+                Rule::UnusedNOQA,
+                Rule::InvalidRuleCode,
+                Rule::InvalidSuppressionComment,
+                Rule::UnmatchedSuppressionComment,
+            ])
+            .with_external_rules(&["TK421"])
+            .with_preview_mode(),
+        )?;
+        assert_diagnostics!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
     fn ruf100_0() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/RUF100_0.py"),
