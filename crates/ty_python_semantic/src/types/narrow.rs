@@ -10,7 +10,7 @@ use crate::semantic_index::scope::ScopeId;
 use crate::subscript::PyIndex;
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
-use crate::types::infer::infer_same_file_expression_type;
+use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::typed_dict::{
     SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
@@ -1260,32 +1260,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     None | Some(KnownFunction::RevealType)
                 ) =>
             {
-                let return_ty = inference.expression_type(expr_call);
-
-                let place_and_constraint = match return_ty {
-                    Type::TypeIs(type_is) => {
-                        let (_, place) = type_is.place_info(self.db)?;
-                        Some((
-                            place,
-                            NarrowingConstraint::regular(
-                                type_is
-                                    .return_type(self.db)
-                                    .negate_if(self.db, !is_positive),
-                            ),
-                        ))
-                    }
-                    // TypeGuard only narrows in the positive case
-                    Type::TypeGuard(type_guard) if is_positive => {
-                        let (_, place) = type_guard.place_info(self.db)?;
-                        Some((
-                            place,
-                            NarrowingConstraint::typeguard(type_guard.return_type(self.db)),
-                        ))
-                    }
-                    _ => None,
-                }?;
-
-                Some(NarrowingConstraints::from_iter([place_and_constraint]))
+                self.evaluate_type_guard_call(inference, expr_call, is_positive)
+            }
+            Type::BoundMethod(_) => {
+                self.evaluate_type_guard_call(inference, expr_call, is_positive)
             }
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
             // (i.e., whether E is non-empty). We only narrow the parts of the type where we know
@@ -1369,6 +1347,42 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
             _ => None,
         }
+    }
+
+    // Helper to evaluate TypeGuard/TypeIs narrowing for a call expression.
+    // Used for both direct function calls and bound method calls.
+    fn evaluate_type_guard_call(
+        &mut self,
+        inference: &ExpressionInference<'db>,
+        expr_call: &ast::ExprCall,
+        is_positive: bool,
+    ) -> Option<NarrowingConstraints<'db>> {
+        let return_ty = inference.expression_type(expr_call);
+
+        let place_and_constraint = match return_ty {
+            Type::TypeIs(type_is) => {
+                let (_, place) = type_is.place_info(self.db)?;
+                Some((
+                    place,
+                    NarrowingConstraint::regular(
+                        type_is
+                            .return_type(self.db)
+                            .negate_if(self.db, !is_positive),
+                    ),
+                ))
+            }
+            // TypeGuard only narrows in the positive case
+            Type::TypeGuard(type_guard) if is_positive => {
+                let (_, place) = type_guard.place_info(self.db)?;
+                Some((
+                    place,
+                    NarrowingConstraint::typeguard(type_guard.return_type(self.db)),
+                ))
+            }
+            _ => None,
+        }?;
+
+        Some(NarrowingConstraints::from_iter([place_and_constraint]))
     }
 
     fn evaluate_match_pattern_singleton(

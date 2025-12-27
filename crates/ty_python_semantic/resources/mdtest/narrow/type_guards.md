@@ -93,6 +93,44 @@ def _(a: int) -> TypeIs[str]: ...
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
 
+## Methods
+
+Methods narrow the first positional argument after `self` or `cls`
+
+```py
+from typing import TypeGuard
+
+class C:
+    def f(self, x: object) -> TypeGuard[str]:
+        return True
+
+    @classmethod
+    def g(cls, x: object) -> TypeGuard[int]:
+        return True
+    # TODO: this could error at definition time
+    def h(self) -> TypeGuard[str]:
+        return True
+    # TODO: this could error at definition time
+    @classmethod
+    def j(cls) -> TypeGuard[int]:
+        return True
+
+def _(x: object):
+    if C().f(x):
+        reveal_type(x)  # revealed: str
+    if C.f(C(), x):
+        # TODO: should be str
+        reveal_type(x)  # revealed: object
+    if C.g(x):
+        reveal_type(x)  # revealed: int
+    if C().g(x):
+        reveal_type(x)  # revealed: int
+    if C().h():  # error: [invalid-type-guard-call] "Type guard call does not have a target"
+        pass
+    if C.j():  # error: [invalid-type-guard-call] "Type guard call does not have a target"
+        pass
+```
+
 ## Arguments to special forms
 
 `TypeGuard` and `TypeIs` accept exactly one type argument.
