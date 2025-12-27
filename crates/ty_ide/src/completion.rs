@@ -770,10 +770,22 @@ impl<'m> ContextCursor<'m> {
     /// Returns None if no context-based exclusions can
     /// be identified. Meaning that all keywords are valid.
     fn valid_keywords(&self) -> Option<FxHashSet<&'static str>> {
-        if self.is_in_decorator_expression() {
+        let covering_node = self.covering_node(self.range);
+
+        // Check if the cursor is within the naming
+        // part of a decorator node.
+        if covering_node
+            .ancestors()
+            // We bail if we're specifying arguments as we don't
+            // want to suppress suggestions there.
+            .take_while(|node| {
+                !matches!(node, ast::AnyNodeRef::Arguments(_)) && !node.is_statement()
+            })
+            .any(|node| matches!(node, ast::AnyNodeRef::Decorator(_)))
+        {
             return Some(FxHashSet::from_iter(["lambda"]));
         }
-        self.covering_node(self.range).ancestors().find_map(|node| {
+        covering_node.ancestors().find_map(|node| {
             self.is_in_for_statement_iterable(node)
                 .then(|| FxHashSet::from_iter(["yield", "lambda", "await"]))
                 .or_else(|| {
@@ -785,51 +797,6 @@ impl<'m> ContextCursor<'m> {
                     })
                 })
         })
-    }
-
-    /// Returns true if the cursor is after an `@` token
-    /// that corresponds to a decorator declaration
-    ///
-    /// `@` can also be used as an operator, this distinguishes
-    /// between the two usages and only looks for the decorator case.
-    fn is_in_decorator_expression(&self) -> bool {
-        const LIMIT: usize = 10;
-        enum S {
-            Start,
-            At,
-        }
-        let mut state = S::Start;
-        for token in self.tokens_before.iter().rev().take(LIMIT) {
-            // Matches lines that starts with `@` as
-            // heuristic for decorators. When decorators
-            // are constructed they are often not identified
-            // as decorators yet by the AST, hence we use
-            // token matching for the decorator case.
-            //
-            // As the grammar also allows @ to be used as an operator,
-            // we want to distinguish between whether it looks
-            // like it's being used as an operator or a
-            // decorator.
-            //
-            // TODO: This doesn't handle decorators
-            // that start at the very top of the file.
-            state = match (state, token.kind()) {
-                (S::Start, TokenKind::Newline | TokenKind::Indent | TokenKind::Dedent) => break,
-                (S::Start, TokenKind::At) => S::At,
-                (S::Start, _) => S::Start,
-                (
-                    S::At,
-                    TokenKind::Newline
-                    | TokenKind::NonLogicalNewline
-                    | TokenKind::Indent
-                    | TokenKind::Dedent,
-                ) => {
-                    return true;
-                }
-                _ => break,
-            }
-        }
-        false
     }
 
     /// Returns true when only an expression is valid after the cursor
@@ -6652,9 +6619,6 @@ if x in a<CURSOR>:
         .not_contains("raise");
     }
 
-    // TODO: This should not contain raise.
-    // `is_in_decorator_expression` currently doesn't
-    // detect decorators that start at the top of the file.
     #[test]
     fn only_lambda_keyword_in_decorator_top_of_file() {
         completion_test_builder(
@@ -6665,7 +6629,7 @@ def func(): ...
         )
         .build()
         .contains("lambda")
-        .contains("raise");
+        .not_contains("raise");
     }
 
     #[test]
@@ -6697,6 +6661,30 @@ from dataclasses import dataclass
         )
         .build()
         .contains("frozen");
+    }
+
+    #[test]
+    fn decorator_args_do_not_suppress_keywords() {
+        completion_test_builder(
+            "\
+from dataclasses import dataclass
+
+@dataclass(frozen=Tr<CURSOR>
+",
+        )
+        .build()
+        .contains("True");
+    }
+
+    #[test]
+    fn decorator_chained_call_args_do_not_suppress_keywords() {
+        completion_test_builder(
+            "\
+  @decorator(foo=False)(bar=Tr<CURSOR>
+  ",
+        )
+        .build()
+        .contains("True");
     }
 
     #[test]
