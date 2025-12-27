@@ -86,17 +86,187 @@ jobs:
             cd typing/conformance/tests
 
             echo "Running ty on old commit (merge base)"
-            "$RUFF_DIR/ty-old" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/old-output.txt" 2>&1 || true
+            "$RUFF_DIR/ty-old" check \
+              --output-format gitlab . \
+              | jq '
+                .[]
+                | .key = .location?.path? + ":" + (.location?.positions?.begin?.line? | tostring)
+                | .source = "old"
+              ' \
+              > "$GITHUB_WORKSPACE/old.jsonl" 2>&1 || true
 
             echo "Running ty on new commit"
-            "$RUFF_DIR/ty-new" check --color=never --output-format=concise . > "$GITHUB_WORKSPACE/new-output.txt" 2>&1 || true
+            "$RUFF_DIR/ty-new" check \
+              --output-format=gitlab . \
+              | jq '
+                  .[]
+                  | .key = .location?.path? + ":" + (.location?.positions?.begin?.line? | tostring)
+                  | .source = "new"
+              ' \
+              > "$GITHUB_WORKSPACE/new.jsonl" 2>&1 || true
           )
 
-          if ! diff -u old-output.txt new-output.txt > typing_conformance_diagnostics.diff; then
-            echo "Differences found between base and PR"
+          (
+            echo "Collecting expected errors from typing conformance tests"
+            rg '# E\:?' . \
+              --json \
+              | jq '
+                select(.type == "match") |
+                {
+                  key: (.data?.path?.text? + ":" + (.data?.line_number? | tostring)),
+                  source: "expected"
+                }' \
+              > "$GITHUB_WORKSPACE/expected.jsonl" 2>&1 || true
+          )
+
+          (
+            echo "Collating error comparisons between current commit and merge base"
+            jq -s -r '
+              def xor($a; $b): ($a or $b) and (($a and $b) | not);
+              def has($a; $b): $a | index($b) != null;
+              def missing($a; $b): $a | index($b) == null;
+              def severity_to_level:
+                {
+                  "major": "error",
+                  "minor": "warning",
+                  "info": "note"
+                }[.] // "error";
+                def to_concise($d): "\($d.location.path | gsub("^.*typing"; "typing")):" +
+                  "\($d.location.positions.begin.line):\($d.location.positions.begin.column): " +
+                  "\( $d.severity | severity_to_level)[\($d.check_name)]" +
+                  "\($d.description | gsub("^[a-z-]*:"; ""))";
+              def ascii_titlecase:
+                  split(" ") | map((.[0:1] | ascii_upcase) + .[1:]) | join(" ");
+              def sign($s):
+                if $s | contains("positive") then "+ " else "- " end;
+              group_by(.key)
+              | map({
+                  key: .[0].key,
+                  sources: (map(.source) | unique),
+                  changed: xor(
+                    has(map(.source); "new");
+                    has(map(.source); "old")
+                  ),
+                  classification: (
+                    if has(map(.source); "new") and has(map(.source); "expected") then "true_positive"
+                    elif has(map(.source); "new") and missing(map(.source); "expected") then "false_positive"
+                    elif missing(map(.source); "new") and has(map(.source); "expected") then "false_negative"
+                    elif missing(map(.source); "new") and missing(map(.source); "expected") then "true_negative"
+                    else "unknown"
+                    end
+                  ),
+                  old: map(select(.source == "old")) | first,
+                  new: map(select(.source == "new")) | first,
+                  expected: map(select(.source == "expected")) | first
+                })
+              | map(select(.changed))
+              | map({
+                  classification: .classification?,
+                  concise: (
+                    if .classification == "true_positive" then to_concise(.new)
+                    elif .classification == "false_positive" then to_concise(.new)
+                    elif .classification == "false_negative" then to_concise(.old)
+                    elif .classification == "true_negative" then to_concise(.old)
+                    else "unknown"
+                    end
+                  )
+                })
+              | group_by(.classification)
+              | .[]
+              | "### \(. [0].classification | gsub("_"; " ") | ascii_titlecase)s\n"
+                + "\n```diff\n"
+                + (map(sign(.classification) + .concise) | join("\n"))
+                + "\n```\n"
+            ' "${GITHUB_WORKSPACE}/old.jsonl" \
+              "${GITHUB_WORKSPACE}/new.jsonl" \
+              "${GITHUB_WORKSPACE}/expected.jsonl" \
+              > "${GITHUB_WORKSPACE}/changed.md" 2>&1 || true
+          )
+
+          (
+            echo "Computing statistics for summary"
+            jq -s -r '
+              def has($a; $b): $a | index($b) != null;
+              def stats(fp_source):
+                map(select(has(.source; fp_source) or has(.source; "expected")))
+                | group_by(.key)
+                | map(map(.source) | unique)
+                | reduce .[] as $s (
+                    { tp: 0, fp: 0, fn: 0 };
+                    if      $s == [fp_source]  then .fp += 1
+                    elif    $s == ["expected"] then .fn += 1
+                    elif    ($s | length == 2) then .tp += 1
+                    else .
+                    end
+                  )
+                | .precision = (if (.tp + .fp) > 0 then .tp / (.tp + .fp) else 1 end)
+                | .recall    = (if (.tp + .fn) > 0 then .tp / (.tp + .fn) else 1 end);
+              def sign(x):
+                if x > 0 then "+"
+                elif x < 0 then "-"
+                else "±0"
+                end;
+              def trend(x):
+                if x > 0 then "improves"
+                elif x < 0 then "regresses"
+                else "does not change"
+                end;
+              def pct(x):
+                (x * 100 | tostring | .[0:5]) + "%";
+              def summary:
+                [
+                  "## Typing Conformance",
+                  "\n",
+                  "### Summary",
+                  "\n",
+                  "| Metric     | Old | New | Δ |",
+                  "|------------|-----|-----|---|",
+                  "| True Positives | \(.old.tp) | \(.new.tp) | \(.new.tp - .old.tp) |",
+                  "| False Positives | \(.old.fp) | \(.new.fp) | \(.new.fp - .old.fp) |",
+                  "| False Negatives | \(.old.fn) | \(.new.fn) | \(.new.fn - .old.fn) |",
+                  "| Precision  | \(pct(.old.precision)) | \(pct(.new.precision)) | \(sign(.comparison.precision_delta))\(pct(.comparison.precision_delta)) |",
+                  "| Recall     | \(pct(.old.recall)) | \(pct(.new.recall)) | \(sign(.comparison.recall_delta))\(pct(.comparison.recall_delta)) |",
+                  "",
+                  (
+                    "Compared to the current merge base, this PR "
+                    + trend(.comparison.precision_delta)
+                    + " precision and "
+                    + trend(.comparison.recall_delta)
+                    + " recall "
+                    + "(TP: \(.new.tp - .old.tp), "
+                    + "FP: \(.new.fp - .old.fp), "
+                    + "FN: \(.new.fn - .old.fn))."
+                  )
+                ]
+                | join("\n");
+              {
+                new: stats("new"),
+                old: stats("old")
+              }
+              | .comparison = {
+                  precision_delta: (.new.precision - .old.precision),
+                  recall_delta:    (.new.recall    - .old.recall)
+                }
+              | summary
+            ' \
+            "${GITHUB_WORKSPACE}/new.jsonl" \
+            "${GITHUB_WORKSPACE}/old.jsonl" \
+            "${GITHUB_WORKSPACE}/expected.jsonl" \
+            > "${GITHUB_WORKSPACE}/stats.md" 2>&1 || true
+          )
+
+          (
+            echo "Preparing final output for comment"
+            {
+              cat ${GITHUB_WORKSPACE}/stats.md
+              echo
+              cat ${GITHUB_WORKSPACE}/changed.md
+            } > "${GITHUB_WORKSPACE}/typing_conformance_diagnostics.diff" 2>&1 || true
+          )
+          if [ ! -s "${GITHUB_WORKSPACE}/changed.md" ]; then
+              echo "No differences found"
           else
-            echo "No differences found"
-            touch typing_conformance_diagnostics.diff
+              echo "Differences found between base and PR"
           fi
 
           echo "${CONFORMANCE_SUITE_COMMIT}" > conformance-suite-commit
