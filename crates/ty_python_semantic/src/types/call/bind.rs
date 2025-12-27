@@ -1622,21 +1622,6 @@ impl<'db> CallableBinding<'db> {
         )
         .entered();
 
-        // If the callable is a top materialization (e.g., `Top[Callable[..., object]]`), any call
-        // should fail because we don't know the actual signature. The type IS callable (it passes
-        // `callable()`), but it represents an infinite union of all possible callable types, so
-        // there's no valid set of arguments.
-        if let Type::Callable(callable) = self.signature_type
-            && callable.is_top_materialization(db)
-        {
-            for overload in &mut self.overloads {
-                overload
-                    .errors
-                    .push(BindingError::CalledTopCallable(self.signature_type));
-            }
-            return None;
-        }
-
         tracing::trace!(
             target: "ty_python_semantic::types::call::bind",
             matching_overload_index = ?self.matching_overload_index(),
@@ -3716,6 +3701,11 @@ impl<'db> Binding<'db> {
             self.return_ty,
             &mut self.errors,
         );
+        if self.signature.parameters().is_top() {
+            self.errors
+                .push(BindingError::CalledTopCallable(self.signature_type));
+            return;
+        }
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
@@ -4741,6 +4731,5 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         db,
         CallableSignature::single(new_signature),
         CallableTypeKind::FunctionLike,
-        false,
     )))
 }
