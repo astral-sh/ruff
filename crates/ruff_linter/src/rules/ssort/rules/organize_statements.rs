@@ -72,6 +72,31 @@ impl Violation for UnsortedStatements {
     }
 }
 
+/// Get the separator text following a statement in the suite.
+///
+/// ## Arguments
+/// * `suite` - The suite of statements.
+/// * `locator` - The locator for the source code.
+/// * `stmt_idx` - The index of the statement in the suite.
+///
+/// ## Returns
+/// A string representing the separator text following the statement.
+fn separator_for(suite: &[Stmt], locator: &Locator, stmt_idx: usize) -> String {
+    if let Some(next) = suite.get(stmt_idx + 1) {
+        // Preserve the exact text between this statement and the next
+        let range = TextRange::new(suite[stmt_idx].range().end(), next.range().start());
+        locator.slice(range).to_string()
+    } else if suite.len() > 1 {
+        // Reuse the first separator as the trailing text after the last statement may include EOF
+        // newlines or comments
+        let range = TextRange::new(suite[0].range().end(), suite[1].range().start());
+        locator.slice(range).to_string()
+    } else {
+        // Use a two-newline separator since we have a single statement suite
+        "\n\n".to_string()
+    }
+}
+
 /// Sort a suite of statements based on their reference order.
 ///
 /// ## Arguments
@@ -117,22 +142,29 @@ fn organize_suite(suite: &[Stmt], context: &LintContext, locator: &Locator) {
         return;
     }
 
-    // Build a replacement string from the sorted nodes
+    // Build a replacement string by reordering statements while preserving formatting
     let mut replacement = String::new();
     for (i, &node_idx) in sorted.iter().enumerate() {
+        // Append the statement text
         replacement.push_str(locator.slice(suite[node_idx].range()));
 
-        // Add two newlines between statements but not at the end
-        if i < nodes.len() - 1 {
-            replacement.push_str("\n\n");
+        // Append the separator unless this is the last sorted node
+        if i < sorted.len() - 1 {
+            replacement.push_str(&separator_for(suite, locator, node_idx));
         }
     }
 
     // Report the violation and suggest a fix
-    let start = suite.first().unwrap().range().start();
-    let end = suite.last().unwrap().range().end();
-    let mut diagnostic = context.report_diagnostic(UnsortedStatements, TextRange::new(start, end));
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(replacement, start, end)));
+    let range = TextRange::new(
+        suite.first().unwrap().range().start(),
+        suite.last().unwrap().range().end(),
+    );
+    let mut diagnostic = context.report_diagnostic(UnsortedStatements, range);
+    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
+        replacement,
+        range.start(),
+        range.end(),
+    )));
 }
 
 /// SS001
