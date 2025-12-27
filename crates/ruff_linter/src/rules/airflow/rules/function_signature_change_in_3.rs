@@ -85,12 +85,11 @@ pub(crate) fn airflow_3_function_signature_change(checker: &Checker, expr: &Expr
         return;
     };
 
-    // This handles both direct calls from constructor and variable assignments.
     let qualified_name = if let Expr::Call(call) = value.as_ref() {
-        // For direct calls, resolve the qualified name of the constructor
+        // Resolve the qualified name of the constructor
         checker.semantic().resolve_qualified_name(&call.func)
     } else {
-        // For variables like `hlc.create_asset()`, resolve through assignment
+        // Resolve through assignment
         typing::resolve_assignment(value, checker.semantic())
     };
 
