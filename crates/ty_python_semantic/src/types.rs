@@ -7948,6 +7948,14 @@ impl<'db> Type<'db> {
                 method.self_instance(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             )),
 
+            Type::NominalInstance(instance) if matches!(type_mapping, TypeMapping::PromoteLiterals(PromoteLiteralsMode::On)) => {
+                match instance.known_class(db) {
+                    Some(KnownClass::Complex) => KnownUnion::Complex.to_type(db),
+                    Some(KnownClass::Float) => KnownUnion::Float.to_type(db),
+                    _ => instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                }
+            }
+
             Type::NominalInstance(instance) => {
                 instance.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             },
