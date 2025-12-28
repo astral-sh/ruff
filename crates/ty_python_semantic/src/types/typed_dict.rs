@@ -21,11 +21,11 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
-};
+use crate::types::{NormalizedVisitor, TypeContext};
 
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use ordermap::OrderSet;
 
 bitflags! {
