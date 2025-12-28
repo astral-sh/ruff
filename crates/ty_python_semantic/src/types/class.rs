@@ -30,6 +30,9 @@ use crate::types::generics::{
 };
 use crate::types::infer::{infer_expression_type, infer_unpack_types, nearest_enclosing_class};
 use crate::types::member::{Member, class_member};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::signatures::{CallableSignature, Parameter, Parameters, Signature};
 use crate::types::tuple::{TupleSpec, TupleType};
 use crate::types::typed_dict::typed_dict_params_from_class_def;
@@ -37,11 +40,10 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
-    MaterializationKind, NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
-    declaration_type, determine_upper_bound,
+    DeprecatedInstance, FindLegacyTypeVarsVisitor, IntersectionType, KnownInstanceType,
+    ManualPEP695TypeAliasType, MaterializationKind, NormalizedVisitor, PropertyInstanceType,
+    TypeAliasType, TypeContext, TypeMapping, TypedDictParams, UnionBuilder, VarianceInferable,
+    binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,

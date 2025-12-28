@@ -23,11 +23,13 @@ use crate::types::constraints::{
 };
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor,
-    KnownClass, MaterializationKind, NormalizedVisitor, ParamSpecAttrKind, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable, todo_type,
+    FindLegacyTypeVarsVisitor, KnownClass, MaterializationKind, NormalizedVisitor,
+    ParamSpecAttrKind, TypeContext, TypeMapping, VarianceInferable, todo_type,
 };
 use crate::{Db, FxOrderSet};
 use ruff_python_ast::{self as ast, name::Name};
@@ -1860,7 +1862,7 @@ impl<'db> Parameters<'db> {
     ///
     /// Internally, this is represented as `(*Any, **Any)` that accepts parameters of type [`Any`].
     ///
-    /// [`Any`]: crate::types::DynamicType::Any
+    /// [`Any`]: DynamicType::Any
     pub(crate) fn gradual_form() -> Self {
         Self {
             value: vec![
