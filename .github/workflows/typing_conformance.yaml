@@ -57,6 +57,9 @@ jobs:
       - name: Install Rust toolchain
         run: rustup show
 
+      - name: Install ripgrep
+        run: apt-get install ripgrep
+
       - name: Compute diagnostic diff
         shell: bash
         env:
