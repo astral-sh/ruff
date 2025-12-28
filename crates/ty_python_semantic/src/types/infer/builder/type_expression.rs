@@ -968,8 +968,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         }
                     }
                 }
-                KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(_)) => {
-                    // TODO: support generic "manual" PEP 695 type aliases
+                KnownInstanceType::TypeAliasType(
+                    TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_),
+                ) => {
+                    // TODO: support generic manual-PEP-695/implicit type aliases
                     let slice_ty = self.infer_expression(slice, TypeContext::default());
                     let mut variables = FxOrderSet::default();
                     slice_ty.bind_and_find_all_legacy_typevars(

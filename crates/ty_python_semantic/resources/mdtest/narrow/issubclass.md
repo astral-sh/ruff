@@ -173,9 +173,20 @@ python-version = "3.10"
 ```
 
 ```py
+from typing import Literal
+
 def _(x: type[int | list | bytes]):
     # error: [invalid-argument-type]
     if issubclass(x, int | list[int]):
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+    # TODO: This should be an error
+    elif isinstance(x, (list[int] | bytes, int)):
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+    # TODO: This should be an error
+    elif isinstance(x, (int, str | Literal[42])):
+        reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+    # TODO: This should be an error
+    elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
     else:
         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
@@ -345,12 +356,11 @@ def flag() -> bool:
 
 t = int if flag() else str
 
-# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `type | UnionType | tuple[Divergent, ...]`, found `Literal["str"]"
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `_ClassInfo`, found `Literal["str"]"
 if issubclass(t, "str"):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 
-# TODO: this should cause us to emit a diagnostic during
-# type checking
+# error: [invalid-argument-type] "Argument to function `issubclass` is incorrect: Expected `_ClassInfo`, found `tuple[<class 'bytes'>, Literal["str"]]`"
 if issubclass(t, (bytes, "str")):
     reveal_type(t)  # revealed: <class 'int'> | <class 'str'>
 

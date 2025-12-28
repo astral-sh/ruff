@@ -12,28 +12,39 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/issubclass.md
 ## mdtest_snippet.py
 
 ```
-1 | def _(x: type[int | list | bytes]):
-2 |     # error: [invalid-argument-type]
-3 |     if issubclass(x, int | list[int]):
-4 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
-5 |     else:
-6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+ 1 | from typing import Literal
+ 2 | 
+ 3 | def _(x: type[int | list | bytes]):
+ 4 |     # error: [invalid-argument-type]
+ 5 |     if issubclass(x, int | list[int]):
+ 6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+ 7 |     # TODO: This should be an error
+ 8 |     elif isinstance(x, (list[int] | bytes, int)):
+ 9 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+10 |     # TODO: This should be an error
+11 |     elif isinstance(x, (int, str | Literal[42])):
+12 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+13 |     # TODO: This should be an error
+14 |     elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
+15 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+16 |     else:
+17 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
 ```
 
 # Diagnostics
 
 ```
 error[invalid-argument-type]: Invalid second argument to `issubclass`
- --> src/mdtest_snippet.py:3:8
+ --> src/mdtest_snippet.py:5:8
   |
-1 | def _(x: type[int | list | bytes]):
-2 |     # error: [invalid-argument-type]
-3 |     if issubclass(x, int | list[int]):
+3 | def _(x: type[int | list | bytes]):
+4 |     # error: [invalid-argument-type]
+5 |     if issubclass(x, int | list[int]):
   |        ^^^^^^^^^^^^^^---------------^
   |                      |
   |                      This `UnionType` instance contains non-class elements
-4 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
-5 |     else:
+6 |         reveal_type(x)  # revealed: type[int] | type[list[Unknown]] | type[bytes]
+7 |     # TODO: This should be an error
   |
 info: A `UnionType` instance can only be used as the second argument to `issubclass` if all elements are class objects
 info: Element `<class 'list[int]'>` in the union is not a class object

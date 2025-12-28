@@ -34,12 +34,14 @@ pub(crate) use self::infer::{
 pub use self::signatures::ParameterKind;
 pub(crate) use self::signatures::{CallableSignature, Signature};
 pub(crate) use self::subclass_of::{SubclassOfInner, SubclassOfType};
+use crate::ast_node_ref::AstNodeRef;
 pub use crate::diagnostic::add_inferred_python_version_hint_to_diagnostic;
 use crate::place::{
     Definedness, Place, PlaceAndQualifiers, TypeOrigin, Widening, builtins_module_scope,
     imported_symbol, known_module_symbol,
 };
 use crate::semantic_index::definition::{Definition, DefinitionKind};
+use crate::semantic_index::expression::{Expression, ExpressionKind};
 use crate::semantic_index::place::ScopedPlaceId;
 use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
@@ -7501,10 +7503,15 @@ impl<'db> Type<'db> {
                     invalid_expressions: smallvec::smallvec_inline![InvalidTypeExpression::Generic],
                     fallback_type: Type::unknown(),
                 }),
-                KnownInstanceType::UnionType(instance) => {
+                KnownInstanceType::UnionType(UnionTypeInstance::Eager(instance)) => {
                     // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
                     // expensive if there are errors.
                     instance.union_type(db).clone()
+                }
+                KnownInstanceType::UnionType(UnionTypeInstance::Lazy(instance)) => {
+                    Ok(Type::TypeAlias(TypeAliasType::Implicit(
+                        ImplicitTypeAliasType::new(db, instance.name(db), instance.definition(db)),
+                    )))
                 }
                 KnownInstanceType::Literal(ty) => Ok(ty.inner(db)),
                 KnownInstanceType::Annotated(ty) => Ok(ty.inner(db)),
@@ -7881,11 +7888,12 @@ impl<'db> Type<'db> {
                     }
                 }
                 KnownInstanceType::UnionType(instance) => {
-                    if let Ok(union_type) = instance.union_type(db) {
+                    if let UnionTypeInstance::Eager(eager) = instance
+                    && let Ok(union_type) = eager.union_type(db) {
                         Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
+                            UnionTypeInstance::eager(
                                 db,
-                                instance._value_expr_types(db),
+                                *eager._value_expr_types(db),
                                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                             )
                         )))
@@ -8975,7 +8983,7 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         }
         KnownInstanceType::UnionType(instance) => {
             if let Ok(union_type) = instance.union_type(db) {
-                visitor.visit_type(db, *union_type);
+                visitor.visit_type(db, union_type);
             }
         }
         KnownInstanceType::Literal(ty)
@@ -10860,16 +10868,230 @@ impl InferredAs {
     }
 }
 
-/// Contains information about a `types.UnionType` instance built from a PEP 604
-/// union or a legacy `typing.Union[…]` annotation in a value expression context,
-/// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
+/// An instance of `types.UnionType`.
+#[derive(
+    Clone, Copy, Debug, Hash, PartialEq, Eq, PartialOrd, Ord, salsa::Update, get_size2::GetSize,
+)]
+pub enum UnionTypeInstance<'db> {
+    Lazy(LazyUnionTypeInstance<'db>),
+    Eager(EagerUnionTypeInstance<'db>),
+}
+
+impl<'db> UnionTypeInstance<'db> {
+    /// Create a eager union type instance from the given value expression types and union type.
+    pub(crate) fn eager(
+        db: &'db dyn Db,
+        value_expr_types: Option<[Type<'db>; 2]>,
+        union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
+    ) -> Self {
+        UnionTypeInstance::Eager(EagerUnionTypeInstance::new(
+            db,
+            value_expr_types,
+            union_type,
+        ))
+    }
+
+    /// Create a lazy union type instance from a definition.
+    pub(crate) fn from_definition(
+        db: &'db dyn Db,
+        name: Name,
+        definition: Definition<'db>,
+    ) -> Self {
+        UnionTypeInstance::Lazy(LazyUnionTypeInstance::new(db, name, definition))
+    }
+
+    /// Create an eager union type instance from value expression types.
+    pub(crate) fn from_value_expression_types(
+        db: &'db dyn Db,
+        value_expr_types: [Type<'db>; 2],
+        scope_id: ScopeId<'db>,
+        typevar_binding_context: Option<Definition<'db>>,
+    ) -> Type<'db> {
+        EagerUnionTypeInstance::from_value_expression_types(
+            db,
+            value_expr_types,
+            scope_id,
+            typevar_binding_context,
+        )
+    }
+
+    /// The type of the full union, which can be used when this `UnionType` instance
+    /// is used in a type expression context. For `int | str`, this would contain
+    /// `Ok(int | str)`. If any of the element types could not be converted, this
+    /// contains the first encountered error.
+    pub(crate) fn union_type(
+        &self,
+        db: &'db dyn Db,
+    ) -> Result<Type<'db>, InvalidTypeExpressionError<'db>> {
+        match self {
+            // `LazyUnionTypeInstance::union_type` is always OK, since it is checked when promoting an `EagerUnionTypeInstance` to a `LazyUnionTypeInstance`.
+            UnionTypeInstance::Lazy(lazy) => Ok(lazy.union_type(db)),
+            // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
+            // expensive if there are errors.
+            UnionTypeInstance::Eager(eager) => eager.union_type(db).clone(),
+        }
+    }
+
+    /// Get the types of the elements of this union as they would appear in a value
+    /// expression context. For a PEP 604 union, we return the actual types that were
+    /// inferred when we encountered the union in a value expression context. For a
+    /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
+    /// their corresponding value-expression types, i.e. we turn instances like `int`
+    /// into class literals like `<class 'int'>`. This operation is potentially lossy.
+    pub(crate) fn value_expression_types(
+        &self,
+        db: &'db dyn Db,
+    ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
+        match self {
+            UnionTypeInstance::Lazy(lazy) => Ok(Either::Left(lazy.value_expression_types(db)?)),
+            UnionTypeInstance::Eager(eager) => Ok(Either::Right(eager.value_expression_types(db)?)),
+        }
+    }
+
+    /// The optional value expression types (only available for eager instances).
+    #[allow(clippy::ref_option)]
+    pub(crate) fn _value_expr_types(&self, db: &'db dyn Db) -> &'db Option<[Type<'db>; 2]> {
+        match self {
+            UnionTypeInstance::Lazy(_) => &None,
+            UnionTypeInstance::Eager(eager) => eager._value_expr_types(db),
+        }
+    }
+
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        match self {
+            UnionTypeInstance::Lazy(_) => self,
+            UnionTypeInstance::Eager(eager) => {
+                UnionTypeInstance::Eager(eager.normalized_impl(db, visitor))
+            }
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            UnionTypeInstance::Lazy(_) => Some(self),
+            UnionTypeInstance::Eager(eager) => eager
+                .recursive_type_normalized_impl(db, div, nested)
+                .map(UnionTypeInstance::Eager),
+        }
+    }
+}
+
+/// An instance of `types.UnionType` defined by assignment (e.g. `JsonValue = int | float | bool | str | None | dict[str, "JsonValue"] | list["JsonValue"]`).
+/// [`LazyUnionTypeInstance`] is evaluated lazily, so it can have a recursive structure.
+/// [`UnionTypeInstance`] defined with a name is handled in this struct.
+/// [`UnionTypeInstance`] without a name is handled as [`EagerUnionTypeInstance`].
 ///
 /// # Ordering
 /// Ordering is based on the context's salsa-assigned id and not on its values.
 /// The id may change between runs, or when the context was garbage collected and recreated.
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 #[derive(PartialOrd, Ord)]
-pub struct UnionTypeInstance<'db> {
+pub struct LazyUnionTypeInstance<'db> {
+    name: ast::name::Name,
+    definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for LazyUnionTypeInstance<'_> {}
+
+#[salsa::tracked]
+impl<'db> LazyUnionTypeInstance<'db> {
+    #[salsa::tracked(
+        cycle_fn=lazy_union_value_type_cycle_recover,
+        cycle_initial=lazy_union_value_type_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn value_type(self, db: &'db dyn Db, kind: ExpressionKind) -> Type<'db> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+
+        let value_node = match definition.kind(db) {
+            DefinitionKind::Assignment(assignment) => assignment.value(&module),
+            // SAFETY: Only implicit union type aliases that meet this condition are promoted to `LazyUnionTypeInstance`; others are eagerly expanded and do not reach here.
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module).unwrap(),
+            _ => unreachable!(),
+        };
+        let value_expression = Expression::new(
+            db,
+            file,
+            definition.file_scope(db),
+            AstNodeRef::new(&module, value_node),
+            None,
+            kind,
+        );
+
+        infer_expression_type(db, value_expression, TypeContext::default())
+    }
+
+    /// The type of the full union, which can be used when this `UnionType` instance
+    /// is used in a type expression context.
+    pub(crate) fn union_type(self, db: &'db dyn Db) -> Type<'db> {
+        self.value_type(db, ExpressionKind::TypeExpression)
+    }
+
+    /// Get the types of the elements of this union as they would appear in a value
+    /// expression context. For a PEP 604 union, we return the actual types that were
+    /// inferred when we encountered the union in a value expression context. For a
+    /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
+    /// their corresponding value-expression types, i.e. we turn instances like `int`
+    /// into class literals like `<class 'int'>`. This operation is potentially lossy.
+    pub(crate) fn value_expression_types(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
+        match self.value_type(db, ExpressionKind::Normal) {
+            Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::Eager(eager))) => {
+                eager.value_expression_types(db)
+            }
+            other => Err(InvalidTypeExpressionError {
+                fallback_type: Type::unknown(),
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::InvalidType(other, self.definition(db).scope(db))
+                ],
+            }),
+        }
+    }
+}
+
+fn lazy_union_value_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_ty: &Type<'db>,
+    current_ty: Type<'db>,
+    _self: LazyUnionTypeInstance<'db>,
+    _kind: ExpressionKind,
+) -> Type<'db> {
+    current_ty.cycle_normalized(db, *previous_ty, cycle)
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn lazy_union_value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self: LazyUnionTypeInstance<'db>,
+    _kind: ExpressionKind,
+) -> Type<'db> {
+    Type::divergent(id)
+}
+
+/// Contains information about a `types.UnionType` instance built from a PEP 604
+/// union or a legacy `typing.Union[…]` annotation in a value expression context,
+/// e.g. `IntOrStr = int | str` or `IntOrStr = Union[int, str]`.
+///
+/// [`EagerUnionTypeInstance`] cannot have a recursive structure. [`UnionTypeInstance`] used on the fly without a name is handled by this struct.
+/// [`UnionTypeInstance`] with a defined name is handled as [`LazyUnionTypeInstance`].
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct EagerUnionTypeInstance<'db> {
     /// The types of the elements of this union, as they were inferred in a value
     /// expression context. For `int | str`, this would contain `<class 'int'>` and
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
@@ -10886,9 +11108,9 @@ pub struct UnionTypeInstance<'db> {
     union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
 }
 
-impl get_size2::GetSize for UnionTypeInstance<'_> {}
+impl get_size2::GetSize for EagerUnionTypeInstance<'_> {}
 
-impl<'db> UnionTypeInstance<'db> {
+impl<'db> EagerUnionTypeInstance<'db> {
     pub(crate) fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: [Type<'db>; 2],
@@ -10901,13 +11123,13 @@ impl<'db> UnionTypeInstance<'db> {
                 Ok(ty) => builder.add_in_place(ty),
                 Err(error) => {
                     return Type::KnownInstance(KnownInstanceType::UnionType(
-                        UnionTypeInstance::new(db, Some(value_expr_types), Err(error)),
+                        UnionTypeInstance::eager(db, Some(value_expr_types), Err(error)),
                     ));
                 }
             }
         }
 
-        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::new(
+        Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::eager(
             db,
             Some(value_expr_types),
             Ok(builder.build()),
@@ -13717,6 +13939,78 @@ impl<'db> ManualPEP695TypeAliasType<'db> {
     }
 }
 
+/// An implicit type alias defined by assigning a type expression to a name.
+/// It is lazily evaluated and can have a recursive structure (e.g. `JsonValue = int | str | list["JsonValue"] | dict[str, "JsonValue"]`).
+///
+/// # Ordering
+/// Ordering is based on the type alias's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the alias was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct ImplicitTypeAliasType<'db> {
+    #[returns(ref)]
+    pub name: Name,
+    pub definition: Definition<'db>,
+}
+
+impl get_size2::GetSize for ImplicitTypeAliasType<'_> {}
+
+fn walk_implicit_type_alias<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
+    db: &'db dyn Db,
+    type_alias: ImplicitTypeAliasType<'db>,
+    visitor: &V,
+) {
+    visitor.visit_type(db, type_alias.value_type(db));
+}
+
+#[salsa::tracked]
+impl<'db> ImplicitTypeAliasType<'db> {
+    #[salsa::tracked(
+        cycle_fn=implicit_value_type_cycle_recover,
+        cycle_initial=implicit_value_type_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    pub(crate) fn value_type(self, db: &'db dyn Db) -> Type<'db> {
+        let definition = self.definition(db);
+        let file = definition.file(db);
+        let module = parsed_module(db, file).load(db);
+        let value_node = match definition.kind(db) {
+            DefinitionKind::Assignment(assignment) => assignment.value(&module),
+            // SAFETY: Only implicit type aliases that meet this condition are promoted to `ImplicitTypeAliasType`; others are eagerly expanded and do not reach here.
+            DefinitionKind::AnnotatedAssignment(assignment) => assignment.value(&module).unwrap(),
+            _ => unreachable!(),
+        };
+        let value_expression = Expression::new(
+            db,
+            file,
+            definition.file_scope(db),
+            AstNodeRef::new(&module, value_node),
+            None,
+            ExpressionKind::TypeExpression,
+        );
+
+        infer_expression_type(db, value_expression, TypeContext::default())
+    }
+}
+
+fn implicit_value_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_ty: &Type<'db>,
+    current_ty: Type<'db>,
+    _self: ImplicitTypeAliasType<'db>,
+) -> Type<'db> {
+    current_ty.cycle_normalized(db, *previous_ty, cycle)
+}
+
+fn implicit_value_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _self: ImplicitTypeAliasType<'db>,
+) -> Type<'db> {
+    Type::divergent(id)
+}
+
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, salsa::Update, get_size2::GetSize,
 )]
@@ -13725,6 +14019,8 @@ pub enum TypeAliasType<'db> {
     PEP695(PEP695TypeAliasType<'db>),
     /// A type alias defined by manually instantiating the PEP 695 `types.TypeAliasType`.
     ManualPEP695(ManualPEP695TypeAliasType<'db>),
+    /// A type alias defined implicitly (e.g. `JsonValue = int | str | list["JsonValue"] | dict[str, "JsonValue"]`).
+    Implicit(ImplicitTypeAliasType<'db>),
 }
 
 fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -13742,6 +14038,9 @@ fn walk_type_alias_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         TypeAliasType::ManualPEP695(type_alias) => {
             walk_manual_pep_695_type_alias(db, type_alias, visitor);
         }
+        TypeAliasType::Implicit(type_alias) => {
+            walk_implicit_type_alias(db, type_alias, visitor);
+        }
     }
 }
 
@@ -13754,6 +14053,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::ManualPEP695(type_alias) => {
                 TypeAliasType::ManualPEP695(type_alias.normalized_impl(db, visitor))
             }
+            TypeAliasType::Implicit(type_alias) => TypeAliasType::Implicit(type_alias),
         }
     }
 
@@ -13763,6 +14063,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::ManualPEP695(type_alias) => Some(TypeAliasType::ManualPEP695(
                 type_alias.recursive_type_normalized_impl(db, div)?,
             )),
+            TypeAliasType::Implicit(type_alias) => Some(TypeAliasType::Implicit(type_alias)),
         }
     }
 
@@ -13770,6 +14071,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.name(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.name(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.name(db),
         }
     }
 
@@ -13777,6 +14079,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias.definition(db)),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.definition(db),
+            TypeAliasType::Implicit(type_alias) => Some(type_alias.definition(db)),
         }
     }
 
@@ -13784,6 +14087,7 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.value_type(db),
         }
     }
 
@@ -13791,13 +14095,14 @@ impl<'db> TypeAliasType<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.raw_value_type(db),
             TypeAliasType::ManualPEP695(type_alias) => type_alias.value(db),
+            TypeAliasType::Implicit(type_alias) => type_alias.value_type(db),
         }
     }
 
     pub(crate) fn as_pep_695_type_alias(self) -> Option<PEP695TypeAliasType<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => Some(type_alias),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
@@ -13805,21 +14110,21 @@ impl<'db> TypeAliasType<'db> {
         // TODO: Add support for generic non-PEP695 type aliases.
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.generic_context(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
     pub(crate) fn specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.specialization(db),
-            TypeAliasType::ManualPEP695(_) => None,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => None,
         }
     }
 
     fn apply_function_specialization(self, db: &'db dyn Db, ty: Type<'db>) -> Type<'db> {
         match self {
             TypeAliasType::PEP695(type_alias) => type_alias.apply_function_specialization(db, ty),
-            TypeAliasType::ManualPEP695(_) => ty,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => ty,
         }
     }
 
@@ -13832,7 +14137,7 @@ impl<'db> TypeAliasType<'db> {
             TypeAliasType::PEP695(type_alias) => {
                 TypeAliasType::PEP695(type_alias.apply_specialization(db, f))
             }
-            TypeAliasType::ManualPEP695(_) => self,
+            TypeAliasType::ManualPEP695(_) | TypeAliasType::Implicit(_) => self,
         }
     }
 }

@@ -5279,6 +5279,33 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 self.typevar_binding_context = previous_typevar_binding_context;
 
+                let legacy_typevars = |ty: Type<'db>| {
+                    let mut variables = FxOrderSet::default();
+                    ty.bind_and_find_all_legacy_typevars(
+                        self.db(),
+                        self.typevar_binding_context,
+                        &mut variables,
+                    );
+                    variables
+                };
+                // Convert eager union instances to lazy for assignments
+                // This enables lazy evaluation for recursive type aliases like `Foo = int | list["Foo"]`
+                let value_ty = if let Some(name) = target.as_name_expr()
+                && let Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::Eager(eager))) = value_ty
+                // TODO: support generic recursive union type instances
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                {
+                    Type::KnownInstance(KnownInstanceType::UnionType(
+                        UnionTypeInstance::from_definition(
+                            self.db(),
+                            name.id().clone(),
+                            definition,
+                        ),
+                    ))
+                } else {
+                    value_ty
+                };
+
                 // `TYPE_CHECKING` is a special variable that should only be assigned `False`
                 // at runtime, but is always considered `True` in type checking.
                 // See mdtest/known_constants.md#user-defined-type_checking for details.
@@ -6060,6 +6087,29 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::BooleanLiteral(true)
             } else if self.in_stub() && value.is_ellipsis_literal_expr() {
                 declared.inner_type()
+            } else {
+                inferred_ty
+            };
+
+            let legacy_typevars = |ty: Type<'db>| {
+                let mut variables = FxOrderSet::default();
+                ty.bind_and_find_all_legacy_typevars(
+                    self.db(),
+                    self.typevar_binding_context,
+                    &mut variables,
+                );
+                variables
+            };
+            // Convert eager union instances to lazy for assignments
+            // This enables lazy evaluation for recursive type aliases like `Foo: TypeAlias = int | list["Foo"]`
+            let inferred_ty = if let Some(name) = target.as_name_expr()
+                && let Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::Eager(eager))) = inferred_ty
+                // TODO: support generic recursive union type instances
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+            {
+                Type::KnownInstance(KnownInstanceType::UnionType(
+                    UnionTypeInstance::from_definition(self.db(), name.id().clone(), definition),
+                ))
             } else {
                 inferred_ty
             };
@@ -11732,7 +11782,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                         let is_empty = elements.peek().is_none();
                         let union_type = Type::KnownInstance(KnownInstanceType::UnionType(
-                            UnionTypeInstance::new(
+                            UnionTypeInstance::eager(
                                 db,
                                 None,
                                 Ok(UnionType::from_elements(db, elements)),

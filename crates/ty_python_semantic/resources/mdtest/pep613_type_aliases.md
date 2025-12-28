@@ -293,11 +293,10 @@ def _(rec: RecursiveHomogeneousTuple):
     reveal_type(rec)  # revealed: tuple[Divergent, ...]
 
 ClassInfo: TypeAlias = type | UnionType | tuple["ClassInfo", ...]
-reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[Divergent, ...]'>
+reveal_type(ClassInfo)  # revealed: <types.UnionType special-form 'type | UnionType | tuple[ClassInfo, ...]'>
 
 def my_isinstance(obj: object, classinfo: ClassInfo) -> bool:
-    # TODO should be `type | UnionType | tuple[ClassInfo, ...]`
-    reveal_type(classinfo)  # revealed: type | UnionType | tuple[Divergent, ...]
+    reveal_type(classinfo)  # revealed: type | UnionType | tuple[ClassInfo, ...]
     return isinstance(obj, classinfo)
 
 K = TypeVar("K")
@@ -315,7 +314,7 @@ my_isinstance(1, (int, (str, float)))
 my_isinstance(1, (int, (str | float)))
 # error: [invalid-argument-type]
 my_isinstance(1, 1)
-# TODO should be an invalid-argument-type error
+# error: [invalid-argument-type] "Argument to function `my_isinstance` is incorrect: Expected `ClassInfo`, found `tuple[<class 'int'>, tuple[<class 'str'>, Literal[1]]]`"
 my_isinstance(1, (int, (str, 1)))
 ```
 
