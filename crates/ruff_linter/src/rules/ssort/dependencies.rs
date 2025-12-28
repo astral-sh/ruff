@@ -143,11 +143,16 @@ impl Dependencies {
     ///
     /// ## Arguments
     /// * `nodes` - The list of all nodes in the AST.
+    /// * `narrative_order` - Whether to use a narrative-oriented order for the result.
     ///
     /// ## Returns
     /// A vector of node indices in dependency-respecting order, or a CycleError if a cycle is
     /// detected.
-    pub(super) fn dependency_order(&self, nodes: &[Node]) -> Result<Vec<usize>, CycleError> {
+    pub(super) fn dependency_order(
+        &self,
+        nodes: &[Node],
+        narrative_order: bool,
+    ) -> Result<Vec<usize>, CycleError> {
         // Tracks which nodes have already been emitted to avoid duplicates
         let mut emitted = vec![false; nodes.len()];
 
@@ -200,6 +205,21 @@ impl Dependencies {
                 &mut visiting,
                 &mut result,
             )?;
+        }
+        if narrative_order {
+            // Collect positions of movable nodes
+            let positions: Vec<usize> = result
+                .iter()
+                .enumerate()
+                .filter_map(|(i, &idx)| nodes[idx].movable.then_some(i))
+                .collect();
+
+            // Swap movable nodes symmetrically to reverse their order
+            for k in 0..positions.len() / 2 {
+                let i = positions[k];
+                let j = positions[positions.len() - 1 - k];
+                result.swap(i, j);
+            }
         }
         Ok(result)
     }

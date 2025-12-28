@@ -2,3 +2,4 @@
 
 mod dependencies;
 pub(crate) mod rules;
+pub mod settings;

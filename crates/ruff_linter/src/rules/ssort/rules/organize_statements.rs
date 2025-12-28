@@ -122,10 +122,11 @@ impl Violation for UnsortedStatements {
 /// ## Arguments
 /// * `locator` - The locator for the source code.
 /// * `stmt` - The statement to get the replacement text for.
+/// * `narrative_order` - Whether to use a narrative-oriented order for the result.
 ///
 /// ## Returns
 /// A string representing the replacement text for the statement.
-fn get_replacement_text(locator: &Locator, stmt: &Stmt) -> String {
+fn get_replacement_text(locator: &Locator, stmt: &Stmt, narrative_order: bool) -> String {
     // If the statement is a class, get its definition, otherwise, return the original text
     let original_text = locator.slice(stmt.range()).to_string();
     let class_def = match stmt {
@@ -134,7 +135,7 @@ fn get_replacement_text(locator: &Locator, stmt: &Stmt) -> String {
     };
 
     // Construct the replacement text by sorting the class body
-    let inner_replacement = organize_suite(&class_def.body, locator);
+    let inner_replacement = organize_suite(&class_def.body, locator, narrative_order);
 
     // Compute the range of the body text and insert the replacement text between them
     let body_range = TextRange::new(
@@ -179,10 +180,11 @@ fn separator_for(suite: &[Stmt], locator: &Locator, stmt_idx: usize) -> String {
 /// ## Arguments
 /// * `suite` - The suite of statements to organize.
 /// * `locator` - The locator for the source code.
+/// * `narrative_order` - Whether to use a narrative-oriented order for the result.
 ///
 /// ## Returns
 /// A string representing the organized suite of statements.
-fn organize_suite(suite: &[Stmt], locator: &Locator) -> String {
+fn organize_suite(suite: &[Stmt], locator: &Locator, narrative_order: bool) -> String {
     // Collect all statements marking only functions and classes as movable
     let nodes: Vec<Node> = suite
         .iter()
@@ -205,14 +207,14 @@ fn organize_suite(suite: &[Stmt], locator: &Locator) -> String {
     // Get the dependency order of the nodes
     let dependencies = Dependencies::from_nodes(&nodes);
     let sorted = dependencies
-        .dependency_order(&nodes)
+        .dependency_order(&nodes, narrative_order)
         .unwrap_or_else(|_| (0..nodes.len()).collect());
 
     // Build a replacement string by reordering statements while preserving formatting
     let mut replacement = String::new();
     for (i, &node_idx) in sorted.iter().enumerate() {
         // Append the statement text
-        let suite_text = get_replacement_text(locator, &nodes[node_idx].stmt);
+        let suite_text = get_replacement_text(locator, &nodes[node_idx].stmt, narrative_order);
         replacement.push_str(&suite_text);
 
         // Append the separator unless this is the last sorted node
@@ -226,7 +228,11 @@ fn organize_suite(suite: &[Stmt], locator: &Locator) -> String {
 /// SS001
 pub(crate) fn organize_statements(checker: &Checker, suite: &[Stmt]) {
     // Build the replacement string recursively by sorting the statements in the suite
-    let replacement = organize_suite(suite, checker.locator());
+    let replacement = organize_suite(
+        suite,
+        checker.locator(),
+        checker.settings().ssort.narrative_order,
+    );
 
     // Only report a diagnostic if the replacement is different
     let range = TextRange::new(
