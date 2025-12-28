@@ -55,8 +55,23 @@ impl<'a> Visitor<'a> for DependencyVisitor<'a> {
     /// * `expr` - The expression node to visit.
     fn visit_expr(&mut self, expr: &'a Expr) {
         // If the expression is a reference, add it to the set
-        if let Expr::Name(name) = expr {
-            self.names.insert(&name.id);
+        match expr {
+            // Unqualified reference, e.g. `foo()`
+            Expr::Name(name) => {
+                self.names.insert(&name.id);
+            }
+
+            // Instance method call, e.g. `self.foo()`
+            Expr::Attribute(attr) => {
+                if let Expr::Name(value) = &*attr.value {
+                    if value.id.as_str() == "self" {
+                        self.names.insert(&attr.attr.id);
+                    }
+                }
+            }
+
+            // Other expressions are not relevant for dependency collection
+            _ => {}
         }
         walk_expr(self, expr);
     }

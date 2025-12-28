@@ -3,7 +3,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
 
-use crate::checkers::ast::{Checker, LintContext};
+use crate::checkers::ast::Checker;
 use crate::rules::ssort::dependencies::{Dependencies, Node};
 use crate::{FixAvailability, Locator, Violation};
 
@@ -45,6 +45,51 @@ use crate::{FixAvailability, Locator, Violation};
 /// def foo():
 ///     bar()
 /// ```
+///
+/// ## Limitations
+///
+/// This rule will not sort bodies containing circular dependencies, as they cannot be
+/// reordered while preserving the dependency relationships. However, nested bodies within
+/// those statements may still be sorted independently.
+///
+/// For example, the top-level functions `a` and `b` will not be sorted due to their circular
+/// dependency, but the class `C` will have its methods sorted:
+///
+/// ```python
+/// def a():
+///     return b()
+///
+///
+/// def b():
+///     return a()
+///
+///
+/// class C:
+///     def method_b(self):
+///         return self.method_a()
+///
+///     def method_a(self):
+///         pass
+/// ```
+///
+/// After applying this rule:
+///
+/// ```python
+/// def a():
+///     return b()
+///
+///
+/// def b():
+///     return a()
+///
+///
+/// class C:
+///     def method_a(self):
+///         pass
+///
+///     def method_b(self):
+///         return self.method_a()
+/// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct UnsortedStatements;
@@ -70,6 +115,38 @@ impl Violation for UnsortedStatements {
     fn fix_title(&self) -> Option<String> {
         Some("Organize statements".to_string())
     }
+}
+
+/// Get the replacement text for a statement, organizing its body if it is a class definition.
+///
+/// ## Arguments
+/// * `locator` - The locator for the source code.
+/// * `stmt` - The statement to get the replacement text for.
+///
+/// ## Returns
+/// A string representing the replacement text for the statement.
+fn get_replacement_text(locator: &Locator, stmt: &Stmt) -> String {
+    // If the statement is a class, get its definition, otherwise, return the original text
+    let original_text = locator.slice(stmt.range()).to_string();
+    let class_def = match stmt {
+        Stmt::ClassDef(c) => c,
+        _ => return original_text,
+    };
+
+    // Construct the replacement text by sorting the class body
+    let inner_replacement = organize_suite(&class_def.body, locator);
+
+    // Compute the range of the body text and insert the replacement text between them
+    let body_range = TextRange::new(
+        class_def.body.first().unwrap().range().start(),
+        class_def.body.last().unwrap().range().end(),
+    );
+    format!(
+        "{}{}{}",
+        locator.slice(TextRange::new(stmt.range().start(), body_range.start())),
+        inner_replacement,
+        locator.slice(TextRange::new(body_range.end(), stmt.range().end()))
+    )
 }
 
 /// Get the separator text following a statement in the suite.
@@ -101,9 +178,11 @@ fn separator_for(suite: &[Stmt], locator: &Locator, stmt_idx: usize) -> String {
 ///
 /// ## Arguments
 /// * `suite` - The suite of statements to organize.
-/// * `context` - The linting context.
 /// * `locator` - The locator for the source code.
-fn organize_suite(suite: &[Stmt], context: &LintContext, locator: &Locator) {
+///
+/// ## Returns
+/// A string representing the organized suite of statements.
+fn organize_suite(suite: &[Stmt], locator: &Locator) -> String {
     // Collect all statements marking only functions and classes as movable
     let nodes: Vec<Node> = suite
         .iter()
@@ -123,51 +202,45 @@ fn organize_suite(suite: &[Stmt], context: &LintContext, locator: &Locator) {
         })
         .collect();
 
-    // Return early if there are fewer than 2 movable nodes
-    if nodes.iter().filter(|node| node.movable).count() < 2 {
-        return;
-    }
-
-    // Check if the order has changed compared to the original order
+    // Get the dependency order of the nodes
     let dependencies = Dependencies::from_nodes(&nodes);
-    let sorted = match dependencies.dependency_order(&nodes) {
-        Ok(sorted) => sorted,
-        Err(_) => return,
-    };
-    if sorted
-        .iter()
-        .enumerate()
-        .all(|(i, &idx)| idx == nodes[i].index)
-    {
-        return;
-    }
+    let sorted = dependencies
+        .dependency_order(&nodes)
+        .unwrap_or_else(|_| (0..nodes.len()).collect());
 
     // Build a replacement string by reordering statements while preserving formatting
     let mut replacement = String::new();
     for (i, &node_idx) in sorted.iter().enumerate() {
         // Append the statement text
-        replacement.push_str(locator.slice(suite[node_idx].range()));
+        let suite_text = get_replacement_text(locator, &nodes[node_idx].stmt);
+        replacement.push_str(&suite_text);
 
         // Append the separator unless this is the last sorted node
         if i < sorted.len() - 1 {
             replacement.push_str(&separator_for(suite, locator, node_idx));
         }
     }
-
-    // Report the violation and suggest a fix
-    let range = TextRange::new(
-        suite.first().unwrap().range().start(),
-        suite.last().unwrap().range().end(),
-    );
-    let mut diagnostic = context.report_diagnostic(UnsortedStatements, range);
-    diagnostic.set_fix(Fix::safe_edit(Edit::replacement(
-        replacement,
-        range.start(),
-        range.end(),
-    )));
+    replacement
 }
 
 /// SS001
 pub(crate) fn organize_statements(checker: &Checker, suite: &[Stmt]) {
-    organize_suite(suite, &checker.context(), checker.locator());
+    // Build the replacement string recursively by sorting the statements in the suite
+    let replacement = organize_suite(suite, checker.locator());
+
+    // Only report a diagnostic if the replacement is different
+    let range = TextRange::new(
+        suite.first().unwrap().range().start(),
+        suite.last().unwrap().range().end(),
+    );
+    let original_text = checker.locator().slice(range);
+    if replacement != original_text {
+        checker
+            .report_diagnostic(UnsortedStatements, range)
+            .set_fix(Fix::safe_edit(Edit::replacement(
+                replacement,
+                range.start(),
+                range.end(),
+            )));
+    }
 }
