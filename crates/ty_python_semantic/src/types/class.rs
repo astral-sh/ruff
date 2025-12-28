@@ -1222,7 +1222,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                CallableTypeKind::FunctionLike,
+                CallableTypeKind::Regular,
             );
 
             if returns_non_subclass {
@@ -1292,7 +1292,7 @@ impl<'db> ClassType<'db> {
                 Some(CallableType::new(
                     db,
                     synthesized_dunder_init_signature,
-                    CallableTypeKind::FunctionLike,
+                    CallableTypeKind::Regular,
                 ))
             } else {
                 None
