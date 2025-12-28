@@ -7150,9 +7150,9 @@ impl<'db> Type<'db> {
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
         //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
+        // Note: We extract and use the `__new__` return type annotation. If it's a TypeVar (including
+        // `Self`), we specialize it in the context of the instance type. If it's a custom type
+        // (e.g., `str` for a descriptor), we use that instead of the instance type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -7162,6 +7162,16 @@ impl<'db> Type<'db> {
         // easy to check if that's the one we found?
         // Note that `__new__` is a static method, so we must inject the `cls` argument.
         let new_method = self_type.lookup_dunder_new(db);
+
+        // Extract the annotated return type from `__new__` if available.
+        // This allows classes to return different types (e.g., `def __new__(cls) -> str: ...`).
+        let new_return_type = new_method.as_ref().and_then(|method| match &method.place {
+            Place::Defined(Type::FunctionLiteral(function_literal), ..) => {
+                let signature = function_literal.last_definition_signature(db);
+                signature.return_ty
+            }
+            _ => None,
+        });
 
         // Construct an instance type that we can use to look up the `__init__` instance method.
         // This performs the same logic as `Type::to_instance`, except for generic class literals.
@@ -7273,6 +7283,9 @@ impl<'db> Type<'db> {
             .to_instance(db)
             .expect("type should be convertible to instance type");
 
+        // Store whether we have a custom __new__ before moving new_call_outcome
+        let has_new_method = new_call_outcome.is_some();
+
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
             (
@@ -7315,10 +7328,27 @@ impl<'db> Type<'db> {
                         )
                     })
                     .unwrap_or(instance_ty);
-                Ok(specialized)
+
+                // Use custom __new__ return type if available and different from instance type
+                let result_ty = Self::choose_constructor_return_type(
+                    db,
+                    new_return_type,
+                    specialized,
+                    has_new_method,
+                );
+                Ok(result_ty)
             }
 
-            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (None, None | Some(Ok(_)), None | Some(Ok(_))) => {
+                // Use custom __new__ return type if available and different from instance type
+                let result_ty = Self::choose_constructor_return_type(
+                    db,
+                    new_return_type,
+                    instance_ty,
+                    has_new_method,
+                );
+                Ok(result_ty)
+            }
 
             (_, None | Some(Ok(_)), Some(Err(error))) => {
                 // no custom `__new__` or it was called and succeeded, but `__init__` failed.
@@ -7337,6 +7367,96 @@ impl<'db> Type<'db> {
                 ))
             }
         }
+    }
+
+    /// Choose the return type for a constructor call.
+    ///
+    /// If `__new__` has a custom return type that differs from the instance type,
+    /// use it (unless it's `Self` or equivalent to the instance type).
+    fn choose_constructor_return_type(
+        db: &'db dyn Db,
+        new_return_type: Option<Type<'db>>,
+        instance_ty: Type<'db>,
+        has_new_method: bool,
+    ) -> Type<'db> {
+        // If there's no custom __new__ method, use the instance type
+        if !has_new_method {
+            return instance_ty;
+        }
+
+        // If we couldn't extract a return type from __new__, use the instance type
+        let Some(new_return_ty) = new_return_type else {
+            return instance_ty;
+        };
+
+        // If the return type is a TypeVar, specialize it in the context of instance_ty.
+        // For example, if Parameter[str].__new__ returns _T, we should return str, not Parameter[str].
+        if let Type::TypeVar(typevar) = new_return_ty {
+            use crate::types::ClassType;
+            // Try to get the specialized value of this TypeVar from instance_ty
+            if let Some(inst_instance) = instance_ty.as_nominal_instance() {
+                let inst_class = inst_instance.class(db);
+                if let ClassType::Generic(generic) = inst_class {
+                    let specialization = generic.specialization(db);
+                    if let Some(specialized_value) = specialization.get(db, typevar) {
+                        return specialized_value;
+                    }
+                }
+            }
+            // If we can't specialize the TypeVar, fall back to instance_ty
+            return instance_ty;
+        }
+
+        // If both the return type and instance type are NominalInstances, check if they're
+        // the same class or if the return type is a base class of the instance type.
+        // If so, use instance_ty to preserve specialization logic.
+        if let (Some(new_instance), Some(inst_instance)) = (
+            new_return_ty.as_nominal_instance(),
+            instance_ty.as_nominal_instance(),
+        ) {
+            let new_class = new_instance.class(db);
+            let inst_class = inst_instance.class(db);
+            let new_class_literal = new_class.class_literal(db).0;
+            let inst_class_literal = inst_class.class_literal(db).0;
+
+            // Compare unspecialized classes to handle cases where the instance class
+            // inherits from a generic base class (e.g., D(C[V, int]))
+            // Check if new_class_literal appears anywhere in the MRO of inst_class_literal
+            use crate::types::class_base::ClassBase;
+            let is_same_class = new_class_literal == inst_class_literal;
+            let is_subclass = inst_class_literal.iter_mro(db, None).any(|base| {
+                if let ClassBase::Class(class_type) = base {
+                    class_type.class_literal(db).0 == new_class_literal
+                } else {
+                    false
+                }
+            });
+
+            if is_same_class || is_subclass {
+                return instance_ty;
+            }
+        }
+
+        // If the return type is a union containing the instance type, it's likely from
+        // an overload or `Self | SomeOtherType`, so use the instance type
+        if let Type::Union(union) = new_return_ty {
+            if union
+                .elements(db)
+                .iter()
+                .any(|elem| elem.is_equivalent_to(db, instance_ty))
+            {
+                return instance_ty;
+            }
+        }
+
+        // If the return type is equivalent to the instance type (common for normal classes
+        // where __new__ returns Self or the same class), use the instance type
+        if new_return_ty.is_equivalent_to(db, instance_ty) {
+            return instance_ty;
+        }
+
+        // Otherwise, use the custom return type from __new__
+        new_return_ty
     }
 
     #[must_use]
