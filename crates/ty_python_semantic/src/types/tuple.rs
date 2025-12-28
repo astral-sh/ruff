@@ -1542,7 +1542,8 @@ impl<'db> Tuple<Type<'db>> {
         {
             if rev {
                 a.iter()
-                    .zip(b)
+                    .rev()
+                    .zip(b.iter().rev())
                     .when_any(db, |(self_element, other_element)| {
                         self_element.is_disjoint_from_impl(
                             db,
@@ -1554,8 +1555,7 @@ impl<'db> Tuple<Type<'db>> {
                     })
             } else {
                 a.iter()
-                    .rev()
-                    .zip(b.iter().rev())
+                    .zip(b)
                     .when_any(db, |(self_element, other_element)| {
                         self_element.is_disjoint_from_impl(
                             db,
