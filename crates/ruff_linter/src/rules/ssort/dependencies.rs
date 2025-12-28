@@ -9,8 +9,8 @@ use ruff_python_ast::{Expr, Stmt};
 /// An error indicating that a cycle was detected in the dependency graph.
 #[derive(Debug)]
 pub(super) struct CycleError {
-    /// The index of the node where the cycle was detected.
-    pub(crate) index: usize,
+    /// The indices of nodes involved in the cycle, in call order.
+    pub(crate) cycle: Vec<usize>,
 }
 
 /// Allows CycleError to be treated as a standard error.
@@ -20,7 +20,7 @@ impl std::error::Error for CycleError {}
 impl fmt::Display for CycleError {
     /// Format the cycle error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(formatter, "Cycle detected at node index {}", self.index)
+        write!(formatter, "Cycle detected involving nodes {:?}", self.cycle)
     }
 }
 
@@ -159,17 +159,24 @@ impl Dependencies {
         // Tracks which nodes are currently being visited to detect cycles
         let mut visiting = vec![false; nodes.len()];
 
+        // Tracks the current stack of nodes being visited for cycle reporting
+        let mut stack = Vec::new();
+
         fn emit_deps(
             idx: usize,
             deps: &[Vec<usize>],
             nodes: &[Node],
             emitted: &mut [bool],
             visiting: &mut [bool],
+            stack: &mut Vec<usize>,
             result: &mut Vec<usize>,
         ) -> Result<(), CycleError> {
             // If we're already visiting this node, we've detected a cycle
             if visiting[idx] {
-                return Err(CycleError { index: idx });
+                let pos = stack.iter().position(|&n| n == idx).unwrap();
+                return Err(CycleError {
+                    cycle: stack[pos..].to_vec(),
+                });
             }
 
             // If we've already emitted this node, skip it
@@ -179,15 +186,17 @@ impl Dependencies {
 
             // Temporarily mark this node as being visited to detect cycles
             visiting[idx] = true;
+            stack.push(idx);
 
             // Recursively emit all movable dependencies first
             for &dep in &deps[idx] {
                 if nodes[dep].movable {
-                    emit_deps(dep, deps, nodes, emitted, visiting, result)?;
+                    emit_deps(dep, deps, nodes, emitted, visiting, stack, result)?;
                 }
             }
 
             // Mark this node as no longer being visited and emit it
+            stack.pop();
             visiting[idx] = false;
             emitted[idx] = true;
             result.push(idx);
@@ -203,6 +212,7 @@ impl Dependencies {
                 nodes,
                 &mut emitted,
                 &mut visiting,
+                &mut stack,
                 &mut result,
             )?;
         }
@@ -223,4 +233,33 @@ impl Dependencies {
         }
         Ok(result)
     }
+}
+
+/// Extract all statements from a suite and convert them into nodes.
+///
+/// Note that only function and class definitions are marked as movable.
+///
+/// ## Arguments
+/// * `suite` - The suite of statements to extract nodes from.
+///
+/// ## Returns
+/// A vector of nodes representing the statements in the suite.
+pub(super) fn nodes_from_suite(suite: &'_ [Stmt]) -> Vec<Node<'_>> {
+    suite
+        .iter()
+        .enumerate()
+        .map(|(index, stmt)| {
+            let name = match stmt {
+                Stmt::FunctionDef(def) => Some(&def.name.id),
+                Stmt::ClassDef(def) => Some(&def.name.id),
+                _ => None,
+            };
+            Node {
+                index,
+                name,
+                stmt,
+                movable: name.is_some(),
+            }
+        })
+        .collect()
 }

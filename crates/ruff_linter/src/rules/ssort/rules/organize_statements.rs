@@ -4,7 +4,7 @@ use ruff_python_ast::Stmt;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::rules::ssort::dependencies::{Dependencies, Node};
+use crate::rules::ssort::dependencies::{Dependencies, nodes_from_suite};
 use crate::{FixAvailability, Locator, Violation};
 
 /// ## What it does
@@ -185,26 +185,8 @@ fn separator_for(suite: &[Stmt], locator: &Locator, stmt_idx: usize) -> String {
 /// ## Returns
 /// A string representing the organized suite of statements.
 fn organize_suite(suite: &[Stmt], locator: &Locator, narrative_order: bool) -> String {
-    // Collect all statements marking only functions and classes as movable
-    let nodes: Vec<Node> = suite
-        .iter()
-        .enumerate()
-        .map(|(index, stmt)| {
-            let name = match stmt {
-                Stmt::FunctionDef(def) => Some(&def.name.id),
-                Stmt::ClassDef(def) => Some(&def.name.id),
-                _ => None,
-            };
-            Node {
-                index,
-                name,
-                stmt,
-                movable: name.is_some(),
-            }
-        })
-        .collect();
-
     // Get the dependency order of the nodes
+    let nodes = nodes_from_suite(suite);
     let dependencies = Dependencies::from_nodes(&nodes);
     let sorted = dependencies
         .dependency_order(&nodes, narrative_order)
