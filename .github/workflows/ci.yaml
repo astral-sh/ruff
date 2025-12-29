@@ -49,6 +49,8 @@ jobs:
       py-fuzzer: ${{ steps.check_py_fuzzer.outputs.changed }}
       # Flag that is set to "true" when code related to the playground changes.
       playground: ${{ steps.check_playground.outputs.changed }}
+      # Flag that is set to "true" when code related to the benchmarks changes.
+      benchmarks: ${{ steps.check_benchmarks.outputs.changed }}
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
@@ -95,6 +97,7 @@ jobs:
             ':!crates/ruff_python_formatter/**' \
             ':!crates/ruff_formatter/**' \
             ':!crates/ruff_dev/**' \
+            ':!crates/ruff_benchmark/**' \
             ':scripts/*' \
             ':python/**' \
             ':.github/workflows/ci.yaml' \
@@ -202,6 +205,21 @@ jobs:
             ':crates/ruff_python_trivia/**' \
             ':crates/ruff_source_file/**' \
             ':crates/ruff_text_size/**' \
+            ':.github/workflows/ci.yaml' \
+          ; then
+              echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check if the benchmark code changed
+        id: check_benchmarks
+        env:
+          MERGE_BASE: ${{ steps.merge_base.outputs.sha }}
+        run: |
+          if git diff --quiet "${MERGE_BASE}...HEAD" -- \
+            ':Cargo.toml' \
+            ':Cargo.lock' \
             ':crates/ruff_benchmark/**' \
             ':.github/workflows/ci.yaml' \
           ; then
@@ -530,7 +548,12 @@ jobs:
     needs: determine_changes
     # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
     # Ecosystem check needs linter and/or formatter changes.
-    if: ${{ !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' && needs.determine_changes.outputs.code == 'true' }}
+    if: |
+      !contains(github.event.pull_request.labels.*.name, 'no-test') && github.event_name == 'pull_request' &&
+      (
+        needs.determine_changes.outputs.linter == 'true' ||
+        needs.determine_changes.outputs.formatter == 'true'
+      )
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
@@ -926,7 +949,9 @@ jobs:
       (
         github.ref == 'refs/heads/main' ||
         needs.determine_changes.outputs.formatter == 'true' ||
-        needs.determine_changes.outputs.linter == 'true'
+        needs.determine_changes.outputs.linter == 'true' ||
+        needs.determine_changes.outputs.parser == 'true' ||
+        needs.determine_changes.outputs.benchmarks == 'true'
       )
     timeout-minutes: 20
     permissions:
@@ -968,7 +993,8 @@ jobs:
       github.repository == 'astral-sh/ruff' &&
       (
         github.ref == 'refs/heads/main' ||
-        needs.determine_changes.outputs.ty == 'true'
+        needs.determine_changes.outputs.ty == 'true' ||
+        needs.determine_changes.outputs.benchmarks == 'true'
       )
     timeout-minutes: 20
     steps:
@@ -1046,7 +1072,16 @@ jobs:
     # so hardcoding depot here is fine
     runs-on: depot-ubuntu-22.04-arm-4
     needs: determine_changes
-    if: ${{ github.repository == 'astral-sh/ruff' && !contains(github.event.pull_request.labels.*.name, 'no-test') && (needs.determine_changes.outputs.ty == 'true' || github.ref == 'refs/heads/main') }}
+    if: |
+      github.repository == 'astral-sh/ruff' &&
+      (
+        !contains(github.event.pull_request.labels.*.name, 'no-test') &&
+        (
+          needs.determine_changes.outputs.ty == 'true' ||
+          needs.determine_changes.outputs.benchmarks == 'true' ||
+          github.ref == 'refs/heads/main'
+        )
+      )
     timeout-minutes: 20
     steps:
       - name: "Checkout Branch"
