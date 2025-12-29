@@ -1,0 +1,30 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> simple_decorator.py:1:1
+  |
+1 | / def function():
+2 | |     return dependency()
+3 | |
+4 | | def decorator(fn):
+5 | |     return fn
+6 | |
+7 | | @decorator
+8 | | def dependency():
+9 | |     return True
+  | |_______________^
+  |
+help: Organize statements
+1 | def function():
+2 |     return dependency()
+3 | 
+  - def decorator(fn):
+  -     return fn
+  - 
+4 | @decorator
+5 | def dependency():
+6 |     return True
+7 + 
+8 + def decorator(fn):
+9 +     return fn

@@ -263,3 +263,523 @@ pub(super) fn nodes_from_suite(suite: &'_ [Stmt]) -> Vec<Node<'_>> {
         })
         .collect()
 }
+
+#[cfg(test)]
+mod tests {
+    use anyhow::Result;
+    use ruff_python_parser::parse_module;
+
+    use super::{CycleError, Dependencies, collect_dependencies, nodes_from_suite};
+
+    /// Test that CycleError displays correctly.
+    #[test]
+    fn cycle_error_display() {
+        let err = CycleError {
+            cycle: vec![0, 1, 2],
+        };
+        let display = format!("{}", err);
+
+        assert!(display.contains("Cycle detected"));
+        assert!(display.contains("0"));
+        assert!(display.contains("1"));
+        assert!(display.contains("2"));
+    }
+
+    /// Test that CycleError implements std::error::Error.
+    #[test]
+    fn cycle_error_is_error() {
+        let err = CycleError { cycle: vec![0] };
+        let _: &dyn std::error::Error = &err;
+    }
+
+    /// Test that functions with no external references have no dependencies.
+    #[test]
+    fn collect_dependencies_none() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(collect_dependencies(&nodes[0], &nodes).len(), 0);
+        assert_eq!(collect_dependencies(&nodes[1], &nodes).len(), 0);
+        Ok(())
+    }
+
+    /// Test that a simple single dependency is collected.
+    #[test]
+    fn collect_dependencies_simple() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return foo()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[1], &nodes);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that multiple dependencies are collected.
+    #[test]
+    fn collect_dependencies_multiple() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return foo() + bar()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[2], &nodes);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that self-referential calls (recursion) are filtered out.
+    #[test]
+    fn collect_dependencies_self_reference() -> Result<()> {
+        let source = r#"
+def factorial(n):
+    return n * factorial(n - 1)
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[0], &nodes);
+
+        assert_eq!(deps.len(), 0);
+        Ok(())
+    }
+
+    /// Test that non-self attribute access doesn't create dependencies.
+    #[test]
+    fn collect_dependencies_non_self_attribute() -> Result<()> {
+        let source = r#"
+def foo():
+    obj = SomeClass()
+    return obj.method()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[0], &nodes);
+
+        assert_eq!(deps.len(), 0);
+        Ok(())
+    }
+
+    /// Test that dependencies between classes are collected.
+    #[test]
+    fn collect_dependencies_between_classes() -> Result<()> {
+        let source = r#"
+class Base:
+    pass
+
+class Derived:
+    base = Base()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[1], &nodes);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that nested function calls are tracked (transitivity).
+    #[test]
+    fn collect_dependencies_nested_calls() -> Result<()> {
+        let source = r#"
+def a():
+    return 1
+
+def b():
+    return a()
+
+def c():
+    return b()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(collect_dependencies(&nodes[1], &nodes), vec![0]);
+        assert_eq!(collect_dependencies(&nodes[2], &nodes), vec![1]);
+        Ok(())
+    }
+
+    /// Test that dependencies in various expression contexts are collected.
+    #[test]
+    fn collect_dependencies_various_contexts() -> Result<()> {
+        let source = r#"
+def foo():
+    return [1, 2]
+
+def bar():
+    return foo()[0] + len(foo())
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = collect_dependencies(&nodes[1], &nodes);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that nodes with no dependencies maintain their original order.
+    #[test]
+    fn dependency_order_preserved() -> Result<()> {
+        let source = r#"
+def foo():
+    pass
+
+def bar():
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order, vec![0, 1]);
+        Ok(())
+    }
+
+    /// Test that a simple reordering works correctly.
+    #[test]
+    fn dependency_order_simple_reorder() -> Result<()> {
+        let source = r#"
+def bar():
+    return foo()
+
+def foo():
+    return 1
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order, vec![1, 0]);
+        Ok(())
+    }
+
+    /// Test that a dependency chain is ordered correctly.
+    #[test]
+    fn dependency_order_chain() -> Result<()> {
+        let source = r#"
+def baz():
+    return bar()
+
+def bar():
+    return foo()
+
+def foo():
+    return 1
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order, vec![2, 1, 0]);
+        Ok(())
+    }
+
+    /// Test that non-movable statements stay in their original positions.
+    #[test]
+    fn dependency_order_non_movable_preserved() -> Result<()> {
+        let source = r#"
+x = 1
+
+def foo():
+    return x
+
+def bar():
+    return foo()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order, vec![0, 1, 2]);
+        Ok(())
+    }
+
+    /// Test that cycle detection between two functions works correctly.
+    #[test]
+    fn dependency_order_simple_cycle() -> Result<()> {
+        let source = r#"
+def foo():
+    return bar()
+
+def bar():
+    return foo()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let result = deps.dependency_order(&nodes, false);
+
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.cycle, vec![0, 1]);
+        Ok(())
+    }
+
+    /// Test that cycle detection with three functions works correctly.
+    #[test]
+    fn dependency_order_three_way_cycle() -> Result<()> {
+        let source = r#"
+def a():
+    return b()
+
+def b():
+    return c()
+
+def c():
+    return a()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let result = deps.dependency_order(&nodes, false);
+
+        assert!(result.is_err());
+        assert!(!result.unwrap_err().cycle.is_empty());
+        Ok(())
+    }
+
+    /// Test that narrative mode reverses movable nodes while keeping non-movable nodes in place.
+    #[test]
+    fn dependency_order_narrative_simple() -> Result<()> {
+        let source = r#"
+def baz():
+    return bar()
+
+def bar():
+    return foo()
+
+def foo():
+    return 1
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, true)?;
+
+        assert_eq!(order, vec![0, 1, 2]);
+        Ok(())
+    }
+
+    /// Test that narrative mode with non-movable statements interspersed works correctly.
+    #[test]
+    fn dependency_order_narrative_with_non_movable() -> Result<()> {
+        let source = r#"
+x = 1
+
+def foo():
+    return x
+
+y = 2
+
+def bar():
+    return foo()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, true)?;
+
+        assert_eq!(order.len(), 4);
+        assert_eq!(order[0], 0);
+        assert_eq!(order[1], 3);
+        assert_eq!(order[2], 2);
+        assert_eq!(order[3], 1);
+        Ok(())
+    }
+
+    /// Test that complex diamond dependency graphs are ordered correctly.
+    #[test]
+    fn dependency_order_diamond() -> Result<()> {
+        let source = r#"
+def d():
+    return c() + b()
+
+def c():
+    return a()
+
+def b():
+    return a()
+
+def a():
+    return 1
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order[0], 3);
+        assert_eq!(order[3], 0);
+        assert!([1, 2].contains(&order[1]));
+        assert!([1, 2].contains(&order[2]));
+        assert_ne!(order[1], order[2]);
+        Ok(())
+    }
+
+    /// Test that ordering with interleaved non-movable and movable statements works correctly.
+    #[test]
+    fn dependency_order_interleaved() -> Result<()> {
+        let source = r#"
+x = 1
+
+def foo():
+    return x
+
+y = 2
+
+def bar():
+    return y
+
+z = 3
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order[0], 0);
+        assert_eq!(order[2], 2);
+        assert_eq!(order[4], 4);
+        Ok(())
+    }
+
+    /// Test that a single-node graph works correctly.
+    #[test]
+    fn dependency_order_single_node() -> Result<()> {
+        let source = r#"
+def foo():
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let deps = Dependencies::from_nodes(&nodes);
+        let order = deps.dependency_order(&nodes, false)?;
+
+        assert_eq!(order, vec![0]);
+        Ok(())
+    }
+
+    /// Test that an empty source file produces no nodes.
+    #[test]
+    fn nodes_from_suite_empty() -> Result<()> {
+        let parsed = parse_module("")?;
+        let nodes = nodes_from_suite(parsed.suite());
+        assert_eq!(nodes.len(), 0);
+        Ok(())
+    }
+
+    /// Test that function definitions are correctly extracted as movable nodes.
+    #[test]
+    fn nodes_from_suite_functions() -> Result<()> {
+        let source = r#"
+def foo():
+    pass
+
+def bar():
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("foo"));
+        assert!(nodes[0].movable);
+        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("bar"));
+        assert!(nodes[1].movable);
+        Ok(())
+    }
+
+    /// Test that class definitions are correctly extracted as movable nodes.
+    #[test]
+    fn nodes_from_suite_classes() -> Result<()> {
+        let source = r#"
+class Foo:
+    pass
+
+class Bar:
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(nodes.len(), 2);
+        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("Foo"));
+        assert!(nodes[0].movable);
+        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("Bar"));
+        assert!(nodes[1].movable);
+        Ok(())
+    }
+
+    /// Test that non-function/class statements are non-movable.
+    #[test]
+    fn nodes_from_suite_non_movable() -> Result<()> {
+        let source = r#"
+x = 1
+y = 2
+
+def foo():
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(nodes.len(), 3);
+        assert_eq!(nodes[0].name, None);
+        assert!(!nodes[0].movable);
+        assert_eq!(nodes[1].name, None);
+        assert!(!nodes[1].movable);
+        assert_eq!(nodes[2].name.map(|n| n.as_str()), Some("foo"));
+        assert!(nodes[2].movable);
+        Ok(())
+    }
+
+    /// Test mixed classes and functions are all movable.
+    #[test]
+    fn nodes_from_suite_mixed() -> Result<()> {
+        let source = r#"
+class Foo:
+    pass
+
+def bar():
+    pass
+
+class Baz:
+    pass
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+
+        assert_eq!(nodes.len(), 3);
+        assert!(nodes.iter().all(|n| n.movable));
+        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("Foo"));
+        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("bar"));
+        assert_eq!(nodes[2].name.map(|n| n.as_str()), Some("Baz"));
+        Ok(())
+    }
+}

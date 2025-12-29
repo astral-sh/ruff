@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS002 Function call cycle detected: a() -> b() -> c() -> a()
+ --> cycle.py:1:1
+  |
+1 | / def a():
+2 | |     return b()
+  | |______________^
+3 |   def b():
+4 |       return c()
+  |

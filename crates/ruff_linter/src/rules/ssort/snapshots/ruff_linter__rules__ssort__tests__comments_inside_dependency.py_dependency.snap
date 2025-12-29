@@ -1,0 +1,31 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+  --> comments_inside_dependency.py:1:1
+   |
+ 1 | / def a():
+ 2 | |     # depends on b()
+ 3 | |     return b() + 1
+ 4 | |
+ 5 | | def b():
+ 6 | |     return True
+ 7 | |
+ 8 | | def c():
+ 9 | |     # depends on a()
+10 | |     return a() + 1
+   | |__________________^
+   |
+help: Organize statements
+1 + def b():
+2 +     return True
+3 + 
+4 | def a():
+5 |     # depends on b()
+6 |     return b() + 1
+  - 
+  - def b():
+  -     return True
+7 | 
+8 | def c():
+9 |     # depends on a()

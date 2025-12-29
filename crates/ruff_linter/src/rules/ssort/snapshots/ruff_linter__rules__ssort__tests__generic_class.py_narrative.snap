@@ -1,0 +1,20 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> generic_class.py:1:1
+  |
+1 | / obj = ClassA[str]()
+2 | | class ClassA[T: (str, bytes)](BaseClass[T]):
+3 | |     attr1: T
+4 | | class BaseClass[T]:
+5 | |     pass
+  | |________^
+  |
+help: Organize statements
+  - obj = ClassA[str]()
+1 | class ClassA[T: (str, bytes)](BaseClass[T]):
+2 |     attr1: T
+3 | class BaseClass[T]:
+4 |     pass
+5 + obj = ClassA[str]()

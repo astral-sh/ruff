@@ -209,6 +209,11 @@ fn organize_suite(suite: &[Stmt], locator: &Locator, narrative_order: bool) -> S
 
 /// SS001
 pub(crate) fn organize_statements(checker: &Checker, suite: &[Stmt]) {
+    // Skip empty suites
+    if suite.is_empty() {
+        return;
+    }
+
     // Build the replacement string recursively by sorting the statements in the suite
     let replacement = organize_suite(
         suite,
@@ -230,5 +235,376 @@ pub(crate) fn organize_statements(checker: &Checker, suite: &[Stmt]) {
                 range.start(),
                 range.end(),
             )));
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{get_replacement_text, separator_for};
+    use crate::Locator;
+    use anyhow::Result;
+    use ruff_python_parser::parse_module;
+
+    /// Test that get_replacement_text() returns the original text for a function.
+    #[test]
+    fn get_replacement_text_function() -> Result<()> {
+        let source = r#"def foo():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert_eq!(replacement, source.trim_end());
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() returns the original text for a non-sortable class.
+    #[test]
+    fn get_replacement_text_non_sortable_class() -> Result<()> {
+        let source = r#"class Foo:
+    x = 1
+    y = 2
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert_eq!(replacement, source.trim_end());
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() sorts methods with dependencies.
+    #[test]
+    fn get_replacement_text_sortable_methods() -> Result<()> {
+        let source = r#"class Foo:
+    def method_b(self):
+        return self.method_a()
+
+    def method_a(self):
+        pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert!(replacement.contains("def method_a(self):"));
+        assert!(replacement.contains("def method_b(self):"));
+        let method_a_pos = replacement.find("def method_a(self):").unwrap();
+        let method_b_pos = replacement.find("def method_b(self):").unwrap();
+        assert!(method_a_pos < method_b_pos);
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() preserves the class header.
+    #[test]
+    fn get_replacement_text_class_header() -> Result<()> {
+        let source = r#"class Foo(Base):
+    def method_b(self):
+        return self.method_a()
+
+    def method_a(self):
+        pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert!(replacement.starts_with("class Foo(Base):"));
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() returns the original text for an assignment.
+    #[test]
+    fn get_replacement_text_assignment() -> Result<()> {
+        let source = r#"x = 1
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert_eq!(replacement, source.trim_end());
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() returns the original text for circular dependencies.
+    #[test]
+    fn get_replacement_text_circular_dependency() -> Result<()> {
+        let source = r#"class Foo:
+    def a(self):
+        return self.b()
+
+    def b(self):
+        return self.a()
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert_eq!(replacement, source.trim_end());
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() returns the original text for an empty class.
+    #[test]
+    fn get_replacement_text_empty_class() -> Result<()> {
+        let source = r#"class Foo:
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert_eq!(replacement, source.trim_end());
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() handles complex a class with multiple methods.
+    #[test]
+    fn get_replacement_text_complex_class() -> Result<()> {
+        let source = r#"class Foo:
+    def method_c(self):
+        return self.method_b()
+
+    def method_b(self):
+        return self.method_a()
+
+    def method_a(self):
+        return 1
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert!(replacement.contains("def method_a(self):"));
+        assert!(replacement.contains("def method_b(self):"));
+        assert!(replacement.contains("def method_c(self):"));
+        let method_a_pos = replacement.find("def method_a(self):").unwrap();
+        let method_b_pos = replacement.find("def method_b(self):").unwrap();
+        let method_c_pos = replacement.find("def method_c(self):").unwrap();
+        assert!(method_a_pos < method_b_pos);
+        assert!(method_b_pos < method_c_pos);
+        Ok(())
+    }
+
+    /// Test that get_replacement_text() preserves decorators on methods.
+    #[test]
+    fn get_replacement_text_with_decorators() -> Result<()> {
+        let source = r#"class Foo:
+    @decorator
+    def method_b(self):
+        return self.method_a()
+
+    def method_a(self):
+        return 1
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let stmt = &parsed.suite()[0];
+
+        let replacement = get_replacement_text(&locator, stmt, false);
+
+        assert!(replacement.contains("@decorator"));
+        assert!(replacement.contains("def method_a(self):"));
+        assert!(replacement.contains("def method_b(self):"));
+        Ok(())
+    }
+
+    /// Test that separator_for() includes trailing inline comments.
+    #[test]
+    fn separator_for_inline_comment() -> Result<()> {
+        let source = r#"def foo():
+    pass  # inline comment
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "  # inline comment\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() handles the last statement correctly.
+    #[test]
+    fn separator_for_last_statement() -> Result<()> {
+        let source = r#"def foo():
+    pass
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 1);
+
+        assert_eq!(separator, "\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() returns a double newline for two statements.
+    #[test]
+    fn separator_for_two_statements() -> Result<()> {
+        let source = r#"def foo():
+    pass
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+        assert_eq!(separator, "\n\n");
+
+        Ok(())
+    }
+
+    /// Test that separator_for() handles multiple statements correctly.
+    #[test]
+    fn separator_for_multiple_statements() -> Result<()> {
+        let source = r#"def foo():
+    pass
+
+def bar():
+    pass
+
+def baz():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let sep0 = separator_for(suite, &locator, 0);
+        assert_eq!(sep0, "\n\n");
+
+        let sep1 = separator_for(suite, &locator, 1);
+        assert_eq!(sep1, "\n\n");
+
+        Ok(())
+    }
+
+    /// Test that separator_for() returns the default separator for a single statement.
+    #[test]
+    fn separator_for_single_statement() -> Result<()> {
+        let source = r#"def foo():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() preserves custom spacing between statements.
+    #[test]
+    fn separator_for_custom_spacing() -> Result<()> {
+        let source = r#"def foo():
+    pass
+
+
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "\n\n\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() preserves comments between statements.
+    #[test]
+    fn separator_for_with_comment() -> Result<()> {
+        let source = r#"def foo():
+    pass
+# Comment
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "\n# Comment\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() handles multiple blank lines.
+    #[test]
+    fn separator_for_multiple_blank_lines() -> Result<()> {
+        let source = r#"def foo():
+    pass
+
+
+
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "\n\n\n\n\n");
+        Ok(())
+    }
+
+    /// Test that separator_for() handles multiple comments.
+    #[test]
+    fn separator_for_multiple_comments() -> Result<()> {
+        let source = r#"def foo():
+    pass
+# Comment 1
+# Comment 2
+
+def bar():
+    pass
+"#;
+        let locator = Locator::new(source);
+        let parsed = parse_module(source)?;
+        let suite = parsed.suite();
+
+        let separator = separator_for(suite, &locator, 0);
+
+        assert_eq!(separator, "\n# Comment 1\n# Comment 2\n\n");
+        Ok(())
     }
 }
