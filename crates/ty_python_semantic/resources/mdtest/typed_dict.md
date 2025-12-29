@@ -314,6 +314,66 @@ a_person = {"name": "Alice", "age": 30, "extra": True}
 (a_person := {"name": "Alice", "age": 30, "extra": True})
 ```
 
+## Union of `TypedDict`
+
+When assigning to a union of `TypedDict` types, the type will be narrowed based on the dictionary
+literal:
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    foo: int
+
+x1: Foo | None = {"foo": 1}
+reveal_type(x1)  # revealed: Foo
+
+class Bar(TypedDict):
+    bar: int
+
+x2: Foo | Bar = {"foo": 1}
+reveal_type(x2)  # revealed: Foo
+
+x3: Foo | Bar = {"bar": 1}
+reveal_type(x3)  # revealed: Bar
+
+x4: Foo | Bar | None = {"bar": 1}
+reveal_type(x4)  # revealed: Bar
+
+# error: [invalid-assignment]
+x5: Foo | Bar = {"baz": 1}
+reveal_type(x5)  # revealed: Foo | Bar
+
+class FooBar1(TypedDict):
+    foo: int
+    bar: int
+
+class FooBar2(TypedDict):
+    foo: int
+    bar: int
+
+x6: FooBar1 | FooBar2 | None = {"foo": 1, "bar": 1}
+reveal_type(x6)  # revealed: FooBar1 | FooBar2
+
+x7: FooBar1 | FooBar2 | None = {"foo": 1, "bar": 1}
+reveal_type(x7)  # revealed: FooBar1 | FooBar2
+```
+
+In doing so, may have to infer the same type with multiple distinct type contexts:
+
+```py
+from typing import TypedDict
+
+class NestedFoo(TypedDict):
+    foo: list[FooBar1]
+
+class NestedBar(TypedDict):
+    foo: list[FooBar2]
+
+x1: NestedFoo | NestedBar = {"foo": [{"foo": 1, "bar": 1}]}
+reveal_type(x1)  # revealed: NestedFoo | NestedBar
+```
+
 ## Type ignore compatibility issues
 
 Users should be able to ignore TypedDict validation errors with `# type: ignore`
