@@ -788,6 +788,12 @@ pub fn inlay_hint_call_argument_details<'db>(
             continue;
         }
 
+        // Skip if this argument maps to multiple parameters (e.g., unpacked tuple filling
+        // multiple slots). Showing a single parameter name would be misleading.
+        if arg_mapping.parameters.len() > 1 {
+            continue;
+        }
+
         let Some(param_index) = arg_mapping.parameters.first() else {
             continue;
         };

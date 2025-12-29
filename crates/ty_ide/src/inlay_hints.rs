@@ -4466,6 +4466,110 @@ mod tests {
     }
 
     #[test]
+    fn test_function_call_with_unpacked_tuple_argument() {
+        // When an unpacked tuple fills multiple parameters, no hint should be shown
+        // for that argument because showing a single parameter name would be misleading.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: int, d: str): ...
+            t: tuple[int, int] = (23, 42)
+            foo('foo', *t, d='bar')",
+        );
+
+        // `*t` fills both `b` and `c`, so no hint is shown for it
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(a: str, b: int, c: int, d: str): ...
+        t: tuple[int, int] = (23, 42)
+        foo([a=]'foo', *t, d='bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+          |         ^
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo('foo', *t, d='bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo([a=]'foo', *t, d='bar')
+          |      ^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_unpacked_tuple_argument_single_element() {
+        // When an unpacked tuple fills only one parameter, a hint should be shown.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: str): ...
+            t: tuple[int] = (42,)
+            foo('foo', *t, 'bar')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(a: str, b: int, c: str): ...
+        t: tuple[int] = (42,)
+        foo([a=]'foo', [b=]*t, [c=]'bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                 ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                 ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                         ^
+          |
+        ");
+    }
+
+    #[test]
     fn test_function_call_positional_only_and_positional_or_keyword_parameters() {
         let mut test = inlay_hint_test(
             "
