@@ -8017,7 +8017,7 @@ impl<'db> Type<'db> {
                 Type::PropertyInstance(property.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
 
-            Type::Union(union) => union.map(db, |element| {
+            Type::Union(union) => union.map_leave_aliases(db, |element| {
                 element.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
             }),
             Type::Intersection(intersection) => {
@@ -8044,7 +8044,16 @@ impl<'db> Type<'db> {
                 // In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
                 let value_type = visitor.visit(self, || alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
-                alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
+                // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
+                // TODO: The rule that recursive type aliases must be expanded could potentially be removed,
+                // but doing so would currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is incomplete.
+                if !is_recursive && alias.value_type(db) == mapped {
+                    self
+                } else {
+                    mapped
+                }
             }
 
             Type::ModuleLiteral(_)
@@ -13942,6 +13951,23 @@ impl<'db> UnionType<'db> {
             .fold(UnionBuilder::new(db), |builder, element| {
                 builder.add(element)
             })
+            .recursively_defined(self.recursively_defined(db))
+            .build()
+    }
+
+    /// A version of [`UnionType::map`] that does not unpack type aliases.
+    pub(crate) fn map_leave_aliases(
+        self,
+        db: &'db dyn Db,
+        transform_fn: impl FnMut(&Type<'db>) -> Type<'db>,
+    ) -> Type<'db> {
+        self.elements(db)
+            .iter()
+            .map(transform_fn)
+            .fold(
+                UnionBuilder::new(db).unpack_aliases(false),
+                UnionBuilder::add,
+            )
             .recursively_defined(self.recursively_defined(db))
             .build()
     }
