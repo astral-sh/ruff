@@ -1592,7 +1592,9 @@ mod implicit_globals {
     use crate::place::{Definedness, PlaceAndQualifiers};
     use crate::semantic_index::symbol::Symbol;
     use crate::semantic_index::{place_table, use_def_map};
-    use crate::types::{KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type};
+    use crate::types::{
+        ClassLiteral, KnownClass, MemberLookupPolicy, Parameter, Parameters, Signature, Type,
+    };
     use ruff_python_ast::PythonVersion;
 
     use super::{DefinedPlace, Place, place_from_declarations};
@@ -1611,7 +1613,10 @@ mod implicit_globals {
         else {
             return Place::Undefined.into();
         };
-        let module_type_scope = module_type_class.body_scope(db);
+        let Some(class) = module_type_class.as_static() else {
+            return Place::Undefined.into();
+        };
+        let module_type_scope = class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
@@ -1739,8 +1744,10 @@ mod implicit_globals {
             return smallvec::SmallVec::default();
         };
 
-        let module_type_scope = module_type.body_scope(db);
-        let module_type_symbol_table = place_table(db, module_type_scope);
+        let ClassLiteral::Static(module_type) = module_type else {
+            return smallvec::SmallVec::default();
+        };
+        let module_type_symbol_table = place_table(db, module_type.body_scope(db));
 
         module_type_symbol_table
             .symbols()

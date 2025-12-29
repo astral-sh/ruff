@@ -96,7 +96,7 @@ pub(crate) fn typing_self<'db>(
     let identity = TypeVarIdentity::new(
         db,
         ast::name::Name::new_static("Self"),
-        Some(class.definition(db)),
+        class.definition(db),
         TypeVarKind::TypingSelf,
     );
     let bounds = TypeVarBoundOrConstraints::UpperBound(Type::instance(

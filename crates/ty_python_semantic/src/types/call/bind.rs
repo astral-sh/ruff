@@ -43,11 +43,11 @@ use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Paramete
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, DATACLASS_FLAGS, DataclassFlags, DataclassParams, FieldInstance,
-    GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    FieldInstance, GenericAlias, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1134,7 +1134,8 @@ impl<'db> Bindings<'db> {
                             }
 
                             // `dataclass` being used as a non-decorator
-                            if let [Some(Type::ClassLiteral(class_literal))] =
+                            // TODO: support dynamic class literals here as well
+                            if let [Some(Type::ClassLiteral(ClassLiteral::Static(class_literal)))] =
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default_params(db);

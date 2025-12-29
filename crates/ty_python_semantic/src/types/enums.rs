@@ -1,5 +1,6 @@
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 
 use crate::{
     Db, FxIndexMap,
@@ -9,7 +10,7 @@ use crate::{
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        Type, TypeQualifiers,
+        StaticClassLiteral, Type, TypeQualifiers,
     },
 };
 
@@ -54,6 +55,23 @@ pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
     class: ClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
+    let class = match class {
+        ClassLiteral::Static(class) => class,
+        ClassLiteral::Dynamic(..) => {
+            // Classes created via `type` cannot be enums; the following fails at runtime:
+            // ```python
+            // import enum
+            //
+            // class BaseEnum(enum.Enum):
+            //     pass
+            //
+            // MyEnum = type("MyEnum", (BaseEnum,), {"A": 1, "B": 2})
+            // ```
+            // TODO: Add a diagnostic for including an enum in a `type(...)` call.
+            return None;
+        }
+    };
+
     // This is a fast path to avoid traversing the MRO of known classes
     if class
         .known(db)
@@ -139,42 +157,43 @@ pub(crate) fn enum_metadata<'db>(
                                 auto_counter += 1;
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
-                                let auto_value_ty = if Type::ClassLiteral(class)
-                                    .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
-                                {
-                                    Type::string_literal(db, &name.to_lowercase())
-                                } else {
-                                    let custom_mixins: smallvec::SmallVec<[Option<KnownClass>; 1]> =
-                                        class
-                                            .iter_mro(db, None)
-                                            .skip(1)
-                                            .filter_map(ClassBase::into_class)
-                                            .filter(|class| {
-                                                !Type::from(*class).is_subtype_of(
-                                                    db,
-                                                    KnownClass::Enum.to_subclass_of(db),
-                                                )
-                                            })
-                                            .map(|class| class.known(db))
-                                            .filter(|class| {
-                                                !matches!(class, Some(KnownClass::Object))
-                                            })
-                                            .collect();
-
-                                    // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
-                                    // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
-                                    //
-                                    // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
-                                    // so we fall back to `Any` in those cases.
-                                    if matches!(
-                                        custom_mixins.as_slice(),
-                                        [] | [Some(KnownClass::Int)]
-                                    ) {
-                                        Type::IntLiteral(auto_counter)
+                                let auto_value_ty =
+                                    if Type::ClassLiteral(ClassLiteral::Static(class))
+                                        .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
+                                    {
+                                        Type::string_literal(db, &name.to_lowercase())
                                     } else {
-                                        Type::any()
-                                    }
-                                };
+                                        let custom_mixins: SmallVec<[Option<KnownClass>; 1]> =
+                                            class
+                                                .iter_mro(db, None)
+                                                .skip(1)
+                                                .filter_map(ClassBase::into_class)
+                                                .filter(|class| {
+                                                    !Type::from(*class).is_subtype_of(
+                                                        db,
+                                                        KnownClass::Enum.to_subclass_of(db),
+                                                    )
+                                                })
+                                                .map(|class| class.known(db))
+                                                .filter(|class| {
+                                                    !matches!(class, Some(KnownClass::Object))
+                                                })
+                                                .collect();
+
+                                        // `IntEnum`s have the same `auto()` behaviour to enums inheriting from `(int, Enum)`,
+                                        // and `IntEnum`s also have `int` in their MROs, so both cases are handled here.
+                                        //
+                                        // In general, the `auto()` behaviour for enums with non-`int` mixins is hard to predict,
+                                        // so we fall back to `Any` in those cases.
+                                        if matches!(
+                                            custom_mixins.as_slice(),
+                                            [] | [Some(KnownClass::Int)]
+                                        ) {
+                                            Type::IntLiteral(auto_counter)
+                                        } else {
+                                            Type::any()
+                                        }
+                                    };
                                 Some(auto_value_ty)
                             }
 
@@ -308,8 +327,12 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 ///
 /// This is a lighter-weight check than `enum_metadata`, which additionally
 /// verifies that the class has members.
-pub(crate) fn is_enum_class_by_inheritance<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+pub(crate) fn is_enum_class_by_inheritance<'db>(
+    db: &'db dyn Db,
+    class: StaticClassLiteral<'db>,
+) -> bool {
+    Type::ClassLiteral(ClassLiteral::Static(class))
+        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
         || class
             .metaclass(db)
             .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))
