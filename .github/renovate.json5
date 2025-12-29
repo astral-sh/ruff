@@ -81,12 +81,6 @@
       description: "Weekly update of pre-commit dependencies",
     },
     {
-      groupName: "NPM Development dependencies",
-      matchManagers: ["npm"],
-      matchDepTypes: ["devDependencies"],
-      description: "Weekly update of NPM development dependencies",
-    },
-    {
       groupName: "Monaco",
       matchManagers: ["npm"],
       matchPackageNames: ["monaco"],
