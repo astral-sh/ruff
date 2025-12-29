@@ -105,8 +105,8 @@ reveal_type(y)  # revealed: Unknown
 
 ```py
 def one(x: int | None):
-    assert (y := x), reveal_type(y)  # revealed: (int & ~AlwaysTruthy) | None
-    reveal_type(y)  # revealed: int & ~AlwaysFalsy
+    assert (y := x), reveal_type(y)  # revealed: int | None
+    reveal_type(y)  # revealed: int
 
 def two(x: int | None):
     assert isinstance((y := x), int), reveal_type(y)  # revealed: None

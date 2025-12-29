@@ -1545,9 +1545,12 @@ impl KnownFunction {
                 {
                     let mut diag = builder.into_diagnostic("Revealed type");
                     let span = context.span(&call_expression.arguments.args[0]);
+                    // Remove ~AlwaysTruthy and ~AlwaysFalsy constraints for cleaner display,
+                    // as they make types more confusing without adding useful information.
+                    let display_type = revealed_type.remove_truthiness_constraints(db);
                     diag.annotate(Annotation::primary(span).message(format_args!(
                         "`{}`",
-                        revealed_type
+                        display_type
                             .display_with(db, DisplaySettings::default().preserve_long_unions())
                     )));
                 }

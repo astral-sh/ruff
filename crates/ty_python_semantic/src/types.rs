@@ -65,7 +65,7 @@ use crate::types::generics::{
     walk_generic_context,
 };
 use crate::types::mro::{Mro, MroError, MroIterator};
-pub(crate) use crate::types::narrow::infer_narrowing_constraint;
+pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
 use crate::types::newtype::NewType;
 pub(crate) use crate::types::signatures::{Parameter, Parameters};
 use crate::types::signatures::{ParameterForm, walk_signature};
@@ -1465,6 +1465,188 @@ impl<'db> Type<'db> {
     #[must_use]
     pub(crate) fn negate_if(&self, db: &'db dyn Db, yes: bool) -> Type<'db> {
         if yes { self.negate(db) } else { *self }
+    }
+
+    /// Removes both `~AlwaysTruthy` and `~AlwaysFalsy` constraints from this type.
+    ///
+    /// For intersection types, this removes `AlwaysTruthy` and `AlwaysFalsy` from the negative set.
+    /// For union types and generic aliases, this applies recursively to each element/type argument.
+    /// Other types are returned unchanged.
+    ///
+    /// This is useful for simplifying types for display, as these truthiness constraints
+    /// are rarely useful to show and make types more confusing.
+    #[must_use]
+    pub(crate) fn remove_truthiness_constraints(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Type::Union(union) => {
+                // Transform elements and check if any changed.
+                let transformed: Box<[Type<'db>]> = union
+                    .elements(db)
+                    .iter()
+                    .map(|elem| elem.remove_truthiness_constraints(db))
+                    .collect();
+
+                let changed = transformed
+                    .iter()
+                    .zip(union.elements(db).iter())
+                    .any(|(new, old)| new != old);
+
+                if !changed {
+                    self
+                } else {
+                    UnionType::from_elements(db, transformed.iter().copied())
+                }
+            }
+            Type::Intersection(intersection) => {
+                // First, recursively transform positive elements.
+                let transformed_positives: Box<[Type<'db>]> = intersection
+                    .positive(db)
+                    .iter()
+                    .map(|ty| ty.remove_truthiness_constraints(db))
+                    .collect();
+
+                // Filter out `AlwaysTruthy` and ``AlwaysFalsy from negatives.
+                let filtered_negatives: Box<[Type<'db>]> = intersection
+                    .negative(db)
+                    .iter()
+                    .filter(|ty| !matches!(ty, Type::AlwaysTruthy | Type::AlwaysFalsy))
+                    .copied()
+                    .collect();
+
+                let positives_changed = transformed_positives
+                    .iter()
+                    .zip(intersection.positive(db).iter())
+                    .any(|(new, old)| new != old);
+                let negatives_changed = filtered_negatives.len() != intersection.negative(db).len();
+
+                if !positives_changed && !negatives_changed {
+                    // Nothing changed, return unchanged.
+                    self
+                } else {
+                    IntersectionBuilder::new(db)
+                        .positive_elements(transformed_positives.iter().copied())
+                        .negative_elements(filtered_negatives.iter().copied())
+                        .build()
+                }
+            }
+            Type::GenericAlias(alias) => {
+                // Transform type arguments recursively.
+                let specialization = alias.specialization(db);
+                let transformed_types: Box<[Type<'db>]> = specialization
+                    .types(db)
+                    .iter()
+                    .map(|ty| ty.remove_truthiness_constraints(db))
+                    .collect();
+
+                // Check if any types changed.
+                let changed = transformed_types
+                    .iter()
+                    .zip(specialization.types(db).iter())
+                    .any(|(new, old)| new != old);
+
+                if !changed {
+                    self
+                } else {
+                    let new_specialization = Specialization::new(
+                        db,
+                        specialization.generic_context(db),
+                        transformed_types,
+                        specialization.materialization_kind(db),
+                        specialization.tuple_inner(db),
+                    );
+                    Type::GenericAlias(GenericAlias::new(db, alias.origin(db), new_specialization))
+                }
+            }
+            Type::NominalInstance(instance) => {
+                // Transform the class type if it's generic.
+                let class = instance.class(db);
+                match class {
+                    ClassType::Generic(alias) => {
+                        // Transform the generic alias and create a new instance.
+                        let transformed =
+                            Type::GenericAlias(alias).remove_truthiness_constraints(db);
+                        if let Type::GenericAlias(new_alias) = transformed {
+                            if new_alias == alias {
+                                self
+                            } else {
+                                Type::instance(db, ClassType::Generic(new_alias))
+                            }
+                        } else {
+                            // If it simplified to something else (unlikely), return as-is.
+                            self
+                        }
+                    }
+                    ClassType::NonGeneric(_) => self,
+                }
+            }
+            _ => self,
+        }
+    }
+
+    /// Filters this type to keep only elements matching the desired truthiness.
+    ///
+    /// When `is_truthy` is true, keeps truthy elements and removes falsy ones.
+    /// When `is_truthy` is false, keeps falsy elements and removes truthy ones.
+    ///
+    /// Special handling is provided for:
+    /// - `bool` → narrows to `Literal[True]` or `Literal[False]`
+    /// - `LiteralString` → narrows to `LiteralString & ~Literal[""]` or `Literal[""]`
+    /// - Unions → recursively filters each element
+    ///
+    /// For other types with ambiguous truthiness (like `int`), returns the type unchanged
+    /// since we can't statically determine which elements match.
+    ///
+    /// This is used for truthiness narrowing (e.g., `if x:` narrows x to truthy elements).
+    #[must_use]
+    pub(crate) fn filter_for_truthiness(self, db: &'db dyn Db, is_truthy: bool) -> Type<'db> {
+        // Check if the type's truthiness already matches or contradicts what we want.
+        match self.bool(db).negate_if(!is_truthy) {
+            Truthiness::AlwaysTrue => return self,
+            Truthiness::AlwaysFalse => return Type::Never,
+            Truthiness::Ambiguous => {}
+        }
+
+        // Truthiness is ambiguous. Try to filter recursively for compound types.
+        match self {
+            Type::Union(union) => UnionType::from_elements(
+                db,
+                union
+                    .elements(db)
+                    .iter()
+                    .map(|elem| elem.filter_for_truthiness(db, is_truthy)),
+            ),
+            Type::Intersection(_) => {
+                // For intersections, we can't easily filter. But we can check if
+                // any element makes the intersection definitely wrong.
+                // For now, return the intersection unchanged for ambiguous cases.
+                // The subtype check in add_negative handles the definite cases.
+                self
+            }
+            Type::NominalInstance(instance) if instance.has_known_class(db, KnownClass::Bool) => {
+                // bool has ambiguous truthiness: True is truthy, False is falsy
+                if is_truthy {
+                    Type::BooleanLiteral(true)
+                } else {
+                    Type::BooleanLiteral(false)
+                }
+            }
+            Type::LiteralString => {
+                // LiteralString has ambiguous truthiness: "" is falsy, all others truthy.
+                if is_truthy {
+                    IntersectionBuilder::new(db)
+                        .add_positive(Type::LiteralString)
+                        .add_negative(Type::string_literal(db, ""))
+                        .build()
+                } else {
+                    Type::string_literal(db, "")
+                }
+            }
+            _ => {
+                // For other types with ambiguous truthiness, we can't filter.
+                // Just return the type unchanged.
+                self
+            }
+        }
     }
 
     /// If the type is a union, filters union elements based on the provided predicate.

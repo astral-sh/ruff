@@ -82,19 +82,19 @@ class B: ...
 
 def f(x: A | B):
     if x:
-        reveal_type(x)  # revealed: (A & ~AlwaysFalsy) | (B & ~AlwaysFalsy)
+        reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: (A & ~AlwaysTruthy) | (B & ~AlwaysTruthy)
+        reveal_type(x)  # revealed: A | B
 
     if x and not x:
-        reveal_type(x)  # revealed: (A & ~AlwaysFalsy & ~AlwaysTruthy) | (B & ~AlwaysFalsy & ~AlwaysTruthy)
+        reveal_type(x)  # revealed: A | B
     else:
         reveal_type(x)  # revealed: A | B
 
     if x or not x:
         reveal_type(x)  # revealed: A | B
     else:
-        reveal_type(x)  # revealed: (A & ~AlwaysTruthy & ~AlwaysFalsy) | (B & ~AlwaysTruthy & ~AlwaysFalsy)
+        reveal_type(x)  # revealed: A | B
 ```
 
 ### Truthiness of Types
@@ -111,9 +111,9 @@ x = int if flag() else str
 reveal_type(x)  # revealed: <class 'int'> | <class 'str'>
 
 if x:
-    reveal_type(x)  # revealed: (<class 'int'> & ~AlwaysFalsy) | (<class 'str'> & ~AlwaysFalsy)
+    reveal_type(x)  # revealed: <class 'int'> | <class 'str'>
 else:
-    reveal_type(x)  # revealed: (<class 'int'> & ~AlwaysTruthy) | (<class 'str'> & ~AlwaysTruthy)
+    reveal_type(x)  # revealed: <class 'int'> | <class 'str'>
 ```
 
 ## Determined Truthiness
@@ -179,9 +179,9 @@ if isinstance(x, str) and not isinstance(x, B):
     reveal_type(z)  # revealed: (A & str & ~B) | Literal[0, 42, "", "hello"]
 
     if z:
-        reveal_type(z)  # revealed: (A & str & ~B & ~AlwaysFalsy) | Literal[42, "hello"]
+        reveal_type(z)  # revealed: (A & str & ~B) | Literal[42, "hello"]
     else:
-        reveal_type(z)  # revealed: (A & str & ~B & ~AlwaysTruthy) | Literal[0, ""]
+        reveal_type(z)  # revealed: (A & str & ~B) | Literal[0, ""]
 ```
 
 ## Narrowing Multiple Variables
@@ -219,7 +219,7 @@ x = A()
 
 if x and not x:
     y = x
-    reveal_type(y)  # revealed: A & ~AlwaysFalsy & ~AlwaysTruthy
+    reveal_type(y)  # revealed: A
 else:
     y = x
     reveal_type(y)  # revealed: A
@@ -264,16 +264,16 @@ def _(
 ):
     reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
     if ta:
-        reveal_type(ta)  # revealed: type[TruthyClass] | (type[AmbiguousClass] & ~AlwaysFalsy)
+        reveal_type(ta)  # revealed: type[TruthyClass] | type[AmbiguousClass]
 
     reveal_type(af)  # revealed: type[AmbiguousClass] | type[FalsyClass]
     if af:
-        reveal_type(af)  # revealed: type[AmbiguousClass] & ~AlwaysFalsy
+        reveal_type(af)  # revealed: type[AmbiguousClass]
 
     # error: [unsupported-bool-conversion] "Boolean conversion is not supported for type `MetaDeferred`"
     if d:
         # TODO: Should be `Unknown`
-        reveal_type(d)  # revealed: type[DeferredClass] & ~AlwaysFalsy
+        reveal_type(d)  # revealed: type[DeferredClass]
 
     tf = TruthyClass if flag else FalsyClass
     reveal_type(tf)  # revealed: <class 'TruthyClass'> | <class 'FalsyClass'>
@@ -296,12 +296,12 @@ def _(x: Literal[0, 1]):
     reveal_type(x and A())  # revealed: Literal[0] | A
 
 def _(x: str):
-    reveal_type(x or A())  # revealed: (str & ~AlwaysFalsy) | A
-    reveal_type(x and A())  # revealed: (str & ~AlwaysTruthy) | A
+    reveal_type(x or A())  # revealed: str | A
+    reveal_type(x and A())  # revealed: str | A
 
 def _(x: bool | str):
-    reveal_type(x or A())  # revealed: Literal[True] | (str & ~AlwaysFalsy) | A
-    reveal_type(x and A())  # revealed: Literal[False] | (str & ~AlwaysTruthy) | A
+    reveal_type(x or A())  # revealed: Literal[True] | str | A
+    reveal_type(x and A())  # revealed: Literal[False] | str | A
 
 class Falsy:
     def __bool__(self) -> Literal[False]:

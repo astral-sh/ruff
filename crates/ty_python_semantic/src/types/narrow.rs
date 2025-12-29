@@ -31,6 +31,24 @@ use ruff_python_ast::{BoolOp, ExprBoolOp};
 use rustc_hash::FxHashMap;
 use std::collections::hash_map::Entry;
 
+/// A narrowing constraint that can be applied to a type.
+///
+/// This represents either a type to intersect with (for most narrowing operations)
+/// or a truthiness filter (for `if x:` style narrowing).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub(crate) enum NarrowingConstraint<'db> {
+    /// Intersect with this type.
+    ///
+    /// For example, `isinstance(x, int)` creates `IntersectWith(int)`.
+    IntersectWith(Type<'db>),
+
+    /// Filter for truthiness.
+    ///
+    /// `Truthiness(true)` means keep truthy values (from `if x:`).
+    /// `Truthiness(false)` means keep falsy values (from `if not x:` or the else branch).
+    Truthiness(bool),
+}
+
 /// Return the type constraint that `test` (if true) would place on `symbol`, if any.
 ///
 /// For example, if we have this code:
@@ -51,7 +69,7 @@ pub(crate) fn infer_narrowing_constraint<'db>(
     db: &'db dyn Db,
     predicate: Predicate<'db>,
     place: ScopedPlaceId,
-) -> Option<Type<'db>> {
+) -> Option<NarrowingConstraint<'db>> {
     let constraints = match predicate.node {
         PredicateNode::Expression(expression) => {
             if predicate.is_positive {
@@ -277,7 +295,20 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, Type<'db>>;
+type NarrowingConstraints<'db> = FxHashMap<ScopedPlaceId, NarrowingConstraint<'db>>;
+
+impl<'db> NarrowingConstraint<'db> {
+    /// Convert this constraint to a type for intersection operations.
+    ///
+    /// `Truthiness` constraints are converted to `~AlwaysFalsy` or `~AlwaysTruthy`.
+    fn to_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            NarrowingConstraint::IntersectWith(ty) => ty,
+            NarrowingConstraint::Truthiness(true) => Type::AlwaysFalsy.negate(db),
+            NarrowingConstraint::Truthiness(false) => Type::AlwaysTruthy.negate(db),
+        }
+    }
+}
 
 fn merge_constraints_and<'db>(
     into: &mut NarrowingConstraints<'db>,
@@ -287,10 +318,26 @@ fn merge_constraints_and<'db>(
     for (key, value) in from {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
-                *entry.get_mut() = IntersectionBuilder::new(db)
-                    .add_positive(*entry.get())
-                    .add_positive(*value)
-                    .build();
+                let merged = match (*entry.get(), *value) {
+                    // Two truthiness constraints: if same, keep; if different, convert to types
+                    // and let the intersection builder + filter_for_truthiness handle it.
+                    // We can't just return Never because types with mutable truthiness
+                    // (like class instances) can satisfy both truthy and falsy at different times.
+                    (NarrowingConstraint::Truthiness(a), NarrowingConstraint::Truthiness(b))
+                        if a == b =>
+                    {
+                        NarrowingConstraint::Truthiness(a)
+                    }
+                    // Mixed or two IntersectWith or different truthiness: convert to types and intersect
+                    (existing, new) => {
+                        let merged_ty = IntersectionBuilder::new(db)
+                            .add_positive(existing.to_type(db))
+                            .add_positive(new.to_type(db))
+                            .build();
+                        NarrowingConstraint::IntersectWith(merged_ty)
+                    }
+                };
+                *entry.get_mut() = merged;
             }
             Entry::Vacant(entry) => {
                 entry.insert(*value);
@@ -307,16 +354,35 @@ fn merge_constraints_or<'db>(
     for (key, value) in from {
         match into.entry(*key) {
             Entry::Occupied(mut entry) => {
-                *entry.get_mut() = UnionBuilder::new(db).add(*entry.get()).add(*value).build();
+                let merged = match (*entry.get(), *value) {
+                    // Two truthiness constraints: if same, keep; if different, no constraint
+                    (NarrowingConstraint::Truthiness(a), NarrowingConstraint::Truthiness(b)) => {
+                        if a == b {
+                            NarrowingConstraint::Truthiness(a)
+                        } else {
+                            // truthy OR falsy = any truthiness = object
+                            NarrowingConstraint::IntersectWith(Type::object())
+                        }
+                    }
+                    // Mixed or two IntersectWith: convert to types and union
+                    (existing, new) => {
+                        let merged_ty = UnionBuilder::new(db)
+                            .add(existing.to_type(db))
+                            .add(new.to_type(db))
+                            .build();
+                        NarrowingConstraint::IntersectWith(merged_ty)
+                    }
+                };
+                *entry.get_mut() = merged;
             }
             Entry::Vacant(entry) => {
-                entry.insert(Type::object());
+                entry.insert(NarrowingConstraint::IntersectWith(Type::object()));
             }
         }
     }
     for (key, value) in into.iter_mut() {
         if !from.contains_key(key) {
-            *value = Type::object();
+            *value = NarrowingConstraint::IntersectWith(Type::object());
         }
     }
 }
@@ -510,8 +576,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
     /// Narrow a type based on `len()`, only narrowing the parts that are safe to narrow.
     ///
-    /// For narrowable types (literals, tuples), we apply `~AlwaysFalsy` (positive) or
-    /// `~AlwaysTruthy` (negative). For non-narrowable types, we return them unchanged.
+    /// For narrowable types (literals, tuples), we filter by truthiness directly.
+    /// For non-narrowable types, we return them unchanged.
     ///
     /// Returns `None` if no part of the type is narrowable.
     fn narrow_type_by_len(db: &'db dyn Db, ty: Type<'db>, is_positive: bool) -> Option<Type<'db>> {
@@ -547,26 +613,15 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .any(|element| Self::is_base_type_narrowable_by_len(db, *element));
 
                 if has_narrowable {
-                    // Apply the narrowing constraint to the whole intersection.
-                    let mut builder = IntersectionBuilder::new(db).add_positive(ty);
-                    if is_positive {
-                        builder = builder.add_negative(Type::AlwaysFalsy);
-                    } else {
-                        builder = builder.add_negative(Type::AlwaysTruthy);
-                    }
-                    Some(builder.build())
+                    // Apply truthiness filter directly to the intersection.
+                    Some(ty.filter_for_truthiness(db, is_positive))
                 } else {
                     None
                 }
             }
             _ if Self::is_base_type_narrowable_by_len(db, ty) => {
-                let mut builder = IntersectionBuilder::new(db).add_positive(ty);
-                if is_positive {
-                    builder = builder.add_negative(Type::AlwaysFalsy);
-                } else {
-                    builder = builder.add_negative(Type::AlwaysTruthy);
-                }
-                Some(builder.build())
+                // Apply truthiness filter directly.
+                Some(ty.filter_for_truthiness(db, is_positive))
             }
             _ => None,
         }
@@ -580,13 +635,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let target = place_expr(expr)?;
         let place = self.expect_place(&target);
 
-        let ty = if is_positive {
-            Type::AlwaysFalsy.negate(self.db)
-        } else {
-            Type::AlwaysTruthy.negate(self.db)
-        };
-
-        Some(NarrowingConstraints::from_iter([(place, ty)]))
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::Truthiness(is_positive),
+        )]))
     }
 
     fn evaluate_expr_named(
@@ -917,7 +969,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .collect();
             if filtered.len() < union.elements(self.db).len() {
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(place, UnionType::from_elements(self.db, filtered));
+                constraints.insert(
+                    place,
+                    NarrowingConstraint::IntersectWith(UnionType::from_elements(self.db, filtered)),
+                );
             }
         }
 
@@ -983,7 +1038,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 // As mentioned above, the synthesized `TypedDict` is always negated.
                 let intersection = Type::TypedDict(synthesized_typeddict).negate(self.db);
                 let place = self.expect_place(&subscript_place_expr);
-                constraints.insert(place, intersection);
+                constraints.insert(place, NarrowingConstraint::IntersectWith(intersection));
             }
         }
 
@@ -1004,7 +1059,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             self.evaluate_expr_compare_op(lhs_ty, rhs_ty, *op, is_positive)
                     {
                         let place = self.expect_place(&left);
-                        constraints.insert(place, ty);
+                        constraints.insert(place, NarrowingConstraint::IntersectWith(ty));
                     }
                 }
                 ast::Expr::Call(ast::ExprCall {
@@ -1052,8 +1107,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                         let place = self.expect_place(&target);
                         constraints.insert(
                             place,
-                            Type::instance(self.db, rhs_class.unknown_specialization(self.db))
-                                .negate_if(self.db, !is_positive),
+                            NarrowingConstraint::IntersectWith(
+                                Type::instance(self.db, rhs_class.unknown_specialization(self.db))
+                                    .negate_if(self.db, !is_positive),
+                            ),
                         );
                     }
                 }
@@ -1093,7 +1150,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                 Some(NarrowingConstraints::from_iter([(
                     place,
-                    guarded_ty.negate_if(self.db, !is_positive),
+                    NarrowingConstraint::IntersectWith(guarded_ty.negate_if(self.db, !is_positive)),
                 )]))
             }
             // For the expression `len(E)`, we narrow the type based on whether len(E) is truthy
@@ -1112,7 +1169,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 if let Some(narrowed_ty) = Self::narrow_type_by_len(self.db, arg_ty, is_positive) {
                     let target = place_expr(arg)?;
                     let place = self.expect_place(&target);
-                    Some(NarrowingConstraints::from_iter([(place, narrowed_ty)]))
+                    Some(NarrowingConstraints::from_iter([(
+                        place,
+                        NarrowingConstraint::IntersectWith(narrowed_ty),
+                    )]))
                 } else {
                     None
                 }
@@ -1142,7 +1202,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 
                     return Some(NarrowingConstraints::from_iter([(
                         place,
-                        constraint.negate_if(self.db, !is_positive),
+                        NarrowingConstraint::IntersectWith(
+                            constraint.negate_if(self.db, !is_positive),
+                        ),
                     )]));
                 }
 
@@ -1155,7 +1217,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     .map(|constraint| {
                         NarrowingConstraints::from_iter([(
                             place,
-                            constraint.negate_if(self.db, !is_positive),
+                            NarrowingConstraint::IntersectWith(
+                                constraint.negate_if(self.db, !is_positive),
+                            ),
                         )])
                     })
             }
@@ -1190,7 +1254,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             ast::Singleton::False => Type::BooleanLiteral(false),
         };
         let ty = ty.negate_if(self.db, !is_positive);
-        Some(NarrowingConstraints::from_iter([(place, ty)]))
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::IntersectWith(ty),
+        )]))
     }
 
     fn evaluate_match_pattern_class(
@@ -1223,7 +1290,10 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             _ => return None,
         };
 
-        Some(NarrowingConstraints::from_iter([(place, narrowed_type)]))
+        Some(NarrowingConstraints::from_iter([(
+            place,
+            NarrowingConstraint::IntersectWith(narrowed_type),
+        )]))
     }
 
     fn evaluate_match_pattern_value(
@@ -1243,7 +1313,9 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             infer_same_file_expression_type(self.db, value, TypeContext::default(), self.module);
 
         self.evaluate_expr_compare_op(subject_ty, value_ty, ast::CmpOp::Eq, is_positive)
-            .map(|ty| NarrowingConstraints::from_iter([(place, ty)]))
+            .map(|ty| {
+                NarrowingConstraints::from_iter([(place, NarrowingConstraint::IntersectWith(ty))])
+            })
     }
 
     fn evaluate_match_pattern_or(

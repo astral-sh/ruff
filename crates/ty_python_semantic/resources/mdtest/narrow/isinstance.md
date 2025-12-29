@@ -365,12 +365,12 @@ def f(
     if isinstance(c, bool):
         reveal_type(c)  # revealed: Never
     else:
-        reveal_type(c)  # revealed: P & ~AlwaysTruthy
+        reveal_type(c)  # revealed: P
 
     if isinstance(d, bool):
         reveal_type(d)  # revealed: Never
     else:
-        reveal_type(d)  # revealed: P & ~AlwaysFalsy
+        reveal_type(d)  # revealed: P
 ```
 
 ## Narrowing if an object of type `Any` or `Unknown` is used as the second argument
