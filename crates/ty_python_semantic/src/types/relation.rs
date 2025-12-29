@@ -350,9 +350,9 @@ impl<'db> Type<'db> {
             // only has to hold when the typevar has a valid specialization (i.e., one that
             // satisfies the upper bound/constraints).
             if let Type::TypeVar(bound_typevar) = self {
-                return ConstraintSet::constrain_typevar(db, bound_typevar, Type::Never, target);
+                return ConstraintSet::upper_bound_constraint(db, bound_typevar, target);
             } else if let Type::TypeVar(bound_typevar) = target {
-                return ConstraintSet::constrain_typevar(db, bound_typevar, self, Type::object());
+                return ConstraintSet::lower_bound_constraint(db, bound_typevar, self);
             }
         }
 
