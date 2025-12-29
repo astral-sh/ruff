@@ -10981,16 +10981,7 @@ impl<'db> UnionTypeInstance<'db> {
         }
     }
 
-    /// The optional value expression types (only available for eager instances).
-    #[allow(clippy::ref_option)]
-    pub(crate) fn _value_expr_types(self, db: &'db dyn Db) -> &'db Option<[Type<'db>; 2]> {
-        match self.inner(db) {
-            UnionTypeInstanceInner::Lazy(_) => &None,
-            UnionTypeInstanceInner::Eager(eager) => &eager._value_expr_types,
-        }
-    }
-
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         match self.inner(db) {
             UnionTypeInstanceInner::Lazy(_) => self,
             UnionTypeInstanceInner::Eager(eager) => UnionTypeInstance::new(
@@ -11020,10 +11011,6 @@ impl<'db> UnionTypeInstance<'db> {
 /// [`LazyUnionTypeInstance`] is evaluated lazily, so it can have a recursive structure.
 /// [`UnionTypeInstance`] defined with a name is handled in this struct.
 /// [`UnionTypeInstance`] without a name is handled as [`EagerUnionTypeInstance`].
-///
-/// # Ordering
-/// Ordering is based on the context's salsa-assigned id and not on its values.
-/// The id may change between runs, or when the context was garbage collected and recreated.
 #[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub struct LazyUnionTypeInstance<'db> {
     name: ast::name::Name,
@@ -11037,7 +11024,7 @@ impl<'db> LazyUnionTypeInstance<'db> {
 
     /// The type of the full union, which can be used when this `UnionType` instance
     /// is used in a type expression context.
-    pub(crate) fn union_type(&self, db: &'db dyn Db) -> Type<'db> {
+    fn union_type(&self, db: &'db dyn Db) -> Type<'db> {
         self.value_type(db, ExpressionKind::TypeExpression)
     }
 
@@ -11047,7 +11034,7 @@ impl<'db> LazyUnionTypeInstance<'db> {
     /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
     /// their corresponding value-expression types, i.e. we turn instances like `int`
     /// into class literals like `<class 'int'>`. This operation is potentially lossy.
-    pub(crate) fn value_expression_types(
+    fn value_expression_types(
         &self,
         db: &'db dyn Db,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
@@ -11115,7 +11102,6 @@ fn lazy_union_value_type_cycle_recover<'db>(
     current_ty.cycle_normalized(db, *previous_ty, cycle)
 }
 
-#[allow(clippy::unnecessary_wraps)]
 fn lazy_union_value_type_cycle_initial<'db>(
     _db: &'db dyn Db,
     id: salsa::Id,
@@ -11149,7 +11135,7 @@ pub struct EagerUnionTypeInstance<'db> {
 }
 
 impl<'db> EagerUnionTypeInstance<'db> {
-    pub(crate) fn from_value_expression_types(
+    fn from_value_expression_types(
         db: &'db dyn Db,
         value_expr_types: [Type<'db>; 2],
         scope_id: ScopeId<'db>,
@@ -11180,7 +11166,7 @@ impl<'db> EagerUnionTypeInstance<'db> {
     /// legacy `typing.Union[…]` annotation, we turn the type-expression types into
     /// their corresponding value-expression types, i.e. we turn instances like `int`
     /// into class literals like `<class 'int'>`. This operation is potentially lossy.
-    pub(crate) fn value_expression_types(
+    fn value_expression_types(
         &'db self,
         db: &'db dyn Db,
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
@@ -11204,7 +11190,7 @@ impl<'db> EagerUnionTypeInstance<'db> {
         }
     }
 
-    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+    fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
         let value_expr_types = self._value_expr_types.map(|[first, second]| {
             [
                 first.normalized_impl(db, visitor),
