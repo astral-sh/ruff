@@ -66,6 +66,7 @@ use crate::types::generics::{
     InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, typing_self,
     walk_generic_context,
 };
+use crate::types::infer::infer_same_file_expression_type;
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::infer_narrowing_constraint;
 use crate::types::newtype::NewType;
@@ -11088,7 +11089,7 @@ fn lazy_union_value_type<'db>(
         kind,
     );
 
-    infer_expression_type(db, value_expression, TypeContext::default())
+    infer_same_file_expression_type(db, value_expression, TypeContext::default(), &module)
 }
 
 fn lazy_union_value_type_cycle_recover<'db>(
@@ -14016,7 +14017,7 @@ impl<'db> ImplicitTypeAliasType<'db> {
             ExpressionKind::TypeExpression,
         );
 
-        infer_expression_type(db, value_expression, TypeContext::default())
+        infer_same_file_expression_type(db, value_expression, TypeContext::default(), &module)
     }
 }
 
