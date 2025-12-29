@@ -7507,7 +7507,7 @@ impl<'db> Type<'db> {
                     UnionTypeInstanceInner::Eager(instance) => {
                         // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
                         // expensive if there are errors.
-                        instance.union_type.clone()
+                        instance.union_type(db).clone()
                     }
                     UnionTypeInstanceInner::Lazy(instance) => Ok(Type::TypeAlias(
                         TypeAliasType::Implicit(ImplicitTypeAliasType::new(
@@ -7893,11 +7893,11 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::UnionType(instance) => {
                     if let UnionTypeInstanceInner::Eager(eager) = instance.inner(db)
-                    && let Ok(union_type) = eager.union_type {
+                    && let Ok(union_type) = eager.union_type(db) {
                         Type::KnownInstance(KnownInstanceType::UnionType(
                             UnionTypeInstance::eager(
                                 db,
-                                eager._value_expr_types,
+                                *eager._value_expr_types(db),
                                 Ok(union_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                             )
                         )))
@@ -10903,10 +10903,11 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Self {
         UnionTypeInstance::new(
             db,
-            UnionTypeInstanceInner::Eager(EagerUnionTypeInstance {
-                _value_expr_types: value_expr_types,
+            UnionTypeInstanceInner::Eager(EagerUnionTypeInstance::new(
+                db,
+                value_expr_types,
                 union_type,
-            }),
+            )),
         )
     }
 
@@ -10957,7 +10958,7 @@ impl<'db> UnionTypeInstance<'db> {
             UnionTypeInstanceInner::Lazy(lazy) => Ok(lazy.union_type(db)),
             // Cloning here is cheap if the result is a `Type` (which is `Copy`). It's more
             // expensive if there are errors.
-            UnionTypeInstanceInner::Eager(eager) => eager.union_type.clone(),
+            UnionTypeInstanceInner::Eager(eager) => eager.union_type(db).clone(),
         }
     }
 
@@ -10986,7 +10987,7 @@ impl<'db> UnionTypeInstance<'db> {
     pub(crate) fn _value_expr_types(self, db: &'db dyn Db) -> &'db Option<[Type<'db>; 2]> {
         match self.inner(db) {
             UnionTypeInstanceInner::Lazy(_) => &None,
-            UnionTypeInstanceInner::Eager(eager) => &eager._value_expr_types,
+            UnionTypeInstanceInner::Eager(eager) => eager._value_expr_types(db),
         }
     }
 
@@ -10995,7 +10996,7 @@ impl<'db> UnionTypeInstance<'db> {
             UnionTypeInstanceInner::Lazy(_) => self,
             UnionTypeInstanceInner::Eager(eager) => UnionTypeInstance::new(
                 db,
-                UnionTypeInstanceInner::Eager(eager.clone().normalized_impl(db, visitor)),
+                UnionTypeInstanceInner::Eager(eager.normalized_impl(db, visitor)),
             ),
         }
     }
@@ -11009,7 +11010,6 @@ impl<'db> UnionTypeInstance<'db> {
         match self.inner(db) {
             UnionTypeInstanceInner::Lazy(_) => Some(self),
             UnionTypeInstanceInner::Eager(eager) => eager
-                .clone()
                 .recursive_type_normalized_impl(db, div, nested)
                 .map(|eager| UnionTypeInstance::new(db, UnionTypeInstanceInner::Eager(eager))),
         }
@@ -11131,22 +11131,30 @@ fn lazy_union_value_type_cycle_initial<'db>(
 ///
 /// [`EagerUnionTypeInstance`] cannot have a recursive structure. [`UnionTypeInstance`] used on the fly without a name is handled by this struct.
 /// [`UnionTypeInstance`] with a defined name is handled as [`LazyUnionTypeInstance`].
-#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+///
+/// # Ordering
+/// Ordering is based on the context's salsa-assigned id and not on its values.
+/// The id may change between runs, or when the context was garbage collected and recreated.
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
 pub struct EagerUnionTypeInstance<'db> {
     /// The types of the elements of this union, as they were inferred in a value
     /// expression context. For `int | str`, this would contain `<class 'int'>` and
     /// `<class 'str'>`. For `Union[int, str]`, this field is `None`, as we infer
     /// the elements as type expressions. Use `value_expression_types` to get the
     /// corresponding value expression types.
-    #[allow(clippy::used_underscore_binding)]
+    #[returns(ref)]
     _value_expr_types: Option<[Type<'db>; 2]>,
 
     /// The type of the full union, which can be used when this `UnionType` instance
     /// is used in a type expression context. For `int | str`, this would contain
     /// `Ok(int | str)`. If any of the element types could not be converted, this
     /// contains the first encountered error.
+    #[returns(ref)]
     union_type: Result<Type<'db>, InvalidTypeExpressionError<'db>>,
 }
+
+impl get_size2::GetSize for EagerUnionTypeInstance<'_> {}
 
 impl<'db> EagerUnionTypeInstance<'db> {
     pub(crate) fn from_value_expression_types(
@@ -11190,10 +11198,10 @@ impl<'db> EagerUnionTypeInstance<'db> {
                 .unwrap_or_else(Type::unknown)
         };
 
-        if let Some(value_expr_types) = &self._value_expr_types {
+        if let Some(value_expr_types) = self._value_expr_types(db) {
             Ok(Either::Left(value_expr_types.iter().copied()))
         } else {
-            match self.union_type.clone()? {
+            match self.union_type(db).clone()? {
                 Type::Union(union) => Ok(Either::Right(Either::Left(
                     union.elements(db).iter().copied().map(to_class_literal),
                 ))),
@@ -11205,19 +11213,19 @@ impl<'db> EagerUnionTypeInstance<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        let value_expr_types = self._value_expr_types.map(|[first, second]| {
+        let value_expr_types = self._value_expr_types(db).map(|[first, second]| {
             [
                 first.normalized_impl(db, visitor),
                 second.normalized_impl(db, visitor),
             ]
         });
 
-        let union_type = self.union_type.map(|ty| ty.normalized_impl(db, visitor));
+        let union_type = self
+            .union_type(db)
+            .clone()
+            .map(|ty| ty.normalized_impl(db, visitor));
 
-        Self {
-            _value_expr_types: value_expr_types,
-            union_type,
-        }
+        Self::new(db, value_expr_types, union_type)
     }
 
     fn recursive_type_normalized_impl(
@@ -11228,7 +11236,7 @@ impl<'db> EagerUnionTypeInstance<'db> {
     ) -> Option<Self> {
         // The `Divergent` elimination rules are different within union types.
         // See `UnionType::recursive_type_normalized_impl` for details.
-        let value_expr_types = match &self._value_expr_types {
+        let value_expr_types = match self._value_expr_types(db) {
             Some([first, second]) if nested => Some([
                 first.recursive_type_normalized_impl(db, div, nested)?,
                 second.recursive_type_normalized_impl(db, div, nested)?,
@@ -11243,7 +11251,7 @@ impl<'db> EagerUnionTypeInstance<'db> {
             ]),
             None => None,
         };
-        let union_type = match self.union_type {
+        let union_type = match self.union_type(db).clone() {
             Ok(ty) if nested => Ok(ty.recursive_type_normalized_impl(db, div, nested)?),
             Ok(ty) => Ok(ty
                 .recursive_type_normalized_impl(db, div, nested)
@@ -11251,10 +11259,7 @@ impl<'db> EagerUnionTypeInstance<'db> {
             Err(err) => Err(err),
         };
 
-        Some(Self {
-            _value_expr_types: value_expr_types,
-            union_type,
-        })
+        Some(Self::new(db, value_expr_types, union_type))
     }
 }
 

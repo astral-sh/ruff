@@ -5294,7 +5294,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = value_ty
                 && let Some(eager) = instance.as_eager(self.db())
                 // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
                 {
                     Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::from_definition(
@@ -6107,7 +6107,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = inferred_ty
                 && let Some(eager) = instance.as_eager(self.db())
                 // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
             {
                 Type::KnownInstance(KnownInstanceType::UnionType(
                     UnionTypeInstance::from_definition(self.db(), name.id().clone(), definition),
