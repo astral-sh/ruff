@@ -6924,6 +6924,86 @@ mod tests {
         ");
     }
 
+    #[test]
+    fn hover_narrowed_type_with_top_materialization() {
+        let mut test = inlay_hint_test(
+            r#"
+                def f(xyxy: object):
+                    if isinstance(xyxy, list):
+                        x = xyxy
+                "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x[: Top[list[Unknown]]] = xyxy
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:24:1
+           |
+        22 | CallableTypeOf: _SpecialForm
+        23 |
+        24 | Top: _SpecialForm
+           | ^^^
+        25 | """
+        26 | `Top[T]` represents the "top materialization" of `T`.
+           |
+        info: Source
+         --> main2.py:4:13
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |             ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                 ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | ^^^^^^^
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:4:22
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                      ^^^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x: Top[list[Unknown]] = xyxy
+        "#);
+    }
+
     struct InlayHintLocationDiagnostic {
         source: FileRange,
         target: FileRange,

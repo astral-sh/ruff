@@ -20,12 +20,67 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
-# Top[T] evaluates to the top materialization of T, a type that is a supertype
-# of every materialization of T.
+
 Top: _SpecialForm
-# Bottom[T] evaluates to the bottom materialization of T, a type that is a subtype
-# of every materialization of T.
+"""
+`Top[T]` represents the "top materialization" of `T`.
+
+For any type `T`, the top [materialization] of `T` is a type that is
+a supertype of all materializations of `T`.
+
+For a [fully static] type `T`, `Top[T]` is always exactly the same type
+as `T` itself. For example, the top materialization of `Sequence[int]`
+is simply `Sequence[int]`.
+
+For a [gradual type] `T` that contains [`Any`][Any] or `Unknown` inside
+it, however, `Top[T]` will not be equivalent to `T`. `Top[Sequence[Any]]`
+evaluates to `Sequence[object]`: since `Sequence` is covariant, no
+possible materialization of `Any` exists such that a fully static
+materialization of `Sequence[Any]` would not be a subtype of
+`Sequence[object]`.
+
+`Top[T]` cannot be simplified further for invariant gradual types.
+`Top[list[Any]]` cannot be simplified to any other type: because `list`
+is invariant, `list[object]` is not a supertype of `list[int]`. The
+top materialization of `list[Any]` is simply `Top[list[Any]]`: the
+infinite union of `list[T]` for every possible fully static type `T`.
+
+[materialization]: https://typing.python.org/en/latest/spec/concepts.html#materialization
+[fully static]: https://typing.python.org/en/latest/spec/concepts.html#fully-static-types
+[gradual type]: https://typing.python.org/en/latest/spec/concepts.html#gradual-types
+[Any]: https://typing.python.org/en/latest/spec/special-types.html#any
+"""
+
 Bottom: _SpecialForm
+"""
+`Bottom[T]` represents the "bottom materialization" of `T`.
+
+For any type `T`, the bottom [materialization] of `T` is a type that is
+a subtype of all materializations of `T`.
+
+For a [fully static] type `T`, `Bottom[T]` is always exactly the same type
+as `T` itself. For example, the bottom materialization of `Sequence[int]`
+is simply `Sequence[int]`.
+
+For a [gradual type] `T` that contains [`Any`][Any] or `Unknown` inside it,
+however, `Bottom[T]` will not be equivalent to `T`. `Bottom[Sequence[Any]]`
+evaluates to `Sequence[Never]`: since `Sequence` is covariant, no
+possible materialization of `Any` exists such that a fully static
+materialization of `Sequence[Any]` would not be a supertype of
+`Sequence[Never]`. (`Sequence[Never]` is not the same type as the
+uninhabited type `Never`: for example, it is inhabited by the empty tuple,
+`()`.)
+
+For many invariant gradual types `T`, `Bottom[T]` is equivalent to
+[`Never`][Never], although ty will not necessarily apply this simplification
+eagerly.
+
+[materialization]: https://typing.python.org/en/latest/spec/concepts.html#materialization
+[fully static]: https://typing.python.org/en/latest/spec/concepts.html#fully-static-types
+[gradual type]: https://typing.python.org/en/latest/spec/concepts.html#gradual-types
+[Never]: https://typing.python.org/en/latest/spec/special-types.html#never
+[Any]: https://typing.python.org/en/latest/spec/special-types.html#any
+"""
 
 # ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
 # to mean `complex | float | int`. This is to support a typing-system special case [1].
