@@ -1,5 +1,6 @@
 use ruff_db::system::SystemPath;
 
+use crate::glob::include::MatchFile;
 pub(crate) use exclude::{ExcludeFilter, ExcludeFilterBuilder};
 pub(crate) use include::{IncludeFilter, IncludeFilterBuilder};
 pub(crate) use portable::{
@@ -39,7 +40,9 @@ impl IncludeExcludeFilter {
         if self.exclude.match_directory(path, mode) {
             IncludeResult::Excluded
         } else if self.include.match_directory(path) {
-            IncludeResult::Included
+            IncludeResult::Included {
+                literal_match: None,
+            }
         } else {
             IncludeResult::NotIncluded
         }
@@ -52,10 +55,16 @@ impl IncludeExcludeFilter {
     ) -> IncludeResult {
         if self.exclude.match_file(path, mode) {
             IncludeResult::Excluded
-        } else if self.include.match_file(path) {
-            IncludeResult::Included
         } else {
-            IncludeResult::NotIncluded
+            match self.include.match_file(path) {
+                MatchFile::LiteralMatch => IncludeResult::Included {
+                    literal_match: Some(true),
+                },
+                MatchFile::PatternMatch => IncludeResult::Included {
+                    literal_match: Some(false),
+                },
+                MatchFile::NoMatch => IncludeResult::NotIncluded,
+            }
         }
     }
 }
@@ -86,7 +95,7 @@ pub(crate) enum IncludeResult {
     ///
     /// For directories: This isn't a guarantee that any file in this directory gets included
     /// but we need to traverse it to make this decision.
-    Included,
+    Included { literal_match: Option<bool> },
 
     /// The path matches an exclude pattern.
     Excluded,
