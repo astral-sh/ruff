@@ -47,7 +47,7 @@ jobs:
       - run: cp LICENSE crates/ruff_wasm/pkg # wasm-pack does not put the LICENSE file in the pkg
       - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
-          node-version: 22
+          node-version: 24
           registry-url: "https://registry.npmjs.org"
       - name: "Publish (dry-run)"
         if: ${{ inputs.plan == '' || fromJson(inputs.plan).announcement_tag_is_implicit }}
