@@ -432,8 +432,12 @@ impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => self.record_class(db, literal.enum_class(db)),
-            Type::GenericAlias(alias) => self.record_class(db, alias.origin(db)),
+            Type::EnumLiteral(literal) => {
+                self.record_class(db, literal.enum_class(db));
+            }
+            Type::GenericAlias(alias) => {
+                self.record_class(db, ClassLiteral::Static(alias.origin(db)));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -558,13 +562,15 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
 
         let ty = Type::ClassLiteral(self.class);
         if qualification_level.is_some() {
-            write!(f.with_type(ty), "{}", self.class.qualified_name(self.db))?;
+            let qualified_name = self.class.qualified_name(self.db);
+            write!(f.with_type(ty), "{qualified_name}")?;
         } else {
             write!(f.with_type(ty), "{}", self.class.name(self.db))?;
         }
 
         if qualification_level == Some(&QualificationLevel::FileAndLineNumber) {
             let file = self.class.file(self.db);
+            let class_offset = self.class.header_range(self.db).start();
             let path = file.path(self.db);
             let path = match path {
                 FilePath::System(path) => Cow::Owned(FilePath::System(
@@ -575,7 +581,6 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
                 FilePath::Vendored(_) | FilePath::SystemVirtual(_) => Cow::Borrowed(path),
             };
             let line_index = line_index(self.db, file);
-            let class_offset = self.class.header_range(self.db).start();
             let line_number = line_index.line_index(class_offset);
             f.set_invalid_type_annotation();
             write!(f, " @ {path}:{line_number}")?;
@@ -1287,7 +1292,7 @@ impl<'db> GenericAlias<'db> {
         settings: DisplaySettings<'db>,
     ) -> DisplayGenericAlias<'db> {
         DisplayGenericAlias {
-            origin: self.origin(db),
+            origin: ClassLiteral::Static(self.origin(db)),
             specialization: self.specialization(db),
             db,
             settings,

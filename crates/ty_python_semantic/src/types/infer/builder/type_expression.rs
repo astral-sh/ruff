@@ -1045,12 +1045,12 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 value_ty
             }
             Type::ClassLiteral(class) => {
-                match class.generic_context(self.db()) {
-                    Some(generic_context) => {
+                match (class.generic_context(self.db()), class.as_static()) {
+                    (Some(generic_context), Some(static_class)) => {
                         let specialized_class = self.infer_explicit_class_specialization(
                             subscript,
                             value_ty,
-                            class,
+                            static_class,
                             generic_context,
                         );
 
@@ -1062,7 +1062,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             )
                             .unwrap_or(Type::unknown())
                     }
-                    None => {
+                    _ => {
                         // TODO: emit a diagnostic if you try to specialize a non-generic class.
                         self.infer_type_expression(slice);
                         todo_type!("specialized non-generic class")
