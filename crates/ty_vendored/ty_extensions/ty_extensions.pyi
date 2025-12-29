@@ -42,7 +42,8 @@ materialization of `Sequence[Any]` would not be a subtype of
 `Top[T]` cannot be simplified further for invariant gradual types.
 `Top[list[Any]]` cannot be simplified to any other type: because `list`
 is invariant, `list[object]` is not a supertype of `list[int]`. The
-top materialization of `list[Any]` is simply `Top[list[Any]]`.
+top materialization of `list[Any]` is simply `Top[list[Any]]`: the
+infinite union of `list[T]` for every possible fully static type `T`.
 
 [materialization]: https://typing.python.org/en/latest/spec/concepts.html#materialization
 [fully static]: https://typing.python.org/en/latest/spec/concepts.html#fully-static-types
@@ -67,7 +68,7 @@ evaluates to `Sequence[Never]`: since `Sequence` is covariant, no
 possible materialization of `Any` exists such that a fully static
 materialization of `Sequence[Any]` would not be a supertype of
 `Sequence[Never]`. (`Sequence[Never]` is not the same type as the
-uninhabited type `Never`: for example, it is inhabited the empty tuple,
+uninhabited type `Never`: for example, it is inhabited by the empty tuple,
 `()`.)
 
 For many invariant gradual types `T`, `Bottom[T]` is equivalent to
