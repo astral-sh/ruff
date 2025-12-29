@@ -37,7 +37,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 22
+          node-version: 24
           package-manager-cache: false
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
       - name: "Install Node dependencies"

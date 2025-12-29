@@ -387,7 +387,7 @@ jobs:
         run: rustup target add wasm32-unknown-unknown
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 22
+          node-version: 24
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
@@ -760,7 +760,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 22
+          node-version: 24
       - name: "Cache pre-commit"
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
@@ -900,7 +900,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
         with:
-          node-version: 22
+          node-version: 24
           cache: "npm"
           cache-dependency-path: playground/package-lock.json
       - uses: jetli/wasm-bindgen-action@20b33e20595891ab1a0ed73145d8a21fc96e7c29 # v0.2.0
