@@ -1,0 +1,5 @@
+{
+  "target_version": "py312",
+  "quote_style": "double",
+  "f_string_consistent_quotes": "disabled"
+}
