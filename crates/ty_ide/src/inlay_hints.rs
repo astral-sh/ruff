@@ -1875,13 +1875,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:18
@@ -2234,13 +2234,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:10
@@ -2288,13 +2288,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
@@ -2363,13 +2363,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
@@ -2422,13 +2422,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:10
@@ -2481,13 +2481,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:6:10
@@ -2540,13 +2540,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:10
@@ -2599,13 +2599,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:10
@@ -2658,13 +2658,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:10
@@ -2716,13 +2716,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:10
@@ -2774,13 +2774,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:11:10
@@ -2847,13 +2847,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:12:10
@@ -3167,13 +3167,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:13
@@ -3303,13 +3303,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:19
@@ -3378,13 +3378,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:48
@@ -3529,13 +3529,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:13
@@ -3604,13 +3604,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:47
@@ -3754,13 +3754,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:13
@@ -3825,13 +3825,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:47
@@ -4286,13 +4286,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
@@ -4341,13 +4341,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
@@ -5304,13 +5304,13 @@ mod tests {
         bar([a=]1, [b=]2)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:14
@@ -5322,13 +5322,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:17
@@ -6154,13 +6154,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:63

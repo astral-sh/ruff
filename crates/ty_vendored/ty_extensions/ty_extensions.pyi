@@ -3,15 +3,9 @@ import sys
 import types
 from collections.abc import Iterable
 from enum import Enum
-from typing import (
-    Any,
-    ClassVar,
-    LiteralString,
-    Protocol,
-    _SpecialForm,
-)
+from typing import Any, ClassVar, Protocol, _SpecialForm
 
-from typing_extensions import Self  # noqa: UP035
+from typing_extensions import LiteralString, Self  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
