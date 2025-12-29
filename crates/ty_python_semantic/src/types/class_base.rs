@@ -1,11 +1,13 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::{ApplySpecialization, Specialization};
+use crate::types::mro::MroIterator;
+
 use crate::types::tuple::TupleType;
 use crate::types::{
     ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
-    TypeContext, TypeMapping, todo_type,
+    MaterializationKind, MroError, NormalizedVisitor, SpecialFormType, Type, TypeContext,
+    TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -245,7 +247,8 @@ impl<'db> ClassBase<'db> {
                 SpecialFormType::Generic => Some(Self::Generic),
 
                 SpecialFormType::NamedTuple => {
-                    let fields = subclass.own_fields(db, None, CodeGeneratorKind::NamedTuple);
+                    let class = subclass.as_static()?;
+                    let fields = class.own_fields(db, None, CodeGeneratorKind::NamedTuple);
                     Self::try_from_type(
                         db,
                         TupleType::heterogeneous(
@@ -309,6 +312,16 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the metaclass of this class base.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Class(class) => class.metaclass(db),
+            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            // TODO: all `Protocol` classes actually have `_ProtocolMeta` as their metaclass.
+            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -359,7 +372,13 @@ impl<'db> ClassBase<'db> {
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let Some((class_literal, specialization)) = class.static_class_literal(db) else {
+                    // Dynamic classes can't have cyclic MRO since their bases must
+                    // already exist at creation time. Unlike statement classes, we do not
+                    // permit dynamic classes to have forward references in their
+                    // bases list.
+                    return false;
+                };
                 class_literal
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)

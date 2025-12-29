@@ -870,6 +870,102 @@ static_assert(not has_member(F, "__match_args__"))
 static_assert(not has_member(F(), "__weakref__"))
 ```
 
+### Dynamic classes (created via `type()`)
+
+Dynamic classes created using the three-argument form of `type()` support autocomplete for members
+inherited from their base classes on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+    def base_method(self) -> str:
+        return "hello"
+
+class Mixin:
+    mixin_attr: str = "mixin"
+
+# Dynamic class with a single base
+DynamicSingle = type("DynamicSingle", (Base,), {})
+
+# The class object has access to base class attributes
+static_assert(has_member(DynamicSingle, "base_attr"))
+static_assert(has_member(DynamicSingle, "base_method"))
+
+# Dynamic class with multiple bases
+DynamicMulti = type("DynamicMulti", (Base, Mixin), {})
+
+static_assert(has_member(DynamicMulti, "base_attr"))
+static_assert(has_member(DynamicMulti, "mixin_attr"))
+```
+
+Members from `object` and the `type` metaclass are available on the class object:
+
+```py
+from ty_extensions import has_member, static_assert
+
+Dynamic = type("Dynamic", (), {})
+
+# object members are available on the class
+static_assert(has_member(Dynamic, "__doc__"))
+static_assert(has_member(Dynamic, "__init__"))
+
+# type metaclass members are available on the class
+static_assert(has_member(Dynamic, "__name__"))
+static_assert(has_member(Dynamic, "__bases__"))
+static_assert(has_member(Dynamic, "__mro__"))
+static_assert(has_member(Dynamic, "__subclasses__"))
+```
+
+Attributes from the namespace dict (third argument) are not tracked:
+
+```py
+from ty_extensions import has_member, static_assert
+
+DynamicWithDict = type("DynamicWithDict", (), {"custom_attr": 42})
+
+# Namespace dict attributes are not available for autocomplete
+static_assert(not has_member(DynamicWithDict, "custom_attr"))
+static_assert(not has_member(DynamicWithDict(), "custom_attr"))
+```
+
+Dynamic classes inheriting from classes with custom metaclasses get metaclass members:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class MyMeta(type):
+    meta_attr: str = "meta"
+
+class Base(metaclass=MyMeta):
+    base_attr: int = 1
+
+Dynamic = type("Dynamic", (Base,), {})
+
+# Metaclass attributes are available on the class
+static_assert(has_member(Dynamic, "meta_attr"))
+static_assert(has_member(Dynamic, "base_attr"))
+```
+
+However, instances of dynamic classes currently do not expose members for autocomplete:
+
+```py
+from ty_extensions import has_member, static_assert
+
+class Base:
+    base_attr: int = 1
+
+DynamicSingle = type("DynamicSingle", (Base,), {})
+instance = DynamicSingle()
+
+# TODO: Instance members should be available but currently are not
+static_assert(not has_member(instance, "base_attr"))
+static_assert(not has_member(instance, "__repr__"))
+static_assert(not has_member(instance, "__hash__"))
+```
+
 ### Attributes not available at runtime
 
 Typeshed includes some attributes in `object` that are not available for some (builtin) types. For

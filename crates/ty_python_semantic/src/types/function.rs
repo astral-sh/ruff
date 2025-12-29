@@ -564,10 +564,11 @@ impl<'db> OverloadLiteral<'db> {
                 let index = semantic_index(db, scope_id.file(db));
                 let class = nearest_enclosing_class(db, index, scope_id).unwrap();
 
-                let typing_self = typing_self(db, scope_id, typevar_binding_context, class).expect(
-                    "We should always find the surrounding class \
+                let typing_self = typing_self(db, scope_id, typevar_binding_context, class.into())
+                    .expect(
+                        "We should always find the surrounding class \
                      for an implicit self: Self annotation",
-                );
+                    );
 
                 if self.is_classmethod(db) {
                     Some(SubclassOfType::from(
@@ -1227,10 +1228,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1739,7 +1737,9 @@ impl KnownFunction {
                 if class.is_protocol(db) {
                     return;
                 }
-                report_bad_argument_to_get_protocol_members(context, call_expression, *class);
+                if let Some(class) = class.as_static() {
+                    report_bad_argument_to_get_protocol_members(context, call_expression, class);
+                }
             }
 
             KnownFunction::RevealProtocolInterface => {
@@ -2023,7 +2023,7 @@ impl KnownFunction {
                 if !class.has_ordering_method_in_mro(db) {
                     report_invalid_total_ordering_call(
                         context,
-                        class.class_literal(db).0,
+                        class.class_literal(db),
                         call_expression,
                     );
                 }
