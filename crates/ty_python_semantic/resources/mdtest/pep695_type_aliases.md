@@ -140,7 +140,7 @@ type IntOrStr = int | str
 
 def f(x: IntOrStr, y: str | bytes):
     z = x or y
-    reveal_type(z)  # revealed: (int & ~AlwaysFalsy) | str | bytes
+    reveal_type(z)  # revealed: int | str | bytes
 ```
 
 ## Multiple layers of union aliases

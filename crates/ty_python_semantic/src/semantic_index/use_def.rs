@@ -266,7 +266,9 @@ use crate::semantic_index::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
-use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
+use crate::types::{
+    IntersectionBuilder, NarrowingConstraint, Truthiness, Type, infer_narrowing_constraint,
+};
 
 mod place_state;
 
@@ -757,22 +759,50 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        let constraint_tys: Vec<_> = self
+        let constraints: Vec<_> = self
             .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
             .collect();
 
-        if constraint_tys.is_empty() {
+        if constraints.is_empty() {
+            return base_ty;
+        }
+
+        // Separate truthiness constraints from intersection constraints.
+        // We apply truthiness filtering after intersecting with other constraints,
+        // so that pattern narrowing happens first.
+        let mut truthiness_constraints = Vec::new();
+        let mut intersection_types = Vec::new();
+
+        for constraint in constraints.into_iter().rev() {
+            match constraint {
+                NarrowingConstraint::Truthiness(is_truthy) => {
+                    truthiness_constraints.push(is_truthy);
+                }
+                NarrowingConstraint::IntersectWith(ty) => {
+                    intersection_types.push(ty);
+                }
+            }
+        }
+
+        // First intersect with type constraints.
+        let result_ty = if intersection_types.is_empty() {
             base_ty
         } else {
-            constraint_tys
+            intersection_types
                 .into_iter()
-                .rev()
                 .fold(
                     IntersectionBuilder::new(db).add_positive(base_ty),
                     IntersectionBuilder::add_positive,
                 )
                 .build()
-        }
+        };
+
+        // Then apply truthiness filtering.
+        truthiness_constraints
+            .into_iter()
+            .fold(result_ty, |ty, is_truthy| {
+                ty.filter_for_truthiness(db, is_truthy)
+            })
     }
 }
 

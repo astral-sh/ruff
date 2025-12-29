@@ -58,9 +58,9 @@ and `tuple[()]` in the negative case (see <https://github.com/astral-sh/ty/issue
 ```py
 def _(x: tuple[int, ...]):
     if len(x):
-        reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysFalsy
+        reveal_type(x)  # revealed: tuple[int, ...]
     else:
-        reveal_type(x)  # revealed: tuple[int, ...] & ~AlwaysTruthy
+        reveal_type(x)  # revealed: tuple[int, ...]
 ```
 
 ## Unions of narrowable types
@@ -70,9 +70,9 @@ from typing import Literal
 
 def _(x: Literal["foo", ""] | tuple[int, ...]):
     if len(x):
-        reveal_type(x)  # revealed: Literal["foo"] | (tuple[int, ...] & ~AlwaysFalsy)
+        reveal_type(x)  # revealed: Literal["foo"] | tuple[int, ...]
     else:
-        reveal_type(x)  # revealed: Literal[""] | (tuple[int, ...] & ~AlwaysTruthy)
+        reveal_type(x)  # revealed: Literal[""] | tuple[int, ...]
 ```
 
 ## Types that are not narrowed
@@ -119,13 +119,13 @@ def _(lines: list[str]):
         if not line:
             continue
 
-        reveal_type(line)  # revealed: str & ~AlwaysFalsy
+        reveal_type(line)  # revealed: str
         value = line if len(line) < 3 else ""
-        reveal_type(value)  # revealed: (str & ~AlwaysFalsy) | Literal[""]
+        reveal_type(value)  # revealed: str
 
         if len(value):
             # `Literal[""]` is removed, `str & ~AlwaysFalsy` is unchanged
-            reveal_type(value)  # revealed: str & ~AlwaysFalsy
+            reveal_type(value)  # revealed: str
             # Accessing value[0] is safe here
             _ = value[0]
 ```

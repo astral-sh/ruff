@@ -189,7 +189,7 @@ def _(
     h: Literal[42] | Not[Literal[42]],
     i: Not[Literal[42]] | Literal[42],
 ):
-    reveal_type(a)  # revealed: Literal[""] | ~AlwaysFalsy
+    reveal_type(a)  # revealed: object
     reveal_type(b)  # revealed: object
     reveal_type(c)  # revealed: object
     reveal_type(d)  # revealed: object

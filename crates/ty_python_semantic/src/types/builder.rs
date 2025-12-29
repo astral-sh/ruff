@@ -908,6 +908,17 @@ impl<'db> IntersectionBuilder<'db> {
         self
     }
 
+    pub(crate) fn negative_elements<I, T>(mut self, elements: I) -> Self
+    where
+        I: IntoIterator<Item = T>,
+        T: Into<Type<'db>>,
+    {
+        for element in elements {
+            self = self.add_negative(element.into());
+        }
+        self
+    }
+
     pub(crate) fn build(mut self) -> Type<'db> {
         // Avoid allocating the UnionBuilder unnecessarily if we have just one intersection:
         if self.intersections.len() == 1 {
@@ -1257,6 +1268,26 @@ impl<'db> InnerIntersectionBuilder<'db> {
     fn build(mut self, db: &'db dyn Db, order_elements: bool) -> Type<'db> {
         self.simplify_constrained_typevars(db);
 
+        // Strip out redundant ~AlwaysTruthy and ~AlwaysFalsy constraints from the negative set.
+        // These are only redundant when all positive elements already have a determined truthiness
+        // that makes the constraint unnecessary:
+        // - Strip ~AlwaysFalsy when ALL positive elements are always truthy
+        // - Strip ~AlwaysTruthy when ALL positive elements are always falsy
+        //
+        // We keep them when they're the only element (standalone negation like ~AlwaysFalsy)
+        // because that's how truthiness narrowing constraints are represented.
+        // See https://github.com/astral-sh/ty/issues/2233
+        if !self.positive.is_empty() && !self.negative.is_empty() {
+            let all_always_truthy = self.positive.iter().all(|ty| ty.bool(db).is_always_true());
+            let all_always_falsy = self.positive.iter().all(|ty| ty.bool(db).is_always_false());
+
+            self.negative.retain(|ty| match ty {
+                Type::AlwaysFalsy => !all_always_truthy,
+                Type::AlwaysTruthy => !all_always_falsy,
+                _ => true,
+            });
+        }
+
         // If any typevars are in `self.positive`, speculatively solve all bounded type variables
         // to their upper bound and all constrained type variables to the union of their constraints.
         // If that speculative intersection simplifies to `Never`, this intersection must also simplify
@@ -1469,5 +1500,65 @@ mod tests {
 
             assert_eq!(actual.display(&db).to_string(), "Literal[SafeUUID.unknown]");
         }
+    }
+
+    #[test]
+    fn build_intersection_always_falsy_int_literal() {
+        let db = setup_db();
+
+        // IntLiteral(0) is always falsy, so IntLiteral(0) & ~AlwaysFalsy should be Never
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::IntLiteral(0))
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        // Same with reversed order
+        let ty = IntersectionBuilder::new(&db)
+            .add_negative(Type::AlwaysFalsy)
+            .add_positive(Type::IntLiteral(0))
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        // IntLiteral(1) is always truthy, so IntLiteral(1) & ~AlwaysFalsy should be IntLiteral(1)
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::IntLiteral(1))
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        assert_eq!(ty, Type::IntLiteral(1));
+
+        // BooleanLiteral(false) is always falsy
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::BooleanLiteral(false))
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        assert_eq!(ty, Type::Never);
+
+        // BooleanLiteral(true) is always truthy
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(Type::BooleanLiteral(true))
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        assert_eq!(ty, Type::BooleanLiteral(true));
+
+        // Test a union: Literal[0, 1] & ~AlwaysFalsy should become Literal[1]
+        let union = UnionType::from_elements(&db, [Type::IntLiteral(0), Type::IntLiteral(1)]);
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(union)
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        assert_eq!(ty, Type::IntLiteral(1));
+
+        // Test with isinstance-like constraint: Literal[0, 1] & (int & ~AlwaysFalsy)
+        let int_ty = KnownClass::Int.to_instance(&db);
+        let constraint = IntersectionBuilder::new(&db)
+            .add_positive(int_ty)
+            .add_negative(Type::AlwaysFalsy)
+            .build();
+        let ty = IntersectionBuilder::new(&db)
+            .add_positive(union)
+            .add_positive(constraint)
+            .build();
+        assert_eq!(ty, Type::IntLiteral(1));
     }
 }
