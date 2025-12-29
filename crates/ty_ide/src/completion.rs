@@ -352,7 +352,8 @@ impl<'db> Completion<'db> {
                 | Type::PropertyInstance(_)
                 | Type::BoundSuper(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_) => CompletionKind::Struct,
+                | Type::NewTypeInstance(_)
+                | Type::FunctionalInstance(_) => CompletionKind::Struct,
                 Type::IntLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::TypeIs(_)

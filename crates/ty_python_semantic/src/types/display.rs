@@ -750,6 +750,14 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     )?;
                     f.write_char(']')
                 }
+                SubclassOfInner::FunctionalClass(functional_class) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    // Display the dynamic class name
+                    f.write_str(functional_class.name(self.db).as_str())?;
+                    f.write_char(']')
+                }
             },
             Type::SpecialForm(special_form) => {
                 f.set_invalid_type_annotation();
@@ -1031,6 +1039,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
             }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(self.db)),
+            Type::FunctionalInstance(functional_class) => f
+                .with_type(self.ty)
+                .write_str(functional_class.name(self.db)),
         }
     }
 }

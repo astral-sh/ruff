@@ -18,13 +18,16 @@ use crate::semantic_index::{
 use crate::types::bound_super::BoundSuperError;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::context::InferContext;
-use crate::types::diagnostic::{INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD};
+use crate::types::diagnostic::{
+    DUPLICATE_BASE, INCONSISTENT_MRO, INVALID_TYPE_ALIAS_TYPE, SUPER_CALL_IN_NAMED_TUPLE_METHOD,
+};
 use crate::types::enums::{
     enum_metadata, is_enum_class_by_inheritance, try_unwrap_nonmember_value,
 };
 use crate::types::function::{
     DataclassTransformerFlags, DataclassTransformerParams, KnownFunction,
 };
+use crate::types::functional_class::FunctionalMroError;
 use crate::types::generics::{
     GenericContext, InferableTypeVars, Specialization, walk_generic_context, walk_specialization,
 };
@@ -71,6 +74,250 @@ use ruff_python_ast::{self as ast, PythonVersion};
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, file_to_module};
+
+/// Performs member lookups over an MRO (Method Resolution Order).
+///
+/// This struct encapsulates the shared logic for looking up class and instance
+/// members by iterating through an MRO. Both `ClassLiteral` and `FunctionalClassType`
+/// use this to avoid duplicating the MRO traversal logic.
+pub(super) struct MroLookup<'db, I> {
+    db: &'db dyn Db,
+    mro_iter: I,
+}
+
+impl<'db, I: Iterator<Item = ClassBase<'db>>> MroLookup<'db, I> {
+    /// Create a new MRO lookup from a database and an MRO iterator.
+    pub(super) fn new(db: &'db dyn Db, mro_iter: I) -> Self {
+        Self { db, mro_iter }
+    }
+
+    /// Look up a class member by iterating through the MRO.
+    ///
+    /// Parameters:
+    /// - `name`: The member name to look up
+    /// - `policy`: Controls which classes in the MRO to skip
+    /// - `inherited_generic_context`: Generic context for `own_class_member` calls
+    /// - `is_self_object`: Whether the class itself is `object` (affects policy filtering)
+    ///
+    /// Returns `ClassMemberResult::TypedDict` if a `TypedDict` base is encountered,
+    /// allowing the caller to handle this case specially.
+    ///
+    /// If we encounter a dynamic type in the MRO, we save it and after traversal:
+    /// 1. Use it as the type if no other classes define the attribute, or
+    /// 2. Intersect it with the type from non-dynamic MRO members.
+    pub(super) fn class_member(
+        self,
+        name: &str,
+        policy: MemberLookupPolicy,
+        inherited_generic_context: Option<GenericContext<'db>>,
+        is_self_object: bool,
+    ) -> ClassMemberResult<'db> {
+        let db = self.db;
+        let mut dynamic_type: Option<Type<'db>> = None;
+        let mut lookup_result: LookupResult<'db> =
+            Err(LookupError::Undefined(TypeQualifiers::empty()));
+
+        for superclass in self.mro_iter {
+            match superclass {
+                ClassBase::Generic | ClassBase::Protocol => {
+                    // Skip over these very special class bases that aren't really classes.
+                }
+                ClassBase::Dynamic(_) => {
+                    // Note: calling `Type::from(superclass).member()` would be incorrect here.
+                    // What we'd really want is a `Type::Any.own_class_member()` method,
+                    // but adding such a method wouldn't make much sense -- it would always return `Any`!
+                    dynamic_type.get_or_insert(Type::from(superclass));
+                }
+                ClassBase::Class(class) => {
+                    let known = class.known(db);
+
+                    // Only exclude `object` members if this is not an `object` class itself
+                    if known == Some(KnownClass::Object)
+                        && policy.mro_no_object_fallback()
+                        && !is_self_object
+                    {
+                        continue;
+                    }
+
+                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
+                        continue;
+                    }
+
+                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
+                        && policy.mro_no_int_or_str_fallback()
+                    {
+                        continue;
+                    }
+
+                    lookup_result = lookup_result.or_else(|lookup_error| {
+                        lookup_error.or_fall_back_to(
+                            db,
+                            class
+                                .own_class_member(db, inherited_generic_context, name)
+                                .inner,
+                        )
+                    });
+                }
+                ClassBase::FunctionalClass(_) => {
+                    // Functional classes don't have own members, they delegate to bases.
+                    // The MRO iteration will already include the base classes.
+                }
+                ClassBase::TypedDict => {
+                    return ClassMemberResult::TypedDict;
+                }
+            }
+            if lookup_result.is_ok() {
+                break;
+            }
+        }
+
+        ClassMemberResult::Done {
+            lookup_result,
+            dynamic_type,
+        }
+    }
+
+    /// Look up an instance member by iterating through the MRO.
+    ///
+    /// Unlike class member lookup, instance member lookup:
+    /// - Uses `own_instance_member` to check each class
+    /// - Builds a union of inferred types from multiple classes
+    /// - Stops on the first definitely-declared attribute
+    ///
+    /// Returns `InstanceMemberResult::TypedDict` if a `TypedDict` base is encountered,
+    /// allowing the caller to handle this case specially.
+    pub(super) fn instance_member(self, name: &str) -> InstanceMemberResult<'db> {
+        let db = self.db;
+        let mut union = UnionBuilder::new(db);
+        let mut union_qualifiers = TypeQualifiers::empty();
+        let mut is_definitely_bound = false;
+
+        for superclass in self.mro_iter {
+            match superclass {
+                ClassBase::Generic | ClassBase::Protocol => {
+                    // Skip over these very special class bases that aren't really classes.
+                }
+                ClassBase::Dynamic(_) => {
+                    return InstanceMemberResult::Done(PlaceAndQualifiers::todo(
+                        "instance attribute on class with dynamic base",
+                    ));
+                }
+                ClassBase::Class(class) => {
+                    if let member @ PlaceAndQualifiers {
+                        place: Place::Defined(ty, origin, boundness, _),
+                        qualifiers,
+                    } = class.own_instance_member(db, name).inner
+                    {
+                        if boundness == Definedness::AlwaysDefined {
+                            if origin.is_declared() {
+                                // We found a definitely-declared attribute. Discard possibly collected
+                                // inferred types from subclasses and return the declared type.
+                                return InstanceMemberResult::Done(member);
+                            }
+
+                            is_definitely_bound = true;
+                        }
+
+                        // If the attribute is not definitely declared on this class, keep looking
+                        // higher up in the MRO, and build a union of all inferred types (and
+                        // possibly-declared types):
+                        union = union.add(ty);
+
+                        // TODO: We could raise a diagnostic here if there are conflicting type
+                        // qualifiers
+                        union_qualifiers |= qualifiers;
+                    }
+                }
+                ClassBase::FunctionalClass(_) => {
+                    // Functional classes don't have own instance members, they delegate to bases.
+                    // The MRO iteration will already include the base classes.
+                }
+                ClassBase::TypedDict => {
+                    return InstanceMemberResult::TypedDict;
+                }
+            }
+        }
+
+        let result = if union.is_empty() {
+            Place::Undefined.with_qualifiers(TypeQualifiers::empty())
+        } else {
+            let boundness = if is_definitely_bound {
+                Definedness::AlwaysDefined
+            } else {
+                Definedness::PossiblyUndefined
+            };
+
+            Place::Defined(
+                union.build(),
+                TypeOrigin::Inferred,
+                boundness,
+                Widening::None,
+            )
+            .with_qualifiers(union_qualifiers)
+        };
+
+        InstanceMemberResult::Done(result)
+    }
+}
+
+/// Result of class member lookup from MRO iteration.
+pub(super) enum ClassMemberResult<'db> {
+    /// Found the member or exhausted the MRO
+    Done {
+        lookup_result: LookupResult<'db>,
+        dynamic_type: Option<Type<'db>>,
+    },
+    /// Encountered a `TypedDict` base - caller should handle this specially
+    TypedDict,
+}
+
+impl<'db> ClassMemberResult<'db> {
+    /// Finalize the lookup result by handling dynamic type intersection.
+    pub(super) fn finalize(self, db: &'db dyn Db) -> PlaceAndQualifiers<'db> {
+        match self {
+            ClassMemberResult::TypedDict => {
+                // Caller should handle TypedDict case before calling finalize
+                unreachable!("finalize called on TypedDict result")
+            }
+            ClassMemberResult::Done {
+                lookup_result,
+                dynamic_type,
+            } => match (PlaceAndQualifiers::from(lookup_result), dynamic_type) {
+                (symbol_and_qualifiers, None) => symbol_and_qualifiers,
+
+                (
+                    PlaceAndQualifiers {
+                        place: Place::Defined(ty, _, _, _),
+                        qualifiers,
+                    },
+                    Some(dynamic),
+                ) => Place::bound(
+                    IntersectionBuilder::new(db)
+                        .add_positive(ty)
+                        .add_positive(dynamic)
+                        .build(),
+                )
+                .with_qualifiers(qualifiers),
+
+                (
+                    PlaceAndQualifiers {
+                        place: Place::Undefined,
+                        qualifiers,
+                    },
+                    Some(dynamic),
+                ) => Place::bound(dynamic).with_qualifiers(qualifiers),
+            },
+        }
+    }
+}
+
+/// Result of instance member lookup from MRO iteration.
+pub(super) enum InstanceMemberResult<'db> {
+    /// Found the member or exhausted the MRO
+    Done(PlaceAndQualifiers<'db>),
+    /// Encountered a `TypedDict` base - caller should handle this specially
+    TypedDict,
+}
 
 fn explicit_bases_cycle_initial<'db>(
     _db: &'db dyn Db,
@@ -643,10 +890,11 @@ impl<'db> ClassType<'db> {
                     }
                 },
 
-                // Protocol, Generic, and TypedDict are not represented by a ClassType.
-                ClassBase::Protocol | ClassBase::Generic | ClassBase::TypedDict => {
-                    ConstraintSet::from(false)
-                }
+                // Protocol, Generic, TypedDict, and FunctionalClass are not represented by a ClassType.
+                ClassBase::Protocol
+                | ClassBase::Generic
+                | ClassBase::TypedDict
+                | ClassBase::FunctionalClass(_) => ConstraintSet::from(false),
 
                 ClassBase::Class(base) => match (base, other) {
                     (ClassType::NonGeneric(base), ClassType::NonGeneric(other)) => {
@@ -1156,7 +1404,7 @@ impl<'db> ClassType<'db> {
 
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
-    fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
+    pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
         let (class_literal, specialization) = self.class_literal(db);
         class_literal
             .own_instance_member(db, name)
@@ -2163,110 +2411,37 @@ impl<'db> ClassLiteral<'db> {
         policy: MemberLookupPolicy,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> PlaceAndQualifiers<'db> {
-        // If we encounter a dynamic type in this class's MRO, we'll save that dynamic type
-        // in this variable. After we've traversed the MRO, we'll either:
-        // (1) Use that dynamic type as the type for this attribute,
-        //     if no other classes in the MRO define the attribute; or,
-        // (2) Intersect that dynamic type with the type of the attribute
-        //     from the non-dynamic members of the class's MRO.
-        let mut dynamic_type_to_intersect_with: Option<Type<'db>> = None;
+        let result = MroLookup::new(db, mro_iter).class_member(
+            name,
+            policy,
+            self.inherited_generic_context(db),
+            self.is_known(db, KnownClass::Object),
+        );
 
-        let mut lookup_result: LookupResult<'db> =
-            Err(LookupError::Undefined(TypeQualifiers::empty()));
+        match result {
+            ClassMemberResult::Done { .. } => result.finalize(db),
 
-        for superclass in mro_iter {
-            match superclass {
-                ClassBase::Generic | ClassBase::Protocol => {
-                    // Skip over these very special class bases that aren't really classes.
-                }
-                ClassBase::Dynamic(_) => {
-                    // Note: calling `Type::from(superclass).member()` would be incorrect here.
-                    // What we'd really want is a `Type::Any.own_class_member()` method,
-                    // but adding such a method wouldn't make much sense -- it would always return `Any`!
-                    dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
-                }
-                ClassBase::Class(class) => {
-                    let known = class.known(db);
-
-                    if known == Some(KnownClass::Object)
-                        // Only exclude `object` members if this is not an `object` class itself
-                        && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
-                    {
-                        continue;
-                    }
-
-                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
-                        continue;
-                    }
-
-                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
-                        && policy.mro_no_int_or_str_fallback()
-                    {
-                        continue;
-                    }
-
-                    lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
+            ClassMemberResult::TypedDict => {
+                // `TypedDict`-specific handling with type mapping
+                KnownClass::TypedDictFallback
+                    .to_class_literal(db)
+                    .find_name_in_mro_with_policy(db, name, policy)
+                    .expect("Will return Some() when called on class literal")
+                    .map_type(|ty| {
+                        ty.apply_type_mapping(
                             db,
-                            class
-                                .own_class_member(db, self.inherited_generic_context(db), name)
-                                .inner,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: determine_upper_bound(
+                                    db,
+                                    self,
+                                    None,
+                                    ClassBase::is_typed_dict,
+                                ),
+                            },
+                            TypeContext::default(),
                         )
-                    });
-                }
-                ClassBase::TypedDict => {
-                    return KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Will return Some() when called on class literal")
-                        .map_type(|ty| {
-                            ty.apply_type_mapping(
-                                db,
-                                &TypeMapping::ReplaceSelf {
-                                    new_upper_bound: determine_upper_bound(
-                                        db,
-                                        self,
-                                        None,
-                                        ClassBase::is_typed_dict,
-                                    ),
-                                },
-                                TypeContext::default(),
-                            )
-                        });
-                }
+                    })
             }
-            if lookup_result.is_ok() {
-                break;
-            }
-        }
-
-        match (
-            PlaceAndQualifiers::from(lookup_result),
-            dynamic_type_to_intersect_with,
-        ) {
-            (symbol_and_qualifiers, None) => symbol_and_qualifiers,
-
-            (
-                PlaceAndQualifiers {
-                    place: Place::Defined(ty, _, _, _),
-                    qualifiers,
-                },
-                Some(dynamic_type),
-            ) => Place::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic_type)
-                    .build(),
-            )
-            .with_qualifiers(qualifiers),
-
-            (
-                PlaceAndQualifiers {
-                    place: Place::Undefined,
-                    qualifiers,
-                },
-                Some(dynamic_type),
-            ) => Place::bound(dynamic_type).with_qualifiers(qualifiers),
         }
     }
 
@@ -3364,81 +3539,20 @@ impl<'db> ClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        let mut union = UnionBuilder::new(db);
-        let mut union_qualifiers = TypeQualifiers::empty();
-        let mut is_definitely_bound = false;
-
-        for superclass in self.iter_mro(db, specialization) {
-            match superclass {
-                ClassBase::Generic | ClassBase::Protocol => {
-                    // Skip over these very special class bases that aren't really classes.
-                }
-                ClassBase::Dynamic(_) => {
-                    return PlaceAndQualifiers::todo(
-                        "instance attribute on class with dynamic base",
-                    );
-                }
-                ClassBase::Class(class) => {
-                    if let member @ PlaceAndQualifiers {
-                        place: Place::Defined(ty, origin, boundness, _),
-                        qualifiers,
-                    } = class.own_instance_member(db, name).inner
-                    {
-                        if boundness == Definedness::AlwaysDefined {
-                            if origin.is_declared() {
-                                // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from subclasses and return the declared type.
-                                return member;
-                            }
-
-                            is_definitely_bound = true;
-                        }
-
-                        // If the attribute is not definitely declared on this class, keep looking higher
-                        // up in the MRO, and build a union of all inferred types (and possibly-declared
-                        // types):
-                        union = union.add(ty);
-
-                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                        union_qualifiers |= qualifiers;
-                    }
-                }
-                ClassBase::TypedDict => {
-                    return KnownClass::TypedDictFallback
-                        .to_instance(db)
-                        .instance_member(db, name)
-                        .map_type(|ty| {
-                            ty.apply_type_mapping(
-                                db,
-                                &TypeMapping::ReplaceSelf {
-                                    new_upper_bound: Type::instance(
-                                        db,
-                                        self.unknown_specialization(db),
-                                    ),
-                                },
-                                TypeContext::default(),
-                            )
-                        });
-                }
-            }
-        }
-
-        if union.is_empty() {
-            Place::Undefined.with_qualifiers(TypeQualifiers::empty())
-        } else {
-            let boundness = if is_definitely_bound {
-                Definedness::AlwaysDefined
-            } else {
-                Definedness::PossiblyUndefined
-            };
-
-            Place::Defined(
-                union.build(),
-                TypeOrigin::Inferred,
-                boundness,
-                Widening::None,
-            )
-            .with_qualifiers(union_qualifiers)
+        match MroLookup::new(db, self.iter_mro(db, specialization)).instance_member(name) {
+            InstanceMemberResult::Done(result) => result,
+            InstanceMemberResult::TypedDict => KnownClass::TypedDictFallback
+                .to_instance(db)
+                .instance_member(db, name)
+                .map_type(|ty| {
+                    ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::ReplaceSelf {
+                            new_upper_bound: Type::instance(db, self.unknown_specialization(db)),
+                        },
+                        TypeContext::default(),
+                    )
+                }),
         }
     }
 
@@ -5981,6 +6095,52 @@ impl KnownClass {
                         value,
                     )),
                 )));
+            }
+
+            KnownClass::Type => {
+                // Check for MRO errors in three-argument type() calls.
+                // The return type will be SubclassOf(FunctionalClass) for these calls.
+                if let Type::SubclassOf(subclass_of) = overload.return_type() {
+                    if let super::subclass_of::SubclassOfInner::FunctionalClass(functional_class) =
+                        subclass_of.subclass_of()
+                    {
+                        if let Err(error) = functional_class.try_mro(db) {
+                            match error {
+                                FunctionalMroError::DuplicateBases(duplicates) => {
+                                    if let Some(builder) =
+                                        context.report_lint(&DUPLICATE_BASE, call_expression)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Duplicate base class{} {} in class `{}`",
+                                            if duplicates.len() == 1 { "" } else { "es" },
+                                            duplicates
+                                                .iter()
+                                                .map(|base| base.display(db))
+                                                .join(", "),
+                                            functional_class.name(db),
+                                        ));
+                                    }
+                                }
+                                FunctionalMroError::UnresolvableMro => {
+                                    if let Some(builder) =
+                                        context.report_lint(&INCONSISTENT_MRO, call_expression)
+                                    {
+                                        builder.into_diagnostic(format_args!(
+                                            "Cannot create a consistent method resolution order (MRO) \
+                                            for class `{}` with bases `[{}]`",
+                                            functional_class.name(db),
+                                            functional_class
+                                                .bases(db)
+                                                .iter()
+                                                .map(|base| base.display(db))
+                                                .join(", ")
+                                        ));
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             _ => {}

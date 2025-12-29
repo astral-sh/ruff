@@ -161,6 +161,10 @@ fn check_class_declaration<'db>(
                 has_typeddict_in_mro = true;
                 continue;
             }
+            ClassBase::FunctionalClass(_) => {
+                // Functional classes don't have their own members to override
+                continue;
+            }
             ClassBase::Class(class) => class,
         };
 

@@ -177,6 +177,14 @@ impl ClassInfoConstraintFunction {
                     ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     ClassInfoConstraintFunction::IsInstance => Some(Type::TypeVar(bound_typevar)),
                 },
+                SubclassOfInner::FunctionalClass(functional_class) => match self {
+                    ClassInfoConstraintFunction::IsInstance => {
+                        Some(functional_class.to_instance(db))
+                    }
+                    ClassInfoConstraintFunction::IsSubclass => {
+                        Some(SubclassOfType::from(db, functional_class))
+                    }
+                },
             },
             Type::Dynamic(_) => Some(classinfo),
             Type::Intersection(intersection) => {
@@ -271,7 +279,8 @@ impl ClassInfoConstraintFunction {
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => None,
+            | Type::NewTypeInstance(_)
+            | Type::FunctionalInstance(_) => None,
         }
     }
 }

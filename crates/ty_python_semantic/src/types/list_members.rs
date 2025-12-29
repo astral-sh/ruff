@@ -181,13 +181,26 @@ impl<'db> AllMembers<'db> {
             ),
 
             Type::NominalInstance(instance) => {
-                let (class_literal, specialization) = instance.class(db).class_literal(db);
+                let class = instance.class(db);
+                let (class_literal, specialization) = class.class_literal(db);
                 self.extend_with_instance_members(db, ty, class_literal);
                 self.extend_with_synthetic_members(db, ty, class_literal, specialization);
             }
 
             Type::NewTypeInstance(newtype) => {
                 self.extend_with_type(db, newtype.concrete_base_type(db));
+            }
+
+            Type::FunctionalInstance(functional_class) => {
+                // Iterate the functional class's MRO (which includes `object`)
+                for class in functional_class
+                    .iter_mro(db)
+                    .filter_map(ClassBase::into_class)
+                {
+                    let (class_literal, specialization) = class.class_literal(db);
+                    self.extend_with_instance_members_for_class(db, ty, class_literal);
+                    self.extend_with_synthetic_members(db, ty, class_literal, specialization);
+                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -428,51 +441,61 @@ impl<'db> AllMembers<'db> {
         }
     }
 
+    /// Extend with instance members from a single class (not its MRO).
+    fn extend_with_instance_members_for_class(
+        &mut self,
+        db: &'db dyn Db,
+        ty: Type<'db>,
+        class_literal: ClassLiteral<'db>,
+    ) {
+        let class_body_scope = class_literal.body_scope(db);
+        let file = class_body_scope.file(db);
+        let index = semantic_index(db, file);
+        for function_scope_id in attribute_scopes(db, class_body_scope) {
+            for place_expr in index.place_table(function_scope_id).members() {
+                let Some(name) = place_expr.as_instance_attribute() else {
+                    continue;
+                };
+                let result = ty.member(db, name);
+                let Some(ty) = result.place.ignore_possibly_undefined() else {
+                    continue;
+                };
+                self.members.insert(Member {
+                    name: Name::new(name),
+                    ty,
+                });
+            }
+        }
+
+        // This is very similar to `extend_with_class_members`,
+        // but uses the type of the class instance to query the
+        // class member. This gets us the right type for each
+        // member, e.g., `SomeClass.__delattr__` is not a bound
+        // method, but `instance_of_SomeClass.__delattr__` is.
+        for memberdef in all_end_of_scope_members(db, class_body_scope) {
+            let result = ty.member(db, memberdef.member.name.as_str());
+            let Some(ty) = result.place.ignore_possibly_undefined() else {
+                continue;
+            };
+            self.members.insert(Member {
+                name: memberdef.member.name,
+                ty,
+            });
+        }
+    }
+
+    /// Extend with instance members from a class and all classes in its MRO.
     fn extend_with_instance_members(
         &mut self,
         db: &'db dyn Db,
         ty: Type<'db>,
         class_literal: ClassLiteral<'db>,
     ) {
-        for parent in class_literal
+        for class in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
         {
-            let class_body_scope = parent.body_scope(db);
-            let file = class_body_scope.file(db);
-            let index = semantic_index(db, file);
-            for function_scope_id in attribute_scopes(db, class_body_scope) {
-                for place_expr in index.place_table(function_scope_id).members() {
-                    let Some(name) = place_expr.as_instance_attribute() else {
-                        continue;
-                    };
-                    let result = ty.member(db, name);
-                    let Some(ty) = result.place.ignore_possibly_undefined() else {
-                        continue;
-                    };
-                    self.members.insert(Member {
-                        name: Name::new(name),
-                        ty,
-                    });
-                }
-            }
-
-            // This is very similar to `extend_with_class_members`,
-            // but uses the type of the class instance to query the
-            // class member. This gets us the right type for each
-            // member, e.g., `SomeClass.__delattr__` is not a bound
-            // method, but `instance_of_SomeClass.__delattr__` is.
-            for memberdef in all_end_of_scope_members(db, class_body_scope) {
-                let result = ty.member(db, memberdef.member.name.as_str());
-                let Some(ty) = result.place.ignore_possibly_undefined() else {
-                    continue;
-                };
-                self.members.insert(Member {
-                    name: memberdef.member.name,
-                    ty,
-                });
-            }
+            self.extend_with_instance_members_for_class(db, ty, class.class_literal(db).0);
         }
     }
 

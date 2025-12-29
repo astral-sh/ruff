@@ -29,7 +29,7 @@ use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, Speci
 ///
 /// See [`ClassType::iter_mro`] for more details.
 #[derive(PartialEq, Eq, Clone, Debug, salsa::Update, get_size2::GetSize)]
-pub(super) struct Mro<'db>(Box<[ClassBase<'db>]>);
+pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 
 impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
@@ -277,6 +277,7 @@ impl<'db> Mro<'db> {
                         }
                         match base {
                             ClassBase::Class(_)
+                            | ClassBase::FunctionalClass(_)
                             | ClassBase::Generic
                             | ClassBase::Protocol
                             | ClassBase::TypedDict => {
@@ -508,7 +509,7 @@ pub(super) struct DuplicateBaseError<'db> {
 ///
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
+pub(super) fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     // Most MROs aren't that long...
     let mut mro = Vec::with_capacity(8);
 

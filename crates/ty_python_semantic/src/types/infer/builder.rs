@@ -4668,7 +4668,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_) => {
+            | Type::NewTypeInstance(_)
+            | Type::FunctionalInstance(_) => {
                 // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
                 // However, we would still have to perform the first inference without type context.
                 let value_ty = infer_value_ty(self, TypeContext::default());
@@ -9813,6 +9814,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     should always return a bound symbol"
                                 ),
                                 SubclassOfInner::TypeVar(_) => false,
+                                SubclassOfInner::FunctionalClass(functional_class) => {
+                                    !functional_class.instance_member(db, attr).is_undefined()
+                                }
                             }
                         }
                         _ => false,
@@ -10085,7 +10089,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::NewTypeInstance(_)
+                | Type::FunctionalInstance(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -10586,7 +10591,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::NewTypeInstance(_)
+                | Type::FunctionalInstance(_),
                 Type::FunctionLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::Callable(..)
@@ -10617,7 +10623,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_),
+                | Type::NewTypeInstance(_)
+                | Type::FunctionalInstance(_),
                 op,
             ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
                 .map(|outcome| outcome.return_type(self.db()))

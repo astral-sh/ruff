@@ -23,14 +23,238 @@ tests for the `__class__` attribute.)
 reveal_type(type(1))  # revealed: <class 'int'>
 ```
 
-But a three-argument call to type creates a dynamic instance of the `type` class:
+A three-argument call to `type()` creates a new class. We synthesize a class type using the name
+from the first argument:
+
+```py
+class Base: ...
+class Mixin: ...
+
+# We synthesize a class type using the name argument
+reveal_type(type("Foo", (), {}))  # revealed: type[Foo]
+
+# With a single base class
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type[Foo]
+
+# With multiple base classes
+reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: type[Foo]
+
+# The inferred type is assignable to type[Base] since Foo inherits from Base
+tests: list[type[Base]] = []
+testCaseClass = type("Foo", (Base,), {})
+tests.append(testCaseClass)  # No error - type[Foo] is assignable to type[Base]
+```
+
+Instances of functional classes are typed with the synthesized class name. Attributes from all base
+classes are accessible:
+
+```py
+class Base:
+    base_attr: int = 1
+
+    def base_method(self) -> str:
+        return "hello"
+
+class Mixin:
+    mixin_attr: str = "mixin"
+
+Foo = type("Foo", (Base,), {})
+foo = Foo()
+
+# Instance is typed with the synthesized class name
+reveal_type(foo)  # revealed: Foo
+
+# Inherited attributes are accessible
+reveal_type(foo.base_attr)  # revealed: int
+reveal_type(foo.base_method())  # revealed: str
+
+# Multiple inheritance: attributes from all bases are accessible
+Bar = type("Bar", (Base, Mixin), {})
+bar = Bar()
+reveal_type(bar.base_attr)  # revealed: int
+reveal_type(bar.mixin_attr)  # revealed: str
+```
+
+Attributes from the namespace dict (third argument) are not tracked. Like Pyright, we error when
+attempting to access them:
 
 ```py
 class Base: ...
 
-reveal_type(type("Foo", (), {}))  # revealed: type
+Foo = type("Foo", (Base,), {"custom_attr": 42})
+foo = Foo()
 
-reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type
+# error: [unresolved-attribute] "Object of type `Foo` has no attribute `custom_attr`"
+reveal_type(foo.custom_attr)  # revealed: Unknown
+```
+
+Regular classes can inherit from functional classes:
+
+```py
+class Base:
+    base_attr: int = 1
+
+FunctionalClass = type("FunctionalClass", (Base,), {})
+
+class Child(FunctionalClass):
+    child_attr: str = "child"
+
+child = Child()
+
+# Attributes from the functional class's base are accessible
+reveal_type(child.base_attr)  # revealed: int
+
+# The child class's own attributes are accessible
+reveal_type(child.child_attr)  # revealed: str
+
+# Child instances are subtypes of FunctionalClass instances
+def takes_functional(x: FunctionalClass) -> None: ...
+
+takes_functional(child)  # No error - Child is a subtype of FunctionalClass
+
+# isinstance narrows to the functional class instance type
+def check_isinstance(x: object) -> None:
+    if isinstance(x, FunctionalClass):
+        reveal_type(x)  # revealed: FunctionalClass
+```
+
+Functional classes are correctly recognized as disjoint from unrelated types:
+
+```py
+class Base: ...
+
+Foo = type("Foo", (Base,), {})
+
+def check_disjointness(x: Foo | int) -> None:
+    if isinstance(x, int):
+        reveal_type(x)  # revealed: int
+    else:
+        # Foo is disjoint from int, so we can narrow to Foo
+        reveal_type(x)  # revealed: Foo
+
+# Functional class inheriting from int is NOT disjoint from int
+IntSubclass = type("IntSubclass", (int,), {})
+
+def check_int_subclass(x: IntSubclass | str) -> None:
+    if isinstance(x, int):
+        # IntSubclass inherits from int, so it's included in the narrowed type
+        reveal_type(x)  # revealed: IntSubclass
+    else:
+        reveal_type(x)  # revealed: str
+```
+
+Functional classes can be used as pivot in `super()`:
+
+```py
+class Base:
+    def method(self) -> int:
+        return 42
+
+FunctionalChild = type("FunctionalChild", (Base,), {})
+
+# Using functional class as pivot with functional class instance owner
+fc = FunctionalChild()
+reveal_type(super(FunctionalChild, fc))  # revealed: <super: FunctionalChild, FunctionalChild>
+reveal_type(super(FunctionalChild, fc).method())  # revealed: int
+
+# Regular class inheriting from functional class
+class RegularChild(FunctionalChild):
+    pass
+
+rc = RegularChild()
+reveal_type(super(RegularChild, rc))  # revealed: <super: <class 'RegularChild'>, RegularChild>
+reveal_type(super(RegularChild, rc).method())  # revealed: int
+
+# Using functional class as pivot with regular class instance owner
+reveal_type(super(FunctionalChild, rc))  # revealed: <super: FunctionalChild, RegularChild>
+reveal_type(super(FunctionalChild, rc).method())  # revealed: int
+```
+
+Functional classes can inherit from other functional classes:
+
+```py
+class Base:
+    base_attr: int = 1
+
+# Create a functional class that inherits from a regular class.
+Parent = type("Parent", (Base,), {})
+reveal_type(Parent)  # revealed: type[Parent]
+
+# Create a functional class that inherits from another functional class.
+ChildCls = type("ChildCls", (Parent,), {})
+reveal_type(ChildCls)  # revealed: type[ChildCls]
+
+# Child instances have access to attributes from the entire inheritance chain.
+child = ChildCls()
+reveal_type(child)  # revealed: ChildCls
+reveal_type(child.base_attr)  # revealed: int
+
+# Child instances are subtypes of Parent instances.
+def takes_parent(x: Parent) -> None: ...
+
+takes_parent(child)  # No error - ChildCls is a subtype of Parent
+```
+
+Functional classes with generic base classes:
+
+```py
+from typing import Generic, TypeVar
+
+T = TypeVar("T")
+
+class Container(Generic[T]):
+    value: T
+
+# Functional class inheriting from a generic class specialization
+IntContainer = type("IntContainer", (Container[int],), {})
+reveal_type(IntContainer)  # revealed: type[IntContainer]
+
+container = IntContainer()
+reveal_type(container)  # revealed: IntContainer
+reveal_type(container.value)  # revealed: int
+```
+
+`type(instance)` returns the class of the functional instance:
+
+```py
+class Base: ...
+
+Foo = type("Foo", (Base,), {})
+foo = Foo()
+
+# type() on an instance returns the class
+reveal_type(type(foo))  # revealed: type[Foo]
+```
+
+`__class__` attribute access on functional instances:
+
+```py
+class Base: ...
+
+Foo = type("Foo", (Base,), {})
+foo = Foo()
+
+# __class__ returns the class type
+reveal_type(foo.__class__)  # revealed: type[Foo]
+```
+
+Functional instances are subtypes of `object`:
+
+```py
+class Base: ...
+
+Foo = type("Foo", (Base,), {})
+foo = Foo()
+
+# All functional instances are subtypes of object
+def takes_object(x: object) -> None: ...
+
+takes_object(foo)  # No error - Foo is a subtype of object
+
+# Even functional classes with no explicit bases are subtypes of object
+EmptyBases = type("EmptyBases", (), {})
+empty = EmptyBases()
+takes_object(empty)  # No error
 ```
 
 Other numbers of arguments are invalid
@@ -59,6 +283,30 @@ type("Foo", (1, 2), {})
 
 # error: [invalid-argument-type] "Argument to class `type` is incorrect: Expected `dict[str, Any]`, found `dict[str | bytes, Any]`"
 type("Foo", (Base,), {b"attr": 1})
+```
+
+MRO errors are detected and reported:
+
+```py
+class A: ...
+
+# Duplicate bases are detected
+# error: [duplicate-base] "Duplicate base class <class 'A'> in class `Dup`"
+Dup = type("Dup", (A, A), {})
+```
+
+```py
+class A: ...
+class B(A): ...
+class C(A): ...
+
+# This creates an inconsistent MRO because D would need B before C (from first base)
+# but also C before B (from second base inheritance through A)
+class X(B, C): ...
+class Y(C, B): ...
+
+# error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`"
+Conflict = type("Conflict", (X, Y), {})
 ```
 
 ## Calls to `str()`

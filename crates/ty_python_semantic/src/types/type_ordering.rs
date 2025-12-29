@@ -118,11 +118,17 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SubclassOfInner::Dynamic(left), SubclassOfInner::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
+                (SubclassOfInner::Dynamic(_), _) => Ordering::Less,
+                (_, SubclassOfInner::Dynamic(_)) => Ordering::Greater,
                 (SubclassOfInner::TypeVar(left), SubclassOfInner::TypeVar(right)) => {
                     left.as_id().cmp(&right.as_id())
                 }
                 (SubclassOfInner::TypeVar(_), _) => Ordering::Less,
                 (_, SubclassOfInner::TypeVar(_)) => Ordering::Greater,
+                (
+                    SubclassOfInner::FunctionalClass(left),
+                    SubclassOfInner::FunctionalClass(right),
+                ) => left.cmp(&right),
             }
         }
 
@@ -167,6 +173,12 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::Class(_), _) => Ordering::Less,
                 (_, ClassBase::Class(_)) => Ordering::Greater,
 
+                (ClassBase::FunctionalClass(left), ClassBase::FunctionalClass(right)) => {
+                    left.cmp(&right)
+                }
+                (ClassBase::FunctionalClass(_), _) => Ordering::Less,
+                (_, ClassBase::FunctionalClass(_)) => Ordering::Greater,
+
                 (ClassBase::Protocol, _) => Ordering::Less,
                 (_, ClassBase::Protocol) => Ordering::Greater,
 
@@ -189,6 +201,27 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 }
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
+                (
+                    SuperOwnerKind::InstanceTypeVar(left) | SuperOwnerKind::ClassTypeVar(left),
+                    SuperOwnerKind::InstanceTypeVar(right) | SuperOwnerKind::ClassTypeVar(right),
+                ) => left.cmp(&right),
+                (SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_), _) => {
+                    Ordering::Less
+                }
+                (_, SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_)) => {
+                    Ordering::Greater
+                }
+                (SuperOwnerKind::FunctionalClass(left), SuperOwnerKind::FunctionalClass(right)) => {
+                    left.cmp(&right)
+                }
+                (SuperOwnerKind::FunctionalClass(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::FunctionalClass(_)) => Ordering::Greater,
+                (
+                    SuperOwnerKind::FunctionalInstance(left),
+                    SuperOwnerKind::FunctionalInstance(right),
+                ) => left.cmp(&right),
+                (SuperOwnerKind::FunctionalInstance(_), _) => Ordering::Less,
+                (_, SuperOwnerKind::FunctionalInstance(_)) => Ordering::Greater,
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }
@@ -226,6 +259,10 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
         (Type::NewTypeInstance(left), Type::NewTypeInstance(right)) => left.cmp(right),
         (Type::NewTypeInstance(_), _) => Ordering::Less,
         (_, Type::NewTypeInstance(_)) => Ordering::Greater,
+
+        (Type::FunctionalInstance(left), Type::FunctionalInstance(right)) => left.cmp(right),
+        (Type::FunctionalInstance(_), _) => Ordering::Less,
+        (_, Type::FunctionalInstance(_)) => Ordering::Greater,
 
         (Type::Union(_), _) | (_, Type::Union(_)) => {
             unreachable!("our type representation does not permit nested unions");

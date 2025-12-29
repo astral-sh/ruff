@@ -1258,6 +1258,16 @@ fn is_instance_truthiness<'db>(
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
         }
 
+        Type::FunctionalInstance(functional_class) => {
+            // Check if any base class is an instance of the target class.
+            always_true_if(
+                functional_class
+                    .bases(db)
+                    .iter()
+                    .any(|base| is_instance(&base.to_instance_type(db))),
+            )
+        }
+
         Type::BooleanLiteral(..)
         | Type::BytesLiteral(..)
         | Type::IntLiteral(..)

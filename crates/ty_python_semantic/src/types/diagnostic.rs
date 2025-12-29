@@ -3281,7 +3281,9 @@ pub(crate) fn report_undeclared_protocol_member(
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Class(class) => class,
                 SubclassOfInner::Dynamic(DynamicType::Any) => return true,
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => return false,
+                SubclassOfInner::Dynamic(_)
+                | SubclassOfInner::TypeVar(_)
+                | SubclassOfInner::FunctionalClass(_) => return false,
             },
             Type::NominalInstance(instance) => instance.class(db),
             Type::Union(union) => {
