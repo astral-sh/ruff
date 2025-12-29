@@ -625,7 +625,7 @@ jobs:
 
       # NOTE: astral-sh-bot uses this artifact to post comments on PRs.
       # Make sure to update the bot if you rename the artifact.
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         name: Upload Results
         with:
           name: ecosystem-result
@@ -993,7 +993,7 @@ jobs:
         run: cargo codspeed build -m instrumentation --features "codspeed,ty_instrumented" --profile profiling --no-default-features -p ruff_benchmark --bench ty
 
       - name: "Upload benchmark binary"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: benchmarks-instrumented-ty-binary
           path: target/codspeed/simulation/ruff_benchmark
@@ -1026,7 +1026,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Download benchmark binary"
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v4.3.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: benchmarks-instrumented-ty-binary
           path: target/codspeed/simulation/ruff_benchmark
@@ -1071,7 +1071,7 @@ jobs:
         run: cargo codspeed build -m walltime --features "codspeed,ty_walltime" --profile profiling --no-default-features -p ruff_benchmark
 
       - name: "Upload benchmark binary"
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: benchmarks-walltime-binary
           path: target/codspeed/walltime/ruff_benchmark
@@ -1106,7 +1106,7 @@ jobs:
           tool: cargo-codspeed
 
       - name: "Download benchmark binary"
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
           name: benchmarks-walltime-binary
           path: target/codspeed/walltime/ruff_benchmark
