@@ -117,6 +117,9 @@ impl<'db> Completions<'db> {
         self.items.sort_by(|c1, c2| self.context.compare(c1, c2));
         self.items
             .dedup_by(|c1, c2| (&c1.name, c1.module_name) == (&c2.name, c2.module_name));
+        // A user should refine its completion request if the searched symbol doesn't appear in the first 1k results.
+        // Serializing/deserializing 1k completions can be expensive and result in noticeable lag.
+        self.items.truncate(1000);
         self.items
     }
 
