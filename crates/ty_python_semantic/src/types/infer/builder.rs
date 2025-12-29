@@ -5291,10 +5291,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // Convert eager union instances to lazy for assignments
                 // This enables lazy evaluation for recursive type aliases like `Foo = int | list["Foo"]`
                 let value_ty = if let Some(name) = target.as_name_expr()
-                && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = value_ty
-                && let Some(eager) = instance.as_eager(self.db())
+                && let Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::Eager(eager))) = value_ty
                 // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
                 {
                     Type::KnownInstance(KnownInstanceType::UnionType(
                         UnionTypeInstance::from_definition(
@@ -6104,10 +6103,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // Convert eager union instances to lazy for assignments
             // This enables lazy evaluation for recursive type aliases like `Foo: TypeAlias = int | list["Foo"]`
             let inferred_ty = if let Some(name) = target.as_name_expr()
-                && let Type::KnownInstance(KnownInstanceType::UnionType(instance)) = inferred_ty
-                && let Some(eager) = instance.as_eager(self.db())
+                && let Type::KnownInstance(KnownInstanceType::UnionType(UnionTypeInstance::Eager(eager))) = inferred_ty
                 // TODO: support generic recursive union type instances
-                && eager.union_type.as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
+                && eager.union_type(self.db()).as_ref().is_ok_and(|ty| legacy_typevars(*ty).is_empty())
             {
                 Type::KnownInstance(KnownInstanceType::UnionType(
                     UnionTypeInstance::from_definition(self.db(), name.id().clone(), definition),
