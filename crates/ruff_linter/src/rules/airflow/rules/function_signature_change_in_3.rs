@@ -7,12 +7,6 @@ use ruff_python_semantic::Modules;
 use ruff_python_semantic::analyze::typing;
 use ruff_text_size::Ranged;
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub(crate) enum FunctionSignatureChangeType {
-    /// Function signature changed to only accept keyword arguments.
-    KeywordOnly { message: &'static str },
-}
-
 /// ## What it does
 /// Checks for Airflow function calls that will raise a runtime error in Airflow 3.0
 /// due to function signature changes, such as functions that changed to accept only
@@ -41,7 +35,7 @@ pub(crate) enum FunctionSignatureChangeType {
 /// collector.create_asset(uri="s3://bucket/key")
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.14.11")]
+#[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct Airflow3IncompatibleFunctionSignature {
     function_name: String,
     change_type: FunctionSignatureChangeType,
@@ -72,26 +66,29 @@ impl Violation for Airflow3IncompatibleFunctionSignature {
 }
 
 /// AIR303
-pub(crate) fn airflow_3_function_signature_change(checker: &Checker, expr: &Expr) {
+pub(crate) fn airflow_3_incompatible_function_signature(checker: &Checker, expr: &Expr) {
     if !checker.semantic().seen_module(Modules::AIRFLOW) {
         return;
     }
 
-    let Expr::Call(call_expr @ ExprCall { arguments, .. }) = expr else {
+    let Expr::Call(ExprCall {
+        func, arguments, ..
+    }) = expr
+    else {
         return;
     };
 
-    let Expr::Attribute(ExprAttribute { attr, value, .. }) = &*call_expr.func else {
+    let Expr::Attribute(ExprAttribute { attr, value, .. }) = func.as_ref() else {
         return;
     };
 
-    let qualified_name = if let Expr::Call(call) = value.as_ref() {
-        // Resolve the qualified name of the constructor
-        checker.semantic().resolve_qualified_name(&call.func)
-    } else {
-        // Resolve through assignment
-        typing::resolve_assignment(value, checker.semantic())
-    };
+    // Resolve the qualified name: try variable assignments first, then fall back to direct
+    // constructor calls.
+    let qualified_name = typing::resolve_assignment(value, checker.semantic()).or_else(|| {
+        value
+            .as_call_expr()
+            .and_then(|call| checker.semantic().resolve_qualified_name(&call.func))
+    });
 
     let Some(qualified_name) = qualified_name else {
         return;
@@ -122,4 +119,10 @@ fn check_keyword_only_method(
             );
         }
     }
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub(crate) enum FunctionSignatureChangeType {
+    /// Function signature changed to only accept keyword arguments.
+    KeywordOnly { message: &'static str },
 }
