@@ -340,7 +340,7 @@ mod flaky {
 
     // Similarly, `T'`, the bottom materialization of `T`, should also be assignable to `T`.
     type_property_test!(
-        bottom_materialization_of_type_is_assigneble_to_type, db,
+        bottom_materialization_of_type_is_assignable_to_type, db,
         forall types t. t.bottom_materialization(db).is_assignable_to(db, t)
     );
 }
