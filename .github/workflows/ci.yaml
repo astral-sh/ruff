@@ -385,7 +385,7 @@ jobs:
           save-if: ${{ github.ref == 'refs/heads/main' }}
       - name: "Install Rust toolchain"
         run: rustup target add wasm32-unknown-unknown
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 22
           cache: "npm"
@@ -758,7 +758,7 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 22
       - name: "Cache pre-commit"
@@ -898,7 +898,7 @@ jobs:
       - uses: Swatinem/rust-cache@779680da715d629ac1d338a641029a2f4372abb5 # v2.8.2
         with:
           save-if: ${{ github.ref == 'refs/heads/main' }}
-      - uses: actions/setup-node@2028fbc5c25fe9cf00d9f06a71cc4710d4507903 # v6.0.0
+      - uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
         with:
           node-version: 22
           cache: "npm"
