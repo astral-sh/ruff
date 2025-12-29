@@ -1874,8 +1874,7 @@ impl<'a> Visitor<'a> for Checker<'a> {
                                     self.visit_non_type_definition(value);
                                 }
                             } else {
-                                // The only case when a keyword argument is None is when using **kwargs, since there is no explicit 'arg' name for it.
-                                // Ex: typing.TypeVar(*args, **kwargs)
+                                // Ex: typing.TypeVar(**kwargs)
                                 self.visit_non_type_definition(value);
                             }
                         }
