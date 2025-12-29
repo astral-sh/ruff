@@ -26,14 +26,6 @@ mod tests {
     #[test_case(Path::new("comments_inside_dependency.py"), true)]
     #[test_case(Path::new("concat.py"), false)]
     #[test_case(Path::new("concat.py"), true)]
-    #[test_case(Path::new("cycle.py"), false)]
-    #[test_case(Path::new("cycle.py"), true)]
-    #[test_case(Path::new("cycle_class_self.py"), false)]
-    #[test_case(Path::new("cycle_class_self.py"), true)]
-    #[test_case(Path::new("cycle_compact_formatting.py"), false)]
-    #[test_case(Path::new("cycle_compact_formatting.py"), true)]
-    #[test_case(Path::new("cycle_with_dependant.py"), false)]
-    #[test_case(Path::new("cycle_with_dependant.py"), true)]
     #[test_case(Path::new("dependency_order.py"), false)]
     #[test_case(Path::new("dependency_order.py"), true)]
     #[test_case(Path::new("empty.py"), false)]
@@ -66,8 +58,6 @@ mod tests {
     #[test_case(Path::new("nested_class.py"), true)]
     #[test_case(Path::new("pretend_dunder_properties.py"), false)]
     #[test_case(Path::new("pretend_dunder_properties.py"), true)]
-    #[test_case(Path::new("reversed_cycle.py"), false)]
-    #[test_case(Path::new("reversed_cycle.py"), true)]
     #[test_case(Path::new("simple_decorator.py"), false)]
     #[test_case(Path::new("simple_decorator.py"), true)]
     #[test_case(Path::new("simple_dependency.py"), false)]
@@ -100,8 +90,7 @@ mod tests {
                 "dependency"
             }
         );
-        let mut settings =
-            LinterSettings::for_rules(vec![Rule::UnsortedStatements, Rule::FunctionCallCycle]);
+        let mut settings = LinterSettings::for_rule(Rule::UnsortedStatements);
         settings.ssort.narrative_order = narrative_order;
         let diagnostics = test_path(Path::new("ssort").join(path).as_path(), &settings)?;
         assert_diagnostics!(snapshot, diagnostics);

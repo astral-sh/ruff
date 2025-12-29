@@ -1194,7 +1194,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
 
         // ssort
         (SSort, "001") => rules::ssort::rules::UnsortedStatements,
-        (SSort, "002") => rules::ssort::rules::FunctionCallCycle,
 
         _ => return None,
     })
