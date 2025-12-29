@@ -5251,7 +5251,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nexted_keyword_function_calls() {
+    fn test_nested_keyword_function_calls() {
         let mut test = inlay_hint_test(
             "
             def foo(x: str) -> str:

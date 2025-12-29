@@ -5904,7 +5904,7 @@ impl KnownClass {
                 // Parsing something of the form:
                 //
                 // @deprecated("message")
-                // @deprecated("message", caregory = DeprecationWarning, stacklevel = 1)
+                // @deprecated("message", category = DeprecationWarning, stacklevel = 1)
                 //
                 // "Static type checker behavior is not affected by the category and stacklevel arguments"
                 // so we only need the message and can ignore everything else. The message is mandatory,
