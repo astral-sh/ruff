@@ -994,7 +994,6 @@ jobs:
       (
         github.ref == 'refs/heads/main' ||
         needs.determine_changes.outputs.ty == 'true' ||
-        needs.determine_changes.outputs.parser == 'true' ||
         needs.determine_changes.outputs.benchmarks == 'true'
       )
     timeout-minutes: 20
@@ -1080,7 +1079,6 @@ jobs:
         (
           needs.determine_changes.outputs.ty == 'true' ||
           needs.determine_changes.outputs.benchmarks == 'true' ||
-          needs.determine_changes.outputs.parser == 'true' ||
           github.ref == 'refs/heads/main'
         )
       )
