@@ -51,23 +51,23 @@ impl IncludeFilter {
 
         if self.literal_pattern_indices.is_empty() {
             return if self.glob_set.is_match(path) {
-                MatchFile::PatternMatch
+                MatchFile::Pattern
             } else {
-                MatchFile::NoMatch
+                MatchFile::No
             };
         }
 
         let matches = self.glob_set.matches(path);
 
         if matches.is_empty() {
-            MatchFile::NoMatch
+            MatchFile::No
         } else {
             for match_index in matches {
                 if self.literal_pattern_indices.contains(&match_index) {
-                    return MatchFile::LiteralMatch;
+                    return MatchFile::Literal;
                 }
             }
-            MatchFile::PatternMatch
+            MatchFile::Pattern
         }
     }
 
@@ -142,13 +142,13 @@ impl Eq for IncludeFilter {}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum MatchFile {
-    NoMatch,
+    No,
     /// The file path matches the glob literally exactly. This is only the case for globs
     /// that don't use any wildcards.
-    LiteralMatch,
+    Literal,
 
     /// The file path matches the glob pattern.
-    PatternMatch,
+    Pattern,
 }
 
 impl MatchFile {}
@@ -377,39 +377,33 @@ mod tests {
             "files/*.py",
         ]);
 
-        assert_eq!(filter.match_file("lib"), MatchFile::LiteralMatch);
-        assert_eq!(filter.match_file("lib/more/test"), MatchFile::PatternMatch);
+        assert_eq!(filter.match_file("lib"), MatchFile::Literal);
+        assert_eq!(filter.match_file("lib/more/test"), MatchFile::Pattern);
 
         // Unlike `directory`, `directory/` only includes a directory with the given name and its contents
-        assert_eq!(filter.match_file("directory"), MatchFile::NoMatch);
-        assert_eq!(
-            filter.match_file("directory/more/test"),
-            MatchFile::PatternMatch
-        );
+        assert_eq!(filter.match_file("directory"), MatchFile::No);
+        assert_eq!(filter.match_file("directory/more/test"), MatchFile::Pattern);
 
         // Unlike `src`, `src/*` only includes a directory with the given name.
-        assert_eq!(filter.match_file("src"), MatchFile::NoMatch);
-        assert_eq!(filter.match_file("src/more/test"), MatchFile::PatternMatch);
+        assert_eq!(filter.match_file("src"), MatchFile::No);
+        assert_eq!(filter.match_file("src/more/test"), MatchFile::Pattern);
 
         // Unlike `tests`, `tests/**` only includes files under `tests`, but not a file named tests
-        assert_eq!(filter.match_file("tests"), MatchFile::NoMatch);
-        assert_eq!(
-            filter.match_file("tests/more/test"),
-            MatchFile::PatternMatch
-        );
+        assert_eq!(filter.match_file("tests"), MatchFile::No);
+        assert_eq!(filter.match_file("tests/more/test"), MatchFile::Pattern);
 
         // Unlike `match_directory`, prefixes should not be included.
-        assert_eq!(filter.match_file("a"), MatchFile::NoMatch);
-        assert_eq!(filter.match_file("a/test-b"), MatchFile::NoMatch);
+        assert_eq!(filter.match_file("a"), MatchFile::No);
+        assert_eq!(filter.match_file("a/test-b"), MatchFile::No);
 
-        assert_eq!(filter.match_file("a/test-b/x"), MatchFile::NoMatch);
-        assert_eq!(filter.match_file("a/test"), MatchFile::NoMatch);
+        assert_eq!(filter.match_file("a/test-b/x"), MatchFile::No);
+        assert_eq!(filter.match_file("a/test"), MatchFile::No);
 
-        assert_eq!(filter.match_file("files/a.py"), MatchFile::PatternMatch);
-        assert_eq!(filter.match_file("files/a.py/bcd"), MatchFile::PatternMatch);
+        assert_eq!(filter.match_file("files/a.py"), MatchFile::Pattern);
+        assert_eq!(filter.match_file("files/a.py/bcd"), MatchFile::Pattern);
 
-        assert_eq!(filter.match_file("not_included"), MatchFile::NoMatch);
-        assert_eq!(filter.match_file("files/a.pi"), MatchFile::NoMatch);
+        assert_eq!(filter.match_file("not_included"), MatchFile::No);
+        assert_eq!(filter.match_file("files/a.pi"), MatchFile::No);
     }
 
     /// Check that we skip directories that can never match.

@@ -57,13 +57,13 @@ impl IncludeExcludeFilter {
             IncludeResult::Excluded
         } else {
             match self.include.match_file(path) {
-                MatchFile::LiteralMatch => IncludeResult::Included {
+                MatchFile::Literal => IncludeResult::Included {
                     literal_match: Some(true),
                 },
-                MatchFile::PatternMatch => IncludeResult::Included {
+                MatchFile::Pattern => IncludeResult::Included {
                     literal_match: Some(false),
                 },
-                MatchFile::NoMatch => IncludeResult::NotIncluded,
+                MatchFile::No => IncludeResult::NotIncluded,
             }
         }
     }
