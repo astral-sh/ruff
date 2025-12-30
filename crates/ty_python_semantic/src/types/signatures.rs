@@ -933,8 +933,16 @@ impl<'db> Signature<'db> {
 
         if let Some(self_type) = self_type {
             // 1. Existing Self-handling: replace typing.Self with the concrete self type
+            //
+            // For classmethods, self_type is a class object (e.g., type[Child] or ClassLiteral[Child]).
+            // However, `Self` in return types (like `-> Iterator[Self]`) should be the *instance* type,
+            // not the class object. So we use `to_instance()` to get the instance type for `Self` binding.
+            //
+            // For regular methods, self_type is already an instance, and `to_instance()` returns None,
+            // so we fall back to using self_type directly.
+            let self_type_for_binding = self_type.to_instance(db).unwrap_or(self_type);
             let self_mapping = TypeMapping::BindSelf {
-                self_type,
+                self_type: self_type_for_binding,
                 binding_context,
             };
             parameters = parameters.apply_type_mapping_impl(
