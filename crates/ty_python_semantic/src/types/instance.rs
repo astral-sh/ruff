@@ -165,7 +165,7 @@ impl<'db> Type<'db> {
         // This matches the behaviour of other type checkers, and is required for us to
         // recognise `str` as a subtype of `Container[str]`.
         structurally_satisfied.or(db, || {
-            let Some(nominal_instance) = protocol.as_nominal_type() else {
+            let Some(nominal_instance) = protocol.to_nominal_instance() else {
                 return ConstraintSet::from(false);
             };
 
@@ -175,7 +175,7 @@ impl<'db> Type<'db> {
             // `Q`'s members in a Liskov-incompatible way.
             let type_to_test = self
                 .as_protocol_instance()
-                .and_then(ProtocolInstanceType::as_nominal_type)
+                .and_then(ProtocolInstanceType::to_nominal_instance)
                 .map(Type::NominalInstance)
                 .unwrap_or(self);
 
@@ -658,7 +658,7 @@ impl<'db> ProtocolInstanceType<'db> {
     /// If this is a synthesized protocol that does not correspond to a class definition
     /// in source code, return `None`. These are "pure" abstract types, that cannot be
     /// treated in a nominal way.
-    pub(super) fn as_nominal_type(self) -> Option<NominalInstanceType<'db>> {
+    pub(super) fn to_nominal_instance(self) -> Option<NominalInstanceType<'db>> {
         match self.inner {
             Protocol::FromClass(class) => {
                 Some(NominalInstanceType(NominalInstanceInner::NonTuple(*class)))

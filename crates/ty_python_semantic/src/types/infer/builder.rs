@@ -105,15 +105,16 @@ use crate::types::typed_dict::{
 };
 use crate::types::visitor::any_over_type;
 use crate::types::{
-    BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType, CallableTypeKind,
-    ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, SubclassOfType, TrackedConstraintSet,
-    Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers,
-    TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation,
-    TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, UnionBuilder,
-    UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
+    CallableTypeKind, ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
+    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
+    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
+    todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -7973,16 +7974,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     {
         // Extract the type variable `T` from `list[T]` in typeshed.
         let elt_tys = |collection_class: KnownClass| {
-            let class_literal = collection_class.try_to_class_literal(self.db())?;
-            let generic_context = class_literal.generic_context(self.db())?;
+            let collection_alias = collection_class
+                .try_to_class_literal(self.db())?
+                .identity_specialization(self.db())
+                .into_generic_alias()?;
+
+            let generic_context = collection_alias
+                .specialization(self.db())
+                .generic_context(self.db());
+
             Some((
-                class_literal,
+                collection_alias,
                 generic_context,
                 generic_context.variables(self.db()),
             ))
         };
 
-        let Some((class_literal, generic_context, elt_tys)) = elt_tys(collection_class) else {
+        let Some((collection_alias, generic_context, elt_tys)) = elt_tys(collection_class) else {
             // Infer the element types without type context, and fallback to unknown for
             // custom typesheds.
             for elt in elts.flatten().flatten() {
@@ -8003,40 +8011,79 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             annotation.filter_disjoint_elements(self.db(), collection_ty, inferable)
         });
 
-        // Extract the annotated type of `T`, if provided.
-        let annotated_elt_tys = tcx
-            .known_specialization(self.db(), collection_class)
-            .map(|specialization| specialization.types(self.db()));
+        // Collect type constraints from the declared element types.
+        let (elt_tcx_constraints, elt_tcx_variance) = {
+            let mut builder = SpecializationBuilder::new(
+                self.db(),
+                generic_context.inferable_typevars(self.db()),
+            );
+
+            // For a given type variable, we keep track of the variance of any assignments to
+            // that type variable in the type context.
+            let mut elt_tcx_variance: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
+                FxHashMap::default();
+
+            if let Some(tcx) = tcx.annotation
+                // If there are multiple potential type contexts, we fallback to `Unknown`.
+                // TODO: We could perform multi-inference here.
+                && tcx
+                    .filter_union(self.db(), |ty| ty.class_specialization(self.db()).is_some())
+                    .class_specialization(self.db())
+                    .is_some()
+            {
+                let collection_instance =
+                    Type::instance(self.db(), ClassType::Generic(collection_alias));
+
+                builder
+                    .infer_reverse_map(
+                        tcx,
+                        collection_instance,
+                        |(typevar, variance, inferred_ty)| {
+                            elt_tcx_variance
+                                .entry(typevar)
+                                .and_modify(|current| *current = current.join(variance))
+                                .or_insert(variance);
+
+                            Some(inferred_ty)
+                        },
+                    )
+                    .ok()?;
+            }
+
+            (builder.into_type_mappings(), elt_tcx_variance)
+        };
 
         // Create a set of constraints to infer a precise type for `T`.
         let mut builder = SpecializationBuilder::new(self.db(), inferable);
 
-        match annotated_elt_tys {
-            // The annotated type acts as a constraint for `T`.
+        for elt_ty in elt_tys.clone() {
+            let elt_ty_identity = elt_ty.identity(self.db());
+            let elt_tcx = elt_tcx_constraints
+                // The annotated type acts as a constraint for `T`.
+                //
+                // Note that we infer the annotated type _before_ the elements, to more closely match
+                // the order of any unions as written in the type annotation.
+                .get(&elt_ty_identity)
+                .copied();
+
+            // Avoid unnecessarily widening the return type based on a covariant
+            // type parameter from the type context.
             //
-            // Note that we infer the annotated type _before_ the elements, to more closely match the
-            // order of any unions as written in the type annotation.
-            Some(annotated_elt_tys) => {
-                for (elt_ty, annotated_elt_ty) in iter::zip(elt_tys.clone(), annotated_elt_tys) {
-                    builder
-                        .infer(Type::TypeVar(elt_ty), *annotated_elt_ty)
-                        .ok()?;
-                }
+            // Note that we also avoid unioning  the inferred type with `Unknown` in this
+            // case, which is only necessary for invariant collections.
+            if elt_tcx_variance
+                .get(&elt_ty_identity)
+                .is_some_and(|variance| variance.is_covariant())
+            {
+                continue;
             }
 
-            // If a valid type annotation was not provided, avoid restricting the type of the collection
-            // by unioning the inferred type with `Unknown`.
-            None => {
-                for elt_ty in elt_tys.clone() {
-                    builder.infer(Type::TypeVar(elt_ty), Type::unknown()).ok()?;
-                }
-            }
+            // If a valid type annotation was not provided, avoid restricting the type of the
+            // collection by unioning the inferred type with `Unknown`.
+            let elt_tcx = elt_tcx.unwrap_or(Type::unknown());
+
+            builder.infer(Type::TypeVar(elt_ty), elt_tcx).ok()?;
         }
-
-        let elt_tcxs = match annotated_elt_tys {
-            None => Either::Left(iter::repeat(TypeContext::default())),
-            Some(tys) => Either::Right(tys.iter().map(|ty| TypeContext::new(Some(*ty)))),
-        };
 
         for elts in elts {
             // An unpacking expression for a dictionary.
@@ -8060,14 +8107,21 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // The inferred type of each element acts as an additional constraint on `T`.
-            for (elt, elt_ty, elt_tcx) in itertools::izip!(elts, elt_tys.clone(), elt_tcxs.clone())
-            {
+            for (elt, elt_ty) in iter::zip(elts, elt_tys.clone()) {
                 let Some(elt) = elt else { continue };
 
-                let inferred_elt_ty = infer_elt_expression(self, elt, elt_tcx);
+                // Note that unlike when preferring the declared type, we use covariant type
+                // assignments from the type context to potentially _narrow_ the inferred type,
+                // by avoiding literal promotion.
+                let elt_ty_identity = elt_ty.identity(self.db());
+                let elt_tcx = elt_tcx_constraints.get(&elt_ty_identity).copied();
 
-                // Simplify the inference based on the declared type of the element.
-                if let Some(elt_tcx) = elt_tcx.annotation {
+                let inferred_elt_ty = infer_elt_expression(self, elt, TypeContext::new(elt_tcx));
+
+                // Simplify the inference based on a non-covariant declared type.
+                if let Some(elt_tcx) =
+                    elt_tcx.filter(|_| !elt_tcx_variance[&elt_ty_identity].is_covariant())
+                {
                     if inferred_elt_ty.is_assignable_to(self.db(), elt_tcx) {
                         continue;
                     }
@@ -8075,14 +8129,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
                 // Convert any element literals to their promoted type form to avoid excessively large
                 // unions for large nested list literals, which the constraint solver struggles with.
-                let inferred_elt_ty = inferred_elt_ty.promote_literals(self.db(), elt_tcx);
+                let inferred_elt_ty =
+                    inferred_elt_ty.promote_literals(self.db(), TypeContext::new(elt_tcx));
 
                 builder.infer(Type::TypeVar(elt_ty), inferred_elt_ty).ok()?;
             }
         }
 
-        let class_type =
-            class_literal.apply_specialization(self.db(), |_| builder.build(generic_context));
+        let class_type = collection_alias
+            .origin(self.db())
+            .apply_specialization(self.db(), |_| builder.build(generic_context));
 
         Type::from(class_type).to_instance(self.db())
     }
@@ -8570,7 +8626,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         call_expression: &ast::ExprCall,
         tcx: TypeContext<'db>,
     ) -> Type<'db> {
-        // TODO: Use the type context for more precise inference.
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 

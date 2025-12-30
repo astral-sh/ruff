@@ -3012,7 +3012,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .class_specialization(self.db)?;
 
             builder
-                .infer_map(return_ty, tcx, |(_, variance, inferred_ty)| {
+                .infer_reverse_map(tcx, return_ty, |(_, variance, inferred_ty)| {
                     // Avoid unnecessarily widening the return type based on a covariant
                     // type parameter from the type context, as it can lead to argument
                     // assignability errors if the type variable is constrained by a narrower
@@ -3024,11 +3024,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     Some(inferred_ty)
                 })
                 .ok()?;
+
             Some(builder.type_mappings().clone())
         });
 
-        // For a given type variable, we track the variance of any assignments to that type variable
-        // in the argument types.
+        // For a given type variable, we keep track of the variance of any assignments to
+        // that type variable in the type context.
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
@@ -3115,7 +3116,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            // If the type variable is a non-covariant position in the argument, then we avoid
+            // If the type variable is a non-covariant position in any argument, then we avoid
             // promotion, respecting any literals in the parameter type.
             if variance_in_arguments
                 .get(&identity)

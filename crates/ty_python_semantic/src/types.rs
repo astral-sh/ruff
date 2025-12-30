@@ -4,6 +4,7 @@ use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
 
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::time::Duration;
 
 use bitflags::bitflags;
@@ -61,8 +62,8 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    InferableTypeVars, PartialSpecialization, Specialization, bind_typevar, typing_self,
-    walk_generic_context,
+    InferableTypeVars, PartialSpecialization, Specialization, SpecializationBuilder, bind_typevar,
+    typing_self, walk_generic_context,
 };
 use crate::types::mro::{Mro, MroError, MroIterator};
 pub(crate) use crate::types::narrow::{NarrowingConstraint, infer_narrowing_constraint};
@@ -1124,27 +1125,32 @@ impl<'db> Type<'db> {
         self.specialization_of(db, class_literal)
     }
 
-    /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, None)
-    }
-
     /// If the type is a specialized instance of the given class, returns the specialization.
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
         expected_class: ClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, Some(expected_class))
+        self.class_and_specialization_of_optional(db, Some(expected_class))
+            .map(|(_, specialization)| specialization)
     }
 
-    fn specialization_of_optional(
+    /// If this type is a class instance, returns its class literal and specialization.
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
+        self.class_and_specialization_of_optional(db, None)
+    }
+
+    fn class_and_specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<Specialization<'db>> {
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
+            Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
             Type::TypeAlias(alias) => alias.value_type(db).as_nominal_instance()?,
             _ => return None,
         }
@@ -1155,7 +1161,7 @@ impl<'db> Type<'db> {
             return None;
         }
 
-        specialization
+        Some((class_literal, specialization?))
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -4160,28 +4166,32 @@ impl<'db> Type<'db> {
 
             return;
         };
-
         let (class_literal, Some(specialization)) = instance.class(db).class_literal(db) else {
             return;
         };
+        let generic_context = specialization.generic_context(db);
 
-        let tcx_specialization = tcx.annotation.and_then(|tcx| {
-            tcx.filter_union(db, |ty| ty.specialization_of(db, class_literal).is_some())
-                .specialization_of(db, class_literal)
-        });
+        // Collect the type mappings used to narrow the type context.
+        let tcx_mappings = {
+            let mut builder =
+                SpecializationBuilder::new(db, generic_context.inferable_typevars(db));
 
-        for (typevar, ty) in specialization
-            .generic_context(db)
-            .variables(db)
-            .zip(specialization.types(db))
-        {
-            let variance = typevar.variance_with_polarity(db, polarity);
-            let tcx = TypeContext::new(tcx_specialization.and_then(|spec| spec.get(db, typevar)));
+            if let Some(tcx) = tcx.annotation {
+                let alias_instance = Type::instance(db, class_literal.identity_specialization(db));
+                let _ = builder.infer_reverse(tcx, alias_instance);
+            }
 
-            f(typevar, *ty, variance, tcx);
+            builder.into_type_mappings()
+        };
+
+        for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
+            let variance = type_var.variance_with_polarity(db, polarity);
+            let narrowed_tcx = TypeContext::new(tcx_mappings.get(&type_var.identity(db)).copied());
+
+            f(type_var, *ty, variance, narrowed_tcx);
 
             visitor.visit(*ty, || {
-                ty.visit_specialization_impl(db, tcx, variance, f, visitor);
+                ty.visit_specialization_impl(db, narrowed_tcx, variance, f, visitor);
             });
         }
     }
@@ -5898,8 +5908,11 @@ impl<'db> Type<'db> {
                 }
 
                 Some(KnownFunction::AssertType) => {
-                    let val_ty =
-                        BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+                    let val_ty = BoundTypeVarInstance::synthetic(
+                        db,
+                        Name::new_static("T"),
+                        TypeVarVariance::Invariant,
+                    );
 
                     Binding::single(
                         self,
@@ -6393,30 +6406,38 @@ impl<'db> Type<'db> {
                 }
 
                 Some(KnownClass::Tuple) => {
-                    let object = Type::object();
+                    let element_ty = BoundTypeVarInstance::synthetic(
+                        db,
+                        Name::new_static("T"),
+                        TypeVarVariance::Covariant,
+                    );
 
                     // ```py
-                    // class tuple:
+                    // class tuple(Sequence[_T_co]):
                     //     @overload
                     //     def __new__(cls) -> tuple[()]: ...
                     //     @overload
-                    //     def __new__(cls, iterable: Iterable[object]) -> tuple[object, ...]: ...
+                    //     def __new__(cls, iterable: Iterable[_T_co]) -> tuple[_T_co, ...]: ...
                     // ```
                     CallableBinding::from_overloads(
                         self,
                         [
                             Signature::new(Parameters::empty(), Some(Type::empty_tuple(db))),
-                            Signature::new(
+                            Signature::new_generic(
+                                Some(GenericContext::from_typevar_instances(db, [element_ty])),
                                 Parameters::new(
                                     db,
                                     [Parameter::positional_only(Some(Name::new_static(
                                         "iterable",
                                     )))
                                     .with_annotated_type(
-                                        KnownClass::Iterable.to_specialized_instance(db, [object]),
+                                        KnownClass::Iterable.to_specialized_instance(
+                                            db,
+                                            [Type::TypeVar(element_ty)],
+                                        ),
                                     )],
                                 ),
-                                Some(Type::homogeneous_tuple(db, object)),
+                                Some(Type::homogeneous_tuple(db, Type::TypeVar(element_ty))),
                             ),
                         ],
                     )
@@ -6543,7 +6564,11 @@ impl<'db> Type<'db> {
             }
 
             Type::DataclassDecorator(_) => {
-                let typevar = BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Invariant);
+                let typevar = BoundTypeVarInstance::synthetic(
+                    db,
+                    Name::new_static("T"),
+                    TypeVarVariance::Invariant,
+                );
                 let typevar_meta = SubclassOfType::from(db, typevar);
                 let context = GenericContext::from_typevar_instances(db, [typevar]);
                 let parameters = [Parameter::positional_only(Some(Name::new_static("cls")))
@@ -7925,6 +7950,7 @@ impl<'db> Type<'db> {
                         }
                         TypeMapping::Specialization(_) |
                         TypeMapping::PartialSpecialization(_) |
+                        TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
                         TypeMapping::BindSelf { .. } |
                         TypeMapping::ReplaceSelf { .. } |
@@ -8095,15 +8121,28 @@ impl<'db> Type<'db> {
                 if TypeMapping::EagerExpansion == *type_mapping {
                     return alias.raw_value_type(db).expand_eagerly(db);
                 }
-                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is performed without `visitor` inheritance.
-                // In the case of recursive type aliases, this leads to infinite recursion.
+
+                // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
+                // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
-                let value_type = visitor.visit(self, || alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor));
+                let value_type = visitor.visit(self, || {
+                    match type_mapping {
+                        // We only want to perform the unique specialization onto the specialization of the type alias below,
+                        // not the raw value type.
+                        TypeMapping::UniqueSpecialization { .. } => alias.raw_value_type(db),
+
+                        _ => alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
+                    }
+                });
+
                 let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
+
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
-                // TODO: The rule that recursive type aliases must be expanded could potentially be removed,
-                // but doing so would currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is incomplete.
+                //
+                // TODO: The rule that recursive type aliases must be expanded could potentially be removed, but doing so would
+                // currently cause a stack overflow, as the current recursive type alias specialization/expansion mechanism is
+                // incomplete.
                 if !is_recursive && alias.value_type(db) == mapped {
                     self
                 } else {
@@ -8120,6 +8159,7 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
+                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -8133,6 +8173,7 @@ impl<'db> Type<'db> {
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
                 TypeMapping::PartialSpecialization(_) |
+                TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
                 TypeMapping::ReplaceSelf { .. } |
@@ -8847,12 +8888,17 @@ impl PromoteLiteralsMode {
 /// This is represented as an enum (with some variants using `Cow`), and not an `FnMut` trait,
 /// since we sometimes have to apply type mappings lazily (e.g., to the signature of a function
 /// literal).
-#[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
+#[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
     Specialization(Specialization<'db>),
     /// Applies a partial specialization to the type
     PartialSpecialization(PartialSpecialization<'a, 'db>),
+    /// Resets any specializations to contain unique synthetic type variables.
+    UniqueSpecialization {
+        // A list of synthetic type variables, and the types they replaced.
+        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
+    },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals(PromoteLiteralsMode),
@@ -8886,6 +8932,7 @@ impl<'db> TypeMapping<'_, 'db> {
         match self {
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::Materialize(_)
@@ -8920,6 +8967,7 @@ impl<'db> TypeMapping<'_, 'db> {
             TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
             TypeMapping::Specialization(_)
             | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
@@ -10416,14 +10464,10 @@ impl<'db> BoundTypeVarInstance<'db> {
 
     /// Create a new PEP 695 type variable that can be used in signatures
     /// of synthetic generic functions.
-    pub(crate) fn synthetic(
-        db: &'db dyn Db,
-        name: &'static str,
-        variance: TypeVarVariance,
-    ) -> Self {
+    pub(crate) fn synthetic(db: &'db dyn Db, name: Name, variance: TypeVarVariance) -> Self {
         let identity = TypeVarIdentity::new(
             db,
-            Name::new_static(name),
+            name,
             None, // definition
             TypeVarKind::Pep695,
         );
@@ -10572,7 +10616,8 @@ impl<'db> BoundTypeVarInstance<'db> {
                     Type::TypeVar(self)
                 }
             }
-            TypeMapping::PromoteLiterals(_)
+            TypeMapping::UniqueSpecialization { .. }
+            | TypeMapping::PromoteLiterals(_)
             | TypeMapping::ReplaceParameterDefaults
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::EagerExpansion => Type::TypeVar(self),
