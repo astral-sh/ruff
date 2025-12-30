@@ -2075,6 +2075,7 @@ fn token_suffix_by_kinds<const N: usize>(
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
     use ty_module_resolver::ModuleName;
@@ -7562,9 +7563,7 @@ TypedDi<CURSOR>
                 .iter()
                 .filter(|c| !self.skip_builtins || !c.builtin)
                 .filter(|c| !self.skip_keywords || c.kind != Some(CompletionKind::Keyword))
-                .filter(|c| {
-                    !self.skip_dunders || !c.name.starts_with("__") || !c.name.ends_with("__")
-                })
+                .filter(|c| !self.skip_dunders || !is_dunder(&c.name))
                 .filter(|c| {
                     self.predicate
                         .as_ref()
