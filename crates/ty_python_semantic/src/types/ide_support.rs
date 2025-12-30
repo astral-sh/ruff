@@ -73,7 +73,7 @@ pub fn definitions_for_name<'db>(
         let is_global = place_expr.is_global();
         let is_nonlocal = place_expr.is_nonlocal();
 
-        // TODO: The current algorithm doesn't return definintions or bindings
+        // TODO: The current algorithm doesn't return definitions or bindings
         // for other scopes that are outside of this scope hierarchy that target
         // this name using a nonlocal or global binding. The semantic analyzer
         // doesn't appear to track these in a way that we can easily access
@@ -785,6 +785,12 @@ pub fn inlay_hint_call_argument_details<'db>(
         };
 
         if !arg_mapping.matched {
+            continue;
+        }
+
+        // Skip if this argument maps to multiple parameters (e.g., unpacked tuple filling
+        // multiple slots). Showing a single parameter name would be misleading.
+        if arg_mapping.parameters.len() > 1 {
             continue;
         }
 

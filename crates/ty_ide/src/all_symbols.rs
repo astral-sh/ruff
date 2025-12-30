@@ -21,6 +21,9 @@ pub fn all_symbols<'db>(
         return Vec::new();
     }
 
+    let all_symbols_span = tracing::debug_span!("all_symbols");
+    let _span = all_symbols_span.enter();
+
     let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
     let is_typing_extensions_available = importing_from.is_stub(db)
         || resolve_real_shadowable_module(db, importing_from, &typing_extensions).is_some();
@@ -29,6 +32,7 @@ pub fn all_symbols<'db>(
     {
         let modules = all_modules(db);
         let db = db.dyn_clone();
+        let all_symbols_span = &all_symbols_span;
         let results = &results;
         let query = &query;
 
@@ -39,6 +43,7 @@ pub fn all_symbols<'db>(
                 let Some(file) = module.file(&*db) else {
                     continue;
                 };
+
                 // By convention, modules starting with an underscore
                 // are generally considered unexported. However, we
                 // should consider first party modules fair game.
@@ -59,6 +64,9 @@ pub fn all_symbols<'db>(
                     continue;
                 }
                 s.spawn(move |_| {
+                    let symbols_for_file_span = tracing::debug_span!(parent: all_symbols_span, "symbols_for_file_global_only", ?file);
+                    let _entered = symbols_for_file_span.entered();
+
                     if query.is_match_symbol_name(module.name(&*db)) {
                         results.lock().unwrap().push(AllSymbolInfo {
                             symbol: None,
