@@ -266,7 +266,7 @@ use crate::semantic_index::use_def::place_state::{
     LiveDeclarationsIterator, PlaceState, PreviousDefinitions, ScopedDefinitionId,
 };
 use crate::semantic_index::{EnclosingSnapshotResult, SemanticIndex};
-use crate::types::{IntersectionBuilder, Truthiness, Type, infer_narrowing_constraint};
+use crate::types::{NarrowingConstraint, Truthiness, Type, infer_narrowing_constraint};
 
 mod place_state;
 
@@ -757,22 +757,22 @@ impl<'db> ConstraintsIterator<'_, 'db> {
         base_ty: Type<'db>,
         place: ScopedPlaceId,
     ) -> Type<'db> {
-        let constraint_tys: Vec<_> = self
-            .filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
-            .collect();
-
-        if constraint_tys.is_empty() {
-            base_ty
-        } else {
-            constraint_tys
-                .into_iter()
-                .rev()
-                .fold(
-                    IntersectionBuilder::new(db).add_positive(base_ty),
-                    IntersectionBuilder::add_positive,
-                )
-                .build()
-        }
+        // Constraints are in reverse-source order. Due to TypeGuard semantics
+        // constraint AND is non-commutative and so we _must_ apply in
+        // source order.
+        //
+        // Fortunately, constraint AND is still associative, so we can still iterate left-to-right
+        // and accumulate rightward.
+        self.filter_map(|constraint| infer_narrowing_constraint(db, constraint, place))
+            .reduce(|acc, constraint| {
+                // See above---note the reverse application
+                constraint.merge_constraint_and(acc, db)
+            })
+            .map_or(base_ty, |constraint| {
+                NarrowingConstraint::regular(base_ty)
+                    .merge_constraint_and(constraint, db)
+                    .evaluate_constraint_type(db)
+            })
     }
 }
 

@@ -27,8 +27,8 @@ use crate::types::visitor::TypeVisitor;
 use crate::types::{
     BoundTypeVarIdentity, CallableType, CallableTypeKind, IntersectionType, KnownBoundMethodType,
     KnownClass, KnownInstanceType, MaterializationKind, Protocol, ProtocolInstanceType,
-    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypedDictType, UnionType,
-    WrapperDescriptorKind, visitor,
+    SpecialFormType, StringLiteralType, SubclassOfInner, Type, TypeGuardLike, TypedDictType,
+    UnionType, WrapperDescriptorKind, visitor,
 };
 
 /// Settings for displaying types and signatures
@@ -590,6 +590,28 @@ impl Display for ClassDisplay<'_> {
     }
 }
 
+/// Helper for displaying `TypeGuardLike` types `TypeIs` and `TypeGuard`.
+fn fmt_type_guard_like<'db, T: TypeGuardLike<'db>>(
+    db: &'db dyn Db,
+    guard: T,
+    settings: &DisplaySettings<'db>,
+    f: &mut TypeWriter<'_, '_, 'db>,
+) -> fmt::Result {
+    f.with_type(Type::SpecialForm(T::special_form()))
+        .write_str(T::FORM_NAME)?;
+    f.write_char('[')?;
+    guard
+        .return_type(db)
+        .display_with(db, settings.singleline())
+        .fmt_detailed(f)?;
+    if let Some(name) = guard.place_name(db) {
+        f.set_invalid_type_annotation();
+        f.write_str(" @ ")?;
+        f.write_str(&name)?;
+    }
+    f.write_str("]")
+}
+
 /// Writes the string representation of a type, which is the value displayed either as
 /// `Literal[<repr>]` or `Literal[<repr1>, <repr2>]` for literal types or as `<repr>` for
 /// non literals
@@ -971,20 +993,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     .fmt_detailed(f)?;
                 f.write_str(">")
             }
-            Type::TypeIs(type_is) => {
-                f.with_type(Type::SpecialForm(SpecialFormType::TypeIs))
-                    .write_str("TypeIs")?;
-                f.write_char('[')?;
-                type_is
-                    .return_type(self.db)
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
-                if let Some(name) = type_is.place_name(self.db) {
-                    f.set_invalid_type_annotation();
-                    f.write_str(" @ ")?;
-                    f.write_str(&name)?;
-                }
-                f.write_str("]")
+            Type::TypeIs(type_is) => fmt_type_guard_like(self.db, type_is, &self.settings, f),
+            Type::TypeGuard(type_guard) => {
+                fmt_type_guard_like(self.db, type_guard, &self.settings, f)
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
                 ClassType::NonGeneric(class) => class

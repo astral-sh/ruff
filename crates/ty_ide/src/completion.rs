@@ -356,6 +356,7 @@ impl<'db> Completion<'db> {
                 Type::IntLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::TypeIs(_)
+                | Type::TypeGuard(_)
                 | Type::StringLiteral(_)
                 | Type::LiteralString
                 | Type::BytesLiteral(_) => CompletionKind::Value,

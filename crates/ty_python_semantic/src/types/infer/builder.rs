@@ -2059,7 +2059,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             let declared_ty = self.file_expression_type(returns);
             let expected_ty = match declared_ty {
-                Type::TypeIs(_) => KnownClass::Bool.to_instance(self.db()),
+                Type::TypeIs(_) | Type::TypeGuard(_) => KnownClass::Bool.to_instance(self.db()),
                 ty => ty,
             };
 
@@ -4665,6 +4665,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::AlwaysTruthy
             | Type::AlwaysFalsy
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_)
             | Type::NewTypeInstance(_) => {
                 // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
@@ -8939,9 +8940,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
 
         match return_ty {
-            // TODO: TypeGuard
             Type::TypeIs(type_is) => match find_narrowed_place() {
                 Some(place) => type_is.bind(db, scope, place),
+                None => return_ty,
+            },
+            Type::TypeGuard(type_guard) => match find_narrowed_place() {
+                Some(place) => type_guard.bind(db, scope, place),
                 None => return_ty,
             },
             _ => return_ty,
@@ -10039,6 +10043,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
+                | Type::TypeGuard(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
             ) => {
@@ -10539,6 +10544,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
+                | Type::TypeGuard(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
                 Type::FunctionLiteral(_)
@@ -10569,6 +10575,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::BoundSuper(_)
                 | Type::TypeVar(_)
                 | Type::TypeIs(_)
+                | Type::TypeGuard(_)
                 | Type::TypedDict(_)
                 | Type::NewTypeInstance(_),
                 op,
