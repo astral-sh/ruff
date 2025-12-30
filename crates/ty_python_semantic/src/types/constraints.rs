@@ -750,12 +750,22 @@ impl<'db> ConstrainedTypeVar<'db> {
             return false;
         }
         match (self.bound(db), other.bound(db)) {
+            // Every type satisfies Never ≤ T, so this is vacuously true.
+            (_, ConstraintBound::Lower(other_lower)) if other_lower.is_never() => true,
+
+            // Every type satisfies T ≤ object, so this is vacuously true.
+            (_, ConstraintBound::Upper(other_upper)) if other_upper.is_object() => true,
+
+            // (β ⊆ α) ↔ ((α ≤ T) → (β ≤ T))
             (ConstraintBound::Lower(self_lower), ConstraintBound::Lower(other_lower)) => {
                 other_lower.is_constraint_set_assignable_to(db, self_lower)
             }
+
+            // (α ⊆ β) ↔ ((T ≤ α) → (T ≤ β))
             (ConstraintBound::Upper(self_upper), ConstraintBound::Upper(other_upper)) => {
                 self_upper.is_constraint_set_assignable_to(db, other_upper)
             }
+
             _ => false,
         }
     }
