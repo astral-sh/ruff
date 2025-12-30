@@ -1257,7 +1257,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
+    pub const fn as_class_literal(self) -> Option<ClassLiteral<'db>> {
         match self {
             Type::ClassLiteral(class_type) => Some(class_type),
             _ => None,

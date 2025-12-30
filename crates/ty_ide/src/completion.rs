@@ -12,6 +12,7 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, ModuleName};
+use ty_python_semantic::HasType;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
     Completion as SemanticCompletion, NameKind, SemanticModel,
@@ -60,6 +61,7 @@ pub fn completion<'db>(
             completions.extend(semantic_completions);
             if scoped.is_some() {
                 add_keyword_completions(db, &mut completions);
+                add_argument_completions(db, &model, &context.cursor, &mut completions);
             }
             if settings.auto_import {
                 if let Some(scoped) = scoped {
@@ -75,8 +77,6 @@ pub fn completion<'db>(
                     );
                 }
             }
-
-            add_function_arg_completions(db, file, &context.cursor, &mut completions);
         }
     }
 
@@ -416,6 +416,25 @@ impl<'db> Completion<'db> {
             is_type_check_only: false,
             is_definitively_raisable: false,
             documentation: None,
+        }
+    }
+
+    fn argument(name: &str, ty: Option<Type<'db>>, documentation: Option<&str>) -> Self {
+        let insert = Some(format!("{name}=").into_boxed_str());
+        let documentation = documentation.map(|d| Docstring::new(d.to_owned()));
+
+        Completion {
+            name: name.into(),
+            qualified: None,
+            insert,
+            ty,
+            kind: Some(CompletionKind::Variable),
+            module_name: None,
+            import: None,
+            builtin: false,
+            is_type_check_only: false,
+            is_definitively_raisable: false,
+            documentation,
         }
     }
 
@@ -1063,7 +1082,77 @@ enum Sort {
     Lower,
 }
 
-/// Detect and construct completions for unset function arguments.
+/// Detect and add completions for unset arguments.
+fn add_argument_completions<'db>(
+    db: &'db dyn Db,
+    model: &SemanticModel<'db>,
+    cursor: &ContextCursor<'_>,
+    completions: &mut Completions<'db>,
+) {
+    for node in cursor.covering_node(cursor.range).ancestors() {
+        match node {
+            ast::AnyNodeRef::ExprCall(call) => {
+                if call.arguments.range().contains_range(cursor.range) {
+                    add_function_arg_completions(db, model.file(), cursor, completions);
+                }
+                return;
+            }
+            ast::AnyNodeRef::StmtClassDef(class_def) => {
+                if let Some(arguments) = class_def.arguments.as_deref()
+                    && arguments.range().contains_range(cursor.range)
+                {
+                    add_class_arg_completions(model, class_def, completions);
+                }
+                return;
+            }
+            node => {
+                if node.is_statement() {
+                    return;
+                }
+            }
+        }
+    }
+}
+
+/// Detect and add completions for unset class arguments.
+///
+/// Some arguments we know are always valid and thus they are easy
+/// to provide. The `metaclass` keyword is always valid.
+/// For `typing.TypedDict` subclasses, we add
+/// `TypedDict` specific keywords like `total`.
+fn add_class_arg_completions<'db>(
+    model: &SemanticModel<'db>,
+    class_def: &ast::StmtClassDef,
+    completions: &mut Completions<'db>,
+) {
+    let is_set = |name| {
+        class_def
+            .arguments
+            .as_ref()
+            .is_some_and(|args| args.find_keyword(name).is_some())
+    };
+
+    if !is_set("metaclass") {
+        let ty = Some(KnownClass::Type.to_subclass_of(model.db()));
+        completions.add(Completion::argument("metaclass", ty, None));
+    }
+
+    let is_typed_dict = class_def
+        .inferred_type(model)
+        .and_then(Type::as_class_literal)
+        .is_some_and(|t| t.is_typed_dict(model.db()));
+
+    // TODO: Handle PEP 728 that adds two extra keywords,
+    // closed and extra_items.
+    //
+    // See https://peps.python.org/pep-0728/
+    if is_typed_dict && !is_set("total") {
+        let ty = Some(KnownClass::Bool.to_instance(model.db()));
+        completions.add(Completion::argument("total", ty, None));
+    }
+}
+
+/// Detect and add completions for unset function arguments.
 ///
 /// Suggestions are only provided if the cursor is currently inside a
 /// function call and the function arguments have not 1) already been
@@ -1074,18 +1163,15 @@ fn add_function_arg_completions<'db>(
     cursor: &ContextCursor<'_>,
     completions: &mut Completions<'db>,
 ) {
-    // But be careful: this isn't as simple as just finding a call
-    // expression. We also have to make sure we are in the "arguments"
-    // portion of the call. Otherwise we risk incorrectly returning
-    // something for `(<CURSOR>)(arg1, arg2)`-style expressions.
-    if !cursor
-        .covering_node(TextRange::empty(cursor.offset))
-        .ancestors()
-        .take_while(|node| !node.is_statement())
-        .any(|node| node.is_arguments())
-    {
-        return;
-    }
+    debug_assert!(
+        cursor
+            .covering_node(cursor.range)
+            .ancestors()
+            .take_while(|node| !node.is_statement())
+            .any(|node| node.is_arguments()),
+        "Should only be called if we're already certain we're in an arguments node to avoid \
+        adding completions for something like `(<CURSOR>)(arg1, arg2)`-style expressions"
+    );
 
     let Some(sig_help) = signature_help(db, file, cursor.offset) else {
         return;
@@ -1098,25 +1184,11 @@ fn add_function_arg_completions<'db>(
                 continue;
             }
 
-            let name = Name::new(&p.name);
-            let documentation = p
-                .documentation
-                .as_ref()
-                .map(|d| Docstring::new(d.to_owned()));
-            let insert = Some(format!("{name}=").into_boxed_str());
-            completions.add(Completion {
-                name,
-                qualified: None,
-                insert,
-                ty: p.ty,
-                kind: Some(CompletionKind::Variable),
-                module_name: None,
-                import: None,
-                builtin: false,
-                is_type_check_only: false,
-                is_definitively_raisable: false,
-                documentation,
-            });
+            completions.add(Completion::argument(
+                &p.name,
+                p.ty,
+                p.documentation.as_deref(),
+            ));
         }
     }
 }
@@ -3032,6 +3104,7 @@ class Foo(<CURSOR>):
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3049,6 +3122,7 @@ class Bar: ...
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3066,6 +3140,7 @@ class Bar: ...
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
+        metaclass=
         ");
     }
 
@@ -3081,7 +3156,157 @@ class Foo(<CURSOR>",
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
         Bar
         Foo
+        metaclass=
         ");
+    }
+
+    #[test]
+    fn class_metaclass() {
+        let builder = completion_test_builder(
+            "\
+class Foo(meta<CURSOR>",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("metaclass");
+    }
+
+    #[test]
+    fn class_metaclass_set() {
+        let builder = completion_test_builder(
+            "\
+class Foo(metaclass=x, meta<CURSOR>",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("metaclass");
+    }
+
+    #[test]
+    fn class_metaclass_generic() {
+        let builder = completion_test_builder(
+            "\
+class Foo[T](meta<CURSOR>",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("metaclass");
+    }
+
+    #[test]
+    fn class_typed_dict_total() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypedDict
+
+class Foo(TypedDict, tot<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("total");
+    }
+
+    #[test]
+    fn class_typed_dict_total_alias() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypedDict as TD
+
+class Foo(TD, tot<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("total");
+    }
+
+    #[test]
+    fn class_typed_dict_total_set() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypedDict
+
+class Foo(TypedDict, total=False, tot<CURSOR>
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .not_contains("total");
+    }
+
+    #[test]
+    fn class_typed_dict_total_subclass() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypedDict
+
+class Foo(TypedDict):
+    x: int
+
+class Bar(Foo, to<CURSOR>)
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("total");
+    }
+
+    #[test]
+    fn class_typed_dict_total_pep695_generic() {
+        let builder = completion_test_builder(
+            "\
+from typing import TypedDict
+
+class Foo[T](TypedDict, to<CURSOR>)
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("total");
+    }
+
+    #[test]
+    fn class_typed_dict_total_typevar_generic() {
+        let builder = completion_test_builder(
+            "\
+from typing import Generic, TypeVar, TypedDict
+
+T = TypeVar('T')
+
+class Foo(TypedDict, Generic[T], to<CURSOR>)
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("total");
     }
 
     #[test]
@@ -3754,6 +3979,28 @@ bar(<CURSOR>
         foo
         okay=
         ");
+    }
+
+    #[test]
+    fn call_attribute_argument_no_arg_completions() {
+        let builder = completion_test_builder(
+            "\
+class A:
+    class B:
+        class C: ...
+
+def f(aaaa): ...
+
+f(A.B.<CURSOR>)
+",
+        );
+
+        builder
+            .skip_keywords()
+            .skip_builtins()
+            .build()
+            .contains("C")
+            .not_contains("aaaa");
     }
 
     #[test]
