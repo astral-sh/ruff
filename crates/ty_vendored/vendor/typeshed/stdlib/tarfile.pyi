@@ -907,7 +907,11 @@ at targetpath.
     def makedev(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
         """Make a character or block device called targetpath.
         """
-    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None: ...  # undocumented
+    def makelink(self, tarinfo: TarInfo, targetpath: StrOrBytesPath) -> None:  # undocumented
+        """Make a (symbolic) link called targetpath. If it cannot be created
+          (platform limitation), we try to make a copy of the referenced file
+          instead of a link.
+        """
     def makelink_with_filter(
         self, tarinfo: TarInfo, targetpath: StrOrBytesPath, filter_function: _FilterFunction, extraction_root: str
     ) -> None:  # undocumented
