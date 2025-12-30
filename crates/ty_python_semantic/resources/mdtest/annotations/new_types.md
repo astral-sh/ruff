@@ -189,6 +189,13 @@ reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
 reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
 static_assert(is_assignable_to(Foo, float))
 static_assert(is_assignable_to(Foo, int | float))
+static_assert(is_assignable_to(Foo, int | float | None))
+# The assignments above require treating `Foo` as its underlying union type. Each of its members is
+# assignable to the union on the right, so `Foo` is assignable to the union, even though `Foo` as a
+# whole isn't assignable to any one member. However, we need to be sure that this treatment doesn't
+# break cases like the assignment below, where `Foo` *is* assignable to the union on the right, even
+# though its members *aren't*.
+static_assert(is_assignable_to(Foo, Foo | None))
 
 Bar = NewType("Bar", complex)
 Bar(1 + 2j)
@@ -200,7 +207,10 @@ reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[c
 reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
 reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
 static_assert(is_assignable_to(Bar, complex))
-static_assert(is_assignable_to(Foo, int | float | complex))
+static_assert(is_assignable_to(Bar, int | float | complex))
+static_assert(is_assignable_to(Bar, int | float | complex | None))
+# See the `Foo | None` case above.
+static_assert(is_assignable_to(Bar, Bar | None))
 ```
 
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
