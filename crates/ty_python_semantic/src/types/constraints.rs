@@ -205,9 +205,13 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         upper: Type<'db>,
     ) -> Self {
-        Self {
-            node: ConstrainedTypeVar::new_upper_bound_node(db, typevar, upper),
-        }
+        let node = ConstrainedTypeVar::new_upper_bound_node(db, typevar, upper);
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::ConstraintSet",
+            constraint = %node.display(db),
+            "create upper bound constraint",
+        );
+        Self { node }
     }
 
     /// Returns a constraint set that constrains a typevar to a particular lower bound.
@@ -216,9 +220,13 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         lower: Type<'db>,
     ) -> Self {
-        Self {
-            node: ConstrainedTypeVar::new_lower_bound_node(db, typevar, lower),
-        }
+        let node = ConstrainedTypeVar::new_lower_bound_node(db, typevar, lower);
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::ConstraintSet",
+            constraint = %node.display(db),
+            "create lower bound constraint",
+        );
+        Self { node }
     }
 
     /// Returns a constraint set that constrains a typevar to a particular type.
@@ -227,9 +235,13 @@ impl<'db> ConstraintSet<'db> {
         typevar: BoundTypeVarInstance<'db>,
         ty: Type<'db>,
     ) -> Self {
-        Self {
-            node: ConstrainedTypeVar::new_equality_node(db, typevar, ty),
-        }
+        let node = ConstrainedTypeVar::new_equality_node(db, typevar, ty);
+        tracing::trace!(
+            target: "ty_python_semantic::types::constraints::ConstraintSet",
+            node = %node.display(db),
+            "create equality constraint",
+        );
+        Self { node }
     }
 
     /// Returns whether this constraint set never holds
@@ -3712,21 +3724,36 @@ impl<'db> BoundTypeVarInstance<'db> {
         // return the range of valid materializations that we can choose from.
         match self.typevar(db).bound_or_constraints(db) {
             None => Node::AlwaysTrue,
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.top_materialization(db);
-                ConstrainedTypeVar::new_upper_bound_node(db, self, bound)
+            Some(TypeVarBoundOrConstraints::UpperBound(unmaterialized_bound)) => {
+                let bound = unmaterialized_bound.top_materialization(db);
+                let constraint = ConstrainedTypeVar::new_upper_bound_node(db, self, bound);
+                tracing::trace!(
+                    target: "ty_python_semantic::types::constraints::ConstraintSet",
+                    kind = %"upper_bound",
+                    typevar_bound = %unmaterialized_bound.display(db),
+                    constraint = %constraint.display(db),
+                    "create valid specialization constraint",
+                );
+                constraint
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut specializations = Node::AlwaysFalse;
-                for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
+                for unmaterialized_constraint in constraints.elements(db) {
+                    let constraint_lower = unmaterialized_constraint.bottom_materialization(db);
+                    let constraint_upper = unmaterialized_constraint.top_materialization(db);
                     let lower_bound =
                         ConstrainedTypeVar::new_lower_bound_node(db, self, constraint_lower);
                     let upper_bound =
                         ConstrainedTypeVar::new_upper_bound_node(db, self, constraint_upper);
-                    specializations =
-                        specializations.or_with_offset(db, lower_bound.and(db, upper_bound));
+                    let constraint = lower_bound.and(db, upper_bound);
+                    tracing::trace!(
+                        target: "ty_python_semantic::types::constraints::ConstraintSet",
+                        kind = %"constrained",
+                        typevar_constraint = %unmaterialized_constraint.display(db),
+                        constraint = %constraint.display(db),
+                        "create valid specialization constraint",
+                    );
+                    specializations = specializations.or_with_offset(db, constraint);
                 }
                 specializations
             }
@@ -3754,28 +3781,47 @@ impl<'db> BoundTypeVarInstance<'db> {
         // materialization of the bound or constraints.
         match self.typevar(db).bound_or_constraints(db) {
             None => (Node::AlwaysTrue, Vec::new()),
-            Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                let bound = bound.bottom_materialization(db);
-                (
-                    ConstrainedTypeVar::new_lower_bound_node(db, self, bound),
-                    Vec::new(),
-                )
+            Some(TypeVarBoundOrConstraints::UpperBound(unmaterialized_bound)) => {
+                let bound = unmaterialized_bound.bottom_materialization(db);
+                let constraint = ConstrainedTypeVar::new_lower_bound_node(db, self, bound);
+                tracing::trace!(
+                    target: "ty_python_semantic::types::constraints::ConstraintSet",
+                    kind = %"upper_bound",
+                    typevar_bound = %unmaterialized_bound.display(db),
+                    constraint = %constraint.display(db),
+                    "create required specialization constraint",
+                );
+                (constraint, Vec::new())
             }
             Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
                 let mut non_gradual_constraints = Node::AlwaysFalse;
                 let mut gradual_constraints = Vec::new();
-                for constraint in constraints.elements(db) {
-                    let constraint_lower = constraint.bottom_materialization(db);
-                    let constraint_upper = constraint.top_materialization(db);
+                for unmaterialized_constraint in constraints.elements(db) {
+                    let constraint_lower = unmaterialized_constraint.bottom_materialization(db);
+                    let constraint_upper = unmaterialized_constraint.top_materialization(db);
                     let lower_bound =
                         ConstrainedTypeVar::new_lower_bound_node(db, self, constraint_lower);
                     let upper_bound =
                         ConstrainedTypeVar::new_upper_bound_node(db, self, constraint_upper);
                     let constraint = lower_bound.and(db, upper_bound);
                     if constraint_lower == constraint_upper {
+                        tracing::trace!(
+                            target: "ty_python_semantic::types::constraints::ConstraintSet",
+                            kind = %"constrained",
+                            typevar_constraint = %unmaterialized_constraint.display(db),
+                            constraint = %constraint.display(db),
+                            "create required specialization constraint",
+                        );
                         non_gradual_constraints =
                             non_gradual_constraints.or_with_offset(db, constraint);
                     } else {
+                        tracing::trace!(
+                            target: "ty_python_semantic::types::constraints::ConstraintSet",
+                            kind = %"gradual_constrained",
+                            typevar_constraint = %unmaterialized_constraint.display(db),
+                            constraint = %constraint.display(db),
+                            "create required specialization constraint",
+                        );
                         gradual_constraints.push(constraint);
                     }
                 }
