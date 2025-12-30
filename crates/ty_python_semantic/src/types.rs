@@ -1125,25 +1125,25 @@ impl<'db> Type<'db> {
         self.specialization_of(db, class_literal)
     }
 
-    /// If this type is a class instance, returns its specialization.
-    pub(crate) fn class_specialization(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
-        self.specialization_of_optional(db, None)
-    }
-
     /// If the type is a specialized instance of the given class, returns the specialization.
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
         expected_class: ClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.specialization_of_optional(db, Some(expected_class))
+        self.class_and_specialization_of_optional(db, Some(expected_class))
             .map(|(_, specialization)| specialization)
     }
 
-    fn specialization_of_optional(
+    /// If this type is a class instance, returns its class literal and specialization.
+    pub(crate) fn class_specialization(
+        self,
+        db: &'db dyn Db,
+    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
+        self.class_and_specialization_of_optional(db, None)
+    }
+
+    fn class_and_specialization_of_optional(
         self,
         db: &'db dyn Db,
         expected_class: Option<ClassLiteral<'_>>,

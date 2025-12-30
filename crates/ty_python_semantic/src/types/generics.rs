@@ -2101,16 +2101,15 @@ impl<'db> SpecializationBuilder<'db> {
         //
         // Given a forward type mapping of `T@Sequence` -> `T@list`, and a synthetic type mapping of
         // `T@Sequence` -> `int`, we want to infer the reverse type mapping `T@list` -> `int`.
-        for (synthetic_type_var_identity, actual_type) in forward_type_mappings {
-            if let Some((synthetic_type_var, formal_type)) = synthetic_specialization
-                .iter()
-                .find(|(typevar, _)| synthetic_type_var_identity == typevar.identity(self.db))
+        for (synthetic_type_var, formal_type) in synthetic_specialization {
+            if let Some(actual_type) =
+                forward_type_mappings.get(&synthetic_type_var.identity(self.db))
             {
                 let variance = synthetic_type_var.variance_with_polarity(self.db, polarity);
 
                 // Note that it is possible that we need to recurse deeper, so we continue
                 // to perform a reverse inference on the nested types.
-                self.infer_reverse_map_impl(*formal_type, actual_type, variance, f)?;
+                self.infer_reverse_map_impl(formal_type, *actual_type, variance, f)?;
             }
         }
 
