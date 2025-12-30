@@ -297,7 +297,7 @@ pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> 
     settings.preview.is_enabled()
 }
 
-// https://github.com/astral-sh/ruff/pull/TODO
+// https://github.com/astral-sh/ruff/pull/22312
 pub(crate) const fn is_plc0206_narrower_range_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
