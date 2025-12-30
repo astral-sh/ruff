@@ -96,6 +96,9 @@ PLC0206 Extracting value from dictionary without calling `.items()`
  9 | for instrument in ORCHESTRA:
    |     ^^^^^^^^^^^^^^^^^^^^^^^
 10 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
+   |                            ---------------------
+11 |
+12 | for instrument in ORCHESTRA:
    |
 
 
@@ -107,6 +110,9 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 12 | for instrument in ORCHESTRA:
    |     ^^^^^^^^^^^^^^^^^^^^^^^
 13 |     ORCHESTRA[instrument]
+   |     ---------------------
+14 |
+15 | for instrument in ORCHESTRA.keys():
    |
 
 
@@ -118,6 +124,9 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 15 | for instrument in ORCHESTRA.keys():
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 16 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
+   |                            ---------------------
+17 |
+18 | for instrument in ORCHESTRA.keys():
    |
 
 
@@ -129,6 +138,9 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 18 | for instrument in ORCHESTRA.keys():
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 19 |     ORCHESTRA[instrument]
+   |     ---------------------
+20 |
+21 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
 
 
@@ -140,6 +152,9 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 21 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 22 |     print(f"{instrument}: {temp_orchestra[instrument]}")
+   |                            --------------------------
+23 |
+24 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
 
 
@@ -151,4 +166,7 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 24 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 25 |     temp_orchestra[instrument]
+   |     --------------------------
+26 |
+27 | # # OK
    |

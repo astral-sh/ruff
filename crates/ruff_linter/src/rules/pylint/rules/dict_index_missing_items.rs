@@ -144,6 +144,10 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
                         .report_diagnostic(DictIndexMissingItems, self.range),
                 );
             }
+
+            if self.checker.settings().preview.is_enabled() {
+                self.guard.as_mut().unwrap().secondary_annotation("", expr);
+            }
         } else {
             visitor::walk_expr(self, expr);
         }
