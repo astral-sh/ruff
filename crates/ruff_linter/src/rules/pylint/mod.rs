@@ -257,6 +257,7 @@ mod tests {
         Rule::UselessExceptionStatement,
         Path::new("useless_exception_statement.py")
     )]
+    #[test_case(Rule::DictIndexMissingItems, Path::new("dict_index_missing_items.py"))]
     fn preview_rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!(
             "preview__{}_{}",
