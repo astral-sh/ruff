@@ -2076,6 +2076,7 @@ fn token_suffix_by_kinds<const N: usize>(
 #[cfg(test)]
 mod tests {
     use insta::assert_snapshot;
+    use ruff_python_ast::helpers::is_dunder;
     use ruff_python_ast::token::{TokenKind, Tokens};
     use ruff_python_parser::{Mode, ParseOptions};
     use ty_module_resolver::ModuleName;
@@ -4027,7 +4028,10 @@ b.a.<CURSOR>
 ",
         );
 
-        builder.build().not_contains("a").contains("x");
+        assert_snapshot!(builder.skip_dunders().build().snapshot(),
+        @r"
+        x
+        ");
     }
 
     #[test]
@@ -7538,6 +7542,7 @@ TypedDi<CURSOR>
         settings: CompletionSettings,
         skip_builtins: bool,
         skip_keywords: bool,
+        skip_dunders: bool,
         type_signatures: bool,
         imports: bool,
         module_names: bool,
@@ -7559,6 +7564,7 @@ TypedDi<CURSOR>
                 .iter()
                 .filter(|c| !self.skip_builtins || !c.builtin)
                 .filter(|c| !self.skip_keywords || c.kind != Some(CompletionKind::Keyword))
+                .filter(|c| !self.skip_dunders || !is_dunder(&c.name))
                 .filter(|c| {
                     self.predicate
                         .as_ref()
@@ -7619,6 +7625,16 @@ TypedDi<CURSOR>
         /// might want to skip keywords but *not* builtins.
         fn skip_keywords(mut self) -> CompletionTestBuilder {
             self.skip_keywords = true;
+            self
+        }
+
+        /// When set, dunder completions are skipped.
+        /// This is useful to reduce noise for snapshot tests
+        /// when filtering on methods and attributes.
+        ///
+        /// Not enabled by default.
+        fn skip_dunders(mut self) -> CompletionTestBuilder {
+            self.skip_dunders = true;
             self
         }
 
@@ -7770,6 +7786,7 @@ TypedDi<CURSOR>
                 settings: CompletionSettings::default(),
                 skip_builtins: false,
                 skip_keywords: false,
+                skip_dunders: false,
                 type_signatures: false,
                 imports: false,
                 module_names: false,
