@@ -3783,7 +3783,7 @@ impl<'db> BoundTypeVarInstance<'db> {
             None => (Node::AlwaysTrue, Vec::new()),
             Some(TypeVarBoundOrConstraints::UpperBound(unmaterialized_bound)) => {
                 let bound = unmaterialized_bound.bottom_materialization(db);
-                let constraint = ConstrainedTypeVar::new_lower_bound_node(db, self, bound);
+                let constraint = ConstrainedTypeVar::new_upper_bound_node(db, self, bound);
                 tracing::trace!(
                     target: "ty_python_semantic::types::constraints::ConstraintSet",
                     kind = %"upper_bound",
