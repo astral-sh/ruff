@@ -1,5 +1,5 @@
-"""CSV parsing and writing.
-"""
+"""CSV parsing and writing."""
+
 import csv
 import sys
 from _typeshed import SupportsWrite
@@ -30,8 +30,9 @@ _DialectLike: TypeAlias = str | Dialect | csv.Dialect | type[Dialect | csv.Diale
 class Dialect:
     """CSV dialect
 
-The Dialect type records CSV parsing and generation options.
-"""
+    The Dialect type records CSV parsing and generation options.
+    """
+
     delimiter: str
     quotechar: str | None
     escapechar: str | None
@@ -59,14 +60,16 @@ if sys.version_info >= (3, 10):
     class Reader:
         """CSV reader
 
-Reader objects are responsible for reading and parsing tabular data
-in CSV format.
-"""
+        Reader objects are responsible for reading and parsing tabular data
+        in CSV format.
+        """
+
         @property
         def dialect(self) -> Dialect: ...
         line_num: int
         def __iter__(self) -> Self:
             """Implement iter(self)."""
+
         def __next__(self) -> list[str]:
             """Implement next(self)."""
 
@@ -75,35 +78,38 @@ in CSV format.
     class Writer:
         """CSV writer
 
-Writer objects are responsible for generating tabular data
-in CSV format from sequence input.
-"""
+        Writer objects are responsible for generating tabular data
+        in CSV format from sequence input.
+        """
+
         @property
         def dialect(self) -> Dialect: ...
         if sys.version_info >= (3, 13):
             def writerow(self, row: Iterable[Any], /) -> Any:
                 """Construct and write a CSV record from an iterable of fields.
 
-Non-string elements will be converted to string.
-"""
+                Non-string elements will be converted to string.
+                """
+
             def writerows(self, rows: Iterable[Iterable[Any]], /) -> None:
                 """Construct and write a series of iterables to a csv file.
 
-Non-string elements will be converted to string.
-"""
+                Non-string elements will be converted to string.
+                """
         else:
             def writerow(self, row: Iterable[Any]) -> Any:
                 """writerow(iterable)
 
-Construct and write a CSV record from an iterable of fields.  Non-string
-elements will be converted to string.
-"""
+                Construct and write a CSV record from an iterable of fields.  Non-string
+                elements will be converted to string.
+                """
+
             def writerows(self, rows: Iterable[Iterable[Any]]) -> None:
                 """writerows(iterable of iterables)
 
-Construct and write a series of iterables to a csv file.  Non-string
-elements will be converted to string.
-"""
+                Construct and write a series of iterables to a csv file.  Non-string
+                elements will be converted to string.
+                """
 
     # For the return types below.
     # These aliases can be removed when typeshed drops support for 3.9.
@@ -143,11 +149,12 @@ def writer(
 ) -> _writer:
     """Return a writer object that will write user data on the given file object.
 
-The "fileobj" argument can be any object that supports the file API.
-The optional "dialect" argument defines a CSV dialect.  The function
-also accepts optional keyword arguments which override settings
-provided by the dialect.
-"""
+    The "fileobj" argument can be any object that supports the file API.
+    The optional "dialect" argument defines a CSV dialect.  The function
+    also accepts optional keyword arguments which override settings
+    provided by the dialect.
+    """
+
 def reader(
     iterable: Iterable[str],
     /,
@@ -164,15 +171,16 @@ def reader(
 ) -> _reader:
     """Return a reader object that will process lines from the given iterable.
 
-The "iterable" argument can be any object that returns a line
-of input for each iteration, such as a file object or a list.  The
-optional "dialect" argument defines a CSV dialect.  The function
-also accepts optional keyword arguments which override settings
-provided by the dialect.
+    The "iterable" argument can be any object that returns a line
+    of input for each iteration, such as a file object or a list.  The
+    optional "dialect" argument defines a CSV dialect.  The function
+    also accepts optional keyword arguments which override settings
+    provided by the dialect.
 
-The returned object is an iterator.  Each iteration returns a row
-of the CSV file (which can span multiple input lines).
-"""
+    The returned object is an iterator.  Each iteration returns a row
+    of the CSV file (which can span multiple input lines).
+    """
+
 def register_dialect(
     name: str,
     /,
@@ -189,20 +197,24 @@ def register_dialect(
 ) -> None:
     """Create a mapping from a string name to a CVS dialect.
 
-The optional "dialect" argument specifies the base dialect instance
-or the name of the registered dialect.  The function also accepts
-optional keyword arguments which override settings provided by the
-dialect.
-"""
+    The optional "dialect" argument specifies the base dialect instance
+    or the name of the registered dialect.  The function also accepts
+    optional keyword arguments which override settings provided by the
+    dialect.
+    """
+
 def unregister_dialect(name: str) -> None:
     """Delete the name/dialect mapping associated with a string name."""
+
 def get_dialect(name: str) -> Dialect:
     """Return the dialect instance associated with name."""
+
 def list_dialects() -> list[str]:
     """Return a list of all known dialect names."""
+
 def field_size_limit(new_limit: int = ...) -> int:
     """Sets an upper limit on parsed fields.
 
-Returns old limit. If limit is not given, no new limit is set and
-the old limit is returned
-"""
+    Returns old limit. If limit is not given, no new limit is set and
+    the old limit is returned
+    """

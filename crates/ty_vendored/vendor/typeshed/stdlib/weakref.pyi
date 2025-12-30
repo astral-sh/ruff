@@ -4,6 +4,7 @@ This module is an implementation of PEP 205:
 
 https://peps.python.org/pep-0205/
 """
+
 from _typeshed import SupportsKeysAndGetItem
 from _weakref import getweakrefcount as getweakrefcount, getweakrefs as getweakrefs, proxy as proxy
 from _weakrefset import WeakSet as WeakSet
@@ -64,6 +65,7 @@ class ReferenceType(Generic[_T]):  # "weakref"
     def __new__(cls, o: _T, callback: Callable[[Self], Any] | None = ..., /) -> Self: ...
     def __call__(self) -> _T | None:
         """Call self as a function."""
+
     def __eq__(self, value: object, /) -> bool: ...
     def __hash__(self) -> int: ...
     def __class_getitem__(cls, item: Any, /) -> GenericAlias:
@@ -75,9 +77,10 @@ ref = ReferenceType
 
 class WeakMethod(ref[_CallableT]):
     """
-A custom `weakref.ref` subclass which simulates a weak reference to
-a bound method, working around the lifetime problem of bound methods.
-"""
+    A custom `weakref.ref` subclass which simulates a weak reference to
+    a bound method, working around the lifetime problem of bound methods.
+    """
+
     __slots__ = ("_func_ref", "_meth_type", "_alive", "__weakref__")
     def __new__(cls, meth: _CallableT, callback: Callable[[Self], Any] | None = None) -> Self: ...
     def __call__(self) -> _CallableT | None: ...
@@ -88,9 +91,10 @@ a bound method, working around the lifetime problem of bound methods.
 class WeakValueDictionary(MutableMapping[_KT, _VT]):
     """Mapping class that references values weakly.
 
-Entries in the dictionary will be discarded when no strong
-reference to the value exists anymore
-"""
+    Entries in the dictionary will be discarded when no strong
+    reference to the value exists anymore
+    """
+
     @overload
     def __init__(self) -> None: ...
     @overload
@@ -128,23 +132,25 @@ reference to the value exists anymore
     def itervaluerefs(self) -> Iterator[KeyedRef[_KT, _VT]]:
         """Return an iterator that yields the weak references to the values.
 
-The references are not guaranteed to be 'live' at the time
-they are used, so the result of calling the references needs
-to be checked before being used.  This can be used to avoid
-creating references that will cause the garbage collector to
-keep the values around longer than needed.
+        The references are not guaranteed to be 'live' at the time
+        they are used, so the result of calling the references needs
+        to be checked before being used.  This can be used to avoid
+        creating references that will cause the garbage collector to
+        keep the values around longer than needed.
 
-"""
+        """
+
     def valuerefs(self) -> list[KeyedRef[_KT, _VT]]:
         """Return a list of weak references to the values.
 
-The references are not guaranteed to be 'live' at the time
-they are used, so the result of calling the references needs
-to be checked before being used.  This can be used to avoid
-creating references that will cause the garbage collector to
-keep the values around longer than needed.
+        The references are not guaranteed to be 'live' at the time
+        they are used, so the result of calling the references needs
+        to be checked before being used.  This can be used to avoid
+        creating references that will cause the garbage collector to
+        keep the values around longer than needed.
 
-"""
+        """
+
     def setdefault(self, key: _KT, default: _VT) -> _VT: ...
     @overload
     def pop(self, key: _KT) -> _VT: ...
@@ -169,12 +175,13 @@ keep the values around longer than needed.
 class KeyedRef(ref[_T], Generic[_KT, _T]):
     """Specialized reference that includes a key corresponding to the value.
 
-This is used in the WeakValueDictionary to avoid having to create
-a function object for each key stored in the mapping.  A shared
-callback object can use the 'key' attribute of a KeyedRef instead
-of getting a reference to the key from an enclosing scope.
+    This is used in the WeakValueDictionary to avoid having to create
+    a function object for each key stored in the mapping.  A shared
+    callback object can use the 'key' attribute of a KeyedRef instead
+    of getting a reference to the key from an enclosing scope.
 
-"""
+    """
+
     __slots__ = ("key",)
     key: _KT
     def __new__(type, ob: _T, callback: Callable[[Self], Any], key: _KT) -> Self: ...
@@ -183,13 +190,14 @@ of getting a reference to the key from an enclosing scope.
 class WeakKeyDictionary(MutableMapping[_KT, _VT]):
     """Mapping class that references keys weakly.
 
-Entries in the dictionary will be discarded when there is no
-longer a strong reference to the key. This can be used to
-associate additional data with an object owned by other parts of
-an application without adding attributes to those objects. This
-can be especially useful with objects that override attribute
-accesses.
-"""
+    Entries in the dictionary will be discarded when there is no
+    longer a strong reference to the key. This can be used to
+    associate additional data with an object owned by other parts of
+    an application without adding attributes to those objects. This
+    can be especially useful with objects that override attribute
+    accesses.
+    """
+
     @overload
     def __init__(self, dict: None = None) -> None: ...
     @overload
@@ -216,13 +224,13 @@ accesses.
     def keyrefs(self) -> list[ref[_KT]]:
         """Return a list of weak references to the keys.
 
-The references are not guaranteed to be 'live' at the time
-they are used, so the result of calling the references needs
-to be checked before being used.  This can be used to avoid
-creating references that will cause the garbage collector to
-keep the keys around longer than needed.
+        The references are not guaranteed to be 'live' at the time
+        they are used, so the result of calling the references needs
+        to be checked before being used.  This can be used to avoid
+        creating references that will cause the garbage collector to
+        keep the keys around longer than needed.
 
-"""
+        """
     # Keep WeakKeyDictionary.setdefault in line with MutableMapping.setdefault, modulo positional-only differences
     @overload
     def setdefault(self: WeakKeyDictionary[_KT, _VT | None], key: _KT, default: None = None) -> _VT: ...
@@ -251,30 +259,34 @@ keep the keys around longer than needed.
 class finalize(Generic[_P, _T]):
     """Class for finalization of weakrefable objects
 
-finalize(obj, func, *args, **kwargs) returns a callable finalizer
-object which will be called when obj is garbage collected. The
-first time the finalizer is called it evaluates func(*arg, **kwargs)
-and returns the result. After this the finalizer is dead, and
-calling it just returns None.
+    finalize(obj, func, *args, **kwargs) returns a callable finalizer
+    object which will be called when obj is garbage collected. The
+    first time the finalizer is called it evaluates func(*arg, **kwargs)
+    and returns the result. After this the finalizer is dead, and
+    calling it just returns None.
 
-When the program exits any remaining finalizers for which the
-atexit attribute is true will be run in reverse order of creation.
-By default atexit is true.
-"""
+    When the program exits any remaining finalizers for which the
+    atexit attribute is true will be run in reverse order of creation.
+    By default atexit is true.
+    """
+
     __slots__ = ()
     def __init__(self, obj: _T, func: Callable[_P, Any], /, *args: _P.args, **kwargs: _P.kwargs) -> None: ...
     def __call__(self, _: Any = None) -> Any | None:
         """If alive then mark as dead and return func(*args, **kwargs);
-otherwise return None
-"""
+        otherwise return None
+        """
+
     def detach(self) -> tuple[_T, Callable[_P, Any], tuple[Any, ...], dict[str, Any]] | None:
         """If alive then mark as dead and return (obj, func, args, kwargs);
-otherwise return None
-"""
+        otherwise return None
+        """
+
     def peek(self) -> tuple[_T, Callable[_P, Any], tuple[Any, ...], dict[str, Any]] | None:
         """If alive then return (obj, func, args, kwargs);
-otherwise return None
-"""
+        otherwise return None
+        """
+
     @property
     def alive(self) -> bool:
         """Whether finalizer is alive"""

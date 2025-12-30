@@ -1,4 +1,5 @@
 """Documentation"""
+
 import sys
 from typing import Final, type_check_only
 
@@ -54,30 +55,32 @@ if sys.platform == "win32":
 
     def UuidCreate() -> str:
         """Return the string representation of a new unique identifier."""
+
     def FCICreate(cabname: str, files: list[str], /) -> None:
         """Create a new CAB file.
 
-  cabname
-    the name of the CAB file
-  files
-    a list of tuples, each containing the name of the file on disk,
-    and the name of the file inside the CAB file
-"""
+        cabname
+          the name of the CAB file
+        files
+          a list of tuples, each containing the name of the file on disk,
+          and the name of the file inside the CAB file
+        """
+
     def OpenDatabase(path: str, persist: int, /) -> _Database:
         """Return a new database object.
 
-  path
-    the file name of the MSI file
-  persist
-    the persistence mode
-"""
+        path
+          the file name of the MSI file
+        persist
+          the persistence mode
+        """
+
     def CreateRecord(count: int, /) -> _Record:
         """Return a new record object.
 
-  count
-    the number of fields of the record
-"""
-
+        count
+          the number of fields of the record
+        """
     MSICOLINFO_NAMES: Final[int]
     MSICOLINFO_TYPES: Final[int]
     MSIDBOPEN_CREATE: Final[int]
