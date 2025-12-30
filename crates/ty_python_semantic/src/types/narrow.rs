@@ -335,9 +335,9 @@ impl<'db> NarrowingConstraint<'db> {
         // the LHS disjuncts when they are anded, so they'll just stay as is.
         //
         // The thing we actually need to deal with is the RHS `regular_disjunct`.
-        // It gets anded onto the LHS `regular_disjunct` to form the new
-        // `regular_disjunct`, and anded onto each LHS `typeguard_disjunct` (via
-        // the refinement) to form new additional `typeguard_disjuncts`.
+        // It gets intersected with the LHS `regular_disjunct` to form the new
+        // `regular_disjunct`, and intersected with each LHS `typeguard_disjunct`
+        // to form new additional `typeguard_disjuncts`.
         let Some(other_regular_disjunct) = other.regular_disjunct else {
             return other;
         };
