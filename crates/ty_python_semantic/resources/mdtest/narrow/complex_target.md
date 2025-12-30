@@ -349,12 +349,28 @@ def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
         reveal_type(x)  # revealed: tuple[str, B]
 ```
 
+If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
+be emitted elsewhere for the out-of-bounds access):
+
+```py
+def _(x: tuple[A, Literal["a"]] | tuple[B]):
+    # error: [index-out-of-bounds]
+    if x[1] == "a":
+        # Can't narrow because index 1 is out of bounds for second tuple
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+    else:
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+```
+
 We can still narrow tuples when non-tuple types are present in the union:
 
 ```py
 def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
     if x[0] == "tag1":
-        # TODO: `list[int]` should probably be excluded since `list[int][0]` is `int`, not `Literal["tag1"]`
+        # A list of ints could have int subclasses in it,
+        # and int subclasses could have custom `__eq__` methods such that they
+        # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
+        # union.
         reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
 ```
 
