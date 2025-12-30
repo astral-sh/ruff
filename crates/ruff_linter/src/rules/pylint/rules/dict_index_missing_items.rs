@@ -11,6 +11,7 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::{Checker, DiagnosticGuard};
+use crate::preview::is_plc0206_narrower_range_enabled;
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value
@@ -77,7 +78,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
         return;
     }
 
-    let range = if checker.settings().preview.is_enabled() {
+    let range = if is_plc0206_narrower_range_enabled(checker.settings()) {
         TextRange::new(target.start(), iter.end())
     } else {
         stmt_for.range()
@@ -92,8 +93,15 @@ struct SubscriptVisitor<'a, 'b> {
     target: &'a Expr,
     /// The name of the iterated object (e.g., `obj` in `for key in obj:`).
     dict_name: &'a ast::ExprName,
+    /// The range to use for the primary diagnostic.
     range: TextRange,
+    /// The [`Checker`] used to emit diagnostics.
     checker: &'a Checker<'b>,
+    /// The [`DiagnosticGuard`] used for attaching additional annotations for each subscript use in
+    /// preview.
+    ///
+    /// The guard is initially `None` and then set to `Some` when the first subscript operation is
+    /// found.
     guard: Option<DiagnosticGuard<'a, 'b>>,
 }
 
@@ -145,7 +153,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
                 );
             }
 
-            if self.checker.settings().preview.is_enabled() {
+            if is_plc0206_narrower_range_enabled(self.checker.settings()) {
                 self.guard.as_mut().unwrap().secondary_annotation("", expr);
             }
         } else {

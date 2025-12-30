@@ -296,3 +296,8 @@ pub(crate) const fn is_s310_resolve_string_literal_bindings_enabled(
 pub(crate) const fn is_range_suppressions_enabled(settings: &LinterSettings) -> bool {
     settings.preview.is_enabled()
 }
+
+// https://github.com/astral-sh/ruff/pull/TODO
+pub(crate) const fn is_plc0206_narrower_range_enabled(settings: &LinterSettings) -> bool {
+    settings.preview.is_enabled()
+}
