@@ -59,9 +59,6 @@ jobs:
 
       - name: Compute diagnostic diff
         shell: bash
-        env:
-          # TODO: Remove this once we fixed the remaining panics in the conformance suite.
-          TY_MAX_PARALLELISM: 1
         run: |
           RUFF_DIR="$GITHUB_WORKSPACE/ruff"
 
