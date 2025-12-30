@@ -1574,7 +1574,24 @@ corresponding attributes.
     def wm_attributes(self, option: Literal["-topmost"], /) -> bool: ...
     if sys.platform == "darwin":
         @overload
-        def wm_attributes(self, option: Literal["-modified"], /) -> bool: ...
+        def wm_attributes(self, option: Literal["-modified"], /) -> bool:
+            """This subcommand returns or sets platform specific attributes
+
+        The first form returns a list of the platform specific flags and
+        their values. The second form returns the value for the specific
+        option. The third form sets one or more of the values. The values
+        are as follows:
+
+        On Windows, -disabled gets or sets whether the window is in a
+        disabled state. -toolwindow gets or sets the style of the window
+        to toolwindow (as defined in the MSDN). -topmost gets or sets
+        whether this is a topmost window (displays above all other
+        windows).
+
+        On Macintosh, XXXXX
+
+        On Unix, there are currently no special attribute values.
+        """
         @overload
         def wm_attributes(self, option: Literal["-notify"], /) -> bool: ...
         @overload
@@ -1698,7 +1715,24 @@ corresponding attributes.
     def wm_attributes(self, option: Literal["-topmost"], value: bool, /) -> Literal[""]: ...
     if sys.platform == "darwin":
         @overload
-        def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]: ...
+        def wm_attributes(self, option: Literal["-modified"], value: bool, /) -> Literal[""]:
+            """This subcommand returns or sets platform specific attributes
+
+        The first form returns a list of the platform specific flags and
+        their values. The second form returns the value for the specific
+        option. The third form sets one or more of the values. The values
+        are as follows:
+
+        On Windows, -disabled gets or sets whether the window is in a
+        disabled state. -toolwindow gets or sets the style of the window
+        to toolwindow (as defined in the MSDN). -topmost gets or sets
+        whether this is a topmost window (displays above all other
+        windows).
+
+        On Macintosh, XXXXX
+
+        On Unix, there are currently no special attribute values.
+        """
         @overload
         def wm_attributes(self, option: Literal["-notify"], value: bool, /) -> Literal[""]: ...
         @overload
