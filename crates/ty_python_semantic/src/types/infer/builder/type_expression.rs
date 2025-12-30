@@ -710,7 +710,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             match class_literal.generic_context(self.db()) {
                                 Some(generic_context) => {
                                     let db = self.db();
-                                    let specialize = |types: &[Option<Type<'db>>]| {
+                                    let specialize = &|types: &[Option<Type<'db>>]| {
                                         SubclassOfType::from(
                                             db,
                                             class_literal.apply_specialization(db, |_| {
@@ -805,7 +805,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             };
         }
 
-        let specialize = |types: &[Option<Type<'db>>]| {
+        let specialize = &|types: &[Option<Type<'db>>]| {
             let specialized = value_ty.apply_specialization(
                 db,
                 generic_context.specialize_partial(db, types.iter().copied()),

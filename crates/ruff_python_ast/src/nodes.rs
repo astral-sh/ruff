@@ -14,7 +14,6 @@ use std::slice::{Iter, IterMut};
 use std::sync::OnceLock;
 
 use bitflags::bitflags;
-use itertools::Itertools;
 
 use ruff_text_size::{Ranged, TextLen, TextRange, TextSize};
 
@@ -3380,10 +3379,13 @@ impl Arguments {
     /// 2
     /// {'4': 5}
     /// ```
-    pub fn arguments_source_order(&self) -> impl Iterator<Item = ArgOrKeyword<'_>> + Clone {
-        let args = self.args.iter().map(ArgOrKeyword::Arg);
-        let keywords = self.keywords.iter().map(ArgOrKeyword::Keyword);
-        args.merge_by(keywords, |left, right| left.start() <= right.start())
+    pub fn arguments_source_order(&self) -> ArgumentsSourceOrder<'_> {
+        ArgumentsSourceOrder {
+            args: &self.args,
+            keywords: &self.keywords,
+            next_arg: 0,
+            next_keyword: 0,
+        }
     }
 
     pub fn inner_range(&self) -> TextRange {
@@ -3396,6 +3398,36 @@ impl Arguments {
 
     pub fn r_paren_range(&self) -> TextRange {
         TextRange::new(self.end() - ')'.text_len(), self.end())
+    }
+}
+
+/// The iterator returned by [`Arguments::arguments_source_order`].
+#[derive(Clone)]
+pub struct ArgumentsSourceOrder<'a> {
+    args: &'a [Expr],
+    keywords: &'a [Keyword],
+    next_arg: usize,
+    next_keyword: usize,
+}
+
+impl<'a> Iterator for ArgumentsSourceOrder<'a> {
+    type Item = ArgOrKeyword<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let arg = self.args.get(self.next_arg);
+        let keyword = self.keywords.get(self.next_keyword);
+
+        if let Some(arg) = arg
+            && keyword.is_none_or(|keyword| arg.start() <= keyword.start())
+        {
+            self.next_arg += 1;
+            Some(ArgOrKeyword::Arg(arg))
+        } else if let Some(keyword) = keyword {
+            self.next_keyword += 1;
+            Some(ArgOrKeyword::Keyword(keyword))
+        } else {
+            None
+        }
     }
 }
 
