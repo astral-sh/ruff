@@ -11,11 +11,12 @@ use crate::{Violation, checkers::ast::Checker};
 ///
 /// ## Why is this bad?
 ///
-/// Including code in `__init__.py` files can cause surprising slowdowns because the code is run at
-/// import time. `__init__.py` files are also often empty, so it's easy to overlook them when
-/// debugging these issues.
+/// `__init__.py` files are often empty or only contain simple code to modify a module's API. As
+/// such, it's easy to overlook them and their possible side effects when debugging.
 ///
 /// ## Example
+///
+/// Instead of defining `MyClass` directly in `__init__.py`:
 ///
 /// ```python
 /// """My module docstring."""
@@ -25,7 +26,7 @@ use crate::{Violation, checkers::ast::Checker};
 ///     def my_method(self): ...
 /// ```
 ///
-/// Use instead:
+/// move the definition to another file, import it, and include it in `__all__`:
 ///
 /// ```python
 /// """My module docstring."""
@@ -35,8 +36,9 @@ use crate::{Violation, checkers::ast::Checker};
 /// __all__ = ["MyClass"]
 /// ```
 ///
-/// When [`lint.ruff.strictly-empty-init-modules`] is enabled, all code, including imports,
-/// docstrings, and assignments to dunder variables like `__all__`, will be flagged:
+/// Code in `__init__.py` files is also run at import time and can cause surprising slowdowns. To
+/// disallow any code in `__init__.py` files, you can enable the
+/// [`lint.ruff.strictly-empty-init-modules`] setting. In this case:
 ///
 /// ```python
 /// from submodule import MyClass
@@ -44,16 +46,30 @@ use crate::{Violation, checkers::ast::Checker};
 /// __all__ = ["MyClass"]
 /// ```
 ///
-/// And the only fix is entirely emptying the file:
+/// the only fix is entirely emptying the file:
 ///
 /// ```python
 /// ```
 ///
+/// ## Details
+///
+/// In non-strict mode, this rule allows several common patterns in `__init__.py` files:
+///
+/// - Imports
+/// - Assignments to `__all__`, `__path__`, `__version__`, and `__author__`
+/// - Module-level and attribute docstrings
+/// - `if TYPE_CHECKING` blocks
+/// - [PEP-562] module-level `__getattr__` and `__dir__` functions
+///
 /// ## Options
+///
 /// - [`lint.ruff.strictly-empty-init-modules`]
 ///
 /// ## References
+///
 /// - [`flake8-empty-init-modules`](https://github.com/samueljsb/flake8-empty-init-modules/)
+///
+/// [PEP-562]: https://peps.python.org/pep-0562/
 #[derive(ViolationMetadata)]
 #[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct NonEmptyInitModule {
