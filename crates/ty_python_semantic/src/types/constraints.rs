@@ -535,15 +535,6 @@ impl<'db> ConstraintBound<'db> {
             ConstraintBound::Lower(ty) => ConstraintBound::Lower(ty.normalized(db)),
         }
     }
-
-    fn ordering(self) -> impl Ord {
-        // We'll put the lower bounds for a typevar before the upper bounds, but otherwise the
-        // bound type doesn't affect the ordering.
-        match self {
-            ConstraintBound::Upper(_) => 1,
-            ConstraintBound::Lower(_) => 0,
-        }
-    }
 }
 
 /// An individual constraint in a constraint set. This restricts a single typevar to be within a
@@ -741,10 +732,10 @@ impl<'db> ConstrainedTypeVar<'db> {
     /// simplifications that we perform that operate on constraints with the same typevar, and this
     /// ensures that we can find all candidate simplifications more easily.
     fn ordering(self, db: &'db dyn Db) -> impl Ord {
+        let typevar = self.typevar(db);
         (
-            self.typevar(db).binding_context(db),
-            self.typevar(db).identity(db),
-            self.bound(db).ordering(),
+            typevar.binding_context(db),
+            typevar.identity(db),
             self.as_id(),
         )
     }
@@ -3941,94 +3932,68 @@ mod tests {
     fn test_display_graph_output() {
         let expected = indoc! {r#"
             (str ≤ T) 3/4
-            ┡━₁ (bool ≤ T) 4/4
-            │   ┡━₁ (T ≤ str) 3/4
-            │   │   ┡━₁ (T ≤ bool) 4/4
-            │   │   │   ┡━₁ (str ≤ U) 1/2
+            ┡━₁ (T ≤ str) 3/4
+            │   ┡━₁ (bool ≤ T) 4/4
+            │   │   ┡━₁ (str ≤ U) 1/2
+            │   │   │   ┡━₁ (U ≤ str) 1/2
             │   │   │   │   ┡━₁ (bool ≤ U) 2/2
-            │   │   │   │   │   ┡━₁ (U ≤ str) 1/2
-            │   │   │   │   │   │   ┡━₁ (U ≤ bool) 2/2
-            │   │   │   │   │   │   │   ┡━₁ always
-            │   │   │   │   │   │   │   └─₀ always
-            │   │   │   │   │   │   └─₀ (U ≤ bool) 2/2
-            │   │   │   │   │   │       ┡━₁ always
-            │   │   │   │   │   │       └─₀ never
-            │   │   │   │   │   └─₀ (U ≤ str) 1/1
-            │   │   │   │   │       ┡━₁ always
-            │   │   │   │   │       └─₀ never
+            │   │   │   │   │   ┡━₁ always
+            │   │   │   │   │   └─₀ always
             │   │   │   │   └─₀ (bool ≤ U) 2/2
             │   │   │   │       ┡━₁ (U ≤ bool) 2/2
             │   │   │   │       │   ┡━₁ always
             │   │   │   │       │   └─₀ never
             │   │   │   │       └─₀ never
-            │   │   │   └─₀ (str ≤ U) 1/2
-            │   │   │       ┡━₁ (bool ≤ U) 2/2
-            │   │   │       │   ┡━₁ (U ≤ str) 1/2
-            │   │   │       │   │   ┡━₁ (U ≤ bool) 2/2
-            │   │   │       │   │   │   ┡━₁ always
-            │   │   │       │   │   │   └─₀ always
-            │   │   │       │   │   └─₀ (U ≤ bool) 2/2
-            │   │   │       │   │       ┡━₁ always
-            │   │   │       │   │       └─₀ never
-            │   │   │       │   └─₀ (U ≤ str) 1/1
-            │   │   │       │       ┡━₁ always
-            │   │   │       │       └─₀ never
-            │   │   │       └─₀ (bool ≤ U) 2/2
-            │   │   │           ┡━₁ (U ≤ bool) 2/2
-            │   │   │           │   ┡━₁ always
-            │   │   │           │   └─₀ never
-            │   │   │           └─₀ never
-            │   │   └─₀ (T ≤ bool) 4/4
-            │   │       ┡━₁ (str ≤ U) 1/2
+            │   │   │   └─₀ (bool ≤ U) 2/2
+            │   │   │       ┡━₁ (U ≤ bool) 2/2
+            │   │   │       │   ┡━₁ always
+            │   │   │       │   └─₀ never
+            │   │   │       └─₀ never
+            │   │   └─₀ (str ≤ U) 1/2
+            │   │       ┡━₁ (U ≤ str) 1/2
             │   │       │   ┡━₁ (bool ≤ U) 2/2
-            │   │       │   │   ┡━₁ (U ≤ str) 1/2
-            │   │       │   │   │   ┡━₁ (U ≤ bool) 2/2
-            │   │       │   │   │   │   ┡━₁ always
-            │   │       │   │   │   │   └─₀ always
-            │   │       │   │   │   └─₀ (U ≤ bool) 2/2
-            │   │       │   │   │       ┡━₁ always
-            │   │       │   │   │       └─₀ never
-            │   │       │   │   └─₀ (U ≤ str) 1/1
-            │   │       │   │       ┡━₁ always
-            │   │       │   │       └─₀ never
+            │   │       │   │   ┡━₁ always
+            │   │       │   │   └─₀ always
             │   │       │   └─₀ (bool ≤ U) 2/2
             │   │       │       ┡━₁ (U ≤ bool) 2/2
             │   │       │       │   ┡━₁ always
             │   │       │       │   └─₀ never
             │   │       │       └─₀ never
-            │   │       └─₀ never
-            │   └─₀ (T ≤ str) 3/3
-            │       ┡━₁ (str ≤ U) 1/2
-            │       │   ┡━₁ (bool ≤ U) 2/2
+            │   │       └─₀ (bool ≤ U) 2/2
+            │   │           ┡━₁ (U ≤ bool) 2/2
+            │   │           │   ┡━₁ always
+            │   │           │   └─₀ never
+            │   │           └─₀ never
+            │   └─₀ (bool ≤ T) 4/4
+            │       ┡━₁ (T ≤ bool) 4/4
+            │       │   ┡━₁ (str ≤ U) 1/2
             │       │   │   ┡━₁ (U ≤ str) 1/2
-            │       │   │   │   ┡━₁ (U ≤ bool) 2/2
+            │       │   │   │   ┡━₁ (bool ≤ U) 2/2
             │       │   │   │   │   ┡━₁ always
             │       │   │   │   │   └─₀ always
-            │       │   │   │   └─₀ (U ≤ bool) 2/2
-            │       │   │   │       ┡━₁ always
+            │       │   │   │   └─₀ (bool ≤ U) 2/2
+            │       │   │   │       ┡━₁ (U ≤ bool) 2/2
+            │       │   │   │       │   ┡━₁ always
+            │       │   │   │       │   └─₀ never
             │       │   │   │       └─₀ never
-            │       │   │   └─₀ (U ≤ str) 1/1
-            │       │   │       ┡━₁ always
+            │       │   │   └─₀ (bool ≤ U) 2/2
+            │       │   │       ┡━₁ (U ≤ bool) 2/2
+            │       │   │       │   ┡━₁ always
+            │       │   │       │   └─₀ never
             │       │   │       └─₀ never
-            │       │   └─₀ (bool ≤ U) 2/2
-            │       │       ┡━₁ (U ≤ bool) 2/2
-            │       │       │   ┡━₁ always
-            │       │       │   └─₀ never
-            │       │       └─₀ never
+            │       │   └─₀ never
             │       └─₀ never
             └─₀ (bool ≤ T) 4/4
                 ┡━₁ (T ≤ bool) 4/4
                 │   ┡━₁ (str ≤ U) 1/2
-                │   │   ┡━₁ (bool ≤ U) 2/2
-                │   │   │   ┡━₁ (U ≤ str) 1/2
-                │   │   │   │   ┡━₁ (U ≤ bool) 2/2
-                │   │   │   │   │   ┡━₁ always
-                │   │   │   │   │   └─₀ always
-                │   │   │   │   └─₀ (U ≤ bool) 2/2
-                │   │   │   │       ┡━₁ always
-                │   │   │   │       └─₀ never
-                │   │   │   └─₀ (U ≤ str) 1/1
-                │   │   │       ┡━₁ always
+                │   │   ┡━₁ (U ≤ str) 1/2
+                │   │   │   ┡━₁ (bool ≤ U) 2/2
+                │   │   │   │   ┡━₁ always
+                │   │   │   │   └─₀ always
+                │   │   │   └─₀ (bool ≤ U) 2/2
+                │   │   │       ┡━₁ (U ≤ bool) 2/2
+                │   │   │       │   ┡━₁ always
+                │   │   │       │   └─₀ never
                 │   │   │       └─₀ never
                 │   │   └─₀ (bool ≤ U) 2/2
                 │   │       ┡━₁ (U ≤ bool) 2/2
