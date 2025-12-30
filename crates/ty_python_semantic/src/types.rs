@@ -8091,7 +8091,6 @@ impl<'db> Type<'db> {
             // TODO(jelle): Materialize should be handled differently, since TypeIs is invariant
             Type::TypeIs(type_is) => type_is.with_type(db, type_is.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
-            // TODO: check variance
             Type::TypeGuard(type_guard) => type_guard.with_type(db, type_guard.return_type(db).apply_type_mapping(db, type_mapping, tcx)),
 
             Type::TypeAlias(alias) => {
