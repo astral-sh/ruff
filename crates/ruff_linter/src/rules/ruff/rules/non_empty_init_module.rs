@@ -87,7 +87,14 @@ pub(crate) fn non_empty_init_module(checker: &Checker, stmt: &Stmt) {
     let strictly_empty_init_modules = checker.settings().ruff.strictly_empty_init_modules;
 
     if !strictly_empty_init_modules {
-        if semantic.in_pep_257_docstring() {
+        // Even though module-level attributes are disallowed, we still allow attribute docstrings
+        // to avoid needing two `noqa` comments in a case like:
+        //
+        // ```py
+        // MY_CONSTANT = 1  # noqa: RUF067
+        // "A very important constant"
+        // ```
+        if semantic.in_pep_257_docstring() || semantic.in_attribute_docstring() {
             return;
         }
 

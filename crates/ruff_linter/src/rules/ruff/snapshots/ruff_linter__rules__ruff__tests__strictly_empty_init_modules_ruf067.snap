@@ -6,7 +6,7 @@ source: crates/ruff_linter/src/rules/ruff/mod.rs
 +linter.ruff.strictly_empty_init_modules = true
 
 --- Summary ---
-Removed: 6
+Removed: 5
 Added: 24
 
 --- Removed ---
@@ -18,17 +18,6 @@ RUF067 `__init__` module should only contain docstrings and re-exports
 12 | MY_CONSTANT = 5
    | ^^^^^^^^^^^^^^^
 13 | """This is an important constant."""
-   |
-
-
-RUF067 `__init__` module should only contain docstrings and re-exports
-  --> __init__.py:13:1
-   |
-12 | MY_CONSTANT = 5
-13 | """This is an important constant."""
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-14 |
-15 | os.environ["FOO"] = 1
    |
 
 
