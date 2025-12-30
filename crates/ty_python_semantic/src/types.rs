@@ -2841,7 +2841,7 @@ impl<'db> Type<'db> {
                 )
             }
 
-            // `TypeIs[T]` and `TypeGuard[T]` is a subtype of `bool`.
+            // `TypeIs[T]` and `TypeGuard[T]` are subtypes of `bool`.
             (Type::TypeIs(_) | Type::TypeGuard(_), _) => {
                 KnownClass::Bool.to_instance(db).has_relation_to_impl(
                     db,
@@ -4367,7 +4367,7 @@ impl<'db> Type<'db> {
             }
 
             Type::TypeIs(type_is) => type_is.is_bound(db),
-            Type::TypeGuard(type_is) => type_is.is_bound(db),
+            Type::TypeGuard(type_guard) => type_guard.is_bound(db),
 
             Type::TypeAlias(alias) => alias.value_type(db).is_single_valued(db),
 
