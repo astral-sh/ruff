@@ -53,3 +53,18 @@ for i in items:
 items = [1, 2, 3, 4]
 for i in items:
     items[i]
+
+
+# A case with multiple uses of the value to show off the secondary annotations
+for instrument in ORCHESTRA:
+    data = json.dumps(
+        {
+            "instrument": instrument,
+            "section": ORCHESTRA[instrument],
+        }
+    )
+
+    print(f"saving data for {instrument} in {ORCHESTRA[instrument]}")
+
+    with open(f"{instrument}/{ORCHESTRA[instrument]}.txt", "w") as f:
+        f.write(data)

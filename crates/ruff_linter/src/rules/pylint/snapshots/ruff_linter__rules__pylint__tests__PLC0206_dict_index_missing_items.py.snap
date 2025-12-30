@@ -71,3 +71,22 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 26 |
 27 |   # # OK
    |
+
+PLC0206 Extracting value from dictionary without calling `.items()`
+  --> dict_index_missing_items.py:59:1
+   |
+58 |   # A case with multiple uses of the value to show off the secondary annotations
+59 | / for instrument in ORCHESTRA:
+60 | |     data = json.dumps(
+61 | |         {
+62 | |             "instrument": instrument,
+63 | |             "section": ORCHESTRA[instrument],
+64 | |         }
+65 | |     )
+66 | |
+67 | |     print(f"saving data for {instrument} in {ORCHESTRA[instrument]}")
+68 | |
+69 | |     with open(f"{instrument}/{ORCHESTRA[instrument]}.txt", "w") as f:
+70 | |         f.write(data)
+   | |_____________________^
+   |
