@@ -116,4 +116,18 @@ class Baz:
         pass
 
 reveal_type(Baz().h)  # revealed: bound method Baz.h(x: Scalar | GenericArray1d[Scalar]) -> None
+
+ImplicitScalar = int | float
+ImplicitArray1d = list[ImplicitScalar] | tuple[ImplicitScalar]
+
+def i(x: ImplicitScalar | ImplicitArray1d) -> None:
+    pass
+
+reveal_type(i)  # revealed: def i(x: ImplicitScalar | ImplicitArray1d) -> None
+
+class Qux:
+    def i(self, x: ImplicitScalar | ImplicitArray1d) -> None:
+        pass
+
+reveal_type(Qux().i)  # revealed: bound method Qux.i(x: ImplicitScalar | ImplicitArray1d) -> None
 ```
