@@ -276,39 +276,6 @@ impl ClassInfoConstraintFunction {
     }
 }
 
-/// Represents a TypeGuard-containing disjunct in a Disjunctive Normal Form
-/// (DNF) narrowing constraint.
-///
-/// Such a constraint may optionally have a refinement applied after the type
-/// guard, which is interpreted as being intersected with the type guard.
-///
-/// For example, `(TypeGuardConstraint { typeguard: A, refinement: Some(B) } &
-/// TypeGuardConstraint { typeguard: C, refinement: Some(D) })` evaluates to
-/// `TypeGuardConstraint { typeguard: C, refinement: Some(D) }` because the type guard
-/// in the second conjunct clobbers that in the first.
-#[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
-struct TypeGuardConstraint<'db> {
-    /// If `TypeGuard[T]`, this is `Some(T)`
-    typeguard: Type<'db>,
-    /// If additional constraints are applied _after_ the `TypeGuard`, then they
-    /// go here
-    refinement: Option<Type<'db>>,
-}
-
-impl<'db> TypeGuardConstraint<'db> {
-    /// Evaluate this typeguard constraint to a single type.
-    /// If there's a refinement, it's intersected with the typeguard constraint.
-    fn evaluate_constraint_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self.refinement {
-            Some(refinement) => IntersectionBuilder::new(db)
-                .add_positive(self.typeguard)
-                .add_positive(refinement)
-                .build(),
-            None => self.typeguard,
-        }
-    }
-}
-
 /// Represents narrowing constraints in Disjunctive Normal Form (DNF).
 ///
 /// This is a disjunction (OR) of conjunctions (AND) of constraints.
@@ -317,19 +284,28 @@ impl<'db> TypeGuardConstraint<'db> {
 ///
 /// For example:
 /// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
-///   => `[Conjunction { constraint: A, typeguard: Some(B) }]`
-///   => evaluates to `B` (`TypeGuard` clobbers)
+///   => and
+///     => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
+///     => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
+///   => NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }
+///   => evaluates to `B` (`TypeGuard` clobbers any previous type information)
 ///
 /// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
-///   => `[Conjunction { constraint: A, typeguard: None }, Conjunction { constraint: object, typeguard: Some(B) }]`
+///   => or
+///     => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
+///     => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
+///   => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [B] }`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
 pub(crate) struct NarrowingConstraint<'db> {
-    /// Regular constraint---we don't need a list here because we can represent
-    /// with a union type
+    /// Regular constraint (from narrowing comparisons or `TypeIs`). We can use a single type here
+    /// because we can eagerly union disjunctions and eagerly intersect conjunctions.
     regular_disjunct: Option<Type<'db>>,
-    /// Disjunction of conjunctions (DNF)
-    typeguard_disjuncts: SmallVec<[TypeGuardConstraint<'db>; 1]>,
+
+    /// TypeGuard constraints. We can't eagerly union disjunctions because `TypeGuard` clobbers the
+    /// previously-known type; within each TypeGuard disjunct, we may eagerly intersect
+    /// conjunctions with a later regular narrowing.
+    typeguard_disjuncts: SmallVec<[Type<'db>; 1]>,
 }
 
 impl<'db> NarrowingConstraint<'db> {
@@ -345,14 +321,12 @@ impl<'db> NarrowingConstraint<'db> {
     fn typeguard(constraint: Type<'db>) -> Self {
         Self {
             regular_disjunct: None,
-            typeguard_disjuncts: smallvec![TypeGuardConstraint {
-                typeguard: constraint,
-                refinement: None,
-            }],
+            typeguard_disjuncts: smallvec![constraint],
         }
     }
 
-    /// Merge two constraints, taking their intersection but respecting `TypeGuard` semantics (with `other` winning)
+    /// Merge two constraints, taking their intersection but respecting `TypeGuard` semantics (with
+    /// `other` winning)
     pub(crate) fn merge_constraint_and(&self, other: Self, db: &'db dyn Db) -> Self {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
@@ -376,28 +350,20 @@ impl<'db> NarrowingConstraint<'db> {
         });
 
         let additional_typeguard_disjuncts =
-            self.typeguard_disjuncts
-                .iter()
-                .map(|typeguard_disjunct| TypeGuardConstraint {
-                    typeguard: typeguard_disjunct.typeguard,
-                    refinement: match typeguard_disjunct.refinement {
-                        Some(refinement) => Some(
-                            IntersectionBuilder::new(db)
-                                .add_positive(refinement)
-                                .add_positive(other_regular_disjunct)
-                                .build(),
-                        ),
-                        None => other.regular_disjunct,
-                    },
-                });
+            self.typeguard_disjuncts.iter().map(|typeguard_disjunct| {
+                IntersectionBuilder::new(db)
+                    .add_positive(*typeguard_disjunct)
+                    .add_positive(other_regular_disjunct)
+                    .build()
+            });
 
         let mut new_typeguard_disjuncts = other.typeguard_disjuncts;
 
         new_typeguard_disjuncts.extend(additional_typeguard_disjuncts);
 
         NarrowingConstraint {
-            typeguard_disjuncts: new_typeguard_disjuncts,
             regular_disjunct: new_regular_disjunct,
+            typeguard_disjuncts: new_typeguard_disjuncts,
         }
     }
 
@@ -409,7 +375,6 @@ impl<'db> NarrowingConstraint<'db> {
             db,
             self.typeguard_disjuncts
                 .into_iter()
-                .map(|disjunct| disjunct.evaluate_constraint_type(db))
                 .chain(self.regular_disjunct),
         )
     }
