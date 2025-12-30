@@ -247,6 +247,56 @@ reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
 reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
 ```
 
+## `NewType`s in arithmetic and comparison expressions might or might not act as their base
+
+These expressions are valid because `Foo` acts as its base type, `int`:
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+
+reveal_type(Foo(42) + 1)  # revealed: int
+reveal_type(1 + Foo(42))  # revealed: int
+reveal_type(Foo(42) + Foo(42))  # revealed: int
+reveal_type(Foo(42) == 42)  # revealed: bool
+reveal_type(42 == Foo(42))  # revealed: bool
+reveal_type(Foo(42) == Foo(42))  # revealed: bool
+```
+
+However, we can't always substitute `int` for `Foo` to evaluate expressions like these. In the
+following cases, only `Foo` itself is valid:
+
+```py
+class Bar:
+    def __add__(self, other: Foo) -> Foo:
+        return other
+
+    def __radd__(self, other: Foo) -> Foo:
+        return other
+
+    def __lt__(self, other: Foo) -> bool:
+        return True
+
+    def __gt__(self, other: Foo) -> bool:
+        return True
+
+    def __contains__(self, key: Foo) -> bool:
+        return True
+
+reveal_type(Foo(42) + Bar())  # revealed: Foo
+reveal_type(Bar() + Foo(42))  # revealed: Foo
+reveal_type(Foo(42) < Bar())  # revealed: bool
+reveal_type(Bar() < Foo(42))  # revealed: bool
+reveal_type(Foo(42) in Bar())  # revealed: bool
+
+42 + Bar()  # error: [unsupported-operator]
+Bar() + 42  # error: [unsupported-operator]
+42 < Bar()  # error: [unsupported-operator]
+Bar() < 42  # error: [unsupported-operator]
+42 in Bar()  # error: [unsupported-operator]
+```
+
 ## A `NewType` definition must be a simple variable assignment
 
 ```py
