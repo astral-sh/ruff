@@ -285,15 +285,15 @@ impl ClassInfoConstraintFunction {
 /// For example:
 /// - `f(x) and g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
 ///   => and
-///     => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
-///     => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
-///   => NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }
+///   ===> `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
+///   ===> `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
+///   => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
 ///   => evaluates to `B` (`TypeGuard` clobbers any previous type information)
 ///
 /// - `f(x) or g(x)` where f returns `TypeIs[A]` and g returns `TypeGuard[B]`
 ///   => or
-///     => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
-///     => `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
+///   ===> `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [] }`
+///   ===> `NarrowingConstraint { regular_disjunct: None, typeguard_disjuncts: [B] }`
 ///   => `NarrowingConstraint { regular_disjunct: Some(A), typeguard_disjuncts: [B] }`
 ///   => evaluates to `(P & A) | B`, where `P` is our previously-known type
 #[derive(Hash, PartialEq, Debug, Eq, Clone, salsa::Update, get_size2::GetSize)]
@@ -302,8 +302,8 @@ pub(crate) struct NarrowingConstraint<'db> {
     /// because we can eagerly union disjunctions and eagerly intersect conjunctions.
     regular_disjunct: Option<Type<'db>>,
 
-    /// TypeGuard constraints. We can't eagerly union disjunctions because `TypeGuard` clobbers the
-    /// previously-known type; within each TypeGuard disjunct, we may eagerly intersect
+    /// `TypeGuard` constraints. We can't eagerly union disjunctions because `TypeGuard` clobbers
+    /// the previously-known type; within each `TypeGuard` disjunct, we may eagerly intersect
     /// conjunctions with a later regular narrowing.
     typeguard_disjuncts: SmallVec<[Type<'db>; 1]>,
 }
@@ -331,13 +331,13 @@ impl<'db> NarrowingConstraint<'db> {
         // Distribute AND over OR: (A1 | A2 | ...) AND (B1 | B2 | ...)
         // becomes (A1 & B1) | (A1 & B2) | ... | (A2 & B1) | ...
         //
-        // In our representation, the RHS `typeguard_disjuncts` will all clobber
-        // the LHS disjuncts when they are anded, so they'll just stay as is.
+        // In our representation, the RHS `typeguard_disjuncts` will all clobber the LHS disjuncts
+        // when they are anded, so they'll just stay as is.
         //
-        // The thing we actually need to deal with is the RHS `regular_disjunct`.
-        // It gets intersected with the LHS `regular_disjunct` to form the new
-        // `regular_disjunct`, and intersected with each LHS `typeguard_disjunct`
-        // to form new additional `typeguard_disjuncts`.
+        // The thing we actually need to deal with is the RHS `regular_disjunct`. It gets
+        // intersected with the LHS `regular_disjunct` to form the new `regular_disjunct`, and
+        // intersected with each LHS `typeguard_disjunct` to form new additional
+        // `typeguard_disjuncts`.
         let Some(other_regular_disjunct) = other.regular_disjunct else {
             return other;
         };
