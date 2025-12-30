@@ -155,7 +155,7 @@ impl ClassInfoConstraintFunction {
     /// The `classinfo` argument can be a class literal, a tuple of (tuples of) class literals. PEP 604
     /// union types are not yet supported. Returns `None` if the `classinfo` argument has a wrong type.
     fn generate_constraint<'db>(self, db: &'db dyn Db, classinfo: Type<'db>) -> Option<Type<'db>> {
-        let constraint_fn = |class: ClassLiteral<'db>| match self {
+        let constraint_from_class_literal = |class: ClassLiteral<'db>| match self {
             ClassInfoConstraintFunction::IsInstance => {
                 Type::instance(db, class.top_materialization(db))
             }
@@ -166,9 +166,11 @@ impl ClassInfoConstraintFunction {
 
         match classinfo {
             Type::TypeAlias(alias) => self.generate_constraint(db, alias.value_type(db)),
-            Type::ClassLiteral(class_literal) => Some(constraint_fn(class_literal)),
+            Type::ClassLiteral(class_literal) => Some(constraint_from_class_literal(class_literal)),
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => Some(constraint_fn(class)),
+                SubclassOfInner::Class(ClassType::NonGeneric(class_literal)) => {
+                    Some(constraint_from_class_literal(class_literal))
+                }
                 // It's not valid to use a generic alias as the second argument to `isinstance()` or `issubclass()`,
                 // e.g. `isinstance(x, list[int])` fails at runtime.
                 SubclassOfInner::Class(ClassType::Generic(_)) => None,
@@ -176,14 +178,6 @@ impl ClassInfoConstraintFunction {
                 SubclassOfInner::TypeVar(bound_typevar) => match self {
                     ClassInfoConstraintFunction::IsSubclass => Some(classinfo),
                     ClassInfoConstraintFunction::IsInstance => Some(Type::TypeVar(bound_typevar)),
-                },
-                SubclassOfInner::FunctionalClass(functional_class) => match self {
-                    ClassInfoConstraintFunction::IsInstance => {
-                        Some(functional_class.to_instance(db))
-                    }
-                    ClassInfoConstraintFunction::IsSubclass => {
-                        Some(SubclassOfType::from(db, functional_class))
-                    }
                 },
             },
             Type::Dynamic(_) => Some(classinfo),
@@ -279,8 +273,7 @@ impl ClassInfoConstraintFunction {
             | Type::WrapperDescriptor(_)
             | Type::DataclassTransformer(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => None,
+            | Type::NewTypeInstance(_) => None,
         }
     }
 }
@@ -803,11 +796,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     // Treat enums as a union of their members.
                     Type::NominalInstance(instance)
-                        if enum_metadata(db, instance.class_literal(db)).is_some() =>
+                        if instance
+                            .class_literal(db)
+                            .is_some_and(|class| enum_metadata(db, class).is_some()) =>
                     {
+                        let class_literal = instance
+                            .class_literal(db)
+                            .expect("Already checked that class_literal is Some");
                         UnionType::from_elements(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
+                            enum_member_literals(db, class_literal, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .map(|ty| filter_to_cannot_be_equal(db, ty, rhs_ty)),
                         )

@@ -2,17 +2,20 @@ use std::collections::VecDeque;
 use std::ops::Deref;
 
 use indexmap::IndexMap;
-use rustc_hash::FxBuildHasher;
+use rustc_hash::{FxBuildHasher, FxHashSet};
 
 use crate::Db;
 use crate::types::class_base::ClassBase;
 use crate::types::generics::Specialization;
-use crate::types::{ClassLiteral, ClassType, KnownClass, KnownInstanceType, SpecialFormType, Type};
+use crate::types::{
+    ClassLiteral, ClassType, FunctionalClassLiteral, KnownClass, KnownInstanceType,
+    SpecialFormType, StmtClassLiteral, Type,
+};
 
 /// The inferred method resolution order of a given class.
 ///
 /// An MRO cannot contain non-specialized generic classes. (This is why [`ClassBase`] contains a
-/// [`ClassType`], not a [`ClassLiteral`].) Any generic classes in a base class list are always
+/// [`ClassType`], not a [`StmtClassLiteral`].) Any generic classes in a base class list are always
 /// specialized — either because the class is explicitly specialized if there is a subscript
 /// expression, or because we create the default specialization if there isn't.
 ///
@@ -34,7 +37,7 @@ pub(crate) struct Mro<'db>(Box<[ClassBase<'db>]>);
 impl<'db> Mro<'db> {
     /// Attempt to resolve the MRO of a given class. Because we derive the MRO from the list of
     /// base classes in the class definition, this operation is performed on a [class
-    /// literal][ClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
+    /// literal][StmtClassLiteral], not a [class type][ClassType]. (You can _also_ get the MRO of a
     /// class type, but this is done by first getting the MRO of the underlying class literal, and
     /// specializing each base class as needed if the class type is a generic alias.)
     ///
@@ -46,9 +49,9 @@ impl<'db> Mro<'db> {
     ///
     /// (We emit a diagnostic warning about the runtime `TypeError` in
     /// [`super::infer::infer_scope_types`].)
-    pub(super) fn of_class(
+    pub(super) fn of_stmt_class(
         db: &'db dyn Db,
-        class_literal: ClassLiteral<'db>,
+        class_literal: StmtClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) -> Result<Self, MroError<'db>> {
         let class = class_literal.apply_optional_specialization(db, specialization);
@@ -67,6 +70,81 @@ impl<'db> Mro<'db> {
             ClassBase::unknown(),
             ClassBase::object(db),
         ])
+    }
+
+    /// Attempt to resolve the MRO of a functional class (created via `type(name, bases, dict)`).
+    ///
+    /// Uses C3 linearization when possible, returning an error if the MRO cannot be resolved.
+    pub(super) fn of_functional_class(
+        db: &'db dyn Db,
+        functional: FunctionalClassLiteral<'db>,
+    ) -> Result<Self, FunctionalMroError<'db>> {
+        let bases = functional.bases(db);
+
+        // Check for duplicate bases first.
+        let mut seen = FxHashSet::default();
+        let mut duplicates = Vec::new();
+        for base in bases {
+            if !seen.insert(*base) {
+                duplicates.push(*base);
+            }
+        }
+        if !duplicates.is_empty() {
+            return Err(FunctionalMroError::DuplicateBases(
+                duplicates.into_boxed_slice(),
+            ));
+        }
+
+        // Compute MRO using C3 linearization.
+        let mro_bases = if bases.is_empty() {
+            // Empty bases: MRO is just `object`.
+            vec![ClassBase::object(db)]
+        } else if bases.len() == 1 {
+            // Single base: MRO is just that base's MRO.
+            bases[0].mro(db, None).collect()
+        } else {
+            // Multiple bases: use C3 merge algorithm.
+            let mut seqs: Vec<VecDeque<ClassBase<'db>>> = Vec::with_capacity(bases.len() + 1);
+
+            // Add each base's MRO.
+            for base in bases {
+                seqs.push(base.mro(db, None).collect());
+            }
+
+            // Add the list of bases in order.
+            seqs.push(bases.iter().copied().collect());
+
+            c3_merge(seqs)
+                .map(|mro| mro.iter().copied().collect())
+                .ok_or(FunctionalMroError::UnresolvableMro)?
+        };
+
+        let mut result = vec![ClassBase::Class(ClassType::NonGeneric(functional.into()))];
+        result.extend(mro_bases);
+        Ok(Self::from(result))
+    }
+
+    /// Compute a fallback MRO for a functional class when `of_functional_class` fails.
+    ///
+    /// Iterates over base MROs sequentially with deduplication.
+    pub(super) fn functional_fallback(
+        db: &'db dyn Db,
+        functional: FunctionalClassLiteral<'db>,
+    ) -> Self {
+        let self_base = ClassBase::Class(ClassType::NonGeneric(functional.into()));
+        let mut result = vec![self_base];
+        let mut seen = FxHashSet::default();
+        seen.insert(self_base);
+
+        for base in functional.bases(db) {
+            for item in base.mro(db, None) {
+                if seen.insert(item) {
+                    result.push(item);
+                }
+            }
+        }
+
+        Self::from(result)
     }
 
     fn of_class_impl(
@@ -156,7 +234,10 @@ impl<'db> Mro<'db> {
                             )
                     ) =>
             {
-                ClassBase::try_from_type(db, *single_base, class.class_literal(db).0).map_or_else(
+                let Some((class_literal, _)) = class.stmt_class_literal(db) else {
+                    return Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)])));
+                };
+                ClassBase::try_from_type(db, *single_base, class_literal).map_or_else(
                     || Err(MroErrorKind::InvalidBases(Box::from([(0, *single_base)]))),
                     |single_base| {
                         if single_base.has_cyclic_mro(db) {
@@ -176,6 +257,11 @@ impl<'db> Mro<'db> {
             // what MRO Python will give this class at runtime
             // (if an MRO is indeed resolvable at all!)
             _ => {
+                let Some((class_literal, _)) = class.stmt_class_literal(db) else {
+                    // Functional classes don't have explicit bases to resolve.
+                    return Ok(std::iter::once(ClassBase::Class(class)).collect());
+                };
+
                 let mut resolved_bases = vec![];
                 let mut invalid_bases = vec![];
 
@@ -191,7 +277,7 @@ impl<'db> Mro<'db> {
                             &original_bases[i + 1..],
                         );
                     } else {
-                        match ClassBase::try_from_type(db, *base, class.class_literal(db).0) {
+                        match ClassBase::try_from_type(db, *base, class_literal) {
                             Some(valid_base) => resolved_bases.push(valid_base),
                             None => invalid_bases.push((i, *base)),
                         }
@@ -258,9 +344,7 @@ impl<'db> Mro<'db> {
                     // `inconsistent-mro` diagnostic (which would be accurate -- but not nearly as
                     // precise!).
                     for (index, base) in original_bases.iter().enumerate() {
-                        let Some(base) =
-                            ClassBase::try_from_type(db, *base, class.class_literal(db).0)
-                        else {
+                        let Some(base) = ClassBase::try_from_type(db, *base, class_literal) else {
                             continue;
                         };
                         base_to_indices.entry(base).or_default().push(index);
@@ -277,7 +361,6 @@ impl<'db> Mro<'db> {
                         }
                         match base {
                             ClassBase::Class(_)
-                            | ClassBase::FunctionalClass(_)
                             | ClassBase::Generic
                             | ClassBase::Protocol
                             | ClassBase::TypedDict => {
@@ -355,8 +438,8 @@ impl<'db> FromIterator<ClassBase<'db>> for Mro<'db> {
 ///
 /// Even for first-party code, where we will have to resolve the MRO for every class we encounter,
 /// loading the cached MRO comes with a certain amount of overhead, so it's best to avoid calling the
-/// Salsa-tracked [`ClassLiteral::try_mro`] method unless it's absolutely necessary.
-pub(super) struct MroIterator<'db> {
+/// Salsa-tracked [`StmtClassLiteral::try_mro`] method unless it's absolutely necessary.
+pub(crate) struct MroIterator<'db> {
     db: &'db dyn Db,
 
     /// The class whose MRO we're iterating over
@@ -373,8 +456,32 @@ pub(super) struct MroIterator<'db> {
     /// The full MRO is expensive to materialize, so this field is `None`
     /// unless we actually *need* to iterate past the first element of the MRO,
     /// at which point it is lazily materialized.
-    subsequent_elements: Option<std::slice::Iter<'db, ClassBase<'db>>>,
+    subsequent_elements: Option<SubsequentMroElements<'db>>,
 }
+
+/// The subsequent elements of an MRO (everything after the first element).
+///
+/// For statement-defined classes, we borrow from the cached MRO via `returns(as_ref)`.
+/// For functional classes, we clone the MRO since the cache returns an owned value.
+enum SubsequentMroElements<'db> {
+    /// Iterator over a borrowed MRO slice (for statement-defined classes).
+    Borrowed(std::slice::Iter<'db, ClassBase<'db>>),
+    /// Iterator over an owned MRO (for functional classes).
+    Owned(std::vec::IntoIter<ClassBase<'db>>),
+}
+
+impl<'db> Iterator for SubsequentMroElements<'db> {
+    type Item = ClassBase<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Borrowed(iter) => iter.next().copied(),
+            Self::Owned(iter) => iter.next(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for SubsequentMroElements<'_> {}
 
 impl<'db> MroIterator<'db> {
     pub(super) fn new(
@@ -391,19 +498,36 @@ impl<'db> MroIterator<'db> {
         }
     }
 
+    fn first_element(&self) -> ClassBase<'db> {
+        match self.class {
+            ClassLiteral::Stmt(stmt) => {
+                ClassBase::Class(stmt.apply_optional_specialization(self.db, self.specialization))
+            }
+            ClassLiteral::Functional(functional) => {
+                ClassBase::Class(ClassType::NonGeneric(functional.into()))
+            }
+        }
+    }
+
     /// Materialize the full MRO of the class.
     /// Return an iterator over that MRO which skips the first element of the MRO.
-    fn full_mro_except_first_element(&mut self) -> impl Iterator<Item = ClassBase<'db>> + '_ {
+    fn full_mro_except_first_element(&mut self) -> &mut SubsequentMroElements<'db> {
         self.subsequent_elements
-            .get_or_insert_with(|| {
-                let mut full_mro_iter = match self.class.try_mro(self.db, self.specialization) {
-                    Ok(mro) => mro.iter(),
-                    Err(error) => error.fallback_mro().iter(),
-                };
-                full_mro_iter.next();
-                full_mro_iter
+            .get_or_insert_with(|| match self.class {
+                ClassLiteral::Stmt(stmt) => {
+                    let mut full_mro_iter = match stmt.try_mro(self.db, self.specialization) {
+                        Ok(mro) => mro.iter(),
+                        Err(error) => error.fallback_mro().iter(),
+                    };
+                    full_mro_iter.next();
+                    SubsequentMroElements::Borrowed(full_mro_iter)
+                }
+                ClassLiteral::Functional(functional) => {
+                    let mro = functional.mro(self.db);
+                    let elements: Vec<_> = mro.iter().skip(1).copied().collect();
+                    SubsequentMroElements::Owned(elements.into_iter())
+                }
             })
-            .copied()
     }
 }
 
@@ -413,10 +537,7 @@ impl<'db> Iterator for MroIterator<'db> {
     fn next(&mut self) -> Option<Self::Item> {
         if !self.first_element_yielded {
             self.first_element_yielded = true;
-            return Some(ClassBase::Class(
-                self.class
-                    .apply_optional_specialization(self.db, self.specialization),
-            ));
+            return Some(self.first_element());
         }
         self.full_mro_except_first_element().next()
     }
@@ -509,7 +630,7 @@ pub(super) struct DuplicateBaseError<'db> {
 ///
 /// [C3-merge algorithm]: https://docs.python.org/3/howto/mro.html#python-2-3-mro
 /// [method resolution order]: https://docs.python.org/3/glossary.html#term-method-resolution-order
-pub(super) fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
+fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
     // Most MROs aren't that long...
     let mut mro = Vec::with_capacity(8);
 
@@ -544,4 +665,16 @@ pub(super) fn c3_merge(mut sequences: Vec<VecDeque<ClassBase>>) -> Option<Mro> {
             }
         }
     }
+}
+
+/// Error kinds for functional class MRO computation.
+///
+/// These mirror the relevant variants from `MroErrorKind` for regular classes.
+#[derive(Debug, Clone)]
+pub(crate) enum FunctionalMroError<'db> {
+    /// The class has duplicate bases in its bases tuple.
+    DuplicateBases(Box<[ClassBase<'db>]>),
+
+    /// The MRO is unresolvable through the C3-merge algorithm.
+    UnresolvableMro,
 }

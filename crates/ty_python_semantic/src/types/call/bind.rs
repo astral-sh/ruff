@@ -46,10 +46,10 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, FunctionalClassType, KnownBoundMethodType, KnownClass, KnownInstanceType,
-    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType, SubclassOfType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
-    WrapperDescriptorKind, enums, list_members, todo_type,
+    FieldInstance, FunctionalClassLiteral, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    StmtClassLiteral, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -906,7 +906,10 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                        if let Some(metadata) = class
+                                            .as_stmt()
+                                            .and_then(|stmt| enums::enum_metadata(db, stmt))
+                                        {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
@@ -1111,11 +1114,11 @@ impl<'db> Bindings<'db> {
                             }
 
                             // `dataclass` being used as a non-decorator
-                            if let [Some(Type::ClassLiteral(class_literal))] =
+                            if let [Some(Type::ClassLiteral(ClassLiteral::Stmt(class_literal)))] =
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(ClassLiteral::new(
+                                overload.set_return_type(Type::from(StmtClassLiteral::new(
                                     db,
                                     class_literal.name(db),
                                     class_literal.body_scope(db),
@@ -1377,7 +1380,6 @@ impl<'db> Bindings<'db> {
 
                         Some(KnownClass::Type) if overload_index == 1 => {
                             // Three-argument call: type(name, bases, dict)
-                            // Create a FunctionalClassType with the name and bases.
                             if let [Some(name_type), Some(bases), Some(_namespace), ..] =
                                 overload.parameter_types()
                             {
@@ -1387,7 +1389,6 @@ impl<'db> Bindings<'db> {
                                     .map(|s| ruff_python_ast::name::Name::new(s.value(db)));
 
                                 // Extract base classes from the bases tuple.
-                                // This handles ClassLiteral, GenericAlias, and SubclassOf (for functional classes).
                                 let base_classes: Option<Box<[ClassBase<'db>]>> =
                                     bases.exact_tuple_instance_spec(db).and_then(|tuple_spec| {
                                         tuple_spec
@@ -1406,11 +1407,6 @@ impl<'db> Bindings<'db> {
                                                         SubclassOfInner::Class(class) => {
                                                             Some(ClassBase::Class(class))
                                                         }
-                                                        SubclassOfInner::FunctionalClass(
-                                                            functional,
-                                                        ) => Some(ClassBase::FunctionalClass(
-                                                            functional,
-                                                        )),
                                                         SubclassOfInner::Dynamic(_)
                                                         | SubclassOfInner::TypeVar(_) => None,
                                                     }
@@ -1422,10 +1418,9 @@ impl<'db> Bindings<'db> {
 
                                 if let (Some(name), Some(bases)) = (name, base_classes) {
                                     let functional_class =
-                                        FunctionalClassType::new(db, name, bases);
-                                    overload.set_return_type(SubclassOfType::from(
-                                        db,
-                                        functional_class,
+                                        FunctionalClassLiteral::new(db, name, bases);
+                                    overload.set_return_type(Type::ClassLiteral(
+                                        ClassLiteral::Functional(functional_class),
                                     ));
                                 }
                             }

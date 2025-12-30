@@ -31,13 +31,13 @@ class Base: ...
 class Mixin: ...
 
 # We synthesize a class type using the name argument
-reveal_type(type("Foo", (), {}))  # revealed: type[Foo]
+reveal_type(type("Foo", (), {}))  # revealed: <class 'Foo'>
 
 # With a single base class
-reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: type[Foo]
+reveal_type(type("Foo", (Base,), {"attr": 1}))  # revealed: <class 'Foo'>
 
 # With multiple base classes
-reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: type[Foo]
+reveal_type(type("Foo", (Base, Mixin), {}))  # revealed: <class 'Foo'>
 
 # The inferred type is assignable to type[Base] since Foo inherits from Base
 tests: list[type[Base]] = []
@@ -129,8 +129,8 @@ def check_disjointness(x: Foo | int) -> None:
     if isinstance(x, int):
         reveal_type(x)  # revealed: int
     else:
-        # Foo is disjoint from int, so we can narrow to Foo
-        reveal_type(x)  # revealed: Foo
+        # Foo and int are not considered disjoint because `class C(Foo, int)` could exist.
+        reveal_type(x)  # revealed: Foo & ~int
 
 # Functional class inheriting from int is NOT disjoint from int
 IntSubclass = type("IntSubclass", (int,), {})
@@ -141,6 +141,27 @@ def check_int_subclass(x: IntSubclass | str) -> None:
         reveal_type(x)  # revealed: IntSubclass
     else:
         reveal_type(x)  # revealed: str
+```
+
+Disjointness also works for `type[]` of functional classes:
+
+```py
+from ty_extensions import is_disjoint_from, static_assert
+
+# Functional classes with disjoint bases have disjoint type[] types.
+IntClass = type("IntClass", (int,), {})
+StrClass = type("StrClass", (str,), {})
+
+static_assert(is_disjoint_from(type[IntClass], type[StrClass]))
+static_assert(is_disjoint_from(type[StrClass], type[IntClass]))
+
+# Functional classes that share a common base are not disjoint.
+class Base: ...
+
+Foo = type("Foo", (Base,), {})
+Bar = type("Bar", (Base,), {})
+
+static_assert(not is_disjoint_from(type[Foo], type[Bar]))
 ```
 
 Functional classes can be used as pivot in `super()`:
@@ -178,11 +199,11 @@ class Base:
 
 # Create a functional class that inherits from a regular class.
 Parent = type("Parent", (Base,), {})
-reveal_type(Parent)  # revealed: type[Parent]
+reveal_type(Parent)  # revealed: <class 'Parent'>
 
 # Create a functional class that inherits from another functional class.
 ChildCls = type("ChildCls", (Parent,), {})
-reveal_type(ChildCls)  # revealed: type[ChildCls]
+reveal_type(ChildCls)  # revealed: <class 'ChildCls'>
 
 # Child instances have access to attributes from the entire inheritance chain.
 child = ChildCls()
@@ -207,7 +228,7 @@ class Container(Generic[T]):
 
 # Functional class inheriting from a generic class specialization
 IntContainer = type("IntContainer", (Container[int],), {})
-reveal_type(IntContainer)  # revealed: type[IntContainer]
+reveal_type(IntContainer)  # revealed: <class 'IntContainer'>
 
 container = IntContainer()
 reveal_type(container)  # revealed: IntContainer
@@ -307,6 +328,18 @@ class Y(C, B): ...
 
 # error: [inconsistent-mro] "Cannot create a consistent method resolution order (MRO) for class `Conflict` with bases `[<class 'X'>, <class 'Y'>]`"
 Conflict = type("Conflict", (X, Y), {})
+```
+
+Metaclass conflicts are detected and reported:
+
+```py
+class Meta1(type): ...
+class Meta2(type): ...
+class A(metaclass=Meta1): ...
+class B(metaclass=Meta2): ...
+
+# error: [conflicting-metaclass] "The metaclass of a derived class (`Bad`) must be a subclass of the metaclasses of all its bases, but `Meta1` (metaclass of base class `<class 'A'>`) and `Meta2` (metaclass of base class `<class 'B'>`) have no subclass relationship"
+Bad = type("Bad", (A, B), {})
 ```
 
 ## Calls to `str()`

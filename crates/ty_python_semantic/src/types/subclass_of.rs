@@ -6,8 +6,8 @@ use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, FunctionalClassType, HasRelationToVisitor, IsDisjointVisitor,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
+    FindLegacyTypeVarsVisitor, FunctionalClassLiteral, HasRelationToVisitor, IsDisjointVisitor,
     KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType,
     todo_type,
@@ -55,9 +55,9 @@ impl<'db> SubclassOfType<'db> {
                     Type::SubclassOf(Self { subclass_of })
                 }
             }
-            SubclassOfInner::Dynamic(_)
-            | SubclassOfInner::TypeVar(_)
-            | SubclassOfInner::FunctionalClass(_) => Type::SubclassOf(Self { subclass_of }),
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
+                Type::SubclassOf(Self { subclass_of })
+            }
         }
     }
 
@@ -165,7 +165,6 @@ impl<'db> SubclassOfType<'db> {
                 typevar.apply_type_mapping_impl(db, type_mapping, visitor),
             )
             .unwrap_or(SubclassOfType::subclass_of_unknown()),
-            SubclassOfInner::FunctionalClass(_) => Type::SubclassOf(self),
         }
     }
 
@@ -177,7 +176,7 @@ impl<'db> SubclassOfType<'db> {
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         match self.subclass_of {
-            SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_) => {}
+            SubclassOfInner::Dynamic(_) => {}
             SubclassOfInner::Class(class) => {
                 class.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -209,9 +208,6 @@ impl<'db> SubclassOfType<'db> {
                         constraints.as_type(db)
                     }
                 }
-            }
-            SubclassOfInner::FunctionalClass(functional_class) => {
-                return Some(functional_class.class_member(db, name, policy));
             }
         };
 
@@ -255,25 +251,6 @@ impl<'db> SubclassOfType<'db> {
             (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
                 unreachable!()
             }
-
-            (
-                SubclassOfInner::FunctionalClass(functional_class),
-                SubclassOfInner::Class(other_class),
-            ) => ConstraintSet::from(functional_class.is_subclass_of(db, other_class)),
-            (SubclassOfInner::Class(_), SubclassOfInner::FunctionalClass(_)) => {
-                // A concrete class is not a subtype of a dynamic class
-                ConstraintSet::from(relation.is_assignability())
-            }
-            (SubclassOfInner::FunctionalClass(_), SubclassOfInner::Dynamic(_)) => {
-                ConstraintSet::from(relation.is_assignability())
-            }
-            (SubclassOfInner::Dynamic(_), SubclassOfInner::FunctionalClass(_)) => {
-                ConstraintSet::from(relation.is_assignability())
-            }
-            (
-                SubclassOfInner::FunctionalClass(self_fc),
-                SubclassOfInner::FunctionalClass(other_fc),
-            ) => ConstraintSet::from(self_fc.is_subclass_of_functional(db, other_fc)),
         }
     }
 
@@ -288,16 +265,15 @@ impl<'db> SubclassOfType<'db> {
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
-            (SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_), _)
-            | (_, SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_)) => {
+            // Dynamic types have unknown structure, so we can't prove disjointness.
+            (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
                 ConstraintSet::from(false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
             }
-            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
-                unreachable!()
-            }
+            // TypeVar should have been handled before calling this method.
+            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => unreachable!(),
         }
     }
 
@@ -325,7 +301,6 @@ impl<'db> SubclassOfType<'db> {
             SubclassOfInner::Class(class) => Type::instance(db, class),
             SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
-            SubclassOfInner::FunctionalClass(functional_class) => functional_class.to_instance(db),
         }
     }
 
@@ -355,14 +330,15 @@ impl<'db> SubclassOfType<'db> {
                     }
                 }
             }
-            SubclassOfInner::FunctionalClass(functional_class) => functional_class.metaclass(db),
         }
     }
 
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.subclass_of
-            .into_class(db)
-            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+        self.subclass_of.into_class(db).is_some_and(|class| {
+            class
+                .stmt_class_literal(db)
+                .is_some_and(|(lit, _)| lit.is_typed_dict(db))
+        })
     }
 }
 
@@ -370,9 +346,7 @@ impl<'db> VarianceInferable<'db> for SubclassOfType<'db> {
     fn variance_of(self, db: &dyn Db, typevar: BoundTypeVarInstance<'_>) -> TypeVarVariance {
         match self.subclass_of {
             SubclassOfInner::Class(class) => class.variance_of(db, typevar),
-            SubclassOfInner::Dynamic(_)
-            | SubclassOfInner::TypeVar(_)
-            | SubclassOfInner::FunctionalClass(_) => TypeVarVariance::Bivariant,
+            SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => TypeVarVariance::Bivariant,
         }
     }
 }
@@ -397,8 +371,6 @@ pub(crate) enum SubclassOfInner<'db> {
     Class(ClassType<'db>),
     Dynamic(DynamicType<'db>),
     TypeVar(BoundTypeVarInstance<'db>),
-    /// A dynamically created class via `type(name, bases, dict)`.
-    FunctionalClass(FunctionalClassType<'db>),
 }
 
 impl<'db> SubclassOfInner<'db> {
@@ -416,7 +388,7 @@ impl<'db> SubclassOfInner<'db> {
 
     pub(crate) fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
-            Self::Dynamic(_) | Self::FunctionalClass(_) => None,
+            Self::Dynamic(_) => None,
             Self::Class(class) => Some(class),
             Self::TypeVar(bound_typevar) => {
                 match bound_typevar.typevar(db).bound_or_constraints(db) {
@@ -439,7 +411,7 @@ impl<'db> SubclassOfInner<'db> {
 
     pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
-            Self::Class(_) | Self::Dynamic(_) | Self::FunctionalClass(_) => None,
+            Self::Class(_) | Self::Dynamic(_) => None,
             Self::TypeVar(bound_typevar) => Some(bound_typevar),
         }
     }
@@ -451,7 +423,6 @@ impl<'db> SubclassOfInner<'db> {
         match self {
             Self::Class(class) => Some(ClassBase::Class(class)),
             Self::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
-            Self::FunctionalClass(functional) => Some(ClassBase::FunctionalClass(functional)),
             Self::TypeVar(_) => None,
         }
     }
@@ -519,7 +490,6 @@ impl<'db> SubclassOfInner<'db> {
             Self::TypeVar(bound_typevar) => {
                 Self::TypeVar(bound_typevar.normalized_impl(db, visitor))
             }
-            Self::FunctionalClass(_) => self,
         }
     }
 
@@ -534,7 +504,7 @@ impl<'db> SubclassOfInner<'db> {
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
             Self::Dynamic(dynamic) => Some(Self::Dynamic(dynamic.recursive_type_normalized())),
-            Self::TypeVar(_) | Self::FunctionalClass(_) => Some(self),
+            Self::TypeVar(_) => Some(self),
         }
     }
 }
@@ -569,13 +539,12 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
             SubclassOfInner::Class(class) => class.into(),
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
-            SubclassOfInner::FunctionalClass(_) => Type::SubclassOf(value),
         }
     }
 }
 
-impl<'db> From<FunctionalClassType<'db>> for SubclassOfInner<'db> {
-    fn from(value: FunctionalClassType<'db>) -> Self {
-        SubclassOfInner::FunctionalClass(value)
+impl<'db> From<FunctionalClassLiteral<'db>> for SubclassOfInner<'db> {
+    fn from(value: FunctionalClassLiteral<'db>) -> Self {
+        SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Functional(value)))
     }
 }

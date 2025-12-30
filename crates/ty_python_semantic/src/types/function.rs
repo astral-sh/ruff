@@ -1221,10 +1221,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1256,16 +1253,6 @@ fn is_instance_truthiness<'db>(
 
         Type::NewTypeInstance(newtype) => {
             always_true_if(is_instance(&newtype.concrete_base_type(db)))
-        }
-
-        Type::FunctionalInstance(functional_class) => {
-            // Check if any base class is an instance of the target class.
-            always_true_if(
-                functional_class
-                    .bases(db)
-                    .iter()
-                    .any(|base| is_instance(&base.to_instance_type(db))),
-            )
         }
 
         Type::BooleanLiteral(..)
@@ -1739,7 +1726,13 @@ impl KnownFunction {
                 if class.is_protocol(db) {
                     return;
                 }
-                report_bad_argument_to_get_protocol_members(context, call_expression, *class);
+                if let Some(stmt_class) = class.as_stmt() {
+                    report_bad_argument_to_get_protocol_members(
+                        context,
+                        call_expression,
+                        stmt_class,
+                    );
+                }
             }
 
             KnownFunction::RevealProtocolInterface => {

@@ -4,14 +4,12 @@ use itertools::{Either, Itertools};
 use ruff_db::diagnostic::Diagnostic;
 use ruff_python_ast::AnyNodeRef;
 
-use crate::types::class::{ClassMemberResult, MroLookup};
 use crate::{
     Db, DisplaySettings,
     place::{Place, PlaceAndQualifiers},
     types::{
-        BoundTypeVarInstance, ClassBase, ClassType, DynamicType, FunctionalClassType,
-        IntersectionBuilder, KnownClass, MemberLookupPolicy, NominalInstanceType,
-        NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Type,
+        ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
+        NominalInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner, Type,
         TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
@@ -187,14 +185,6 @@ pub enum SuperOwnerKind<'db> {
     Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
     Instance(NominalInstanceType<'db>),
-    /// An instance-like type variable owner (e.g., `self: Self` in an instance method).
-    InstanceTypeVar(BoundTypeVarInstance<'db>),
-    /// A class-like type variable owner (e.g., `cls: type[Self]` in a classmethod).
-    ClassTypeVar(BoundTypeVarInstance<'db>),
-    /// A functional class used as class-level owner (e.g., `cls` in a classmethod on a `type()` class).
-    FunctionalClass(FunctionalClassType<'db>),
-    /// An instance of a functional class.
-    FunctionalInstance(FunctionalClassType<'db>),
 }
 
 impl<'db> SuperOwnerKind<'db> {
@@ -209,13 +199,6 @@ impl<'db> SuperOwnerKind<'db> {
                 .as_nominal_instance()
                 .map(Self::Instance)
                 .unwrap_or(Self::Dynamic(DynamicType::Any)),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar) => {
-                SuperOwnerKind::InstanceTypeVar(bound_typevar.normalized_impl(db, visitor))
-            }
-            SuperOwnerKind::ClassTypeVar(bound_typevar) => {
-                SuperOwnerKind::ClassTypeVar(bound_typevar.normalized_impl(db, visitor))
-            }
-            SuperOwnerKind::FunctionalClass(_) | SuperOwnerKind::FunctionalInstance(_) => self,
         }
     }
 
@@ -235,10 +218,6 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Instance(instance) => Some(SuperOwnerKind::Instance(
                 instance.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            SuperOwnerKind::InstanceTypeVar(_)
-            | SuperOwnerKind::ClassTypeVar(_)
-            | SuperOwnerKind::FunctionalClass(_)
-            | SuperOwnerKind::FunctionalInstance(_) => Some(self),
         }
     }
 
@@ -247,29 +226,8 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(dynamic) => {
                 Either::Left(ClassBase::Dynamic(dynamic).mro(db, None))
             }
-            SuperOwnerKind::Class(class) => Either::Right(Either::Left(class.iter_mro(db))),
-            SuperOwnerKind::Instance(instance) => {
-                Either::Right(Either::Left(instance.class(db).iter_mro(db)))
-            }
-            SuperOwnerKind::InstanceTypeVar(bound_typevar)
-            | SuperOwnerKind::ClassTypeVar(bound_typevar) => {
-                // Use the upper bound's class for MRO lookup.
-                let class = match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
-                        Type::NominalInstance(instance) => Some(instance.class(db)),
-                        _ => bound.to_class_type(db),
-                    },
-                    _ => KnownClass::Object.to_class_literal(db).to_class_type(db),
-                };
-                match class {
-                    Some(c) => Either::Right(Either::Left(c.iter_mro(db))),
-                    None => Either::Right(Either::Right(Either::Right(std::iter::empty()))),
-                }
-            }
-            SuperOwnerKind::FunctionalClass(functional_class)
-            | SuperOwnerKind::FunctionalInstance(functional_class) => {
-                Either::Right(Either::Right(Either::Left(functional_class.iter_mro(db))))
-            }
+            SuperOwnerKind::Class(class) => Either::Right(class.iter_mro(db)),
+            SuperOwnerKind::Instance(instance) => Either::Right(instance.class(db).iter_mro(db)),
         }
     }
 
@@ -278,40 +236,6 @@ impl<'db> SuperOwnerKind<'db> {
             SuperOwnerKind::Dynamic(_) => None,
             SuperOwnerKind::Class(class) => Some(class),
             SuperOwnerKind::Instance(instance) => Some(instance.class(db)),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar)
-            | SuperOwnerKind::ClassTypeVar(bound_typevar) => {
-                // Return the upper bound's class for subclass checking.
-                match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
-                        Type::NominalInstance(instance) => Some(instance.class(db)),
-                        _ => bound.to_class_type(db),
-                    },
-                    _ => KnownClass::Object.to_class_literal(db).to_class_type(db),
-                }
-            }
-            // Functional classes don't have a ClassType
-            SuperOwnerKind::FunctionalClass(_) | SuperOwnerKind::FunctionalInstance(_) => None,
-        }
-    }
-}
-
-impl<'db> SuperOwnerKind<'db> {
-    /// Convert to `Type`, requiring a database reference.
-    fn binding_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            SuperOwnerKind::Class(class) => class.into(),
-            SuperOwnerKind::Instance(instance) => instance.into(),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
-            SuperOwnerKind::ClassTypeVar(bound_typevar) => {
-                SubclassOfType::from(db, SubclassOfInner::TypeVar(bound_typevar))
-            }
-            SuperOwnerKind::FunctionalClass(functional_class) => {
-                SubclassOfType::from(db, SubclassOfInner::FunctionalClass(functional_class))
-            }
-            SuperOwnerKind::FunctionalInstance(functional_class) => {
-                functional_class.to_instance(db)
-            }
         }
     }
 }
@@ -322,12 +246,6 @@ impl<'db> From<SuperOwnerKind<'db>> for Type<'db> {
             SuperOwnerKind::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SuperOwnerKind::Class(class) => class.into(),
             SuperOwnerKind::Instance(instance) => instance.into(),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
-            SuperOwnerKind::ClassTypeVar(_)
-            | SuperOwnerKind::FunctionalClass(_)
-            | SuperOwnerKind::FunctionalInstance(_) => {
-                unreachable!("Use `binding_type` method for variants requiring database access")
-            }
         }
     }
 }
@@ -407,9 +325,6 @@ impl<'db> BoundSuperType<'db> {
                     SubclassOfInner::Dynamic(dynamic) => SuperOwnerKind::Dynamic(dynamic),
                     SubclassOfInner::TypeVar(bound_typevar) => {
                         return delegate_to(Type::TypeVar(bound_typevar));
-                    }
-                    SubclassOfInner::FunctionalClass(functional_class) => {
-                        SuperOwnerKind::FunctionalClass(functional_class)
                     }
                 }
             }
@@ -526,9 +441,6 @@ impl<'db> BoundSuperType<'db> {
             Type::NewTypeInstance(newtype) => {
                 return delegate_to(newtype.concrete_base_type(db));
             }
-            Type::FunctionalInstance(functional_class) => {
-                SuperOwnerKind::FunctionalInstance(functional_class)
-            }
             Type::Callable(callable) if callable.is_function_like(db) => {
                 return delegate_to(KnownClass::FunctionType.to_instance(db));
             }
@@ -553,10 +465,8 @@ impl<'db> BoundSuperType<'db> {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-                SubclassOfInner::FunctionalClass(functional_class) => {
-                    ClassBase::FunctionalClass(functional_class)
-                }
-                _ => match subclass_of.subclass_of().into_class(db) {
+                SubclassOfInner::Class(class) => ClassBase::Class(class),
+                SubclassOfInner::TypeVar(_) => match subclass_of.subclass_of().into_class(db) {
                     Some(class) => ClassBase::Class(class),
                     None => {
                         return Err(BoundSuperError::InvalidPivotClassType {
@@ -576,37 +486,25 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        // Check that the owner's MRO contains the pivot class
+        // Check that the owner's MRO contains the pivot class.
         let pivot_in_owner_mro = match pivot_class {
             ClassBase::Class(pivot_class_type) => {
+                let pivot_literal = pivot_class_type.class_literal(db);
                 match owner.into_class(db) {
                     Some(owner_class) => {
-                        let pivot_literal = pivot_class_type.class_literal(db).0;
                         owner_class.iter_mro(db).any(|superclass| match superclass {
                             ClassBase::Dynamic(_) => true,
                             ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => {
                                 false
                             }
                             ClassBase::Class(superclass) => {
-                                superclass.class_literal(db).0 == pivot_literal
+                                superclass.class_literal(db) == pivot_literal
                             }
-                            ClassBase::FunctionalClass(_) => false,
                         })
                     }
-                    // Owner doesn't have a class, skip the check
+                    // Owner doesn't have a class - skip the check.
                     None => true,
                 }
-            }
-            ClassBase::FunctionalClass(pivot_functional_class) => {
-                // For functional class pivot, check if it appears in the owner's MRO
-                owner.iter_mro(db).any(|superclass| match superclass {
-                    ClassBase::Dynamic(_) => true,
-                    ClassBase::FunctionalClass(fc) => fc == pivot_functional_class,
-                    ClassBase::Class(_)
-                    | ClassBase::Generic
-                    | ClassBase::Protocol
-                    | ClassBase::TypedDict => false,
-                })
             }
             ClassBase::Dynamic(_) => true,
             ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => true,
@@ -638,40 +536,26 @@ impl<'db> BoundSuperType<'db> {
     ) -> impl Iterator<Item = ClassBase<'db>> {
         let pivot = self.pivot_class(db);
 
-        // Check if pivot is a functional class
-        if let ClassBase::FunctionalClass(pivot_functional_class) = pivot {
-            let mut pivot_found = false;
-            return Either::Left(mro_iter.skip_while(move |superclass| {
-                if pivot_found {
-                    false
-                } else if matches!(superclass, ClassBase::FunctionalClass(fc) if *fc == pivot_functional_class)
-                {
-                    pivot_found = true;
-                    true
-                } else {
-                    true
-                }
-            }));
-        }
-
         let Some(pivot_class) = pivot.into_class() else {
-            return Either::Right(Either::Left(
-                ClassBase::Dynamic(DynamicType::Unknown).mro(db, None),
-            ));
+            return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
+        let pivot_literal = pivot_class.class_literal(db);
         let mut pivot_found = false;
 
-        Either::Right(Either::Right(mro_iter.skip_while(move |superclass| {
+        Either::Right(mro_iter.skip_while(move |superclass| {
             if pivot_found {
                 false
-            } else if Some(pivot_class) == superclass.into_class() {
+            } else if superclass
+                .into_class()
+                .is_some_and(|c| c.class_literal(db) == pivot_literal)
+            {
                 pivot_found = true;
                 true
             } else {
                 true
             }
-        })))
+        }))
     }
 
     /// Tries to call `__get__` on the attribute.
@@ -699,49 +583,13 @@ impl<'db> BoundSuperType<'db> {
                 .0,
             ),
             SuperOwnerKind::Instance(_) => {
-                let binding_type = owner.binding_type(db);
+                let owner = Type::from(owner);
                 Some(
                     Type::try_call_dunder_get_on_attribute(
                         db,
                         attribute,
-                        binding_type,
-                        binding_type.to_meta_type(db),
-                    )
-                    .0,
-                )
-            }
-            SuperOwnerKind::InstanceTypeVar(_) => {
-                let binding_type = owner.binding_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        binding_type,
-                        binding_type.to_meta_type(db),
-                    )
-                    .0,
-                )
-            }
-            SuperOwnerKind::ClassTypeVar(_) | SuperOwnerKind::FunctionalClass(_) => {
-                let binding_type = owner.binding_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        Type::none(db),
-                        binding_type,
-                    )
-                    .0,
-                )
-            }
-            SuperOwnerKind::FunctionalInstance(_) => {
-                let binding_type = owner.binding_type(db);
-                Some(
-                    Type::try_call_dunder_get_on_attribute(
-                        db,
-                        attribute,
-                        binding_type,
-                        binding_type.to_meta_type(db),
+                        owner,
+                        owner.to_meta_type(db),
                     )
                     .0,
                 )
@@ -766,37 +614,10 @@ impl<'db> BoundSuperType<'db> {
             }
             SuperOwnerKind::Class(class) => class,
             SuperOwnerKind::Instance(instance) => instance.class(db),
-            SuperOwnerKind::InstanceTypeVar(bound_typevar)
-            | SuperOwnerKind::ClassTypeVar(bound_typevar) => {
-                // For type variables, use the upper bound's class for MRO lookup.
-                let class = match bound_typevar.typevar(db).bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => match bound {
-                        Type::NominalInstance(instance) => Some(instance.class(db)),
-                        _ => bound.to_class_type(db),
-                    },
-                    _ => KnownClass::Object.to_class_literal(db).to_class_type(db),
-                };
-                match class {
-                    Some(c) => c,
-                    None => return Place::Undefined.into(),
-                }
-            }
-            SuperOwnerKind::FunctionalClass(_) | SuperOwnerKind::FunctionalInstance(_) => {
-                let mro_after_pivot = self.skip_until_after_pivot(db, owner.iter_mro(db));
-                let result =
-                    MroLookup::new(db, mro_after_pivot).class_member(name, policy, None, false);
-
-                return match result {
-                    ClassMemberResult::Done { .. } => result.finalize(db),
-                    ClassMemberResult::TypedDict => KnownClass::TypedDictFallback
-                        .to_class_literal(db)
-                        .find_name_in_mro_with_policy(db, name, policy)
-                        .expect("Calling `find_name_in_mro` on a class literal type should return `Some`")
-                };
-            }
         };
 
-        let (class_literal, _) = class.class_literal(db);
+        let class_literal = class.class_literal(db);
+
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:

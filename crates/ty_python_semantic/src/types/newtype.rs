@@ -19,7 +19,7 @@ use ruff_python_ast as ast;
 /// ```
 ///
 /// The revealed types there are:
-/// - `typing.NewType`: `Type::ClassLiteral(ClassLiteral)` with `KnownClass::NewType`.
+/// - `typing.NewType`: `Type::ClassLiteral(StmtClassLiteral)` with `KnownClass::NewType`.
 /// - `Foo`: `Type::KnownInstance(KnownInstanceType::NewType(NewType { .. }))`
 /// - `x`: `Type::NewTypeInstance(NewType { .. })`
 ///

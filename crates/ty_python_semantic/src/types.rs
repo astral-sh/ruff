@@ -24,11 +24,11 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::class::FunctionalClassLiteral;
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
 pub use self::diagnostic::{TypeCheckDiagnostics, UNDEFINED_REVEAL, UNRESOLVED_REFERENCE};
-pub(crate) use self::functional_class::FunctionalClassType;
 pub(crate) use self::infer::{
     TypeContext, infer_deferred_types, infer_definition_types, infer_expression_type,
     infer_expression_types, infer_scope_types, static_expression_truthiness,
@@ -79,7 +79,7 @@ use crate::types::visitor::any_over_type;
 use crate::unpack::EvaluationMode;
 use crate::{Db, FxOrderSet, Program};
 pub use class::KnownClass;
-pub(crate) use class::{ClassLiteral, ClassType, GenericAlias};
+pub(crate) use class::{ClassLiteral, ClassType, GenericAlias, StmtClassLiteral};
 use instance::Protocol;
 pub use instance::{NominalInstanceType, ProtocolInstanceType};
 pub use special_form::SpecialFormType;
@@ -96,7 +96,6 @@ mod diagnostic;
 mod display;
 mod enums;
 mod function;
-mod functional_class;
 mod generics;
 pub mod ide_support;
 mod infer;
@@ -816,7 +815,7 @@ pub enum Type<'db> {
     Callable(CallableType<'db>),
     /// A specific module object
     ModuleLiteral(ModuleLiteralType<'db>),
-    /// A specific class object
+    /// A specific class object (either from a `class` statement or `type()` call)
     ClassLiteral(ClassLiteral<'db>),
     /// A specialization of a generic class
     GenericAlias(GenericAlias<'db>),
@@ -881,8 +880,6 @@ pub enum Type<'db> {
     /// wrapped/returned by a specific one of those identity callables, or by another that inherits
     /// from it.
     NewTypeInstance(NewType<'db>),
-    /// An instance of a class created via the functional form `type(name, bases, dict)`.
-    FunctionalInstance(FunctionalClassType<'db>),
 }
 
 /// Helper for `recursive_type_normalized_impl` for `TypeGuardLike` types.
@@ -1013,7 +1010,8 @@ impl<'db> Type<'db> {
 
     fn is_enum(&self, db: &'db dyn Db) -> bool {
         self.as_nominal_instance()
-            .and_then(|instance| crate::types::enums::enum_metadata(db, instance.class_literal(db)))
+            .and_then(|instance| instance.class_literal(db))
+            .and_then(|class| crate::types::enums::enum_metadata(db, class))
             .is_some()
     }
 
@@ -1133,25 +1131,21 @@ impl<'db> Type<'db> {
     pub(crate) fn specialization_of(
         self,
         db: &'db dyn Db,
-        expected_class: ClassLiteral<'_>,
+        expected_class: StmtClassLiteral<'_>,
     ) -> Option<Specialization<'db>> {
-        self.class_and_specialization_of_optional(db, Some(expected_class))
-            .map(|(_, specialization)| specialization)
+        self.specialization_of_optional(db, Some(expected_class))
     }
 
-    /// If this type is a class instance, returns its class literal and specialization.
-    pub(crate) fn class_specialization(
-        self,
-        db: &'db dyn Db,
-    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
-        self.class_and_specialization_of_optional(db, None)
+    /// If this type is a class instance, returns its specialization.
+    pub(crate) fn class_specialization(self, db: &'db dyn Db) -> Option<Specialization<'db>> {
+        self.specialization_of_optional(db, None)
     }
 
-    fn class_and_specialization_of_optional(
+    fn specialization_of_optional(
         self,
         db: &'db dyn Db,
-        expected_class: Option<ClassLiteral<'_>>,
-    ) -> Option<(ClassLiteral<'db>, Specialization<'db>)> {
+        expected_class: Option<StmtClassLiteral<'_>>,
+    ) -> Option<Specialization<'db>> {
         let class_type = match self {
             Type::NominalInstance(instance) => instance,
             Type::ProtocolInstance(instance) => instance.to_nominal_instance()?,
@@ -1160,12 +1154,12 @@ impl<'db> Type<'db> {
         }
         .class(db);
 
-        let (class_literal, specialization) = class_type.class_literal(db);
+        let (class_literal, specialization) = class_type.stmt_class_literal(db)?;
         if expected_class.is_some_and(|expected_class| expected_class != class_literal) {
             return None;
         }
 
-        Some((class_literal, specialization?))
+        specialization
     }
 
     /// Returns the top materialization (or upper bound materialization) of this type, which is the
@@ -1307,9 +1301,11 @@ impl<'db> Type<'db> {
     }
 
     #[track_caller]
-    pub(crate) const fn expect_class_literal(self) -> ClassLiteral<'db> {
+    pub(crate) fn expect_class_literal(self) -> StmtClassLiteral<'db> {
         self.as_class_literal()
             .expect("Expected a Type::ClassLiteral variant")
+            .as_stmt()
+            .expect("Expected a statement-based class literal")
     }
 
     pub const fn is_subclass_of(&self) -> bool {
@@ -1685,8 +1681,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::IntLiteral(_)
-            | Type::FunctionalInstance(_) => self,
+            | Type::IntLiteral(_) => self,
         }
     }
 
@@ -1807,8 +1802,7 @@ impl<'db> Type<'db> {
             | Type::ModuleLiteral(_)
             | Type::ClassLiteral(_)
             | Type::SpecialForm(_)
-            | Type::IntLiteral(_)
-            | Type::FunctionalInstance(_) => Some(self),
+            | Type::IntLiteral(_) => Some(self),
         }
     }
 
@@ -1859,7 +1853,7 @@ impl<'db> Type<'db> {
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
             | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => false,
+            => false,
         }
     }
 
@@ -1879,7 +1873,7 @@ impl<'db> Type<'db> {
                 Some(CallableTypes::one(bound_method.into_callable_type(db)))
             }
 
-            Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::FunctionalInstance(_) => {
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) => {
                 let call_symbol = self
                     .member_lookup_with_policy(
                         db,
@@ -1905,26 +1899,17 @@ impl<'db> Type<'db> {
             }
 
             // TODO: This is unsound so in future we can consider an opt-in option to disable it.
-            Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(class) => Some(class.into_callable(db)),
-
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::TypeVar(_) => {
+            Type::SubclassOf(subclass_of_ty) => {
+                let inner = subclass_of_ty.subclass_of();
+                if let SubclassOfInner::Class(class) = inner {
+                    Some(class.into_callable(db))
+                } else {
                     Some(CallableTypes::one(CallableType::single(
                         db,
                         Signature::new(Parameters::unknown(), Some(Type::from(subclass_of_ty))),
                     )))
                 }
-
-                SubclassOfInner::FunctionalClass(functional_class) => {
-                    Some(CallableTypes::one(CallableType::single(
-                        db,
-                        Signature::new(
-                            Parameters::gradual_form(),
-                            Some(functional_class.to_instance(db)),
-                        ),
-                    )))
-                }
-            },
+            }
 
             Type::Union(union) => {
                 let mut callables = SmallVec::new();
@@ -3134,54 +3119,9 @@ impl<'db> Type<'db> {
                 disjointness_visitor,
             ),
 
-            // NominalInstance is a subtype of FunctionalInstance if the functional class
-            // is in the nominal class's MRO.
-            (Type::NominalInstance(self_instance), Type::FunctionalInstance(target_functional)) => {
-                let self_class = self_instance.class(db);
-                ConstraintSet::from(self_class.iter_mro(db).any(|base| {
-                    matches!(base, ClassBase::FunctionalClass(fc) if fc == target_functional)
-                }))
-            }
-
             // Other than the special cases enumerated above, nominal-instance types are never
             // subtypes of any other variants
             (Type::NominalInstance(_), _) => ConstraintSet::from(false),
-
-            // FunctionalInstance is a subtype of base classes' instances.
-            (
-                Type::FunctionalInstance(functional_class),
-                Type::NominalInstance(target_instance),
-            ) => {
-                // All types are subtypes of object.
-                if target_instance.is_object() {
-                    return ConstraintSet::from(true);
-                }
-                // Check if any base class is a subtype of the target.
-                ConstraintSet::from(functional_class.bases(db).iter().any(|base| {
-                    base.to_instance_type(db)
-                        .is_subtype_of(db, Type::NominalInstance(target_instance))
-                }))
-            }
-
-            // FunctionalInstance with same or related functional class.
-            (
-                Type::FunctionalInstance(self_functional),
-                Type::FunctionalInstance(target_functional),
-            ) => {
-                // Same functional class, or self has target in its bases.
-                ConstraintSet::from(
-                    self_functional == target_functional
-                        || self_functional.bases(db).iter().any(|base| {
-                            base.to_instance_type(db)
-                                .is_subtype_of(db, Type::FunctionalInstance(target_functional))
-                        }),
-                )
-            }
-
-            (Type::FunctionalInstance(_), _) => {
-                // FunctionalInstance is not a subtype of other non-instance types
-                ConstraintSet::from(false)
-            }
         }
     }
 
@@ -3298,7 +3238,11 @@ impl<'db> Type<'db> {
                 if literal.enum_class_instance(db) != Type::NominalInstance(instance) {
                     return ConstraintSet::from(false);
                 }
-                ConstraintSet::from(is_single_member_enum(db, instance.class_literal(db)))
+                ConstraintSet::from(
+                    instance
+                        .class_literal(db)
+                        .is_some_and(|class| is_single_member_enum(db, class)),
+                )
             }
 
             (Type::PropertyInstance(left), Type::PropertyInstance(right)) => {
@@ -3829,26 +3773,22 @@ impl<'db> Type<'db> {
             (Type::SubclassOf(subclass_of_ty), Type::ClassLiteral(class_b))
             | (Type::ClassLiteral(class_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_) => {
-                        ConstraintSet::from(false)
-                    }
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from(
                         !class_a.could_exist_in_mro_of(db, ClassType::NonGeneric(class_b)),
                     ),
-                    SubclassOfInner::TypeVar(_) => unreachable!(),
+                    SubclassOfInner::TypeVar(_) => ConstraintSet::from(false),
                 }
             }
 
             (Type::SubclassOf(subclass_of_ty), Type::GenericAlias(alias_b))
             | (Type::GenericAlias(alias_b), Type::SubclassOf(subclass_of_ty)) => {
                 match subclass_of_ty.subclass_of() {
-                    SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_) => {
-                        ConstraintSet::from(false)
-                    }
+                    SubclassOfInner::Dynamic(_) => ConstraintSet::from(false),
                     SubclassOfInner::Class(class_a) => ConstraintSet::from(
                         !class_a.could_exist_in_mro_of(db, ClassType::Generic(alias_b)),
                     ),
-                    SubclassOfInner::TypeVar(_) => unreachable!(),
+                    SubclassOfInner::TypeVar(_) => ConstraintSet::from(false),
                 }
             }
 
@@ -3856,11 +3796,12 @@ impl<'db> Type<'db> {
                 left.is_disjoint_from_impl(db, right, inferable, disjointness_visitor)
             }
 
-            // for `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any larger than `type`,
-            // so although the type is dynamic we can still determine disjointedness in some situations
+            // For `type[Any]`/`type[Unknown]`/`type[Todo]`, we know the type cannot be any
+            // larger than `type`, so although the type is dynamic we can still determine
+            // disjointedness in some situations.
             (Type::SubclassOf(subclass_of_ty), other)
             | (other, Type::SubclassOf(subclass_of_ty)) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_) => {
+                SubclassOfInner::Dynamic(_) => {
                     KnownClass::Type.to_instance(db).is_disjoint_from_impl(
                         db,
                         other,
@@ -4179,38 +4120,6 @@ impl<'db> Type<'db> {
                     disjointness_visitor,
                 )
                 .negate(db),
-
-            (Type::FunctionalInstance(functional_class), Type::NominalInstance(instance))
-            | (Type::NominalInstance(instance), Type::FunctionalInstance(functional_class)) => {
-                ConstraintSet::from(!functional_class.is_subclass_of(db, instance.class(db)))
-            }
-            // For other types, delegate to base classes' disjointness.
-            (Type::FunctionalInstance(functional_class), other)
-            | (other, Type::FunctionalInstance(functional_class)) => {
-                let bases = functional_class.bases(db);
-                if bases.is_empty() {
-                    // No explicit bases means inherits only from object.
-                    KnownClass::Object.to_instance(db).is_disjoint_from_impl(
-                        db,
-                        other,
-                        inferable,
-                        disjointness_visitor,
-                        relation_visitor,
-                    )
-                } else {
-                    // Check if all base class instances are disjoint from the other type.
-                    // This is conservative: if any base could overlap, we say not disjoint.
-                    bases.iter().when_all(db, |base| {
-                        base.to_instance_type(db).is_disjoint_from_impl(
-                            db,
-                            other,
-                            inferable,
-                            disjointness_visitor,
-                            relation_visitor,
-                        )
-                    })
-                }
-            }
         }
     }
 
@@ -4264,7 +4173,9 @@ impl<'db> Type<'db> {
 
             return;
         };
-        let (class_literal, Some(specialization)) = instance.class(db).class_literal(db) else {
+
+        let Some((class_literal, Some(specialization))) = instance.class(db).stmt_class_literal(db)
+        else {
             return;
         };
         let generic_context = specialization.generic_context(db);
@@ -4348,7 +4259,7 @@ impl<'db> Type<'db> {
                 }
             }
 
-            // We eagerly transform `SubclassOf` to `ClassLiteral` for final types, so `SubclassOf` is never a singleton.
+            // We eagerly transform `SubclassOf` to `StmtClassLiteral` for final types, so `SubclassOf` is never a singleton.
             Type::SubclassOf(..) => false,
             Type::BoundSuper(..) => false,
             Type::BooleanLiteral(_)
@@ -4415,7 +4326,6 @@ impl<'db> Type<'db> {
             Type::TypedDict(_) => false,
             Type::TypeAlias(alias) => alias.value_type(db).is_singleton(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).is_singleton(db),
-            Type::FunctionalInstance(_) => false,
         }
     }
 
@@ -4489,8 +4399,7 @@ impl<'db> Type<'db> {
             | Type::PropertyInstance(_)
             | Type::DataclassDecorator(_)
             | Type::DataclassTransformer(_)
-            | Type::TypedDict(_)
-            | Type::FunctionalInstance(_) => false,
+            | Type::TypedDict(_) => false,
         }
     }
 
@@ -4634,8 +4543,7 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => None,
+            | Type::NewTypeInstance(_) => None,
         }
     }
 
@@ -4724,9 +4632,6 @@ impl<'db> Type<'db> {
             Type::NominalInstance(instance) => instance.class(db).instance_member(db, name),
             Type::NewTypeInstance(newtype) => {
                 newtype.concrete_base_type(db).instance_member(db, name)
-            }
-            Type::FunctionalInstance(functional_class) => {
-                functional_class.instance_member(db, name)
             }
 
             Type::ProtocolInstance(protocol) => protocol.instance_member(db, name),
@@ -5378,7 +5283,7 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "name" | "_name_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                    && Type::ClassLiteral(ClassLiteral::Stmt(enum_literal.enum_class(db)))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
                 Place::bound(Type::string_literal(db, enum_literal.name(db))).into()
@@ -5386,7 +5291,7 @@ impl<'db> Type<'db> {
 
             Type::EnumLiteral(enum_literal)
                 if matches!(name_str, "value" | "_value_")
-                    && Type::ClassLiteral(enum_literal.enum_class(db))
+                    && Type::ClassLiteral(ClassLiteral::Stmt(enum_literal.enum_class(db)))
                         .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db)) =>
             {
                 enum_metadata(db, enum_literal.enum_class(db))
@@ -5410,9 +5315,14 @@ impl<'db> Type<'db> {
 
             Type::NominalInstance(instance)
                 if matches!(name_str, "value" | "_value_")
-                    && is_single_member_enum(db, instance.class(db).class_literal(db).0) =>
+                    && instance.class(db).stmt_class_literal(db).is_some_and(
+                        |(class_literal, _)| is_single_member_enum(db, class_literal),
+                    ) =>
             {
-                enum_metadata(db, instance.class(db).class_literal(db).0)
+                instance
+                    .class(db)
+                    .stmt_class_literal(db)
+                    .and_then(|(class_literal, _)| enum_metadata(db, class_literal))
                     .and_then(|metadata| metadata.members.get_index(0).map(|(_, v)| *v))
                     .map_or(Place::Undefined, Place::bound)
                     .into()
@@ -5421,7 +5331,6 @@ impl<'db> Type<'db> {
             Type::NominalInstance(..)
             | Type::ProtocolInstance(..)
             | Type::NewTypeInstance(..)
-            | Type::FunctionalInstance(..)
             | Type::BooleanLiteral(..)
             | Type::IntLiteral(..)
             | Type::StringLiteral(..)
@@ -5512,11 +5421,11 @@ impl<'db> Type<'db> {
 
             Type::ClassLiteral(..) | Type::GenericAlias(..) | Type::SubclassOf(..) => {
                 if let Some(enum_class) = match self {
-                    Type::ClassLiteral(literal) => Some(literal),
+                    Type::ClassLiteral(literal) => literal.as_stmt(),
                     Type::SubclassOf(subclass_of) => subclass_of
                         .subclass_of()
                         .into_class(db)
-                        .map(|class| class.class_literal(db).0),
+                        .and_then(|class| class.stmt_class_literal(db).map(|(lit, _)| lit)),
                     _ => None,
                 } {
                     if let Some(metadata) = enum_metadata(db, enum_class) {
@@ -5810,7 +5719,6 @@ impl<'db> Type<'db> {
                     }
                     SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar)
                         .try_bool_impl(db, allow_short_circuit, visitor)?,
-                    SubclassOfInner::FunctionalClass(_) => Truthiness::Ambiguous,
                 }
             }
 
@@ -5861,7 +5769,6 @@ impl<'db> Type<'db> {
                     .concrete_base_type(db)
                     .try_bool_impl(db, allow_short_circuit, visitor)?
             }
-            Type::FunctionalInstance(_) => try_dunders()?,
         };
 
         Ok(truthiness)
@@ -6607,40 +6514,31 @@ impl<'db> Type<'db> {
                 .into()
             }
 
-            Type::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Dynamic(dynamic_type) => Type::Dynamic(dynamic_type).bindings(db),
+            Type::SubclassOf(subclass_of_type) => {
+                let inner = subclass_of_type.subclass_of();
+                if let SubclassOfInner::Dynamic(dynamic_type) = inner {
+                    return Type::Dynamic(dynamic_type).bindings(db);
+                }
 
                 // Most type[] constructor calls are handled by `try_call_constructor` and not via
                 // getting the signature here. This signature can still be used in some cases (e.g.
-                // evaluating callable subtyping). TODO improve this definition (intersection of
-                // `__new__` and `__init__` signatures? and respect metaclass `__call__`).
-                SubclassOfInner::Class(class) => Type::from(class).bindings(db),
-
-                // TODO annotated return type on `__new__` or metaclass `__call__`
-                // TODO check call vs signatures of `__new__` and/or `__init__`
-                SubclassOfInner::TypeVar(_) => Binding::single(
-                    self,
-                    Signature::new(Parameters::gradual_form(), self.to_instance(db)),
-                )
-                .into(),
-
-                SubclassOfInner::FunctionalClass(functional_class) => {
-                    // Use the primary base's parameters, but return FunctionalInstance as the type
-                    Binding::single(
+                // evaluating callable subtyping). TODO: improve this definition (intersection of
+                // `__new__` and `__init__` signatures, and respect metaclass `__call__`).
+                match inner {
+                    SubclassOfInner::Class(class) => Type::from(class).bindings(db),
+                    // TODO: annotated return type on `__new__` or metaclass `__call__`.
+                    // TODO: check call vs signatures of `__new__` and/or `__init__`.
+                    SubclassOfInner::TypeVar(_) => Binding::single(
                         self,
-                        Signature::new(
-                            Parameters::gradual_form(),
-                            Some(functional_class.to_instance(db)),
-                        ),
+                        Signature::new(Parameters::gradual_form(), self.to_instance(db)),
                     )
-                    .into()
+                    .into(),
+                    // Dynamic handled by early return above.
+                    SubclassOfInner::Dynamic(_) => unreachable!(),
                 }
-            },
+            }
 
-            Type::NominalInstance(_)
-            | Type::ProtocolInstance(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => {
+            Type::NominalInstance(_) | Type::ProtocolInstance(_) | Type::NewTypeInstance(_) => {
                 // Note that for objects that have a (possibly not callable!) `__call__` attribute,
                 // we will get the signature of the `__call__` attribute, but will pass in the type
                 // of the original object as the "callable type". That ensures that we get errors
@@ -6973,7 +6871,7 @@ impl<'db> Type<'db> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::FunctionalInstance(_) => None
+                => None
             }
         }
 
@@ -7258,7 +7156,9 @@ impl<'db> Type<'db> {
         let from_class_base = |base: ClassBase<'db>| {
             let class = base.into_class()?;
             if class.is_known(db, KnownClass::Generator) {
-                if let Some(specialization) = class.class_literal_specialized(db, None).1 {
+                if let Some((_, Some(specialization))) =
+                    class.stmt_class_literal_specialized(db, None)
+                {
                     if let [_, _, return_ty] = specialization.types(db) {
                         return Some(*return_ty);
                     }
@@ -7589,8 +7489,7 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => None,
+            | Type::NewTypeInstance(_) => None,
         }
     }
 
@@ -7622,21 +7521,12 @@ impl<'db> Type<'db> {
             }
             Type::GenericAlias(alias) => Ok(Type::instance(db, ClassType::from(*alias))),
 
-            Type::SubclassOf(subclass_of) => {
-                // SubclassOf with a FunctionalClass inner can be used in type expressions
-                // to refer to instances of the functional class.
-                match subclass_of.subclass_of() {
-                    SubclassOfInner::FunctionalClass(functional_class) => {
-                        Ok(functional_class.to_instance(db))
-                    }
-                    _ => Err(InvalidTypeExpressionError {
-                        invalid_expressions: smallvec::smallvec_inline![
-                            InvalidTypeExpression::InvalidType(*self, scope_id)
-                        ],
-                        fallback_type: Type::unknown(),
-                    }),
-                }
-            }
+            Type::SubclassOf(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::InvalidType(*self, scope_id)
+                ],
+                fallback_type: Type::unknown(),
+            }),
 
             Type::BooleanLiteral(_)
             | Type::BytesLiteral(_)
@@ -7922,14 +7812,12 @@ impl<'db> Type<'db> {
                     .in_type_expression(db, scope_id, typevar_binding_context)
             }
 
-            Type::NewTypeInstance(_) | Type::FunctionalInstance(_) => {
-                Err(InvalidTypeExpressionError {
-                    invalid_expressions: smallvec::smallvec_inline![
-                        InvalidTypeExpression::InvalidType(*self, scope_id)
-                    ],
-                    fallback_type: Type::unknown(),
-                })
-            }
+            Type::NewTypeInstance(_) => Err(InvalidTypeExpressionError {
+                invalid_expressions: smallvec::smallvec_inline![
+                    InvalidTypeExpression::InvalidType(*self, scope_id)
+                ],
+                fallback_type: Type::unknown(),
+            }),
         }
     }
 
@@ -7957,7 +7845,9 @@ impl<'db> Type<'db> {
             }
             Type::BytesLiteral(_) => KnownClass::Bytes.to_class_literal(db),
             Type::IntLiteral(_) => KnownClass::Int.to_class_literal(db),
-            Type::EnumLiteral(enum_literal) => Type::ClassLiteral(enum_literal.enum_class(db)),
+            Type::EnumLiteral(enum_literal) => {
+                Type::ClassLiteral(ClassLiteral::Stmt(enum_literal.enum_class(db)))
+            }
             Type::FunctionLiteral(_) => KnownClass::FunctionType.to_class_literal(db),
             Type::BoundMethod(_) => KnownClass::MethodType.to_class_literal(db),
             Type::KnownBoundMethod(method) => method.class().to_class_literal(db),
@@ -7995,9 +7885,6 @@ impl<'db> Type<'db> {
             },
             Type::TypeAlias(alias) => alias.value_type(db).to_meta_type(db),
             Type::NewTypeInstance(newtype) => newtype.concrete_base_type(db).to_meta_type(db),
-            Type::FunctionalInstance(functional_class) => {
-                SubclassOfType::from(db, functional_class)
-            }
         }
     }
 
@@ -8351,9 +8238,7 @@ impl<'db> Type<'db> {
             // some other generic context's specialization is applied to it.
             | Type::ClassLiteral(_)
             | Type::BoundSuper(_)
-            | Type::SpecialForm(_)
-            // FunctionalInstance doesn't have type parameters, so no specialization needed
-            | Type::FunctionalInstance(_) => self,
+            | Type::SpecialForm(_) => self,
         }
     }
 
@@ -8586,8 +8471,7 @@ impl<'db> Type<'db> {
             | Type::EnumLiteral(_)
             | Type::BoundSuper(_)
             | Type::SpecialForm(_)
-            | Type::TypedDict(_)
-            | Type::FunctionalInstance(_) => {}
+            | Type::TypedDict(_) => {}
         }
     }
 
@@ -8698,12 +8582,13 @@ impl<'db> Type<'db> {
             }
             Self::ModuleLiteral(module) => Some(TypeDefinition::Module(module.module(db))),
             Self::ClassLiteral(class_literal) => {
-                Some(TypeDefinition::Class(class_literal.definition(db)))
+                class_literal.definition(db).map(TypeDefinition::Class)
             }
             Self::GenericAlias(alias) => Some(TypeDefinition::Class(alias.definition(db))),
-            Self::NominalInstance(instance) => {
-                Some(TypeDefinition::Class(instance.class(db).definition(db)))
-            }
+            Self::NominalInstance(instance) => instance
+                .class(db)
+                .definition(db)
+                .map(TypeDefinition::Class),
             Self::KnownInstance(instance) => match instance {
                 KnownInstanceType::TypeVar(var) => {
                     Some(TypeDefinition::TypeVar(var.definition(db)?))
@@ -8716,9 +8601,11 @@ impl<'db> Type<'db> {
             },
 
             Self::SubclassOf(subclass_of_type) => match subclass_of_type.subclass_of() {
-                SubclassOfInner::Class(class) => Some(TypeDefinition::Class(class.definition(db))),
-                SubclassOfInner::Dynamic(_) | SubclassOfInner::FunctionalClass(_) => None,
-                SubclassOfInner::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
+                SubclassOfInner::Dynamic(_) => None,
+                SubclassOfInner::Class(class) => class.definition(db).map(TypeDefinition::Class),
+                SubclassOfInner::TypeVar(bound_typevar) => {
+                    Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?))
+                }
             },
 
             Self::TypeAlias(alias) => alias.value_type(db).definition(db),
@@ -8745,7 +8632,7 @@ impl<'db> Type<'db> {
             Self::TypeVar(bound_typevar) => Some(TypeDefinition::TypeVar(bound_typevar.typevar(db).definition(db)?)),
 
             Self::ProtocolInstance(protocol) => match protocol.inner {
-                Protocol::FromClass(class) => Some(TypeDefinition::Class(class.definition(db))),
+                Protocol::FromClass(class) => class.definition(db).map(TypeDefinition::Class),
                 Protocol::Synthesized(_) => None,
             },
 
@@ -8766,8 +8653,7 @@ impl<'db> Type<'db> {
             Self::Dynamic(DynamicType::Divergent(_) | DynamicType::Todo(_) | DynamicType::TodoUnpack | DynamicType::TodoStarredExpression)
             | Self::Callable(_)
             | Self::TypeIs(_)
-            | Self::TypeGuard(_)
-            | Self::FunctionalInstance(_) => None,
+            | Self::TypeGuard(_) => None,
         }
     }
 
@@ -8833,7 +8719,7 @@ impl<'db> Type<'db> {
         }
     }
 
-    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<ClassLiteral<'db>> {
+    pub(crate) fn generic_origin(self, db: &'db dyn Db) -> Option<StmtClassLiteral<'db>> {
         match self {
             Type::GenericAlias(generic) => Some(generic.origin(db)),
             Type::NominalInstance(instance) => {
@@ -8953,8 +8839,7 @@ impl<'db> VarianceInferable<'db> for Type<'db> {
             | Type::TypeVar(_)
             | Type::TypedDict(_)
             | Type::TypeAlias(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => TypeVarVariance::Bivariant,
+            | Type::NewTypeInstance(_) => TypeVarVariance::Bivariant,
         };
 
         tracing::trace!(
@@ -11195,7 +11080,12 @@ impl<'db> UnionTypeInstance<'db> {
     ) -> Result<impl Iterator<Item = Type<'db>> + 'db, InvalidTypeExpressionError<'db>> {
         let to_class_literal = |ty: Type<'db>| {
             ty.as_nominal_instance()
-                .map(|instance| Type::ClassLiteral(instance.class(db).class_literal(db).0))
+                .and_then(|instance| {
+                    instance
+                        .class(db)
+                        .stmt_class_literal(db)
+                        .map(|(lit, _)| Type::ClassLiteral(lit.into()))
+                })
                 .unwrap_or_else(Type::unknown)
         };
 
@@ -14110,7 +14000,7 @@ impl<'db> TypeAliasType<'db> {
 #[derive(Debug, Clone, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
 pub(super) struct MetaclassCandidate<'db> {
     metaclass: ClassType<'db>,
-    explicit_metaclass_of: ClassLiteral<'db>,
+    explicit_metaclass_of: StmtClassLiteral<'db>,
 }
 
 #[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
@@ -14868,7 +14758,7 @@ impl<'db> BytesLiteralType<'db> {
 #[derive(PartialOrd, Ord)]
 pub struct EnumLiteralType<'db> {
     /// A reference to the enum class this literal belongs to
-    enum_class: ClassLiteral<'db>,
+    enum_class: StmtClassLiteral<'db>,
     /// The name of the enum member
     #[returns(ref)]
     name: Name,
@@ -15096,7 +14986,7 @@ impl<'db> TypeGuardLike<'db> for TypeGuardType<'db> {
 /// being added to the given class.
 pub(super) fn determine_upper_bound<'db>(
     db: &'db dyn Db,
-    class_literal: ClassLiteral<'db>,
+    class_literal: StmtClassLiteral<'db>,
     specialization: Option<Specialization<'db>>,
     is_known_base: impl Fn(ClassBase<'db>) -> bool,
 ) -> Type<'db> {

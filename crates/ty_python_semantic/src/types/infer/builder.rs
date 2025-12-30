@@ -52,7 +52,9 @@ use crate::semantic_index::{
 use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
-use crate::types::class::{CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator};
+use crate::types::class::{
+    ClassLiteral, CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator,
+};
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
 use crate::types::diagnostic::{
@@ -106,12 +108,12 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassLiteral, ClassType, DataclassParams, DynamicType, InternedType,
-    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
-    TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
+    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
+    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
+    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
+    ParameterForm, Parameters, Signature, SpecialFormType, StmtClassLiteral, SubclassOfType,
+    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
+    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
     TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
     todo_type,
@@ -598,6 +600,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
                 ty.inner_type()
                     .as_class_literal()
+                    .and_then(ClassLiteral::as_stmt)
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
                 None
@@ -728,7 +731,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 if let Some(disjoint_base) = base_class.nearest_disjoint_base(self.db()) {
-                    disjoint_bases.insert(disjoint_base, i, base_class.class_literal(self.db()).0);
+                    disjoint_bases.insert(disjoint_base, i, base_class.class_literal(self.db()));
                 }
 
                 if is_protocol
@@ -759,24 +762,24 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     }
                 }
 
-                let (base_class_literal, _) = base_class.class_literal(self.db());
+                if let Some((base_class_literal, _)) = base_class.stmt_class_literal(self.db()) {
+                    if let (Some(base_params), Some(class_params)) = (
+                        base_class_literal.dataclass_params(self.db()),
+                        class.dataclass_params(self.db()),
+                    ) {
+                        let base_params = base_params.flags(self.db());
+                        let class_is_frozen = class_params.flags(self.db()).is_frozen();
 
-                if let (Some(base_params), Some(class_params)) = (
-                    base_class_literal.dataclass_params(self.db()),
-                    class.dataclass_params(self.db()),
-                ) {
-                    let base_params = base_params.flags(self.db());
-                    let class_is_frozen = class_params.flags(self.db()).is_frozen();
-
-                    if base_params.is_frozen() != class_is_frozen {
-                        report_bad_frozen_dataclass_inheritance(
-                            &self.context,
-                            class,
-                            class_node,
-                            base_class_literal,
-                            &class_node.bases()[i],
-                            base_params,
-                        );
+                        if base_params.is_frozen() != class_is_frozen {
+                            report_bad_frozen_dataclass_inheritance(
+                                &self.context,
+                                class,
+                                class_node,
+                                base_class_literal,
+                                &class_node.bases()[i],
+                                base_params,
+                            );
+                        }
                     }
                 }
             }
@@ -1167,7 +1170,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .expect_class_literal();
 
                     if class.is_protocol(self.db())
-                        || (Type::ClassLiteral(class)
+                        || (Type::ClassLiteral(ClassLiteral::Stmt(class))
                             .is_subtype_of(self.db(), KnownClass::ABCMeta.to_instance(self.db()))
                             && overloads.iter().all(|overload| {
                                 overload.has_known_decorator(
@@ -2696,7 +2699,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let class_literal = infer_definition_types(db, class_definition)
             .declaration_type(class_definition)
             .inner_type()
-            .as_class_literal()?;
+            .as_class_literal()?
+            .as_stmt()?;
 
         let typing_self = typing_self(db, self.scope(), Some(method_definition), class_literal);
         if is_classmethod {
@@ -2873,7 +2877,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
             (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
-            _ => Type::from(ClassLiteral::new(
+            _ => Type::from(StmtClassLiteral::new(
                 self.db(),
                 name.id.clone(),
                 body_scope,
@@ -4168,11 +4172,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                 // If it's a user-defined class, suggest adding a `__setitem__` method.
                                 if object_ty
                                     .as_nominal_instance()
-                                    .and_then(|instance| {
-                                        file_to_module(
-                                            db,
-                                            instance.class(db).class_literal(db).0.file(db),
-                                        )
+                                    .and_then(|instance| instance.class(db).stmt_class_literal(db))
+                                    .and_then(|(class_literal, _)| {
+                                        file_to_module(db, class_literal.file(db))
                                     })
                                     .and_then(|module| module.search_path(db))
                                     .is_some_and(ty_module_resolver::SearchPath::is_first_party)
@@ -4509,8 +4511,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
 
             // Check if class-level attribute already has a value
-            {
-                let class_definition = class_ty.class_literal(db).0;
+            if let Some((class_definition, _)) = class_ty.stmt_class_literal(db) {
                 let class_scope_id = class_definition.body_scope(db).file_scope_id(db);
                 let place_table = builder.index.place_table(class_scope_id);
 
@@ -4668,8 +4669,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_)
-            | Type::NewTypeInstance(_)
-            | Type::FunctionalInstance(_) => {
+            | Type::NewTypeInstance(_) => {
                 // TODO: We could use the annotated parameter type of `__setattr__` as type context here.
                 // However, we would still have to perform the first inference without type context.
                 let value_ty = infer_value_ty(self, TypeContext::default());
@@ -6000,7 +6000,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 let class_literal = infer_definition_types(db, class_definition)
                     .declaration_type(class_definition)
                     .inner_type()
-                    .as_class_literal()?;
+                    .as_class_literal()?
+                    .as_stmt()?;
 
                 class_literal
                     .dataclass_params(db)
@@ -8809,11 +8810,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
                 // in `ClassType::own_class_member()`).
                 class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || CodeGeneratorKind::TypedDict.matches(
-                self.db(),
-                class.class_literal(self.db()).0,
-                class.class_literal(self.db()).1,
-            );
+            ) || class
+                .stmt_class_literal(self.db())
+                .is_some_and(|(class_literal, specialization)| {
+                    CodeGeneratorKind::TypedDict.matches(self.db(), class_literal, specialization)
+                });
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes
@@ -9814,9 +9815,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     should always return a bound symbol"
                                 ),
                                 SubclassOfInner::TypeVar(_) => false,
-                                SubclassOfInner::FunctionalClass(functional_class) => {
-                                    !functional_class.instance_member(db, attr).is_undefined()
-                                }
                             }
                         }
                         _ => false,
@@ -10089,8 +10087,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_)
-                | Type::FunctionalInstance(_),
+                | Type::NewTypeInstance(_),
             ) => {
                 let unary_dunder_method = match op {
                     ast::UnaryOp::Invert => "__invert__",
@@ -10591,8 +10588,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_)
-                | Type::FunctionalInstance(_),
+                | Type::NewTypeInstance(_),
                 Type::FunctionLiteral(_)
                 | Type::BooleanLiteral(_)
                 | Type::Callable(..)
@@ -10623,8 +10619,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 | Type::TypeIs(_)
                 | Type::TypeGuard(_)
                 | Type::TypedDict(_)
-                | Type::NewTypeInstance(_)
-                | Type::FunctionalInstance(_),
+                | Type::NewTypeInstance(_),
                 op,
             ) => Type::try_call_bin_op(self.db(), left_ty, op, right_ty)
                 .map(|outcome| outcome.return_type(self.db()))
@@ -11659,12 +11654,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 }
 
                 if let Some(generic_context) = class.generic_context(self.db()) {
-                    return self.infer_explicit_class_specialization(
-                        subscript,
-                        value_ty,
-                        class,
-                        generic_context,
-                    );
+                    if let Some(stmt_class) = class.as_stmt() {
+                        return self.infer_explicit_class_specialization(
+                            subscript,
+                            value_ty,
+                            stmt_class,
+                            generic_context,
+                        );
+                    }
                 }
             }
             Type::KnownInstance(KnownInstanceType::TypeAliasType(TypeAliasType::ManualPEP695(
@@ -11995,7 +11992,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         &mut self,
         subscript: &ast::ExprSubscript,
         value_ty: Type<'db>,
-        generic_class: ClassLiteral<'db>,
+        generic_class: StmtClassLiteral<'db>,
         generic_context: GenericContext<'db>,
     ) -> Type<'db> {
         let db = self.db();
@@ -12709,7 +12706,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // TODO: properly handle old-style generics; get rid of this temporary hack
             if !value_ty
                 .as_class_literal()
-                .is_some_and(|class| class.iter_mro(db, None).contains(&ClassBase::Generic))
+                .is_some_and(|class| class.iter_mro(db).contains(&ClassBase::Generic))
             {
                 report_not_subscriptable(context, subscript, value_ty, "__class_getitem__");
             }

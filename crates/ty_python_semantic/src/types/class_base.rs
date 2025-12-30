@@ -1,11 +1,12 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
+use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, FunctionalClassType, KnownClass,
-    KnownInstanceType, MaterializationKind, MroError, MroIterator, NormalizedVisitor,
-    SpecialFormType, Type, TypeContext, TypeMapping, todo_type,
+    ApplyTypeMappingVisitor, ClassType, DynamicType, KnownClass, KnownInstanceType,
+    MaterializationKind, MroError, NormalizedVisitor, SpecialFormType, StmtClassLiteral, Type,
+    TypeContext, TypeMapping, todo_type,
 };
 
 /// Enumeration of the possible kinds of types we allow in class bases.
@@ -20,8 +21,6 @@ use crate::types::{
 pub enum ClassBase<'db> {
     Dynamic(DynamicType<'db>),
     Class(ClassType<'db>),
-    /// A class created via `type(name, bases, dict)`.
-    FunctionalClass(FunctionalClassType<'db>),
     /// Although `Protocol` is not a class in typeshed's stubs, it is at runtime,
     /// and can appear in the MRO of a class.
     Protocol,
@@ -41,7 +40,6 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::FunctionalClass(_) => self, // Functional classes don't need normalization
             Self::Protocol | Self::Generic | Self::TypedDict => self,
         }
     }
@@ -57,7 +55,6 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::FunctionalClass(_) => Some(self), // Functional classes don't need normalization
             Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
         }
     }
@@ -65,7 +62,6 @@ impl<'db> ClassBase<'db> {
     pub(crate) fn name(self, db: &'db dyn Db) -> &'db str {
         match self {
             ClassBase::Class(class) => class.name(db),
-            ClassBase::FunctionalClass(functional) => functional.name(db),
             ClassBase::Dynamic(DynamicType::Any) => "Any",
             ClassBase::Dynamic(DynamicType::Unknown | DynamicType::UnknownGeneric(_)) => "Unknown",
             ClassBase::Dynamic(
@@ -96,7 +92,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subclass: ClassLiteral<'db>,
+        subclass: StmtClassLiteral<'db>,
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
@@ -180,8 +176,7 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
-            | Type::TypedDict(_)
-            | Type::FunctionalInstance(_) => None,
+            | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {
                 KnownInstanceType::SubscriptedGeneric(_) => Some(Self::Generic),
@@ -311,25 +306,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn into_class(self) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
-            Self::FunctionalClass(_)
-            | Self::Dynamic(_)
-            | Self::Generic
-            | Self::Protocol
-            | Self::TypedDict => None,
-        }
-    }
-
-    /// Convert this class base to an instance type.
-    ///
-    /// For `Class`, returns a `NominalInstance`. For `FunctionalClass`, returns a `FunctionalInstance`.
-    /// For `Dynamic`, returns the dynamic type itself (which represents both class and instance).
-    /// For `Protocol`, `Generic`, and `TypedDict`, returns `Unknown` since these aren't directly instantiable.
-    pub(crate) fn to_instance_type(self, db: &'db dyn Db) -> Type<'db> {
-        match self {
-            Self::Class(class) => Type::instance(db, class),
-            Self::FunctionalClass(functional) => functional.to_instance(db),
-            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            Self::Protocol | Self::Generic | Self::TypedDict => Type::unknown(),
+            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => None,
         }
     }
 
@@ -337,7 +314,6 @@ impl<'db> ClassBase<'db> {
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         match self {
             Self::Class(class) => class.metaclass(db),
-            Self::FunctionalClass(functional) => functional.metaclass(db),
             Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
             Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
         }
@@ -354,11 +330,7 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => {
                 Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Self::FunctionalClass(_)
-            | Self::Dynamic(_)
-            | Self::Generic
-            | Self::Protocol
-            | Self::TypedDict => self,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
         }
     }
 
@@ -395,13 +367,15 @@ impl<'db> ClassBase<'db> {
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
+                    // Functional classes can't have cyclic MRO since their bases must
+                    // already exist at creation time.
+                    return false;
+                };
                 class_literal
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)
             }
-            // Functional classes can't have cyclic MRO since they're created with existing classes
-            ClassBase::FunctionalClass(_) => false,
             ClassBase::Dynamic(_)
             | ClassBase::Generic
             | ClassBase::Protocol
@@ -423,9 +397,6 @@ impl<'db> ClassBase<'db> {
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
             }
-            ClassBase::FunctionalClass(functional) => {
-                ClassBaseMroIterator::from_functional_class(db, functional)
-            }
         }
     }
 
@@ -440,9 +411,6 @@ impl<'db> ClassBase<'db> {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
-                    ClassBase::FunctionalClass(functional) => {
-                        Type::FunctionalInstance(functional).display(self.db).fmt(f)
-                    }
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
                     ClassBase::TypedDict => f.write_str("typing.TypedDict"),
@@ -465,7 +433,6 @@ impl<'db> From<ClassBase<'db>> for Type<'db> {
         match value {
             ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
             ClassBase::Class(class) => class.into(),
-            ClassBase::FunctionalClass(functional) => Type::FunctionalInstance(functional),
             ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
             ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
             ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
@@ -484,7 +451,6 @@ enum ClassBaseMroIterator<'db> {
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),
     FromClass(MroIterator<'db>),
-    FromFunctionalClass(Box<dyn Iterator<Item = ClassBase<'db>> + 'db>),
 }
 
 impl<'db> ClassBaseMroIterator<'db> {
@@ -506,11 +472,6 @@ impl<'db> ClassBaseMroIterator<'db> {
     ) -> Self {
         ClassBaseMroIterator::FromClass(class.iter_mro_specialized(db, additional_specialization))
     }
-
-    /// Iterate over the MRO of a functional class.
-    fn from_functional_class(db: &'db dyn Db, functional: FunctionalClassType<'db>) -> Self {
-        ClassBaseMroIterator::FromFunctionalClass(Box::new(functional.iter_mro(db)))
-    }
 }
 
 impl<'db> Iterator for ClassBaseMroIterator<'db> {
@@ -521,7 +482,6 @@ impl<'db> Iterator for ClassBaseMroIterator<'db> {
             Self::Length2(iter) => iter.next(),
             Self::Length3(iter) => iter.next(),
             Self::FromClass(iter) => iter.next(),
-            Self::FromFunctionalClass(iter) => iter.next(),
         }
     }
 }

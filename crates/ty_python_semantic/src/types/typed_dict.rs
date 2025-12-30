@@ -74,7 +74,9 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
-            let (class_literal, specialization) = class.class_literal(db);
+            let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
+                return TypedDictSchema::default();
+            };
             class_literal
                 .fields(db, specialization, CodeGeneratorKind::TypedDict)
                 .into_iter()
@@ -294,7 +296,7 @@ impl<'db> TypedDictType<'db> {
 
     pub fn definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
         match self {
-            TypedDictType::Class(defining_class) => Some(defining_class.definition(db)),
+            TypedDictType::Class(defining_class) => defining_class.definition(db),
             TypedDictType::Synthesized(_) => None,
         }
     }

@@ -1576,7 +1576,10 @@ mod implicit_globals {
         else {
             return Place::Undefined.into();
         };
-        let module_type_scope = module_type_class.body_scope(db);
+        let Some(stmt_class) = module_type_class.as_stmt() else {
+            return Place::Undefined.into();
+        };
+        let module_type_scope = stmt_class.body_scope(db);
         let place_table = place_table(db, module_type_scope);
         let Some(symbol_id) = place_table.symbol_id(name) else {
             return Place::Undefined.into();
@@ -1704,7 +1707,9 @@ mod implicit_globals {
             return smallvec::SmallVec::default();
         };
 
-        let module_type_scope = module_type.body_scope(db);
+        let Some(module_type_scope) = module_type.body_scope(db) else {
+            return smallvec::SmallVec::default();
+        };
         let module_type_symbol_table = place_table(db, module_type_scope);
 
         module_type_symbol_table

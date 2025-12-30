@@ -16,7 +16,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 use crate::Db;
 use crate::place::Place;
 use crate::semantic_index::definition::Definition;
-use crate::types::class::{ClassLiteral, ClassType, GenericAlias};
+use crate::types::class::{ClassLiteral, ClassType, GenericAlias, StmtClassLiteral};
+use crate::types::class_base::ClassBase;
 use crate::types::function::{FunctionType, OverloadLiteral};
 use crate::types::generics::{GenericContext, Specialization};
 use crate::types::signatures::{
@@ -366,6 +367,9 @@ struct AmbiguousClassCollector<'db> {
 
 impl<'db> AmbiguousClassCollector<'db> {
     fn record_class(&self, db: &'db dyn Db, class: ClassLiteral<'db>) {
+        let ClassLiteral::Stmt(class) = class else {
+            return;
+        };
         match self.class_names.borrow_mut().entry(class.name(db)) {
             Entry::Vacant(entry) => {
                 entry.insert(AmbiguityState::Unambiguous(class));
@@ -413,10 +417,10 @@ impl<'db> AmbiguousClassCollector<'db> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum AmbiguityState<'db> {
     /// The class can be displayed unambiguously using its unqualified name
-    Unambiguous(ClassLiteral<'db>),
+    Unambiguous(StmtClassLiteral<'db>),
     /// The class must be displayed using its fully qualified name to avoid ambiguity.
     RequiresFullyQualifiedName {
-        class: ClassLiteral<'db>,
+        class: StmtClassLiteral<'db>,
         qualified_name_components: Vec<String>,
     },
     /// Even the class's fully qualified name is not sufficient;
@@ -432,8 +436,12 @@ impl<'db> TypeVisitor<'db> for AmbiguousClassCollector<'db> {
     fn visit_type(&self, db: &'db dyn Db, ty: Type<'db>) {
         match ty {
             Type::ClassLiteral(class) => self.record_class(db, class),
-            Type::EnumLiteral(literal) => self.record_class(db, literal.enum_class(db)),
-            Type::GenericAlias(alias) => self.record_class(db, alias.origin(db)),
+            Type::EnumLiteral(literal) => {
+                self.record_class(db, ClassLiteral::Stmt(literal.enum_class(db)));
+            }
+            Type::GenericAlias(alias) => {
+                self.record_class(db, ClassLiteral::Stmt(alias.origin(db)));
+            }
             // Visit the class (as if it were a nominal-instance type)
             // rather than the protocol members, if it is a class-based protocol.
             // (For the purposes of displaying the type, we'll use the class name.)
@@ -536,7 +544,7 @@ impl fmt::Debug for DisplayType<'_> {
     }
 }
 
-impl<'db> ClassLiteral<'db> {
+impl<'db> StmtClassLiteral<'db> {
     fn display_with(self, db: &'db dyn Db, settings: DisplaySettings<'db>) -> ClassDisplay<'db> {
         ClassDisplay {
             db,
@@ -548,7 +556,7 @@ impl<'db> ClassLiteral<'db> {
 
 struct ClassDisplay<'db> {
     db: &'db dyn Db,
-    class: ClassLiteral<'db>,
+    class: StmtClassLiteral<'db>,
     settings: DisplaySettings<'db>,
 }
 
@@ -556,7 +564,7 @@ impl<'db> FmtDetailed<'db> for ClassDisplay<'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         let qualification_level = self.settings.qualified.get(&**self.class.name(self.db));
 
-        let ty = Type::ClassLiteral(self.class);
+        let ty = Type::ClassLiteral(ClassLiteral::Stmt(self.class));
         if qualification_level.is_some() {
             write!(f.with_type(ty), "{}", self.class.qualified_name(self.db))?;
         } else {
@@ -649,17 +657,23 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .expect("Specialization::tuple() should always return `Some()` for `KnownClass::Tuple`")
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
-                    (ClassType::NonGeneric(class), _) => {
+                    (ClassType::NonGeneric(ClassLiteral::Stmt(class)), _) => {
                         class.display_with(self.db, self.settings.clone()).fmt_detailed(f)
+                    },
+                    (ClassType::NonGeneric(ClassLiteral::Functional(functional)), _) => {
+                        f.with_type(self.ty).write_str(functional.name(self.db).as_str())
                     },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
             Type::ProtocolInstance(protocol) => match protocol.inner {
                 Protocol::FromClass(class) => match *class {
-                    ClassType::NonGeneric(class) => class
+                    ClassType::NonGeneric(ClassLiteral::Stmt(class)) => class
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
+                    ClassType::NonGeneric(ClassLiteral::Functional(functional)) => f
+                        .with_type(self.ty)
+                        .write_str(functional.name(self.db).as_str()),
                     ClassType::Generic(alias) => alias
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
@@ -698,9 +712,17 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.set_invalid_type_annotation();
                 let mut f = f.with_type(self.ty);
                 f.write_str("<class '")?;
-                class
-                    .display_with(self.db, self.settings.clone())
-                    .fmt_detailed(&mut f)?;
+                match class {
+                    ClassLiteral::Stmt(stmt_class) => {
+                        stmt_class
+                            .display_with(self.db, self.settings.clone())
+                            .fmt_detailed(&mut f)?;
+                    }
+                    ClassLiteral::Functional(func_class) => {
+                        // Functional classes don't have qualified names; just use the name.
+                        f.write_str(func_class.name(self.db))?;
+                    }
+                }
                 f.write_str("'>")
             }
             Type::GenericAlias(generic) => {
@@ -713,13 +735,22 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 f.write_str("'>")
             }
             Type::SubclassOf(subclass_of_ty) => match subclass_of_ty.subclass_of() {
-                SubclassOfInner::Class(ClassType::NonGeneric(class)) => {
+                SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Stmt(class))) => {
                     f.with_type(KnownClass::Type.to_class_literal(self.db))
                         .write_str("type")?;
                     f.write_char('[')?;
                     class
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f)?;
+                    f.write_char(']')
+                }
+                SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Functional(
+                    functional,
+                ))) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    f.write_str(functional.name(self.db).as_str())?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
@@ -748,14 +779,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         "{}",
                         bound_typevar.identity(self.db).display(self.db)
                     )?;
-                    f.write_char(']')
-                }
-                SubclassOfInner::FunctionalClass(functional_class) => {
-                    f.with_type(KnownClass::Type.to_class_literal(self.db))
-                        .write_str("type")?;
-                    f.write_char('[')?;
-                    // Display the dynamic class name
-                    f.write_str(functional_class.name(self.db).as_str())?;
                     f.write_char(']')
                 }
             },
@@ -992,9 +1015,17 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
-                Type::from(bound_super.pivot_class(self.db))
-                    .display_with(self.db, self.settings.singleline())
-                    .fmt_detailed(f)?;
+                // Display functional class pivots as just their name (not type[...])
+                match bound_super.pivot_class(self.db) {
+                    ClassBase::Class(ClassType::NonGeneric(ClassLiteral::Functional(fc))) => {
+                        f.with_type(self.ty).write_str(fc.name(self.db))?;
+                    }
+                    pivot => {
+                        Type::from(pivot)
+                            .display_with(self.db, self.settings.singleline())
+                            .fmt_detailed(f)?;
+                    }
+                }
                 f.write_str(", ")?;
                 Type::from(bound_super.owner(self.db))
                     .display_with(self.db, self.settings.singleline())
@@ -1006,9 +1037,12 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 fmt_type_guard_like(self.db, type_guard, &self.settings, f)
             }
             Type::TypedDict(TypedDictType::Class(defining_class)) => match defining_class {
-                ClassType::NonGeneric(class) => class
+                ClassType::NonGeneric(ClassLiteral::Stmt(class)) => class
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
+                ClassType::NonGeneric(ClassLiteral::Functional(functional)) => f
+                    .with_type(self.ty)
+                    .write_str(functional.name(self.db).as_str()),
                 ClassType::Generic(alias) => alias
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
@@ -1039,9 +1073,6 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 }
             }
             Type::NewTypeInstance(newtype) => f.with_type(self.ty).write_str(newtype.name(self.db)),
-            Type::FunctionalInstance(functional_class) => f
-                .with_type(self.ty)
-                .write_str(functional_class.name(self.db)),
         }
     }
 }
@@ -1305,7 +1336,7 @@ impl<'db> GenericAlias<'db> {
 }
 
 pub(crate) struct DisplayGenericAlias<'db> {
-    origin: ClassLiteral<'db>,
+    origin: StmtClassLiteral<'db>,
     specialization: Specialization<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
@@ -1582,7 +1613,7 @@ impl TupleSpecialization {
         matches!(self, Self::Yes)
     }
 
-    fn from_class(db: &dyn Db, class: ClassLiteral) -> Self {
+    fn from_class(db: &dyn Db, class: StmtClassLiteral) -> Self {
         if class.is_tuple(db) {
             Self::Yes
         } else {

@@ -7,7 +7,7 @@ use crate::{
     semantic_index::{place_table, use_def_map},
     types::{
         ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        Type, TypeQualifiers,
+        StmtClassLiteral, Type, TypeQualifiers,
     },
 };
 
@@ -40,7 +40,7 @@ impl EnumMetadata<'_> {
 fn enum_metadata_cycle_initial<'db>(
     _db: &'db dyn Db,
     _id: salsa::Id,
-    _class: ClassLiteral<'db>,
+    _class: StmtClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
     Some(EnumMetadata::empty())
 }
@@ -50,7 +50,7 @@ fn enum_metadata_cycle_initial<'db>(
 #[salsa::tracked(returns(as_ref), cycle_initial=enum_metadata_cycle_initial, heap_size=ruff_memory_usage::heap_size)]
 pub(crate) fn enum_metadata<'db>(
     db: &'db dyn Db,
-    class: ClassLiteral<'db>,
+    class: StmtClassLiteral<'db>,
 ) -> Option<EnumMetadata<'db>> {
     // This is a fast path to avoid traversing the MRO of known classes
     if class
@@ -136,7 +136,7 @@ pub(crate) fn enum_metadata<'db>(
                                 auto_counter += 1;
 
                                 // `StrEnum`s have different `auto()` behaviour to enums inheriting from `(str, Enum)`
-                                let auto_value_ty = if Type::ClassLiteral(class)
+                                let auto_value_ty = if Type::ClassLiteral(ClassLiteral::Stmt(class))
                                     .is_subtype_of(db, KnownClass::StrEnum.to_subclass_of(db))
                                 {
                                     Type::string_literal(db, &name.to_lowercase())
@@ -265,7 +265,7 @@ pub(crate) fn enum_metadata<'db>(
 
 pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     db: &'db dyn Db,
-    class: ClassLiteral<'db>,
+    class: StmtClassLiteral<'db>,
     exclude_member: Option<&'a Name>,
 ) -> Option<impl Iterator<Item = Type<'a>> + 'a> {
     enum_metadata(db, class).map(|metadata| {
@@ -277,13 +277,15 @@ pub(crate) fn enum_member_literals<'a, 'db: 'a>(
     })
 }
 
-pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
+pub(crate) fn is_single_member_enum<'db>(db: &'db dyn Db, class: StmtClassLiteral<'db>) -> bool {
     enum_metadata(db, class).is_some_and(|metadata| metadata.members.len() == 1)
 }
 
 pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
-        Type::ClassLiteral(class_literal) => enum_metadata(db, class_literal).is_some(),
+        Type::ClassLiteral(class_literal) => class_literal
+            .as_stmt()
+            .is_some_and(|stmt| enum_metadata(db, stmt).is_some()),
         _ => false,
     }
 }
@@ -293,8 +295,12 @@ pub(crate) fn is_enum_class<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
 ///
 /// This is a lighter-weight check than `enum_metadata`, which additionally
 /// verifies that the class has members.
-pub(crate) fn is_enum_class_by_inheritance<'db>(db: &'db dyn Db, class: ClassLiteral<'db>) -> bool {
-    Type::ClassLiteral(class).is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
+pub(crate) fn is_enum_class_by_inheritance<'db>(
+    db: &'db dyn Db,
+    class: StmtClassLiteral<'db>,
+) -> bool {
+    Type::ClassLiteral(ClassLiteral::Stmt(class))
+        .is_subtype_of(db, KnownClass::Enum.to_subclass_of(db))
         || class
             .metaclass(db)
             .is_subtype_of(db, KnownClass::EnumType.to_subclass_of(db))

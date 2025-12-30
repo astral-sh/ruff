@@ -20,8 +20,8 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, SubclassOfInner, Type,
-        TypeVarBoundOrConstraints, class::CodeGeneratorKind, generics::Specialization,
+        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, StmtClassLiteral, SubclassOfInner,
+        Type, TypeVarBoundOrConstraints, class::CodeGeneratorKind, generics::Specialization,
     },
 };
 
@@ -182,25 +182,19 @@ impl<'db> AllMembers<'db> {
 
             Type::NominalInstance(instance) => {
                 let class = instance.class(db);
-                let (class_literal, specialization) = class.class_literal(db);
-                self.extend_with_instance_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, specialization);
+                if let Some((class_literal, specialization)) = class.stmt_class_literal(db) {
+                    self.extend_with_instance_members(db, ty, class_literal);
+                    self.extend_with_synthetic_members(
+                        db,
+                        ty,
+                        ClassLiteral::Stmt(class_literal),
+                        specialization,
+                    );
+                }
             }
 
             Type::NewTypeInstance(newtype) => {
                 self.extend_with_type(db, newtype.concrete_base_type(db));
-            }
-
-            Type::FunctionalInstance(functional_class) => {
-                // Iterate the functional class's MRO (which includes `object`)
-                for class in functional_class
-                    .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                {
-                    let (class_literal, specialization) = class.class_literal(db);
-                    self.extend_with_instance_members_for_class(db, ty, class_literal);
-                    self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-                }
             }
 
             Type::ClassLiteral(class_literal) if class_literal.is_typed_dict(db) => {
@@ -225,8 +219,8 @@ impl<'db> AllMembers<'db> {
 
             Type::GenericAlias(generic_alias) => {
                 let class_literal = generic_alias.origin(db);
-                self.extend_with_class_members(db, ty, class_literal);
-                self.extend_with_synthetic_members(db, ty, class_literal, None);
+                self.extend_with_class_members(db, ty, ClassLiteral::Stmt(class_literal));
+                self.extend_with_synthetic_members(db, ty, ClassLiteral::Stmt(class_literal), None);
                 if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
                     self.extend_with_class_members(db, ty, metaclass);
                 }
@@ -238,11 +232,23 @@ impl<'db> AllMembers<'db> {
                 }
                 _ => {
                     if let Some(class_type) = subclass_of_type.subclass_of().into_class(db) {
-                        let (class_literal, specialization) = class_type.class_literal(db);
-                        self.extend_with_class_members(db, ty, class_literal);
-                        self.extend_with_synthetic_members(db, ty, class_literal, specialization);
-                        if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
-                            self.extend_with_class_members(db, ty, metaclass);
+                        if let Some((class_literal, specialization)) =
+                            class_type.stmt_class_literal(db)
+                        {
+                            self.extend_with_class_members(
+                                db,
+                                ty,
+                                ClassLiteral::Stmt(class_literal),
+                            );
+                            self.extend_with_synthetic_members(
+                                db,
+                                ty,
+                                ClassLiteral::Stmt(class_literal),
+                                specialization,
+                            );
+                            if let Type::ClassLiteral(metaclass) = class_literal.metaclass(db) {
+                                self.extend_with_class_members(db, ty, metaclass);
+                            }
                         }
                     }
                 }
@@ -302,12 +308,18 @@ impl<'db> AllMembers<'db> {
                 }
                 Type::SubclassOf(subclass_of) => {
                     if let Some(class) = subclass_of.subclass_of().into_class(db) {
-                        self.extend_with_class_members(db, ty, class.class_literal(db).0);
+                        if let Some((class_literal, _)) = class.stmt_class_literal(db) {
+                            self.extend_with_class_members(
+                                db,
+                                ty,
+                                ClassLiteral::Stmt(class_literal),
+                            );
+                        }
                     }
                 }
                 Type::GenericAlias(generic_alias) => {
                     let class_literal = generic_alias.origin(db);
-                    self.extend_with_class_members(db, ty, class_literal);
+                    self.extend_with_class_members(db, ty, ClassLiteral::Stmt(class_literal));
                 }
                 _ => {}
             },
@@ -317,7 +329,7 @@ impl<'db> AllMembers<'db> {
                     self.extend_with_class_members(db, ty, class_literal);
                 }
 
-                if let Type::ClassLiteral(class) =
+                if let Type::ClassLiteral(ClassLiteral::Stmt(class)) =
                     KnownClass::TypedDictFallback.to_class_literal(db)
                 {
                     self.extend_with_instance_members(db, ty, class);
@@ -423,9 +435,9 @@ impl<'db> AllMembers<'db> {
         class_literal: ClassLiteral<'db>,
     ) {
         for parent in class_literal
-            .iter_mro(db, None)
+            .iter_mro(db)
             .filter_map(ClassBase::into_class)
-            .map(|class| class.class_literal(db).0)
+            .filter_map(|class| class.stmt_class_literal(db).map(|(lit, _)| lit))
         {
             let parent_scope = parent.body_scope(db);
             for memberdef in all_end_of_scope_members(db, parent_scope) {
@@ -446,7 +458,7 @@ impl<'db> AllMembers<'db> {
         &mut self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
+        class_literal: StmtClassLiteral<'db>,
     ) {
         let class_body_scope = class_literal.body_scope(db);
         let file = class_body_scope.file(db);
@@ -489,13 +501,15 @@ impl<'db> AllMembers<'db> {
         &mut self,
         db: &'db dyn Db,
         ty: Type<'db>,
-        class_literal: ClassLiteral<'db>,
+        class_literal: StmtClassLiteral<'db>,
     ) {
         for class in class_literal
             .iter_mro(db, None)
             .filter_map(ClassBase::into_class)
         {
-            self.extend_with_instance_members_for_class(db, ty, class.class_literal(db).0);
+            if let Some((class_literal, _)) = class.stmt_class_literal(db) {
+                self.extend_with_instance_members_for_class(db, ty, class_literal);
+            }
         }
     }
 
@@ -506,7 +520,10 @@ impl<'db> AllMembers<'db> {
         class_literal: ClassLiteral<'db>,
         specialization: Option<Specialization<'db>>,
     ) {
-        match CodeGeneratorKind::from_class(db, class_literal, specialization) {
+        let Some(stmt_class) = class_literal.as_stmt() else {
+            return;
+        };
+        match CodeGeneratorKind::from_class(db, stmt_class, specialization) {
             Some(CodeGeneratorKind::NamedTuple) => {
                 if ty.is_nominal_instance() {
                     self.extend_with_type(db, KnownClass::NamedTupleFallback.to_instance(db));
