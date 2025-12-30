@@ -94,7 +94,7 @@ use crate::{FixAvailability, Locator, Violation};
 #[violation_metadata(preview_since = "0.14.11")]
 pub(crate) struct UnsortedStatements;
 
-/// Allows UnsortedStatements to be treated as a Violation.
+/// Allows `UnsortedStatements` to be treated as a Violation.
 impl Violation for UnsortedStatements {
     /// Fix is sometimes available.
     const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
@@ -129,9 +129,8 @@ impl Violation for UnsortedStatements {
 fn get_replacement_text(locator: &Locator, stmt: &Stmt, narrative_order: bool) -> String {
     // If the statement is a class, get its definition, otherwise, return the original text
     let original_text = locator.slice(stmt.range()).to_string();
-    let class_def = match stmt {
-        Stmt::ClassDef(c) => c,
-        _ => return original_text,
+    let Stmt::ClassDef(class_def) = stmt else {
+        return original_text;
     };
 
     // Construct the replacement text by sorting the class body
@@ -196,7 +195,7 @@ fn organize_suite(suite: &[Stmt], locator: &Locator, narrative_order: bool) -> S
     let mut replacement = String::new();
     for (i, &node_idx) in sorted.iter().enumerate() {
         // Append the statement text
-        let suite_text = get_replacement_text(locator, &nodes[node_idx].stmt, narrative_order);
+        let suite_text = get_replacement_text(locator, nodes[node_idx].stmt, narrative_order);
         replacement.push_str(&suite_text);
 
         // Append the separator unless this is the last sorted node
@@ -245,7 +244,7 @@ mod tests {
     use anyhow::Result;
     use ruff_python_parser::parse_module;
 
-    /// Test that get_replacement_text() returns the original text for a function.
+    /// Test that `get_replacement_text()` returns the original text for a function.
     #[test]
     fn get_replacement_text_function() -> Result<()> {
         let source = r#"def foo():
@@ -261,7 +260,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() returns the original text for a non-sortable class.
+    /// Test that `get_replacement_text()` returns the original text for a non-sortable class.
     #[test]
     fn get_replacement_text_non_sortable_class() -> Result<()> {
         let source = r#"class Foo:
@@ -278,7 +277,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() sorts methods with dependencies.
+    /// Test that `get_replacement_text()` sorts methods with dependencies.
     #[test]
     fn get_replacement_text_sortable_methods() -> Result<()> {
         let source = r#"class Foo:
@@ -302,7 +301,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() preserves the class header.
+    /// Test that `get_replacement_text()` preserves the class header.
     #[test]
     fn get_replacement_text_class_header() -> Result<()> {
         let source = r#"class Foo(Base):
@@ -322,7 +321,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() returns the original text for an assignment.
+    /// Test that `get_replacement_text()` returns the original text for an assignment.
     #[test]
     fn get_replacement_text_assignment() -> Result<()> {
         let source = r#"x = 1
@@ -337,7 +336,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() returns the original text for circular dependencies.
+    /// Test that `get_replacement_text()` returns the original text for circular dependencies.
     #[test]
     fn get_replacement_text_circular_dependency() -> Result<()> {
         let source = r#"class Foo:
@@ -357,7 +356,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() returns the original text for an empty class.
+    /// Test that `get_replacement_text()` returns the original text for an empty class.
     #[test]
     fn get_replacement_text_empty_class() -> Result<()> {
         let source = r#"class Foo:
@@ -373,7 +372,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() handles complex a class with multiple methods.
+    /// Test that `get_replacement_text()` handles complex a class with multiple methods.
     #[test]
     fn get_replacement_text_complex_class() -> Result<()> {
         let source = r#"class Foo:
@@ -403,7 +402,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that get_replacement_text() preserves decorators on methods.
+    /// Test that `get_replacement_text()` preserves decorators on methods.
     #[test]
     fn get_replacement_text_with_decorators() -> Result<()> {
         let source = r#"class Foo:
@@ -426,7 +425,7 @@ mod tests {
         Ok(())
     }
 
-    /// Test that separator_for() includes trailing inline comments.
+    /// Test that `separator_for()` includes trailing inline comments.
     #[test]
     fn separator_for_inline_comment() -> Result<()> {
         let source = r#"def foo():
@@ -445,7 +444,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() handles the last statement correctly.
+    /// Test that `separator_for()` handles the last statement correctly.
     #[test]
     fn separator_for_last_statement() -> Result<()> {
         let source = r#"def foo():
@@ -464,7 +463,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() returns a double newline for two statements.
+    /// Test that `separator_for()` returns a double newline for two statements.
     #[test]
     fn separator_for_two_statements() -> Result<()> {
         let source = r#"def foo():
@@ -483,7 +482,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() handles multiple statements correctly.
+    /// Test that `separator_for()` handles multiple statements correctly.
     #[test]
     fn separator_for_multiple_statements() -> Result<()> {
         let source = r#"def foo():
@@ -508,7 +507,7 @@ def baz():
         Ok(())
     }
 
-    /// Test that separator_for() returns the default separator for a single statement.
+    /// Test that `separator_for()` returns the default separator for a single statement.
     #[test]
     fn separator_for_single_statement() -> Result<()> {
         let source = r#"def foo():
@@ -524,7 +523,7 @@ def baz():
         Ok(())
     }
 
-    /// Test that separator_for() preserves custom spacing between statements.
+    /// Test that `separator_for()` preserves custom spacing between statements.
     #[test]
     fn separator_for_custom_spacing() -> Result<()> {
         let source = r#"def foo():
@@ -545,7 +544,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() preserves comments between statements.
+    /// Test that `separator_for()` preserves comments between statements.
     #[test]
     fn separator_for_with_comment() -> Result<()> {
         let source = r#"def foo():
@@ -565,7 +564,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() handles multiple blank lines.
+    /// Test that `separator_for()` handles multiple blank lines.
     #[test]
     fn separator_for_multiple_blank_lines() -> Result<()> {
         let source = r#"def foo():
@@ -587,7 +586,7 @@ def bar():
         Ok(())
     }
 
-    /// Test that separator_for() handles multiple comments.
+    /// Test that `separator_for()` handles multiple comments.
     #[test]
     fn separator_for_multiple_comments() -> Result<()> {
         let source = r#"def foo():

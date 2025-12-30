@@ -1,10 +1,10 @@
 use std::fmt;
 
-use rustc_hash::FxHashSet;
+use rustc_hash::FxHashMap;
 
 use ruff_python_ast::name::Name;
-use ruff_python_ast::visitor::{Visitor, walk_expr};
-use ruff_python_ast::{Expr, Stmt};
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{Expr, InterpolatedStringElement, Stmt};
 
 /// An error indicating that a cycle was detected in the dependency graph.
 #[derive(Debug)]
@@ -13,10 +13,10 @@ pub(super) struct CycleError {
     pub(crate) cycle: Vec<usize>,
 }
 
-/// Allows CycleError to be treated as a standard error.
+/// Allows `CycleError` to be treated as a standard error.
 impl std::error::Error for CycleError {}
 
-/// Allows CycleError to be formatted for display.
+/// Allows `CycleError` to be formatted for display.
 impl fmt::Display for CycleError {
     /// Format the cycle error for display.
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -40,40 +40,164 @@ pub(super) struct Node<'a> {
     pub(crate) movable: bool,
 }
 
-/// A visitor that collects all variable names referenced in expressions.
-#[derive(Debug)]
+/// A visitor that collects all variable names referenced by a statement.
+#[derive(Default)]
 struct DependencyVisitor<'a> {
-    /// The set of variable names referenced.
-    names: FxHashSet<&'a Name>,
+    /// The names referenced by the statement.
+    names: Vec<&'a Name>,
+
+    /// A mapping from names to their corresponding node indices.
+    name_to_index: FxHashMap<&'a Name, usize>,
+
+    /// The current depth of function definitions during traversal.
+    function_depth: usize,
+
+    /// The current depth of class definitions during traversal.
+    class_depth: usize,
 }
 
-/// Allows DependencyVisitor to be used as a visitor for AST nodes.
+impl<'a> DependencyVisitor<'a> {
+    /// Create a new `DependencyVisitor` with the given name-to-index mapping.
+    ///
+    /// ## Arguments
+    /// * `nodes` - The list of all nodes in the AST.
+    pub(crate) fn new(nodes: &[Node<'a>]) -> Self {
+        let name_to_index: FxHashMap<_, _> = nodes
+            .iter()
+            .filter_map(|node| node.name.map(|name| (name, node.index)))
+            .collect();
+
+        Self {
+            names: Vec::new(),
+            name_to_index,
+            function_depth: 0,
+            class_depth: 0,
+        }
+    }
+}
+
+/// Allows `DependencyVisitor` to be used as a visitor for AST nodes.
 impl<'a> Visitor<'a> for DependencyVisitor<'a> {
+    /// Visit a statement node during AST traversal.
+    ///
+    /// ## Arguments
+    /// * `stmt` - The statement node to visit.
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match stmt {
+            // Only traverse class definitions to capture class-level references
+            Stmt::ClassDef(_) => {
+                self.class_depth += 1;
+                ruff_python_ast::visitor::walk_stmt(self, stmt);
+                self.class_depth -= 1;
+            }
+
+            // Only traverse top-level function definitions to capture global references
+            Stmt::FunctionDef(_) => {
+                if self.function_depth == 0 && self.class_depth == 0 {
+                    self.function_depth += 1;
+                    ruff_python_ast::visitor::walk_stmt(self, stmt);
+                    self.function_depth -= 1;
+                }
+            }
+
+            // Everything else: traverse normally
+            _ => ruff_python_ast::visitor::walk_stmt(self, stmt),
+        }
+    }
+
     /// Visit an expression node during AST traversal.
     ///
     /// ## Arguments
     /// * `expr` - The expression node to visit.
     fn visit_expr(&mut self, expr: &'a Expr) {
-        // If the expression is a reference, add it to the set
         match expr {
-            // Unqualified reference, e.g. `foo()`
+            // Simple variable reference: `foo`
             Expr::Name(name) => {
-                self.names.insert(&name.id);
+                self.names.push(&name.id);
             }
 
-            // Instance method call, e.g. `self.foo()`
+            // Attribute access: `self.foo` or `obj.foo`
+            Expr::Attribute(attr) if matches!(&*attr.value, Expr::Name(n) if n.id.as_str() == "self") =>
+            {
+                self.names.push(&attr.attr.id);
+            }
+
+            // Attribute access: `obj.foo`
             Expr::Attribute(attr) => {
-                if let Expr::Name(value) = &*attr.value {
-                    if value.id.as_str() == "self" {
-                        self.names.insert(&attr.attr.id);
+                self.visit_expr(&attr.value);
+            }
+
+            // Function/method call: `func(arg1, arg2, ...)`
+            Expr::Call(call) => {
+                self.visit_expr(&call.func);
+                call.arguments
+                    .args
+                    .iter()
+                    .for_each(|arg| self.visit_expr(arg));
+                call.arguments
+                    .keywords
+                    .iter()
+                    .for_each(|kw| self.visit_expr(&kw.value));
+            }
+
+            // f-strings: `f"Hello {name}"`
+            Expr::FString(expr_fstring) => {
+                for element in expr_fstring.value.elements() {
+                    if let InterpolatedStringElement::Interpolation(interp) = element {
+                        self.visit_expr(&interp.expression);
                     }
                 }
             }
 
-            // Other expressions are not relevant for dependency collection
+            // Binary operations: `a + b`
+            Expr::BinOp(binop) => {
+                self.visit_expr(&binop.left);
+                self.visit_expr(&binop.right);
+            }
+
+            // Boolean operations: `a and b`, `a or b`
+            Expr::BoolOp(boolop) => {
+                boolop.values.iter().for_each(|v| self.visit_expr(v));
+            }
+
+            // Conditional expression: `a if cond else b`
+            Expr::If(ifexp) => {
+                self.visit_expr(&ifexp.test);
+                self.visit_expr(&ifexp.body);
+                self.visit_expr(&ifexp.orelse);
+            }
+
+            // List literal: `[elem1, elem2, ...]`
+            Expr::List(list) => list.elts.iter().for_each(|elt| self.visit_expr(elt)),
+
+            // Tuple literal: `(elem1, elem2, ...)
+            Expr::Tuple(list) => list.elts.iter().for_each(|elt| self.visit_expr(elt)),
+
+            // Set literal: `{elem1, elem2, ...}`
+            Expr::Set(set) => set.elts.iter().for_each(|elt| self.visit_expr(elt)),
+
+            // Dictionary literal: `{key: value, ...}`
+            Expr::Dict(dict) => {
+                for item in &dict.items {
+                    if let Some(key) = &item.key {
+                        self.visit_expr(key);
+                    }
+                    self.visit_expr(&item.value);
+                }
+            }
+
+            // Generator expressions: `(x for x in iterable if cond)`
+            Expr::Generator(generator) => {
+                self.visit_expr(&generator.elt);
+                for comp in &generator.generators {
+                    self.visit_expr(&comp.iter);
+                    comp.ifs.iter().for_each(|if_| self.visit_expr(if_));
+                }
+            }
+
+            // Everything else: leaf expressions or unsupported types
             _ => {}
         }
-        walk_expr(self, expr);
     }
 }
 
@@ -81,34 +205,28 @@ impl<'a> Visitor<'a> for DependencyVisitor<'a> {
 ///
 /// ## Arguments
 /// * `node` - The node for which to collect dependencies.
-/// * `nodes` - The list of all nodes extracted from the module.
+/// * `visitor` - A reusable dependency visitor to traverse the node's statement.
 ///
 /// ## Returns
 /// A vector of node indices that this node depends on.
-fn collect_dependencies<'a>(node: &'a Node, nodes: &[Node<'a>]) -> Vec<usize> {
-    // Collect the names referenced in the statement
-    let mut visitor = DependencyVisitor {
-        names: FxHashSet::default(),
-    };
+fn collect_dependencies<'a>(node: &'a Node, visitor: &mut DependencyVisitor<'a>) -> Vec<usize> {
+    // Reset the visitor's state
+    visitor.names.clear();
+
+    // Visit the statement to collect referenced names
     visitor.visit_stmt(node.stmt);
 
-    // For each referenced name, find the corresponding node index
-    let mut dependencies = Vec::new();
-    for &referenced in &visitor.names {
-        for other in nodes {
-            // Skip self-references
-            if other.index == node.index {
-                continue;
-            }
+    // Deduplicate the collected names
+    visitor.names.sort_unstable();
+    visitor.names.dedup();
 
-            // If it matches, exit immediately as there will only be one match
-            if other.name == Some(referenced) {
-                dependencies.push(other.index);
-                break;
-            }
-        }
-    }
-    dependencies
+    // Map referenced names to node indices, skipping unknown names and self-references
+    visitor
+        .names
+        .iter()
+        .filter_map(|name| visitor.name_to_index.get(name).copied())
+        .filter(|&idx| idx != node.index)
+        .collect()
 }
 
 /// Holds dependencies between nodes.
@@ -127,10 +245,11 @@ impl Dependencies {
     /// ## Returns
     /// A `Dependencies` instance containing the collected dependencies.
     pub(super) fn from_nodes(nodes: &[Node]) -> Self {
+        let mut visitor = DependencyVisitor::new(nodes);
         Self {
             dependencies: nodes
                 .iter()
-                .map(|node| collect_dependencies(node, nodes))
+                .map(|node| collect_dependencies(node, &mut visitor))
                 .collect(),
         }
     }
@@ -146,26 +265,16 @@ impl Dependencies {
     /// * `narrative_order` - Whether to use a narrative-oriented order for the result.
     ///
     /// ## Returns
-    /// A vector of node indices in dependency-respecting order, or a CycleError if a cycle is
+    /// A vector of node indices in dependency-respecting order, or a `CycleError` if a cycle is
     /// detected.
     pub(super) fn dependency_order(
         &self,
         nodes: &[Node],
         narrative_order: bool,
     ) -> Result<Vec<usize>, CycleError> {
-        // Tracks which nodes have already been emitted to avoid duplicates
-        let mut emitted = vec![false; nodes.len()];
-
-        // Tracks which nodes are currently being visited to detect cycles
-        let mut visiting = vec![false; nodes.len()];
-
-        // Tracks the current stack of nodes being visited for cycle reporting
-        let mut stack = Vec::new();
-
         fn emit_deps(
             idx: usize,
             deps: &[Vec<usize>],
-            nodes: &[Node],
             emitted: &mut [bool],
             visiting: &mut [bool],
             stack: &mut Vec<usize>,
@@ -190,9 +299,7 @@ impl Dependencies {
 
             // Recursively emit all movable dependencies first
             for &dep in &deps[idx] {
-                if nodes[dep].movable {
-                    emit_deps(dep, deps, nodes, emitted, visiting, stack, result)?;
-                }
+                emit_deps(dep, deps, emitted, visiting, stack, result)?;
             }
 
             // Mark this node as no longer being visited and emit it
@@ -203,13 +310,21 @@ impl Dependencies {
             Ok(())
         }
 
+        // Tracks which nodes have already been emitted to avoid duplicates
+        let mut emitted = vec![false; nodes.len()];
+
+        // Tracks which nodes are currently being visited to detect cycles
+        let mut visiting = vec![false; nodes.len()];
+
+        // Tracks the current stack of nodes being visited for cycle reporting
+        let mut stack = Vec::new();
+
         // Iterate over all nodes and return the dependency-respecting order
         let mut result = Vec::with_capacity(nodes.len());
         for idx in 0..nodes.len() {
             emit_deps(
                 idx,
                 &self.dependencies,
-                nodes,
                 &mut emitted,
                 &mut visiting,
                 &mut stack,
@@ -217,19 +332,25 @@ impl Dependencies {
             )?;
         }
         if narrative_order {
-            // Collect positions of movable nodes
-            let positions: Vec<usize> = result
+            // Collect all movable nodes in reverse order
+            let movable: Vec<usize> = result
                 .iter()
-                .enumerate()
-                .filter_map(|(i, &idx)| nodes[idx].movable.then_some(i))
+                .copied()
+                .filter(|&idx| nodes[idx].movable)
                 .collect();
+            let mut movable_iter = movable.into_iter().rev();
 
-            // Swap movable nodes symmetrically to reverse their order
-            for k in 0..positions.len() / 2 {
-                let i = positions[k];
-                let j = positions[positions.len() - 1 - k];
-                result.swap(i, j);
-            }
+            // Reconstruct the result, replacing movable nodes with their reversed counterparts
+            result = result
+                .into_iter()
+                .map(|idx| {
+                    if nodes[idx].movable {
+                        movable_iter.next().unwrap()
+                    } else {
+                        idx
+                    }
+                })
+                .collect();
         }
         Ok(result)
     }
@@ -267,25 +388,28 @@ pub(super) fn nodes_from_suite(suite: &'_ [Stmt]) -> Vec<Node<'_>> {
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::name::Name;
     use ruff_python_parser::parse_module;
 
-    use super::{CycleError, Dependencies, collect_dependencies, nodes_from_suite};
+    use super::{
+        CycleError, Dependencies, DependencyVisitor, collect_dependencies, nodes_from_suite,
+    };
 
-    /// Test that CycleError displays correctly.
+    /// Test that `CycleError` displays correctly.
     #[test]
     fn cycle_error_display() {
         let err = CycleError {
             cycle: vec![0, 1, 2],
         };
-        let display = format!("{}", err);
+        let display = format!("{err}");
 
         assert!(display.contains("Cycle detected"));
-        assert!(display.contains("0"));
-        assert!(display.contains("1"));
-        assert!(display.contains("2"));
+        assert!(display.contains('0'));
+        assert!(display.contains('1'));
+        assert!(display.contains('2'));
     }
 
-    /// Test that CycleError implements std::error::Error.
+    /// Test that `CycleError` implements `std::error::Error`.
     #[test]
     fn cycle_error_is_error() {
         let err = CycleError { cycle: vec![0] };
@@ -304,9 +428,10 @@ def bar():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
 
-        assert_eq!(collect_dependencies(&nodes[0], &nodes).len(), 0);
-        assert_eq!(collect_dependencies(&nodes[1], &nodes).len(), 0);
+        assert_eq!(collect_dependencies(&nodes[0], &mut visitor).len(), 0);
+        assert_eq!(collect_dependencies(&nodes[1], &mut visitor).len(), 0);
         Ok(())
     }
 
@@ -322,7 +447,8 @@ def bar():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[1], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -343,7 +469,8 @@ def baz():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[2], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
 
         assert_eq!(deps.len(), 2);
         assert!(deps.contains(&0));
@@ -360,7 +487,8 @@ def factorial(n):
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[0], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[0], &mut visitor);
 
         assert_eq!(deps.len(), 0);
         Ok(())
@@ -376,7 +504,8 @@ def foo():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[0], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[0], &mut visitor);
 
         assert_eq!(deps.len(), 0);
         Ok(())
@@ -394,7 +523,8 @@ class Derived:
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[1], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
 
         assert_eq!(deps, vec![0]);
         Ok(())
@@ -415,9 +545,10 @@ def c():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
 
-        assert_eq!(collect_dependencies(&nodes[1], &nodes), vec![0]);
-        assert_eq!(collect_dependencies(&nodes[2], &nodes), vec![1]);
+        assert_eq!(collect_dependencies(&nodes[1], &mut visitor), vec![0]);
+        assert_eq!(collect_dependencies(&nodes[2], &mut visitor), vec![1]);
         Ok(())
     }
 
@@ -433,9 +564,315 @@ def bar():
 "#;
         let parsed = parse_module(source)?;
         let nodes = nodes_from_suite(parsed.suite());
-        let deps = collect_dependencies(&nodes[1], &nodes);
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
 
         assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that dependencies in f-strings are collected.
+    #[test]
+    fn collect_dependencies_fstring() -> Result<()> {
+        let source = r#"
+def foo():
+    return "world"
+
+def bar():
+    return f"Hello {foo()}"
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that dependencies in f-strings with multiple interpolations are collected.
+    #[test]
+    fn collect_dependencies_fstring_multiple() -> Result<()> {
+        let source = r#"
+def foo():
+    return "hello"
+
+def bar():
+    return "world"
+
+def baz():
+    return f"{foo()} {bar()}"
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in binary operations are collected.
+    #[test]
+    fn collect_dependencies_binop() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return foo() + bar()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in boolean operations are collected.
+    #[test]
+    fn collect_dependencies_boolop() -> Result<()> {
+        let source = r#"
+def foo():
+    return True
+
+def bar():
+    return False
+
+def baz():
+    return foo() and bar()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in conditional expressions are collected.
+    #[test]
+    fn collect_dependencies_if_expr() -> Result<()> {
+        let source = r#"
+def foo():
+    return True
+
+def bar():
+    return 1
+
+def baz():
+    return 2
+
+def qux():
+    return bar() if foo() else baz()
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[3], &mut visitor);
+
+        assert_eq!(deps.len(), 3);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        assert!(deps.contains(&2));
+        Ok(())
+    }
+
+    /// Test that dependencies in list literals are collected.
+    #[test]
+    fn collect_dependencies_list() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return [foo(), bar()]
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in tuple literals are collected.
+    #[test]
+    fn collect_dependencies_tuple() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return (foo(), bar())
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in set literals are collected.
+    #[test]
+    fn collect_dependencies_set() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return {foo(), bar()}
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in dictionary literals are collected.
+    #[test]
+    fn collect_dependencies_dict() -> Result<()> {
+        let source = r#"
+def foo():
+    return "key"
+
+def bar():
+    return "value"
+
+def baz():
+    return {foo(): bar()}
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in dictionary literals with only values are collected.
+    #[test]
+    fn collect_dependencies_dict_values_only() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return {"key": foo()}
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that dependencies in generator expressions are collected.
+    #[test]
+    fn collect_dependencies_generator() -> Result<()> {
+        let source = r#"
+def foo():
+    return [1, 2, 3]
+
+def bar():
+    return (x * 2 for x in foo())
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[1], &mut visitor);
+
+        assert_eq!(deps, vec![0]);
+        Ok(())
+    }
+
+    /// Test that dependencies in generator expressions with filters are collected.
+    #[test]
+    fn collect_dependencies_generator_with_filter() -> Result<()> {
+        let source = r#"
+def foo():
+    return [1, 2, 3]
+
+def bar(x):
+    return x > 1
+
+def baz():
+    return (x for x in foo() if bar(x))
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[2], &mut visitor);
+
+        assert_eq!(deps.len(), 2);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        Ok(())
+    }
+
+    /// Test that dependencies in complex nested expressions are collected.
+    #[test]
+    fn collect_dependencies_nested_complex() -> Result<()> {
+        let source = r#"
+def foo():
+    return 1
+
+def bar():
+    return 2
+
+def baz():
+    return 3
+
+def qux():
+    return [foo() if bar() else baz()]
+"#;
+        let parsed = parse_module(source)?;
+        let nodes = nodes_from_suite(parsed.suite());
+        let mut visitor = DependencyVisitor::new(&nodes);
+        let deps = collect_dependencies(&nodes[3], &mut visitor);
+
+        assert_eq!(deps.len(), 3);
+        assert!(deps.contains(&0));
+        assert!(deps.contains(&1));
+        assert!(deps.contains(&2));
         Ok(())
     }
 
@@ -708,9 +1145,9 @@ def bar():
         let nodes = nodes_from_suite(parsed.suite());
 
         assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("foo"));
+        assert_eq!(nodes[0].name.map(Name::as_str), Some("foo"));
         assert!(nodes[0].movable);
-        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("bar"));
+        assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
         assert!(nodes[1].movable);
         Ok(())
     }
@@ -729,9 +1166,9 @@ class Bar:
         let nodes = nodes_from_suite(parsed.suite());
 
         assert_eq!(nodes.len(), 2);
-        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("Foo"));
+        assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
         assert!(nodes[0].movable);
-        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("Bar"));
+        assert_eq!(nodes[1].name.map(Name::as_str), Some("Bar"));
         assert!(nodes[1].movable);
         Ok(())
     }
@@ -754,7 +1191,7 @@ def foo():
         assert!(!nodes[0].movable);
         assert_eq!(nodes[1].name, None);
         assert!(!nodes[1].movable);
-        assert_eq!(nodes[2].name.map(|n| n.as_str()), Some("foo"));
+        assert_eq!(nodes[2].name.map(Name::as_str), Some("foo"));
         assert!(nodes[2].movable);
         Ok(())
     }
@@ -777,9 +1214,9 @@ class Baz:
 
         assert_eq!(nodes.len(), 3);
         assert!(nodes.iter().all(|n| n.movable));
-        assert_eq!(nodes[0].name.map(|n| n.as_str()), Some("Foo"));
-        assert_eq!(nodes[1].name.map(|n| n.as_str()), Some("bar"));
-        assert_eq!(nodes[2].name.map(|n| n.as_str()), Some("Baz"));
+        assert_eq!(nodes[0].name.map(Name::as_str), Some("Foo"));
+        assert_eq!(nodes[1].name.map(Name::as_str), Some("bar"));
+        assert_eq!(nodes[2].name.map(Name::as_str), Some("Baz"));
         Ok(())
     }
 }

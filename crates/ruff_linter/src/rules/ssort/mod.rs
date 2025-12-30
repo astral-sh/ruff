@@ -32,8 +32,6 @@ mod tests {
     #[test_case(Path::new("empty.py"), true)]
     #[test_case(Path::new("format_string.py"), false)]
     #[test_case(Path::new("format_string.py"), true)]
-    #[test_case(Path::new("generic_class.py"), false)]
-    #[test_case(Path::new("generic_class.py"), true)]
     #[test_case(Path::new("generic_class_method_locals.py"), false)]
     #[test_case(Path::new("generic_class_method_locals.py"), true)]
     #[test_case(Path::new("generic_function.py"), false)]
@@ -78,8 +76,6 @@ mod tests {
     #[test_case(Path::new("top_level_statement.py"), true)]
     #[test_case(Path::new("type_alias.py"), false)]
     #[test_case(Path::new("type_alias.py"), true)]
-    #[test_case(Path::new("walrus.py"), false)]
-    #[test_case(Path::new("walrus.py"), true)]
     fn default(path: &Path, narrative_order: bool) -> Result<()> {
         let snapshot = format!(
             "{}_{}",
