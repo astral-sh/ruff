@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: del.md - `del` statement - Delete items - TypedDict deletion
 mdtest path: crates/ty_python_semantic/resources/mdtest/del.md

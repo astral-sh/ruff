@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: invalid_assignment.md - Invalid assignment diagnostics - Multiline expressions
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/invalid_assignment.md

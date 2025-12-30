@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: isinstance.md - Narrowing for `isinstance` checks - `classinfo` is an invalid PEP-604 union of types
 mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md

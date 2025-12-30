@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/except_stmt_unparenthesized_tuple_as.py
 ---
 ## AST
 

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: liskov.md - The Liskov Substitution Principle - Edge case: function defined in another module and then assigned in a class body
 mdtest path: crates/ty_python_semantic/resources/mdtest/liskov.md

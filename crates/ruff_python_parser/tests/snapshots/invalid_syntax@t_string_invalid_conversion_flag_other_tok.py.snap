@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/t_string_invalid_conversion_flag_other_tok.py
 ---
 ## AST
 

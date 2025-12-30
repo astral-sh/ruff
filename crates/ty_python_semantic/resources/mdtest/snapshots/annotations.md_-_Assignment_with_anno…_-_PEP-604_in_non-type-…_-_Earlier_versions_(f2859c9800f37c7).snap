@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: annotations.md - Assignment with annotations - PEP-604 in non-type-expression context - Earlier versions
 mdtest path: crates/ty_python_semantic/resources/mdtest/assignment/annotations.md

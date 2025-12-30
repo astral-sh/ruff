@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: typed_dict.md - `TypedDict` - Redundant cast warnings
 mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md

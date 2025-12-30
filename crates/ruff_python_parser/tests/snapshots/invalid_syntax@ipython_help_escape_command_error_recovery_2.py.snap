@@ -1,6 +1,5 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
-input_file: crates/ruff_python_parser/resources/inline/err/ipython_help_escape_command_error_recovery_2.py
 ---
 ## AST
 
