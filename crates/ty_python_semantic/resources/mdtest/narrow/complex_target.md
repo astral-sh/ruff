@@ -279,6 +279,85 @@ def _(t9: tuple[int | None, str] | tuple[str, int]):
         reveal_type(t9)  # revealed: tuple[int | None, str] | tuple[str, int]
 ```
 
+### Tagged unions of tuples (equality narrowing)
+
+Narrow unions of tuples based on literal tag elements using `==` comparison:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+        reveal_type(x[1])  # revealed: A
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+        reveal_type(x[1])  # revealed: B
+        reveal_type(x[2])  # revealed: C
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] != "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[1], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], B]
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    if x[0] == b"a":
+        reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+
+# Multiple tuple variants
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B] | tuple[Literal["c"], C]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    elif x[0] == "b":
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["c"], C]
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    if x[1] == "tag1":
+        reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+    else:
+        reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+```
+
+Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
+discriminating index, we can't safely narrow with equality:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    # Can't narrow because second tuple has `str` (not literal) at index 0
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+    else:
+        # But we *can* narrow with inequality
+        reveal_type(x)  # revealed: tuple[str, B]
+```
+
+We can still narrow tuples when non-tuple types are present in the union:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
+    if x[0] == "tag1":
+        # TODO: `list[int]` should probably be excluded since `list[int][0]` is `int`, not `Literal["tag1"]`
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
+```
+
 ### String subscript
 
 ```py
