@@ -100,6 +100,21 @@ class Answer(Enum):
 reveal_type(enum_members(Answer))
 ```
 
+### Declared `_value_` annotation
+
+If a `_value_` annotation is defined on an `Enum` class, all enum member values
+must be compatible with the declared type:
+
+```py
+from enum import Enum
+
+class Color(Enum):
+    _value_: int
+    RED = 1
+    GREEN = "green"  # error: [invalid-assignment]
+```
+
+
 ### Non-member attributes with disallowed type
 
 Methods, callables, descriptors (including properties), and nested classes that are defined in the
