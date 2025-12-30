@@ -11,11 +11,11 @@ repository = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+filetime = { workspace = true }
 glob = { workspace = true }
 globset = { workspace = true }
 itertools = { workspace = true }
 regex = { workspace = true }
-filetime = { workspace = true }
 seahash = { workspace = true }
 
 [dev-dependencies]

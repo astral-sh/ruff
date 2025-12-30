@@ -136,5 +136,11 @@ repos:
     hooks:
       - id: shellcheck
 
+  - repo: https://github.com/DevinR528/cargo-sort
+    rev: v2.0.2
+    hooks:
+      - id: cargo-sort
+        args: ["-g", "-w"]
+
 ci:
   skip: [cargo-fmt, dev-generate-all]
