@@ -135,6 +135,3 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-
-ci:
-  skip: [cargo-fmt, dev-generate-all]
