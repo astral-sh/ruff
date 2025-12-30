@@ -3,15 +3,9 @@ import sys
 import types
 from collections.abc import Iterable
 from enum import Enum
-from typing import (
-    Any,
-    ClassVar,
-    LiteralString,
-    Protocol,
-    _SpecialForm,
-)
+from typing import Any, ClassVar, Protocol, _SpecialForm
 
-from typing_extensions import Self  # noqa: UP035
+from typing_extensions import LiteralString, Self  # noqa: UP035
 
 # Special operations
 def static_assert(condition: object, msg: LiteralString | None = None) -> None: ...
@@ -26,12 +20,67 @@ Not: _SpecialForm
 Intersection: _SpecialForm
 TypeOf: _SpecialForm
 CallableTypeOf: _SpecialForm
-# Top[T] evaluates to the top materialization of T, a type that is a supertype
-# of every materialization of T.
+
 Top: _SpecialForm
-# Bottom[T] evaluates to the bottom materialization of T, a type that is a subtype
-# of every materialization of T.
+"""
+`Top[T]` represents the "top materialization" of `T`.
+
+For any type `T`, the top [materialization] of `T` is a type that is
+a supertype of all materializations of `T`.
+
+For a [fully static] type `T`, `Top[T]` is always exactly the same type
+as `T` itself. For example, the top materialization of `Sequence[int]`
+is simply `Sequence[int]`.
+
+For a [gradual type] `T` that contains [`Any`][Any] or `Unknown` inside
+it, however, `Top[T]` will not be equivalent to `T`. `Top[Sequence[Any]]`
+evaluates to `Sequence[object]`: since `Sequence` is covariant, no
+possible materialization of `Any` exists such that a fully static
+materialization of `Sequence[Any]` would not be a subtype of
+`Sequence[object]`.
+
+`Top[T]` cannot be simplified further for invariant gradual types.
+`Top[list[Any]]` cannot be simplified to any other type: because `list`
+is invariant, `list[object]` is not a supertype of `list[int]`. The
+top materialization of `list[Any]` is simply `Top[list[Any]]`: the
+infinite union of `list[T]` for every possible fully static type `T`.
+
+[materialization]: https://typing.python.org/en/latest/spec/concepts.html#materialization
+[fully static]: https://typing.python.org/en/latest/spec/concepts.html#fully-static-types
+[gradual type]: https://typing.python.org/en/latest/spec/concepts.html#gradual-types
+[Any]: https://typing.python.org/en/latest/spec/special-types.html#any
+"""
+
 Bottom: _SpecialForm
+"""
+`Bottom[T]` represents the "bottom materialization" of `T`.
+
+For any type `T`, the bottom [materialization] of `T` is a type that is
+a subtype of all materializations of `T`.
+
+For a [fully static] type `T`, `Bottom[T]` is always exactly the same type
+as `T` itself. For example, the bottom materialization of `Sequence[int]`
+is simply `Sequence[int]`.
+
+For a [gradual type] `T` that contains [`Any`][Any] or `Unknown` inside it,
+however, `Bottom[T]` will not be equivalent to `T`. `Bottom[Sequence[Any]]`
+evaluates to `Sequence[Never]`: since `Sequence` is covariant, no
+possible materialization of `Any` exists such that a fully static
+materialization of `Sequence[Any]` would not be a supertype of
+`Sequence[Never]`. (`Sequence[Never]` is not the same type as the
+uninhabited type `Never`: for example, it is inhabited by the empty tuple,
+`()`.)
+
+For many invariant gradual types `T`, `Bottom[T]` is equivalent to
+[`Never`][Never], although ty will not necessarily apply this simplification
+eagerly.
+
+[materialization]: https://typing.python.org/en/latest/spec/concepts.html#materialization
+[fully static]: https://typing.python.org/en/latest/spec/concepts.html#fully-static-types
+[gradual type]: https://typing.python.org/en/latest/spec/concepts.html#gradual-types
+[Never]: https://typing.python.org/en/latest/spec/special-types.html#never
+[Any]: https://typing.python.org/en/latest/spec/special-types.html#any
+"""
 
 # ty treats annotations of `float` to mean `float | int`, and annotations of `complex`
 # to mean `complex | float | int`. This is to support a typing-system special case [1].
@@ -184,12 +233,26 @@ def reveal_mro(cls: type | types.GenericAlias) -> None:
 # A protocol describing an interface that should be satisfied by all named tuples
 # created using `typing.NamedTuple` or `collections.namedtuple`.
 class NamedTupleLike(Protocol):
-    # from typing.NamedTuple stub
+    # _fields is defined as `tuple[Any, ...]` rather than `tuple[str, ...]` so
+    # that instances of actual `NamedTuple` classes with more precise `_fields`
+    # types are considered assignable to this protocol (protocol attribute members
+    # are invariant, and `tuple[str, str]` is not invariantly assignable to
+    # `tuple[str, ...]`).
+    _fields: ClassVar[tuple[Any, ...]]
     _field_defaults: ClassVar[dict[str, Any]]
-    _fields: ClassVar[tuple[str, ...]]
     @classmethod
     def _make(cls: type[Self], iterable: Iterable[Any]) -> Self: ...
     def _asdict(self, /) -> dict[str, Any]: ...
-    def _replace(self, /, **kwargs) -> Self: ...
+
+    # Positional arguments aren't actually accepted by these methods at runtime,
+    # but adding the `*args` parameters means that all `NamedTuple` classes
+    # are understood as assignable to this protocol due to the special case
+    # outlined in https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable:
+    #
+    # > If the input signature in a function definition includes both a
+    # > `*args` and `**kwargs` parameter and both are typed as `Any`
+    # > (explicitly or implicitly because it has no annotation), a type
+    # > checker should treat this as the equivalent of `...`.
+    def _replace(self, *args, **kwargs) -> Self: ...
     if sys.version_info >= (3, 13):
-        def __replace__(self, **kwargs) -> Self: ...
+        def __replace__(self, *args, **kwargs) -> Self: ...

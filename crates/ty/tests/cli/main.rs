@@ -634,7 +634,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
@@ -643,7 +643,7 @@ fn concise_diagnostics() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     test.py:2:7: warning[unresolved-reference] Name `x` used when not defined
-    test.py:3:7: error[non-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    test.py:3:7: error[not-subscriptable] Cannot subscript object of type `Literal[4]` with no `__getitem__` method
     Found 2 diagnostics
 
     ----- stderr -----
@@ -658,7 +658,9 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
@@ -692,8 +694,8 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
         }
       },
       {
-        "check_name": "non-subscriptable",
-        "description": "non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
+        "check_name": "not-subscriptable",
+        "description": "not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method",
         "severity": "major",
         "fingerprint": "[FINGERPRINT]",
         "location": {
@@ -706,6 +708,25 @@ fn gitlab_diagnostics() -> anyhow::Result<()> {
             "end": {
               "line": 3,
               "column": 11
+            }
+          }
+        }
+      },
+      {
+        "check_name": "revealed-type",
+        "description": "revealed-type: Revealed type: `LiteralString`",
+        "severity": "info",
+        "fingerprint": "[FINGERPRINT]",
+        "location": {
+          "path": "test.py",
+          "positions": {
+            "begin": {
+              "line": 5,
+              "column": 13
+            },
+            "end": {
+              "line": 5,
+              "column": 26
             }
           }
         }
@@ -723,7 +744,9 @@ fn github_diagnostics() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
+        from typing_extensions import reveal_type
+        reveal_type('str'.lower())  # [revealed-type]
         "#,
     )?;
 
@@ -732,7 +755,8 @@ fn github_diagnostics() -> anyhow::Result<()> {
     exit_code: 1
     ----- stdout -----
     ::warning title=ty (unresolved-reference),file=<temp_dir>/test.py,line=2,col=7,endLine=2,endColumn=8::test.py:2:7: unresolved-reference: Name `x` used when not defined
-    ::error title=ty (non-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: non-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::error title=ty (not-subscriptable),file=<temp_dir>/test.py,line=3,col=7,endLine=3,endColumn=11::test.py:3:7: not-subscriptable: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    ::notice title=ty (revealed-type),file=<temp_dir>/test.py,line=5,col=13,endLine=5,endColumn=26::test.py:5:13: revealed-type: Revealed type: `LiteralString`
 
     ----- stderr -----
     ");

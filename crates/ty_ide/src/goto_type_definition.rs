@@ -179,13 +179,13 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:21:1
+          --> stdlib/ty_extensions.pyi:15:1
            |
-        19 | # Types
-        20 | Unknown = object()
-        21 | AlwaysTruthy = object()
+        13 | # Types
+        14 | Unknown = object()
+        15 | AlwaysTruthy = object()
            | ------------
-        22 | AlwaysFalsy = object()
+        16 | AlwaysFalsy = object()
            |
         ");
     }
@@ -883,13 +883,13 @@ mod tests {
         4 | class MyClass:
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         "#);
     }
@@ -938,13 +938,13 @@ mod tests {
           |      ^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         "#);
     }
@@ -965,13 +965,13 @@ mod tests {
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         "#);
     }
@@ -1726,13 +1726,13 @@ def function():
           |     ^^^^^^ Clicking here
           |
         info: Found 1 type definition
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | -------
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         ");
     }

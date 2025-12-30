@@ -1043,7 +1043,7 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
             ]) && flake8_gettext::is_gettext_func_call(
                 checker,
                 func,
-                &checker.settings().flake8_gettext.functions_names,
+                &checker.settings().flake8_gettext.function_names,
             ) {
                 if checker.is_rule_enabled(Rule::FStringInGetTextFuncCall) {
                     flake8_gettext::rules::f_string_in_gettext_func_call(checker, args);

@@ -1479,7 +1479,7 @@ pub struct Flake8GetTextOptions {
 impl Flake8GetTextOptions {
     pub fn into_settings(self) -> flake8_gettext::settings::Settings {
         flake8_gettext::settings::Settings {
-            functions_names: self
+            function_names: self
                 .function_names
                 .unwrap_or_else(flake8_gettext::settings::default_func_names)
                 .into_iter()

@@ -1867,7 +1867,7 @@ def external_getattribute(name) -> int:
 
 class ThisFails:
     def __init__(self):
-        # error: [invalid-assignment] "Implicit shadowing of function `__getattribute__`"
+        # error: [invalid-assignment]
         self.__getattribute__ = external_getattribute
 
 # error: [unresolved-attribute]
@@ -2773,6 +2773,23 @@ import baz
 reveal_type(foo.bar)  # revealed: Unknown
 # error: [possibly-missing-attribute]
 reveal_type(baz.bar)  # revealed: Unknown
+```
+
+## Diagnostic for function attribute accessed on `Callable` type
+
+<!-- snapshot-diagnostics -->
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+```py
+from typing import Callable
+
+def f(x: Callable):
+    x.__name__  # error: [unresolved-attribute]
+    x.__annotate__  # error: [unresolved-attribute]
 ```
 
 ## References

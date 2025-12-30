@@ -2217,7 +2217,7 @@ impl<'db> InteriorNode<'db> {
         heap_size=ruff_memory_usage::heap_size,
     )]
     fn sequent_map(self, db: &'db dyn Db) -> SequentMap<'db> {
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::SequentMap",
             constraints = %Node::Interior(self).display(db),
             "create sequent map",
@@ -2860,7 +2860,7 @@ impl<'db> SequentMap<'db> {
 
     fn add_single_tautology(&mut self, db: &'db dyn Db, ante: ConstrainedTypeVar<'db>) {
         if self.single_tautologies.insert(ante) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!("¬{} → false", ante.display(db)),
                 "add sequent",
@@ -2878,7 +2878,7 @@ impl<'db> SequentMap<'db> {
             .pair_impossibilities
             .insert(Self::pair_key(db, ante1, ante2))
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!("{} ∧ {} → false", ante1.display(db), ante2.display(db)),
                 "add sequent",
@@ -2903,7 +2903,7 @@ impl<'db> SequentMap<'db> {
             .or_default()
             .insert(post)
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!(
                     "{} ∧ {} → {}",
@@ -2931,7 +2931,7 @@ impl<'db> SequentMap<'db> {
             .or_default()
             .insert(post)
         {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 sequent = %format_args!(
                     "{} → {}",
@@ -3185,7 +3185,7 @@ impl<'db> SequentMap<'db> {
         // elements. (For instance, when processing `T ≤ τ₁ & τ₂` and `T ≤ τ₂ & τ₁`, these clauses
         // would add sequents for `(T ≤ τ₁ & τ₂) → (T ≤ τ₂ & τ₁)` and vice versa.)
         if left_constraint.implies(db, right_constraint) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db),
                 right = %right_constraint.display(db),
@@ -3194,7 +3194,7 @@ impl<'db> SequentMap<'db> {
             self.add_single_implication(db, left_constraint, right_constraint);
         }
         if right_constraint.implies(db, left_constraint) {
-            tracing::debug!(
+            tracing::trace!(
                 target: "ty_python_semantic::types::constraints::SequentMap",
                 left = %left_constraint.display(db),
                 right = %right_constraint.display(db),
@@ -3205,7 +3205,7 @@ impl<'db> SequentMap<'db> {
 
         match left_constraint.intersect(db, right_constraint) {
             IntersectionResult::Simplified(intersection_constraint) => {
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db),
                     right = %right_constraint.display(db),
@@ -3229,7 +3229,7 @@ impl<'db> SequentMap<'db> {
             IntersectionResult::CannotSimplify => {}
 
             IntersectionResult::Disjoint => {
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::SequentMap",
                     left = %left_constraint.display(db),
                     right = %right_constraint.display(db),
@@ -3774,10 +3774,7 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// specifies the required specializations, and the iterator will be empty. For a constrained
     /// typevar, the primary result will include the fully static constraints, and the iterator
     /// will include an entry for each non-fully-static constraint.
-    fn required_specializations(
-        self,
-        db: &'db dyn Db,
-    ) -> (Node<'db>, impl IntoIterator<Item = Node<'db>>) {
+    fn required_specializations(self, db: &'db dyn Db) -> (Node<'db>, Vec<Node<'db>>) {
         // For upper bounds and constraints, we are free to choose any materialization that makes
         // the check succeed. In non-inferable positions, it is most helpful to choose a
         // materialization that is as restrictive as possible, since that minimizes the number of
@@ -3819,7 +3816,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         constraints: ConstraintSet<'db>,
     ) -> Result<Specialization<'db>, ()> {
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             generic_context = %self.display_full(db),
             constraints = %constraints.node.display(db),
@@ -3846,7 +3843,7 @@ impl<'db> GenericContext<'db> {
                 constraints.and_with_offset(db, bound_typevar.valid_specializations(db))
             })
             .and_with_offset(db, constraints.node);
-        tracing::debug!(
+        tracing::trace!(
             target: "ty_python_semantic::types::constraints::specialize_constrained",
             valid = %abstracted.display(db),
             "limited to valid specializations",
@@ -3890,7 +3887,7 @@ impl<'db> GenericContext<'db> {
                 // The BDD is satisfiable, but the typevar is unconstrained, then we use `None` to tell
                 // specialize_recursive to fall back on the typevar's default.
                 if unconstrained {
-                    tracing::debug!(
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         "typevar is unconstrained",
@@ -3902,7 +3899,7 @@ impl<'db> GenericContext<'db> {
                 // for this constraint set.
                 if representatives.is_empty() {
                     // TODO: Construct a useful error here
-                    tracing::debug!(
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         "typevar cannot be satisfied",
@@ -3925,7 +3922,7 @@ impl<'db> GenericContext<'db> {
                 // If `lower ≰ upper`, then there is no type that satisfies all of the paths in the
                 // BDD. That's an ambiguous specialization, as described above.
                 if !greatest_lower_bound.is_constraint_set_assignable_to(db, least_upper_bound) {
-                    tracing::debug!(
+                    tracing::trace!(
                         target: "ty_python_semantic::types::constraints::specialize_constrained",
                         bound_typevar = %identity.display(db),
                         greatest_lower_bound = %greatest_lower_bound.display(db),
@@ -3938,7 +3935,7 @@ impl<'db> GenericContext<'db> {
 
                 // Of all of the types that satisfy all of the paths in the BDD, we choose the
                 // "largest" one (i.e., "closest to `object`") as the specialization.
-                tracing::debug!(
+                tracing::trace!(
                     target: "ty_python_semantic::types::constraints::specialize_constrained",
                     bound_typevar = %identity.display(db),
                     specialization = %least_upper_bound.display(db),

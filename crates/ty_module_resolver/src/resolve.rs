@@ -466,7 +466,7 @@ fn absolute_desperate_search_paths(db: &dyn Db, importing_file: File) -> Option<
 /// Get the search-paths for desperate resolution of relative imports in this file.
 ///
 /// Currently this is "the closest ancestor dir that contains a pyproject.toml (or ty.toml)",
-/// which is a completely arbitrary decision. However it's farily important that relative
+/// which is a completely arbitrary decision. However it's fairly important that relative
 /// desperate search-paths pick a single "best" answer because every one is *valid* but one
 /// that's too long or too short may cause problems.
 ///

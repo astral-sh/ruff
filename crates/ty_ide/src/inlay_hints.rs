@@ -1875,13 +1875,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:18
@@ -2204,7 +2204,7 @@ mod tests {
 
         assert_snapshot!(test.inlay_hints(), @r#"
         a[: list[Unknown | int]] = [1, 2]
-        b[: list[Unknown | float]] = [1.0, 2.0]
+        b[: list[Unknown | int | float]] = [1.0, 2.0]
         c[: list[Unknown | bool]] = [True, False]
         d[: list[Unknown | None]] = [None, None]
         e[: list[Unknown | str]] = ["hel", "lo"]
@@ -2229,25 +2229,25 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |     ^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |          ^^^^^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2265,7 +2265,7 @@ mod tests {
           |
         2 | a[: list[Unknown | int]] = [1, 2]
           |                    ^^^
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |
 
@@ -2281,27 +2281,46 @@ mod tests {
          --> main2.py:3:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |     ^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
           |          ^^^^^^^
+        4 | c[: list[Unknown | bool]] = [True, False]
+        5 | d[: list[Unknown | None]] = [None, None]
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+           --> stdlib/builtins.pyi:348:7
+            |
+        347 | @disjoint_base
+        348 | class int:
+            |       ^^^
+        349 |     """int([x]) -> integer
+        350 |     int(x, base=10) -> integer
+            |
+        info: Source
+         --> main2.py:3:20
+          |
+        2 | a[: list[Unknown | int]] = [1, 2]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                    ^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2315,11 +2334,11 @@ mod tests {
         662 |     """Convert a string or number to a floating-point number, if possible."""
             |
         info: Source
-         --> main2.py:3:20
+         --> main2.py:3:26
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
-          |                    ^^^^^
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
+          |                          ^^^^^
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |
@@ -2336,7 +2355,7 @@ mod tests {
          --> main2.py:4:5
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |     ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2344,19 +2363,19 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |          ^^^^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2376,7 +2395,7 @@ mod tests {
          --> main2.py:4:20
           |
         2 | a[: list[Unknown | int]] = [1, 2]
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
           |                    ^^^^
         5 | d[: list[Unknown | None]] = [None, None]
@@ -2394,7 +2413,7 @@ mod tests {
         info: Source
          --> main2.py:5:5
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |     ^^^^
@@ -2403,18 +2422,18 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:5:10
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |          ^^^^^^^
@@ -2434,7 +2453,7 @@ mod tests {
         info: Source
          --> main2.py:5:20
           |
-        3 | b[: list[Unknown | float]] = [1.0, 2.0]
+        3 | b[: list[Unknown | int | float]] = [1.0, 2.0]
         4 | c[: list[Unknown | bool]] = [True, False]
         5 | d[: list[Unknown | None]] = [None, None]
           |                    ^^^^
@@ -2462,13 +2481,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:6:10
@@ -2521,13 +2540,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:10
@@ -2580,13 +2599,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:10
@@ -2639,13 +2658,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:10
@@ -2697,13 +2716,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:10
@@ -2755,13 +2774,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:11:10
@@ -2828,13 +2847,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:12:10
@@ -2885,7 +2904,7 @@ mod tests {
         info: Source
 
         a: list[Unknown | int] = [1, 2]
-        b: list[Unknown | float] = [1.0, 2.0]
+        b: list[Unknown | int | float] = [1.0, 2.0]
         c: list[Unknown | bool] = [True, False]
         d: list[Unknown | None] = [None, None]
         e: list[Unknown | str] = ["hel", "lo"]
@@ -3148,13 +3167,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:7:13
@@ -3284,13 +3303,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:19
@@ -3359,13 +3378,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:8:48
@@ -3510,13 +3529,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:13
@@ -3585,13 +3604,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:9:47
@@ -3735,13 +3754,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:13
@@ -3806,13 +3825,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
           --> main2.py:10:47
@@ -4267,13 +4286,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:10
@@ -4322,13 +4341,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:10
@@ -4443,6 +4462,110 @@ mod tests {
         assert_snapshot!(test.inlay_hints(), @r"
         def foo(*, x: int): pass
         foo(x=1)
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_unpacked_tuple_argument() {
+        // When an unpacked tuple fills multiple parameters, no hint should be shown
+        // for that argument because showing a single parameter name would be misleading.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: int, d: str): ...
+            t: tuple[int, int] = (23, 42)
+            foo('foo', *t, d='bar')",
+        );
+
+        // `*t` fills both `b` and `c`, so no hint is shown for it
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(a: str, b: int, c: int, d: str): ...
+        t: tuple[int, int] = (23, 42)
+        foo([a=]'foo', *t, d='bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+          |         ^
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo('foo', *t, d='bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: int, d: str): ...
+        3 | t: tuple[int, int] = (23, 42)
+        4 | foo([a=]'foo', *t, d='bar')
+          |      ^
+          |
+        ");
+    }
+
+    #[test]
+    fn test_function_call_with_unpacked_tuple_argument_single_element() {
+        // When an unpacked tuple fills only one parameter, a hint should be shown.
+        let mut test = inlay_hint_test(
+            "
+            def foo(a: str, b: int, c: str): ...
+            t: tuple[int] = (42,)
+            foo('foo', *t, 'bar')",
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r"
+        def foo(a: str, b: int, c: str): ...
+        t: tuple[int] = (42,)
+        foo([a=]'foo', [b=]*t, [c=]'bar')
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:9
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:6
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |      ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                 ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                 ^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+         --> main.py:2:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+          |                         ^
+        3 | t: tuple[int] = (42,)
+        4 | foo('foo', *t, 'bar')
+          |
+        info: Source
+         --> main2.py:4:25
+          |
+        2 | def foo(a: str, b: int, c: str): ...
+        3 | t: tuple[int] = (42,)
+        4 | foo([a=]'foo', [b=]*t, [c=]'bar')
+          |                         ^
+          |
         ");
     }
 
@@ -5232,7 +5355,7 @@ mod tests {
     }
 
     #[test]
-    fn test_nexted_keyword_function_calls() {
+    fn test_nested_keyword_function_calls() {
         let mut test = inlay_hint_test(
             "
             def foo(x: str) -> str:
@@ -5285,13 +5408,13 @@ mod tests {
         bar([a=]1, [b=]2)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:2:14
@@ -5303,13 +5426,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:3:17
@@ -6135,13 +6258,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-          --> stdlib/ty_extensions.pyi:20:1
+          --> stdlib/ty_extensions.pyi:14:1
            |
-        19 | # Types
-        20 | Unknown = object()
+        13 | # Types
+        14 | Unknown = object()
            | ^^^^^^^
-        21 | AlwaysTruthy = object()
-        22 | AlwaysFalsy = object()
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
            |
         info: Source
          --> main2.py:4:63
@@ -6799,6 +6922,86 @@ mod tests {
           |                    ^^^^
           |
         ");
+    }
+
+    #[test]
+    fn hover_narrowed_type_with_top_materialization() {
+        let mut test = inlay_hint_test(
+            r#"
+                def f(xyxy: object):
+                    if isinstance(xyxy, list):
+                        x = xyxy
+                "#,
+        );
+
+        assert_snapshot!(test.inlay_hints(), @r#"
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x[: Top[list[Unknown]]] = xyxy
+
+        ---------------------------------------------
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:24:1
+           |
+        22 | CallableTypeOf: _SpecialForm
+        23 |
+        24 | Top: _SpecialForm
+           | ^^^
+        25 | """
+        26 | `Top[T]` represents the "top materialization" of `T`.
+           |
+        info: Source
+         --> main2.py:4:13
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |             ^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+            --> stdlib/builtins.pyi:2829:7
+             |
+        2828 | @disjoint_base
+        2829 | class list(MutableSequence[_T]):
+             |       ^^^^
+        2830 |     """Built-in mutable sequence.
+             |
+        info: Source
+         --> main2.py:4:17
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                 ^^^^
+          |
+
+        info[inlay-hint-location]: Inlay Hint Target
+          --> stdlib/ty_extensions.pyi:14:1
+           |
+        13 | # Types
+        14 | Unknown = object()
+           | ^^^^^^^
+        15 | AlwaysTruthy = object()
+        16 | AlwaysFalsy = object()
+           |
+        info: Source
+         --> main2.py:4:22
+          |
+        2 | def f(xyxy: object):
+        3 |     if isinstance(xyxy, list):
+        4 |         x[: Top[list[Unknown]]] = xyxy
+          |                      ^^^^^^^
+          |
+
+        ---------------------------------------------
+        info[inlay-hint-edit]: File after edits
+        info: Source
+
+        def f(xyxy: object):
+            if isinstance(xyxy, list):
+                x: Top[list[Unknown]] = xyxy
+        "#);
     }
 
     struct InlayHintLocationDiagnostic {

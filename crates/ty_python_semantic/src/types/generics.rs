@@ -208,7 +208,7 @@ pub struct GenericContext<'db> {
     variables_inner: FxOrderMap<BoundTypeVarIdentity<'db>, BoundTypeVarInstance<'db>>,
 }
 
-pub(super) fn walk_generic_context<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_generic_context<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     context: GenericContext<'db>,
     visitor: &V,
@@ -549,7 +549,7 @@ impl<'db> GenericContext<'db> {
         db: &'db dyn Db,
         types: Box<[Type<'db>]>,
     ) -> Specialization<'db> {
-        assert!(self.len(db) == types.len());
+        assert_eq!(self.len(db), types.len());
         Specialization::new(db, self, types, None, None)
     }
 
@@ -563,38 +563,46 @@ impl<'db> GenericContext<'db> {
         I: IntoIterator<Item = Option<Type<'db>>>,
         I::IntoIter: ExactSizeIterator,
     {
-        let mut types = self.fill_in_defaults(db, types);
-        let len = types.len();
-        loop {
-            let mut any_changed = false;
-            for i in 0..len {
-                let partial = PartialSpecialization {
-                    generic_context: self,
-                    types: &types,
-                    // Don't recursively substitute type[i] in itself. Ideally, we could instead
-                    // check if the result is self-referential after we're done applying the
-                    // partial specialization. But when we apply a paramspec, we don't use the
-                    // callable that it maps to directly; we create a new callable that reuses
-                    // parts of it. That means we can't look for the previous type directly.
-                    // Instead we use this to skip specializing the type in itself in the first
-                    // place.
-                    skip: Some(i),
-                };
-                let updated = types[i].apply_type_mapping(
-                    db,
-                    &TypeMapping::PartialSpecialization(partial),
-                    TypeContext::default(),
-                );
-                if updated != types[i] {
-                    types[i] = updated;
-                    any_changed = true;
+        fn specialize_recursive_impl<'db>(
+            db: &'db dyn Db,
+            context: GenericContext<'db>,
+            mut types: Box<[Type<'db>]>,
+        ) -> Specialization<'db> {
+            let len = types.len();
+            loop {
+                let mut any_changed = false;
+                for i in 0..len {
+                    let partial = PartialSpecialization {
+                        generic_context: context,
+                        types: &types,
+                        // Don't recursively substitute type[i] in itself. Ideally, we could instead
+                        // check if the result is self-referential after we're done applying the
+                        // partial specialization. But when we apply a paramspec, we don't use the
+                        // callable that it maps to directly; we create a new callable that reuses
+                        // parts of it. That means we can't look for the previous type directly.
+                        // Instead we use this to skip specializing the type in itself in the first
+                        // place.
+                        skip: Some(i),
+                    };
+                    let updated = types[i].apply_type_mapping(
+                        db,
+                        &TypeMapping::PartialSpecialization(partial),
+                        TypeContext::default(),
+                    );
+                    if updated != types[i] {
+                        types[i] = updated;
+                        any_changed = true;
+                    }
+                }
+
+                if !any_changed {
+                    return Specialization::new(db, context, types, None, None);
                 }
             }
-
-            if !any_changed {
-                return Specialization::new(db, self, types, None, None);
-            }
         }
+
+        let types = self.fill_in_defaults(db, types);
+        specialize_recursive_impl(db, self, types)
     }
 
     /// Creates a specialization of this generic context for the `tuple` class.
@@ -614,7 +622,7 @@ impl<'db> GenericContext<'db> {
     {
         let types = types.into_iter();
         let variables = self.variables(db);
-        assert!(self.len(db) == types.len());
+        assert_eq!(self.len(db), types.len());
 
         // Typevars can have other typevars as their default values, e.g.
         //
@@ -711,7 +719,7 @@ impl LegacyGenericBase {
     }
 }
 
-impl std::fmt::Display for LegacyGenericBase {
+impl Display for LegacyGenericBase {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
@@ -748,7 +756,7 @@ pub struct Specialization<'db> {
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for Specialization<'_> {}
 
-pub(super) fn walk_specialization<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
+pub(super) fn walk_specialization<'db, V: TypeVisitor<'db> + ?Sized>(
     db: &'db dyn Db,
     specialization: Specialization<'db>,
     visitor: &V,
@@ -817,16 +825,16 @@ fn is_subtype_in_invariant_position<'db>(
         // range of types covered by derived and within the range covered by base, because if such a type
         // exists, it's a subtype of `Top[base]` and a supertype of `Bottom[derived]`.
         (MaterializationKind::Bottom, MaterializationKind::Top) => {
-            (is_subtype_of(base_bottom, derived_bottom)
-                .and(db, || is_subtype_of(derived_bottom, base_top)))
-            .or(db, || {
-                is_subtype_of(base_bottom, derived_top)
-                    .and(db, || is_subtype_of(derived_top, base_top))
-            })
-            .or(db, || {
-                is_subtype_of(base_top, derived_top)
-                    .and(db, || is_subtype_of(derived_bottom, base_top))
-            })
+            is_subtype_of(base_bottom, derived_bottom)
+                .and(db, || is_subtype_of(derived_bottom, base_top))
+                .or(db, || {
+                    is_subtype_of(base_bottom, derived_top)
+                        .and(db, || is_subtype_of(derived_top, base_top))
+                })
+                .or(db, || {
+                    is_subtype_of(base_top, derived_top)
+                        .and(db, || is_subtype_of(derived_bottom, base_top))
+                })
         }
         // A top materialization is a subtype of a bottom materialization only if both original
         // un-materialized types are the same fully static type.
@@ -1094,7 +1102,7 @@ impl<'db> Specialization<'db> {
     /// Panics if the two specializations are not for the same generic context.
     pub(crate) fn combine(self, db: &'db dyn Db, other: Self) -> Self {
         let generic_context = self.generic_context(db);
-        assert!(other.generic_context(db) == generic_context);
+        assert_eq!(other.generic_context(db), generic_context);
         // TODO special-casing Unknown to mean "no mapping" is not right here, and can give
         // confusing/wrong results in cases where there was a mapping found for a typevar, and it
         // was of type Unknown. We should probably add a bitset or similar to Specialization that
@@ -1394,7 +1402,8 @@ impl<'db> Specialization<'db> {
         }
 
         let mut result = ConstraintSet::from(true);
-        for ((bound_typevar, self_type), other_type) in (generic_context.variables(db))
+        for ((bound_typevar, self_type), other_type) in generic_context
+            .variables(db)
             .zip(self.types(db))
             .zip(other.types(db))
         {
@@ -1731,7 +1740,11 @@ impl<'db> SpecializationBuilder<'db> {
                 else {
                     return Ok(());
                 };
-                if (actual_union.elements(self.db).iter()).any(|ty| ty.is_type_var()) {
+                if actual_union
+                    .elements(self.db)
+                    .iter()
+                    .any(|ty| ty.is_type_var())
+                {
                     return Ok(());
                 }
                 let remaining_actual =
@@ -1753,19 +1766,20 @@ impl<'db> SpecializationBuilder<'db> {
                 //
                 // without specializing `T` to `None`.
                 if !actual.is_never() {
-                    let assignable_elements =
-                        (union_formal.elements(self.db).iter()).filter(|ty| {
-                            actual
-                                .when_subtype_of(self.db, **ty, self.inferable)
-                                .is_always_satisfied(self.db)
-                        });
+                    let assignable_elements = union_formal.elements(self.db).iter().filter(|ty| {
+                        actual
+                            .when_subtype_of(self.db, **ty, self.inferable)
+                            .is_always_satisfied(self.db)
+                    });
                     if assignable_elements.exactly_one().is_ok() {
                         return Ok(());
                     }
                 }
 
-                let mut bound_typevars =
-                    (union_formal.elements(self.db).iter()).filter_map(|ty| ty.as_typevar());
+                let mut bound_typevars = union_formal
+                    .elements(self.db)
+                    .iter()
+                    .filter_map(|ty| ty.as_typevar());
 
                 // TODO:
                 // Handling more than one bare typevar is something that we can't handle yet.
@@ -1899,8 +1913,10 @@ impl<'db> SpecializationBuilder<'db> {
                     let Ok(actual_tuple) = actual_tuple.resize(self.db, most_precise_length) else {
                         return Ok(());
                     };
-                    for (formal_element, actual_element) in
-                        formal_tuple.all_elements().zip(actual_tuple.all_elements())
+                    for (formal_element, actual_element) in formal_tuple
+                        .all_elements()
+                        .iter()
+                        .zip(actual_tuple.all_elements())
                     {
                         let variance = TypeVarVariance::Covariant.compose(polarity);
                         self.infer_map_impl(*formal_element, *actual_element, variance, &mut f)?;
