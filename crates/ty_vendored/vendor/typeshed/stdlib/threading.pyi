@@ -105,7 +105,7 @@ def main_thread() -> Thread:
     Python interpreter was started.
     """
 
-def settrace(func: TraceFunction) -> None:
+def settrace(func: TraceFunction | None) -> None:
     """Set a trace function for all threads started from the threading module.
 
     The func will be passed to sys.settrace() for each thread, before its run()
@@ -128,7 +128,7 @@ if sys.version_info >= (3, 12):
         run() method is called.
         """
 
-    def settrace_all_threads(func: TraceFunction) -> None:
+    def settrace_all_threads(func: TraceFunction | None) -> None:
         """Set a trace function for all threads started from the threading module
         and all Python threads that are currently executing.
 
@@ -652,8 +652,11 @@ class Event:
         """
 
 excepthook: Callable[[_ExceptHookArgs], object]
+"""Handle uncaught Thread.run() exception."""
+
 if sys.version_info >= (3, 10):
     __excepthook__: Callable[[_ExceptHookArgs], object]
+    """Handle uncaught Thread.run() exception."""
 ExceptHookArgs = _ExceptHookArgs
 
 class Timer(Thread):
