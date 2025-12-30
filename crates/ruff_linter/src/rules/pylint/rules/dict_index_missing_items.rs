@@ -10,7 +10,7 @@ use ruff_python_semantic::analyze::typing::is_dict;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
-use crate::checkers::ast::Checker;
+use crate::checkers::ast::{Checker, DiagnosticGuard};
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value
@@ -77,45 +77,44 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
         return;
     }
 
-    let has_violation = {
-        let mut visitor = SubscriptVisitor::new(target, dict_name);
-        for stmt in body {
-            visitor.visit_stmt(stmt);
-        }
-        visitor.has_violation
+    let range = if checker.settings().preview.is_enabled() {
+        TextRange::new(target.start(), iter.end())
+    } else {
+        stmt_for.range()
     };
 
-    if has_violation {
-        let range = if checker.settings().preview.is_enabled() {
-            TextRange::new(target.start(), iter.end())
-        } else {
-            stmt_for.range()
-        };
-        checker.report_diagnostic(DictIndexMissingItems, range);
-    }
+    SubscriptVisitor::new(target, dict_name, checker, range).visit_body(body);
 }
 
 /// A visitor to detect subscript operations on a target dictionary.
-struct SubscriptVisitor<'a> {
+struct SubscriptVisitor<'a, 'b> {
     /// The target of the for loop (e.g., `key` in `for key in obj:`).
     target: &'a Expr,
     /// The name of the iterated object (e.g., `obj` in `for key in obj:`).
     dict_name: &'a ast::ExprName,
-    /// Whether a violation has been detected.
-    has_violation: bool,
+    range: TextRange,
+    checker: &'a Checker<'b>,
+    guard: Option<DiagnosticGuard<'a, 'b>>,
 }
 
-impl<'a> SubscriptVisitor<'a> {
-    fn new(target: &'a Expr, dict_name: &'a ast::ExprName) -> Self {
+impl<'a, 'b> SubscriptVisitor<'a, 'b> {
+    fn new(
+        target: &'a Expr,
+        dict_name: &'a ast::ExprName,
+        checker: &'a Checker<'b>,
+        range: TextRange,
+    ) -> Self {
         Self {
             target,
             dict_name,
-            has_violation: false,
+            range,
+            checker,
+            guard: None,
         }
     }
 }
 
-impl<'a> Visitor<'a> for SubscriptVisitor<'a> {
+impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
     fn visit_expr(&mut self, expr: &'a Expr) {
         // Given `obj[key]`, `value` must be `obj` and `slice` must be `key`.
         if let Expr::Subscript(ast::ExprSubscript {
@@ -139,7 +138,12 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a> {
                 return;
             }
 
-            self.has_violation = true;
+            if self.guard.is_none() {
+                self.guard = Some(
+                    self.checker
+                        .report_diagnostic(DictIndexMissingItems, self.range),
+                );
+            }
         } else {
             visitor::walk_expr(self, expr);
         }
