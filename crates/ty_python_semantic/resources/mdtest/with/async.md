@@ -254,6 +254,32 @@ async def main_async_generator():
         reveal_type(session)  # revealed: Session
 ```
 
+Generic classmethods with `@asynccontextmanager` should correctly infer the type parameter when
+called on subclasses:
+
+```py
+from contextlib import asynccontextmanager
+from typing import AsyncIterator, TypeVar
+
+T = TypeVar("T", bound="Base")
+
+class Base:
+    @classmethod
+    def create(cls: type[T]) -> T:
+        return cls()
+
+    @classmethod
+    @asynccontextmanager
+    async def yielder(cls: type[T]) -> AsyncIterator[T]:
+        yield cls.create()
+
+class Child(Base): ...
+
+async def main():
+    async with Child.yielder() as child:
+        reveal_type(child)  # revealed: Child
+```
+
 ## `asyncio.timeout`
 
 ```toml

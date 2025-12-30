@@ -967,6 +967,16 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        // TODO: Remove this special handling once we have full support for
+                        // generic protocols in the solver.
+                        Some(KnownFunction::ContextManager) => {
+                            if let [Some(callable)] = overload.parameter_types() {
+                                if let Some(return_ty) = contextmanager_return_type(db, *callable) {
+                                    overload.set_return_type(return_ty);
+                                }
+                            }
+                        }
+
                         Some(KnownFunction::IsProtocol) => {
                             if let [Some(ty)] = overload.parameter_types() {
                                 // We evaluate this to `Literal[True]` only if the runtime function `typing.is_protocol`
@@ -4725,7 +4735,58 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
     });
 
     let new_return_ty = Type::from(context_manager).to_instance(db)?;
-    let new_signature = Signature::new(signature.parameters().clone(), Some(new_return_ty));
+    let new_signature = Signature::new_generic(
+        signature.generic_context,
+        signature.parameters().clone(),
+        Some(new_return_ty),
+    );
+
+    Some(Type::Callable(CallableType::new(
+        db,
+        CallableSignature::single(new_signature),
+        CallableTypeKind::FunctionLike,
+    )))
+}
+
+/// Infer the return type for a call to `contextmanager`.
+///
+/// The `@contextmanager` decorator transforms a function that returns (a subtype of) `Iterator[T]`
+/// into a function that returns `_GeneratorContextManager[T, None, None]`.
+///
+/// TODO: This function only handles the most basic case. It should be removed once we have
+/// full support for generic protocols in the solver.
+fn contextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> Option<Type<'db>> {
+    let bindings = func_ty.bindings(db);
+    let binding = bindings
+        .single_element()?
+        .overloads
+        .iter()
+        .exactly_one()
+        .ok()?;
+    let signature = &binding.signature;
+    let return_ty = signature.return_ty?;
+
+    let yield_ty = return_ty
+        .try_iterate_with_mode(db, EvaluationMode::Sync)
+        .ok()?
+        .homogeneous_element_type(db);
+
+    let context_manager =
+        known_module_symbol(db, KnownModule::Contextlib, "_GeneratorContextManager")
+            .place
+            .ignore_possibly_undefined()?
+            .as_class_literal()?;
+
+    let context_manager = context_manager.apply_specialization(db, |generic_context| {
+        generic_context.specialize_partial(db, [Some(yield_ty), None, None])
+    });
+
+    let new_return_ty = Type::from(context_manager).to_instance(db)?;
+    let new_signature = Signature::new_generic(
+        signature.generic_context,
+        signature.parameters().clone(),
+        Some(new_return_ty),
+    );
 
     Some(Type::Callable(CallableType::new(
         db,
