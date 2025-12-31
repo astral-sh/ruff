@@ -262,7 +262,8 @@ class Foo[T]:
         return self
 
     def method10[S: Callable[..., str]](self: S, other: S) -> S:
-        # revealed: <super: <class 'Foo'>, S@method10>
+        # error: [invalid-super-argument]
+        # revealed: Unknown
         reveal_type(super())
         return self
 
