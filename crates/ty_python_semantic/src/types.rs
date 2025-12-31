@@ -13584,7 +13584,18 @@ impl<'db> ModuleLiteralType<'db> {
         let relative_submodule_name = ModuleName::new(name)?;
         let mut absolute_submodule_name = self.module(db).name(db).clone();
         absolute_submodule_name.extend(&relative_submodule_name);
-        let submodule = resolve_module(db, importing_file, &absolute_submodule_name)?;
+
+        // Try to resolve submodules normally. If that fails, fall back to any submodules
+        // discovered while indexing the package directory. This should ensure we pick
+        // the real submodule over a package-level `__getattr__` return type when the
+        // normal resolver can't find it (eg. when the submodule hasn't been imported yet).
+        let submodule = resolve_module(db, importing_file, &absolute_submodule_name).or_else(|| {
+            self.module(db)
+                .all_submodules(db)
+                .iter()
+                .copied()
+                .find(|candidate| candidate.name(db) == &absolute_submodule_name)
+        })?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
