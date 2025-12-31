@@ -12,7 +12,6 @@ use ruff_text_size::{Ranged, TextRange};
 
 use crate::Violation;
 use crate::checkers::ast::{Checker, DiagnosticGuard};
-use crate::preview::is_plc0206_narrower_range_enabled;
 
 /// ## What it does
 /// Checks for dictionary iterations that extract the dictionary value
@@ -113,13 +112,11 @@ impl<'a, 'b> SubscriptVisitor<'a, 'b> {
         checker: &'a Checker<'b>,
     ) -> Self {
         let ast::StmtFor { target, iter, .. } = stmt_for;
-        let range = if is_plc0206_narrower_range_enabled(checker.settings()) {
-            let target_range =
+        let range = {
+            let target_start =
                 parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
-                    .unwrap_or(target.range());
-            TextRange::new(target_range.start(), iter.end())
-        } else {
-            stmt_for.range()
+                    .map_or(target.start(), TextRange::start);
+            TextRange::new(target_start, iter.end())
         };
 
         Self {
@@ -166,9 +163,7 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
                 )
             });
 
-            if is_plc0206_narrower_range_enabled(self.checker.settings()) {
-                guard.secondary_annotation("", expr);
-            }
+            guard.secondary_annotation("", expr);
         } else {
             visitor::walk_expr(self, expr);
         }
