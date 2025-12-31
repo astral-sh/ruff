@@ -148,15 +148,13 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
                 return;
             }
 
-            if self.guard.is_none() {
-                self.guard = Some(
-                    self.checker
-                        .report_diagnostic(DictIndexMissingItems, self.range),
-                );
-            }
+            let guard = self.guard.get_or_insert_with(|| {
+                self.checker
+                    .report_diagnostic(DictIndexMissingItems, self.range)
+            });
 
             if is_plc0206_narrower_range_enabled(self.checker.settings()) {
-                self.guard.as_mut().unwrap().secondary_annotation("", expr);
+                guard.secondary_annotation("", expr);
             }
         } else {
             visitor::walk_expr(self, expr);
