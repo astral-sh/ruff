@@ -115,6 +115,40 @@ Foo()  # error: [missing-argument]
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+### Metaclass `__call__` returning bare `type`
+
+When the metaclass `__call__` is annotated as returning `type`, this is typically a mistake in
+singleton patterns where the programmer intended to return an instance. Both mypy and pyright handle
+this specially by ignoring the `type` return annotation and using the instance type instead.
+
+```py
+from typing import Any
+
+class Singleton(type):
+    _instances: dict["Singleton", object] = {}
+
+    def __call__(cls, *args: Any, **kwargs: Any) -> type:
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        # error: [invalid-return-type]
+        return cls._instances[cls]
+
+class MyConfig(metaclass=Singleton):
+    def __init__(self, x: int) -> None:
+        pass
+
+    def get(self, key: str) -> str:
+        return key
+
+# Despite the `-> type` annotation, we treat this as returning an instance.
+# This matches mypy and pyright behavior for this common pattern.
+MyConfig()  # error: [missing-argument]
+reveal_type(MyConfig(1))  # revealed: MyConfig
+
+# Instance methods work correctly.
+MyConfig(1).get("key")
+```
+
 ## Default
 
 ```py
