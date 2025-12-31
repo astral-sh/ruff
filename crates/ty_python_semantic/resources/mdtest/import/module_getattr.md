@@ -175,3 +175,103 @@ class BrokenWorkerInterpreter(Exception):
 def current_default_thread_limiter() -> int:
     return 0
 ```
+
+## `__getattr__` still handles non-submodules
+
+If there is no matching submodule on disk, module `__getattr__` should still fire; we should not
+invent submodules just because a package defines `__getattr__`.
+
+```py
+import alias_only
+
+reveal_type(alias_only.missing_attr)  # revealed: str
+```
+
+`alias_only/__init__.py`:
+
+```py
+def __getattr__(name: str) -> str:
+    return "from getattr"
+```
+
+## PySide-like package: submodules beat `__getattr__`
+
+Some packages (e.g., PySide) expose a module-level `__getattr__` that returns a list of names, but
+real submodules should still win for attribute access.
+
+```py
+from pyside_like import QtCore, QtWidgets
+
+reveal_type(QtCore)  # revealed: <module 'pyside_like.QtCore'>
+reveal_type(QtWidgets)  # revealed: <module 'pyside_like.QtWidgets'>
+reveal_type(QtCore.Qt.WindowType.FramelessWindowHint)  # revealed: int
+reveal_type(QtWidgets.QFileDialog)  # revealed: <class 'QFileDialog'>
+```
+
+`pyside_like/__init__.py`:
+
+```py
+def __getattr__(name: str) -> list[str]:
+    return []
+```
+
+`pyside_like/QtCore.py`:
+
+```py
+class Qt:
+    class WindowType:
+        FramelessWindowHint: int = 1
+```
+
+`pyside_like/QtWidgets.py`:
+
+```py
+class QFileDialog:
+    ...
+```
+
+## Module `__getattr__` requires Python 3.7+
+
+```toml
+[environment]
+python-version = "3.6"
+```
+
+```py
+# error: [unresolved-import]
+from getattr_py36 import dynamic_value
+
+reveal_type(dynamic_value)  # revealed: Unknown
+```
+
+`getattr_py36.py`:
+
+```py
+def __getattr__(name: str) -> int:
+    return 1
+```
+
+## Stub files allow `__getattr__` on older versions
+
+```toml
+[environment]
+python-version = "3.6"
+```
+
+```py
+import stubbed_pkg
+
+reveal_type(stubbed_pkg.via_stub)  # revealed: int
+```
+
+`stubbed_pkg/__init__.py`:
+
+```py
+pass
+```
+
+`stubbed_pkg/__init__.pyi`:
+
+```pyi
+def __getattr__(name: str) -> int: ...
+```
