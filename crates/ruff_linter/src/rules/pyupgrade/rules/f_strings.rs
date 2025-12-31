@@ -8,9 +8,7 @@ use ruff_python_ast::helpers::any_over_expr;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, Keyword, StringFlags};
-use ruff_python_literal::format::{
-    FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
-};
+use ruff_python_literal::format::{FieldName, FieldNamePart, FieldType, FormatPart, FormatString};
 use ruff_source_file::LineRanges;
 use ruff_text_size::{Ranged, TextRange};
 
@@ -229,9 +227,6 @@ enum FStringConversion {
     /// The format call uses arguments with side effects which are repeated within the
     /// format string. For example: `"{x} {x}".format(x=foo())`.
     SideEffects,
-    /// The format string is a raw string containing `\N{...}` which would be
-    /// misinterpreted in an f-string.
-    UnsafeRawString,
     /// The format string should be converted to an f-string.
     Convert(String),
 }
@@ -277,8 +272,8 @@ impl FStringConversion {
             return Ok(Self::EmptyLiteral);
         }
 
-        // Parse the format string.
-        let format_string = FormatString::from_str(contents)?;
+        // Parse the format string
+        let format_string = FormatString::parse(contents, raw)?;
 
         // If the format string contains only literal parts, it doesn't need to be converted.
         if format_string
@@ -287,15 +282,6 @@ impl FStringConversion {
             .all(|part| matches!(part, FormatPart::Literal(..)))
         {
             return Ok(Self::NonEmptyLiteral);
-        }
-
-        // `\N{...}` is literal in raw strings but becomes a Unicode escape in f-strings.
-        if raw
-            && format_string.format_parts.iter().any(
-                |part| matches!(part, FormatPart::Literal(literal) if literal.contains("\\N{")),
-            )
-        {
-            return Ok(Self::UnsafeRawString);
         }
 
         let mut converted = String::with_capacity(contents.len());
@@ -428,7 +414,6 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
 
     let mut patches: Vec<(TextRange, FStringConversion)> = vec![];
     let mut tokens = checker.tokens().in_range(call.func.range()).iter();
-    let mut unsafe_conversion = false;
     let end = loop {
         let Some(token) = tokens.next() else {
             unreachable!("Should break from the `Tok::Dot` arm");
@@ -454,11 +439,6 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                     // If the format string contains side effects that would need to be repeated,
                     // we can't convert it to an f-string.
                     Ok(FStringConversion::SideEffects) => return,
-                    // If the format string is a raw string with `\N{...}`, conversion would be unsafe.
-                    // We still want to emit the diagnostic, but without offering a fix.
-                    Ok(FStringConversion::UnsafeRawString) => {
-                        unsafe_conversion = true;
-                    }
                     // If any of the segments fail to convert, then we can't convert the entire
                     // expression.
                     Err(_) => return,
@@ -469,7 +449,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
             _ => {}
         }
     };
-    if patches.is_empty() && !unsafe_conversion {
+    if patches.is_empty() {
         return;
     }
 
@@ -484,7 +464,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
                 Some(curly_unescape(checker.locator().slice(range)).to_string())
             }
             // We handled this in the previous loop.
-            FStringConversion::SideEffects | FStringConversion::UnsafeRawString => unreachable!(),
+            FStringConversion::SideEffects => unreachable!(),
         };
         if let Some(fstring) = fstring {
             contents.push_str(
@@ -538,7 +518,7 @@ pub(crate) fn f_strings(checker: &Checker, call: &ast::ExprCall, summary: &Forma
     // ```
     let has_comments = checker.comment_ranges().intersects(call.arguments.range());
 
-    if !has_comments && !unsafe_conversion {
+    if !has_comments {
         if contents.is_empty() {
             // Ex) `''.format(self.project)`
             diagnostic.set_fix(Fix::safe_edit(Edit::range_replacement(
