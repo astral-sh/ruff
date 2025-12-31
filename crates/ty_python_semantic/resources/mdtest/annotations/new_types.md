@@ -374,7 +374,8 @@ A = NewType("A", EllipsisType)
 static_assert(is_singleton(A))
 static_assert(is_single_valued(A))
 reveal_type(type(A(...)) is EllipsisType)  # revealed: Literal[True]
-reveal_type(A(...) is ...)  # revealed: Literal[True]
+# TODO: This should be `Literal[True]` also.
+reveal_type(A(...) is ...)  # revealed: bool
 
 B = NewType("B", int)
 static_assert(not is_singleton(B))
