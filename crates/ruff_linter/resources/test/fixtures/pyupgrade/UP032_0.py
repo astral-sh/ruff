@@ -279,5 +279,5 @@ if __name__ == "__main__":
 # Unicode escape in regular string, should convert.
 "\N{angle}AOB = {angle}°".format(angle=180)
 
-# Unicode escape in raw string, should not convert - would change semantics.
+# Raw string with \N{...} - both {angle} are format placeholders, should convert.
 r"\N{angle}AOB = {angle}°".format(angle=180)
