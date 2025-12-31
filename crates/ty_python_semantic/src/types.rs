@@ -13653,9 +13653,31 @@ impl<'db> ModuleLiteralType<'db> {
             .map(|file| imported_symbol(db, file, name, None))
             .unwrap_or_default();
 
-        // If the normal lookup failed, try to call the module's `__getattr__` function
+        // If the normal lookup failed, check if __getattr__ exists
         if place_and_qualifiers.place.is_undefined() {
-            return self.try_module_getattr(db, name);
+            let Some(file) = self.module(db).file(db) else {
+                return place_and_qualifiers;
+            };
+
+            // Check if the module has __getattr__
+            let has_getattr = !imported_symbol(db, file, "__getattr__", None)
+                .place
+                .is_undefined();
+
+            // If __getattr__ exists, try to resolve as a submodule first.
+            // This is important because __getattr__ is only called at runtime for attributes that don't exist,
+            // so we must check if a submodule exists (even if not explicitly imported) before using __getattr__.
+            // This matches the behavior of other type checkers for the `from X import Y` case.
+            if has_getattr {
+                if let Some(submodule) = self.resolve_submodule(db, name) {
+                    return Place::bound(submodule).into();
+                }
+
+                // Either no matching submodule or not imported - try __getattr__
+                return self.try_module_getattr(db, name);
+            }
+
+            return place_and_qualifiers;
         }
 
         place_and_qualifiers
