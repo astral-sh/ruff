@@ -531,8 +531,9 @@ impl<'db> MroIterator<'db> {
                     SubsequentMroElements::Owned(elements.into_iter())
                 }
                 ClassLiteral::FunctionalNamedTuple(namedtuple) => {
-                    // Namedtuples inherit from their tuple base type.
-                    // The MRO after self is the full MRO of the tuple base type.
+                    // Namedtuples inherit from their tuple base type. For example,
+                    // `NamedTuple("Point", [("x", int), ("y", str)])` has the MRO:
+                    // `[Point, tuple[int, str], tuple, object]`.
                     let tuple_base = namedtuple.tuple_base_type(self.db);
                     let elements: Vec<_> = tuple_base.iter_mro(self.db).collect();
                     SubsequentMroElements::Owned(elements.into_iter())

@@ -819,6 +819,14 @@ impl<'db> ClassLiteral<'db> {
         }
     }
 
+    /// Returns the functional namedtuple literal if this is one.
+    pub(crate) fn as_functional_namedtuple(self) -> Option<FunctionalNamedTupleLiteral<'db>> {
+        match self {
+            Self::FunctionalNamedTuple(namedtuple) => Some(namedtuple),
+            Self::Stmt(_) | Self::Functional(_) => None,
+        }
+    }
+
     /// Converts a functional class variant to a non-generic `ClassType`.
     ///
     /// Returns `None` for statement-based classes (use `default_specialization` instead).
@@ -1031,8 +1039,9 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StmtClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_)) => None,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+            ) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
         }
     }
@@ -1046,8 +1055,9 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StmtClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_)) => None,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+            ) => None,
             Self::Generic(generic) => Some((
                 generic.origin(db),
                 Some(
@@ -1441,6 +1451,35 @@ impl<'db> ClassType<'db> {
             Signature::new(parameters, Some(return_annotation))
         }
 
+        // Handle functional namedtuples separately since they have synthesized class members.
+        if let Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) = self {
+            // Check for synthesized namedtuple class members like _fields, __new__, _replace, etc.
+            if let Some(ty) = synthesize_namedtuple_class_member(
+                db,
+                name,
+                namedtuple.to_instance(db),
+                namedtuple.fields(db).iter().cloned(),
+                inherited_generic_context,
+            ) {
+                return Member {
+                    inner: Place::bound(ty).into(),
+                };
+            }
+
+            // Check if it's a field name (returns a property descriptor).
+            for (field_name, field_ty, _) in namedtuple.fields(db).as_ref() {
+                if field_name.as_str() == name {
+                    return Member {
+                        inner: Place::bound(create_field_property(db, *field_ty)).into(),
+                    };
+                }
+            }
+
+            // Not a synthesized member or field, return unbound
+            // (tuple base class members will be found via MRO traversal).
+            return Member::unbound();
+        }
+
         let Some((class_literal, specialization)) = self.stmt_class_literal(db) else {
             return Member::unbound();
         };
@@ -1760,13 +1799,34 @@ impl<'db> ClassType<'db> {
     /// A helper function for `instance_member` that looks up the `name` attribute only on
     /// this class, not on its superclasses.
     pub(super) fn own_instance_member(self, db: &'db dyn Db, name: &str) -> Member<'db> {
-        // Functional classes don't have "own" instance members - everything is inherited.
-        let Some((class_literal, specialization)) = self.stmt_class_literal(db) else {
-            return Member::unbound();
-        };
-        class_literal
-            .own_instance_member(db, name)
-            .map_type(|ty| ty.apply_optional_specialization(db, specialization))
+        match self {
+            Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => {
+                // For functional namedtuples, the field attributes are "own" instance members.
+                for (field_name, field_ty, _) in namedtuple.fields(db).as_ref() {
+                    if field_name.as_str() == name {
+                        return Member {
+                            inner: Place::bound(create_field_property(db, *field_ty)).into(),
+                        };
+                    }
+                }
+                Member::unbound()
+            }
+            Self::NonGeneric(ClassLiteral::Functional(_)) => {
+                // Functional type() classes don't have own instance members.
+                Member::unbound()
+            }
+            Self::NonGeneric(ClassLiteral::Stmt(class_literal)) => {
+                class_literal.own_instance_member(db, name)
+            }
+            Self::Generic(generic) => {
+                generic
+                    .origin(db)
+                    .own_instance_member(db, name)
+                    .map_type(|ty| {
+                        ty.apply_optional_specialization(db, Some(generic.specialization(db)))
+                    })
+            }
+        }
     }
 
     /// Return a callable type (or union of callable types) that represents the callable
@@ -2020,8 +2080,9 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => stmt.variance_of(db, typevar),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_)) => TypeVarVariance::Bivariant,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+            ) => TypeVarVariance::Bivariant,
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
@@ -2885,16 +2946,7 @@ impl<'db> StmtClassLiteral<'db> {
                 .own_fields(db, specialization, CodeGeneratorKind::NamedTuple)
                 .get(name)
             {
-                let property_getter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))],
-                    ),
-                    Some(field.declared_ty),
-                );
-                let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
-                return Member::definitely_declared(Type::PropertyInstance(property));
+                return Member::definitely_declared(create_field_property(db, field.declared_ty));
             }
         }
 
@@ -3137,37 +3189,49 @@ impl<'db> StmtClassLiteral<'db> {
                     .with_annotated_type(instance_ty);
                 signature_from_fields(vec![self_parameter], Some(Type::none(db)))
             }
-            (CodeGeneratorKind::NamedTuple, "__new__") => {
-                let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
-                    .with_annotated_type(KnownClass::Type.to_instance(db));
-                signature_from_fields(vec![cls_parameter], Some(Type::none(db)))
-            }
-            (CodeGeneratorKind::NamedTuple, "_replace" | "__replace__") => {
-                if name == "__replace__"
-                    && Program::get(db).python_version(db) < PythonVersion::PY313
-                {
-                    return None;
-                }
-                // Use `Self` type variable as return type so that subclasses get the correct
-                // return type when calling `_replace`. For example, if `IntBox` inherits from
-                // `Box[int]` (a NamedTuple), then `IntBox(1)._replace(content=42)` should return
-                // `IntBox`, not `Box[int]`.
-                let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+            (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
+                let inherited_generic_context = self.inherited_generic_context(db);
+                let fields_iter = self
+                    .fields(db, specialization, field_policy)
+                    .into_iter()
+                    .map(|(name, field)| {
+                        let default_ty = match &field.kind {
+                            FieldKind::NamedTuple { default_ty } => *default_ty,
+                            _ => None,
+                        };
+                        (name.clone(), field.declared_ty, default_ty)
+                    });
+                let result = synthesize_namedtuple_class_member(
                     db,
+                    name,
                     instance_ty,
-                    BindingContext::Synthetic,
-                ));
-                let self_parameter = Parameter::positional_or_keyword(Name::new_static("self"))
-                    .with_annotated_type(self_ty);
-                signature_from_fields(vec![self_parameter], Some(self_ty))
-            }
-            (CodeGeneratorKind::NamedTuple, "_fields") => {
-                // Synthesize a precise tuple type for _fields using literal string types.
-                // For example, a NamedTuple with `name` and `age` fields gets
-                // `tuple[Literal["name"], Literal["age"]]`.
-                let fields = self.fields(db, specialization, field_policy);
-                let field_types = fields.keys().map(|name| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, field_types))
+                    fields_iter,
+                    inherited_generic_context,
+                );
+                // For fallback members from NamedTupleFallback, apply type mapping to handle
+                // `Self` in inherited namedtuple classes. The explicitly synthesized members
+                // (__new__, _fields, _replace, __replace__) don't need this mapping.
+                if matches!(name, "__new__" | "_fields" | "_replace" | "__replace__") {
+                    result
+                } else {
+                    result.map(|ty| {
+                        ty.apply_type_mapping(
+                            db,
+                            &TypeMapping::ReplaceSelf {
+                                new_upper_bound: determine_upper_bound(
+                                    db,
+                                    self,
+                                    specialization,
+                                    |base| {
+                                        base.into_class()
+                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
+                                    },
+                                ),
+                            },
+                            TypeContext::default(),
+                        )
+                    })
+                }
             }
             (CodeGeneratorKind::DataclassLike(_), "__lt__" | "__le__" | "__gt__" | "__ge__") => {
                 if !has_dataclass_param(DataclassFlags::ORDER) {
@@ -3248,31 +3312,6 @@ impl<'db> StmtClassLiteral<'db> {
                 // This could probably be `weakref | None`, but it does not seem important enough to
                 // model it precisely.
                 Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
-            }
-            (CodeGeneratorKind::NamedTuple, name) if name != "__init__" => {
-                KnownClass::NamedTupleFallback
-                    .to_class_literal(db)
-                    .as_class_literal()?
-                    .as_stmt()?
-                    .own_class_member(db, self.inherited_generic_context(db), None, name)
-                    .ignore_possibly_undefined()
-                    .map(|ty| {
-                        ty.apply_type_mapping(
-                            db,
-                            &TypeMapping::ReplaceSelf {
-                                new_upper_bound: determine_upper_bound(
-                                    db,
-                                    self,
-                                    specialization,
-                                    |base| {
-                                        base.into_class()
-                                            .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
-                                    },
-                                ),
-                            },
-                            TypeContext::default(),
-                        )
-                    })
             }
             (CodeGeneratorKind::DataclassLike(_), "__replace__")
                 if Program::get(db).python_version(db) >= PythonVersion::PY313 =>
@@ -4866,6 +4905,111 @@ pub(crate) struct FunctionalMetaclassConflict<'db> {
     pub(crate) base2: ClassBase<'db>,
 }
 
+/// Create a read-only property type for a namedtuple field.
+///
+/// Namedtuple fields are accessed via read-only properties. This creates a property
+/// with a getter that takes `self` and returns the field type.
+fn create_field_property<'db>(db: &'db dyn Db, field_ty: Type<'db>) -> Type<'db> {
+    let property_getter_signature = Signature::new(
+        Parameters::new(
+            db,
+            [Parameter::positional_only(Some(Name::new_static("self")))],
+        ),
+        Some(field_ty),
+    );
+    let property_getter = Type::single_callable(db, property_getter_signature);
+    let property = PropertyInstanceType::new(db, Some(property_getter), None);
+    Type::PropertyInstance(property)
+}
+
+/// Synthesize a namedtuple class member given the field information.
+///
+/// This is used by both `FunctionalNamedTupleLiteral` and `StmtClassLiteral` (for declarative
+/// namedtuples) to avoid duplicating the synthesis logic.
+///
+/// The `inherited_generic_context` parameter is used for declarative namedtuples to preserve
+/// generic context in the synthesized `__new__` signature.
+fn synthesize_namedtuple_class_member<'db>(
+    db: &'db dyn Db,
+    name: &str,
+    instance_ty: Type<'db>,
+    fields: impl Iterator<Item = (Name, Type<'db>, Option<Type<'db>>)>,
+    inherited_generic_context: Option<GenericContext<'db>>,
+) -> Option<Type<'db>> {
+    match name {
+        "__new__" => {
+            // __new__(cls, field1, field2, ...) -> Self
+            let mut parameters = vec![
+                Parameter::positional_or_keyword(Name::new_static("cls"))
+                    .with_annotated_type(KnownClass::Type.to_instance(db)),
+            ];
+
+            for (field_name, field_ty, default_ty) in fields {
+                let mut param =
+                    Parameter::positional_or_keyword(field_name).with_annotated_type(field_ty);
+                if let Some(default) = default_ty {
+                    param = param.with_default_type(default);
+                }
+                parameters.push(param);
+            }
+
+            let signature = Signature::new_generic(
+                inherited_generic_context,
+                Parameters::new(db, parameters),
+                Some(instance_ty),
+            );
+            Some(Type::function_like_callable(db, signature))
+        }
+        "_fields" => {
+            // _fields: tuple[Literal["field1"], Literal["field2"], ...]
+            let field_types =
+                fields.map(|(field_name, _, _)| Type::string_literal(db, &field_name));
+            Some(Type::heterogeneous_tuple(db, field_types))
+        }
+        "_replace" | "__replace__" => {
+            if name == "__replace__" && Program::get(db).python_version(db) < PythonVersion::PY313 {
+                return None;
+            }
+
+            // _replace(self, *, field1=..., field2=...) -> Self
+            let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                db,
+                instance_ty,
+                BindingContext::Synthetic,
+            ));
+
+            let mut parameters = vec![
+                Parameter::positional_or_keyword(Name::new_static("self"))
+                    .with_annotated_type(self_ty),
+            ];
+
+            for (field_name, field_ty, _) in fields {
+                parameters.push(
+                    Parameter::keyword_only(field_name)
+                        .with_annotated_type(field_ty)
+                        .with_default_type(field_ty),
+                );
+            }
+
+            let signature = Signature::new(Parameters::new(db, parameters), Some(self_ty));
+            Some(Type::function_like_callable(db, signature))
+        }
+        "__init__" => {
+            // Namedtuples don't have a custom __init__. All construction happens in __new__.
+            None
+        }
+        _ => {
+            // Fall back to NamedTupleFallback for other synthesized methods.
+            KnownClass::NamedTupleFallback
+                .to_class_literal(db)
+                .as_class_literal()?
+                .as_stmt()?
+                .own_class_member(db, inherited_generic_context, None, name)
+                .ignore_possibly_undefined()
+        }
+    }
+}
+
 /// A namedtuple created via the functional form `namedtuple(name, fields)` or
 /// `NamedTuple(name, fields)`.
 ///
@@ -4906,6 +5050,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     ///
     /// Namedtuples always have `type` as their metaclass.
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        let _ = self;
         KnownClass::Type.to_class_literal(db)
     }
 
@@ -4930,20 +5075,9 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     /// Look up an instance member by name.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // First check if it's one of the field names.
-        for (field_name, field_ty, _) in self.fields(db).iter() {
+        for (field_name, field_ty, _) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
-                // Namedtuple fields are accessed via read-only properties.
-                // Create a property getter that takes `self` and returns the field type.
-                let property_getter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))],
-                    ),
-                    Some(*field_ty),
-                );
-                let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
-                return Place::bound(Type::PropertyInstance(property)).into();
+                return Place::bound(create_field_property(db, *field_ty)).into();
             }
         }
 
@@ -4964,19 +5098,9 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
         }
 
         // Check if it's a field name (returns a property descriptor).
-        for (field_name, field_ty, _) in self.fields(db).iter() {
+        for (field_name, field_ty, _) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
-                // Create a property getter that takes `self` and returns the field type.
-                let property_getter_signature = Signature::new(
-                    Parameters::new(
-                        db,
-                        [Parameter::positional_only(Some(Name::new_static("self")))],
-                    ),
-                    Some(*field_ty),
-                );
-                let property_getter = Type::single_callable(db, property_getter_signature);
-                let property = PropertyInstanceType::new(db, Some(property_getter), None);
-                return Place::bound(Type::PropertyInstance(property)).into();
+                return Place::bound(create_field_property(db, *field_ty)).into();
             }
         }
 
@@ -4988,82 +5112,13 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
 
     /// Generate synthesized class members for namedtuples.
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
-        let fields = self.fields(db);
-        let instance_ty = self.to_instance(db);
-
-        match name {
-            "__new__" => {
-                // __new__(cls, field1, field2, ...) -> Self
-                let mut parameters = vec![
-                    Parameter::positional_or_keyword(Name::new_static("cls"))
-                        .with_annotated_type(KnownClass::Type.to_instance(db)),
-                ];
-
-                for (field_name, field_ty, default_ty) in fields.iter() {
-                    let mut param = Parameter::positional_or_keyword(field_name.clone())
-                        .with_annotated_type(*field_ty);
-                    if let Some(default) = default_ty {
-                        param = param.with_default_type(*default);
-                    }
-                    parameters.push(param);
-                }
-
-                let signature = Signature::new(Parameters::new(db, parameters), Some(instance_ty));
-                Some(Type::function_like_callable(db, signature))
-            }
-            "_fields" => {
-                // _fields: tuple[Literal["field1"], Literal["field2"], ...]
-                let field_types = fields
-                    .iter()
-                    .map(|(name, _, _)| Type::string_literal(db, name));
-                Some(Type::heterogeneous_tuple(db, field_types))
-            }
-            "_replace" | "__replace__" => {
-                if name == "__replace__"
-                    && Program::get(db).python_version(db) < PythonVersion::PY313
-                {
-                    return None;
-                }
-
-                // _replace(self, *, field1=..., field2=...) -> Self
-                let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
-                    db,
-                    instance_ty,
-                    BindingContext::Synthetic,
-                ));
-
-                let mut parameters = vec![
-                    Parameter::positional_or_keyword(Name::new_static("self"))
-                        .with_annotated_type(self_ty),
-                ];
-
-                for (field_name, field_ty, _) in fields.iter() {
-                    parameters.push(
-                        Parameter::keyword_only(field_name.clone())
-                            .with_annotated_type(*field_ty)
-                            .with_default_type(*field_ty),
-                    );
-                }
-
-                let signature = Signature::new(Parameters::new(db, parameters), Some(self_ty));
-                Some(Type::function_like_callable(db, signature))
-            }
-            "__init__" => {
-                // Namedtuples don't have a custom __init__. All construction happens in __new__.
-                // Return None so that the constructor call machinery doesn't try to match
-                // arguments against __init__.
-                None
-            }
-            _ => {
-                // Fall back to NamedTupleFallback for other synthesized methods.
-                KnownClass::NamedTupleFallback
-                    .to_class_literal(db)
-                    .as_class_literal()?
-                    .as_stmt()?
-                    .own_class_member(db, None, None, name)
-                    .ignore_possibly_undefined()
-            }
-        }
+        synthesize_namedtuple_class_member(
+            db,
+            name,
+            self.to_instance(db),
+            self.fields(db).iter().cloned(),
+            None,
+        )
     }
 }
 
@@ -5298,6 +5353,7 @@ pub enum KnownClass {
     Iterable,
     Iterator,
     Mapping,
+    Sequence,
     // typing_extensions
     ExtensionsTypeVar, // must be distinct from typing.TypeVar, backports new features
     // Collections
@@ -5414,6 +5470,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Mapping
+            | Self::Sequence
             // Evaluating `NotImplementedType` in a boolean context was deprecated in Python 3.9
             // and raises a `TypeError` in Python >=3.14
             // (see https://docs.python.org/3/library/constants.html#NotImplemented)
@@ -5502,6 +5559,7 @@ impl KnownClass {
             | KnownClass::Iterable
             | KnownClass::Iterator
             | KnownClass::Mapping
+            | KnownClass::Sequence
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -5589,6 +5647,7 @@ impl KnownClass {
             | KnownClass::Iterable
             | KnownClass::Iterator
             | KnownClass::Mapping
+            | KnownClass::Sequence
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -5676,6 +5735,7 @@ impl KnownClass {
             | KnownClass::Iterable
             | KnownClass::Iterator
             | KnownClass::Mapping
+            | KnownClass::Sequence
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -5716,6 +5776,7 @@ impl KnownClass {
             Self::SupportsIndex
             | Self::Iterable
             | Self::Iterator
+            | Self::Sequence
             | Self::Awaitable
             | Self::NamedTupleLike
             | Self::Generator => true,
@@ -5869,6 +5930,7 @@ impl KnownClass {
             | KnownClass::Iterable
             | KnownClass::Iterator
             | KnownClass::Mapping
+            | KnownClass::Sequence
             | KnownClass::ChainMap
             | KnownClass::Counter
             | KnownClass::DefaultDict
@@ -5961,6 +6023,7 @@ impl KnownClass {
             Self::Iterable => "Iterable",
             Self::Iterator => "Iterator",
             Self::Mapping => "Mapping",
+            Self::Sequence => "Sequence",
             // For example, `typing.List` is defined as `List = _Alias()` in typeshed
             Self::StdlibAlias => "_Alias",
             // This is the name the type of `sys.version_info` has in typeshed,
@@ -6301,6 +6364,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Mapping
+            | Self::Sequence
             | Self::ProtocolMeta
             | Self::SupportsIndex => KnownModule::Typing,
             Self::TypeAliasType
@@ -6440,6 +6504,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Mapping
+            | Self::Sequence
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -6532,6 +6597,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Mapping
+            | Self::Sequence
             | Self::NamedTupleFallback
             | Self::NamedTupleLike
             | Self::ConstraintSet
@@ -6596,6 +6662,7 @@ impl KnownClass {
             "Iterable" => &[Self::Iterable],
             "Iterator" => &[Self::Iterator],
             "Mapping" => &[Self::Mapping],
+            "Sequence" => &[Self::Sequence],
             "ParamSpec" => &[Self::ParamSpec, Self::ExtensionsParamSpec],
             "ParamSpecArgs" => &[Self::ParamSpecArgs],
             "ParamSpecKwargs" => &[Self::ParamSpecKwargs],
@@ -6739,6 +6806,7 @@ impl KnownClass {
             | Self::Iterable
             | Self::Iterator
             | Self::Mapping
+            | Self::Sequence
             | Self::ProtocolMeta
             | Self::NewType => matches!(module, KnownModule::Typing | KnownModule::TypingExtensions),
             Self::Deprecated => matches!(module, KnownModule::Warnings | KnownModule::TypingExtensions),

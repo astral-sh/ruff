@@ -6458,6 +6458,31 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                // Functional namedtuple: create a signature with the field types as parameters.
+                None if class.as_functional_namedtuple().is_some() => {
+                    let namedtuple = class.as_functional_namedtuple().unwrap();
+                    let parameters: Vec<_> = namedtuple
+                        .fields(db)
+                        .iter()
+                        .map(|(name, ty, default_ty)| {
+                            let mut param = Parameter::positional_or_keyword(name.clone())
+                                .with_annotated_type(*ty);
+                            if let Some(default) = default_ty {
+                                param = param.with_default_type(*default);
+                            }
+                            param
+                        })
+                        .collect();
+                    Binding::single(
+                        self,
+                        Signature::new(
+                            Parameters::new(db, parameters),
+                            Some(namedtuple.to_instance(db)),
+                        ),
+                    )
+                    .into()
+                }
+
                 // Most class literal constructor calls are handled by `try_call_constructor` and
                 // not via getting the signature here. This signature can still be used in some
                 // cases (e.g. evaluating callable subtyping). TODO improve this definition
@@ -6503,6 +6528,14 @@ impl<'db> Type<'db> {
             Type::SpecialForm(SpecialFormType::NamedTuple) => {
                 // typing.NamedTuple(typename: str, fields: Sequence[tuple[str, type]])
                 // The return type is set in bind.rs based on the actual arguments.
+                let field_tuple = Type::heterogeneous_tuple(
+                    db,
+                    [
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Type.to_instance(db),
+                    ],
+                );
+                let fields_type = KnownClass::Sequence.to_specialized_instance(db, [field_tuple]);
                 Binding::single(
                     self,
                     Signature::new(
@@ -6512,10 +6545,10 @@ impl<'db> Type<'db> {
                                 Parameter::positional_or_keyword(Name::new_static("typename"))
                                     .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 Parameter::positional_or_keyword(Name::new_static("fields"))
-                                    .with_annotated_type(todo_type!("Sequence[tuple[str, type]]")),
+                                    .with_annotated_type(fields_type),
                             ],
                         ),
-                        Some(todo_type!("functional `NamedTuple` syntax")),
+                        None,
                     ),
                 )
                 .into()

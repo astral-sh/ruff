@@ -360,6 +360,34 @@ def takes_tuple(t: tuple[int, int]) -> None:
 takes_tuple(Point(1, 2))
 ```
 
+## `collections.namedtuple` with rename
+
+The `rename` parameter replaces invalid field names with positional names (`_0`, `_1`, etc.):
+
+```py
+from collections import namedtuple
+
+# Fields with Python keywords are renamed when rename=True.
+NT1 = namedtuple("NT1", ["abc", "def"], rename=True)
+nt1 = NT1(abc="x", _1="y")
+reveal_type(nt1)  # revealed: NT1
+
+# Fields starting with underscore are renamed when rename=True.
+NT2 = namedtuple("NT2", ["abc", "_d"], rename=True)
+nt2 = NT2(abc="x", _1="y")
+reveal_type(nt2)  # revealed: NT2
+
+# Duplicate field names are renamed when rename=True.
+NT3 = namedtuple("NT3", ["a", "a", "a"], rename=True)
+nt3 = NT3(a="x", _1="y", _2="z")
+reveal_type(nt3)  # revealed: NT3
+
+# Without rename=True, the original field names are used.
+NT4 = namedtuple("NT4", ["abc", "xyz"])
+nt4 = NT4(abc="x", xyz="y")
+reveal_type(nt4)  # revealed: NT4
+```
+
 ## `collections.namedtuple` tuple compatibility
 
 Functional namedtuples inherit from tuple with `Any` element types since `collections.namedtuple`

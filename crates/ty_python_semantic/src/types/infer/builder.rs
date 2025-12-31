@@ -10,6 +10,8 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::is_keyword;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -5256,17 +5258,23 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
                         Some(_) | None => {
-                            // Check for special forms like typing.NamedTuple.
+                            // Check for special forms like `typing.NamedTuple`.
                             if let Some(SpecialFormType::NamedTuple) =
                                 callable_type.as_special_form()
                             {
-                                self.infer_functional_namedtuple_expression(call_expr)
+                                self.infer_functional_namedtuple_expression(
+                                    call_expr,
+                                    callable_type,
+                                )
                             } else if callable_type
                                 .as_function_literal()
                                 .is_some_and(|f| f.is_known(self.db(), KnownFunction::NamedTuple))
                             {
-                                // Handle collections.namedtuple.
-                                self.infer_collections_namedtuple_expression(call_expr)
+                                // Handle `collections.namedtuple`.
+                                self.infer_collections_namedtuple_expression(
+                                    call_expr,
+                                    callable_type,
+                                )
                             } else {
                                 self.infer_call_expression_impl(call_expr, callable_type, tcx)
                             }
@@ -5800,16 +5808,19 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
-    /// Infer the type for a functional NamedTuple creation:
+    /// Infer the type for a functional `NamedTuple` creation:
     /// `NamedTuple("Name", [("field", type), ...])`
-    fn infer_functional_namedtuple_expression(&mut self, call_expr: &ast::ExprCall) -> Type<'db> {
+    fn infer_functional_namedtuple_expression(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        callable_type: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
         // We need at least 2 arguments: the name and the fields.
         if arguments.args.len() < 2 {
             // Fall back to normal call inference.
-            let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
             return self.infer_call_expression_impl(
                 call_expr,
                 callable_type,
@@ -5821,7 +5832,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let name_expr = &arguments.args[0];
         let name_ty = self.infer_expression(name_expr, TypeContext::default());
         let Some(name_lit) = name_ty.as_string_literal() else {
-            let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
             return self.infer_call_expression_impl(
                 call_expr,
                 callable_type,
@@ -5830,25 +5840,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         };
         let name = ast::name::Name::new(name_lit.value(db));
 
-        // Get the fields (second argument must be a list literal).
+        // Get the fields (second argument must be a list or tuple literal).
         let fields_expr = &arguments.args[1];
-        let ast::Expr::List(list_expr) = fields_expr else {
-            // If not a list literal, fall back to normal call inference.
-            let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
-            return self.infer_call_expression_impl(
-                call_expr,
-                callable_type,
-                TypeContext::default(),
-            );
+        let field_elts: &[ast::Expr] = match fields_expr {
+            ast::Expr::List(list_expr) => &list_expr.elts,
+            ast::Expr::Tuple(tuple_expr) => &tuple_expr.elts,
+            _ => {
+                // If not a list or tuple literal, fall back to normal call inference.
+                return self.infer_call_expression_impl(
+                    call_expr,
+                    callable_type,
+                    TypeContext::default(),
+                );
+            }
         };
 
-        // Extract fields from the list literal.
+        // Extract fields from the list/tuple literal.
         let mut fields: Vec<(ast::name::Name, Type<'db>, Option<Type<'db>>)> =
-            Vec::with_capacity(list_expr.elts.len());
-        for elt in &list_expr.elts {
+            Vec::with_capacity(field_elts.len());
+        for elt in field_elts {
             // Each element should be a tuple like ("field_name", type).
             let ast::Expr::Tuple(tuple_expr) = elt else {
-                let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
                 return self.infer_call_expression_impl(
                     call_expr,
                     callable_type,
@@ -5857,7 +5869,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             };
 
             if tuple_expr.elts.len() != 2 {
-                let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
                 return self.infer_call_expression_impl(
                     call_expr,
                     callable_type,
@@ -5869,7 +5880,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             let field_name_expr = &tuple_expr.elts[0];
             let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
             let Some(field_name_lit) = field_name_ty.as_string_literal() else {
-                let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
                 return self.infer_call_expression_impl(
                     call_expr,
                     callable_type,
@@ -5888,19 +5898,22 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Create the functional namedtuple type.
         let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields.into_boxed_slice());
-        SubclassOfType::from(db, namedtuple)
+        Type::ClassLiteral(ClassLiteral::FunctionalNamedTuple(namedtuple))
     }
 
     /// Infer the type for a `collections.namedtuple` creation:
     /// `namedtuple("Name", ["field1", "field2"])` or `namedtuple("Name", "field1 field2")`.
-    fn infer_collections_namedtuple_expression(&mut self, call_expr: &ast::ExprCall) -> Type<'db> {
+    fn infer_collections_namedtuple_expression(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        callable_type: Type<'db>,
+    ) -> Type<'db> {
         let db = self.db();
         let arguments = &call_expr.arguments;
 
         // We need at least 2 arguments: the name and the fields.
         if arguments.args.len() < 2 {
             // Fall back to normal call inference.
-            let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
             return self.infer_call_expression_impl(
                 call_expr,
                 callable_type,
@@ -5912,7 +5925,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let name_expr = &arguments.args[0];
         let name_ty = self.infer_expression(name_expr, TypeContext::default());
         let Some(name_lit) = name_ty.as_string_literal() else {
-            let callable_type = self.infer_expression(&call_expr.func, TypeContext::default());
             return self.infer_call_expression_impl(
                 call_expr,
                 callable_type,
@@ -5930,8 +5942,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for elt in &list_expr.elts {
                     let field_ty = self.infer_expression(elt, TypeContext::default());
                     let Some(field_lit) = field_ty.as_string_literal() else {
-                        let callable_type =
-                            self.infer_expression(&call_expr.func, TypeContext::default());
                         return self.infer_call_expression_impl(
                             call_expr,
                             callable_type,
@@ -5948,8 +5958,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 for elt in &tuple_expr.elts {
                     let field_ty = self.infer_expression(elt, TypeContext::default());
                     let Some(field_lit) = field_ty.as_string_literal() else {
-                        let callable_type =
-                            self.infer_expression(&call_expr.func, TypeContext::default());
                         return self.infer_call_expression_impl(
                             call_expr,
                             callable_type,
@@ -5964,8 +5972,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             _ => {
                 let fields_ty = self.infer_expression(fields_expr, TypeContext::default());
                 let Some(fields_lit) = fields_ty.as_string_literal() else {
-                    let callable_type =
-                        self.infer_expression(&call_expr.func, TypeContext::default());
                     return self.infer_call_expression_impl(
                         call_expr,
                         callable_type,
@@ -5982,7 +5988,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         };
 
-        // Extract the defaults keyword argument (a tuple/list of default values).
+        // Extract the defaults keyword argument (a tuple or list of default values).
         let defaults: Vec<Type<'db>> = arguments
             .find_keyword("defaults")
             .map(|kw| match &kw.value {
@@ -6002,6 +6008,39 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             })
             .unwrap_or_default();
 
+        // Check the rename keyword argument. If `rename=True`, invalid field names
+        // are replaced with `_N` where N is the 0-indexed position.
+        let rename = arguments.find_keyword("rename").is_some_and(|kw| {
+            let rename_ty = self.infer_expression(&kw.value, TypeContext::default());
+            matches!(rename_ty, Type::BooleanLiteral(true))
+        });
+
+        // Apply renaming logic if `rename=True`.
+        let field_names: Vec<ast::name::Name> = if rename {
+            let mut seen: FxHashSet<&str> = FxHashSet::default();
+            field_names
+                .iter()
+                .enumerate()
+                .map(|(i, name)| {
+                    let name_str = name.as_str();
+                    // Rename if: starts with underscore, is a keyword,
+                    // is not a valid identifier, or is a duplicate.
+                    let needs_rename = name_str.starts_with('_')
+                        || is_keyword(name_str)
+                        || !is_identifier(name_str)
+                        || seen.contains(name_str);
+                    if needs_rename {
+                        ast::name::Name::new(format!("_{i}"))
+                    } else {
+                        seen.insert(name_str);
+                        name.clone()
+                    }
+                })
+                .collect()
+        } else {
+            field_names
+        };
+
         // All fields have type `Any` for collections.namedtuple.
         let any_ty = Type::any();
         let num_fields = field_names.len();
@@ -6020,7 +6059,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         // Create the functional namedtuple type.
         let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields);
-        SubclassOfType::from(db, namedtuple)
+        Type::ClassLiteral(ClassLiteral::FunctionalNamedTuple(namedtuple))
     }
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
@@ -8853,17 +8892,17 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
 
-        // Handle special forms like typing.NamedTuple.
+        // Handle special forms like `typing.NamedTuple`.
         if let Some(SpecialFormType::NamedTuple) = callable_type.as_special_form() {
-            return self.infer_functional_namedtuple_expression(call_expression);
+            return self.infer_functional_namedtuple_expression(call_expression, callable_type);
         }
 
-        // Handle collections.namedtuple.
+        // Handle `collections.namedtuple`.
         if callable_type
             .as_function_literal()
             .is_some_and(|f| f.is_known(self.db(), KnownFunction::NamedTuple))
         {
-            return self.infer_collections_namedtuple_expression(call_expression);
+            return self.infer_collections_namedtuple_expression(call_expression, callable_type);
         }
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
