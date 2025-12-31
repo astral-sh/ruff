@@ -17,6 +17,7 @@ use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
 use ruff_python_ast::name::Name;
+use ruff_python_ast::PythonVersion;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
@@ -13659,10 +13660,14 @@ impl<'db> ModuleLiteralType<'db> {
                 return place_and_qualifiers;
             };
 
+            let supports_module_getattr =
+                file.is_stub(db) || Program::get(db).python_version(db) >= PythonVersion::PY37;
+
             // Check if the module has __getattr__
-            let has_getattr = !imported_symbol(db, file, "__getattr__", None)
-                .place
-                .is_undefined();
+            let has_getattr = supports_module_getattr
+                && !imported_symbol(db, file, "__getattr__", None)
+                    .place
+                    .is_undefined();
 
             // If __getattr__ exists, try to resolve as a submodule first.
             // This is important because __getattr__ is only called at runtime for attributes that don't exist,
