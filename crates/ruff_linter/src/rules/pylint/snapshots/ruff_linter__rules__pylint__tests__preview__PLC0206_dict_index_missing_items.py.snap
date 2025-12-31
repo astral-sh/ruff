@@ -7,7 +7,7 @@ source: crates/ruff_linter/src/rules/pylint/mod.rs
 
 --- Summary ---
 Removed: 7
-Added: 7
+Added: 8
 
 --- Removed ---
 PLC0206 Extracting value from dictionary without calling `.items()`
@@ -212,4 +212,17 @@ PLC0206 Extracting value from dictionary without calling `.items()`
 69 |     with open(f"{instrument}/{ORCHESTRA[instrument]}.txt", "w") as f:
    |                               ---------------------
 70 |         f.write(data)
+   |
+
+
+PLC0206 Extracting value from dictionary without calling `.items()`
+  --> dict_index_missing_items.py:75:5
+   |
+73 |   # This should still suppress the error
+74 |   for (  # noqa: PLC0206
+75 | /     instrument
+76 | | ) in ORCHESTRA:
+   | |______________^
+77 |       print(f"{instrument}: {ORCHESTRA[instrument]}")
+   |                              ---------------------
    |

@@ -68,3 +68,10 @@ for instrument in ORCHESTRA:
 
     with open(f"{instrument}/{ORCHESTRA[instrument]}.txt", "w") as f:
         f.write(data)
+
+
+# This should still suppress the error
+for (  # noqa: PLC0206
+    instrument
+) in ORCHESTRA:
+    print(f"{instrument}: {ORCHESTRA[instrument]}")
