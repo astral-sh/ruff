@@ -331,7 +331,7 @@ impl<'db> BoundSuperType<'db> {
             Type::NominalInstance(instance) => SuperOwnerKind::Instance(instance),
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.as_nominal_type() {
+                if let Some(nominal_instance) = protocol.to_nominal_instance() {
                     SuperOwnerKind::Instance(nominal_instance)
                 } else {
                     return Err(BoundSuperError::AbstractOwnerType {

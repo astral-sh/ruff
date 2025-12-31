@@ -1,6 +1,7 @@
 """Create and manipulate C compatible data types in Python."""
 
 import _typeshed
+import builtins
 import sys
 from _typeshed import ReadableBuffer, StrOrBytesPath, WriteableBuffer
 from abc import abstractmethod
@@ -251,24 +252,50 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
 _GetT = TypeVar("_GetT")
 _SetT = TypeVar("_SetT")
 
-# This class is not exposed. It calls itself _ctypes.CField.
-@final
-@type_check_only
-class _CField(Generic[_CT, _GetT, _SetT]):
-    offset: int
-    size: int
-    if sys.version_info >= (3, 10):
-        @overload
-        def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
-        @overload
-        def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
-    else:
-        @overload
-        def __get__(self, instance: None, owner: type[Any] | None, /) -> Self: ...
-        @overload
-        def __get__(self, instance: Any, owner: type[Any] | None, /) -> _GetT: ...
+if sys.version_info >= (3, 14):
+    @final
+    class CField(Generic[_CT, _GetT, _SetT]):
+        """Structure/Union member"""
 
-    def __set__(self, instance: Any, value: _SetT, /) -> None: ...
+        offset: int
+        size: int
+        name: str
+        type: builtins.type[_CT]
+        byte_offset: int
+        byte_size: int
+        is_bitfield: bool
+        bit_offset: int
+        bit_size: int
+        is_anonymous: bool
+        @overload
+        def __get__(self, instance: None, owner: builtins.type[Any] | None = None, /) -> Self:
+            """Return an attribute of instance, which is of type owner."""
+
+        @overload
+        def __get__(self, instance: Any, owner: builtins.type[Any] | None = None, /) -> _GetT: ...
+        def __set__(self, instance: Any, value: _SetT, /) -> None:
+            """Set an attribute of instance to value."""
+
+    _CField = CField
+
+else:
+    @final
+    @type_check_only
+    class _CField(Generic[_CT, _GetT, _SetT]):
+        offset: int
+        size: int
+        if sys.version_info >= (3, 10):
+            @overload
+            def __get__(self, instance: None, owner: type[Any] | None = None, /) -> Self: ...
+            @overload
+            def __get__(self, instance: Any, owner: type[Any] | None = None, /) -> _GetT: ...
+        else:
+            @overload
+            def __get__(self, instance: None, owner: type[Any] | None, /) -> Self: ...
+            @overload
+            def __get__(self, instance: Any, owner: type[Any] | None, /) -> _GetT: ...
+
+        def __set__(self, instance: Any, value: _SetT, /) -> None: ...
 
 # This class is not exposed. It calls itself _ctypes.UnionType.
 @type_check_only

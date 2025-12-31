@@ -72,7 +72,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -82,15 +82,15 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | -------
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
-        ");
+        "#);
     }
 
     // this is a slightly different case to the one above,
@@ -137,7 +137,7 @@ mod tests {
             "#,
         );
 
-        assert_snapshot!(test.goto_type_definition(), @r"
+        assert_snapshot!(test.goto_type_definition(), @r#"
         info[goto-type definition]: Go to type definition
          --> main.py:4:1
           |
@@ -147,16 +147,15 @@ mod tests {
           | ^^ Clicking here
           |
         info: Found 1 type definition
-           --> stdlib/typing.pyi:781:1
-            |
-        779 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
-        780 |
-        781 | Generic: type[_Generic]
-            | -------
-        782 |
-        783 | class _ProtocolMeta(ABCMeta):
-            |
-        ");
+            --> stdlib/typing.pyi:1268:1
+             |
+        1266 |         def __class_getitem__(cls, args: TypeVar | tuple[TypeVar, ...]) -> _Final: ...
+        1267 |
+        1268 | Generic: type[_Generic]
+             | -------
+        1269 | """Abstract base class for generic types.
+             |
+        "#);
     }
 
     #[test]

@@ -32,6 +32,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 /// documentation generators, or custom introspection utilities that rely on
 /// specific docstring formatting.
 ///
+/// ## Options
+///
+/// - `lint.pydocstyle.ignore-decorators`
+///
 /// ## References
 /// - [PEP 257 – Docstring Conventions](https://peps.python.org/pep-0257/)
 ///

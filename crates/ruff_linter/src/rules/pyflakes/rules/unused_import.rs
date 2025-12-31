@@ -389,7 +389,7 @@ pub(crate) fn unused_import(checker: &Checker, scope: &Scope) {
         }
     }
 
-    let in_init = checker.path().ends_with("__init__.py");
+    let in_init = checker.in_init_module();
     let fix_init = !checker.settings().ignore_init_module_imports;
     let preview_mode = is_dunder_init_fix_unused_import_enabled(checker.settings());
     let dunder_all_exprs = find_dunder_all_exprs(checker.semantic());

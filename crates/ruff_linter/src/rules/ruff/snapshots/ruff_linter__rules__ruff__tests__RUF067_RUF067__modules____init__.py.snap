@@ -1,0 +1,53 @@
+---
+source: crates/ruff_linter/src/rules/ruff/mod.rs
+---
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:12:1
+   |
+10 | __all__ = __all__ = __all__
+11 |
+12 | MY_CONSTANT = 5
+   | ^^^^^^^^^^^^^^^
+13 | """This is an important constant."""
+   |
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:15:1
+   |
+13 | """This is an important constant."""
+14 |
+15 | os.environ["FOO"] = 1
+   | ^^^^^^^^^^^^^^^^^^^^^
+   |
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:18:1
+   |
+18 | / def foo():
+19 | |     return Path("foo.py")
+   | |_________________________^
+20 |
+21 |   def __getattr__(name):  # ok
+   |
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:26:1
+   |
+24 |   __path__ = __import__('pkgutil').extend_path(__path__, __name__)  # ok
+25 |
+26 | / if os.environ["FOO"] != "1":  # RUF067
+27 | |     MY_CONSTANT = 4  # ok, don't flag nested statements
+   | |___________________^
+28 |
+29 |   if TYPE_CHECKING:  # ok
+   |
+
+RUF067 `__init__` module should only contain docstrings and re-exports
+  --> __init__.py:48:1
+   |
+47 | # non-`extend_path` assignments are not allowed
+48 | __path__ = 5  # RUF067
+   | ^^^^^^^^^^^^
+49 |
+50 | # also allow `__author__`
+   |

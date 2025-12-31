@@ -70,8 +70,8 @@ export default function Editor({
 }: Props) {
   const serverRef = useRef<PlaygroundServer | null>(null);
 
-  if (serverRef.current != null) {
-    serverRef.current.update(
+  useEffect(() => {
+    serverRef.current?.update(
       {
         files,
         workspace,
@@ -81,7 +81,14 @@ export default function Editor({
       },
       isViewingVendoredFile,
     );
-  }
+  }, [
+    files,
+    workspace,
+    onOpenFile,
+    onVendoredFileChange,
+    onBackToUserFile,
+    isViewingVendoredFile,
+  ]);
 
   // Update the diagnostics in the editor.
   useEffect(() => {
@@ -106,11 +113,7 @@ export default function Editor({
 
   useEffect(() => {
     return () => {
-      const server = serverRef.current;
-
-      if (server != null) {
-        server.dispose();
-      }
+      serverRef.current?.dispose();
     };
   }, []);
 

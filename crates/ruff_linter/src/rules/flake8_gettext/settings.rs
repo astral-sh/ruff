@@ -5,7 +5,7 @@ use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Clone, CacheKey)]
 pub struct Settings {
-    pub functions_names: Vec<Name>,
+    pub function_names: Vec<Name>,
 }
 
 pub fn default_func_names() -> Vec<Name> {
@@ -19,7 +19,7 @@ pub fn default_func_names() -> Vec<Name> {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            functions_names: default_func_names(),
+            function_names: default_func_names(),
         }
     }
 }
@@ -30,7 +30,7 @@ impl Display for Settings {
             formatter = f,
             namespace = "linter.flake8_gettext",
             fields = [
-                self.functions_names | array
+                self.function_names | array
             ]
         }
         Ok(())
