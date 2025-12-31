@@ -17,6 +17,7 @@ help: Convert to `X | None`
 10 + x: str | None             # UP045
 11 | x: "Optional[str]"           # UP045
 12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
 note: This is an unsafe fix and may change runtime behavior
 
 UP045 [*] Use `X | None` for type annotations
@@ -26,6 +27,7 @@ UP045 [*] Use `X | None` for type annotations
 11 | x: "Optional[str]"           # UP045
    |     ^^^^^^^^^^^^^
 12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
    |
 help: Convert to `X | None`
 8  | 
@@ -34,4 +36,23 @@ help: Convert to `X | None`
    - x: "Optional[str]"           # UP045
 11 + x: "str | None"           # UP045
 12 | cast("Optional[str]", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:12:7
+   |
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+   |       ^^^^^^^^^^^^^
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
+   |
+help: Convert to `X | None`
+9  | 
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+   - cast("Optional[str]", None)  # UP045
+12 + cast("str | None", None)  # UP045
+13 | cast(Optional[str], None)    # okay, str | None is a runtime error
 note: This is an unsafe fix and may change runtime behavior
