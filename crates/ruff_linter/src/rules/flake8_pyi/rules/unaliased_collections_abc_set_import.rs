@@ -1,10 +1,12 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
+use ruff_python_ast::{Stmt, StmtImportFrom};
 use ruff_python_semantic::Imported;
 use ruff_python_semantic::{Binding, BindingKind, Scope};
 use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
 use crate::renamer::Renamer;
+use crate::rules::pyupgrade::rules::is_import_required_by_isort;
 use crate::{Applicability, Fix, FixAvailability, Violation};
 
 /// ## What it does
@@ -70,6 +72,20 @@ pub(crate) fn unaliased_collections_abc_set_import(checker: &Checker, binding: &
 
     let name = binding.name(checker.source());
     if name == "AbstractSet" {
+        return;
+    }
+
+    // Skip if this import is required by isort to prevent infinite loops with I002 and F401
+    if let Some(stmt @ Stmt::ImportFrom(StmtImportFrom { names, .. })) =
+        binding.statement(checker.semantic())
+        && names.iter().any(|alias| {
+            is_import_required_by_isort(
+                &checker.settings().isort.required_imports,
+                stmt.into(),
+                alias,
+            )
+        })
+    {
         return;
     }
 
