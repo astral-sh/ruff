@@ -1,7 +1,7 @@
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
-    self as ast, Expr, ExprContext,
+    self as ast, Expr, ExprContext, StmtFor,
     token::parenthesized_range,
     visitor::{self, Visitor},
 };
@@ -66,8 +66,8 @@ impl Violation for DictIndexMissingItems<'_> {
 }
 
 /// PLC0206
-pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFor) {
-    let ast::StmtFor { iter, body, .. } = stmt_for;
+pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &StmtFor) {
+    let StmtFor { iter, body, .. } = stmt_for;
 
     // Extract the name of the iteration object (e.g., `obj` in `for key in obj:`).
     let Some(dict_name) = extract_dict_name(iter) else {
@@ -97,21 +97,15 @@ struct SubscriptVisitor<'a, 'b> {
     range: TextRange,
     /// The [`Checker`] used to emit diagnostics.
     checker: &'a Checker<'b>,
-    /// The [`DiagnosticGuard`] used for attaching additional annotations for each subscript use in
-    /// preview.
+    /// The [`DiagnosticGuard`] used to attach additional annotations for each subscript.
     ///
-    /// The guard is initially `None` and then set to `Some` when the first subscript operation is
-    /// found.
+    /// The guard is initially `None` and then set to `Some` when the first subscript is found.
     guard: Option<DiagnosticGuard<'a, 'b>>,
 }
 
 impl<'a, 'b> SubscriptVisitor<'a, 'b> {
-    fn new(
-        stmt_for: &'a ast::StmtFor,
-        dict_name: &'a ast::ExprName,
-        checker: &'a Checker<'b>,
-    ) -> Self {
-        let ast::StmtFor { target, iter, .. } = stmt_for;
+    fn new(stmt_for: &'a StmtFor, dict_name: &'a ast::ExprName, checker: &'a Checker<'b>) -> Self {
+        let StmtFor { target, iter, .. } = stmt_for;
         let range = {
             let target_start =
                 parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
