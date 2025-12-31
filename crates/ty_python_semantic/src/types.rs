@@ -5760,25 +5760,27 @@ impl<'db> Type<'db> {
         );
 
         // Extract metaclass `__call__` info if it exists and has a declared return type.
-        let metaclass_call_info =
-            if let Place::Defined(Type::BoundMethod(metaclass_dunder_call), _, boundness, _) =
-                metaclass_dunder_call.place
-            {
-                let signature = metaclass_dunder_call.function(db).signature(db);
-                // Only use metaclass `__call__` if it has a declared return type.
-                // If return type is unannotated, fall through to `__new__`/`__init__`.
-                let has_declared_return = signature
-                    .overloads
-                    .iter()
-                    .any(|sig| sig.return_ty.is_some());
-                if has_declared_return {
-                    Some((metaclass_dunder_call, boundness))
-                } else {
-                    None
-                }
+        let metaclass_call_info = if let Place::Defined(DefinedPlace {
+            ty: Type::BoundMethod(metaclass_dunder_call),
+            definedness: boundness,
+            ..
+        }) = metaclass_dunder_call.place
+        {
+            let signature = metaclass_dunder_call.function(db).signature(db);
+            // Only use metaclass `__call__` if it has a declared return type.
+            // If return type is unannotated (unknown), fall through to `__new__`/`__init__`.
+            let has_declared_return = signature
+                .overloads
+                .iter()
+                .any(|sig| !sig.return_ty.is_unknown());
+            if has_declared_return {
+                Some((metaclass_dunder_call, boundness))
             } else {
                 None
-            };
+            }
+        } else {
+            None
+        };
 
         // The code below deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
@@ -5892,23 +5894,11 @@ impl<'db> Type<'db> {
                 .to_instance(db)
                 .expect("type should be convertible to instance type");
 
-            // Special case: if the return type is exactly `type`, treat it as returning the
-            // instance type. This is a common pattern in singleton metaclasses where `__call__`
-            // is annotated as `-> type` but actually returns an instance. Both mypy and pyright
-            // handle this specially to avoid false positives.
-            // Note: `-> type` in annotations becomes `NominalInstance(type)`.
-            let returns_bare_type = matches!(
-                metaclass_return_type,
-                Type::NominalInstance(instance) if instance.class(db).is_known(db, KnownClass::Type)
-            );
-
             // Check if we should skip `__new__`/`__init__` evaluation.
             // Skip if: return type is not assignable to instance, is Never, or contains Any.
-            // But don't skip if the return type is exactly `type` (common singleton pattern).
-            let skip_new_init = !returns_bare_type
-                && (!metaclass_return_type.is_assignable_to(db, instance_ty)
-                    || metaclass_return_type.is_never()
-                    || matches!(metaclass_return_type, Type::Dynamic(DynamicType::Any)));
+            let skip_new_init = !metaclass_return_type.is_assignable_to(db, instance_ty)
+                || metaclass_return_type.is_never()
+                || matches!(metaclass_return_type, Type::Dynamic(DynamicType::Any));
 
             // If there are argument errors or we should skip `__new__`/`__init__`, return metaclass result.
             if call_result.is_err() || skip_new_init {
