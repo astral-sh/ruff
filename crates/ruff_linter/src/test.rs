@@ -389,6 +389,15 @@ Either ensure you always emit a fix or change `Violation::FIX_AVAILABILITY` to e
                 `Violation::fix_title` returns `None`"
             );
 
+            if let Some(fix) = diagnostic.fix() {
+                assert!(
+                    fix.applicability() >= rule.applicability(),
+                    "Expected fix for rule {rule:?} to be at least {:?} but got {:?}",
+                    rule.applicability(),
+                    fix.applicability(),
+                );
+            }
+
             // Not strictly necessary but adds some coverage for this code path by overriding the
             // noqa offset and the source file
             if let Some(range) = diagnostic.range() {

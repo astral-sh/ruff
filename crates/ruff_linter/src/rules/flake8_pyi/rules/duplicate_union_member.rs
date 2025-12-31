@@ -37,7 +37,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `typing.Union`](https://docs.python.org/3/library/typing.html#typing.Union)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.262")]
+#[violation_metadata(stable_since = "v0.0.262", safety = "unsafe")]
 pub(crate) struct DuplicateUnionMember {
     duplicate_name: String,
 }

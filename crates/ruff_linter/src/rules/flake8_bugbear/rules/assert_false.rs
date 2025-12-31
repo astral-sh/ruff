@@ -35,7 +35,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// ## References
 /// - [Python documentation: `assert`](https://docs.python.org/3/reference/simple_stmts.html#the-assert-statement)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.67")]
+#[violation_metadata(stable_since = "v0.0.67", safety = "unsafe")]
 pub(crate) struct AssertFalse;
 
 impl AlwaysFixableViolation for AssertFalse {

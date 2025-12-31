@@ -38,7 +38,7 @@ use crate::{Applicability, Edit, Fix, FixAvailability, Violation};
 /// (assuming `foo()` returns a truthy value), but only once in
 /// `foo() or bar()`.
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "v0.3.6")]
+#[violation_metadata(preview_since = "v0.3.6", safety = "unsafe")]
 pub(crate) struct IfExpInsteadOfOrOperator;
 
 impl Violation for IfExpInsteadOfOrOperator {

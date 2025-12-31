@@ -113,7 +113,7 @@ use ruff_text_size::Ranged;
 ///
 /// [PEP 673]: https://peps.python.org/pep-0673/#valid-locations-for-self
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.271")]
+#[violation_metadata(stable_since = "v0.0.271", safety = "display-only")]
 pub(crate) struct NonSelfReturnType {
     class_name: String,
     method_name: String,

@@ -57,7 +57,7 @@ use crate::rules::flake8_comprehensions::fixes;
 ///
 /// Additionally, this fix may drop comments when rewriting the comprehension.
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.73")]
+#[violation_metadata(stable_since = "v0.0.73", safety = "unsafe")]
 pub(crate) struct UnnecessaryComprehension {
     kind: ComprehensionKind,
 }

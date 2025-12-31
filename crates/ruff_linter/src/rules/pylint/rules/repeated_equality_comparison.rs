@@ -53,7 +53,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// - [Python documentation: Membership test operations](https://docs.python.org/3/reference/expressions.html#membership-test-operations)
 /// - [Python documentation: `set`](https://docs.python.org/3/library/stdtypes.html#set)
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.279")]
+#[violation_metadata(stable_since = "v0.0.279", safety = "unsafe")]
 pub(crate) struct RepeatedEqualityComparison {
     expression: SourceCodeSnippet,
     all_hashable: bool,
