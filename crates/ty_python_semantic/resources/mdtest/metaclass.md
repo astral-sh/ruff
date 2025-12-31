@@ -1,3 +1,96 @@
+## Custom `__call__` on metaclass
+
+When a metaclass defines a custom `__call__` method, it controls what happens when the class is
+called. The return type and parameter types of the metaclass `__call__` are used instead of the
+class's `__new__` and `__init__` methods.
+
+### Basic metaclass `__call__`
+
+```py
+class Meta(type):
+    def __call__(cls, x: int, y: str) -> str:
+        return y
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo(1, "hello"))  # revealed: str
+
+a: str = Foo(1, "hello")  # OK
+```
+
+### Metaclass `__call__` with wrong arguments
+
+```py
+class Meta(type):
+    def __call__(cls, x: int) -> int:
+        return x
+
+class Foo(metaclass=Meta): ...
+
+Foo("wrong")  # error: [invalid-argument-type]
+Foo()  # error: [missing-argument]
+Foo(1, 2)  # error: [too-many-positional-arguments]
+```
+
+### Metaclass `__call__` takes precedence over `__init__`
+
+```py
+class Meta(type):
+    def __call__(cls) -> str:
+        return "hello"
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int, y: int) -> None:
+        pass
+
+# The metaclass __call__ takes precedence, so no arguments are needed
+# and the return type is str, not Foo.
+reveal_type(Foo())  # revealed: str
+```
+
+### Metaclass `__call__` with TypeVar return type
+
+When the metaclass `__call__` returns a TypeVar bound to the class type, it's essentially a
+pass-through to the normal constructor machinery. In this case, we should still check the `__new__`
+and `__init__` signatures.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    def __call__(cls: type[T], *args, **kwargs) -> T:
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# The metaclass __call__ returns T (bound to Foo), so we check __init__ parameters.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Metaclass `__call__` with no return type annotation
+
+When the metaclass `__call__` has no return type annotation (returns `Unknown`), we should still
+check the `__new__` and `__init__` signatures.
+
+```py
+class Meta(type):
+    def __call__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# No return type annotation means we fall through to check __init__ parameters.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
 ## Default
 
 ```py

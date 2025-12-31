@@ -3347,9 +3347,22 @@ impl<'db> StaticClassLiteral<'db> {
                         )
                     })
             }
+            (CodeGeneratorKind::NamedTuple, "__new__") => {
+                let cls_parameter = Parameter::positional_or_keyword(Name::new_static("cls"))
+                    .with_annotated_type(KnownClass::Type.to_instance(db));
+                // Use `Self` type variable as return type so that subclasses get the correct
+                // return type when calling `__new__`. For example, if `IntBox` inherits from
+                // `Box[int]` (a NamedTuple), then `IntBox(1)` should return `IntBox`, not `Box[int]`.
+                let self_ty = Type::TypeVar(BoundTypeVarInstance::synthetic_self(
+                    db,
+                    instance_ty,
+                    BindingContext::Synthetic,
+                ));
+                signature_from_fields(vec![cls_parameter], self_ty)
+            }
             (
                 CodeGeneratorKind::NamedTuple,
-                "__new__" | "_replace" | "__replace__" | "_fields" | "__slots__",
+                "_replace" | "__replace__" | "_fields" | "__slots__",
             ) => {
                 let fields = self.fields(db, specialization, field_policy);
                 let fields_iter = fields.iter().map(|(name, field)| {
