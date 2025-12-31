@@ -268,3 +268,12 @@ def _(
 ) -> (int, str):  # error: [invalid-type-form]
     return x
 ```
+
+### Special-cased diagnostic for `callable` used in a type expression
+
+```py
+# error: [invalid-type-form]
+# error: [invalid-type-form]
+def decorator(fn: callable) -> callable:
+    return fn
+```

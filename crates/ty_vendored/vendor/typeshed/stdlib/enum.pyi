@@ -510,6 +510,7 @@ class Flag(Enum):
 
     _name_: str | None  # type: ignore[assignment]
     _value_: int
+    _numeric_repr_: Callable[[int], str]
     @_magic_enum_attr
     def name(self) -> str | None:  # type: ignore[override]
         """The name of the Enum member."""

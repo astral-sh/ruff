@@ -10,6 +10,9 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         return Vec::new();
     }
 
+    let workspace_symbols_span = tracing::debug_span!("workspace_symbols");
+    let _span = workspace_symbols_span.enter();
+
     let project = db.project();
 
     let query = QueryPattern::fuzzy(query);
@@ -20,12 +23,16 @@ pub fn workspace_symbols(db: &dyn Db, query: &str) -> Vec<WorkspaceSymbolInfo> {
         let files = &files;
         let results = &results;
         let query = &query;
+        let workspace_symbols_span = &workspace_symbols_span;
 
         rayon::scope(move |s| {
             // For each file, extract symbols and add them to results
             for file in files.iter() {
                 let db = db.dyn_clone();
                 s.spawn(move |_| {
+                    let symbols_for_file_span = tracing::debug_span!(parent: workspace_symbols_span, "symbols_for_file", ?file);
+                    let _entered = symbols_for_file_span.entered();
+
                     for (_, symbol) in symbols_for_file(&*db, *file).search(query) {
                         // It seems like we could do better here than
                         // locking `results` for every single symbol,

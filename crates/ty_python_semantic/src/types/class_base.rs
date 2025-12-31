@@ -177,6 +177,7 @@ impl<'db> ClassBase<'db> {
             | Type::AlwaysFalsy
             | Type::AlwaysTruthy
             | Type::TypeIs(_)
+            | Type::TypeGuard(_)
             | Type::TypedDict(_) => None,
 
             Type::KnownInstance(known_instance) => match known_instance {

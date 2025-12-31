@@ -66,7 +66,11 @@ impl BackgroundDocumentRequestHandler for DocumentDiagnosticRequestHandler {
                         // SAFETY: Pull diagnostic requests are only called for text documents, not for
                         // notebook documents.
                         items: diagnostics
-                            .to_lsp_diagnostics(db, snapshot.resolved_client_capabilities())
+                            .to_lsp_diagnostics(
+                                db,
+                                snapshot.resolved_client_capabilities(),
+                                snapshot.global_settings(),
+                            )
                             .expect_text_document(),
                     },
                 })

@@ -350,6 +350,7 @@ class _ExceptHookArgs(structseq[Any], tuple[type[BaseException], BaseException |
         """Thread"""
 
 _excepthook: Callable[[_ExceptHookArgs], Any]
+"""Handle uncaught Thread.run() exception."""
 
 if sys.version_info >= (3, 12):
     def daemon_threads_allowed() -> bool:

@@ -31,6 +31,7 @@ class ForkingPickler(pickle.Pickler):
     loads = pickle.loads
 
 register = ForkingPickler.register
+"""Register a reduce function for a type."""
 
 def dump(obj: Any, file: SupportsWrite[bytes], protocol: int | None = None) -> None:
     """Replacement for pickle.dump() using ForkingPickler."""

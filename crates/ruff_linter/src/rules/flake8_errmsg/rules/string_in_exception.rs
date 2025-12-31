@@ -47,6 +47,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     raise RuntimeError(msg)
 /// RuntimeError: 'Some value' is incorrect
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-errmsg.max-string-length`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.183")]
 pub(crate) struct RawStringInException;

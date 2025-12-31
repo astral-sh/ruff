@@ -1,3 +1,4 @@
+use crate::AnalysisSettings;
 use crate::lint::{LintRegistry, RuleSelection};
 use ruff_db::files::File;
 use ty_module_resolver::Db as ModuleResolverDb;
@@ -13,6 +14,8 @@ pub trait Db: ModuleResolverDb {
 
     fn lint_registry(&self) -> &LintRegistry;
 
+    fn analysis_settings(&self) -> &AnalysisSettings;
+
     /// Whether ty is running with logging verbosity INFO or higher (`-v` or more).
     fn verbose(&self) -> bool;
 }
@@ -23,8 +26,8 @@ pub(crate) mod tests {
 
     use crate::program::Program;
     use crate::{
-        ProgramSettings, PythonPlatform, PythonVersionSource, PythonVersionWithSource,
-        default_lint_registry,
+        AnalysisSettings, ProgramSettings, PythonPlatform, PythonVersionSource,
+        PythonVersionWithSource, default_lint_registry,
     };
     use ty_module_resolver::SearchPathSettings;
 
@@ -52,6 +55,7 @@ pub(crate) mod tests {
         vendored: VendoredFileSystem,
         events: Events,
         rule_selection: Arc<RuleSelection>,
+        analysis_settings: Arc<AnalysisSettings>,
     }
 
     impl TestDb {
@@ -71,6 +75,7 @@ pub(crate) mod tests {
                 events,
                 files: Files::default(),
                 rule_selection: Arc::new(RuleSelection::from_registry(default_lint_registry())),
+                analysis_settings: AnalysisSettings::default().into(),
             }
         }
 
@@ -131,6 +136,10 @@ pub(crate) mod tests {
 
         fn lint_registry(&self) -> &LintRegistry {
             default_lint_registry()
+        }
+
+        fn analysis_settings(&self) -> &AnalysisSettings {
+            &self.analysis_settings
         }
 
         fn verbose(&self) -> bool {

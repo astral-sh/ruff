@@ -154,7 +154,7 @@ class IMAP4:
         (code, [data]) = <instance>.response(code)
         """
 
-    def append(self, mailbox: str, flags: str, date_time: str, message: ReadableBuffer) -> str:
+    def append(self, mailbox: str, flags: str, date_time: str, message: ReadableBuffer) -> tuple[str, _list[bytes]]:
         """Append message to named mailbox.
 
         (typ, [data]) = <instance>.append(mailbox, flags, date_time, message)

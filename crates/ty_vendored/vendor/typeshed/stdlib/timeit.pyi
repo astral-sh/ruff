@@ -56,6 +56,10 @@ _Timer: TypeAlias = Callable[[], float]
 _Stmt: TypeAlias = str | Callable[[], object]
 
 default_timer: _Timer
+"""perf_counter() -> float
+
+Performance counter for benchmarking.
+"""
 
 class Timer:
     """Class for timing execution speed of small code snippets.

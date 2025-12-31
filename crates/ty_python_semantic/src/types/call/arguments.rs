@@ -348,8 +348,8 @@ pub(crate) fn is_expandable_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
             class.is_known(db, KnownClass::Bool)
                 || instance.tuple_spec(db).is_some_and(|spec| match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => fixed_length_tuple
-                        .all_elements()
-                        .any(|element| is_expandable_type(db, *element)),
+                        .iter_all_elements()
+                        .any(|element| is_expandable_type(db, element)),
                     Tuple::Variable(_) => false,
                 })
                 || enum_metadata(db, class.class_literal(db).0).is_some()
@@ -380,12 +380,12 @@ fn expand_type<'db>(db: &'db dyn Db, ty: Type<'db>) -> Option<Vec<Type<'db>>> {
                 return match &*spec {
                     Tuple::Fixed(fixed_length_tuple) => {
                         let expanded = fixed_length_tuple
-                            .all_elements()
+                            .iter_all_elements()
                             .map(|element| {
-                                if let Some(expanded) = expand_type(db, *element) {
+                                if let Some(expanded) = expand_type(db, element) {
                                     Either::Left(expanded.into_iter())
                                 } else {
-                                    Either::Right(std::iter::once(*element))
+                                    Either::Right(std::iter::once(element))
                                 }
                             })
                             .multi_cartesian_product()

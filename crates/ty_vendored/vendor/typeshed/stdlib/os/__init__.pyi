@@ -2439,29 +2439,12 @@ class _wrap_close:
     def write(self, s: str, /) -> int: ...
     def writelines(self, lines: Iterable[str], /) -> None: ...
 
-def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
-def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-    """spawnl(mode, file, *args) -> integer
-
-    Execute file with arguments from args in a subprocess.
-    If mode == P_NOWAIT return the pid of the process.
-    If mode == P_WAIT return the process's exit code if it exits normally;
-    otherwise return -SIG, where SIG is the signal that killed it.
-    """
-
-def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
-    """spawnle(mode, file, *args, env) -> integer
-
-    Execute file with arguments from args in a subprocess with the
-    supplied environment.
-    If mode == P_NOWAIT return the pid of the process.
-    If mode == P_WAIT return the process's exit code if it exits normally;
-    otherwise return -SIG, where SIG is the signal that killed it.
-    """
-
-if sys.platform != "win32":
-    def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-        """spawnv(mode, file, args) -> integer
+if sys.version_info >= (3, 14):
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+        """spawnl(mode, file, *args) -> integer
 
         Execute file with arguments from args in a subprocess.
         If mode == P_NOWAIT return the pid of the process.
@@ -2469,43 +2452,140 @@ if sys.platform != "win32":
         otherwise return -SIG, where SIG is the signal that killed it.
         """
 
-    def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-        """spawnve(mode, file, args, env) -> integer
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
+        """spawnle(mode, file, *args, env) -> integer
 
         Execute file with arguments from args in a subprocess with the
-        specified environment.
+        supplied environment.
         If mode == P_NOWAIT return the pid of the process.
         If mode == P_WAIT return the process's exit code if it exits normally;
         otherwise return -SIG, where SIG is the signal that killed it.
         """
 
 else:
-    def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
-        """Execute the program specified by path in a new process.
+    def popen(cmd: str, mode: str = "r", buffering: int = -1) -> _wrap_close: ...
+    def spawnl(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+        """spawnl(mode, file, *args) -> integer
 
-        mode
-          Mode of process creation.
-        path
-          Path of executable file.
-        argv
-          Tuple or list of strings.
+        Execute file with arguments from args in a subprocess.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
         """
 
-    def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
-        """Execute the program specified by path in a new process.
+    def spawnle(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise sig
+        """spawnle(mode, file, *args, env) -> integer
 
-        mode
-          Mode of process creation.
-        path
-          Path of executable file.
-        argv
-          Tuple or list of strings.
-        env
-          Dictionary of strings mapping to strings.
+        Execute file with arguments from args in a subprocess with the
+        supplied environment.
+        If mode == P_NOWAIT return the pid of the process.
+        If mode == P_WAIT return the process's exit code if it exits normally;
+        otherwise return -SIG, where SIG is the signal that killed it.
         """
 
-def system(command: StrOrBytesPath) -> int:
-    """Execute the command in a subshell."""
+if sys.platform != "win32":
+    if sys.version_info >= (3, 14):
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+            """spawnv(mode, file, args) -> integer
+
+            Execute file with arguments from args in a subprocess.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+            """spawnve(mode, file, args, env) -> integer
+
+            Execute file with arguments from args in a subprocess with the
+            specified environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+    else:
+        def spawnv(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+            """spawnv(mode, file, args) -> integer
+
+            Execute file with arguments from args in a subprocess.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+        def spawnve(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+            """spawnve(mode, file, args, env) -> integer
+
+            Execute file with arguments from args in a subprocess with the
+            specified environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+else:
+    if sys.version_info >= (3, 14):
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
+            """Execute the program specified by path in a new process.
+
+            mode
+              Mode of process creation.
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            """
+
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
+            """Execute the program specified by path in a new process.
+
+            mode
+              Mode of process creation.
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            """
+    else:
+        def spawnv(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, /) -> int:
+            """Execute the program specified by path in a new process.
+
+            mode
+              Mode of process creation.
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            """
+
+        def spawnve(mode: int, path: StrOrBytesPath, argv: _ExecVArgs, env: _ExecEnv, /) -> int:
+            """Execute the program specified by path in a new process.
+
+            mode
+              Mode of process creation.
+            path
+              Path of executable file.
+            argv
+              Tuple or list of strings.
+            env
+              Dictionary of strings mapping to strings.
+            """
+
+if sys.version_info >= (3, 14):
+    @deprecated("Soft deprecated. Use the subprocess module instead.")
+    def system(command: StrOrBytesPath) -> int:
+        """Execute the command in a subshell."""
+
+else:
+    def system(command: StrOrBytesPath) -> int:
+        """Execute the command in a subshell."""
 
 @final
 class times_result(structseq[float], tuple[float, float, float, float, float]):
@@ -2616,45 +2696,90 @@ if sys.platform == "win32":
             """
 
 else:
-    def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
-        """spawnlp(mode, file, *args) -> integer
+    if sys.version_info >= (3, 14):
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+            """spawnlp(mode, file, *args) -> integer
 
-        Execute file (which is looked for along $PATH) with arguments from
-        args in a subprocess with the supplied environment.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
 
-    def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
-        """spawnlpe(mode, file, *args, env) -> integer
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
+            """spawnlpe(mode, file, *args, env) -> integer
 
-        Execute file (which is looked for along $PATH) with arguments from
-        args in a subprocess with the supplied environment.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
 
-    def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
-        """spawnvp(mode, file, args) -> integer
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+            """spawnvp(mode, file, args) -> integer
 
-        Execute file (which is looked for along $PATH) with arguments from
-        args in a subprocess.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
 
-    def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
-        """spawnvpe(mode, file, args, env) -> integer
+        @deprecated("Soft deprecated. Use the subprocess module instead.")
+        def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+            """spawnvpe(mode, file, args, env) -> integer
 
-        Execute file (which is looked for along $PATH) with arguments from
-        args in a subprocess with the supplied environment.
-        If mode == P_NOWAIT return the pid of the process.
-        If mode == P_WAIT return the process's exit code if it exits normally;
-        otherwise return -SIG, where SIG is the signal that killed it.
-        """
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+    else:
+        def spawnlp(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: StrOrBytesPath) -> int:
+            """spawnlp(mode, file, *args) -> integer
+
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+        def spawnlpe(mode: int, file: StrOrBytesPath, arg0: StrOrBytesPath, *args: Any) -> int:  # Imprecise signature
+            """spawnlpe(mode, file, *args, env) -> integer
+
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+        def spawnvp(mode: int, file: StrOrBytesPath, args: _ExecVArgs) -> int:
+            """spawnvp(mode, file, args) -> integer
+
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
+
+        def spawnvpe(mode: int, file: StrOrBytesPath, args: _ExecVArgs, env: _ExecEnv) -> int:
+            """spawnvpe(mode, file, args, env) -> integer
+
+            Execute file (which is looked for along $PATH) with arguments from
+            args in a subprocess with the supplied environment.
+            If mode == P_NOWAIT return the pid of the process.
+            If mode == P_WAIT return the process's exit code if it exits normally;
+            otherwise return -SIG, where SIG is the signal that killed it.
+            """
 
     def wait() -> tuple[int, int]:  # Unix only
         """Wait for completion of a child process.

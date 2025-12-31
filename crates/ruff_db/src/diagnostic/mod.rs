@@ -1,4 +1,4 @@
-use std::{fmt::Formatter, path::Path, sync::Arc};
+use std::{borrow::Cow, fmt::Formatter, path::Path, sync::Arc};
 
 use ruff_diagnostics::{Applicability, Fix};
 use ruff_source_file::{LineColumn, SourceCode, SourceFile};
@@ -11,6 +11,7 @@ pub use self::render::{
     ceil_char_boundary,
     github::{DisplayGithubDiagnostics, GithubRenderer},
 };
+use crate::cancellation::CancellationToken;
 use crate::{Db, files::File};
 
 mod render;
@@ -408,11 +409,6 @@ impl Diagnostic {
     /// Returns `true` if `self` is a syntax error message.
     pub fn is_invalid_syntax(&self) -> bool {
         self.id().is_invalid_syntax()
-    }
-
-    /// Returns the message body to display to the user.
-    pub fn body(&self) -> &str {
-        self.primary_message()
     }
 
     /// Returns the message of the first sub-diagnostic with a `Help` severity.
@@ -1312,6 +1308,8 @@ pub struct DisplayDiagnosticConfig {
     show_fix_diff: bool,
     /// The lowest applicability that should be shown when reporting diagnostics.
     fix_applicability: Applicability,
+
+    cancellation_token: Option<CancellationToken>,
 }
 
 impl DisplayDiagnosticConfig {
@@ -1385,6 +1383,20 @@ impl DisplayDiagnosticConfig {
     pub fn fix_applicability(&self) -> Applicability {
         self.fix_applicability
     }
+
+    pub fn with_cancellation_token(
+        mut self,
+        token: Option<CancellationToken>,
+    ) -> DisplayDiagnosticConfig {
+        self.cancellation_token = token;
+        self
+    }
+
+    pub fn is_canceled(&self) -> bool {
+        self.cancellation_token
+            .as_ref()
+            .is_some_and(|token| token.is_cancelled())
+    }
 }
 
 impl Default for DisplayDiagnosticConfig {
@@ -1398,6 +1410,7 @@ impl Default for DisplayDiagnosticConfig {
             show_fix_status: false,
             show_fix_diff: false,
             fix_applicability: Applicability::Safe,
+            cancellation_token: None,
         }
     }
 }
@@ -1474,6 +1487,15 @@ pub enum ConciseMessage<'a> {
     Custom(&'a str),
 }
 
+impl<'a> ConciseMessage<'a> {
+    pub fn to_str(&self) -> Cow<'a, str> {
+        match self {
+            ConciseMessage::MainDiagnostic(s) | ConciseMessage::Custom(s) => Cow::Borrowed(s),
+            ConciseMessage::Both { .. } => Cow::Owned(self.to_string()),
+        }
+    }
+}
+
 impl std::fmt::Display for ConciseMessage<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match *self {
@@ -1487,6 +1509,16 @@ impl std::fmt::Display for ConciseMessage<'_> {
                 write!(f, "{message}")
             }
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for ConciseMessage<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.collect_str(self)
     }
 }
 
