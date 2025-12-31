@@ -73,8 +73,8 @@ def __getattr__(name: str) -> str:
 value = 42
 ```
 
-If you `import mod` (without importing the submodule directly), accessing `mod.sub` will prefer
-the actual submodule if it exists, matching the behavior of other type checkers and user expectations.
+If you `import mod` (without importing the submodule directly), accessing `mod.sub` will prefer the
+actual submodule if it exists, matching the behavior of other type checkers and user expectations.
 
 `test_import_mod.py`:
 
@@ -137,23 +137,23 @@ def __getattr__(name: Literal["known_attr"]) -> int:
 
 ## Submodule wins over alias-only `__getattr__`
 
-When a package defines a module-level `__getattr__`, we should expect real submodules to take precedence over that result.
+When a package defines a module-level `__getattr__`, we should expect real submodules to take
+precedence over that result.
 
 ```py
 import anyio_like
 
 # Submodule should be found as a real module, not via __getattr__
-reveal_type(anyio_like.to_thread.current_default_thread_limiter()) # revealed: int
+reveal_type(anyio_like.to_thread.current_default_thread_limiter())  # revealed: int
 
 # The alias handled by __getattr__ should still work
-reveal_type(anyio_like.BrokenWorkerIntepreter) # revealed: type[BrokenWorkerInterpreter]
+reveal_type(anyio_like.BrokenWorkerIntepreter)  # revealed: type[BrokenWorkerInterpreter]
 ```
 
 `anyio_like/__init__.py`:
 
 ```py
 from ._core import BrokenWorkerInterpreter
-
 
 def __getattr__(attr: str) -> type[BrokenWorkerInterpreter]:
     if attr == "BrokenWorkerIntepreter":
@@ -165,8 +165,7 @@ def __getattr__(attr: str) -> type[BrokenWorkerInterpreter]:
 `anyio_like/_core.py`:
 
 ```py
-class BrokenWorkerInterpreter(Exception):
-    ...
+class BrokenWorkerInterpreter(Exception): ...
 ```
 
 `anyio_like/to_thread.py`:
@@ -226,8 +225,7 @@ class Qt:
 `pyside_like/QtWidgets.py`:
 
 ```py
-class QFileDialog:
-    ...
+class QFileDialog: ...
 ```
 
 ## Module `__getattr__` requires Python 3.7+

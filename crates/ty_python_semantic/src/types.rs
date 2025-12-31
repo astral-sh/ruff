@@ -16,8 +16,8 @@ use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagno
 use ruff_db::files::File;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast as ast;
-use ruff_python_ast::name::Name;
 use ruff_python_ast::PythonVersion;
+use ruff_python_ast::name::Name;
 use ruff_text_size::{Ranged, TextRange};
 use smallvec::{SmallVec, smallvec};
 use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
@@ -13590,13 +13590,14 @@ impl<'db> ModuleLiteralType<'db> {
         // discovered while indexing the package directory. This should ensure we pick
         // the real submodule over a package-level `__getattr__` return type when the
         // normal resolver can't find it (eg. when the submodule hasn't been imported yet).
-        let submodule = resolve_module(db, importing_file, &absolute_submodule_name).or_else(|| {
-            self.module(db)
-                .all_submodules(db)
-                .iter()
-                .copied()
-                .find(|candidate| candidate.name(db) == &absolute_submodule_name)
-        })?;
+        let submodule =
+            resolve_module(db, importing_file, &absolute_submodule_name).or_else(|| {
+                self.module(db)
+                    .all_submodules(db)
+                    .iter()
+                    .copied()
+                    .find(|candidate| candidate.name(db) == &absolute_submodule_name)
+            })?;
         Some(Type::module_literal(db, importing_file, submodule))
     }
 
