@@ -2,6 +2,7 @@ use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::{
     self as ast, Expr, ExprContext,
+    token::parenthesized_range,
     visitor::{self, Visitor},
 };
 use ruff_python_semantic::SemanticModel;
@@ -79,7 +80,9 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
     }
 
     let range = if is_plc0206_narrower_range_enabled(checker.settings()) {
-        TextRange::new(target.start(), iter.end())
+        let target_range = parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
+            .unwrap_or(target.range());
+        TextRange::new(target_range.start(), iter.end())
     } else {
         stmt_for.range()
     };
