@@ -102,10 +102,10 @@ crates shared with Ruff, such as `ruff_db`, `ruff_python_ast`, and `ruff_python_
     annotations for the Python standard library.
 - `ty_wasm`: library crate for exposing ty as a WebAssembly module. Powers the
     [ty Playground](https://play.ty.dev/).
-- `ty_completion_eval`: framework for evaluating completion suggestions returned by the ty LSP.
-- `ty_module_resolver`: resolves Python modules across search paths allowing varying resolution modes.
-- `ty_static`: static data related to `ty`, currently only stores environment variable used by `ty`.
-- `ty_combine`: a utility crate containing the `Combine` trait.
+- `ty_completion_eval`: Framework for evaluating completion suggestions returned by the ty LSP.
+- `ty_module_resolver`: The module resolver, which allows resolving imports to their modules.
+- `ty_static`: Lists the known environment variables used by `ty`.
+- `ty_combine`: Utility crate containing the `Combine` trait, which is used to combine `Options`.
 
 ## Writing tests
 
