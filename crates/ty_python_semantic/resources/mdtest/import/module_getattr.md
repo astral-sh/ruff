@@ -134,3 +134,44 @@ from typing import Literal
 def __getattr__(name: Literal["known_attr"]) -> int:
     return 3
 ```
+
+## Submodule wins over alias-only `__getattr__`
+
+When a package defines a module-level `__getattr__`, we should expect real submodules to take precedence over that result.
+
+```py
+import anyio
+
+# Submodule should be found as a real module, not via __getattr__
+reveal_type(anyio.to_thread.current_default_thread_limiter()) # revealed: int
+
+# The alias handled by __getattr__ should still work
+reveal_type(anyio.BrokenWorkerIntepreter) # revealed: type[BrokenWorkerInterpreter]
+```
+
+`anyio/__init__.py`:
+
+```py
+from ._core import BrokenWorkerInterpreter
+
+
+def __getattr__(attr: str) -> type[BrokenWorkerInterpreter]:
+    if attr == "BrokenWorkerIntepreter":
+        return BrokenWorkerInterpreter
+
+    raise AttributeError(f"module {__name__!r} has no attribute {attr!r}")
+```
+
+`anyio/_core.py`:
+
+```py
+class BrokenWorkerInterpreter(Exception):
+    ...
+```
+
+`anyio/to_thread.py`:
+
+```py
+def current_default_thread_limiter() -> int:
+    return 0
+```
