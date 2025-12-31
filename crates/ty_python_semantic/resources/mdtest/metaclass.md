@@ -91,6 +91,30 @@ Foo()  # error: [missing-argument]
 reveal_type(Foo(1))  # revealed: Foo
 ```
 
+### Metaclass `__call__` with specific parameters
+
+When the metaclass `__call__` has specific parameters (not just `*args, **kwargs`), we should check
+the metaclass `__call__` signature, even if the return type is the instance type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    def __call__(cls: type[T], x: int) -> T:
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# The metaclass __call__ has specific parameters, so we check them.
+Foo("wrong")  # error: [invalid-argument-type]
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
 ## Default
 
 ```py
