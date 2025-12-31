@@ -418,18 +418,7 @@ impl<'db> BoundSuperType<'db> {
             Type::TypeAlias(alias) => {
                 return delegate_with_error_mapped(alias.value_type(db), None);
             }
-            Type::TypeVar(type_var) => {
-                let type_var = type_var.typevar(db);
-                return match type_var.bound_or_constraints(db) {
-                    Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        delegate_with_error_mapped(bound, Some(type_var))
-                    }
-                    Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
-                        delegate_with_error_mapped(constraints.as_type(db), Some(type_var))
-                    }
-                    None => delegate_with_error_mapped(Type::object(), Some(type_var)),
-                };
-            }
+            Type::TypeVar(bound_typevar) => SuperOwnerKind::InstanceTypeVar(bound_typevar),
             Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
