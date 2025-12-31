@@ -506,6 +506,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::Functional(functional) => {
                 ClassBase::Class(ClassType::NonGeneric(functional.into()))
             }
+            ClassLiteral::FunctionalNamedTuple(namedtuple) => {
+                ClassBase::Class(ClassType::NonGeneric(namedtuple.into()))
+            }
         }
     }
 
@@ -525,6 +528,13 @@ impl<'db> MroIterator<'db> {
                 ClassLiteral::Functional(functional) => {
                     let mro = functional.mro(self.db);
                     let elements: Vec<_> = mro.iter().skip(1).copied().collect();
+                    SubsequentMroElements::Owned(elements.into_iter())
+                }
+                ClassLiteral::FunctionalNamedTuple(namedtuple) => {
+                    // Namedtuples inherit from their tuple base type.
+                    // The MRO after self is the full MRO of the tuple base type.
+                    let tuple_base = namedtuple.tuple_base_type(self.db);
+                    let elements: Vec<_> = tuple_base.iter_mro(self.db).collect();
                     SubsequentMroElements::Owned(elements.into_iter())
                 }
             })

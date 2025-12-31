@@ -24,7 +24,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::class::FunctionalClassLiteral;
+pub(crate) use self::class::{FunctionalClassLiteral, FunctionalNamedTupleLiteral};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
@@ -6501,7 +6501,24 @@ impl<'db> Type<'db> {
             }
 
             Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                Binding::single(self, Signature::todo("functional `NamedTuple` syntax")).into()
+                // typing.NamedTuple(typename: str, fields: Sequence[tuple[str, type]])
+                // The return type is set in bind.rs based on the actual arguments.
+                Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("typename"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("fields"))
+                                    .with_annotated_type(todo_type!("Sequence[tuple[str, type]]")),
+                            ],
+                        ),
+                        Some(todo_type!("functional `NamedTuple` syntax")),
+                    ),
+                )
+                .into()
             }
 
             Type::GenericAlias(_) => {

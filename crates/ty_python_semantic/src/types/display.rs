@@ -663,6 +663,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::NonGeneric(ClassLiteral::Functional(functional)), _) => {
                         f.with_type(self.ty).write_str(functional.name(self.db).as_str())
                     },
+                    (ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)), _) => {
+                        f.with_type(self.ty).write_str(namedtuple.name(self.db).as_str())
+                    },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
@@ -674,6 +677,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     ClassType::NonGeneric(ClassLiteral::Functional(functional)) => f
                         .with_type(self.ty)
                         .write_str(functional.name(self.db).as_str()),
+                    ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => f
+                        .with_type(self.ty)
+                        .write_str(namedtuple.name(self.db).as_str()),
                     ClassType::Generic(alias) => alias
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
@@ -722,6 +728,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         // Functional classes don't have qualified names; just use the name.
                         f.write_str(func_class.name(self.db))?;
                     }
+                    ClassLiteral::FunctionalNamedTuple(namedtuple) => {
+                        // Functional namedtuples don't have qualified names; just use the name.
+                        f.write_str(namedtuple.name(self.db))?;
+                    }
                 }
                 f.write_str("'>")
             }
@@ -751,6 +761,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str("type")?;
                     f.write_char('[')?;
                     f.write_str(functional.name(self.db).as_str())?;
+                    f.write_char(']')
+                }
+                SubclassOfInner::Class(ClassType::NonGeneric(
+                    ClassLiteral::FunctionalNamedTuple(namedtuple),
+                )) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    f.write_str(namedtuple.name(self.db).as_str())?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
@@ -1043,6 +1062,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 ClassType::NonGeneric(ClassLiteral::Functional(functional)) => f
                     .with_type(self.ty)
                     .write_str(functional.name(self.db).as_str()),
+                ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => f
+                    .with_type(self.ty)
+                    .write_str(namedtuple.name(self.db).as_str()),
                 ClassType::Generic(alias) => alias
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),

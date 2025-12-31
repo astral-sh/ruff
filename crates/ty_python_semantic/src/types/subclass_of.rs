@@ -7,10 +7,10 @@ use crate::types::protocol_class::ProtocolClass;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, FunctionalClassLiteral, HasRelationToVisitor, IsDisjointVisitor,
-    KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType,
-    todo_type,
+    FindLegacyTypeVarsVisitor, FunctionalClassLiteral, FunctionalNamedTupleLiteral,
+    HasRelationToVisitor, IsDisjointVisitor, KnownClass, MaterializationKind, MemberLookupPolicy,
+    NormalizedVisitor, SpecialFormType, Type, TypeContext, TypeMapping, TypeRelation,
+    TypeVarBoundOrConstraints, TypedDictType, UnionType, todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -546,5 +546,13 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
 impl<'db> From<FunctionalClassLiteral<'db>> for SubclassOfInner<'db> {
     fn from(value: FunctionalClassLiteral<'db>) -> Self {
         SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Functional(value)))
+    }
+}
+
+impl<'db> From<FunctionalNamedTupleLiteral<'db>> for SubclassOfInner<'db> {
+    fn from(value: FunctionalNamedTupleLiteral<'db>) -> Self {
+        SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(
+            value,
+        )))
     }
 }

@@ -90,11 +90,11 @@ Alternative functional syntax:
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
-# TODO: should be an error
+# error: [missing-argument] "No argument provided for required parameter `name`"
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
-reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.id)  # revealed: int
+reveal_type(alice2.name)  # revealed: str
 ```
 
 ### Definition
@@ -305,10 +305,81 @@ reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```py
 from collections import namedtuple
 
-Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
+Person = namedtuple("Person", ["id", "name"])
 
-alice = Person(1, "Alice", 42)
-bob = Person(2, "Bob")
+alice = Person(1, "Alice")
+
+# Field access returns Any (no type information available).
+reveal_type(alice.id)  # revealed: Any
+reveal_type(alice.name)  # revealed: Any
+
+# Alternative field specifications.
+Point1 = namedtuple("Point1", ["x", "y"])
+Point2 = namedtuple("Point2", "x y")
+Point3 = namedtuple("Point3", "x, y")
+
+p1 = Point1(1, 2)
+p2 = Point2(3, 4)
+p3 = Point3(5, 6)
+
+reveal_type(p1.x)  # revealed: Any
+reveal_type(p2.x)  # revealed: Any
+reveal_type(p3.x)  # revealed: Any
+```
+
+## `collections.namedtuple` with defaults
+
+The `defaults` parameter provides default values for the rightmost fields:
+
+```py
+from collections import namedtuple
+
+# Two fields, one default (applies to 'y').
+Point = namedtuple("Point", ["x", "y"], defaults=[0])
+
+# Can be called with both arguments.
+p1 = Point(1, 2)
+reveal_type(p1)  # revealed: Point
+
+# Can be called with just the required argument.
+p2 = Point(1)
+reveal_type(p2)  # revealed: Point
+
+# error: [missing-argument] "No argument provided for required parameter `x`"
+Point()
+
+# All fields have defaults.
+Point3D = namedtuple("Point3D", ["x", "y", "z"], defaults=[0, 0, 0])
+p3 = Point3D()
+reveal_type(p3)  # revealed: Point3D
+
+# Namedtuples with defaults are still compatible with tuple types.
+def takes_tuple(t: tuple[int, int]) -> None:
+    pass
+
+takes_tuple(Point(1, 2))
+```
+
+## `collections.namedtuple` tuple compatibility
+
+Functional namedtuples inherit from tuple with `Any` element types since `collections.namedtuple`
+doesn't provide type information:
+
+```py
+from collections import namedtuple
+from ty_extensions import static_assert, is_subtype_of
+
+Person = namedtuple("Person", ["name", "age"])
+
+# Functional namedtuples inherit from tuple[Any, Any, ...].
+static_assert(is_subtype_of(Person, tuple[object, object]))
+
+def takes_tuple(t: tuple[str, int]) -> None:
+    pass
+
+# Instances are assignable to tuple types since fields are Any.
+p = Person("Alice", 30)
+takes_tuple(p)
 ```
 
 ## The symbol `NamedTuple` itself
