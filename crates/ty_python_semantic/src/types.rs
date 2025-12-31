@@ -12529,7 +12529,7 @@ impl<'db> BoundMethodType<'db> {
             .nth(1)
             .and_then(class_base::ClassBase::into_class)?;
         let base_member = base.class_member(db, name, MemberLookupPolicy::default());
-        if let Place::Defined(Type::FunctionLiteral(base_func), _, _) = base_member.place {
+        if let Place::Defined(Type::FunctionLiteral(base_func), _, _, _) = base_member.place {
             if let [signature] = base_func.signature(db).overloads.as_slice() {
                 let unspecialized_return_ty = signature.return_ty.unwrap_or_else(|| {
                     let base_method_ty =
