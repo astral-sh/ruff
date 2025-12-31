@@ -49,12 +49,20 @@ use crate::preview::is_plc0206_narrower_range_enabled;
 /// ```
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.8.0")]
-pub(crate) struct DictIndexMissingItems;
+pub(crate) struct DictIndexMissingItems<'a> {
+    key: &'a str,
+    dict: &'a str,
+}
 
-impl Violation for DictIndexMissingItems {
+impl Violation for DictIndexMissingItems<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
         "Extracting value from dictionary without calling `.items()`".to_string()
+    }
+
+    fn fix_title(&self) -> Option<String> {
+        let Self { key, dict } = self;
+        Some(format!("Use `for {key}, value in {dict}.items()` instead"))
     }
 }
 
@@ -149,8 +157,13 @@ impl<'a> Visitor<'a> for SubscriptVisitor<'a, '_> {
             }
 
             let guard = self.guard.get_or_insert_with(|| {
-                self.checker
-                    .report_diagnostic(DictIndexMissingItems, self.range)
+                self.checker.report_diagnostic(
+                    DictIndexMissingItems {
+                        key: self.checker.locator().slice(self.target),
+                        dict: self.checker.locator().slice(self.dict_name),
+                    },
+                    self.range,
+                )
             });
 
             if is_plc0206_narrower_range_enabled(self.checker.settings()) {
