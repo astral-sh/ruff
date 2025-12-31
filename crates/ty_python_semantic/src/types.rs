@@ -6602,6 +6602,10 @@ impl<'db> Type<'db> {
             )
             .into(),
 
+            Type::KnownInstance(KnownInstanceType::Annotated(ty)) => {
+                ty.inner(db).to_meta_type(db).bindings(db)
+            }
+
             Type::KnownInstance(known_instance) => {
                 known_instance.instance_fallback(db).bindings(db)
             }
