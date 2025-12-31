@@ -73,15 +73,15 @@ def __getattr__(name: str) -> str:
 value = 42
 ```
 
-If you `import mod` (without importing the submodule directly), accessing `mod.sub` will call
-`mod.__getattr__('sub')`, so `reveal_type(mod.sub)` will show the return type of `__getattr__`.
+If you `import mod` (without importing the submodule directly), accessing `mod.sub` will prefer
+the actual submodule if it exists, matching the behavior of other type checkers and user expectations.
 
 `test_import_mod.py`:
 
 ```py
 import mod
 
-reveal_type(mod.sub)  # revealed: str
+reveal_type(mod.sub)  # revealed: <module 'mod.sub'>
 ```
 
 If you `import mod.sub` (importing the submodule directly), then `mod.sub` refers to the actual
