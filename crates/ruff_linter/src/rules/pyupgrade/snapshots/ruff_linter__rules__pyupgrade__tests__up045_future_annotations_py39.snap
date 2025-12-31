@@ -1,0 +1,37 @@
+---
+source: crates/ruff_linter/src/rules/pyupgrade/mod.rs
+---
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:10:4
+   |
+10 | x: Optional[str]             # UP045
+   |    ^^^^^^^^^^^^^
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+   |
+help: Convert to `X | None`
+7  | from typing import Optional, cast
+8  | 
+9  | 
+   - x: Optional[str]             # UP045
+10 + x: str | None             # UP045
+11 | x: "Optional[str]"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+note: This is an unsafe fix and may change runtime behavior
+
+UP045 [*] Use `X | None` for type annotations
+  --> UP045_py39.py:11:5
+   |
+10 | x: Optional[str]             # UP045
+11 | x: "Optional[str]"           # UP045
+   |     ^^^^^^^^^^^^^
+12 | cast("Optional[str]", None)  # UP045
+   |
+help: Convert to `X | None`
+8  | 
+9  | 
+10 | x: Optional[str]             # UP045
+   - x: "Optional[str]"           # UP045
+11 + x: "str | None"           # UP045
+12 | cast("Optional[str]", None)  # UP045
+note: This is an unsafe fix and may change runtime behavior
