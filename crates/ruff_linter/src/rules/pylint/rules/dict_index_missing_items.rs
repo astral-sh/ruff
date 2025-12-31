@@ -60,9 +60,7 @@ impl Violation for DictIndexMissingItems {
 
 /// PLC0206
 pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFor) {
-    let ast::StmtFor {
-        target, iter, body, ..
-    } = stmt_for;
+    let ast::StmtFor { iter, body, .. } = stmt_for;
 
     // Extract the name of the iteration object (e.g., `obj` in `for key in obj:`).
     let Some(dict_name) = extract_dict_name(iter) else {
@@ -79,15 +77,7 @@ pub(crate) fn dict_index_missing_items(checker: &Checker, stmt_for: &ast::StmtFo
         return;
     }
 
-    let range = if is_plc0206_narrower_range_enabled(checker.settings()) {
-        let target_range = parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
-            .unwrap_or(target.range());
-        TextRange::new(target_range.start(), iter.end())
-    } else {
-        stmt_for.range()
-    };
-
-    SubscriptVisitor::new(target, dict_name, checker, range).visit_body(body);
+    SubscriptVisitor::new(stmt_for, dict_name, checker).visit_body(body);
 }
 
 /// A visitor to detect subscript operations on a target dictionary.
@@ -110,11 +100,20 @@ struct SubscriptVisitor<'a, 'b> {
 
 impl<'a, 'b> SubscriptVisitor<'a, 'b> {
     fn new(
-        target: &'a Expr,
+        stmt_for: &'a ast::StmtFor,
         dict_name: &'a ast::ExprName,
         checker: &'a Checker<'b>,
-        range: TextRange,
     ) -> Self {
+        let ast::StmtFor { target, iter, .. } = stmt_for;
+        let range = if is_plc0206_narrower_range_enabled(checker.settings()) {
+            let target_range =
+                parenthesized_range(target.into(), stmt_for.into(), checker.tokens())
+                    .unwrap_or(target.range());
+            TextRange::new(target_range.start(), iter.end())
+        } else {
+            stmt_for.range()
+        };
+
         Self {
             target,
             dict_name,
