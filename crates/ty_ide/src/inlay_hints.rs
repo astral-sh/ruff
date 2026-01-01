@@ -26,13 +26,13 @@ pub struct InlayHint {
 
 impl InlayHint {
     fn variable_type(
-        context: InlayHintImporterContext,
+        context: InlayHintContext,
         expr: &Expr,
         rhs: &Expr,
         ty: Type,
         allow_edits: bool,
     ) -> Option<Self> {
-        let InlayHintImporterContext {
+        let InlayHintContext {
             db,
             file,
             dynamic_importer,
@@ -57,36 +57,35 @@ impl InlayHint {
         // span for its range, and then advance where we are.
         let mut offset = 0;
 
-        // This could be different from the original label if we need to
+        // This edit label could be different from the original label if we need to
         // qualify certain imported symbols. `A` could turn into `foo.A`.
-        let mut text_edit_label = details.label.clone();
-        let mut text_edit_offset = 0;
+        let mut edit_label = details.label.clone();
+        let mut edit_offset = 0;
 
         let mut label_parts = vec![": ".into()];
-
         for (target, detail) in details.targets.iter().zip(&details.details) {
             match detail {
                 TypeDetail::Type(ty) => {
                     let start = target.start().to_usize();
                     let end = target.end().to_usize();
-
                     // If we skipped over some bytes, push them with no target
                     if start > offset {
                         label_parts.push(details.label[offset..start].into());
                     }
 
-                    // Get the possible qualified label part
+                    // Possibly import the current type and return the qualified name
                     let qualified_name = |dynamic_importer: &mut DynamicImporter| {
                         let type_definition = ty.definition(db)?;
                         let definition = type_definition.definition()?;
 
-                        // Don't try to import symbols in scope.
+                        // Don't try to import symbols in scope
                         if definition.file(db) == file {
                             return None;
                         }
 
                         let definition_name = definition.name(db);
 
+                        // Fallback to the label if we cannot find the name
                         let definition_name = definition_name
                             .as_deref()
                             .unwrap_or(&details.label[start..end]);
@@ -108,26 +107,23 @@ impl InlayHint {
 
                     // Ok, this is the first type that claimed these bytes, give it the target
                     if start >= offset {
-                        let nav_target = ty.navigation_targets(db).into_iter().next();
-
-                        let text_edit_start = start + text_edit_offset;
-                        let text_edit_end = end + text_edit_offset;
-
-                        // Try to import the current type
+                        // Try import the symbol and update the edit label if required
                         if let Some(qualified_name) = qualified_name(dynamic_importer) {
-                            let old_len = text_edit_end - text_edit_start;
-                            let new_len = qualified_name.len();
+                            let original_label_length = end - start;
+                            let new_label_length = qualified_name.len();
 
-                            // Update qualified_label for text edits if needed
-                            text_edit_label
-                                .replace_range(text_edit_start..text_edit_end, &qualified_name);
-                            text_edit_offset += new_len - old_len;
+                            edit_label.replace_range(
+                                start + edit_offset..end + edit_offset,
+                                &qualified_name,
+                            );
+                            edit_offset += new_label_length - original_label_length;
                         }
+
+                        let target = ty.navigation_targets(db).into_iter().next();
 
                         // Always use original text for the label part
                         label_parts.push(
-                            InlayHintLabelPart::new(&details.label[start..end])
-                                .with_target(nav_target),
+                            InlayHintLabelPart::new(&details.label[start..end]).with_target(target),
                         );
                         offset = end;
                     }
@@ -148,11 +144,10 @@ impl InlayHint {
         let text_edits = if details.is_valid_syntax && allow_edits {
             let mut text_edits = vec![InlayHintTextEdit {
                 range: TextRange::new(position, position),
-                new_text: format!(": {text_edit_label}"),
+                new_text: format!(": {edit_label}"),
             }];
 
-            let import_edits = dynamic_importer.text_edits();
-            text_edits.extend(import_edits);
+            text_edits.extend(dynamic_importer.text_edits());
 
             text_edits
         } else {
@@ -336,7 +331,7 @@ impl Default for InlayHintSettings {
     }
 }
 
-struct InlayHintImporterContext<'a, 'db> {
+struct InlayHintContext<'a, 'db> {
     db: &'db dyn Db,
     file: File,
     dynamic_importer: &'a mut DynamicImporter<'a, 'db>,
@@ -345,8 +340,8 @@ struct InlayHintImporterContext<'a, 'db> {
 struct InlayHintVisitor<'a, 'db> {
     db: &'db dyn Db,
     model: SemanticModel<'db>,
-    /// Imports that we have already resolved.
-    /// We store these imports so we don't create multiple imports for the same symbol.
+    /// Imports that we have already created.
+    /// We store these imports so that we don't create multiple imports for the same symbol.
     dynamic_imports: FxHashMap<DynamicallyImportedMember, ImportAction>,
     importer: Importer<'db>,
     hints: Vec<InlayHint>,
@@ -392,7 +387,7 @@ impl<'a, 'db> InlayHintVisitor<'a, 'db> {
         let mut dynamic_importer =
             DynamicImporter::new(&self.importer, members, &mut self.dynamic_imports);
 
-        let context = InlayHintImporterContext {
+        let context = InlayHintContext {
             db: self.db,
             file: self.model.file(),
             dynamic_importer: &mut dynamic_importer,
@@ -641,11 +636,7 @@ struct DynamicallyImportedMember {
 struct DynamicImporter<'a, 'db> {
     importer: &'a Importer<'db>,
     members: MembersInScope<'db>,
-
-    /// Imports that we have already resolved.
-    /// We store these imports so we don't create multiple imports for the same symbol.
     dynamic_imports: &'a mut FxHashMap<DynamicallyImportedMember, ImportAction>,
-
     imported_members: Vec<DynamicallyImportedMember>,
 }
 
@@ -4623,12 +4614,7 @@ mod tests {
             foo(val.y()[1])",
         );
 
-        assert_snapshot!(
-            test.inlay_hints_with_settings(&InlayHintSettings {
-                variable_types: true,
-                call_argument_names: true,
-
-            }), @r"
+        assert_snapshot!(test.inlay_hints(), @r"
         from typing import List
 
         def foo(x: int): pass
