@@ -4,8 +4,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
 use crate::place::TypeOrigin;
@@ -37,11 +37,11 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
-    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
-    determine_upper_bound,
+    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext,
+    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
+    declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2252,13 +2252,8 @@ impl<'db> ClassLiteral<'db> {
                     qualifiers,
                 },
                 Some(dynamic_type),
-            ) => Place::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic_type)
-                    .build(),
-            )
-            .with_qualifiers(qualifiers),
+            ) => Place::bound(IntersectionType::from_elements(db, [ty, dynamic_type]))
+                .with_qualifiers(qualifiers),
 
             (
                 PlaceAndQualifiers {

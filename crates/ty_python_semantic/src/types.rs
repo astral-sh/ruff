@@ -7631,13 +7631,13 @@ impl<'db> Type<'db> {
                 // but it appears to be what users often expect, and it improves compatibility with
                 // other type checkers such as mypy.
                 // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionBuilder::new(db)
-                    .positive_elements([
+                SpecialFormType::NamedTuple => Ok(IntersectionType::from_elements(
+                    db,
+                    [
                         Type::homogeneous_tuple(db, Type::object()),
                         KnownClass::NamedTupleLike.to_instance(db),
-                    ])
-                    .build()),
-
+                    ],
+                )),
                 SpecialFormType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
@@ -15035,16 +15035,10 @@ pub(crate) mod tests {
         // salsa, but that would mean we would have to pass in `db` everywhere.
 
         // A union of several `Todo` types collapses to a single `Todo` type:
-        assert!(UnionType::from_elements(&db, vec![todo1, todo2]).is_todo());
+        assert!(UnionType::from_elements(&db, [todo1, todo2]).is_todo());
 
         // And similar for intersection types:
-        assert!(
-            IntersectionBuilder::new(&db)
-                .add_positive(todo1)
-                .add_positive(todo2)
-                .build()
-                .is_todo()
-        );
+        assert!(IntersectionType::from_elements(&db, [todo1, todo2]).is_todo());
         assert!(
             IntersectionBuilder::new(&db)
                 .add_positive(todo1)
@@ -15129,16 +15123,10 @@ pub(crate) mod tests {
         assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(Type::Never)
-            .add_positive(div)
-            .build();
+        let intersection = IntersectionType::from_elements(&db, [Type::Never, div]);
         assert_eq!(intersection.display(&db).to_string(), "Never");
 
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(div)
-            .add_positive(Type::Never)
-            .build();
+        let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
         assert_eq!(intersection.display(&db).to_string(), "Never");
     }
 
