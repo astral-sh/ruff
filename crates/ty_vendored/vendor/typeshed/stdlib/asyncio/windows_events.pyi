@@ -116,13 +116,17 @@ if sys.platform == "win32":
     if sys.version_info >= (3, 14):
         class _WindowsSelectorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[SelectorEventLoop]]
+            """Windows version of selector event loop."""
 
         class _WindowsProactorEventLoopPolicy(events._BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[ProactorEventLoop]]
+            """Windows version of proactor event loop using IOCP."""
 
     else:
         class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[SelectorEventLoop]]
+            """Windows version of selector event loop."""
+
             def get_child_watcher(self) -> NoReturn:
                 """Get the watcher for child processes."""
 
@@ -131,6 +135,8 @@ if sys.platform == "win32":
 
         class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[ProactorEventLoop]]
+            """Windows version of proactor event loop using IOCP."""
+
             def get_child_watcher(self) -> NoReturn:
                 """Get the watcher for child processes."""
 

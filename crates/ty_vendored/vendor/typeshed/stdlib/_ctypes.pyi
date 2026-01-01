@@ -127,6 +127,8 @@ class _SimpleCData(_CData, Generic[_T], metaclass=_PyCSimpleType):
     """XXX to be provided"""
 
     value: _T
+    """current value"""
+
     # The TypeVar can be unsolved here,
     # but we can't use overloads without creating many, many mypy false-positive errors
     def __init__(self, value: _T = ...) -> None: ...  # pyright: ignore[reportInvalidTypeVarUse]
@@ -157,6 +159,8 @@ class _Pointer(_PointerLike, _CData, Generic[_CT], metaclass=_PyCPointerType):
 
     _type_: type[_CT]
     contents: _CT
+    """the object this pointer points to (read-write)"""
+
     @overload
     def __init__(self) -> None: ...
     @overload
@@ -228,8 +232,14 @@ class CFuncPtr(_PointerLike, _CData, metaclass=_PyCFuncPtrType):
     """Function Pointer"""
 
     restype: type[_CDataType] | Callable[[int], Any] | None
+    """specify the result type"""
+
     argtypes: Sequence[type[_CDataType]]
+    """specify the argument types"""
+
     errcheck: _ECT
+    """a function to check for errors"""
+
     # Abstract attribute that must be defined on subclasses
     _flags_: ClassVar[int]
     @overload
@@ -258,15 +268,35 @@ if sys.version_info >= (3, 14):
         """Structure/Union member"""
 
         offset: int
+        """offset in bytes of this field (same as byte_offset)"""
+
         size: int
+        """size in bytes of this field. For bitfields, this is a legacy packed value; use byte_size instead"""
+
         name: str
+        """name of this field"""
+
         type: builtins.type[_CT]
+        """type of this field"""
+
         byte_offset: int
+        """offset in bytes of this field. For bitfields: excludes bit_offset."""
+
         byte_size: int
+        """size of this field in bytes"""
+
         is_bitfield: bool
+        """true if this is a bitfield"""
+
         bit_offset: int
+        """additional offset in bits (relative to byte_offset); zero for non-bitfields"""
+
         bit_size: int
+        """size of this field in bits"""
+
         is_anonymous: bool
+        """true if this field is anonymous"""
+
         @overload
         def __get__(self, instance: None, owner: builtins.type[Any] | None = None, /) -> Self:
             """Return an attribute of instance, which is of type owner."""

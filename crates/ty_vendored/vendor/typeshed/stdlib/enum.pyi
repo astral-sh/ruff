@@ -696,6 +696,8 @@ class auto:
     def __and__(self, other: int | Self) -> Self: ...
     def __xor__(self, other: int | Self) -> Self: ...
     __ror__ = __or__
+    """Return value|self."""
+
     __rand__ = __and__
     __rxor__ = __xor__
 

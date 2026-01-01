@@ -177,6 +177,13 @@ class Thread:
     """
 
     name: str
+    """A string used for identification purposes only.
+
+    It has no semantics. Multiple threads may be given the same name. The
+    initial name is set by the constructor.
+
+    """
+
     @property
     def ident(self) -> int | None:
         """Thread identifier of this thread or None if it has not been started.
@@ -187,6 +194,17 @@ class Thread:
 
         """
     daemon: bool
+    """A boolean value indicating whether this thread is a daemon thread.
+
+    This must be set before start() is called, otherwise RuntimeError is
+    raised. Its initial value is inherited from the creating thread; the
+    main thread is not a daemon thread and therefore all threads created in
+    the main thread default to daemon = False.
+
+    The entire Python program exits when only daemon threads are left.
+
+    """
+
     if sys.version_info >= (3, 14):
         def __init__(
             self,
@@ -652,11 +670,8 @@ class Event:
         """
 
 excepthook: Callable[[_ExceptHookArgs], object]
-"""Handle uncaught Thread.run() exception."""
-
 if sys.version_info >= (3, 10):
     __excepthook__: Callable[[_ExceptHookArgs], object]
-    """Handle uncaught Thread.run() exception."""
 ExceptHookArgs = _ExceptHookArgs
 
 class Timer(Thread):

@@ -126,6 +126,13 @@ class TarFile:
     fileobj: _Fileobj | None
     format: _TarFormat | None
     tarinfo: type[TarInfo]
+    """Informational class which holds the details about an
+    archive member given by a tar header block.
+    TarInfo objects are returned by TarFile.getmember(),
+    TarFile.getmembers() and TarFile.gettarinfo() and are
+    usually created internally.
+    """
+
     dereference: bool | None
     ignore_zeros: bool | None
     encoding: str | None
@@ -1117,6 +1124,8 @@ class TarInfo:
     )
     name: str
     path: str
+    """In pax headers, "name" is called "path"."""
+
     size: int
     mtime: int | float
     chksum: int

@@ -1759,6 +1759,8 @@ class CalledProcessError(SubprocessError):
 
     # morally: str | bytes | None
     stdout: Any
+    """Alias for output attribute, to match stderr"""
+
     stderr: Any
     def __init__(
         self, returncode: int, cmd: _CMD, output: str | bytes | None = None, stderr: str | bytes | None = None

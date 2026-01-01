@@ -801,13 +801,6 @@ def intern(string: LiteralString, /) -> LiteralString:
 def intern(string: str, /) -> str: ...  # type: ignore[misc]
 
 __interactivehook__: Callable[[], object]
-"""Configure readline completion on interactive prompts.
-
-If the readline module can be imported, the hook will set the Tab key
-as completion key and register ~/.python_history as history file.
-This can be overridden in the sitecustomize or usercustomize module,
-or in a PYTHONSTARTUP file.
-"""
 
 if sys.version_info >= (3, 13):
     def _is_gil_enabled() -> bool:

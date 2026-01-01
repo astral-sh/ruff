@@ -46,6 +46,9 @@ if sys.version_info >= (3, 14):
 
     class InterpreterPoolExecutor(ThreadPoolExecutor):
         BROKEN: type[BrokenInterpreterPool]
+        """
+        Raised when a worker thread in an InterpreterPoolExecutor failed initializing.
+        """
 
         @overload  # type: ignore[override]
         @classmethod

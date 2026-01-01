@@ -476,8 +476,7 @@ The mean (expected value) and variance of the random variable are:
 """
 
 randint = _inst.randint
-"""Return random integer in range [a, b], including both end points.
-        """
+"""Return random integer in range [a, b], including both end points."""
 
 choice = _inst.choice
 """Choose a random element from a non-empty sequence."""
@@ -624,6 +623,7 @@ if sys.version_info >= (3, 12):
         Var[X] = n * p * (1 - p)
 
     """
+
 betavariate = _inst.betavariate
 """Beta distribution.
 

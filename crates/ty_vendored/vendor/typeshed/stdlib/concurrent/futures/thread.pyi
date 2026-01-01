@@ -96,6 +96,9 @@ class BrokenThreadPool(BrokenExecutor):
 class ThreadPoolExecutor(Executor):
     if sys.version_info >= (3, 14):
         BROKEN: type[BrokenThreadPool]
+        """
+        Raised when a worker thread in a ThreadPoolExecutor failed initializing.
+        """
 
     _max_workers: int
     _idle_semaphore: Semaphore

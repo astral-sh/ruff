@@ -551,15 +551,6 @@ underlying type::
 """
 
 _AnnotatedAlias: Any  # undocumented
-"""Runtime representation of an annotated type.
-
-At its core 'Annotated[t, dec1, dec2, ...]' is an alias for the type 't'
-with extra metadata. The alias behaves like a normal typing alias.
-Instantiating is the same as instantiating the underlying type; binding
-it to types is also the same.
-
-The metadata itself is stored in a '__metadata__' attribute as a tuple.
-"""
 
 # New and changed things in 3.10
 if sys.version_info >= (3, 10):
@@ -609,23 +600,19 @@ else:
         def __init__(self, origin: ParamSpec) -> None: ...
 
     Concatenate: _SpecialForm
-    """Special form for annotating higher-order functions.
-
-    ``Concatenate`` can be used in conjunction with ``ParamSpec`` and
-    ``Callable`` to represent a higher-order function which adds, removes or
-    transforms the parameters of a callable.
+    """Used in conjunction with ``ParamSpec`` and ``Callable`` to represent a
+    higher order function which adds, removes or transforms parameters of a
+    callable.
 
     For example::
 
-        Callable[Concatenate[int, P], int]
+       Callable[Concatenate[int, P], int]
 
     See PEP 612 for detailed information.
     """
 
     TypeAlias: _SpecialForm
-    """Special form for marking type aliases.
-
-    Use TypeAlias to indicate that an assignment should
+    """Special marker indicating that an assignment should
     be recognized as a proper type alias definition by type
     checkers.
 
@@ -637,52 +624,44 @@ else:
     """
 
     TypeGuard: _SpecialForm
-    """Special typing construct for marking user-defined type predicate functions.
-
-    ``TypeGuard`` can be used to annotate the return type of a user-defined
-    type predicate function.  ``TypeGuard`` only accepts a single type argument.
+    """Special typing form used to annotate the return type of a user-defined
+    type guard function.  ``TypeGuard`` only accepts a single type argument.
     At runtime, functions marked this way should return a boolean.
 
     ``TypeGuard`` aims to benefit *type narrowing* -- a technique used by static
     type checkers to determine a more precise type of an expression within a
     program's code flow.  Usually type narrowing is done by analyzing
     conditional code flow and applying the narrowing to a block of code.  The
-    conditional expression here is sometimes referred to as a "type predicate".
+    conditional expression here is sometimes referred to as a "type guard".
 
     Sometimes it would be convenient to use a user-defined boolean function
-    as a type predicate.  Such a function should use ``TypeGuard[...]`` or
-    ``TypeIs[...]`` as its return type to alert static type checkers to
-    this intention. ``TypeGuard`` should be used over ``TypeIs`` when narrowing
-    from an incompatible type (e.g., ``list[object]`` to ``list[int]``) or when
-    the function does not return ``True`` for all instances of the narrowed type.
+    as a type guard.  Such a function should use ``TypeGuard[...]`` as its
+    return type to alert static type checkers to this intention.
 
-    Using  ``-> TypeGuard[NarrowedType]`` tells the static type checker that
-    for a given function:
+    Using  ``-> TypeGuard`` tells the static type checker that for a given
+    function:
 
     1. The return value is a boolean.
     2. If the return value is ``True``, the type of its argument
-       is ``NarrowedType``.
+    is the type inside ``TypeGuard``.
 
     For example::
 
-         def is_str_list(val: list[object]) -> TypeGuard[list[str]]:
-             '''Determines whether all objects in the list are strings'''
-             return all(isinstance(x, str) for x in val)
-
-         def func1(val: list[object]):
-             if is_str_list(val):
-                 # Type of ``val`` is narrowed to ``list[str]``.
-                 print(" ".join(val))
-             else:
-                 # Type of ``val`` remains as ``list[object]``.
-                 print("Not a list of strings!")
+        def is_str(val: Union[str, float]):
+            # "isinstance" type guard
+            if isinstance(val, str):
+                # Type of ``val`` is narrowed to ``str``
+                ...
+            else:
+                # Else, type of ``val`` is narrowed to ``float``.
+                ...
 
     Strict type narrowing is not enforced -- ``TypeB`` need not be a narrower
     form of ``TypeA`` (it can even be a wider form) and this may lead to
     type-unsafe results.  The main reason is to allow for things like
-    narrowing ``list[object]`` to ``list[str]`` even though the latter is not
-    a subtype of the former, since ``list`` is invariant.  The responsibility of
-    writing type-safe type predicates is left to the user.
+    narrowing ``List[object]`` to ``List[str]`` even though the latter is not
+    a subtype of the former, since ``List`` is invariant.  The responsibility of
+    writing type-safe type guards is left to the user.
 
     ``TypeGuard`` also works with type variables.  For more information, see
     PEP 647 (User-Defined Type Guards).
@@ -724,16 +703,13 @@ else:
 
     Example::
 
-        from typing import Self
+      from typing import Self
 
-        class Foo:
-            def return_self(self) -> Self:
-                ...
-                return self
+      class ReturnsSelf:
+          def parse(self, data: bytes) -> Self:
+              ...
+              return self
 
-    This is especially useful for:
-        - classmethods that are used as alternative constructors
-        - annotating an `__enter__` method which returns self
     """
 
     Never: _SpecialForm
@@ -742,7 +718,7 @@ else:
     This can be used to define a function that should never be
     called, or a function that never returns::
 
-        from typing import Never
+        from typing_extensions import Never
 
         def never_call_me(arg: Never) -> None:
             pass
@@ -755,7 +731,8 @@ else:
                 case str():
                     print("It's a str")
                 case _:
-                    never_call_me(arg)  # OK, arg is of type Never
+                    never_call_me(arg)  # ok, arg is of type Never
+
     """
 
     def reveal_type(obj: _T, /) -> _T:
@@ -816,11 +793,8 @@ else:
     def get_overloads(func: Callable[..., object]) -> Sequence[Callable[..., object]]:
         """Return all defined overloads for *func* as a sequence."""
     Required: _SpecialForm
-    """Special typing construct to mark a TypedDict key as required.
-
-    This is mainly useful for total=False TypedDicts.
-
-    For example::
+    """A special typing construct to mark a key of a total=False TypedDict
+    as required. For example:
 
         class Movie(TypedDict, total=False):
             title: Required[str]
@@ -836,9 +810,8 @@ else:
     """
 
     NotRequired: _SpecialForm
-    """Special typing construct to mark a TypedDict key as potentially missing.
-
-    For example::
+    """A special typing construct to mark a key of a TypedDict as
+    potentially missing. For example:
 
         class Movie(TypedDict):
             title: str
@@ -855,70 +828,57 @@ else:
 
     Example::
 
-        from typing import LiteralString
+      from typing_extensions import LiteralString
 
-        def run_query(sql: LiteralString) -> None:
-            ...
+      def query(sql: LiteralString) -> ...:
+          ...
 
-        def caller(arbitrary_string: str, literal_string: LiteralString) -> None:
-            run_query("SELECT * FROM students")  # OK
-            run_query(literal_string)  # OK
-            run_query("SELECT * FROM " + literal_string)  # OK
-            run_query(arbitrary_string)  # type checker error
-            run_query(  # type checker error
-                f"SELECT * FROM students WHERE name = {arbitrary_string}"
-            )
+      query("SELECT * FROM table")  # ok
+      query(f"SELECT * FROM {input()}")  # not ok
 
-    Only string literals and other LiteralStrings are compatible
-    with LiteralString. This provides a tool to help prevent
-    security issues such as SQL injection.
+    See PEP 675 for details.
+
     """
 
     Unpack: _SpecialForm
     """Type unpack operator.
 
     The type unpack operator takes the child types from some container type,
-    such as `tuple[int, str]` or a `TypeVarTuple`, and 'pulls them out'.
+    such as `tuple[int, str]` or a `TypeVarTuple`, and 'pulls them out'. For
+    example:
 
-    For example::
+      # For some generic class `Foo`:
+      Foo[Unpack[tuple[int, str]]]  # Equivalent to Foo[int, str]
 
-        # For some generic class `Foo`:
-        Foo[Unpack[tuple[int, str]]]  # Equivalent to Foo[int, str]
+      Ts = TypeVarTuple('Ts')
+      # Specifies that `Bar` is generic in an arbitrary number of types.
+      # (Think of `Ts` as a tuple of an arbitrary number of individual
+      #  `TypeVar`s, which the `Unpack` is 'pulling out' directly into the
+      #  `Generic[]`.)
+      class Bar(Generic[Unpack[Ts]]): ...
+      Bar[int]  # Valid
+      Bar[int, str]  # Also valid
 
-        Ts = TypeVarTuple('Ts')
-        # Specifies that `Bar` is generic in an arbitrary number of types.
-        # (Think of `Ts` as a tuple of an arbitrary number of individual
-        #  `TypeVar`s, which the `Unpack` is 'pulling out' directly into the
-        #  `Generic[]`.)
-        class Bar(Generic[Unpack[Ts]]): ...
-        Bar[int]  # Valid
-        Bar[int, str]  # Also valid
-
-    From Python 3.11, this can also be done using the `*` operator::
+    From Python 3.11, this can also be done using the `*` operator:
 
         Foo[*tuple[int, str]]
         class Bar(Generic[*Ts]): ...
 
-    And from Python 3.12, it can be done using built-in syntax for generics::
-
-        Foo[*tuple[int, str]]
-        class Bar[*Ts]: ...
-
     The operator can also be used along with a `TypedDict` to annotate
-    `**kwargs` in a function signature::
+    `**kwargs` in a function signature. For instance:
 
-        class Movie(TypedDict):
-            name: str
-            year: int
+      class Movie(TypedDict):
+        name: str
+        year: int
 
-        # This function expects two keyword arguments - *name* of type `str` and
-        # *year* of type `int`.
-        def foo(**kwargs: Unpack[Movie]): ...
+      # This function expects two keyword arguments - *name* of type `str` and
+      # *year* of type `int`.
+      def foo(**kwargs: Unpack[Movie]): ...
 
     Note that there is only some runtime checking of this operator. Not
     everything the runtime allows may be accepted by static type checkers.
 
-    For more information, see PEPs 646 and 692.
+    For more information, see PEP 646 and PEP 692.
     """
 
     def dataclass_transform(
@@ -1433,7 +1393,7 @@ else:
     ReadOnly: _SpecialForm
     """A special typing construct to mark an item of a TypedDict as read-only.
 
-    For example::
+    For example:
 
         class Movie(TypedDict):
             title: ReadOnly[str]
@@ -1447,68 +1407,41 @@ else:
     """
 
     TypeIs: _SpecialForm
-    """Special typing construct for marking user-defined type predicate functions.
-
-    ``TypeIs`` can be used to annotate the return type of a user-defined
-    type predicate function.  ``TypeIs`` only accepts a single type argument.
-    At runtime, functions marked this way should return a boolean and accept
-    at least one argument.
+    """Special typing form used to annotate the return type of a user-defined
+    type narrower function.  ``TypeIs`` only accepts a single type argument.
+    At runtime, functions marked this way should return a boolean.
 
     ``TypeIs`` aims to benefit *type narrowing* -- a technique used by static
     type checkers to determine a more precise type of an expression within a
     program's code flow.  Usually type narrowing is done by analyzing
     conditional code flow and applying the narrowing to a block of code.  The
-    conditional expression here is sometimes referred to as a "type predicate".
+    conditional expression here is sometimes referred to as a "type guard".
 
     Sometimes it would be convenient to use a user-defined boolean function
-    as a type predicate.  Such a function should use ``TypeIs[...]`` or
-    ``TypeGuard[...]`` as its return type to alert static type checkers to
-    this intention.  ``TypeIs`` usually has more intuitive behavior than
-    ``TypeGuard``, but it cannot be used when the input and output types
-    are incompatible (e.g., ``list[object]`` to ``list[int]``) or when the
-    function does not return ``True`` for all instances of the narrowed type.
+    as a type guard.  Such a function should use ``TypeIs[...]`` as its
+    return type to alert static type checkers to this intention.
 
-    Using  ``-> TypeIs[NarrowedType]`` tells the static type checker that for
-    a given function:
+    Using  ``-> TypeIs`` tells the static type checker that for a given
+    function:
 
     1. The return value is a boolean.
     2. If the return value is ``True``, the type of its argument
-       is the intersection of the argument's original type and
-       ``NarrowedType``.
-    3. If the return value is ``False``, the type of its argument
-       is narrowed to exclude ``NarrowedType``.
+    is the intersection of the type inside ``TypeIs`` and the argument's
+    previously known type.
 
     For example::
 
-        from typing import assert_type, final, TypeIs
+        def is_awaitable(val: object) -> TypeIs[Awaitable[Any]]:
+            return hasattr(val, '__await__')
 
-        class Parent: pass
-        class Child(Parent): pass
-        @final
-        class Unrelated: pass
-
-        def is_parent(val: object) -> TypeIs[Parent]:
-            return isinstance(val, Parent)
-
-        def run(arg: Child | Unrelated):
-            if is_parent(arg):
-                # Type of ``arg`` is narrowed to the intersection
-                # of ``Parent`` and ``Child``, which is equivalent to
-                # ``Child``.
-                assert_type(arg, Child)
+        def f(val: Union[int, Awaitable[int]]) -> int:
+            if is_awaitable(val):
+                assert_type(val, Awaitable[int])
             else:
-                # Type of ``arg`` is narrowed to exclude ``Parent``,
-                # so only ``Unrelated`` is left.
-                assert_type(arg, Unrelated)
-
-    The type inside ``TypeIs`` must be consistent with the type of the
-    function's argument; if it is not, static type checkers will raise
-    an error.  An incorrectly written ``TypeIs`` function can lead to
-    unsound behavior in the type system; it is the user's responsibility
-    to write such functions in a type-safe manner.
+                assert_type(val, int)
 
     ``TypeIs`` also works with type variables.  For more information, see
-    PEP 742 (Narrowing types with ``TypeIs``).
+    PEP 742 (Narrowing types with TypeIs).
     """
 
 # TypeAliasType was added in Python 3.12, but had significant changes in 3.14.
