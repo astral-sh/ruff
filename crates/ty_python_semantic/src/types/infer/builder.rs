@@ -4760,15 +4760,43 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             return false;
                         }
 
+                        let dunder_set_lookup = meta_attr_ty.class_member(db, "__set__".into());
                         let assignable_to_meta_attr =
-                            if let Place::Defined(meta_dunder_set, _, _, _) =
-                                meta_attr_ty.class_member(db, "__set__".into()).place
+                            if let Place::Defined(meta_dunder_set, _, dunder_set_boundness, _) =
+                                dunder_set_lookup.place
                             {
+                                // When `__set__` is only possibly defined (some union elements have it, some don't),
+                                // we need to check the `__set__` call only for elements that actually have `__set__`.
+                                // Otherwise, we'd be passing a union containing non-descriptor types as `self` to
+                                // `__set__`, which would fail. We also need to check normal assignment for non-descriptor
+                                // elements.
+                                let (descriptor_ty, non_descriptor_ty) = if dunder_set_boundness
+                                    == Definedness::PossiblyUndefined
+                                    && let Type::Union(union) = meta_attr_ty
+                                {
+                                    let with_set = union.filter(db, |elem| {
+                                        !elem
+                                            .class_member(db, "__set__".into())
+                                            .place
+                                            .is_undefined()
+                                    });
+                                    let without_set = union.filter(db, |elem| {
+                                        elem.class_member(db, "__set__".into()).place.is_undefined()
+                                    });
+                                    (with_set, Some(without_set))
+                                } else {
+                                    (meta_attr_ty, None)
+                                };
+
                                 // TODO: We could use the annotated parameter type of `__set__` as
                                 // type context here.
                                 let dunder_set_result = meta_dunder_set.try_call(
                                     db,
-                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                    &CallArguments::positional([
+                                        descriptor_ty,
+                                        object_ty,
+                                        value_ty,
+                                    ]),
                                 );
 
                                 if emit_diagnostics {
@@ -4783,7 +4811,36 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
                                 }
 
-                                dunder_set_result.is_ok()
+                                let descriptor_ok = dunder_set_result.is_ok();
+
+                                // For union elements without `__set__`, the value
+                                // shadows the class attribute in the instance dict.
+                                // Check against instance member type if declared.
+                                let non_descriptor_ok =
+                                    if non_descriptor_ty.is_some_and(|ty| !ty.is_never()) {
+                                        if let PlaceAndQualifiers {
+                                            place: Place::Defined(instance_attr_ty, _, _, _),
+                                            qualifiers,
+                                        } = object_ty.instance_member(db, attribute)
+                                        {
+                                            let value_ty = infer_value_ty(
+                                                self,
+                                                TypeContext::new(Some(instance_attr_ty)),
+                                            );
+                                            if invalid_assignment_to_final(self, qualifiers) {
+                                                return false;
+                                            }
+                                            ensure_assignable_to(self, value_ty, instance_attr_ty)
+                                        } else {
+                                            // No instance member declared; value shadows
+                                            // the class attribute
+                                            true
+                                        }
+                                    } else {
+                                        true
+                                    };
+
+                                descriptor_ok && non_descriptor_ok
                             } else {
                                 let value_ty =
                                     infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
@@ -4914,14 +4971,41 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
 
                         let assignable_to_meta_attr =
-                            if let Place::Defined(meta_dunder_set, _, _, _) =
+                            if let Place::Defined(meta_dunder_set, _, dunder_set_boundness, _) =
                                 meta_attr_ty.class_member(db, "__set__".into()).place
                             {
+                                // When `__set__` is only possibly defined (some union elements have it, some don't),
+                                // we need to check the `__set__` call only for elements that actually have `__set__`.
+                                // Otherwise, we'd be passing a union containing non-descriptor types as `self` to
+                                // `__set__`, which would fail. We also need to check normal assignment for non-descriptor
+                                // elements.
+                                let (descriptor_ty, non_descriptor_ty) = if dunder_set_boundness
+                                    == Definedness::PossiblyUndefined
+                                    && let Type::Union(union) = meta_attr_ty
+                                {
+                                    let with_set = union.filter(db, |elem| {
+                                        !elem
+                                            .class_member(db, "__set__".into())
+                                            .place
+                                            .is_undefined()
+                                    });
+                                    let without_set = union.filter(db, |elem| {
+                                        elem.class_member(db, "__set__".into()).place.is_undefined()
+                                    });
+                                    (with_set, Some(without_set))
+                                } else {
+                                    (meta_attr_ty, None)
+                                };
+
                                 // TODO: We could use the annotated parameter type of `__set__` as
                                 // type context here.
                                 let dunder_set_result = meta_dunder_set.try_call(
                                     db,
-                                    &CallArguments::positional([meta_attr_ty, object_ty, value_ty]),
+                                    &CallArguments::positional([
+                                        descriptor_ty,
+                                        object_ty,
+                                        value_ty,
+                                    ]),
                                 );
 
                                 if emit_diagnostics {
@@ -4936,7 +5020,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     }
                                 }
 
-                                dunder_set_result.is_ok()
+                                let descriptor_ok = dunder_set_result.is_ok();
+
+                                // For union elements without `__set__`, the value
+                                // is written directly to the class dict. Check that
+                                // the value is assignable to the type of those elements.
+                                let non_descriptor_ok = if let Some(non_desc_ty) = non_descriptor_ty
+                                {
+                                    if non_desc_ty.is_never() {
+                                        true
+                                    } else {
+                                        let value_ty = infer_value_ty(
+                                            self,
+                                            TypeContext::new(Some(non_desc_ty)),
+                                        );
+                                        ensure_assignable_to(self, value_ty, non_desc_ty)
+                                    }
+                                } else {
+                                    true
+                                };
+
+                                descriptor_ok && non_descriptor_ok
                             } else {
                                 let value_ty =
                                     infer_value_ty(self, TypeContext::new(Some(meta_attr_ty)));
