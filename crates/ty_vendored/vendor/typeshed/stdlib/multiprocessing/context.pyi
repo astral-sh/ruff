@@ -70,7 +70,8 @@ can be used to create shared objects.
         def Pipe(self, duplex: bool = True) -> tuple[Connection[Any, Any], Connection[Any, Any]]:
             """Returns two connection object connected by a pipe"""
     else:
-        def Pipe(self, duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]: ...
+        def Pipe(self, duplex: bool = True) -> tuple[PipeConnection[Any, Any], PipeConnection[Any, Any]]:
+            """Returns two connection object connected by a pipe"""
 
     def Barrier(
         self, parties: int, action: Callable[..., object] | None = None, timeout: float | None = None
