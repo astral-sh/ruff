@@ -15,9 +15,9 @@ use crate::types::typed_dict::{
     SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -343,18 +343,12 @@ impl<'db> NarrowingConstraint<'db> {
         };
 
         let new_regular_disjunct = self.regular_disjunct.map(|regular_disjunct| {
-            IntersectionBuilder::new(db)
-                .add_positive(regular_disjunct)
-                .add_positive(other_regular_disjunct)
-                .build()
+            IntersectionType::from_elements(db, [regular_disjunct, other_regular_disjunct])
         });
 
         let additional_typeguard_disjuncts =
             self.typeguard_disjuncts.iter().map(|typeguard_disjunct| {
-                IntersectionBuilder::new(db)
-                    .add_positive(*typeguard_disjunct)
-                    .add_positive(other_regular_disjunct)
-                    .build()
+                IntersectionType::from_elements(db, [*typeguard_disjunct, other_regular_disjunct])
             });
 
         let mut new_typeguard_disjuncts = other.typeguard_disjuncts;
@@ -954,10 +948,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match op {
             ast::CmpOp::IsNot => {
                 if rhs_ty.is_singleton(self.db) {
-                    let ty = IntersectionBuilder::new(self.db)
-                        .add_negative(rhs_ty)
-                        .build();
-                    Some(ty)
+                    Some(rhs_ty.negate(self.db))
                 } else {
                     // Non-singletons cannot be safely narrowed using `is not`
                     None
