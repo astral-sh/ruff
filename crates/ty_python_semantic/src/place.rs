@@ -1068,6 +1068,10 @@ fn symbol_impl<'db>(
                 // Fall through to the looked up type
             }
         }
+    } else if name == "__file__" {
+        // We special-case `__file__` here because we know that for a successfully imported
+        // Python module, it is always a string, even though typeshed says `str | None`.
+        return Place::bound(KnownClass::Str.to_instance(db)).into();
     }
 
     place_table(db, scope)
