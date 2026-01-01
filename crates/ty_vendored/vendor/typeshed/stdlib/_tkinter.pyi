@@ -21,6 +21,7 @@ class Tcl_Obj:
     @property
     def string(self) -> str:
         """the string representation of this object, either as str or bytes"""
+
     @property
     def typename(self) -> str:
         """name of the Tcl type"""
@@ -96,6 +97,7 @@ class TkappType:
     if sys.version_info >= (3, 12):
         def gettrace(self, /) -> _TkinterTraceFunc | None:
             """Get the tracing function."""
+
         def settrace(self, func: _TkinterTraceFunc | None, /) -> None:
             """Set the tracing function."""
 
@@ -132,13 +134,13 @@ if sys.version_info >= (3, 13):
     ):
         """
 
-  wantTk
-    if false, then Tk_Init() doesn't get called
-  sync
-    if true, then pass -sync to wish
-  use
-    if not None, then pass -use to wish
-"""
+        wantTk
+          if false, then Tk_Init() doesn't get called
+        sync
+          if true, then pass -sync to wish
+        use
+          if not None, then pass -use to wish
+        """
 
 else:
     def create(
@@ -154,18 +156,19 @@ else:
     ):
         """
 
-  wantTk
-    if false, then Tk_Init() doesn't get called
-  sync
-    if true, then pass -sync to wish
-  use
-    if not None, then pass -use to wish
-"""
+        wantTk
+          if false, then Tk_Init() doesn't get called
+        sync
+          if true, then pass -sync to wish
+        use
+          if not None, then pass -use to wish
+        """
 
 def getbusywaitinterval() -> int:
     """Return the current busy-wait interval between successive calls to Tcl_DoOneEvent in a threaded Python interpreter."""
+
 def setbusywaitinterval(new_val: int, /) -> None:
     """Set the busy-wait interval in milliseconds between successive calls to Tcl_DoOneEvent in a threaded Python interpreter.
 
-It should be set to a divisor of the maximum time between frames in an animation.
-"""
+    It should be set to a divisor of the maximum time between frames in an animation.
+    """

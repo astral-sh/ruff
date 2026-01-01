@@ -1,4 +1,5 @@
 """Selector and proactor event loops for Windows."""
+
 import socket
 import sys
 from _typeshed import Incomplete, ReadableBuffer, WriteableBuffer
@@ -50,8 +51,9 @@ if sys.platform == "win32":
     class PipeServer:
         """Class representing a pipe server.
 
-This is much like a bound, listening socket.
-"""
+        This is much like a bound, listening socket.
+        """
+
         def __init__(self, address: str) -> None: ...
         def __del__(self) -> None: ...
         def closed(self) -> bool: ...
@@ -62,6 +64,7 @@ This is much like a bound, listening socket.
 
     class ProactorEventLoop(proactor_events.BaseProactorEventLoop):
         """Windows version of proactor event loop using IOCP."""
+
         def __init__(self, proactor: IocpProactor | None = None) -> None: ...
         async def create_pipe_connection(
             self, protocol_factory: Callable[[], streams.StreamReaderProtocol], address: str
@@ -72,6 +75,7 @@ This is much like a bound, listening socket.
 
     class IocpProactor:
         """Proactor implementation using IOCP."""
+
         def __init__(self, concurrency: int = 0xFFFFFFFF) -> None: ...
         def __del__(self) -> None: ...
         def set_loop(self, loop: events.AbstractEventLoop) -> None: ...
@@ -97,9 +101,10 @@ This is much like a bound, listening socket.
         def wait_for_handle(self, handle: windows_utils.PipeHandle, timeout: int | None = None) -> bool:
             """Wait for a handle.
 
-Return a Future object. The result of the future is True if the wait
-completed, or False if the wait did not complete (on timeout).
-"""
+            Return a Future object. The result of the future is True if the wait
+            completed, or False if the wait did not complete (on timeout).
+            """
+
         def close(self) -> None: ...
         if sys.version_info >= (3, 11):
             def recvfrom_into(
@@ -121,18 +126,20 @@ completed, or False if the wait did not complete (on timeout).
         class WindowsSelectorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[SelectorEventLoop]]
             """Windows version of selector event loop."""
-            
+
             def get_child_watcher(self) -> NoReturn:
                 """Get the watcher for child processes."""
+
             def set_child_watcher(self, watcher: Any) -> NoReturn:
                 """Set the watcher for child processes."""
 
         class WindowsProactorEventLoopPolicy(events.BaseDefaultEventLoopPolicy):
             _loop_factory: ClassVar[type[ProactorEventLoop]]
             """Windows version of proactor event loop using IOCP."""
-            
+
             def get_child_watcher(self) -> NoReturn:
                 """Get the watcher for child processes."""
+
             def set_child_watcher(self, watcher: Any) -> NoReturn:
                 """Set the watcher for child processes."""
 
