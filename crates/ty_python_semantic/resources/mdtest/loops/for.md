@@ -951,3 +951,24 @@ for x in Bar:
     # TODO: should reveal `Any`
     reveal_type(x)  # revealed: Unknown
 ```
+
+## Iterating over an intersection with a TypeVar whose bound is a union
+
+When a TypeVar has a union bound where some elements are iterable and some are not, and the TypeVar
+is intersected with an iterable type (e.g., via `isinstance`), the iteration should use the iterable
+parts of the TypeVar's bound.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def f[T: tuple[int, ...] | int](x: T):
+    if isinstance(x, tuple):
+        reveal_type(x)  # revealed: T@f & tuple[object, ...]
+        for item in x:
+            # The TypeVar T is constrained to tuple[int, ...] by the isinstance check,
+            # so iterating should give `int`, not `object`.
+            reveal_type(item)  # revealed: int
+```
