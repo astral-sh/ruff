@@ -25,6 +25,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
     CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
@@ -40,14 +41,15 @@ use crate::types::generics::{
     InferableTypeVars, Specialization, SpecializationBuilder, SpecializationError,
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
+use crate::types::subclass_of::SubclassOfInner;
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
-    CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    CallableTypeKind, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
+    FieldInstance, FunctionalClassLiteral, KnownBoundMethodType, KnownClass, KnownInstanceType,
+    MemberLookupPolicy, NominalInstanceType, PropertyInstanceType, SpecialFormType,
+    StmtClassLiteral, TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance,
+    UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -904,7 +906,10 @@ impl<'db> Bindings<'db> {
                             if let [Some(ty)] = overload.parameter_types() {
                                 let return_ty = match ty {
                                     Type::ClassLiteral(class) => {
-                                        if let Some(metadata) = enums::enum_metadata(db, *class) {
+                                        if let Some(metadata) = class
+                                            .as_stmt()
+                                            .and_then(|stmt| enums::enum_metadata(db, stmt))
+                                        {
                                             Type::heterogeneous_tuple(
                                                 db,
                                                 metadata
@@ -1109,11 +1114,11 @@ impl<'db> Bindings<'db> {
                             }
 
                             // `dataclass` being used as a non-decorator
-                            if let [Some(Type::ClassLiteral(class_literal))] =
+                            if let [Some(Type::ClassLiteral(ClassLiteral::Stmt(class_literal)))] =
                                 overload.parameter_types()
                             {
                                 let params = DataclassParams::default_params(db);
-                                overload.set_return_type(Type::from(ClassLiteral::new(
+                                overload.set_return_type(Type::from(StmtClassLiteral::new(
                                     db,
                                     class_literal.name(db),
                                     class_literal.body_scope(db),
@@ -1370,6 +1375,54 @@ impl<'db> Bindings<'db> {
                         Some(KnownClass::Type) if overload_index == 0 => {
                             if let [Some(arg)] = overload.parameter_types() {
                                 overload.set_return_type(arg.dunder_class(db));
+                            }
+                        }
+
+                        Some(KnownClass::Type) if overload_index == 1 => {
+                            // Three-argument call: type(name, bases, dict)
+                            if let [Some(name_type), Some(bases), Some(_namespace), ..] =
+                                overload.parameter_types()
+                            {
+                                // Extract the name from the first argument (if it's a string literal).
+                                let name = name_type
+                                    .as_string_literal()
+                                    .map(|s| ruff_python_ast::name::Name::new(s.value(db)));
+
+                                // Extract base classes from the bases tuple.
+                                let base_classes: Option<Box<[ClassBase<'db>]>> =
+                                    bases.exact_tuple_instance_spec(db).and_then(|tuple_spec| {
+                                        tuple_spec
+                                            .fixed_elements()
+                                            .map(|base| match base {
+                                                Type::ClassLiteral(class) => {
+                                                    Some(ClassBase::Class(
+                                                        class.default_specialization(db),
+                                                    ))
+                                                }
+                                                Type::GenericAlias(alias) => Some(
+                                                    ClassBase::Class(ClassType::Generic(*alias)),
+                                                ),
+                                                Type::SubclassOf(subclass_of) => {
+                                                    match subclass_of.subclass_of() {
+                                                        SubclassOfInner::Class(class) => {
+                                                            Some(ClassBase::Class(class))
+                                                        }
+                                                        SubclassOfInner::Dynamic(_)
+                                                        | SubclassOfInner::TypeVar(_) => None,
+                                                    }
+                                                }
+                                                _ => None,
+                                            })
+                                            .collect::<Option<Box<[_]>>>()
+                                    });
+
+                                if let (Some(name), Some(bases)) = (name, base_classes) {
+                                    let functional_class =
+                                        FunctionalClassLiteral::new(db, name, bases);
+                                    overload.set_return_type(Type::ClassLiteral(
+                                        ClassLiteral::Functional(functional_class),
+                                    ));
+                                }
                             }
                         }
 

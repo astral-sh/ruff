@@ -13,8 +13,8 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
+    ApplyTypeMappingVisitor, ClassBase, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, StmtClassLiteral, TypeContext,
     TypeMapping, TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
@@ -34,7 +34,12 @@ impl<'db> Type<'db> {
     }
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        let (class_literal, specialization) = class.class_literal(db);
+        let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
+            // Functional classes don't have a class literal; just return a nominal instance.
+            return Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(
+                class,
+            )));
+        };
         match class_literal.known(db) {
             Some(KnownClass::Tuple) => Type::tuple(TupleType::new(
                 db,
@@ -227,18 +232,21 @@ impl<'db> NominalInstanceType<'db> {
         }
     }
 
-    pub(super) fn class_literal(&self, db: &'db dyn Db) -> ClassLiteral<'db> {
+    /// Returns the statement-defined class literal for this instance, if there is one.
+    pub(super) fn class_literal(&self, db: &'db dyn Db) -> Option<StmtClassLiteral<'db>> {
         let class = match self.0 {
             NominalInstanceInner::ExactTuple(tuple) => tuple.to_class_type(db),
             NominalInstanceInner::NonTuple(class) => class,
             NominalInstanceInner::Object => {
-                return KnownClass::Object
-                    .try_to_class_literal(db)
-                    .expect("Typeshed should always have a `object` class in `builtins.pyi`");
+                return Some(
+                    KnownClass::Object
+                        .try_to_class_literal(db)
+                        .expect("Typeshed should always have a `object` class in `builtins.pyi`"),
+                );
             }
         };
-        let (class_literal, _) = class.class_literal(db);
-        class_literal
+        let (class_literal, _) = class.stmt_class_literal(db)?;
+        Some(class_literal)
     }
 
     /// Returns the [`KnownClass`] that this is a nominal instance of, or `None` if it is not an
@@ -277,7 +285,7 @@ impl<'db> NominalInstanceType<'db> {
                     .find_map(|class| match class.known(db)? {
                         // N.B. this is a pure optimisation: iterating through the MRO would give us
                         // the correct tuple spec for `sys._version_info`, since we special-case the class
-                        // in `ClassLiteral::explicit_bases()` so that it is inferred as inheriting from
+                        // in `StmtClassLiteral::explicit_bases()` so that it is inferred as inheriting from
                         // a tuple type with the correct spec for the user's configured Python version and platform.
                         KnownClass::VersionInfo => {
                             Some(Cow::Owned(TupleSpec::version_info_spec(db)))
@@ -339,10 +347,9 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::ExactTuple(_) | NominalInstanceInner::Object => return None,
             NominalInstanceInner::NonTuple(class) => class,
         };
-        let (class, Some(specialization)) = class.class_literal(db) else {
-            return None;
-        };
-        if !class.is_known(db, KnownClass::Slice) {
+        let (class_literal, specialization) = class.stmt_class_literal(db)?;
+        let specialization = specialization?;
+        if !class_literal.is_known(db, KnownClass::Slice) {
             return None;
         }
         let [start, stop, step] = specialization.types(db) else {
@@ -482,8 +489,13 @@ impl<'db> NominalInstanceType<'db> {
                 }
             }
         }
+
         result.or(db, || {
-            ConstraintSet::from(!(self.class(db)).could_coexist_in_mro_with(db, other.class(db)))
+            ConstraintSet::from(
+                !self
+                    .class(db)
+                    .could_coexist_in_mro_with(db, other.class(db)),
+            )
         })
     }
 
@@ -498,7 +510,11 @@ impl<'db> NominalInstanceType<'db> {
             NominalInstanceInner::NonTuple(class) => class
                 .known(db)
                 .map(KnownClass::is_singleton)
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| {
+                    class
+                        .stmt_class_literal(db)
+                        .is_some_and(|(lit, _)| is_single_member_enum(db, lit))
+                }),
         }
     }
 
@@ -510,7 +526,11 @@ impl<'db> NominalInstanceType<'db> {
                 .known(db)
                 .and_then(KnownClass::is_single_valued)
                 .or_else(|| Some(self.tuple_spec(db)?.is_single_valued(db)))
-                .unwrap_or_else(|| is_single_member_enum(db, class.class_literal(db).0)),
+                .unwrap_or_else(|| {
+                    class
+                        .stmt_class_literal(db)
+                        .is_some_and(|(lit, _)| is_single_member_enum(db, lit))
+                }),
         }
     }
 
@@ -623,7 +643,7 @@ pub(super) fn walk_protocol_instance_type<'db, V: super::visitor::TypeVisitor<'d
     } else {
         match protocol.inner {
             Protocol::FromClass(class) => {
-                if let Some(specialization) = class.class_literal(db).1 {
+                if let Some((_, Some(specialization))) = class.stmt_class_literal(db) {
                     walk_specialization(db, specialization, visitor);
                 }
             }

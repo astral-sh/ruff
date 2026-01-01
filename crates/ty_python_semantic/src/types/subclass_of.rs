@@ -1,14 +1,16 @@
 use crate::place::PlaceAndQualifiers;
 use crate::semantic_index::definition::Definition;
+use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::generics::InferableTypeVars;
 use crate::types::protocol_class::ProtocolClass;
 use crate::types::variance::VarianceInferable;
 use crate::types::{
-    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassType, DynamicType,
-    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor, KnownClass,
-    MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type, TypeContext,
-    TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType, todo_type,
+    ApplyTypeMappingVisitor, BoundTypeVarInstance, ClassLiteral, ClassType, DynamicType,
+    FindLegacyTypeVarsVisitor, FunctionalClassLiteral, HasRelationToVisitor, IsDisjointVisitor,
+    KnownClass, MaterializationKind, MemberLookupPolicy, NormalizedVisitor, SpecialFormType, Type,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, TypedDictType, UnionType,
+    todo_type,
 };
 use crate::{Db, FxOrderSet};
 
@@ -263,15 +265,15 @@ impl<'db> SubclassOfType<'db> {
         _visitor: &IsDisjointVisitor<'db>,
     ) -> ConstraintSet<'db> {
         match (self.subclass_of, other.subclass_of) {
+            // Dynamic types have unknown structure, so we can't prove disjointness.
             (SubclassOfInner::Dynamic(_), _) | (_, SubclassOfInner::Dynamic(_)) => {
                 ConstraintSet::from(false)
             }
             (SubclassOfInner::Class(self_class), SubclassOfInner::Class(other_class)) => {
                 ConstraintSet::from(!self_class.could_coexist_in_mro_with(db, other_class))
             }
-            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => {
-                unreachable!()
-            }
+            // TypeVar should have been handled before calling this method.
+            (SubclassOfInner::TypeVar(_), _) | (_, SubclassOfInner::TypeVar(_)) => unreachable!(),
         }
     }
 
@@ -332,9 +334,11 @@ impl<'db> SubclassOfType<'db> {
     }
 
     pub(crate) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
-        self.subclass_of
-            .into_class(db)
-            .is_some_and(|class| class.class_literal(db).0.is_typed_dict(db))
+        self.subclass_of.into_class(db).is_some_and(|class| {
+            class
+                .stmt_class_literal(db)
+                .is_some_and(|(lit, _)| lit.is_typed_dict(db))
+        })
     }
 }
 
@@ -405,17 +409,21 @@ impl<'db> SubclassOfInner<'db> {
         }
     }
 
-    pub(crate) const fn into_dynamic(self) -> Option<DynamicType<'db>> {
-        match self {
-            Self::Class(_) | Self::TypeVar(_) => None,
-            Self::Dynamic(dynamic) => Some(dynamic),
-        }
-    }
-
     pub(crate) const fn into_type_var(self) -> Option<BoundTypeVarInstance<'db>> {
         match self {
             Self::Class(_) | Self::Dynamic(_) => None,
             Self::TypeVar(bound_typevar) => Some(bound_typevar),
+        }
+    }
+
+    /// Convert to a `ClassBase` if this is a class-like type.
+    ///
+    /// Returns `None` for `TypeVar` since type variables require special handling.
+    pub(crate) const fn to_class_base(self) -> Option<ClassBase<'db>> {
+        match self {
+            Self::Class(class) => Some(ClassBase::Class(class)),
+            Self::Dynamic(dynamic) => Some(ClassBase::Dynamic(dynamic)),
+            Self::TypeVar(_) => None,
         }
     }
 
@@ -532,5 +540,11 @@ impl<'db> From<SubclassOfType<'db>> for Type<'db> {
             SubclassOfInner::Dynamic(dynamic) => Type::Dynamic(dynamic),
             SubclassOfInner::TypeVar(bound_typevar) => Type::TypeVar(bound_typevar),
         }
+    }
+}
+
+impl<'db> From<FunctionalClassLiteral<'db>> for SubclassOfInner<'db> {
+    fn from(value: FunctionalClassLiteral<'db>) -> Self {
+        SubclassOfInner::Class(ClassType::NonGeneric(ClassLiteral::Functional(value)))
     }
 }

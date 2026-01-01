@@ -751,7 +751,9 @@ impl<'db> IntersectionBuilder<'db> {
                 self
             }
             Type::NominalInstance(instance)
-                if enum_metadata(self.db, instance.class_literal(self.db)).is_some() =>
+                if instance
+                    .class_literal(self.db)
+                    .is_some_and(|class| enum_metadata(self.db, class).is_some()) =>
             {
                 let mut contains_enum_literal_as_negative_element = false;
                 for intersection in &self.intersections {
@@ -773,10 +775,13 @@ impl<'db> IntersectionBuilder<'db> {
                     // `UnionBuilder` because we would simplify the union to just the enum instance
                     // and end up in this branch again.
                     let db = self.db;
+                    let class_literal = instance
+                        .class_literal(db)
+                        .expect("Already checked that class_literal is Some");
                     self.add_positive_impl(
                         Type::Union(UnionType::new(
                             db,
-                            enum_member_literals(db, instance.class_literal(db), None)
+                            enum_member_literals(db, class_literal, None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
                             RecursivelyDefined::No,

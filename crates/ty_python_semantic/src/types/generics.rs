@@ -20,9 +20,9 @@ use crate::types::variance::VarianceInferable;
 use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion_guard};
 use crate::types::{
     ApplyTypeMappingVisitor, BindingContext, BoundTypeVarIdentity, BoundTypeVarInstance,
-    ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
-    IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind,
-    NormalizedVisitor, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
+    FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType, IsDisjointVisitor,
+    IsEquivalentVisitor, KnownClass, KnownInstanceType, MaterializationKind, NormalizedVisitor,
+    StmtClassLiteral, Type, TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints,
     TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance, UnionType, declaration_type,
     walk_type_var_bounds,
 };
@@ -86,7 +86,7 @@ pub(crate) fn typing_self<'db>(
     db: &'db dyn Db,
     function_scope_id: ScopeId,
     typevar_binding_context: Option<Definition<'db>>,
-    class: ClassLiteral<'db>,
+    class: StmtClassLiteral<'db>,
 ) -> Option<BoundTypeVarInstance<'db>> {
     let index = semantic_index(db, function_scope_id.file(db));
 

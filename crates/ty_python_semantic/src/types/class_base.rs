@@ -1,10 +1,11 @@
 use crate::Db;
 use crate::types::class::CodeGeneratorKind;
 use crate::types::generics::Specialization;
+use crate::types::mro::MroIterator;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassLiteral, ClassType, DynamicType, KnownClass, KnownInstanceType,
-    MaterializationKind, MroError, MroIterator, NormalizedVisitor, SpecialFormType, Type,
+    ApplyTypeMappingVisitor, ClassType, DynamicType, KnownClass, KnownInstanceType,
+    MaterializationKind, MroError, NormalizedVisitor, SpecialFormType, StmtClassLiteral, Type,
     TypeContext, TypeMapping, todo_type,
 };
 
@@ -91,7 +92,7 @@ impl<'db> ClassBase<'db> {
     pub(super) fn try_from_type(
         db: &'db dyn Db,
         ty: Type<'db>,
-        subclass: ClassLiteral<'db>,
+        subclass: StmtClassLiteral<'db>,
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
@@ -102,10 +103,7 @@ impl<'db> ClassBase<'db> {
             {
                 Self::try_from_type(db, todo_type!("GenericAlias instance"), subclass)
             }
-            Type::SubclassOf(subclass_of) => subclass_of
-                .subclass_of()
-                .into_dynamic()
-                .map(ClassBase::Dynamic),
+            Type::SubclassOf(subclass_of) => subclass_of.subclass_of().to_class_base(),
             Type::Intersection(inter) => {
                 let valid_element = inter
                     .positive(db)
@@ -312,6 +310,15 @@ impl<'db> ClassBase<'db> {
         }
     }
 
+    /// Return the metaclass of this class base.
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            Self::Class(class) => class.metaclass(db),
+            Self::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            Self::Protocol | Self::Generic | Self::TypedDict => KnownClass::Type.to_instance(db),
+        }
+    }
+
     fn apply_type_mapping_impl<'a>(
         self,
         db: &'db dyn Db,
@@ -360,7 +367,11 @@ impl<'db> ClassBase<'db> {
     pub(super) fn has_cyclic_mro(self, db: &'db dyn Db) -> bool {
         match self {
             ClassBase::Class(class) => {
-                let (class_literal, specialization) = class.class_literal(db);
+                let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
+                    // Functional classes can't have cyclic MRO since their bases must
+                    // already exist at creation time.
+                    return false;
+                };
                 class_literal
                     .try_mro(db, specialization)
                     .is_err_and(MroError::is_cycle)

@@ -1221,10 +1221,7 @@ fn is_instance_truthiness<'db>(
                 .class(db)
                 .iter_mro(db)
                 .filter_map(ClassBase::into_class)
-                .any(|c| match c {
-                    ClassType::Generic(c) => c.origin(db) == class,
-                    ClassType::NonGeneric(c) => c == class,
-                })
+                .any(|c| c.class_literal(db) == class)
         {
             return true;
         }
@@ -1729,7 +1726,13 @@ impl KnownFunction {
                 if class.is_protocol(db) {
                     return;
                 }
-                report_bad_argument_to_get_protocol_members(context, call_expression, *class);
+                if let Some(stmt_class) = class.as_stmt() {
+                    report_bad_argument_to_get_protocol_members(
+                        context,
+                        call_expression,
+                        stmt_class,
+                    );
+                }
             }
 
             KnownFunction::RevealProtocolInterface => {

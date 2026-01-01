@@ -465,7 +465,8 @@ impl<'db> BoundSuperType<'db> {
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
-                _ => match subclass_of.subclass_of().into_class(db) {
+                SubclassOfInner::Class(class) => ClassBase::Class(class),
+                SubclassOfInner::TypeVar(_) => match subclass_of.subclass_of().into_class(db) {
                     Some(class) => ClassBase::Class(class),
                     None => {
                         return Err(BoundSuperError::InvalidPivotClassType {
@@ -485,21 +486,36 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        if let Some(pivot_class) = pivot_class.into_class()
-            && let Some(owner_class) = owner.into_class(db)
-        {
-            let pivot_class = pivot_class.class_literal(db).0;
-            if !owner_class.iter_mro(db).any(|superclass| match superclass {
-                ClassBase::Dynamic(_) => true,
-                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
-                ClassBase::Class(superclass) => superclass.class_literal(db).0 == pivot_class,
-            }) {
-                return Err(BoundSuperError::FailingConditionCheck {
-                    pivot_class: pivot_class_type,
-                    owner: owner_type,
-                    typevar_context: None,
-                });
+        // Check that the owner's MRO contains the pivot class.
+        let pivot_in_owner_mro = match pivot_class {
+            ClassBase::Class(pivot_class_type) => {
+                let pivot_literal = pivot_class_type.class_literal(db);
+                match owner.into_class(db) {
+                    Some(owner_class) => {
+                        owner_class.iter_mro(db).any(|superclass| match superclass {
+                            ClassBase::Dynamic(_) => true,
+                            ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => {
+                                false
+                            }
+                            ClassBase::Class(superclass) => {
+                                superclass.class_literal(db) == pivot_literal
+                            }
+                        })
+                    }
+                    // Owner doesn't have a class - skip the check.
+                    None => true,
+                }
             }
+            ClassBase::Dynamic(_) => true,
+            ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => true,
+        };
+
+        if !pivot_in_owner_mro {
+            return Err(BoundSuperError::FailingConditionCheck {
+                pivot_class: pivot_class_type,
+                owner: owner_type,
+                typevar_context: None,
+            });
         }
 
         Ok(Type::BoundSuper(BoundSuperType::new(
@@ -518,16 +534,22 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
-        let Some(pivot_class) = self.pivot_class(db).into_class() else {
+        let pivot = self.pivot_class(db);
+
+        let Some(pivot_class) = pivot.into_class() else {
             return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
+        let pivot_literal = pivot_class.class_literal(db);
         let mut pivot_found = false;
 
         Either::Right(mro_iter.skip_while(move |superclass| {
             if pivot_found {
                 false
-            } else if Some(pivot_class) == superclass.into_class() {
+            } else if superclass
+                .into_class()
+                .is_some_and(|c| c.class_literal(db) == pivot_literal)
+            {
                 pivot_found = true;
                 true
             } else {
@@ -594,7 +616,8 @@ impl<'db> BoundSuperType<'db> {
             SuperOwnerKind::Instance(instance) => instance.class(db),
         };
 
-        let (class_literal, _) = class.class_literal(db);
+        let class_literal = class.class_literal(db);
+
         // TODO properly support super() with generic types
         // * requires a fix for https://github.com/astral-sh/ruff/issues/17432
         // * also requires understanding how we should handle cases like this:
