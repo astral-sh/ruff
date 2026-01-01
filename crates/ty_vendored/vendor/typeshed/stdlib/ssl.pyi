@@ -636,27 +636,7 @@ class SSLContext(_SSLContext):
     # However, the docs explicitly state that it's OK to override these attributes on instances,
     # so making these ClassVars wouldn't be appropriate
     sslobject_class: type[SSLObject]
-    """This class implements an interface on top of a low-level SSL object as
-    implemented by OpenSSL. This object captures the state of an SSL connection
-    but does not provide any network IO itself. IO needs to be performed
-    through separate "BIO" objects which are OpenSSL's IO abstraction layer.
-
-    This class does not have a public constructor. Instances are returned by
-    ``SSLContext.wrap_bio``. This class is typically used by framework authors
-    that want to implement asynchronous IO for SSL through memory buffers.
-
-    When compared to ``SSLSocket``, this object lacks the following features:
-
-     * Any form of network IO, including methods such as ``recv`` and ``send``.
-     * The ``do_handshake_on_connect`` and ``suppress_ragged_eofs`` machinery.
-    """
-
     sslsocket_class: type[SSLSocket]
-    """This class implements a subtype of socket.socket that wraps
-    the underlying OS socket in an SSL context when necessary, and
-    provides read and write methods over that channel.
-    """
-
     keylog_filename: str
     post_handshake_auth: bool
     if sys.version_info >= (3, 10):

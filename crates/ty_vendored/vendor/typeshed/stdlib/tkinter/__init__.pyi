@@ -2294,12 +2294,6 @@ class Tk(Misc, Wm):
         .CLASSNAME.py if such a file exists in the home directory.
         """
     report_callback_exception: Callable[[type[BaseException], BaseException, TracebackType | None], object]
-    """Report callback exception on sys.stderr.
-
-    Applications may want to override this internal function, and
-    should when sys.stderr is None.
-    """
-
     # Tk has __getattr__ so that tk_instance.foo falls back to tk_instance.tk.foo
     # Please keep in sync with _tkinter.TkappType.
     # Some methods are intentionally missing because they are inherited from Misc instead.
