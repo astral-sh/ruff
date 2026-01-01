@@ -4,8 +4,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
 use crate::place::TypeOrigin;
@@ -37,9 +37,9 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, StringLiteralType, TypeAliasType, TypeContext,
+    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext,
     TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
     declaration_type, determine_upper_bound,
 };
@@ -912,8 +912,10 @@ impl<'db> ClassType<'db> {
                             TupleSpec::Fixed(fixed_length_tuple) => {
                                 let tuple_length = fixed_length_tuple.len();
 
-                                for (index, ty) in fixed_length_tuple.elements().enumerate() {
-                                    let entry = element_type_to_indices.entry(*ty).or_default();
+                                for (index, ty) in
+                                    fixed_length_tuple.iter_all_elements().enumerate()
+                                {
+                                    let entry = element_type_to_indices.entry(ty).or_default();
                                     if let Ok(index) = i64::try_from(index) {
                                         entry.push(index);
                                     }
@@ -933,7 +935,9 @@ impl<'db> ClassType<'db> {
                             //    __getitem__(self, index: Literal[-3], /) -> float | str
                             //
                             TupleSpec::Variable(variable_length_tuple) => {
-                                for (index, ty) in variable_length_tuple.prefix.iter().enumerate() {
+                                for (index, ty) in
+                                    variable_length_tuple.prefix_elements().iter().enumerate()
+                                {
                                     if let Ok(index) = i64::try_from(index) {
                                         element_type_to_indices.entry(*ty).or_default().push(index);
                                     }
@@ -941,18 +945,18 @@ impl<'db> ClassType<'db> {
                                     let one_based_index = index + 1;
 
                                     if let Ok(i) = i64::try_from(
-                                        variable_length_tuple.suffix.len() + one_based_index,
+                                        variable_length_tuple.suffix_elements().len()
+                                            + one_based_index,
                                     ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .prefix
-                                                    .iter()
-                                                    .rev()
-                                                    .take(one_based_index)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .iter_prefix_elements()
+                                                        .rev()
+                                                        .take(one_based_index),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -961,30 +965,31 @@ impl<'db> ClassType<'db> {
                                     }
                                 }
 
-                                for (index, ty) in
-                                    variable_length_tuple.suffix.iter().rev().enumerate()
+                                for (index, ty) in variable_length_tuple
+                                    .iter_suffix_elements()
+                                    .rev()
+                                    .enumerate()
                                 {
                                     if let Some(index) =
                                         index.checked_add(1).and_then(|i| i64::try_from(i).ok())
                                     {
                                         element_type_to_indices
-                                            .entry(*ty)
+                                            .entry(ty)
                                             .or_default()
                                             .push(0 - index);
                                     }
 
-                                    if let Ok(i) =
-                                        i64::try_from(variable_length_tuple.prefix.len() + index)
-                                    {
+                                    if let Ok(i) = i64::try_from(
+                                        variable_length_tuple.prefix_elements().len() + index,
+                                    ) {
                                         let overload_return = UnionType::from_elements(
                                             db,
-                                            std::iter::once(variable_length_tuple.variable).chain(
-                                                variable_length_tuple
-                                                    .suffix
-                                                    .iter()
-                                                    .take(index + 1)
-                                                    .copied(),
-                                            ),
+                                            std::iter::once(variable_length_tuple.variable())
+                                                .chain(
+                                                    variable_length_tuple
+                                                        .iter_suffix_elements()
+                                                        .take(index + 1),
+                                                ),
                                         );
                                         element_type_to_indices
                                             .entry(overload_return)
@@ -1079,10 +1084,10 @@ impl<'db> ClassType<'db> {
                         if tuple_len.minimum() == 0 && tuple_len.maximum().is_none() {
                             // If the tuple has no length restrictions,
                             // any iterable is allowed as long as the iterable has the correct element type.
-                            let mut tuple_elements = tuple.all_elements();
+                            let mut tuple_elements = tuple.iter_all_elements();
                             iterable_parameter = iterable_parameter.with_annotated_type(
                                 KnownClass::Iterable
-                                    .to_specialized_instance(db, [*tuple_elements.next().unwrap()]),
+                                    .to_specialized_instance(db, [tuple_elements.next().unwrap()]),
                             );
                             assert_eq!(
                                 tuple_elements.next(),
@@ -1217,7 +1222,7 @@ impl<'db> ClassType<'db> {
             let dunder_new_bound_method = CallableType::new(
                 db,
                 dunder_new_signature.bind_self(db, Some(instance_ty)),
-                CallableTypeKind::FunctionLike,
+                CallableTypeKind::Regular,
             );
 
             if returns_non_subclass {
@@ -1287,7 +1292,7 @@ impl<'db> ClassType<'db> {
                 Some(CallableType::new(
                     db,
                     synthesized_dunder_init_signature,
-                    CallableTypeKind::FunctionLike,
+                    CallableTypeKind::Regular,
                 ))
             } else {
                 None
@@ -1935,7 +1940,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
             return known.is_typed_dict_subclass();
         }
@@ -2247,13 +2252,8 @@ impl<'db> ClassLiteral<'db> {
                     qualifiers,
                 },
                 Some(dynamic_type),
-            ) => Place::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic_type)
-                    .build(),
-            )
-            .with_qualifiers(qualifiers),
+            ) => Place::bound(IntersectionType::from_elements(db, [ty, dynamic_type]))
+                .with_qualifiers(qualifiers),
 
             (
                 PlaceAndQualifiers {
@@ -2768,7 +2768,7 @@ impl<'db> ClassLiteral<'db> {
                 }
 
                 let overloads = writeable_fields.map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2797,7 +2797,7 @@ impl<'db> ClassLiteral<'db> {
 
                 // Add (key -> value type) overloads for all TypedDict items ("fields"):
                 let overloads = fields.iter().map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2853,7 +2853,7 @@ impl<'db> ClassLiteral<'db> {
 
                 // Otherwise, add overloads for all deletable fields.
                 let overloads = deletable_fields.map(|(name, _field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     Signature::new(
                         Parameters::new(
@@ -2880,8 +2880,7 @@ impl<'db> ClassLiteral<'db> {
                     .fields(db, specialization, field_policy)
                     .iter()
                     .flat_map(|(name, field)| {
-                        let key_type =
-                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                        let key_type = Type::string_literal(db, name);
 
                         // For a required key, `.get()` always returns the value type. For a non-required key,
                         // `.get()` returns the union of the value type and the type of the default argument
@@ -2907,8 +2906,11 @@ impl<'db> ClassLiteral<'db> {
                             }),
                         );
 
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         let get_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
@@ -2954,8 +2956,11 @@ impl<'db> ClassLiteral<'db> {
                         )
                     }))
                     .chain(std::iter::once({
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
@@ -2992,8 +2997,7 @@ impl<'db> ClassLiteral<'db> {
                         !field.is_required()
                     })
                     .flat_map(|(name, field)| {
-                        let key_type =
-                            Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                        let key_type = Type::string_literal(db, name);
 
                         // TODO: Similar to above: consider merging these two overloads into one
 
@@ -3012,8 +3016,11 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // `.pop()` with a default value
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         let pop_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
@@ -3046,7 +3053,7 @@ impl<'db> ClassLiteral<'db> {
             (CodeGeneratorKind::TypedDict, "setdefault") => {
                 let fields = self.fields(db, specialization, field_policy);
                 let overloads = fields.iter().map(|(name, field)| {
-                    let key_type = Type::StringLiteral(StringLiteralType::new(db, name.as_str()));
+                    let key_type = Type::string_literal(db, name);
 
                     // `setdefault` always returns the field type
                     Signature::new(
@@ -3476,16 +3483,27 @@ impl<'db> ClassLiteral<'db> {
         let is_valid_scope = |method_scope: &Scope| {
             if let Some(method_def) = method_scope.node().as_function() {
                 let method_name = method_def.node(&module).name.as_str();
-                if let Some(Type::FunctionLiteral(method_type)) =
-                    class_member(db, class_body_scope, method_name)
-                        .inner
-                        .place
-                        .ignore_possibly_undefined()
+                match class_member(db, class_body_scope, method_name)
+                    .inner
+                    .place
+                    .ignore_possibly_undefined()
                 {
-                    let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
-                    if method_decorator != Ok(target_method_decorator) {
-                        return false;
+                    Some(Type::FunctionLiteral(method_type)) => {
+                        let method_decorator = MethodDecorator::try_from_fn_type(db, method_type);
+                        if method_decorator != Ok(target_method_decorator) {
+                            return false;
+                        }
                     }
+                    Some(Type::PropertyInstance(_)) => {
+                        // Property getters and setters have their own scopes. They take `self`
+                        // as the first parameter (like regular instance methods), so they're
+                        // included when looking for `MethodDecorator::None`. However, they're
+                        // not classmethods or staticmethods, so exclude them for those cases.
+                        if target_method_decorator != MethodDecorator::None {
+                            return false;
+                        }
+                    }
+                    _ => {}
                 }
             }
             true
@@ -5114,27 +5132,46 @@ impl KnownClass {
         db: &'db dyn Db,
         specialization: impl IntoIterator<Item = Type<'db>>,
     ) -> Option<ClassType<'db>> {
+        fn to_specialized_class_type_impl<'db>(
+            db: &'db dyn Db,
+            class: KnownClass,
+            class_literal: ClassLiteral<'db>,
+            specialization: Box<[Type<'db>]>,
+            generic_context: GenericContext<'db>,
+        ) -> ClassType<'db> {
+            if specialization.len() != generic_context.len(db) {
+                // a cache of the `KnownClass`es that we have already seen mismatched-arity
+                // specializations for (and therefore that we've already logged a warning for)
+                static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> =
+                    LazyLock::new(Mutex::default);
+                if MESSAGES.lock().unwrap().insert(class) {
+                    tracing::info!(
+                        "Wrong number of types when specializing {}. \
+                     Falling back to default specialization for the symbol instead.",
+                        class.display(db)
+                    );
+                }
+                return class_literal.default_specialization(db);
+            }
+
+            class_literal
+                .apply_specialization(db, |_| generic_context.specialize(db, specialization))
+        }
+
         let Type::ClassLiteral(class_literal) = self.to_class_literal(db) else {
             return None;
         };
+
         let generic_context = class_literal.generic_context(db)?;
-
         let types = specialization.into_iter().collect::<Box<[_]>>();
-        if types.len() != generic_context.len(db) {
-            // a cache of the `KnownClass`es that we have already seen mismatched-arity
-            // specializations for (and therefore that we've already logged a warning for)
-            static MESSAGES: LazyLock<Mutex<FxHashSet<KnownClass>>> = LazyLock::new(Mutex::default);
-            if MESSAGES.lock().unwrap().insert(self) {
-                tracing::info!(
-                    "Wrong number of types when specializing {}. \
-                     Falling back to default specialization for the symbol instead.",
-                    self.display(db)
-                );
-            }
-            return Some(class_literal.default_specialization(db));
-        }
 
-        Some(class_literal.apply_specialization(db, |_| generic_context.specialize(db, types)))
+        Some(to_specialized_class_type_impl(
+            db,
+            self,
+            class_literal,
+            types,
+            generic_context,
+        ))
     }
 
     /// Lookup a [`KnownClass`] in typeshed and return a [`Type`]
@@ -5882,7 +5919,7 @@ impl KnownClass {
                 // Parsing something of the form:
                 //
                 // @deprecated("message")
-                // @deprecated("message", caregory = DeprecationWarning, stacklevel = 1)
+                // @deprecated("message", category = DeprecationWarning, stacklevel = 1)
                 //
                 // "Static type checker behavior is not affected by the category and stacklevel arguments"
                 // so we only need the message and can ignore everything else. The message is mandatory,

@@ -247,11 +247,11 @@ does["not"]["exist"] = 0
 # error: [unresolved-reference]
 reveal_type(does["not"]["exist"])  # revealed: Unknown
 
-non_subscriptable = 1
+not_subscriptable = 1
 # error: [invalid-assignment]
-non_subscriptable[0] = 0
-# error: [non-subscriptable]
-reveal_type(non_subscriptable[0])  # revealed: Unknown
+not_subscriptable[0] = 0
+# error: [not-subscriptable]
+reveal_type(not_subscriptable[0])  # revealed: Unknown
 ```
 
 ### No narrowing for custom classes with arbitrary `__getitem__` / `__setitem__`

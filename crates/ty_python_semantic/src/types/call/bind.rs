@@ -14,7 +14,7 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fmt;
 
-use itertools::{Either, Itertools};
+use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -27,9 +27,9 @@ use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
-    CALL_NON_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE, MISSING_ARGUMENT,
-    NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED, POSITIONAL_ONLY_PARAMETER_AS_KWARG,
-    TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
+    CALL_NON_CALLABLE, CALL_TOP_CALLABLE, CONFLICTING_ARGUMENT_FORMS, INVALID_ARGUMENT_TYPE,
+    MISSING_ARGUMENT, NO_MATCHING_OVERLOAD, PARAMETER_ALREADY_ASSIGNED,
+    POSITIONAL_ONLY_PARAMETER_AS_KWARG, TOO_MANY_POSITIONAL_ARGUMENTS, UNKNOWN_ARGUMENT,
 };
 use crate::types::enums::is_enum_class;
 use crate::types::function::{
@@ -2739,24 +2739,19 @@ impl<'a, 'db> ArgumentMatcher<'a, 'db> {
             None => VariadicArgumentType::None,
         };
 
-        let (mut argument_types, length, variable_element) = match &variadic_type {
-            VariadicArgumentType::ParamSpec(paramspec) => (
-                Either::Right(std::iter::empty()),
-                TupleLength::unknown(),
-                Some(*paramspec),
-            ),
+        let (argument_types, length, variable_element) = match &variadic_type {
+            VariadicArgumentType::ParamSpec(paramspec) => {
+                ([].as_slice(), TupleLength::unknown(), Some(*paramspec))
+            }
             VariadicArgumentType::Other(tuple) => (
-                Either::Left(tuple.all_elements().copied()),
+                tuple.all_elements(),
                 tuple.len(),
                 tuple.variable_element().copied(),
             ),
-            VariadicArgumentType::None => (
-                Either::Right(std::iter::empty()),
-                TupleLength::unknown(),
-                None,
-            ),
+            VariadicArgumentType::None => ([].as_slice(), TupleLength::unknown(), None),
         };
 
+        let mut argument_types = argument_types.iter().copied();
         let is_variable = length.is_variable();
 
         // We must be able to match up the fixed-length portion of the argument with positional
@@ -3017,7 +3012,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .class_specialization(self.db)?;
 
             builder
-                .infer_map(return_ty, tcx, |(_, variance, inferred_ty)| {
+                .infer_reverse_map(tcx, return_ty, |(_, variance, inferred_ty)| {
                     // Avoid unnecessarily widening the return type based on a covariant
                     // type parameter from the type context, as it can lead to argument
                     // assignability errors if the type variable is constrained by a narrower
@@ -3029,11 +3024,12 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     Some(inferred_ty)
                 })
                 .ok()?;
+
             Some(builder.type_mappings().clone())
         });
 
-        // For a given type variable, we track the variance of any assignments to that type variable
-        // in the argument types.
+        // For a given type variable, we keep track of the variance of any assignments to
+        // that type variable in the type context.
         let mut variance_in_arguments: FxHashMap<BoundTypeVarIdentity<'_>, TypeVarVariance> =
             FxHashMap::default();
 
@@ -3120,7 +3116,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return ty;
             }
 
-            // If the type variable is a non-covariant position in the argument, then we avoid
+            // If the type variable is a non-covariant position in any argument, then we avoid
             // promotion, respecting any literals in the parameter type.
             if variance_in_arguments
                 .get(&identity)
@@ -3706,6 +3702,11 @@ impl<'db> Binding<'db> {
             self.return_ty,
             &mut self.errors,
         );
+        if self.signature.parameters().is_top() {
+            self.errors
+                .push(BindingError::CalledTopCallable(self.signature_type));
+            return;
+        }
 
         // If this overload is generic, first see if we can infer a specialization of the function
         // from the arguments that were passed in.
@@ -4124,6 +4125,10 @@ pub(crate) enum BindingError<'db> {
     /// This overload binding of the callable does not match the arguments.
     // TODO: We could expand this with an enum to specify why the overload is unmatched.
     UnmatchedOverload,
+    /// The callable type is a top materialization (e.g., `Top[Callable[..., object]]`), which
+    /// represents the infinite union of all callables. While such types *are* callable (they pass
+    /// `callable()`), any specific call should fail because we don't know the actual signature.
+    CalledTopCallable(Type<'db>),
 }
 
 impl<'db> BindingError<'db> {
@@ -4551,6 +4556,24 @@ impl<'db> BindingError<'db> {
             }
 
             Self::UnmatchedOverload => {}
+
+            Self::CalledTopCallable(callable_ty) => {
+                let node = Self::get_node(node, None);
+                if let Some(builder) = context.report_lint(&CALL_TOP_CALLABLE, node) {
+                    let callable_ty_display = callable_ty.display(context.db());
+                    let mut diag = builder.into_diagnostic(format_args!(
+                        "Object of type `{callable_ty_display}` is not safe to call; \
+                        its signature is not known"
+                    ));
+                    diag.info(
+                        "This type includes all possible callables, so it cannot safely be called \
+                        because there is no valid set of arguments for it",
+                    );
+                    if let Some(union_diag) = union_diag {
+                        union_diag.add_union_context(context.db(), &mut diag);
+                    }
+                }
+            }
         }
     }
 

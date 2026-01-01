@@ -2,72 +2,107 @@
 source: crates/ruff_linter/src/rules/pylint/mod.rs
 ---
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:9:1
+  --> dict_index_missing_items.py:9:5
    |
- 8 |   # Errors
- 9 | / for instrument in ORCHESTRA:
-10 | |     print(f"{instrument}: {ORCHESTRA[instrument]}")
-   | |___________________________________________________^
+ 8 | # Errors
+ 9 | for instrument in ORCHESTRA:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+10 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
+   |                            ---------------------
 11 |
-12 |   for instrument in ORCHESTRA:
+12 | for instrument in ORCHESTRA:
    |
+help: Use `for instrument, value in ORCHESTRA.items()` instead
 
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:12:1
+  --> dict_index_missing_items.py:12:5
    |
-10 |       print(f"{instrument}: {ORCHESTRA[instrument]}")
+10 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
 11 |
-12 | / for instrument in ORCHESTRA:
-13 | |     ORCHESTRA[instrument]
-   | |_________________________^
+12 | for instrument in ORCHESTRA:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+13 |     ORCHESTRA[instrument]
+   |     ---------------------
 14 |
-15 |   for instrument in ORCHESTRA.keys():
+15 | for instrument in ORCHESTRA.keys():
    |
+help: Use `for instrument, value in ORCHESTRA.items()` instead
 
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:15:1
+  --> dict_index_missing_items.py:15:5
    |
-13 |       ORCHESTRA[instrument]
+13 |     ORCHESTRA[instrument]
 14 |
-15 | / for instrument in ORCHESTRA.keys():
-16 | |     print(f"{instrument}: {ORCHESTRA[instrument]}")
-   | |___________________________________________________^
+15 | for instrument in ORCHESTRA.keys():
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+16 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
+   |                            ---------------------
 17 |
-18 |   for instrument in ORCHESTRA.keys():
+18 | for instrument in ORCHESTRA.keys():
    |
+help: Use `for instrument, value in ORCHESTRA.items()` instead
 
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:18:1
+  --> dict_index_missing_items.py:18:5
    |
-16 |       print(f"{instrument}: {ORCHESTRA[instrument]}")
+16 |     print(f"{instrument}: {ORCHESTRA[instrument]}")
 17 |
-18 | / for instrument in ORCHESTRA.keys():
-19 | |     ORCHESTRA[instrument]
-   | |_________________________^
+18 | for instrument in ORCHESTRA.keys():
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+19 |     ORCHESTRA[instrument]
+   |     ---------------------
 20 |
-21 |   for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
+21 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
+help: Use `for instrument, value in ORCHESTRA.items()` instead
 
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:21:1
+  --> dict_index_missing_items.py:21:5
    |
-19 |       ORCHESTRA[instrument]
+19 |     ORCHESTRA[instrument]
 20 |
-21 | / for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
-22 | |     print(f"{instrument}: {temp_orchestra[instrument]}")
-   | |________________________________________________________^
+21 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+22 |     print(f"{instrument}: {temp_orchestra[instrument]}")
+   |                            --------------------------
 23 |
-24 |   for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
+24 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
    |
+help: Use `for instrument, value in temp_orchestra.items()` instead
 
 PLC0206 Extracting value from dictionary without calling `.items()`
-  --> dict_index_missing_items.py:24:1
+  --> dict_index_missing_items.py:24:5
    |
-22 |       print(f"{instrument}: {temp_orchestra[instrument]}")
+22 |     print(f"{instrument}: {temp_orchestra[instrument]}")
 23 |
-24 | / for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
-25 | |     temp_orchestra[instrument]
-   | |______________________________^
+24 | for instrument in (temp_orchestra := {"violin": "strings", "oboe": "woodwind"}):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+25 |     temp_orchestra[instrument]
+   |     --------------------------
 26 |
-27 |   # # OK
+27 | # # OK
    |
+help: Use `for instrument, value in temp_orchestra.items()` instead
+
+PLC0206 Extracting value from dictionary without calling `.items()`
+  --> dict_index_missing_items.py:59:5
+   |
+58 | # A case with multiple uses of the value to show off the secondary annotations
+59 | for instrument in ORCHESTRA:
+   |     ^^^^^^^^^^^^^^^^^^^^^^^
+60 |     data = json.dumps(
+61 |         {
+62 |             "instrument": instrument,
+63 |             "section": ORCHESTRA[instrument],
+   |                        ---------------------
+64 |         }
+65 |     )
+66 |
+67 |     print(f"saving data for {instrument} in {ORCHESTRA[instrument]}")
+   |                                              ---------------------
+68 |
+69 |     with open(f"{instrument}/{ORCHESTRA[instrument]}.txt", "w") as f:
+   |                               ---------------------
+70 |         f.write(data)
+   |
+help: Use `for instrument, value in ORCHESTRA.items()` instead

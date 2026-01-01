@@ -432,6 +432,44 @@ b: Litera
     Ok(())
 }
 
+#[test]
+fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
+    let mut server = TestServerBuilder::new()?
+        .with_workspace(
+            SystemPath::new("src"),
+            Some(ClientOptions::default().with_show_syntax_errors(false)),
+        )?
+        .build()
+        .wait_until_workspaces_are_initialized();
+
+    server.initialization_result().unwrap();
+
+    let mut builder = NotebookBuilder::virtual_file("src/test.ipynb");
+
+    builder.add_python_cell(
+        r#"def foo(
+"#,
+    );
+
+    builder.add_python_cell(
+        r#"x = 1 +
+"#,
+    );
+
+    builder.open(&mut server);
+
+    let diagnostics = server.collect_publish_diagnostic_notifications(2);
+
+    assert_json_snapshot!(diagnostics, @r###"
+    {
+      "vscode-notebook-cell://src/test.ipynb#0": [],
+      "vscode-notebook-cell://src/test.ipynb#1": []
+    }
+    "###);
+
+    Ok(())
+}
+
 fn semantic_tokens_full_for_cell(
     server: &mut TestServer,
     cell_uri: &lsp_types::Url,

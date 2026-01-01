@@ -110,11 +110,11 @@ impl Server {
                             .complete(&response.id)
                         {
                             let duration = start_time.elapsed();
-                            tracing::trace!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
+                            tracing::debug!(name: "message response", method, %response.id, duration = format_args!("{:0.2?}", duration));
 
                             self.connection.sender.send(Message::Response(response))?;
                         } else {
-                            tracing::trace!(
+                            tracing::debug!(
                                 "Ignoring response for canceled request id={}",
                                 response.id
                             );

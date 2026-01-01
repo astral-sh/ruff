@@ -45,6 +45,12 @@ pub(crate) enum MockReference {
 /// from unittest import mock
 /// ```
 ///
+/// ## Options
+///
+/// This rule will not trigger if the `mock` import is required by the `isort` configuration.
+///
+/// - `lint.isort.required-imports`
+///
 /// ## References
 /// - [Python documentation: `unittest.mock`](https://docs.python.org/3/library/unittest.mock.html)
 /// - [PyPI: `mock`](https://pypi.org/project/mock/)

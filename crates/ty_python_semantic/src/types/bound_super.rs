@@ -331,7 +331,7 @@ impl<'db> BoundSuperType<'db> {
             Type::NominalInstance(instance) => SuperOwnerKind::Instance(instance),
 
             Type::ProtocolInstance(protocol) => {
-                if let Some(nominal_instance) = protocol.as_nominal_type() {
+                if let Some(nominal_instance) = protocol.to_nominal_instance() {
                     SuperOwnerKind::Instance(nominal_instance)
                 } else {
                     return Err(BoundSuperError::AbstractOwnerType {
@@ -389,7 +389,7 @@ impl<'db> BoundSuperType<'db> {
                     None => delegate_with_error_mapped(Type::object(), Some(type_var)),
                 };
             }
-            Type::BooleanLiteral(_) | Type::TypeIs(_) => {
+            Type::BooleanLiteral(_) | Type::TypeIs(_) | Type::TypeGuard(_) => {
                 return delegate_to(KnownClass::Bool.to_instance(db));
             }
             Type::IntLiteral(_) => return delegate_to(KnownClass::Int.to_instance(db)),

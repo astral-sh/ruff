@@ -251,7 +251,7 @@ reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
 ## Attributes on `NamedTuple`

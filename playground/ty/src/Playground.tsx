@@ -6,7 +6,6 @@ import {
   useEffect,
   useMemo,
   useReducer,
-  useRef,
   useState,
 } from "react";
 import { ErrorMessage, Header, setupMonaco, useTheme } from "shared";
@@ -22,23 +21,18 @@ export default function Playground() {
   const [theme, setTheme] = useTheme();
   const [version, setVersion] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const workspacePromiseRef = useRef<Promise<Workspace> | null>(null);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-
-  let workspacePromise = workspacePromiseRef.current;
-  if (workspacePromise == null) {
-    workspacePromiseRef.current = workspacePromise = startPlayground().then(
-      (fetched) => {
-        setVersion(fetched.version);
-        const workspace = new Workspace("/", PositionEncoding.Utf16, {});
-        restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
-        setWorkspace(workspace);
-        return workspace;
-      },
-    );
-  }
-
   const [files, dispatchFiles] = useReducer(filesReducer, INIT_FILES_STATE);
+
+  const [workspacePromise] = useState<Promise<Workspace>>(() =>
+    startPlayground().then((fetched) => {
+      setVersion(fetched.version);
+      const workspace = new Workspace("/", PositionEncoding.Utf16, {});
+      restoreWorkspace(workspace, fetched.workspace, dispatchFiles, setError);
+      setWorkspace(workspace);
+      return workspace;
+    }),
+  );
 
   const fileName = useMemo(() => {
     return (
