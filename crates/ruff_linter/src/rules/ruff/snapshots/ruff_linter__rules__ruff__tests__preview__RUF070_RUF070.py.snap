@@ -165,3 +165,23 @@ RUF070 Comparison `i != 2.0` should be replaced by `math.isclose()` or `numpy.is
 34 |
 35 | assert x / 2 == 1
    |
+
+RUF070 Comparison `x / 2 == 1` should be replaced by `math.isclose()` or `numpy.isclose()`
+  --> RUF070.py:35:8
+   |
+33 | {i for i in range(10) if i != 2.0}
+34 |
+35 | assert x / 2 == 1
+   |        ^^^^^^^^^^
+36 | assert (x / 2) == (y / 3)
+   |
+
+RUF070 Comparison `x / 2 == y / 3` should be replaced by `math.isclose()` or `numpy.isclose()`
+  --> RUF070.py:36:9
+   |
+35 | assert x / 2 == 1
+36 | assert (x / 2) == (y / 3)
+   |         ^^^^^^^^^^^^^^^^
+37 |
+38 | # ok
+   |

@@ -94,11 +94,34 @@ fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float)) => true,
         ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex)) => true,
         _ => {
-            if let Expr::Call(ast::ExprCall { func, .. }) = expr {
-                semantic.match_builtin_expr(func, "float")
-            } else {
-                false
+            match expr {
+                Expr::Call(ast::ExprCall { func, .. }) => {
+                    semantic.match_builtin_expr(func, "float")
+                }
+                // Division always returns float in Python
+                // https://docs.python.org/3/tutorial/introduction.html#numbers
+                Expr::BinOp(ast::ExprBinOp {
+                    left,
+                    right,
+                    op: ast::Operator::Div,
+                    ..
+                }) => {
+                    // Only trigger for numeric divisions, not path operations
+                    is_numeric_expr(left) || is_numeric_expr(right)
+                }
+                _ => false,
             }
         }
+    }
+}
+
+fn is_numeric_expr(expr: &Expr) -> bool {
+    match expr {
+        Expr::NumberLiteral(_) => true,
+        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
+            is_numeric_expr(left) || is_numeric_expr(right)
+        }
+        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
+        _ => false,
     }
 }
