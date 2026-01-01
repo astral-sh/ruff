@@ -10,8 +10,6 @@ use ruff_python_ast::{
     self as ast, AnyNodeRef, ExprContext, HasNodeIndex, NodeIndex, PythonVersion,
 };
 use ruff_python_stdlib::builtins::version_builtin_was_added;
-use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::is_keyword;
 use ruff_text_size::{Ranged, TextRange};
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::SmallVec;
@@ -55,8 +53,7 @@ use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, FieldKind, FunctionalNamedTupleLiteral, MetaclassErrorKind,
-    MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -111,15 +108,16 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StmtClassLiteral, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    CallableTypeKind, ClassType, CollectionsNamedTupleDefaultsSchema,
+    CollectionsNamedTupleFieldsSchema, DataclassParams, DynamicType, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, TypingNamedTupleFieldsSchema,
+    UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5258,26 +5256,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
                         Some(_) | None => {
-                            // Check for special forms like `typing.NamedTuple`.
-                            if let Some(SpecialFormType::NamedTuple) =
-                                callable_type.as_special_form()
-                            {
-                                self.infer_functional_namedtuple_expression(
-                                    call_expr,
-                                    callable_type,
-                                )
-                            } else if callable_type
-                                .as_function_literal()
-                                .is_some_and(|f| f.is_known(self.db(), KnownFunction::NamedTuple))
-                            {
-                                // Handle `collections.namedtuple`.
-                                self.infer_collections_namedtuple_expression(
-                                    call_expr,
-                                    callable_type,
-                                )
-                            } else {
-                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
-                            }
+                            self.infer_call_expression_impl(call_expr, callable_type, tcx)
                         }
                     };
 
@@ -5808,258 +5787,62 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
-    /// Infer the type for a functional `NamedTuple` creation:
-    /// `NamedTuple("Name", [("field", type), ...])`
-    fn infer_functional_namedtuple_expression(
+    /// Extract fields from a list or tuple literal for `typing.NamedTuple`.
+    fn infer_typing_namedtuple_fields_schema(
         &mut self,
-        call_expr: &ast::ExprCall,
-        callable_type: Type<'db>,
-    ) -> Type<'db> {
+        field_elts: &[ast::Expr],
+    ) -> Option<TypingNamedTupleFieldsSchema<'db>> {
         let db = self.db();
-        let arguments = &call_expr.arguments;
+        let mut fields: Vec<(ast::name::Name, Type<'db>)> = Vec::with_capacity(field_elts.len());
 
-        // We need at least 2 arguments: the name and the fields.
-        if arguments.args.len() < 2 {
-            // Fall back to normal call inference.
-            return self.infer_call_expression_impl(
-                call_expr,
-                callable_type,
-                TypeContext::default(),
-            );
-        }
-
-        // Get the name (first argument must be a string literal).
-        let name_expr = &arguments.args[0];
-        let name_ty = self.infer_expression(name_expr, TypeContext::default());
-        let Some(name_lit) = name_ty.as_string_literal() else {
-            return self.infer_call_expression_impl(
-                call_expr,
-                callable_type,
-                TypeContext::default(),
-            );
-        };
-        let name = ast::name::Name::new(name_lit.value(db));
-
-        // Get the fields (second argument must be a list or tuple literal).
-        let fields_expr = &arguments.args[1];
-        let field_elts: &[ast::Expr] = match fields_expr {
-            ast::Expr::List(list_expr) => &list_expr.elts,
-            ast::Expr::Tuple(tuple_expr) => &tuple_expr.elts,
-            _ => {
-                // If not a list or tuple literal, fall back to normal call inference.
-                return self.infer_call_expression_impl(
-                    call_expr,
-                    callable_type,
-                    TypeContext::default(),
-                );
-            }
-        };
-
-        // Extract fields from the list/tuple literal.
-        let mut fields: Vec<(ast::name::Name, Type<'db>, Option<Type<'db>>)> =
-            Vec::with_capacity(field_elts.len());
         for elt in field_elts {
             // Each element should be a tuple like ("field_name", type).
             let ast::Expr::Tuple(tuple_expr) = elt else {
-                return self.infer_call_expression_impl(
-                    call_expr,
-                    callable_type,
-                    TypeContext::default(),
-                );
+                return None;
             };
 
             if tuple_expr.elts.len() != 2 {
-                return self.infer_call_expression_impl(
-                    call_expr,
-                    callable_type,
-                    TypeContext::default(),
-                );
+                return None;
             }
 
             // First element: field name (string literal).
             let field_name_expr = &tuple_expr.elts[0];
             let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
-            let Some(field_name_lit) = field_name_ty.as_string_literal() else {
-                return self.infer_call_expression_impl(
-                    call_expr,
-                    callable_type,
-                    TypeContext::default(),
-                );
-            };
+            let field_name_lit = field_name_ty.as_string_literal()?;
             let field_name = ast::name::Name::new(field_name_lit.value(db));
 
             // Second element: field type.
             let field_type_expr = &tuple_expr.elts[1];
             let field_type_ty = self.infer_type_expression(field_type_expr);
 
-            // The functional form of typing.NamedTuple doesn't support defaults.
-            fields.push((field_name, field_type_ty, None));
+            fields.push((field_name, field_type_ty));
         }
 
-        // Create the functional namedtuple type.
-        let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields.into_boxed_slice());
-        Type::ClassLiteral(ClassLiteral::FunctionalNamedTuple(namedtuple))
+        Some(TypingNamedTupleFieldsSchema::new(
+            db,
+            fields.into_boxed_slice(),
+        ))
     }
 
-    /// Infer the type for a `collections.namedtuple` creation:
-    /// `namedtuple("Name", ["field1", "field2"])` or `namedtuple("Name", "field1 field2")`.
-    fn infer_collections_namedtuple_expression(
+    /// Extract field names from a list or tuple literal for `collections.namedtuple`.
+    fn infer_collections_namedtuple_fields_schema(
         &mut self,
-        call_expr: &ast::ExprCall,
-        callable_type: Type<'db>,
-    ) -> Type<'db> {
+        field_elts: &[ast::Expr],
+    ) -> Option<CollectionsNamedTupleFieldsSchema<'db>> {
         let db = self.db();
-        let arguments = &call_expr.arguments;
+        let mut field_names: Vec<ast::name::Name> = Vec::with_capacity(field_elts.len());
 
-        // We need at least 2 arguments: the name and the fields.
-        if arguments.args.len() < 2 {
-            // Fall back to normal call inference.
-            return self.infer_call_expression_impl(
-                call_expr,
-                callable_type,
-                TypeContext::default(),
-            );
+        for elt in field_elts {
+            // Each element should be a string literal (field name).
+            let field_ty = self.infer_expression(elt, TypeContext::default());
+            let field_lit = field_ty.as_string_literal()?;
+            field_names.push(ast::name::Name::new(field_lit.value(db)));
         }
 
-        // Get the name (first argument must be a string literal).
-        let name_expr = &arguments.args[0];
-        let name_ty = self.infer_expression(name_expr, TypeContext::default());
-        let Some(name_lit) = name_ty.as_string_literal() else {
-            return self.infer_call_expression_impl(
-                call_expr,
-                callable_type,
-                TypeContext::default(),
-            );
-        };
-        let name = ast::name::Name::new(name_lit.value(db));
-
-        // Get the fields (second argument can be a list, tuple, or space/comma-separated string).
-        let fields_expr = &arguments.args[1];
-        let field_names: Vec<ast::name::Name> = match fields_expr {
-            // List of strings: ["field1", "field2"].
-            ast::Expr::List(list_expr) => {
-                let mut names = Vec::with_capacity(list_expr.elts.len());
-                for elt in &list_expr.elts {
-                    let field_ty = self.infer_expression(elt, TypeContext::default());
-                    let Some(field_lit) = field_ty.as_string_literal() else {
-                        return self.infer_call_expression_impl(
-                            call_expr,
-                            callable_type,
-                            TypeContext::default(),
-                        );
-                    };
-                    names.push(ast::name::Name::new(field_lit.value(db)));
-                }
-                names
-            }
-            // Tuple of strings: ("field1", "field2").
-            ast::Expr::Tuple(tuple_expr) => {
-                let mut names = Vec::with_capacity(tuple_expr.elts.len());
-                for elt in &tuple_expr.elts {
-                    let field_ty = self.infer_expression(elt, TypeContext::default());
-                    let Some(field_lit) = field_ty.as_string_literal() else {
-                        return self.infer_call_expression_impl(
-                            call_expr,
-                            callable_type,
-                            TypeContext::default(),
-                        );
-                    };
-                    names.push(ast::name::Name::new(field_lit.value(db)));
-                }
-                names
-            }
-            // Space or comma-separated string: "field1 field2" or "field1, field2".
-            _ => {
-                let fields_ty = self.infer_expression(fields_expr, TypeContext::default());
-                let Some(fields_lit) = fields_ty.as_string_literal() else {
-                    return self.infer_call_expression_impl(
-                        call_expr,
-                        callable_type,
-                        TypeContext::default(),
-                    );
-                };
-                let fields_str = fields_lit.value(db);
-                // Split by comma or whitespace.
-                fields_str
-                    .split(|c: char| c == ',' || c.is_whitespace())
-                    .filter(|s| !s.is_empty())
-                    .map(ast::name::Name::new)
-                    .collect()
-            }
-        };
-
-        // Extract the defaults keyword argument (a tuple or list of default values).
-        let defaults: Vec<Type<'db>> = arguments
-            .find_keyword("defaults")
-            .map(|kw| match &kw.value {
-                // Handle list literal: defaults=[...]
-                ast::Expr::List(list_expr) => list_expr
-                    .elts
-                    .iter()
-                    .map(|elt| self.infer_expression(elt, TypeContext::default()))
-                    .collect(),
-                // Handle tuple literal: defaults=(...)
-                ast::Expr::Tuple(tuple_expr) => tuple_expr
-                    .elts
-                    .iter()
-                    .map(|elt| self.infer_expression(elt, TypeContext::default()))
-                    .collect(),
-                _ => vec![],
-            })
-            .unwrap_or_default();
-
-        // Check the rename keyword argument. If `rename=True`, invalid field names
-        // are replaced with `_N` where N is the 0-indexed position.
-        let rename = arguments.find_keyword("rename").is_some_and(|kw| {
-            let rename_ty = self.infer_expression(&kw.value, TypeContext::default());
-            matches!(rename_ty, Type::BooleanLiteral(true))
-        });
-
-        // Apply renaming logic if `rename=True`.
-        let field_names: Vec<ast::name::Name> = if rename {
-            let mut seen: FxHashSet<&str> = FxHashSet::default();
-            field_names
-                .iter()
-                .enumerate()
-                .map(|(i, name)| {
-                    let name_str = name.as_str();
-                    // Rename if: starts with underscore, is a keyword,
-                    // is not a valid identifier, or is a duplicate.
-                    let needs_rename = name_str.starts_with('_')
-                        || is_keyword(name_str)
-                        || !is_identifier(name_str)
-                        || seen.contains(name_str);
-                    if needs_rename {
-                        ast::name::Name::new(format!("_{i}"))
-                    } else {
-                        seen.insert(name_str);
-                        name.clone()
-                    }
-                })
-                .collect()
-        } else {
-            field_names
-        };
-
-        // All fields have type `Any` for collections.namedtuple.
-        let any_ty = Type::any();
-        let num_fields = field_names.len();
-        let num_defaults = defaults.len();
-
-        let fields: Box<[(ast::name::Name, Type<'db>, Option<Type<'db>>)]> = field_names
-            .into_iter()
-            .enumerate()
-            .map(|(i, name)| {
-                // Defaults apply to the last N fields.
-                let default_index = i.checked_sub(num_fields - num_defaults);
-                let default_ty = default_index.map(|idx| defaults[idx]);
-                (name, any_ty, default_ty)
-            })
-            .collect();
-
-        // Create the functional namedtuple type.
-        let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields);
-        Type::ClassLiteral(ClassLiteral::FunctionalNamedTuple(namedtuple))
+        Some(CollectionsNamedTupleFieldsSchema::new(
+            db,
+            field_names.into_boxed_slice(),
+        ))
     }
 
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
@@ -8064,6 +7847,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_typing_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::TypingNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_collections_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
+            tcx.annotation
+        {
+            for elt in elts {
+                self.infer_expression(elt, TypeContext::default());
+            }
+            let schema = CollectionsNamedTupleDefaultsSchema::new(self.db(), elts.len());
+            return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
+                schema,
+            ));
+        }
+
         // Remove any union elements of that are unrelated to the tuple type.
         let tcx = tcx.map(|annotation| {
             let inferable = KnownClass::Tuple
@@ -8111,6 +7926,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
             ctx: _,
         } = list;
+
+        if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_typing_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::TypingNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_collections_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
+            tcx.annotation
+        {
+            for elt in elts {
+                self.infer_expression(elt, TypeContext::default());
+            }
+            let schema = CollectionsNamedTupleDefaultsSchema::new(self.db(), elts.len());
+            return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
+                schema,
+            ));
+        }
 
         let elts = elts.iter().map(|elt| [Some(elt)]);
         let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);
@@ -8891,19 +8738,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     ) -> Type<'db> {
         let callable_type =
             self.infer_maybe_standalone_expression(&call_expression.func, TypeContext::default());
-
-        // Handle special forms like `typing.NamedTuple`.
-        if let Some(SpecialFormType::NamedTuple) = callable_type.as_special_form() {
-            return self.infer_functional_namedtuple_expression(call_expression, callable_type);
-        }
-
-        // Handle `collections.namedtuple`.
-        if callable_type
-            .as_function_literal()
-            .is_some_and(|f| f.is_known(self.db(), KnownFunction::NamedTuple))
-        {
-            return self.infer_collections_namedtuple_expression(call_expression, callable_type);
-        }
 
         self.infer_call_expression_impl(call_expression, callable_type, tcx)
     }

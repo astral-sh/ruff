@@ -130,6 +130,15 @@ pub enum SpecialFormType {
     /// Typeshed defines this symbol as a class, but this isn't accurate: it's actually a factory function
     /// at runtime. We therefore represent it as a special form internally.
     NamedTuple,
+
+    /// Internal annotation for `typing.NamedTuple` fields parameter.
+    TypingNamedTupleFieldsSchema,
+
+    /// Internal annotation for `collections.namedtuple` field names parameter.
+    CollectionsNamedTupleFieldsSchema,
+
+    /// Internal annotation for `collections.namedtuple` defaults parameter.
+    CollectionsNamedTupleDefaultsSchema,
 }
 
 impl SpecialFormType {
@@ -182,7 +191,12 @@ impl SpecialFormType {
             | Self::ChainMap
             | Self::OrderedDict => KnownClass::StdlibAlias,
 
-            Self::Unknown | Self::AlwaysTruthy | Self::AlwaysFalsy => KnownClass::Object,
+            Self::Unknown
+            | Self::AlwaysTruthy
+            | Self::AlwaysFalsy
+            | Self::TypingNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleDefaultsSchema => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -266,7 +280,10 @@ impl SpecialFormType {
             | Self::Bottom
             | Self::Intersection
             | Self::TypeOf
-            | Self::CallableTypeOf => module.is_ty_extensions(),
+            | Self::CallableTypeOf
+            | Self::TypingNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleDefaultsSchema => module.is_ty_extensions(),
         }
     }
 
@@ -327,7 +344,10 @@ impl SpecialFormType {
             | Self::ReadOnly
             | Self::Protocol
             | Self::Any
-            | Self::Generic => false,
+            | Self::Generic
+            | Self::TypingNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleDefaultsSchema => false,
         }
     }
 
@@ -382,7 +402,10 @@ impl SpecialFormType {
             | Self::Callable
             | Self::Protocol
             | Self::Generic
-            | Self::Unpack => None,
+            | Self::Unpack
+            | Self::TypingNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleDefaultsSchema => None,
         }
     }
 
@@ -434,7 +457,10 @@ impl SpecialFormType {
             | Self::Unknown
             | Self::TypeOf
             | Self::Any  // can be used in `issubclass()` but not `isinstance()`.
-            | Self::Unpack => false,
+            | Self::Unpack
+            | Self::TypingNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleFieldsSchema
+            | Self::CollectionsNamedTupleDefaultsSchema => false,
         }
     }
 
@@ -485,6 +511,13 @@ impl SpecialFormType {
             SpecialFormType::Protocol => "Protocol",
             SpecialFormType::Generic => "Generic",
             SpecialFormType::NamedTuple => "NamedTuple",
+            SpecialFormType::TypingNamedTupleFieldsSchema => "_TypingNamedTupleFieldsSchema",
+            SpecialFormType::CollectionsNamedTupleFieldsSchema => {
+                "_CollectionsNamedTupleFieldsSchema"
+            }
+            SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
+                "_CollectionsNamedTupleDefaultsSchema"
+            }
         }
     }
 
@@ -535,7 +568,10 @@ impl SpecialFormType {
             | SpecialFormType::TypeOf
             | SpecialFormType::CallableTypeOf
             | SpecialFormType::Top
-            | SpecialFormType::Bottom => &[KnownModule::TyExtensions],
+            | SpecialFormType::Bottom
+            | SpecialFormType::TypingNamedTupleFieldsSchema
+            | SpecialFormType::CollectionsNamedTupleFieldsSchema
+            | SpecialFormType::CollectionsNamedTupleDefaultsSchema => &[KnownModule::TyExtensions],
         }
     }
 

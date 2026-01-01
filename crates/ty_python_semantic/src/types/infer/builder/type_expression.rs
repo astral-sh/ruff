@@ -1033,6 +1033,13 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     }
                     Type::unknown()
                 }
+                // Internal types, should never appear in user code.
+                KnownInstanceType::TypingNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                    self.infer_type_expression(&subscript.slice);
+                    Type::unknown()
+                }
             },
             Type::Dynamic(DynamicType::UnknownGeneric(_)) => {
                 self.infer_explicit_type_alias_specialization(subscript, value_ty, true)
@@ -1588,7 +1595,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | SpecialFormType::TypedDict
             | SpecialFormType::Unknown
             | SpecialFormType::Any
-            | SpecialFormType::NamedTuple => {
+            | SpecialFormType::NamedTuple
+            | SpecialFormType::TypingNamedTupleFieldsSchema
+            | SpecialFormType::CollectionsNamedTupleFieldsSchema
+            | SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

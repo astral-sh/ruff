@@ -1461,6 +1461,20 @@ impl<'db> ClassType<'db> {
                 namedtuple.fields(db).iter().cloned(),
                 inherited_generic_context,
             ) {
+                // For fallback members from NamedTupleFallback, apply type mapping to handle
+                // `Self` in inherited namedtuple classes. The explicitly synthesized members
+                // (__new__, _fields, _replace, __replace__) don't need this mapping.
+                let ty = if matches!(name, "__new__" | "_fields" | "_replace" | "__replace__") {
+                    ty
+                } else {
+                    ty.apply_type_mapping(
+                        db,
+                        &TypeMapping::ReplaceSelf {
+                            new_upper_bound: namedtuple.to_instance(db),
+                        },
+                        TypeContext::default(),
+                    )
+                };
                 return Member {
                     inner: Place::bound(ty).into(),
                 };
@@ -5059,8 +5073,6 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     /// For example, `namedtuple("Point", [("x", int), ("y", int)])` inherits from `tuple[int, int]`.
     pub(crate) fn tuple_base_type(self, db: &'db dyn Db) -> ClassType<'db> {
         let field_types = self.fields(db).iter().map(|(_, ty, _)| *ty);
-        // Note: heterogeneous can return None for very large tuples, but namedtuples
-        // are typically small so we can expect this to succeed.
         TupleType::heterogeneous(db, field_types)
             .map(|t| t.to_class_type(db))
             .unwrap_or_else(|| {
@@ -5112,13 +5124,30 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
 
     /// Generate synthesized class members for namedtuples.
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
-        synthesize_namedtuple_class_member(
+        let instance_ty = self.to_instance(db);
+        let result = synthesize_namedtuple_class_member(
             db,
             name,
-            self.to_instance(db),
+            instance_ty,
             self.fields(db).iter().cloned(),
             None,
-        )
+        );
+        // For fallback members from NamedTupleFallback, apply type mapping to handle
+        // `Self` types. The explicitly synthesized members (__new__, _fields, _replace,
+        // __replace__) don't need this mapping.
+        if matches!(name, "__new__" | "_fields" | "_replace" | "__replace__") {
+            result
+        } else {
+            result.map(|ty| {
+                ty.apply_type_mapping(
+                    db,
+                    &TypeMapping::ReplaceSelf {
+                        new_upper_bound: instance_ty,
+                    },
+                    TypeContext::default(),
+                )
+            })
+        }
     }
 }
 

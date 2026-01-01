@@ -3769,6 +3769,7 @@ quux.<CURSOR>
         __eq__ :: bound method Quux.__eq__(value: object, /) -> bool
         __format__ :: bound method Quux.__format__(format_spec: str, /) -> str
         __ge__ :: bound method Quux.__ge__(value: tuple[int | str, ...], /) -> bool
+        __getattr__ :: bound method NamedTupleFallback.__getattr__(name: str, /) -> Any
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
         __getitem__ :: Overload[(index: Literal[-2, 0], /) -> int, (index: Literal[-1, 1], /) -> str, (index: SupportsIndex, /) -> int | str, (index: slice[Any, Any, Any], /) -> tuple[int | str, ...]]
         __getstate__ :: bound method Quux.__getstate__() -> object

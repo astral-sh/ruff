@@ -55,18 +55,16 @@ class TypedDictFallback(Mapping[str, object], metaclass=ABCMeta):
 class NamedTupleFallback(tuple[Any, ...]):
     _field_defaults: ClassVar[dict[str, Any]]
     _fields: ClassVar[tuple[str, ...]]
+    # Allow any attribute access since we don't know the actual fields.
+    def __getattr__(self, name: str, /) -> Any: ...
     # __orig_bases__ sometimes exists on <3.12, but not consistently
     # So we only add it to the stub on 3.12+.
     if sys.version_info >= (3, 12):
         __orig_bases__: ClassVar[tuple[Any, ...]]
 
-    @overload
-    def __init__(self, typename: str, fields: Iterable[tuple[str, Any]], /) -> None: ...
-    @overload
-    @typing_extensions.deprecated(
-        "Creating a typing.NamedTuple using keyword arguments is deprecated and support will be removed in Python 3.15"
-    )
-    def __init__(self, typename: str, fields: None = None, /, **kwargs: Any) -> None: ...
+    # For instance construction when field names are unknown: Point(1, 2).
+    def __new__(cls, *args: Any, **kwargs: Any) -> typing_extensions.Self: ...
+    def __init__(self, *args: Any, **kwargs: Any) -> None: ...
     @classmethod
     def _make(cls, iterable: Iterable[Any]) -> typing_extensions.Self: ...
     def _asdict(self) -> dict[str, Any]: ...

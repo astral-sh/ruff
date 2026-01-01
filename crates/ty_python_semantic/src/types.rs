@@ -2201,6 +2201,64 @@ impl<'db> Type<'db> {
                 })
             }
 
+            (
+                Type::KnownInstance(KnownInstanceType::TypingNamedTupleFieldsSchema(_)),
+                Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema),
+            ) if relation.is_assignability() => ConstraintSet::from(true),
+
+            // Iterable[tuple[str, type]] is assignable to TypingNamedTupleFieldsSchema.
+            // This allows passing fields via variables:
+            //
+            //   fields = [("x", int), ("y", int)]
+            //   NamedTuple("Point", fields)
+            //
+            // Without this, only literal lists would type-check.
+            (_, Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema))
+                if relation.is_assignability() =>
+            {
+                // Expected: Iterable[tuple[str, type[Any]]]
+                let field_tuple = Type::heterogeneous_tuple(
+                    db,
+                    [
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Type.to_specialized_instance(db, [Type::any()]),
+                    ],
+                );
+                let expected = KnownClass::Iterable.to_specialized_instance(db, [field_tuple]);
+                ConstraintSet::from(self.is_assignable_to(db, expected))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)),
+                Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema),
+            ) if relation.is_assignability() => ConstraintSet::from(true),
+
+            // str | Sequence[str] is assignable to CollectionsNamedTupleFieldsSchema.
+            // This allows passing field names via variables:
+            //
+            //   field_names = ["x", "y"]
+            //   namedtuple("Point", field_names)
+            //
+            // Without this, only literal lists/strings would type-check.
+            (_, Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema))
+                if relation.is_assignability() =>
+            {
+                let expected = UnionType::from_elements(
+                    db,
+                    [
+                        KnownClass::Str.to_instance(db),
+                        KnownClass::Sequence
+                            .to_specialized_instance(db, [KnownClass::Str.to_instance(db)]),
+                    ],
+                );
+                ConstraintSet::from(self.is_assignable_to(db, expected))
+            }
+
+            (
+                Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)),
+                Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema),
+            ) if relation.is_assignability() => ConstraintSet::from(true),
+
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             //
@@ -6065,6 +6123,37 @@ impl<'db> Type<'db> {
                     .into()
                 }
 
+                // collections.namedtuple(typename, field_names, ...)
+                Some(KnownFunction::NamedTuple) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("typename"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("field_names"))
+                                    .with_annotated_type(Type::SpecialForm(
+                                        SpecialFormType::CollectionsNamedTupleFieldsSchema,
+                                    )),
+                                // Additional optional parameters have defaults.
+                                Parameter::keyword_only(Name::new_static("rename"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("defaults"))
+                                    .with_annotated_type(Type::SpecialForm(
+                                        SpecialFormType::CollectionsNamedTupleDefaultsSchema,
+                                    ))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("module"))
+                                    .with_default_type(Type::none(db)),
+                            ],
+                        ),
+                        Some(KnownClass::NamedTupleFallback.to_class_literal(db)),
+                    ),
+                )
+                .into(),
+
                 _ => CallableBinding::from_overloads(
                     self,
                     function_type.signature(db).overloads.iter().cloned(),
@@ -6526,16 +6615,7 @@ impl<'db> Type<'db> {
             }
 
             Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                // typing.NamedTuple(typename: str, fields: Sequence[tuple[str, type]])
-                // The return type is set in bind.rs based on the actual arguments.
-                let field_tuple = Type::heterogeneous_tuple(
-                    db,
-                    [
-                        KnownClass::Str.to_instance(db),
-                        KnownClass::Type.to_instance(db),
-                    ],
-                );
-                let fields_type = KnownClass::Sequence.to_specialized_instance(db, [field_tuple]);
+                // typing.NamedTuple(typename: str, fields: _TypingNamedTupleFieldsSchema)
                 Binding::single(
                     self,
                     Signature::new(
@@ -6545,10 +6625,12 @@ impl<'db> Type<'db> {
                                 Parameter::positional_or_keyword(Name::new_static("typename"))
                                     .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 Parameter::positional_or_keyword(Name::new_static("fields"))
-                                    .with_annotated_type(fields_type),
+                                    .with_annotated_type(Type::SpecialForm(
+                                        SpecialFormType::TypingNamedTupleFieldsSchema,
+                                    )),
                             ],
                         ),
-                        None,
+                        Some(KnownClass::NamedTupleFallback.to_class_literal(db)),
                     ),
                 )
                 .into()
@@ -7676,6 +7758,10 @@ impl<'db> Type<'db> {
                 }
                 KnownInstanceType::Callable(callable) => Ok(Type::Callable(*callable)),
                 KnownInstanceType::LiteralStringAlias(ty) => Ok(ty.inner(db)),
+                // Internal types, should never appear in user code.
+                KnownInstanceType::TypingNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => Ok(Type::unknown()),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7809,6 +7895,11 @@ impl<'db> Type<'db> {
                     ],
                     fallback_type: Type::unknown(),
                 }),
+
+                // Internal types, should never appear in user code.
+                SpecialFormType::TypingNamedTupleFieldsSchema
+                | SpecialFormType::CollectionsNamedTupleFieldsSchema
+                | SpecialFormType::CollectionsNamedTupleDefaultsSchema => Ok(Type::unknown()),
             },
 
             Type::Union(union) => {
@@ -8085,7 +8176,10 @@ impl<'db> Type<'db> {
                 KnownInstanceType::Specialization(_) |
                 KnownInstanceType::Literal(_) |
                 KnownInstanceType::LiteralStringAlias(_) |
-                KnownInstanceType::NewType(_) => {
+                KnownInstanceType::NewType(_) |
+                KnownInstanceType::TypingNamedTupleFieldsSchema(_) |
+                KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) |
+                KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
@@ -8481,7 +8575,10 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::Specialization(_)
                 | KnownInstanceType::Literal(_)
                 | KnownInstanceType::LiteralStringAlias(_)
-                | KnownInstanceType::NewType(_) => {
+                | KnownInstanceType::NewType(_)
+                | KnownInstanceType::TypingNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -9151,6 +9248,15 @@ pub enum KnownInstanceType<'db> {
     /// An identity callable created with `typing.NewType(name, base)`, which behaves like a
     /// subtype of `base` in type expressions. See the `struct NewType` payload for an example.
     NewType(NewType<'db>),
+
+    /// Schema for `typing.NamedTuple` fields, extracted from a list or tuple literal.
+    TypingNamedTupleFieldsSchema(TypingNamedTupleFieldsSchema<'db>),
+
+    /// Schema for `collections.namedtuple` field names, extracted from a list or tuple literal.
+    CollectionsNamedTupleFieldsSchema(CollectionsNamedTupleFieldsSchema<'db>),
+
+    /// Schema for `collections.namedtuple` defaults count, extracted from a list or tuple literal.
+    CollectionsNamedTupleDefaultsSchema(CollectionsNamedTupleDefaultsSchema<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9197,6 +9303,15 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::NewType(newtype) => {
             visitor.visit_type(db, newtype.concrete_base_type(db));
         }
+        KnownInstanceType::TypingNamedTupleFieldsSchema(schema) => {
+            for (_, field_ty) in schema.fields(db) {
+                visitor.visit_type(db, *field_ty);
+            }
+        }
+        // CollectionsNamedTupleFieldsSchema only contains field names, no types to visit.
+        KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) => {}
+        // CollectionsNamedTupleDefaultsSchema only contains a count, no types to visit.
+        KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {}
     }
 }
 
@@ -9243,6 +9358,15 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Specialization(_) => {
                 // Nothing to normalize
                 self
+            }
+            Self::TypingNamedTupleFieldsSchema(schema) => {
+                Self::TypingNamedTupleFieldsSchema(schema.normalized_impl(db, visitor))
+            }
+            Self::CollectionsNamedTupleFieldsSchema(schema) => {
+                Self::CollectionsNamedTupleFieldsSchema(schema.normalized_impl(db, visitor))
+            }
+            Self::CollectionsNamedTupleDefaultsSchema(schema) => {
+                Self::CollectionsNamedTupleDefaultsSchema(schema.normalized_impl(db, visitor))
             }
         }
     }
@@ -9293,6 +9417,30 @@ impl<'db> KnownInstanceType<'db> {
             Self::Specialization(specialization) => specialization
                 .recursive_type_normalized_impl(db, div, true)
                 .map(Self::Specialization),
+            Self::TypingNamedTupleFieldsSchema(schema) => {
+                // Normalize the field types.
+                let normalized_fields: Option<Box<[_]>> = schema
+                    .fields(db)
+                    .iter()
+                    .map(|(name, ty)| {
+                        ty.recursive_type_normalized_impl(db, div, true)
+                            .map(|normalized_ty| (name.clone(), normalized_ty))
+                    })
+                    .collect();
+                normalized_fields.map(|fields| {
+                    Self::TypingNamedTupleFieldsSchema(TypingNamedTupleFieldsSchema::new(
+                        db, fields,
+                    ))
+                })
+            }
+            // CollectionsNamedTupleFieldsSchema only contains field names, no types to normalize.
+            Self::CollectionsNamedTupleFieldsSchema(schema) => {
+                Some(Self::CollectionsNamedTupleFieldsSchema(schema))
+            }
+            // CollectionsNamedTupleDefaultsSchema only contains a count, no types to normalize.
+            Self::CollectionsNamedTupleDefaultsSchema(schema) => {
+                Some(Self::CollectionsNamedTupleDefaultsSchema(schema))
+            }
         }
     }
 
@@ -9319,6 +9467,10 @@ impl<'db> KnownInstanceType<'db> {
             | Self::Callable(_) => KnownClass::GenericAlias,
             Self::LiteralStringAlias(_) => KnownClass::Str,
             Self::NewType(_) => KnownClass::NewType,
+            // Internal types, no corresponding known class.
+            Self::TypingNamedTupleFieldsSchema(_)
+            | Self::CollectionsNamedTupleFieldsSchema(_)
+            | Self::CollectionsNamedTupleDefaultsSchema(_) => KnownClass::Object,
         }
     }
 
@@ -9819,6 +9971,63 @@ impl<'db> FieldInstance<'db> {
             self.kw_only(db),
             self.alias(db),
         ))
+    }
+}
+
+/// Schema for `typing.NamedTuple` fields, extracted from a list or tuple literal.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypingNamedTupleFieldsSchema<'db> {
+    #[returns(ref)]
+    pub fields: Box<[(Name, Type<'db>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypingNamedTupleFieldsSchema<'_> {}
+
+impl<'db> TypingNamedTupleFieldsSchema<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        TypingNamedTupleFieldsSchema::new(
+            db,
+            self.fields(db)
+                .iter()
+                .map(|(name, ty)| (name.clone(), ty.normalized_impl(db, visitor)))
+                .collect::<Box<[_]>>(),
+        )
+    }
+}
+
+/// Schema for `collections.namedtuple` field names, extracted from a list or tuple literal.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct CollectionsNamedTupleFieldsSchema<'db> {
+    #[returns(ref)]
+    pub field_names: Box<[Name]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CollectionsNamedTupleFieldsSchema<'_> {}
+
+impl CollectionsNamedTupleFieldsSchema<'_> {
+    pub(crate) fn normalized_impl(self, _db: &dyn Db, _visitor: &NormalizedVisitor<'_>) -> Self {
+        // Field names don't contain types, so no normalization needed.
+        self
+    }
+}
+
+/// Schema for `collections.namedtuple` defaults count, extracted from a list or tuple literal.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct CollectionsNamedTupleDefaultsSchema<'db> {
+    pub count: usize,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for CollectionsNamedTupleDefaultsSchema<'_> {}
+
+impl CollectionsNamedTupleDefaultsSchema<'_> {
+    pub(crate) fn normalized_impl(self, _db: &dyn Db, _visitor: &NormalizedVisitor<'_>) -> Self {
+        self
     }
 }
 

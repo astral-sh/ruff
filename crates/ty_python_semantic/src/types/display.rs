@@ -2614,6 +2614,46 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                 f.with_type(ty).write_str(declaration.name(self.db))?;
                 f.write_str("'>")
             }
+            KnownInstanceType::TypingNamedTupleFieldsSchema(schema) => {
+                f.set_invalid_type_annotation();
+                f.write_str("<namedtuple-fields-schema [")?;
+                let mut first = true;
+                for (name, field_ty) in schema.fields(self.db) {
+                    if first {
+                        first = false;
+                    } else {
+                        f.write_str(", ")?;
+                    }
+                    write!(
+                        f.with_type(*field_ty),
+                        "({name}, {})",
+                        field_ty.display(self.db)
+                    )?;
+                }
+                f.write_str("]>")
+            }
+            KnownInstanceType::CollectionsNamedTupleFieldsSchema(schema) => {
+                f.set_invalid_type_annotation();
+                f.write_str("<namedtuple-field-names-schema [")?;
+                let mut first = true;
+                for name in schema.field_names(self.db) {
+                    if first {
+                        first = false;
+                    } else {
+                        f.write_str(", ")?;
+                    }
+                    write!(f, "{name}")?;
+                }
+                f.write_str("]>")
+            }
+            KnownInstanceType::CollectionsNamedTupleDefaultsSchema(schema) => {
+                f.set_invalid_type_annotation();
+                write!(
+                    f,
+                    "<namedtuple-defaults-schema count={}>",
+                    schema.count(self.db)
+                )
+            }
         }
     }
 }

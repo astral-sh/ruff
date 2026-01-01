@@ -17,6 +17,8 @@ use std::fmt;
 use itertools::Itertools;
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::name::Name;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::is_keyword;
 use rustc_hash::{FxHashMap, FxHashSet};
 use smallvec::{SmallVec, smallvec, smallvec_inline};
 
@@ -1176,6 +1178,122 @@ impl<'db> Bindings<'db> {
                             }
                         }
 
+                        // collections.namedtuple
+                        Some(KnownFunction::NamedTuple) => {
+                            if let [Some(name_type), Some(field_names_type), ..] =
+                                overload.parameter_types()
+                            {
+                                let name = name_type
+                                    .as_string_literal()
+                                    .map(|s| Name::new(s.value(db)));
+
+                                // Check if field_names_type is a CollectionsNamedTupleFieldsSchema.
+                                let field_names: Option<Box<[Name]>> = if let Type::KnownInstance(
+                                    KnownInstanceType::CollectionsNamedTupleFieldsSchema(schema),
+                                ) = field_names_type
+                                {
+                                    Some(schema.field_names(db).clone())
+                                } else if let Some(string_literal) =
+                                    field_names_type.as_string_literal()
+                                {
+                                    // Handle space/comma-separated string.
+                                    // Python's namedtuple replaces commas with spaces first,
+                                    // then splits on whitespace.
+                                    let field_str = string_literal.value(db);
+                                    Some(
+                                        field_str
+                                            .replace(',', " ")
+                                            .split_whitespace()
+                                            .map(Name::new)
+                                            .collect(),
+                                    )
+                                } else {
+                                    None
+                                };
+
+                                // Check if `rename=True`.
+                                let rename = matches!(
+                                    overload.parameter_type_by_name("rename", false),
+                                    Ok(Some(Type::BooleanLiteral(true)))
+                                );
+
+                                // Extract defaults count from the defaults parameter.
+                                // If it's a CollectionsNamedTupleDefaultsSchema, we can get the count directly.
+                                let num_defaults: usize = overload
+                                    .parameter_type_by_name("defaults", false)
+                                    .ok()
+                                    .flatten()
+                                    .and_then(|ty| {
+                                        if let Type::KnownInstance(
+                                            KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
+                                                schema,
+                                            ),
+                                        ) = ty
+                                        {
+                                            Some(schema.count(db))
+                                        } else {
+                                            None
+                                        }
+                                    })
+                                    .unwrap_or(0);
+
+                                if let (Some(name), Some(mut field_names)) = (name, field_names) {
+                                    // Apply rename logic if `rename=True`.
+                                    if rename {
+                                        let mut seen_names = FxHashSet::<&str>::default();
+                                        for (i, field_name) in field_names.iter_mut().enumerate() {
+                                            let name_str = field_name.as_str();
+                                            // Rename if: starts with underscore, is a keyword,
+                                            // is not a valid identifier, or is a duplicate.
+                                            let needs_rename = name_str.starts_with('_')
+                                                || is_keyword(name_str)
+                                                || !is_identifier(name_str)
+                                                || seen_names.contains(name_str);
+                                            if needs_rename {
+                                                *field_name = Name::new(format!("_{i}"));
+                                            }
+                                            seen_names.insert(field_name.as_str());
+                                        }
+                                    }
+
+                                    // Build fields: All fields have type `Any` for collections.namedtuple.
+                                    // Fields at the end get defaults from the `defaults` parameter.
+                                    let num_fields = field_names.len();
+                                    let fields: Box<[(Name, Type<'db>, Option<Type<'db>>)]> =
+                                        field_names
+                                            .iter()
+                                            .enumerate()
+                                            .map(|(i, field_name)| {
+                                                // Defaults apply to the rightmost fields.
+                                                // We use `Type::any()` for the default type since all fields are `Any`.
+                                                let default = if num_defaults > 0
+                                                    && i >= num_fields - num_defaults
+                                                {
+                                                    Some(Type::any())
+                                                } else {
+                                                    None
+                                                };
+                                                (field_name.clone(), Type::any(), default)
+                                            })
+                                            .collect();
+
+                                    let namedtuple =
+                                        FunctionalNamedTupleLiteral::new(db, name, fields);
+                                    overload.set_return_type(Type::ClassLiteral(
+                                        ClassLiteral::FunctionalNamedTuple(namedtuple),
+                                    ));
+                                } else {
+                                    overload.set_return_type(
+                                        KnownClass::NamedTupleFallback.to_class_literal(db),
+                                    );
+                                }
+                            } else {
+                                overload.set_return_type(
+                                    KnownClass::NamedTupleFallback.to_class_literal(db),
+                                );
+                            }
+                        }
+
                         _ => {
                             // Ideally, either the implementation, or exactly one of the overloads
                             // of the function can have the dataclass_transform decorator applied.
@@ -1460,63 +1578,75 @@ impl<'db> Bindings<'db> {
                     }
 
                     Type::SpecialForm(SpecialFormType::NamedTuple) => {
-                        // Functional NamedTuple synthesis for list/tuple literals is handled
-                        // in builder.rs via AST inspection (since list types don't preserve
-                        // element order). This handler covers the case where fields are passed
-                        // via a variable with a known tuple type:
-                        //
-                        //   fields = (("x", int), ("y", str))
-                        //   NamedTuple("Foo", fields)
-                        //
-                        // Here, builder.rs can't extract the fields (no literal), but we can
-                        // extract them from the tuple type.
                         if let [Some(name_type), Some(fields_type), ..] = overload.parameter_types()
                         {
                             let name = name_type
                                 .as_string_literal()
                                 .map(|s| Name::new(s.value(db)));
 
-                            let extract_field = |field_tuple: &Type<'db>| -> Option<(
-                                Name,
-                                Type<'db>,
-                                Option<Type<'db>>,
-                            )> {
-                                let field_spec = field_tuple.exact_tuple_instance_spec(db)?;
-                                let elements: Vec<_> = field_spec.fixed_elements().collect();
-                                if elements.len() != 2 {
-                                    return None;
-                                }
-                                let field_name = elements[0]
-                                    .as_string_literal()
-                                    .map(|s| Name::new(s.value(db)))?;
-                                let field_ty = elements[1];
-                                let resolved_ty = match field_ty {
-                                    Type::ClassLiteral(class) => class.to_non_generic_instance(db),
-                                    Type::GenericAlias(alias) => {
-                                        Type::instance(db, ClassType::Generic(*alias))
-                                    }
-                                    Type::SubclassOf(subclass_of) => {
-                                        match subclass_of.subclass_of() {
-                                            SubclassOfInner::Class(class) => {
-                                                Type::instance(db, class)
-                                            }
-                                            _ => *field_ty,
-                                        }
-                                    }
-                                    ty => *ty,
-                                };
-                                Some((field_name, resolved_ty, None))
-                            };
-
+                            // Check if fields_type is a TypingNamedTupleFieldsSchema (from literal inference).
                             let fields: Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> =
-                                fields_type
-                                    .exact_tuple_instance_spec(db)
-                                    .and_then(|tuple_spec| {
-                                        tuple_spec
-                                            .fixed_elements()
-                                            .map(extract_field)
-                                            .collect::<Option<Box<[_]>>>()
-                                    });
+                                if let Type::KnownInstance(
+                                    KnownInstanceType::TypingNamedTupleFieldsSchema(schema),
+                                ) = fields_type
+                                {
+                                    // Extract fields from the schema.
+                                    Some(
+                                        schema
+                                            .fields(db)
+                                            .iter()
+                                            .map(|(name, ty)| (name.clone(), *ty, None))
+                                            .collect(),
+                                    )
+                                } else {
+                                    // Fall back to extracting from a tuple type for the variable case:
+                                    //   fields = (("x", int), ("y", str))
+                                    //   NamedTuple("Foo", fields)
+                                    let extract_field = |field_tuple: &Type<'db>| -> Option<(
+                                        Name,
+                                        Type<'db>,
+                                        Option<Type<'db>>,
+                                    )> {
+                                        let field_spec =
+                                            field_tuple.exact_tuple_instance_spec(db)?;
+                                        let elements: Vec<_> =
+                                            field_spec.fixed_elements().collect();
+                                        if elements.len() != 2 {
+                                            return None;
+                                        }
+                                        let field_name = elements[0]
+                                            .as_string_literal()
+                                            .map(|s| Name::new(s.value(db)))?;
+                                        let field_ty = elements[1];
+                                        let resolved_ty = match field_ty {
+                                            Type::ClassLiteral(class) => {
+                                                class.to_non_generic_instance(db)
+                                            }
+                                            Type::GenericAlias(alias) => {
+                                                Type::instance(db, ClassType::Generic(*alias))
+                                            }
+                                            Type::SubclassOf(subclass_of) => {
+                                                match subclass_of.subclass_of() {
+                                                    SubclassOfInner::Class(class) => {
+                                                        Type::instance(db, class)
+                                                    }
+                                                    _ => *field_ty,
+                                                }
+                                            }
+                                            ty => *ty,
+                                        };
+                                        Some((field_name, resolved_ty, None))
+                                    };
+
+                                    fields_type.exact_tuple_instance_spec(db).and_then(
+                                        |tuple_spec| {
+                                            tuple_spec
+                                                .fixed_elements()
+                                                .map(extract_field)
+                                                .collect::<Option<Box<[_]>>>()
+                                        },
+                                    )
+                                };
 
                             if let (Some(name), Some(fields)) = (name, fields) {
                                 let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields);
