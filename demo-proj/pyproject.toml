@@ -1,0 +1,13 @@
+[tool.ruff.lint]
+select = [
+    "I",
+    "E",
+    "W",
+]
+
+extend-safe-fixes = ["E402"]
+
+[tool.ruff.lint.isort]
+combine-as-imports = true
+
+# float_to_top = true
