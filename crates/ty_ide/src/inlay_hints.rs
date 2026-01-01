@@ -7526,7 +7526,6 @@ mod tests {
         );
 
         assert_snapshot!(test.inlay_hints(), @r#"
-
         def f(xyxy: object):
             if isinstance(xyxy, list):
                 x[: Top[list[Unknown]]] = xyxy
@@ -7589,6 +7588,8 @@ mod tests {
         ---------------------------------------------
         info[inlay-hint-edit]: File after edits
         info: Source
+        from ty_extensions import Top
+        from ty_extensions import Unknown
 
         def f(xyxy: object):
             if isinstance(xyxy, list):
