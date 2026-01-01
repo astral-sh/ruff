@@ -5,6 +5,7 @@ including read() and readline().  The typical response object is an
 addinfourl instance, which defines an info() method that returns
 headers and a geturl() method that returns the url.
 """
+
 import tempfile
 from _typeshed import ReadableBuffer
 from collections.abc import Callable, Iterable
@@ -16,6 +17,7 @@ __all__ = ["addbase", "addclosehook", "addinfo", "addinfourl"]
 
 class addbase(tempfile._TemporaryFileWrapper[bytes]):
     """Base class for addinfo and addclosehook. Is a good idea for garbage collection."""
+
     fp: IO[bytes]
     def __init__(self, fp: IO[bytes]) -> None: ...
     def __exit__(
@@ -30,18 +32,21 @@ class addbase(tempfile._TemporaryFileWrapper[bytes]):
 
 class addclosehook(addbase):
     """Class to add a close hook to an open file."""
+
     closehook: Callable[..., object]
     hookargs: tuple[Any, ...]
     def __init__(self, fp: IO[bytes], closehook: Callable[..., object], *hookargs: Any) -> None: ...
 
 class addinfo(addbase):
     """class to add an info() method to an open file."""
+
     headers: Message
     def __init__(self, fp: IO[bytes], headers: Message) -> None: ...
     def info(self) -> Message: ...
 
 class addinfourl(addinfo):
     """class to add info() and geturl() methods to an open file."""
+
     url: str
     code: int | None
     @property

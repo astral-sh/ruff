@@ -1,4 +1,5 @@
 """Common code between queues and channels."""
+
 import sys
 from collections.abc import Callable
 from typing import Final, NewType
@@ -9,6 +10,7 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
 
     class ItemInterpreterDestroyed(Exception):
         """Raised when trying to get an item whose interpreter was destroyed."""
+
     # Actually a descriptor that behaves similarly to classmethod but prevents
     # access from instances.
     classonly = classmethod
@@ -16,9 +18,10 @@ if sys.version_info >= (3, 13):  # needed to satisfy pyright checks for Python <
     class UnboundItem:
         """Represents a cross-interpreter item no longer bound to an interpreter.
 
-An item is unbound when the interpreter that added it to the
-cross-interpreter container is destroyed.
-"""
+        An item is unbound when the interpreter that added it to the
+        cross-interpreter container is destroyed.
+        """
+
         __slots__ = ()
         def __new__(cls) -> Never: ...
         @classonly
