@@ -73,3 +73,23 @@ pub fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&IGNORE_COMMENT_UNKNOWN_RULE);
     registry.register_lint(&INVALID_IGNORE_COMMENT);
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
+pub struct AnalysisSettings {
+    /// Whether errors can be suppressed with `type: ignore` comments.
+    ///
+    /// If set to false, ty won't:
+    ///
+    /// * allow suppressing errors with `type: ignore` comments
+    /// * report unused `type: ignore` comments
+    /// * report invalid `type: ignore` comments
+    pub respect_type_ignore_comments: bool,
+}
+
+impl Default for AnalysisSettings {
+    fn default() -> Self {
+        Self {
+            respect_type_ignore_comments: true,
+        }
+    }
+}

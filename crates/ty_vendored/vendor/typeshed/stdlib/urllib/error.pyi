@@ -21,6 +21,8 @@ class URLError(OSError):
     reason: str | BaseException
     # The `filename` attribute only exists if it was provided to `__init__` and wasn't `None`.
     filename: str
+    """exception filename"""
+
     def __init__(self, reason: str | BaseException, filename: str | None = None) -> None: ...
 
 class HTTPError(URLError, addinfourl):

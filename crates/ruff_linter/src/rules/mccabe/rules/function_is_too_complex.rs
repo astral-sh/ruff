@@ -503,7 +503,7 @@ def f():
     }
 
     #[test]
-    fn match_case_catch_all_with_seuqnece() -> Result<()> {
+    fn match_case_catch_all_with_sequence() -> Result<()> {
         let source = r"
 def f():
     match subject:

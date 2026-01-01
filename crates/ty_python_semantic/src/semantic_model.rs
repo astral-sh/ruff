@@ -106,7 +106,7 @@ impl<'db> SemanticModel<'db> {
 
     /// Returns completions for symbols available in a `import <CURSOR>` context.
     pub fn import_completions(&self) -> Vec<Completion<'db>> {
-        let typing_extensions = ModuleName::new("typing_extensions").unwrap();
+        let typing_extensions = ModuleName::new_static("typing_extensions").unwrap();
         let is_typing_extensions_available = self.file.is_stub(self.db)
             || resolve_real_shadowable_module(self.db, self.file, &typing_extensions).is_some();
         list_modules(self.db)
@@ -235,7 +235,7 @@ impl<'db> SemanticModel<'db> {
             );
         }
         // Builtins are available in all scopes.
-        let builtins = ModuleName::new("builtins").expect("valid module name");
+        let builtins = ModuleName::new_static("builtins").expect("valid module name");
         completions.extend(self.module_completions(&builtins));
         completions
     }

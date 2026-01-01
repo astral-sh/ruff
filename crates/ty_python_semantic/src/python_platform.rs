@@ -1,4 +1,5 @@
 use std::fmt::{Display, Formatter};
+use ty_combine::Combine;
 
 /// The target platform to assume when resolving types.
 #[derive(Debug, Clone, PartialEq, Eq, get_size2::GetSize)]
@@ -52,6 +53,10 @@ impl Default for PythonPlatform {
             PythonPlatform::Identifier("linux".to_string())
         }
     }
+}
+
+impl Combine for PythonPlatform {
+    fn combine_with(&mut self, _other: Self) {}
 }
 
 #[cfg(feature = "schemars")]

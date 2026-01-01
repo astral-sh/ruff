@@ -224,7 +224,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -291,7 +291,7 @@ where
             // Test again if the request was cancelled since it was scheduled on the background task
             // and, if so, return early
             if cancellation_token.is_cancelled() {
-                tracing::trace!(
+                tracing::debug!(
                     "Ignoring request id={id} method={} because it was cancelled",
                     R::METHOD
                 );
@@ -325,14 +325,14 @@ fn panic_response<R>(
         // If the query supports retry, re-queue the request.
         // The query is still likely to succeed if the user modified any other document.
         if let Some(request) = request {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} method={} was cancelled by salsa, re-queueing for retry",
                 request.id,
                 request.method
             );
             client.retry(request);
         } else {
-            tracing::trace!(
+            tracing::debug!(
                 "request id={} was cancelled by salsa, sending content modified",
                 id
             );

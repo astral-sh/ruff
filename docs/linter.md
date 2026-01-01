@@ -188,7 +188,7 @@ IndexError: list index out of range
 ```
 
 ```console
-$ python -c 'next(iter(range(0)))[0]'
+$ python -c 'next(iter(range(0)))'
 Traceback (most recent call last):
   File "<string>", line 1, in <module>
 StopIteration

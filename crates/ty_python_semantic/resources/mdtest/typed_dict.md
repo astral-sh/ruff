@@ -1446,7 +1446,7 @@ class TaggedData(TypedDict, Generic[T]):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData[int]`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items(TypedDict, Generic[T]):
@@ -1488,7 +1488,7 @@ class TaggedData[T](TypedDict):
 p1: TaggedData[int] = {"data": 42, "tag": "number"}
 p2: TaggedData[str] = {"data": "Hello", "tag": "text"}
 
-# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData`: value of type `Literal["not a number"]`"
+# error: [invalid-argument-type] "Invalid argument to key "data" with declared type `int` on TypedDict `TaggedData[int]`: value of type `Literal["not a number"]`"
 p3: TaggedData[int] = {"data": "not a number", "tag": "number"}
 
 class Items[T](TypedDict):
@@ -2019,5 +2019,214 @@ static_assert(is_disjoint_from(TD, dict[str, int]))  # error: [static-assert-err
 static_assert(is_disjoint_from(TD, dict[str, str]))  # error: [static-assert-error]
 ```
 
+## Narrowing tagged unions of `TypedDict`s
+
+In a tagged union of `TypedDict`s, a common field in each member (often `"type"` or `"tag"`) is
+given a distinct `Literal` type/value. We can narrow the union by constraining this field:
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal[42]
+
+class Baz(TypedDict):
+    tag: Literal[b"baz"]  # `BytesLiteral` is supported.
+
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def _(u: Foo | Bar | Baz | Bing):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    elif u["tag"] == 42:
+        reveal_type(u)  # revealed: Bar
+    elif u["tag"] == b"baz":
+        reveal_type(u)  # revealed: Baz
+    else:
+        reveal_type(u)  # revealed: Bing
+```
+
+We can descend into intersections to discover `TypedDict` types that need narrowing:
+
+```py
+from collections.abc import Mapping
+from ty_extensions import Intersection
+
+def _(u: Foo | Intersection[Bar, Mapping[str, int]]):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Bar & Mapping[str, int]
+```
+
+We can also narrow a single `TypedDict` type to `Never`:
+
+```py
+def _(u: Foo):
+    if u["tag"] == "foo":
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tags, though, because `x == "foo"` doesn't generally tell us
+anything about the type of `x`. Here's an example where narrowing would be tempting but unsound:
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+
+class NonLiteralTD(TypedDict):
+    tag: int
+
+def _(u: Foo | NonLiteralTD):
+    if u["tag"] == "foo":
+        # We can't narrow the union here...
+        reveal_type(u)  # revealed: Foo | NonLiteralTD
+    else:
+        # ...(even though we can here)...
+        reveal_type(u)  # revealed: NonLiteralTD
+
+# ...because `NonLiteralTD["tag"]` could be assigned to with one of these, which would make the
+# first condition above true at runtime!
+class WackyInt(int):
+    def __eq__(self, other):
+        return True
+
+_: NonLiteralTD = {"tag": WackyInt(99)}  # allowed
+```
+
+We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
+
+```py
+def _(u: Foo | Bar | dict):
+    if u["tag"] == "foo":
+        # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
+        # false negative in `is_disjoint_impl`.
+        reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+
+# The negation(s) will simplify out if we add something to the union that doesn't inherit from
+# `dict`. It just needs to support indexing with a string key.
+class NotADict:
+    def __getitem__(self, key): ...
+
+def _(u: Foo | Bar | NotADict):
+    if u["tag"] == 42:
+        reveal_type(u)  # revealed: Bar | NotADict
+```
+
+It would be nice if we could also narrow `TypedDict` unions by checking whether a key (which only
+shows up in a subset of the union members) is present, but that isn't generally correct, because
+"extra items" are allowed by default. For example, even though `Bar` here doesn't define a `"foo"`
+field, it could be *assigned to* with another `TypedDict` that does:
+
+```py
+class Foo(TypedDict):
+    foo: int
+
+class Bar(TypedDict):
+    bar: int
+
+def disappointment(u: Foo | Bar):
+    if "foo" in u:
+        # We can't narrow the union here...
+        reveal_type(u)  # revealed: Foo | Bar
+    else:
+        # ...(even though we *can* narrow it here)...
+        # TODO: This should narrow to `Bar`, because "foo" is required in `Foo`.
+        reveal_type(u)  # revealed: Foo | Bar
+
+# ...because `u` could turn out to be one of these.
+class FooBar(TypedDict):
+    foo: int
+    bar: int
+
+static_assert(is_assignable_to(FooBar, Foo))
+static_assert(is_assignable_to(FooBar, Bar))
+```
+
+TODO: The narrowing that we didn't do above will become possible when we add support for
+`closed=True`. This is [one of the main use cases][closed] that motivated the `closed` feature.
+
+## Narrowing tagged unions of `TypedDict`s with `match` statements
+
+Just like with `if` statements, we can narrow tagged unions of `TypedDict`s in `match` statements:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal[42]
+
+class Baz(TypedDict):
+    tag: Literal[b"baz"]
+
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def match_statements(u: Foo | Bar | Baz | Bing):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case 42:
+            reveal_type(u)  # revealed: Bar
+        case b"baz":
+            reveal_type(u)  # revealed: Baz
+        case _:
+            reveal_type(u)  # revealed: Bing
+```
+
+We can also narrow a single `TypedDict` type to `Never`:
+
+```py
+def match_single(u: Foo):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case _:
+            reveal_type(u)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tags:
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+
+class NonLiteralTD(TypedDict):
+    tag: int
+
+def match_non_literal(u: Foo | NonLiteralTD):
+    match u["tag"]:
+        case "foo":
+            # We can't narrow the union here...
+            reveal_type(u)  # revealed: Foo | NonLiteralTD
+        case _:
+            # ...(but we *can* narrow here)...
+            reveal_type(u)  # revealed: NonLiteralTD
+```
+
+We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
+
+```py
+def match_with_dict(u: Foo | Bar | dict):
+    match u["tag"]:
+        case "foo":
+            # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
+            # false negative in `is_disjoint_impl`.
+            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
+
+[closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html

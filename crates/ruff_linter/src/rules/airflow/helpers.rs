@@ -188,7 +188,7 @@ pub(crate) fn match_head(value: &Expr) -> Option<&ExprName> {
 
 /// Return the [`Fix`] that imports the new name and updates where the import is referenced.
 /// This is used for cases that member name has changed.
-/// (e.g., `airflow.datasts.Dataset` to `airflow.sdk.Asset`)
+/// (e.g., `airflow.datasets.Dataset` to `airflow.sdk.Asset`)
 pub(crate) fn generate_import_edit(
     expr: &Expr,
     checker: &Checker,

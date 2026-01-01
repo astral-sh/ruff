@@ -72,32 +72,32 @@ from typing import TypeVar, Protocol, TypedDict
 
 type B = ...
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
 reveal_type(B[int])  # revealed: Unknown
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(b: B[int]):
     reveal_type(b)  # revealed: Unknown
 
 type IntOrStr = int | str
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(c: IntOrStr[int]):
     reveal_type(c)  # revealed: Unknown
 
 type ListOfInts = list[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[int]` is already specialized"
 def _(l: ListOfInts[int]):
     reveal_type(l)  # revealed: Unknown
 
 type List[T] = list[T]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: Double specialization is not allowed"
 def _(l: List[int][int]):
     reveal_type(l)  # revealed: Unknown
 
-# error: [non-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type: `<class 'list[T@DoubleSpecialization]'>` is already specialized"
 type DoubleSpecialization[T] = list[T][T]
 
 def _(d: DoubleSpecialization[int]):
@@ -105,7 +105,7 @@ def _(d: DoubleSpecialization[int]):
 
 type Tuple = tuple[int, str]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `tuple[int, str]` is already specialized"
 def _(doubly_specialized: Tuple[int]):
     reveal_type(doubly_specialized)  # revealed: Unknown
 
@@ -116,7 +116,7 @@ class LegacyProto(Protocol[T]):
 
 type LegacyProtoInt = LegacyProto[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `LegacyProto[int]` is already specialized"
 def _(x: LegacyProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -125,7 +125,7 @@ class Proto[T](Protocol):
 
 type ProtoInt = Proto[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Proto[int]` is already specialized"
 def _(x: ProtoInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -135,7 +135,7 @@ class LegacyDict(TypedDict[T]):
 
 type LegacyDictInt = LegacyDict[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias"
 def _(x: LegacyDictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
@@ -144,13 +144,13 @@ class Dict[T](TypedDict):
 
 type DictInt = Dict[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `Dict` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `Dict[int]` is already specialized"
 def _(x: DictInt[int]):
     reveal_type(x)  # revealed: Unknown
 
 type Union = list[str] | list[int]
 
-# error: [non-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
+# error: [not-subscriptable] "Cannot subscript non-generic type alias: `list[str] | list[int]` is already specialized"
 def _(x: Union[int]):
     reveal_type(x)  # revealed: Unknown
 ```

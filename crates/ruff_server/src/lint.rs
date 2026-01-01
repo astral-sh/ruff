@@ -243,7 +243,7 @@ fn to_lsp_diagnostic(
 ) -> (usize, lsp_types::Diagnostic) {
     let diagnostic_range = diagnostic.range().unwrap_or_default();
     let name = diagnostic.name();
-    let body = diagnostic.body().to_string();
+    let body = diagnostic.concise_message().to_string();
     let fix = diagnostic.fix();
     let suggestion = diagnostic.first_help_text();
     let code = diagnostic.secondary_code();

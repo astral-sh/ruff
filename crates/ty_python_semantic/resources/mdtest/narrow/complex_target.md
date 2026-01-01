@@ -197,15 +197,181 @@ def _(t1: tuple[int | None, int | None], t2: tuple[int, int] | tuple[None, None]
 
     n = 0
     if t1[n] is not None:
-        # Non-literal subscript narrowing are currently not supported, as well as mypy, pyright
+        # Narrowing the individual element type with a non-literal subscript is not supported
         reveal_type(t1[0])  # revealed: int | None
         reveal_type(t1[n])  # revealed: int | None
         reveal_type(t1[1])  # revealed: int | None
 
+    # However, we can still discriminate between tuples in a union using a variable index:
+    if t2[n] is not None:
+        reveal_type(t2)  # revealed: tuple[int, int]
+
     if t2[0] is not None:
+        reveal_type(t2)  # revealed: tuple[int, int]
         reveal_type(t2[0])  # revealed: int
-        # TODO: should be int
-        reveal_type(t2[1])  # revealed: int | None
+        reveal_type(t2[1])  # revealed: int
+    else:
+        reveal_type(t2)  # revealed: tuple[None, None]
+        reveal_type(t2[0])  # revealed: None
+        reveal_type(t2[1])  # revealed: None
+
+    if t2[0] is None:
+        reveal_type(t2)  # revealed: tuple[None, None]
+    else:
+        reveal_type(t2)  # revealed: tuple[int, int]
+
+def _(t3: tuple[int, str] | tuple[None, None] | tuple[bool, bytes]):
+    # Narrow to tuples where first element is not None
+    if t3[0] is not None:
+        reveal_type(t3)  # revealed: tuple[int, str] | tuple[bool, bytes]
+
+    # Narrow to tuples where first element is None
+    if t3[0] is None:
+        reveal_type(t3)  # revealed: tuple[None, None]
+
+def _(t4: tuple[bool, int] | tuple[bool, str]):
+    # Both tuples have bool at index 0, which is not disjoint from True,
+    # so neither gets filtered out when checking `is True`
+    if t4[0] is True:
+        reveal_type(t4)  # revealed: tuple[bool, int] | tuple[bool, str]
+
+def _(t5: tuple[int, None] | tuple[None, int]):
+    # Narrow on second element (index 1)
+    if t5[1] is not None:
+        reveal_type(t5)  # revealed: tuple[None, int]
+    else:
+        reveal_type(t5)  # revealed: tuple[int, None]
+
+    # Negative index
+    if t5[-1] is None:
+        reveal_type(t5)  # revealed: tuple[int, None]
+
+def _(t6: tuple[int, ...] | tuple[None, None]):
+    # Variadic tuple at index 0 has element type `int` (not a union),
+    # so `tuple[None, None]` gets filtered out
+    if t6[0] is not None:
+        reveal_type(t6)  # revealed: tuple[int, ...]
+
+def _(t6b: tuple[int, ...] | tuple[None, ...]):
+    # Both variadic: `int` is disjoint from None, `None` is not disjoint from None
+    if t6b[0] is not None:
+        reveal_type(t6b)  # revealed: tuple[int, ...]
+    else:
+        reveal_type(t6b)  # revealed: tuple[None, ...]
+
+def _(t7: tuple[int, int] | tuple[None, None]):
+    # Index out of range for both tuples - no narrowing, but errors are emitted
+    # error: [index-out-of-bounds] "Index 5 is out of bounds for tuple `tuple[int, int]` with length 2"
+    # error: [index-out-of-bounds] "Index 5 is out of bounds for tuple `tuple[None, None]` with length 2"
+    if t7[5] is not None:
+        reveal_type(t7)  # revealed: tuple[int, int] | tuple[None, None]
+
+def _(t8: tuple[int, int, int] | tuple[None, None]):
+    # Index in range for first tuple but out of range for second
+    # error: [index-out-of-bounds] "Index 2 is out of bounds for tuple `tuple[None, None]` with length 2"
+    if t8[2] is not None:
+        reveal_type(t8)  # revealed: tuple[int, int, int] | tuple[None, None]
+
+def _(t9: tuple[int | None, str] | tuple[str, int]):
+    # When the element type is a union (like `int | None`), we can't filter
+    # out the tuple.
+    if t9[0] is not None:
+        reveal_type(t9)  # revealed: tuple[int | None, str] | tuple[str, int]
+```
+
+### Tagged unions of tuples (equality narrowing)
+
+Narrow unions of tuples based on literal tag elements using `==` comparison:
+
+```py
+from typing import Literal
+
+class A: ...
+class B: ...
+class C: ...
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+        reveal_type(x[1])  # revealed: A
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+        reveal_type(x[1])  # revealed: B
+        reveal_type(x[2])  # revealed: C
+
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B, C]):
+    if x[0] != "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag2"], B, C]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A]
+
+# With int literals
+def _(x: tuple[Literal[1], A] | tuple[Literal[2], B]):
+    if x[0] == 1:
+        reveal_type(x)  # revealed: tuple[Literal[1], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[2], B]
+
+# With bytes literals
+def _(x: tuple[Literal[b"a"], A] | tuple[Literal[b"b"], B]):
+    if x[0] == b"a":
+        reveal_type(x)  # revealed: tuple[Literal[b"a"], A]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal[b"b"], B]
+
+# Multiple tuple variants
+def _(x: tuple[Literal["a"], A] | tuple[Literal["b"], B] | tuple[Literal["c"], C]):
+    if x[0] == "a":
+        reveal_type(x)  # revealed: tuple[Literal["a"], A]
+    elif x[0] == "b":
+        reveal_type(x)  # revealed: tuple[Literal["b"], B]
+    else:
+        reveal_type(x)  # revealed: tuple[Literal["c"], C]
+
+# Using index 1 instead of 0
+def _(x: tuple[A, Literal["tag1"]] | tuple[B, Literal["tag2"]]):
+    if x[1] == "tag1":
+        reveal_type(x)  # revealed: tuple[A, Literal["tag1"]]
+    else:
+        reveal_type(x)  # revealed: tuple[B, Literal["tag2"]]
+```
+
+Narrowing is restricted to `Literal` tag elements. If any tuple has a non-literal type at the
+discriminating index, we can't safely narrow with equality:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[str, B]):
+    # Can't narrow because second tuple has `str` (not literal) at index 0
+    if x[0] == "tag1":
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | tuple[str, B]
+    else:
+        # But we *can* narrow with inequality
+        reveal_type(x)  # revealed: tuple[str, B]
+```
+
+If the index is out of bounds for any tuple in the union, we also skip narrowing (a diagnostic will
+be emitted elsewhere for the out-of-bounds access):
+
+```py
+def _(x: tuple[A, Literal["a"]] | tuple[B]):
+    # error: [index-out-of-bounds]
+    if x[1] == "a":
+        # Can't narrow because index 1 is out of bounds for second tuple
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+    else:
+        reveal_type(x)  # revealed: tuple[A, Literal["a"]] | tuple[B]
+```
+
+We can still narrow tuples when non-tuple types are present in the union:
+
+```py
+def _(x: tuple[Literal["tag1"], A] | tuple[Literal["tag2"], B] | list[int]):
+    if x[0] == "tag1":
+        # A list of ints could have int subclasses in it,
+        # and int subclasses could have custom `__eq__` methods such that they
+        # compare equal to `"tag1"`, so `list[int]` cannot be narrowed out of this
+        # union.
+        reveal_type(x)  # revealed: tuple[Literal["tag1"], A] | list[int]
 ```
 
 ### String subscript

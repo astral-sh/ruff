@@ -5,7 +5,7 @@ use super::{DeferredExpressionState, TypeInferenceBuilder};
 use crate::FxOrderSet;
 use crate::semantic_index::semantic_index;
 use crate::types::diagnostic::{
-    self, INVALID_TYPE_FORM, NON_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
+    self, INVALID_TYPE_FORM, NOT_SUBSCRIPTABLE, report_invalid_argument_number_to_special_form,
     report_invalid_arguments_to_callable,
 };
 use crate::types::generics::bind_typevar;
@@ -16,8 +16,8 @@ use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
     KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
-    Type, TypeAliasType, TypeContext, TypeIsType, TypeMapping, TypeVarKind, UnionBuilder,
-    UnionType, any_over_type, todo_type,
+    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
+    UnionBuilder, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -921,7 +921,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 KnownInstanceType::TypeAliasType(type_alias @ TypeAliasType::PEP695(_)) => {
                     if type_alias.specialization(self.db()).is_some() {
                         if let Some(builder) =
-                            self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                            self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                         {
                             let mut diagnostic =
                                 builder.into_diagnostic("Cannot subscript non-generic type alias");
@@ -951,7 +951,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                             self.infer_type_expression(slice);
 
                             if let Some(builder) =
-                                self.context.report_lint(&NON_SUBSCRIPTABLE, subscript)
+                                self.context.report_lint(&NOT_SUBSCRIPTABLE, subscript)
                             {
                                 let value_type = type_alias.raw_value_type(self.db());
                                 let mut diagnostic = builder
@@ -1521,10 +1521,26 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                         .top_materialization(self.db()),
                 ),
             },
-            SpecialFormType::TypeGuard => {
-                self.infer_type_expression(arguments_slice);
-                todo_type!("`TypeGuard[]` special form")
-            }
+            SpecialFormType::TypeGuard => match arguments_slice {
+                ast::Expr::Tuple(_) => {
+                    self.infer_type_expression(arguments_slice);
+
+                    if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {
+                        let diag = builder.into_diagnostic(format_args!(
+                            "Special form `typing.TypeGuard` expected exactly one type parameter",
+                        ));
+                        diagnostic::add_type_expression_reference_link(diag);
+                    }
+
+                    Type::unknown()
+                }
+                _ => TypeGuardType::unbound(
+                    self.db(),
+                    // Unlike `TypeIs`, don't use top materialization, because
+                    // `TypeGuard` clobbering behavior makes it counterintuitive
+                    self.infer_type_expression(arguments_slice),
+                ),
+            },
             SpecialFormType::Concatenate => {
                 let arguments = if let ast::Expr::Tuple(tuple) = arguments_slice {
                     &*tuple.elts
@@ -1593,8 +1609,10 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
 
                     let mut argument_elements = arguments_as_tuple
                         .as_ref()
-                        .map(|tup| Either::Left(tup.all_elements().copied()))
-                        .unwrap_or(Either::Right(std::iter::once(arguments)));
+                        .map(|tup| tup.all_elements())
+                        .unwrap_or(std::slice::from_ref(&arguments))
+                        .iter()
+                        .copied();
 
                     let probably_meant_literal = argument_elements.all(|ty| match ty {
                         Type::StringLiteral(_)

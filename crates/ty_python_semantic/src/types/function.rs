@@ -374,7 +374,7 @@ impl<'db> OverloadLiteral<'db> {
             .name
             .scoped_use_id(db, scope);
 
-        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined) =
+        let Place::Defined(Type::FunctionLiteral(previous_type), _, Definedness::AlwaysDefined, _) =
             place_from_bindings(db, use_def.bindings_at_use(use_id)).place
         else {
             return None;
@@ -1089,6 +1089,8 @@ impl<'db> FunctionType<'db> {
     pub(crate) fn into_callable_type(self, db: &'db dyn Db) -> CallableType<'db> {
         let kind = if self.is_classmethod(db) {
             CallableTypeKind::ClassMethodLike
+        } else if self.is_staticmethod(db) {
+            CallableTypeKind::StaticMethodLike
         } else {
             CallableTypeKind::FunctionLike
         };
@@ -1301,6 +1303,7 @@ fn is_instance_truthiness<'db>(
         | Type::AlwaysFalsy
         | Type::BoundSuper(..)
         | Type::TypeIs(..)
+        | Type::TypeGuard(..)
         | Type::Callable(..)
         | Type::Dynamic(..)
         | Type::Never

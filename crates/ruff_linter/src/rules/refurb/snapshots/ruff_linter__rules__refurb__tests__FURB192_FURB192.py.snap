@@ -19,6 +19,7 @@ help: Replace with `min`
 4 | 
 5 | sorted(l)[-1]
 6 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
  --> FURB192.py:5:1
@@ -39,6 +40,7 @@ help: Replace with `max`
 6 | 
 7 | sorted(l, reverse=False)[-1]
 8 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `max` over `sorted()` to compute the maximum value in a sequence
  --> FURB192.py:7:1
@@ -59,6 +61,7 @@ help: Replace with `max`
 8  | 
 9  | sorted(l, key=lambda x: x)[0]
 10 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
   --> FURB192.py:9:1
@@ -79,6 +82,7 @@ help: Replace with `min`
 10 | 
 11 | sorted(l, key=key_fn)[0]
 12 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
   --> FURB192.py:11:1
@@ -99,6 +103,7 @@ help: Replace with `min`
 12 | 
 13 | sorted([1, 2, 3])[0]
 14 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
   --> FURB192.py:13:1
@@ -119,6 +124,7 @@ help: Replace with `min`
 14 | 
 15 | # Unsafe
 16 | 
+note: This is an unsafe fix and may change runtime behavior
 
 FURB192 [*] Prefer `min` over `sorted()` to compute the minimum value in a sequence
   --> FURB192.py:17:1

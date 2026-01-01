@@ -27,6 +27,12 @@ use crate::checkers::ast::Checker;
 /// _, b, a = (1, 2, 3)
 /// print(a)  # 3
 /// ```
+///
+/// ## Options
+///
+/// The rule ignores assignments to dummy variables, as specified by:
+///
+/// - `lint.dummy-variable-rgx`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "0.5.0")]
 pub(crate) struct RedeclaredAssignedName {

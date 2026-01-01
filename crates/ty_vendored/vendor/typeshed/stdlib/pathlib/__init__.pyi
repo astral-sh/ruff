@@ -154,6 +154,7 @@ class PurePath(PathLike[str]):
         slashes.
         """
 
+    @deprecated("Deprecated since Python 3.14; will be removed in Python 3.19. Use `Path.as_uri()` instead.")
     def as_uri(self) -> str:
         """Return the path as a URI."""
 
@@ -776,6 +777,9 @@ class Path(PurePath):
             self, top_down: bool = True, on_error: Callable[[OSError], object] | None = None, follow_symlinks: bool = False
         ) -> Iterator[tuple[Self, list[str], list[str]]]:
             """Walk the directory tree from this directory, similar to os.walk()."""
+
+    def as_uri(self) -> str:
+        """Return the path as a URI."""
 
 class PosixPath(Path, PurePosixPath):
     """Path subclass for non-Windows systems.

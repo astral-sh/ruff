@@ -290,4 +290,35 @@ C.f2(1)
 C().f2(1)
 ```
 
+## Types are not bound-method descriptors
+
+```toml
+[environment]
+python-version = "3.14"
+```
+
+The callable type of a type object is not function-like.
+
+```py
+from typing import ClassVar
+from ty_extensions import CallableTypeOf
+
+class WithNew:
+    def __new__(self, x: int) -> WithNew:
+        return super().__new__(WithNew)
+
+class WithInit:
+    def __init__(self, x: int) -> None:
+        pass
+
+class C:
+    with_new: ClassVar[CallableTypeOf[WithNew]]
+    with_init: ClassVar[CallableTypeOf[WithInit]]
+
+C.with_new(1)
+C().with_new(1)
+C.with_init(1)
+C().with_init(1)
+```
+
 [`tensorbase`]: https://github.com/pytorch/pytorch/blob/f3913ea641d871f04fa2b6588a77f63efeeb9f10/torch/_tensor.py#L1084-L1092

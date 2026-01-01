@@ -477,6 +477,17 @@ impl<'src> Parser<'src> {
         }
     }
 
+    pub(super) fn parse_missing_name(&mut self) -> ast::ExprName {
+        let identifier = self.parse_missing_identifier();
+
+        ast::ExprName {
+            range: identifier.range,
+            id: identifier.id,
+            ctx: ExprContext::Invalid,
+            node_index: AtomicNodeIndex::NONE,
+        }
+    }
+
     /// Parses an identifier.
     ///
     /// For an invalid identifier, the `id` field will be an empty string.
@@ -524,16 +535,20 @@ impl<'src> Parser<'src> {
                 node_index: AtomicNodeIndex::NONE,
             }
         } else {
-            self.add_error(
-                ParseErrorType::OtherError("Expected an identifier".into()),
-                range,
-            );
+            self.parse_missing_identifier()
+        }
+    }
 
-            ast::Identifier {
-                id: Name::empty(),
-                range: self.missing_node_range(),
-                node_index: AtomicNodeIndex::NONE,
-            }
+    fn parse_missing_identifier(&mut self) -> ast::Identifier {
+        self.add_error(
+            ParseErrorType::OtherError("Expected an identifier".into()),
+            self.current_token_range(),
+        );
+
+        ast::Identifier {
+            id: Name::empty(),
+            range: self.missing_node_range(),
+            node_index: AtomicNodeIndex::NONE,
         }
     }
 

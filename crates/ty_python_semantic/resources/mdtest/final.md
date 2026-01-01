@@ -118,9 +118,13 @@ class Child(Parent):
 class OtherChild(Parent): ...
 
 class Grandchild(OtherChild):
+    # TODO: The Liskov violation here maybe shouldn't be emitted? Whether called on the
+    # type or on an instance, it will behave the same from the caller's perspective. The only
+    # difference is whether the method body gets access to `self`, which is not a
+    # concern of Liskov.
     @staticmethod
-    # TODO: we should emit a Liskov violation here too
     # error: [override-of-final-method]
+    # error: [invalid-method-override]
     def foo(): ...
     @property
     # TODO: we should emit a Liskov violation here too
@@ -267,6 +271,7 @@ class ChildOfGood(Good):
     def f(self, x: str) -> str: ...
     @overload
     def f(self, x: int) -> int: ...
+
     # error: [override-of-final-method]
     def f(self, x: int | str) -> int | str:
         return x
@@ -277,6 +282,7 @@ class Bad:
     def f(self, x: str) -> str: ...
     @overload
     def f(self, x: int) -> int: ...
+
     # error: [invalid-overload]
     def f(self, x: int | str) -> int | str:
         return x
@@ -286,6 +292,7 @@ class Bad:
     def g(self, x: str) -> str: ...
     @overload
     def g(self, x: int) -> int: ...
+
     # error: [invalid-overload]
     def g(self, x: int | str) -> int | str:
         return x
@@ -295,6 +302,7 @@ class Bad:
     @overload
     @final
     def h(self, x: int) -> int: ...
+
     # error: [invalid-overload]
     def h(self, x: int | str) -> int | str:
         return x
@@ -304,6 +312,7 @@ class Bad:
     @final
     @overload
     def i(self, x: int) -> int: ...
+
     # error: [invalid-overload]
     def i(self, x: int | str) -> int | str:
         return x
@@ -478,7 +487,8 @@ class B(A):
     #
     # TODO: we should emit a Liskov violation here too
     # error: [override-of-final-method]
-    method4 = 42; unrelated = 56  # fmt: skip
+    method4 = 42
+    unrelated = 56  # fmt: skip
 
 # Possible overrides of possibly `@final` methods...
 class C(A):
@@ -542,6 +552,7 @@ class Child(Parent):
     else:
         # Fine because this doesn't override any reachable definitions
         def foooo(self) -> None: ...
+
         # There are `@final` definitions being overridden here,
         # but the definitions that override them are unreachable
         def spam(self) -> None: ...

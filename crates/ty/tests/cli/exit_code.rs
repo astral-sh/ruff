@@ -149,7 +149,7 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
@@ -162,18 +162,18 @@ fn both_warnings_and_errors() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -189,7 +189,7 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
         "test.py",
         r###"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "###,
     )?;
 
@@ -202,18 +202,18 @@ fn both_warnings_and_errors_and_error_on_warning_is_true() -> anyhow::Result<()>
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 
@@ -229,7 +229,7 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
         "test.py",
         r#"
         print(x)     # [unresolved-reference]
-        print(4[1])  # [non-subscriptable]
+        print(4[1])  # [not-subscriptable]
         "#,
     )?;
 
@@ -242,18 +242,18 @@ fn exit_zero_is_true() -> anyhow::Result<()> {
       |
     2 | print(x)     # [unresolved-reference]
       |       ^
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |
     info: rule `unresolved-reference` was selected on the command line
 
-    error[non-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
+    error[not-subscriptable]: Cannot subscript object of type `Literal[4]` with no `__getitem__` method
      --> test.py:3:7
       |
     2 | print(x)     # [unresolved-reference]
-    3 | print(4[1])  # [non-subscriptable]
+    3 | print(4[1])  # [not-subscriptable]
       |       ^^^^
       |
-    info: rule `non-subscriptable` is enabled by default
+    info: rule `not-subscriptable` is enabled by default
 
     Found 2 diagnostics
 

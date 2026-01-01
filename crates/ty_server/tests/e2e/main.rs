@@ -30,6 +30,7 @@
 mod code_actions;
 mod commands;
 mod completions;
+mod configuration;
 mod initialize;
 mod inlay_hints;
 mod notebook;
@@ -211,7 +212,7 @@ impl TestServer {
         test_context: TestContext,
         capabilities: ClientCapabilities,
         initialization_options: Option<ClientOptions>,
-        env_vars: Vec<(String, String)>,
+        env_vars: Vec<(String, Option<String>)>,
     ) -> Self {
         setup_tracing();
 
@@ -225,7 +226,12 @@ impl TestServer {
         // Create test system and set environment variable overrides
         let test_system = Arc::new(TestSystem::new(os_system));
         for (name, value) in env_vars {
-            test_system.set_env_var(name, value);
+            match value {
+                Some(value) => {
+                    test_system.set_env_var(name, value);
+                }
+                None => test_system.remove_env_var(name),
+            }
         }
 
         // Start the server in a separate thread
@@ -509,8 +515,12 @@ impl TestServer {
     /// a panic-free alternative.
     #[track_caller]
     pub(crate) fn await_notification<N: Notification>(&mut self) -> N::Params {
-        self.try_await_notification::<N>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive notification `{}`: {err}", N::METHOD))
+        match self.try_await_notification::<N>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive notification `{}`: {err}", N::METHOD)
+            }
+        }
     }
 
     /// Wait for a notification of the specified type from the server and return its parameters.
@@ -590,8 +600,12 @@ impl TestServer {
     /// If receiving the request fails.
     #[track_caller]
     pub(crate) fn await_request<R: Request>(&mut self) -> (RequestId, R::Params) {
-        self.try_await_request::<R>(None)
-            .unwrap_or_else(|err| panic!("Failed to receive server request `{}`: {err}", R::METHOD))
+        match self.try_await_request::<R>(None) {
+            Ok(result) => result,
+            Err(err) => {
+                panic!("Failed to receive server request `{}`: {err}", R::METHOD)
+            }
+        }
     }
 
     /// Wait for a request of the specified type from the server and return the request ID and
@@ -1073,7 +1087,7 @@ pub(crate) struct TestServerBuilder {
     workspaces: Vec<(WorkspaceFolder, Option<ClientOptions>)>,
     initialization_options: Option<ClientOptions>,
     client_capabilities: ClientCapabilities,
-    env_vars: Vec<(String, String)>,
+    env_vars: Vec<(String, Option<String>)>,
 }
 
 impl TestServerBuilder {
@@ -1104,7 +1118,7 @@ impl TestServerBuilder {
             test_context: TestContext::new()?,
             initialization_options: None,
             client_capabilities,
-            env_vars: Vec::new(),
+            env_vars: vec![("VIRTUAL_ENV".to_string(), None)],
         })
     }
 
@@ -1120,7 +1134,7 @@ impl TestServerBuilder {
         name: impl Into<String>,
         value: impl Into<String>,
     ) -> Self {
-        self.env_vars.push((name.into(), value.into()));
+        self.env_vars.push((name.into(), Some(value.into())));
         self
     }
 
@@ -1244,13 +1258,17 @@ impl TestServerBuilder {
         self
     }
 
+    pub(crate) fn file_path(&self, path: impl AsRef<SystemPath>) -> SystemPathBuf {
+        self.test_context.root().join(path)
+    }
+
     /// Write a file to the test directory
     pub(crate) fn with_file(
         self,
         path: impl AsRef<SystemPath>,
         content: impl AsRef<str>,
     ) -> Result<Self> {
-        let file_path = self.test_context.root().join(path.as_ref());
+        let file_path = self.file_path(path);
         // Ensure parent directories exists
         if let Some(parent) = file_path.parent() {
             fs::create_dir_all(parent.as_std_path())?;
@@ -1322,15 +1340,10 @@ impl TestContext {
         })?;
 
         let mut settings = insta::Settings::clone_current();
+        let project_dir_url = Url::from_file_path(project_dir.as_std_path())
+            .map_err(|()| anyhow!("Failed to convert root directory to url"))?;
         settings.add_filter(&tempdir_filter(project_dir.as_str()), "<temp_dir>/");
-        settings.add_filter(
-            &tempdir_filter(
-                Url::from_file_path(project_dir.as_std_path())
-                    .map_err(|()| anyhow!("Failed to convert root directory to url"))?
-                    .path(),
-            ),
-            "<temp_dir>/",
-        );
+        settings.add_filter(&tempdir_filter(project_dir_url.path()), "<temp_dir>/");
         settings.add_filter(r#"\\(\w\w|\s|\.|")"#, "/$1");
         settings.add_filter(
             r#"The system cannot find the file specified."#,

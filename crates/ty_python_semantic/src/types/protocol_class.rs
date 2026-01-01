@@ -738,7 +738,7 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
                 let attribute_type = if self.name == "__call__" {
                     other
                 } else {
-                    let Place::Defined(attribute_type, _, Definedness::AlwaysDefined) = other
+                    let Place::Defined(attribute_type, _, Definedness::AlwaysDefined, _) = other
                         .invoke_descriptor_protocol(
                             db,
                             self.name,
@@ -783,10 +783,10 @@ impl<'a, 'db> ProtocolMember<'a, 'db> {
             // TODO: consider the types of the attribute on `other` for property members
             ProtocolMemberKind::Property(_) => ConstraintSet::from(matches!(
                 other.member(db, self.name).place,
-                Place::Defined(_, _, Definedness::AlwaysDefined)
+                Place::Defined(_, _, Definedness::AlwaysDefined, _)
             )),
             ProtocolMemberKind::Other(member_type) => {
-                let Place::Defined(attribute_type, _, Definedness::AlwaysDefined) =
+                let Place::Defined(attribute_type, _, Definedness::AlwaysDefined, _) =
                     other.member(db, self.name).place
                 else {
                     return ConstraintSet::from(false);

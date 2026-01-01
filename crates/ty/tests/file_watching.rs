@@ -1020,7 +1020,7 @@ fn search_path() -> anyhow::Result<()> {
     let site_packages = case.root_path().join("site_packages");
 
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("a").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("a").unwrap()),
         None
     );
 
@@ -1193,7 +1193,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     // Unset the custom typeshed directory.
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("os").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()),
         None
     );
 
@@ -1208,7 +1208,7 @@ fn changed_versions_file() -> anyhow::Result<()> {
 
     case.apply_changes(changes, None);
 
-    assert!(resolve_module_confident(case.db(), &ModuleName::new("os").unwrap()).is_some());
+    assert!(resolve_module_confident(case.db(), &ModuleName::new_static("os").unwrap()).is_some());
 
     Ok(())
 }
@@ -1875,11 +1875,11 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
     let mut case = setup([("lib.py", "class Foo: ...")])?;
 
     assert!(
-        resolve_module_confident(case.db(), &ModuleName::new("lib").unwrap()).is_some(),
+        resolve_module_confident(case.db(), &ModuleName::new_static("lib").unwrap()).is_some(),
         "Expected `lib` module to exist."
     );
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("Lib").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("Lib").unwrap()),
         None,
         "Expected `Lib` module not to exist"
     );
@@ -1912,13 +1912,13 @@ fn rename_files_casing_only() -> anyhow::Result<()> {
 
     // Resolving `lib` should now fail but `Lib` should now succeed
     assert_eq!(
-        resolve_module_confident(case.db(), &ModuleName::new("lib").unwrap()),
+        resolve_module_confident(case.db(), &ModuleName::new_static("lib").unwrap()),
         None,
         "Expected `lib` module to no longer exist."
     );
 
     assert!(
-        resolve_module_confident(case.db(), &ModuleName::new("Lib").unwrap()).is_some(),
+        resolve_module_confident(case.db(), &ModuleName::new_static("Lib").unwrap()).is_some(),
         "Expected `Lib` module to exist"
     );
 

@@ -245,7 +245,9 @@ impl ProjectDatabase {
 
         if result.project_changed {
             let new_project_metadata = match config_file_override {
-                Some(config_file) => ProjectMetadata::from_config_file(config_file, self.system()),
+                Some(config_file) => {
+                    ProjectMetadata::from_config_file(config_file, &project_root, self.system())
+                }
                 None => ProjectMetadata::discover(&project_root, self.system()),
             };
             match new_project_metadata {

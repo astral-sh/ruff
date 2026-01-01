@@ -7,7 +7,7 @@ use ruff_db::system::{OsSystem, SystemPathBuf};
 use crate::db::Db;
 pub use crate::logging::{LogLevel, init_logging};
 pub use crate::server::{PartialWorkspaceProgress, PartialWorkspaceProgressParams, Server};
-pub use crate::session::{ClientOptions, DiagnosticMode};
+pub use crate::session::{ClientOptions, DiagnosticMode, WorkspaceOptions};
 pub use document::{NotebookDocument, PositionEncoding, TextDocument};
 pub(crate) use session::Session;
 

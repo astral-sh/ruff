@@ -58,6 +58,10 @@ use crate::checkers::ast::Checker;
 ///     logging.exception("Something went wrong")
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.logger-objects`
+///
 /// ## References
 /// - [Python documentation: The `try` statement](https://docs.python.org/3/reference/compound_stmts.html#the-try-statement)
 /// - [Python documentation: Exception hierarchy](https://docs.python.org/3/library/exceptions.html#exception-hierarchy)

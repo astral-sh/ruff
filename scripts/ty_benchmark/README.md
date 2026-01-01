@@ -67,7 +67,7 @@ some projects only successfully pass type checking using a specific type checker
 
 ## Updating the benchmark
 
-The benchmark script supports snapshoting the results when running with `--snapshot` and `--accept`.
+The benchmark script supports snapshotting the results when running with `--snapshot` and `--accept`.
 The goal of those snapshots is to catch accidental regressions. For example, if a project adds
 new dependencies that we fail to install. They are not intended as a testing tool. E.g. the snapshot runner doesn't account for platform differences so that
 you might see differences when running the snapshots on your machine.

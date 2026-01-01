@@ -175,6 +175,8 @@ class ZipFile:
     filename: str | None
     debug: int
     comment: bytes
+    """The comment text associated with the ZIP file."""
+
     filelist: list[ZipInfo]
     fp: IO[bytes] | None
     NameToInfo: dict[str, ZipInfo]

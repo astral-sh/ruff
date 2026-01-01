@@ -351,6 +351,10 @@ impl Violation for MissingReturnTypePrivateFunction {
 ///     def __init__(self, x: int) -> None:
 ///         self.x = x
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.mypy-init-return`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeSpecialMethod {
@@ -399,6 +403,10 @@ impl Violation for MissingReturnTypeSpecialMethod {
 ///     def bar() -> int:
 ///         return 1
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeStaticMethod {
@@ -447,6 +455,10 @@ impl Violation for MissingReturnTypeStaticMethod {
 ///     def bar(cls) -> int:
 ///         return 1
 /// ```
+///
+/// ## Options
+///
+/// - `lint.flake8-annotations.suppress-none-returning`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.0.105")]
 pub(crate) struct MissingReturnTypeClassMethod {

@@ -29,7 +29,7 @@ use crate::server::lazy_work_done_progress::LazyWorkDoneProgress;
 use crate::server::{Action, Result};
 use crate::session::client::Client;
 use crate::session::index::Index;
-use crate::session::{SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
+use crate::session::{GlobalSettings, SessionSnapshot, SuspendedWorkspaceDiagnosticRequest};
 use crate::system::file_to_url;
 
 /// Handler for [Workspace diagnostics](workspace-diagnostics)
@@ -324,6 +324,7 @@ struct ResponseWriter<'a> {
     // `file_to_url` isn't guaranteed to return the exact same URL as the one provided
     // by the client.
     previous_result_ids: FxHashMap<DocumentKey, (Url, String)>,
+    global_settings: &'a GlobalSettings,
 }
 
 impl<'a> ResponseWriter<'a> {
@@ -361,6 +362,7 @@ impl<'a> ResponseWriter<'a> {
             position_encoding,
             client_capabilities: snapshot.resolved_client_capabilities(),
             previous_result_ids,
+            global_settings: snapshot.global_settings(),
         }
     }
 
@@ -409,14 +411,17 @@ impl<'a> ResponseWriter<'a> {
             new_id => {
                 let lsp_diagnostics = diagnostics
                     .iter()
-                    .map(|diagnostic| {
-                        to_lsp_diagnostic(
-                            db,
-                            diagnostic,
-                            self.position_encoding,
-                            self.client_capabilities,
+                    .filter_map(|diagnostic| {
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.position_encoding,
+                                self.client_capabilities,
+                                self.global_settings,
+                            )?
+                            .1,
                         )
-                        .1
                     })
                     .collect::<Vec<_>>();
 

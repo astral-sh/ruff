@@ -361,6 +361,9 @@ impl Drop for LintDiagnosticGuard<'_, '_> {
                         diag.id()
                     )
                 }
+                LintSource::Editor => {
+                    format!("rule `{}` was selected in the editor settings", diag.id())
+                }
             },
         ));
 

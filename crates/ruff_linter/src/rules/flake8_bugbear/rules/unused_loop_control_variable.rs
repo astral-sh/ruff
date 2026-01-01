@@ -32,6 +32,10 @@ use crate::{Edit, Fix, FixAvailability, Violation};
 ///     bar(i)
 /// ```
 ///
+/// ## Options
+///
+/// - `lint.dummy-variable-rgx`
+///
 /// ## References
 /// - [PEP 8: Naming Conventions](https://peps.python.org/pep-0008/#naming-conventions)
 #[derive(ViolationMetadata)]

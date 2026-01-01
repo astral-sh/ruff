@@ -30,6 +30,10 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// logging.error("...")
 /// ```
+///
+/// ## Options
+///
+/// - `lint.logger-objects`
 #[derive(ViolationMetadata)]
 #[violation_metadata(stable_since = "v0.2.0")]
 pub(crate) struct ExceptionWithoutExcInfo;

@@ -12,7 +12,6 @@ license.workspace = true
 [dependencies]
 ruff_db = { workspace = true }
 ruff_python_ast = { workspace = true }
-ty_python_semantic = { workspace = true }
 
 ordermap = { workspace = true }
 

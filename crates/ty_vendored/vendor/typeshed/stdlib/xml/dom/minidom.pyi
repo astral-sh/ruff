@@ -432,13 +432,9 @@ class Childless:
     attributes: None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
-
+    def lastChild(self) -> None: ...
     def appendChild(self, node: _NodesThatAreChildren | DocumentFragment) -> NoReturn: ...
     def hasChildNodes(self) -> Literal[False]: ...
     def insertBefore(
@@ -460,12 +456,10 @@ class ProcessingInstruction(Childless, Node):
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -516,12 +510,10 @@ class Text(CharacterData):
     previousSibling: _DocumentFragmentChildren | _ElementChildren | _AttrChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -550,12 +542,10 @@ class Comment(CharacterData):
     previousSibling: _DocumentChildren | _ElementChildren | _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -612,12 +602,10 @@ class DocumentType(Identified, Childless, Node):
     previousSibling: _DocumentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -676,12 +664,10 @@ class Notation(Identified, Childless, Node):
     previousSibling: _DocumentFragmentChildren | None
     childNodes: EmptyNodeList
     @property
-    def firstChild(self) -> None:
-        """The type of the None singleton."""
-
+    def firstChild(self) -> None: ...
     @property
-    def lastChild(self) -> None:
-        """The type of the None singleton."""
+    def lastChild(self) -> None: ...
+
     namespaceURI: None
     prefix: None
     @property
@@ -757,6 +743,7 @@ class Document(Node, DocumentLS):
     documentURI: str | None
     doctype: DocumentType | None
     documentElement: Element | None
+    """Top-level element of this document."""
 
     def __init__(self) -> None: ...
     def appendChild(self, node: _DocumentChildrenVar) -> _DocumentChildrenVar: ...  # type: ignore[override]

@@ -3,6 +3,16 @@
   "title": "Options",
   "type": "object",
   "properties": {
+    "analysis": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/AnalysisOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "environment": {
       "description": "Configures the type checking environment.",
       "anyOf": [
@@ -59,6 +69,19 @@
   },
   "additionalProperties": false,
   "definitions": {
+    "AnalysisOptions": {
+      "type": "object",
+      "properties": {
+        "respect-type-ignore-comments": {
+          "description": "Whether ty should respect `type: ignore` comments.\n\nWhen set to `false`, `type: ignore` comments are treated like any other normal\ncomment and can't be used to suppress ty errors (you have to use `ty: ignore` instead).\n\nSetting this option can be useful when using ty alongside other type checkers or when\nyou prefer using `ty: ignore` over `type: ignore`.\n\nDefaults to `true`.",
+          "type": [
+            "boolean",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
     "Array_of_string": {
       "type": "array",
       "items": {
@@ -326,6 +349,16 @@
         "call-non-callable": {
           "title": "detects calls to non-callable objects",
           "description": "## What it does\nChecks for calls to non-callable objects.\n\n## Why is this bad?\nCalling a non-callable object will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4()  # TypeError: 'int' object is not callable\n```",
+          "default": "error",
+          "oneOf": [
+            {
+              "$ref": "#/definitions/Level"
+            }
+          ]
+        },
+        "call-top-callable": {
+          "title": "detects calls to the top callable type",
+          "description": "## What it does\nChecks for calls to objects typed as `Top[Callable[..., T]]` (the infinite union of all\ncallable types with return type `T`).\n\n## Why is this bad?\nWhen an object is narrowed to `Top[Callable[..., object]]` (e.g., via `callable(x)` or\n`isinstance(x, Callable)`), we know the object is callable, but we don't know its\nprecise signature. This type represents the set of all possible callable types\n(including, e.g., functions that take no arguments and functions that require arguments),\nso no specific set of arguments can be guaranteed to be valid.\n\n## Examples\n```python\ndef f(x: object):\n    if callable(x):\n        x()  # error: We know `x` is callable, but not what arguments it accepts\n```",
           "default": "error",
           "oneOf": [
             {
@@ -853,9 +886,9 @@
             }
           ]
         },
-        "non-subscriptable": {
-          "title": "detects subscripting objects that do not support subscripting",
-          "description": "## What it does\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1]  # TypeError: 'int' object is not subscriptable\n```",
+        "not-iterable": {
+          "title": "detects iteration over an object that is not iterable",
+          "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",
           "default": "error",
           "oneOf": [
             {
@@ -863,9 +896,9 @@
             }
           ]
         },
-        "not-iterable": {
-          "title": "detects iteration over an object that is not iterable",
-          "description": "## What it does\nChecks for objects that are not iterable but are used in a context that requires them to be.\n\n## Why is this bad?\nIterating over an object that is not iterable will raise a `TypeError` at runtime.\n\n## Examples\n\n```python\nfor i in 34:  # TypeError: 'int' object is not iterable\n    pass\n```",
+        "not-subscriptable": {
+          "title": "detects subscripting objects that do not support subscripting",
+          "description": "## What it does\nChecks for subscripting objects that do not support subscripting.\n\n## Why is this bad?\nSubscripting an object that does not support it will raise a `TypeError` at runtime.\n\n## Examples\n```python\n4[1]  # TypeError: 'int' object is not subscriptable\n```",
           "default": "error",
           "oneOf": [
             {

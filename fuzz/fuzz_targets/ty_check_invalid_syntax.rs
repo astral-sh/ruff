@@ -19,8 +19,8 @@ use ty_module_resolver::{Db as ModuleResolverDb, SearchPathSettings};
 use ty_python_semantic::lint::LintRegistry;
 use ty_python_semantic::types::check_types;
 use ty_python_semantic::{
-    Db as SemanticDb, Program, ProgramSettings, PythonPlatform, PythonVersionWithSource,
-    default_lint_registry, lint::RuleSelection,
+    AnalysisSettings, Db as SemanticDb, Program, ProgramSettings, PythonPlatform,
+    PythonVersionWithSource, default_lint_registry, lint::RuleSelection,
 };
 
 /// Database that can be used for testing.
@@ -34,6 +34,7 @@ struct TestDb {
     system: TestSystem,
     vendored: VendoredFileSystem,
     rule_selection: Arc<RuleSelection>,
+    analysis_settings: Arc<AnalysisSettings>,
 }
 
 impl TestDb {
@@ -48,6 +49,7 @@ impl TestDb {
             vendored: ty_vendored::file_system().clone(),
             files: Files::default(),
             rule_selection: RuleSelection::from_registry(default_lint_registry()).into(),
+            analysis_settings: AnalysisSettings::default().into(),
         }
     }
 }
@@ -96,6 +98,10 @@ impl SemanticDb for TestDb {
 
     fn rule_selection(&self, _file: File) -> &RuleSelection {
         &self.rule_selection
+    }
+
+    fn analysis_settings(&self) -> &AnalysisSettings {
+        &self.analysis_settings
     }
 
     fn lint_registry(&self) -> &LintRegistry {

@@ -251,7 +251,7 @@ reveal_type(LegacyProperty("height", 42))  # revealed: LegacyProperty[int]
 reveal_type(LegacyProperty.value)  # revealed: property
 reveal_type(LegacyProperty.value.fget)  # revealed: (self, /) -> Unknown
 reveal_type(LegacyProperty[str].value.fget)  # revealed: (self, /) -> str
-reveal_type(LegacyProperty("height", 3.4).value)  # revealed: float
+reveal_type(LegacyProperty("height", 3.4).value)  # revealed: int | float
 ```
 
 ## Attributes on `NamedTuple`
@@ -266,10 +266,10 @@ class Person(NamedTuple):
     age: int | None = None
 
 reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
-reveal_type(Person._fields)  # revealed: tuple[str, ...]
+reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
 reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
 reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Person._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Person._replace)  # revealed: (self: Self, *, name: str = ..., age: int | None = ...) -> Self
 
 reveal_type(Person._make(("Alice", 42)))  # revealed: Person
 
@@ -277,6 +277,10 @@ person = Person("Alice", 42)
 
 reveal_type(person._asdict())  # revealed: dict[str, Any]
 reveal_type(person._replace(name="Bob"))  # revealed: Person
+
+# Invalid keyword arguments are detected:
+# error: [unknown-argument] "Argument `invalid` does not match any known parameter"
+person._replace(invalid=42)
 ```
 
 When accessing them on child classes of generic `NamedTuple`s, the return type is specialized
@@ -343,7 +347,7 @@ satisfy:
 def expects_named_tuple(x: typing.NamedTuple):
     reveal_type(x)  # revealed: tuple[object, ...] & NamedTupleLike
     reveal_type(x._make)  # revealed: bound method type[NamedTupleLike]._make(iterable: Iterable[Any]) -> NamedTupleLike
-    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(**kwargs) -> NamedTupleLike
+    reveal_type(x._replace)  # revealed: bound method NamedTupleLike._replace(...) -> NamedTupleLike
     # revealed: Overload[(value: tuple[object, ...], /) -> tuple[object, ...], (value: tuple[_T@__add__, ...], /) -> tuple[object, ...]]
     reveal_type(x.__add__)
     reveal_type(x.__iter__)  # revealed: bound method tuple[object, ...].__iter__() -> Iterator[object]
@@ -355,8 +359,9 @@ def _(y: type[typing.NamedTuple]):
 def _(z: typing.NamedTuple[int]): ...
 ```
 
-Any instance of a `NamedTuple` class can therefore be passed for a function parameter that is
-annotated with `NamedTuple`:
+NamedTuples are assignable to `NamedTupleLike`. The `NamedTupleLike._replace` method is typed with
+`(*args, **kwargs)`, which type checkers treat as equivalent to `...` (per the typing spec), making
+all NamedTuple implementations automatically compatible:
 
 ```py
 from typing import NamedTuple, Protocol, Iterable, Any
@@ -368,12 +373,15 @@ class Point(NamedTuple):
 
 reveal_type(Point._make)  # revealed: bound method <class 'Point'>._make(iterable: Iterable[Any]) -> Point
 reveal_type(Point._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
-reveal_type(Point._replace)  # revealed: def _replace(self, **kwargs: Any) -> Self@_replace
+reveal_type(Point._replace)  # revealed: (self: Self, *, x: int = ..., y: int = ...) -> Self
 
+# Point is assignable to NamedTuple.
 static_assert(is_assignable_to(Point, NamedTuple))
 
-expects_named_tuple(Point(x=42, y=56))  # fine
+# NamedTuple instances can be passed to functions expecting NamedTupleLike.
+expects_named_tuple(Point(x=42, y=56))
 
+# But plain tuples are not NamedTupleLike (they don't have _make, _asdict, _replace, etc.).
 # error: [invalid-argument-type] "Argument to function `expects_named_tuple` is incorrect: Expected `tuple[object, ...] & NamedTupleLike`, found `tuple[Literal[1], Literal[2]]`"
 expects_named_tuple((1, 2))
 ```

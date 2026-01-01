@@ -189,20 +189,24 @@ impl<'db> CallableSignature<'db> {
                                 type_mapping.update_signature_generic_context(db, context)
                             }),
                             definition: signature.definition,
-                            parameters: Parameters::new(
-                                db,
-                                prefix_parameters
-                                    .iter()
-                                    .map(|param| {
-                                        param.apply_type_mapping_impl(
-                                            db,
-                                            type_mapping,
-                                            tcx,
-                                            visitor,
-                                        )
-                                    })
-                                    .chain(signature.parameters().iter().cloned()),
-                            ),
+                            parameters: if signature.parameters().is_top() {
+                                signature.parameters().clone()
+                            } else {
+                                Parameters::new(
+                                    db,
+                                    prefix_parameters
+                                        .iter()
+                                        .map(|param| {
+                                            param.apply_type_mapping_impl(
+                                                db,
+                                                type_mapping,
+                                                tcx,
+                                                visitor,
+                                            )
+                                        })
+                                        .chain(signature.parameters().iter().cloned()),
+                                )
+                            },
                             return_ty: self_signature.return_ty.map(|ty| {
                                 ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                             }),
@@ -728,7 +732,7 @@ impl<'db> Signature<'db> {
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
-        Self::new(Parameters::object(), Some(Type::Never))
+        Self::new(Parameters::bottom(), Some(Type::Never))
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -815,12 +819,9 @@ impl<'db> Signature<'db> {
                 .generic_context
                 .map(|context| type_mapping.update_signature_generic_context(db, context)),
             definition: self.definition,
-            parameters: self.parameters.apply_type_mapping_impl(
-                db,
-                &type_mapping.flip(),
-                tcx,
-                visitor,
-            ),
+            parameters: self
+                .parameters
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             return_ty: self
                 .return_ty
                 .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
@@ -1331,6 +1332,14 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(true);
         }
 
+        // The top signature is supertype of (and assignable from) all other signatures. It is a
+        // subtype of no signature except itself, and assignable only to the gradual signature.
+        if other.parameters.is_top() {
+            return ConstraintSet::from(true);
+        } else if self.parameters.is_top() && !other.parameters.is_gradual() {
+            return ConstraintSet::from(false);
+        }
+
         // If either of the parameter lists is gradual (`...`), then it is assignable to and from
         // any other parameter list, but not a subtype or supertype of any other parameter list.
         if self.parameters.is_gradual() || other.parameters.is_gradual() {
@@ -1740,6 +1749,10 @@ pub(crate) enum ParametersKind<'db> {
     /// [the typing specification]: https://typing.python.org/en/latest/spec/callables.html#meaning-of-in-callable
     Gradual,
 
+    /// Represents the "top" parameters: top materialization of Gradual parameters, or infinite
+    /// union of all possible parameter signatures.
+    Top,
+
     /// Represents a parameter list containing a `ParamSpec` as the only parameter.
     ///
     /// Note that this is distinct from a parameter list _containing_ a `ParamSpec` which is
@@ -1766,32 +1779,37 @@ impl<'db> Parameters<'db> {
         db: &'db dyn Db,
         parameters: impl IntoIterator<Item = Parameter<'db>>,
     ) -> Self {
-        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
-        let mut kind = ParametersKind::Standard;
-        if let [p1, p2] = value.as_slice()
-            && p1.is_variadic()
-            && p2.is_keyword_variadic()
-        {
-            match (p1.annotated_type(), p2.annotated_type()) {
-                (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
-                    kind = ParametersKind::Gradual;
-                }
-                (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
-                    if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
-                        args_typevar.paramspec_attr(db),
-                        kwargs_typevar.paramspec_attr(db),
-                    ) {
-                        let typevar = args_typevar.without_paramspec_attr(db);
-                        if typevar.is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
-                        {
-                            kind = ParametersKind::ParamSpec(typevar);
+        fn new_impl<'db>(db: &'db dyn Db, value: Vec<Parameter<'db>>) -> Parameters<'db> {
+            let mut kind = ParametersKind::Standard;
+            if let [p1, p2] = value.as_slice()
+                && p1.is_variadic()
+                && p2.is_keyword_variadic()
+            {
+                match (p1.annotated_type(), p2.annotated_type()) {
+                    (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                        kind = ParametersKind::Gradual;
+                    }
+                    (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                        if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
+                            args_typevar.paramspec_attr(db),
+                            kwargs_typevar.paramspec_attr(db),
+                        ) {
+                            let typevar = args_typevar.without_paramspec_attr(db);
+                            if typevar
+                                .is_same_typevar_as(db, kwargs_typevar.without_paramspec_attr(db))
+                            {
+                                kind = ParametersKind::ParamSpec(typevar);
+                            }
                         }
                     }
+                    _ => {}
                 }
-                _ => {}
             }
+            Parameters { value, kind }
         }
-        Self { value, kind }
+
+        let value: Vec<Parameter<'db>> = parameters.into_iter().collect();
+        new_impl(db, value)
     }
 
     /// Create an empty parameter list.
@@ -1812,6 +1830,10 @@ impl<'db> Parameters<'db> {
 
     pub(crate) const fn is_gradual(&self) -> bool {
         matches!(self.kind, ParametersKind::Gradual)
+    }
+
+    pub(crate) const fn is_top(&self) -> bool {
+        matches!(self.kind, ParametersKind::Top)
     }
 
     pub(crate) const fn as_paramspec(&self) -> Option<BoundTypeVarInstance<'db>> {
@@ -1883,8 +1905,9 @@ impl<'db> Parameters<'db> {
         }
     }
 
-    /// Return parameters that represents `(*args: object, **kwargs: object)`.
-    pub(crate) fn object() -> Self {
+    /// Return parameters that represents `(*args: object, **kwargs: object)`, the bottom signature
+    /// (accepts any call, so subtype of all other signatures.)
+    pub(crate) fn bottom() -> Self {
         Self {
             value: vec![
                 Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
@@ -1892,6 +1915,25 @@ impl<'db> Parameters<'db> {
                     .with_annotated_type(Type::object()),
             ],
             kind: ParametersKind::Standard,
+        }
+    }
+
+    /// Return the "top" parameters (infinite union of all possible parameters), which cannot
+    /// accept any call, since there is no possible call that satisfies all possible parameter
+    /// signatures. This is not `(*Never, **Never)`, which is equivalent to no parameters at all
+    /// and still accepts the empty call `()`; it has to be represented instead as a special
+    /// `ParametersKind`.
+    pub(crate) fn top() -> Self {
+        Self {
+            // We always emit `called-top-callable` for any call to the top callable (based on the
+            // `kind` below), so we otherwise give it the most permissive signature`(*object,
+            // **object)`, so that we avoid emitting any other errors about arity mismatches.
+            value: vec![
+                Parameter::variadic(Name::new_static("args")).with_annotated_type(Type::object()),
+                Parameter::keyword_variadic(Name::new_static("kwargs"))
+                    .with_annotated_type(Type::object()),
+            ],
+            kind: ParametersKind::Top,
         }
     }
 
@@ -2051,27 +2093,31 @@ impl<'db> Parameters<'db> {
         tcx: TypeContext<'db>,
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
-        match type_mapping {
-            // Note that we've already flipped the materialization in Signature.apply_type_mapping_impl(),
-            // so the "top" materialization here is the bottom materialization of the whole Signature.
-            // It might make sense to flip the materialization here instead.
-            TypeMapping::Materialize(MaterializationKind::Top) if self.is_gradual() => {
-                Parameters::object()
+        if let TypeMapping::Materialize(materialization_kind) = type_mapping
+            && self.kind == ParametersKind::Gradual
+        {
+            match materialization_kind {
+                MaterializationKind::Bottom => {
+                    // The bottom materialization of the `...` parameters is `(*object, **object)`,
+                    // which accepts any call and is thus a subtype of all other parameters.
+                    return Parameters::bottom();
+                }
+                MaterializationKind::Top => {
+                    return Parameters::top();
+                }
             }
-            // TODO: This is wrong, the empty Parameters is not a subtype of all materializations.
-            // The bottom materialization is not currently representable and implementing it
-            // properly requires extending the Parameters struct.
-            TypeMapping::Materialize(MaterializationKind::Bottom) if self.is_gradual() => {
-                Parameters::empty()
-            }
-            _ => Self {
-                value: self
-                    .value
-                    .iter()
-                    .map(|param| param.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
-                    .collect(),
-                kind: self.kind,
-            },
+        }
+
+        // Parameters are in contravariant position, so we need to flip the type mapping.
+        let type_mapping = type_mapping.flip();
+
+        Self {
+            value: self
+                .value
+                .iter()
+                .map(|param| param.apply_type_mapping_impl(db, &type_mapping, tcx, visitor))
+                .collect(),
+            kind: self.kind,
         }
     }
 

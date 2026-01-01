@@ -13,3 +13,8 @@ self-hosted-runner:
     - github-windows-2025-x86_64-8
     - github-windows-2025-x86_64-16
     - codspeed-macro
+
+paths:
+  ".github/workflows/mypy_primer.yaml":
+    ignore:
+      - 'condition "false" is always evaluated to false. remove the if: section'
