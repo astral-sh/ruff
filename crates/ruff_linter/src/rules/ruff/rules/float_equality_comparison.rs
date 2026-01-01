@@ -1,11 +1,14 @@
 use itertools::Itertools;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
 use ruff_python_ast::{self as ast, CmpOp, Expr};
-use ruff_python_semantic::SemanticModel;
+use ruff_python_semantic::{
+    SemanticModel,
+    analyze::type_inference::{NumberLike, PythonType, ResolvedPythonType},
+};
 use ruff_text_size::{Ranged, TextRange};
 
+use crate::Violation;
 use crate::checkers::ast::Checker;
-use crate::{FixAvailability, Violation};
 
 /// ## What it does
 /// Checks for comparisons between floating-point values using `==` or `!=`.
@@ -41,26 +44,28 @@ use crate::{FixAvailability, Violation};
 /// - [Python documentation: `math.isclose`](https://docs.python.org/3/library/math.html#math.isclose)
 /// - [NumPy documentation: `numpy.isclose`](https://numpy.org/doc/stable/reference/generated/numpy.isclose.html#numpy-isclose)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.14.3")]
-pub(crate) struct FloatEqualityComparison {
-    pub left: String,
-    pub right: String,
-    pub operand: String,
+#[violation_metadata(preview_since = "0.14.11")]
+pub(crate) struct FloatEqualityComparison<'a> {
+    pub left: &'a str,
+    pub right: &'a str,
+    pub operand: &'a str,
 }
 
-impl Violation for FloatEqualityComparison {
-    const FIX_AVAILABILITY: FixAvailability = FixAvailability::Sometimes;
-
+impl Violation for FloatEqualityComparison<'_> {
     #[derive_message_formats]
     fn message(&self) -> String {
+        let FloatEqualityComparison {
+            left,
+            right,
+            operand,
+        } = self;
         format!(
-            "Comparison `{} {} {}` should be replaced by `math.isclose()` or `numpy.isclose()`",
-            self.left, self.operand, self.right,
+            "Comparison `{left} {operand} {right}` should be replaced by `math.isclose()` or `numpy.isclose()`"
         )
     }
 }
 
-/// RUF067
+/// RUF070
 pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCompare) {
     let locator = checker.locator();
     let semantic = checker.semantic();
@@ -75,9 +80,9 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
     {
         checker.report_diagnostic(
             FloatEqualityComparison {
-                left: locator.slice(left.range()).to_string(),
-                right: locator.slice(right.range()).to_string(),
-                operand: operand.to_string(),
+                left: locator.slice(left.range()),
+                right: locator.slice(right.range()),
+                operand: operand.as_str(),
             },
             TextRange::new(left.start(), right.end()),
         );
@@ -85,32 +90,15 @@ pub(crate) fn float_equality_comparison(checker: &Checker, compare: &ast::ExprCo
 }
 
 fn has_float(expr: &Expr, semantic: &SemanticModel) -> bool {
-    match expr {
-        Expr::NumberLiteral(ast::ExprNumberLiteral { value, .. }) => {
-            matches!(value, ast::Number::Float(_))
-        }
-        Expr::BinOp(ast::ExprBinOp {
-            left, right, op, ..
-        }) => {
-            if matches!(op, ast::Operator::Div) {
-                is_numeric_expr(left) || is_numeric_expr(right)
+    match ResolvedPythonType::from(expr) {
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Float)) => true,
+        ResolvedPythonType::Atom(PythonType::Number(NumberLike::Complex)) => true,
+        _ => {
+            if let Expr::Call(ast::ExprCall { func, .. }) = expr {
+                semantic.match_builtin_expr(func, "float")
             } else {
-                has_float(left, semantic) || has_float(right, semantic)
+                false
             }
         }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => has_float(operand, semantic),
-        Expr::Call(ast::ExprCall { func, .. }) => semantic.match_builtin_expr(func, "float"),
-        _ => false,
-    }
-}
-
-fn is_numeric_expr(expr: &Expr) -> bool {
-    match expr {
-        Expr::NumberLiteral(_) => true,
-        Expr::BinOp(ast::ExprBinOp { left, right, .. }) => {
-            is_numeric_expr(left) || is_numeric_expr(right)
-        }
-        Expr::UnaryOp(ast::ExprUnaryOp { operand, .. }) => is_numeric_expr(operand),
-        _ => false,
     }
 }
