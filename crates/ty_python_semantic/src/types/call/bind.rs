@@ -3012,7 +3012,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .class_specialization(self.db)?;
 
             builder
-                .infer_reverse_map(tcx, return_ty, |(_, variance, inferred_ty)| {
+                .infer_reverse_map(tcx, return_ty, |(_, inferred_ty), variance| {
                     // Avoid unnecessarily widening the return type based on a covariant
                     // type parameter from the type context, as it can lead to argument
                     // assignability errors if the type variable is constrained by a narrower
@@ -3045,10 +3045,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                     continue;
                 };
 
-                let specialization_result = builder.infer_map(
+                let specialization_result = builder.infer_map_with_variance(
                     expected_type,
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(identity, inferred_ty), variance| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if preferred_type_mappings

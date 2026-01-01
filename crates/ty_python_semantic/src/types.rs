@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -8126,13 +8127,7 @@ impl<'db> Type<'db> {
                 // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
                 let value_type = visitor.visit(self, || {
-                    match type_mapping {
-                        // We only want to perform the unique specialization onto the specialization of the type alias below,
-                        // not the raw value type.
-                        TypeMapping::UniqueSpecialization { .. } => alias.raw_value_type(db),
-
-                        _ => alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    }
+                    alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 });
 
                 let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
@@ -8897,7 +8892,7 @@ pub enum TypeMapping<'a, 'db> {
     /// Resets any specializations to contain unique synthetic type variables.
     UniqueSpecialization {
         // A list of synthetic type variables, and the types they replaced.
-        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
+        specialization: RefCell<FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>>,
     },
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
