@@ -59,6 +59,7 @@ class ProxyType(Generic[_T]):  # "weakproxy"
     def __eq__(self, value: object, /) -> bool: ...
     def __getattr__(self, attr: str) -> Any: ...
     __hash__: ClassVar[None]  # type: ignore[assignment]
+    """Return hash(self)."""
 
 @disjoint_base
 class ReferenceType(Generic[_T]):  # "weakref"
