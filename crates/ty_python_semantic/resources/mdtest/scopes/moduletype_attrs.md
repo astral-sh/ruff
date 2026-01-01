@@ -101,7 +101,7 @@ reveal_type(typing.__init__)  # revealed: bound method ModuleType.__init__(name:
 
 # For a stub module, we don't know that `__file__` is a string (at runtime it may be entirely
 # unset, but we follow typeshed here):
-reveal_type(typing.__file__)  # revealed: str | None
+reveal_type(typing.__file__)  # revealed: str
 
 # These come from `builtins.object`, not `types.ModuleType`:
 reveal_type(typing.__eq__)  # revealed: bound method ModuleType.__eq__(value: object, /) -> bool
