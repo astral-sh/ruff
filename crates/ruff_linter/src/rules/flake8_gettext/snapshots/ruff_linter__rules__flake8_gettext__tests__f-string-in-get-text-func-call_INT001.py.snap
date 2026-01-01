@@ -31,6 +31,16 @@ INT001 f-string is resolved before function call; consider `_("string %s") % arg
   |
 
 INT001 f-string is resolved before function call; consider `_("string %s") % arg`
+ --> INT001.py:7:24
+  |
+6 | gettext(f"{'value'}")
+7 | ngettext(f"{'value'}", f"{'values'}", 2)
+  |                        ^^^^^^^^^^^^^
+8 |
+9 | _gettext(f"{'value'}")  # no lint
+  |
+
+INT001 f-string is resolved before function call; consider `_("string %s") % arg`
   --> INT001.py:31:14
    |
 29 | def _(message): return message
