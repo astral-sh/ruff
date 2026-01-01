@@ -24,7 +24,6 @@ bitflags = { workspace = true }
 compact_str = { workspace = true }
 get-size2 = { workspace = true, optional = true }
 is-macro = { workspace = true }
-itertools = { workspace = true }
 memchr = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true, optional = true }
