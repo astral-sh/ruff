@@ -71,6 +71,8 @@ Literals are promoted if they are in non-covariant position in the return type o
 function, or constructor of a generic class:
 
 ```py
+from typing import Callable, Literal
+
 class Bivariant[T]:
     def __init__(self, value: T): ...
 
@@ -89,6 +91,12 @@ class Invariant[T]:
 
     def __init__(self, value: T): ...
 
+def takes_literal[T](x: Literal[1]):
+    raise NotImplementedError
+
+def returns_literal[T]() -> Literal[1]:
+    raise NotImplementedError
+
 def f1[T](x: T) -> Bivariant[T] | None: ...
 def f2[T](x: T) -> Covariant[T] | None: ...
 def f3[T](x: T) -> Covariant[T] | Bivariant[T] | None: ...
@@ -100,6 +108,8 @@ def f8[T](x: T) -> Invariant[T] | Covariant[T] | None: ...
 def f9[T](x: T) -> tuple[Invariant[T], Invariant[T]] | None: ...
 def f10[T, U](x: T, y: U) -> tuple[Invariant[T], Covariant[U]] | None: ...
 def f11[T, U](x: T, y: U) -> tuple[Invariant[Covariant[T] | None], Covariant[U]] | None: ...
+def f12[T](x: Callable[[T], None]) -> Invariant[T] | None: ...
+def f13[T](x: Callable[[], T]) -> Invariant[T] | None: ...
 
 reveal_type(Bivariant(1))  # revealed: Bivariant[Literal[1]]
 reveal_type(Covariant(1))  # revealed: Covariant[Literal[1]]
@@ -120,6 +130,11 @@ reveal_type(f9(1))  # revealed: tuple[Invariant[int], Invariant[int]] | None
 
 reveal_type(f10(1, 1))  # revealed: tuple[Invariant[int], Covariant[Literal[1]]] | None
 reveal_type(f11(1, 1))  # revealed: tuple[Invariant[Covariant[int] | None], Covariant[Literal[1]]] | None
+
+# TODO: we should avoid literal promotion here.
+# error: [invalid-argument-type] "Argument to function `f12` is incorrect: Expected `(int, /) -> None`, found `def takes_literal[T](x: Literal[1]) -> Unknown`"
+reveal_type(f12(takes_literal))  # revealed: Invariant[int] | None
+reveal_type(f13(returns_literal))  # revealed: Invariant[int] | None
 ```
 
 ## Invariant and contravariant literal arguments are respected

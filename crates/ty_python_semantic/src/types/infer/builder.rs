@@ -8191,9 +8191,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     .infer_reverse_map(
                         tcx,
                         collection_instance,
-                        |(typevar, variance, inferred_ty)| {
+                        |(typevar, inferred_ty), variance| {
                             elt_tcx_variance
-                                .entry(typevar)
+                                .entry(typevar.identity(self.db()))
                                 .and_modify(|current| *current = current.join(variance))
                                 .or_insert(variance);
 

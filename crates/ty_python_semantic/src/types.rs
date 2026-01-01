@@ -2,6 +2,7 @@ use compact_str::CompactString;
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
+use rustc_hash::FxHashMap;
 
 use std::borrow::Cow;
 use std::cell::RefCell;
@@ -2066,13 +2067,13 @@ impl<'db> Type<'db> {
             builder.into_type_mappings()
         };
 
-        for (type_var, ty) in generic_context.variables(db).zip(specialization.types(db)) {
+        for (type_var, ty) in specialization.types_and_variables(db) {
             let variance = type_var.variance_with_polarity(db, polarity);
             let narrowed_tcx = TypeContext::new(tcx_mappings.get(&type_var.identity(db)).copied());
 
-            f(type_var, *ty, variance, narrowed_tcx);
+            f(type_var, ty, variance, narrowed_tcx);
 
-            visitor.visit(*ty, || {
+            visitor.visit(ty, || {
                 ty.visit_specialization_impl(db, narrowed_tcx, variance, f, visitor);
             });
         }
@@ -6095,20 +6096,21 @@ impl<'db> Type<'db> {
                     return alias.raw_value_type(db).expand_eagerly(db);
                 }
 
+                if let TypeMapping::UniqueSpecialization { .. } = *type_mapping {
+                    return visitor.visit(self, || {
+                        alias.value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
+                    });
+                }
+
                 // Do not call `value_type` here. `value_type` does the specialization internally, so `apply_type_mapping` is
                 // performed without `visitor` inheritance. In the case of recursive type aliases, this leads to infinite recursion.
                 // Instead, call `raw_value_type` and perform the specialization after the `visitor` cache has been created.
                 let value_type = visitor.visit(self, || {
-                    match type_mapping {
-                        // We only want to perform the unique specialization onto the specialization of the type alias below,
-                        // not the raw value type.
-                        TypeMapping::UniqueSpecialization { .. } => alias.raw_value_type(db),
-
-                        _ => alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor),
-                    }
+                    alias.raw_value_type(db).apply_type_mapping_impl(db, type_mapping, tcx, visitor)
                 });
 
                 let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
@@ -6853,29 +6855,45 @@ impl PromoteLiteralsMode {
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
+
     /// Resets any specializations to contain unique synthetic type variables.
     UniqueSpecialization {
+        // The number at which to begin counting synthetic type variables, which
+        // are identified numerically.
+        skip: usize,
+
         // A list of synthetic type variables, and the types they replaced.
-        specialization: RefCell<Vec<(BoundTypeVarInstance<'db>, Type<'db>)>>,
+        specialization: RefCell<FxHashMap<BoundTypeVarInstance<'db>, Type<'db>>>,
+
+        // Whether or not to constrain a given synthetic type variable to the type
+        // it replaces.
+        constrain: bool,
     },
+
     /// Replaces any literal types with their corresponding promoted type form (e.g. `Literal["string"]`
     /// to `str`, or `def _() -> int` to `Callable[[], int]`).
     PromoteLiterals(PromoteLiteralsMode),
+
     /// Binds a legacy typevar with the generic context (class, function, type alias) that it is
     /// being used in.
     BindLegacyTypevars(BindingContext<'db>),
+
     /// Binds any `typing.Self` typevar with a particular `self` class.
     BindSelf {
         self_type: Type<'db>,
         binding_context: Option<BindingContext<'db>>,
     },
+
     /// Replaces occurrences of `typing.Self` with a new `Self` type variable with the given upper bound.
     ReplaceSelf { new_upper_bound: Type<'db> },
+
     /// Create the top or bottom materialization of a type.
     Materialize(MaterializationKind),
+
     /// Replace default types in parameters of callables with `Unknown`. This is used to avoid infinite
     /// recursion when the type of the default value of a parameter depends on the callable itself.
     ReplaceParameterDefaults,
+
     /// Apply eager expansion to the type.
     /// In the case of recursive type aliases, this will diverge, so that part will be replaced with `Divergent`.
     EagerExpansion,
@@ -6917,19 +6935,24 @@ impl<'db> TypeMapping<'_, 'db> {
     }
 
     /// Returns a new `TypeMapping` that should be applied in contravariant positions.
-    pub(crate) fn flip(&self) -> Self {
+    pub(crate) fn flip(&self) -> Cow<'_, Self> {
         match self {
             TypeMapping::Materialize(materialization_kind) => {
-                TypeMapping::Materialize(materialization_kind.flip())
+                Cow::Owned(TypeMapping::Materialize(materialization_kind.flip()))
             }
-            TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
+            TypeMapping::PromoteLiterals(mode) => {
+                Cow::Owned(TypeMapping::PromoteLiterals(mode.flip()))
+            }
             TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
             | TypeMapping::ReplaceSelf { .. }
             | TypeMapping::ReplaceParameterDefaults
-            | TypeMapping::EagerExpansion => self.clone(),
+            | TypeMapping::EagerExpansion => {
+                // Avoid cloning here, as type mappings may contain mutable state.
+                Cow::Borrowed(self)
+            }
         }
     }
 }
@@ -8419,8 +8442,7 @@ impl<'db> BoundTypeVarInstance<'db> {
         self.identity(db) == other.identity(db)
     }
 
-    /// Create a new PEP 695 type variable that can be used in signatures
-    /// of synthetic generic functions.
+    /// Create a new PEP 695 type variable that can be used in signatures of synthetic generic functions.
     pub(crate) fn synthetic(db: &'db dyn Db, name: Name, variance: TypeVarVariance) -> Self {
         let identity = TypeVarIdentity::new(
             db,
@@ -8432,6 +8454,30 @@ impl<'db> BoundTypeVarInstance<'db> {
             db,
             identity,
             None, // _bound_or_constraints
+            Some(variance),
+            None, // _default
+        );
+        Self::new(db, typevar, BindingContext::Synthetic, None)
+    }
+
+    /// Create a new PEP 695 type variable that can be used in signaturesof synthetic generic functions,
+    /// with the given upper bound.
+    pub(crate) fn synthetic_with_bounds_or_constraints(
+        db: &'db dyn Db,
+        name: Name,
+        variance: TypeVarVariance,
+        bounds_or_constraints: Option<TypeVarBoundOrConstraints<'db>>,
+    ) -> Self {
+        let identity = TypeVarIdentity::new(
+            db,
+            name,
+            None, // definition
+            TypeVarKind::Pep695,
+        );
+        let typevar = TypeVarInstance::new(
+            db,
+            identity,
+            bounds_or_constraints.map(TypeVarBoundOrConstraintsEvaluation::from),
             Some(variance),
             None, // _default
         );

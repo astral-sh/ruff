@@ -369,9 +369,7 @@ impl<'db> VarianceInferable<'db> for GenericAlias<'db> {
         std::iter::once(origin.variance_of(db, typevar))
             .chain(
                 specialization
-                    .generic_context(db)
-                    .variables(db)
-                    .zip(specialization.types(db))
+                    .types_and_variables(db)
                     .map(|(generic_typevar, ty)| {
                         if let Some(explicit_variance) =
                             generic_typevar.typevar(db).explicit_variance(db)

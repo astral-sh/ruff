@@ -3020,7 +3020,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 .class_specialization(self.db)?;
 
             builder
-                .infer_reverse_map(tcx, return_ty, |(_, variance, inferred_ty)| {
+                .infer_reverse_map(tcx, return_ty, |(_, inferred_ty), variance| {
                     // Avoid unnecessarily widening the return type based on a covariant
                     // type parameter from the type context, as it can lead to argument
                     // assignability errors if the type variable is constrained by a narrower
@@ -3048,15 +3048,15 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             for (parameter_index, variadic_argument_type) in
                 self.argument_matches[argument_index].iter()
             {
-                let specialization_result = builder.infer_map(
+                let specialization_result = builder.infer_map_with_variance(
                     parameters[parameter_index].annotated_type(),
                     variadic_argument_type.unwrap_or(argument_type),
-                    |(identity, variance, inferred_ty)| {
+                    |(type_var, inferred_ty), variance| {
                         // Avoid widening the inferred type if it is already assignable to the
                         // preferred declared type.
                         if preferred_type_mappings
                             .as_ref()
-                            .and_then(|types| types.get(&identity))
+                            .and_then(|types| types.get(&type_var.identity(self.db)))
                             .is_some_and(|preferred_ty| {
                                 inferred_ty.is_assignable_to(self.db, *preferred_ty)
                             })
@@ -3065,7 +3065,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                         }
 
                         variance_in_arguments
-                            .entry(identity)
+                            .entry(type_var.identity(self.db))
                             .and_modify(|current| *current = current.join(variance))
                             .or_insert(variance);
 
