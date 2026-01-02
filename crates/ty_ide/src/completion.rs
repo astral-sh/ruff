@@ -16,7 +16,6 @@ use ruff_python_codegen::Stylist;
 use ruff_text_size::{Ranged, TextRange, TextSize};
 use rustc_hash::FxHashSet;
 use ty_module_resolver::{KnownModule, ModuleName};
-use ty_python_semantic::HasType;
 use ty_python_semantic::types::UnionType;
 use ty_python_semantic::{
     Completion as SemanticCompletion, HasType, NameKind, SemanticModel,
