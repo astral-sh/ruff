@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::marker::PhantomData;
 
+use super::class::ClassLiteral;
 use super::protocol_class::ProtocolInterface;
 use super::{BoundTypeVarInstance, ClassType, KnownClass, SubclassOfType, Type, TypeVarVariance};
 use crate::place::PlaceAndQualifiers;
@@ -35,7 +36,11 @@ impl<'db> Type<'db> {
 
     pub(crate) fn instance(db: &'db dyn Db, class: ClassType<'db>) -> Self {
         let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
-            // Functional classes don't have a class literal; just return a nominal instance.
+            // Check if it's a functional TypedDict; if so, create a proper TypedDict instance type.
+            if let ClassType::NonGeneric(ClassLiteral::FunctionalTypedDict(typeddict)) = class {
+                return typeddict.to_typed_dict_type(db);
+            }
+            // Other functional classes don't have a class literal; just return a nominal instance.
             return Type::NominalInstance(NominalInstanceType(NominalInstanceInner::NonTuple(
                 class,
             )));

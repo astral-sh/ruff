@@ -53,7 +53,8 @@ use crate::subscript::{PyIndex, PySlice};
 use crate::types::call::bind::{CallableDescription, MatchingOverloadIndex};
 use crate::types::call::{Binding, Bindings, CallArguments, CallError, CallErrorKind};
 use crate::types::class::{
-    ClassLiteral, CodeGeneratorKind, FieldKind, MetaclassErrorKind, MethodDecorator,
+    ClassLiteral, CodeGeneratorKind, FieldKind, FunctionalTypedDictFieldsEvaluation,
+    FunctionalTypedDictLiteral, MetaclassErrorKind, MethodDecorator,
 };
 use crate::types::context::{InNoTypeCheck, InferContext};
 use crate::types::cyclic::CycleDetector;
@@ -116,8 +117,9 @@ use crate::types::{
     StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, TypingNamedTupleFieldsSchema,
-    UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictFieldsSchema, TypedDictType,
+    TypingNamedTupleFieldsSchema, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
+    infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5256,7 +5258,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             self.infer_newtype_expression(target, call_expr, definition)
                         }
                         Some(_) | None => {
-                            self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                            if callable_type.as_special_form() == Some(SpecialFormType::TypedDict) {
+                                self.infer_functional_typeddict(call_expr, definition)
+                            } else {
+                                self.infer_call_expression_impl(call_expr, callable_type, tcx)
+                            }
                         }
                     };
 
@@ -5787,6 +5793,86 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
+    /// Handle functional `TypedDict` creation: `Movie = TypedDict("Movie", {"name": str, ...})`.
+    ///
+    /// This method creates a `FunctionalTypedDictLiteral` with lazy field type resolution
+    /// to avoid cycles when dealing with recursive `TypedDict`s.
+    fn infer_functional_typeddict(
+        &mut self,
+        call_expr: &ast::ExprCall,
+        definition: Definition<'db>,
+    ) -> Type<'db> {
+        let db = self.db();
+        let arguments = &call_expr.arguments;
+
+        // Get the dict literal from the second argument (positional or keyword "fields").
+        // Check this first, before inferring any expressions, so we can fall back cleanly.
+        let fields_arg = arguments
+            .find_positional(1)
+            .or_else(|| arguments.find_keyword("fields").map(|kw| &kw.value));
+
+        let Some(ast::Expr::Dict(dict_expr)) = fields_arg else {
+            // Fields argument is not a dict literal (e.g., dict() call or kwargs),
+            // fall back to normal call inference.
+            return self.infer_call_expression_impl(
+                call_expr,
+                Type::SpecialForm(SpecialFormType::TypedDict),
+                TypeContext::default(),
+            );
+        };
+
+        // Check for dict unpacking and non-string-literal keys before inferring any expressions.
+        // This ensures we can fall back cleanly without double-inference issues.
+        for item in &dict_expr.items {
+            match &item.key {
+                // Dict unpacking (`**other`) is not supported.
+                None => {
+                    return self.infer_call_expression_impl(
+                        call_expr,
+                        Type::SpecialForm(SpecialFormType::TypedDict),
+                        TypeContext::default(),
+                    );
+                }
+                // Keys must be string literals.
+                Some(key) if !matches!(key, ast::Expr::StringLiteral(_)) => {
+                    return self.infer_call_expression_impl(
+                        call_expr,
+                        Type::SpecialForm(SpecialFormType::TypedDict),
+                        TypeContext::default(),
+                    );
+                }
+                _ => {}
+            }
+        }
+
+        // Extract the name from the first argument.
+        let name_ty = arguments
+            .find_positional(0)
+            .map(|arg| self.infer_expression(arg, TypeContext::default()));
+
+        let Some(name) = name_ty.and_then(|ty| ty.as_string_literal().map(|s| s.value(db))) else {
+            // Name is not a valid string literal, fall back to normal call inference.
+            return self.infer_call_expression_impl(
+                call_expr,
+                Type::SpecialForm(SpecialFormType::TypedDict),
+                TypeContext::default(),
+            );
+        };
+
+        // Mark for deferred evaluation since field types need to be resolved later.
+        self.deferred.insert(definition, self.multi_inference_state);
+
+        // Create the TypedDict literal with lazy fields.
+        let typeddict = FunctionalTypedDictLiteral::new(
+            db,
+            ast::name::Name::new(name),
+            Some(definition),
+            Some(FunctionalTypedDictFieldsEvaluation::Lazy),
+        );
+
+        Type::ClassLiteral(ClassLiteral::FunctionalTypedDict(typeddict))
+    }
+
     /// Extract fields from a list or tuple literal for `typing.NamedTuple`.
     fn infer_typing_namedtuple_fields_schema(
         &mut self,
@@ -5845,8 +5931,48 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Extract fields from a dict literal for `typing.TypedDict` functional form.
+    fn infer_typed_dict_fields_schema(
+        &mut self,
+        items: &[ast::DictItem],
+    ) -> Option<TypedDictFieldsSchema<'db>> {
+        let db = self.db();
+        let mut fields: Vec<(ast::name::Name, Type<'db>, Option<bool>)> =
+            Vec::with_capacity(items.len());
+
+        for item in items {
+            // Each key should be a string literal.
+            let key_expr = item.key.as_ref()?;
+            let key_ty = self.infer_expression(key_expr, TypeContext::default());
+            let key_lit = key_ty.as_string_literal()?;
+            let field_name = ast::name::Name::new(key_lit.value(db));
+
+            // Get the field type using annotation expression inference to capture qualifiers.
+            let field_type_and_qualifiers =
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
+            let field_type_ty = field_type_and_qualifiers.inner_type();
+            let qualifiers = field_type_and_qualifiers.qualifiers();
+
+            // Determine required_qualifier based on Required/NotRequired qualifiers:
+            // - Some(true): field marked with Required[T]
+            // - Some(false): field marked with NotRequired[T]
+            // - None: no qualifier, will use the `total` parameter
+            let required_qualifier = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+                Some(true)
+            } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                Some(false)
+            } else {
+                None
+            };
+
+            fields.push((field_name, field_type_ty, required_qualifier));
+        }
+
+        Some(TypedDictFieldsSchema::new(db, fields.into_boxed_slice()))
+    }
+
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
-        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
+        // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType / TypedDict.
         let ast::Expr::Call(ast::ExprCall {
             func, arguments, ..
         }) = value
@@ -5856,6 +5982,12 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let func_ty = self
             .try_expression_type(func)
             .unwrap_or_else(|| self.infer_expression(func, TypeContext::default()));
+
+        if func_ty.as_special_form() == Some(SpecialFormType::TypedDict) {
+            self.infer_functional_typeddict_deferred(arguments);
+            return;
+        }
+
         let known_class = func_ty
             .as_class_literal()
             .and_then(|cls| cls.known(self.db()));
@@ -5878,6 +6010,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             } else {
                 self.infer_type_expression(&default.value);
             }
+        }
+    }
+
+    /// Infer field types for a functional `TypedDict` in the deferred pass.
+    fn infer_functional_typeddict_deferred(&mut self, arguments: &ast::Arguments) {
+        // Get the dict literal from the second argument (positional or keyword "fields").
+        let fields_arg = arguments
+            .find_positional(1)
+            .or_else(|| arguments.find_keyword("fields").map(|kw| &kw.value));
+
+        let Some(ast::Expr::Dict(dict_expr)) = fields_arg else {
+            return;
+        };
+
+        // Infer field types as annotation expressions.
+        for item in &dict_expr.items {
+            // Infer key as a regular expression.
+            if let Some(key) = &item.key {
+                self.infer_expression(key, TypeContext::default());
+            }
+            // Infer value as an annotation expression to capture Required/NotRequired qualifiers.
+            self.infer_annotation_expression(&item.value, DeferredExpressionState::Deferred);
         }
     }
 
@@ -7989,6 +8143,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
+        // Extract fields for typing.TypedDict functional form.
+        if let Some(Type::SpecialForm(SpecialFormType::TypedDictFieldsSchema)) = tcx.annotation {
+            if let Some(schema) = self.infer_typed_dict_fields_schema(items) {
+                return Type::KnownInstance(KnownInstanceType::TypedDictFieldsSchema(schema));
+            }
+        }
+
         let mut item_types = FxHashMap::default();
 
         // Validate `TypedDict` dictionary literal assignments.
@@ -8915,29 +9076,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            let has_special_cased_constructor = matches!(
-                class.known(self.db()),
-                Some(
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                        | KnownClass::Super
-                        | KnownClass::TypeAliasType
-                        | KnownClass::Deprecated
-                )
-            ) || (
-                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-                // in `ClassType::own_class_member()`).
-                class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || class
-                .stmt_class_literal(self.db())
-                .is_some_and(|(class_literal, specialization)| {
-                    CodeGeneratorKind::TypedDict.matches(self.db(), class_literal, specialization)
-                });
+            let has_special_cased_constructor =
+                matches!(
+                    class.known(self.db()),
+                    Some(
+                        KnownClass::Bool
+                            | KnownClass::Str
+                            | KnownClass::Type
+                            | KnownClass::Object
+                            | KnownClass::Property
+                            | KnownClass::Super
+                            | KnownClass::TypeAliasType
+                            | KnownClass::Deprecated
+                    )
+                ) || (
+                    // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+                    // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+                    // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+                    // in `ClassType::own_class_member()`).
+                    class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
+                ) || class.class_literal(self.db()).is_typed_dict(self.db());
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes

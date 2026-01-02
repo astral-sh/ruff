@@ -2259,6 +2259,11 @@ impl<'db> Type<'db> {
                 Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema),
             ) if relation.is_assignability() => ConstraintSet::from(true),
 
+            (
+                Type::KnownInstance(KnownInstanceType::TypedDictFieldsSchema(_)),
+                Type::SpecialForm(SpecialFormType::TypedDictFieldsSchema),
+            ) if relation.is_assignability() => ConstraintSet::from(true),
+
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
             //
@@ -2774,13 +2779,17 @@ impl<'db> Type<'db> {
                     )
                 }),
 
+            // All TypedDicts are subtypes of TypedDictFallback, which in turn is a subtype of
+            // Mapping[str, object]. Using TypedDictFallback as the fallback ensures that TypedDict
+            // instances satisfy bounds like `Self` on TypedDictFallback methods.
+            //
             // TODO: When we support `closed` and/or `extra_items`, we could allow assignments to other
             // compatible `Mapping`s. `extra_items` could also allow for some assignments to `dict`, as
             // long as `total=False`. (But then again, does anyone want a non-total `TypedDict` where all
             // key types are a supertype of the extra items type?)
             (Type::TypedDict(_), _) => relation_visitor.visit((self, target, relation), || {
-                KnownClass::Mapping
-                    .to_specialized_instance(db, [KnownClass::Str.to_instance(db), Type::object()])
+                KnownClass::TypedDictFallback
+                    .to_instance(db)
                     .has_relation_to_impl(
                         db,
                         target,
@@ -6589,6 +6598,7 @@ impl<'db> Type<'db> {
             },
 
             Type::SpecialForm(SpecialFormType::TypedDict) => {
+                // typing.TypedDict(typename: str, fields: _TypedDictFieldsSchema, total: bool = True)
                 Binding::single(
                     self,
                     Signature::new(
@@ -6598,7 +6608,9 @@ impl<'db> Type<'db> {
                                 Parameter::positional_only(Some(Name::new_static("typename")))
                                     .with_annotated_type(KnownClass::Str.to_instance(db)),
                                 Parameter::positional_only(Some(Name::new_static("fields")))
-                                    .with_annotated_type(KnownClass::Dict.to_instance(db))
+                                    .with_annotated_type(Type::SpecialForm(
+                                        SpecialFormType::TypedDictFieldsSchema,
+                                    ))
                                     .with_default_type(Type::any()),
                                 Parameter::keyword_only(Name::new_static("total"))
                                     .with_annotated_type(KnownClass::Bool.to_instance(db))
@@ -6608,7 +6620,8 @@ impl<'db> Type<'db> {
                                     .with_annotated_type(Type::any()),
                             ],
                         ),
-                        None,
+                        // Return type[TypedDict] for fallback when we can't parse the functional form.
+                        Some(KnownClass::TypedDictFallback.to_subclass_of(db)),
                     ),
                 )
                 .into()
@@ -7761,7 +7774,8 @@ impl<'db> Type<'db> {
                 // Internal types, should never appear in user code.
                 KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => Ok(Type::unknown()),
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::TypedDictFieldsSchema(_) => Ok(Type::unknown()),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7899,7 +7913,8 @@ impl<'db> Type<'db> {
                 // Internal types, should never appear in user code.
                 SpecialFormType::TypingNamedTupleFieldsSchema
                 | SpecialFormType::CollectionsNamedTupleFieldsSchema
-                | SpecialFormType::CollectionsNamedTupleDefaultsSchema => Ok(Type::unknown()),
+                | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+                | SpecialFormType::TypedDictFieldsSchema => Ok(Type::unknown()),
             },
 
             Type::Union(union) => {
@@ -8179,7 +8194,8 @@ impl<'db> Type<'db> {
                 KnownInstanceType::NewType(_) |
                 KnownInstanceType::TypingNamedTupleFieldsSchema(_) |
                 KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) |
-                KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) |
+                KnownInstanceType::TypedDictFieldsSchema(_) => {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
@@ -8578,7 +8594,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::TypedDictFieldsSchema(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -9257,6 +9274,9 @@ pub enum KnownInstanceType<'db> {
 
     /// Schema for `collections.namedtuple` defaults count, extracted from a list or tuple literal.
     CollectionsNamedTupleDefaultsSchema(CollectionsNamedTupleDefaultsSchema<'db>),
+
+    /// Schema for `typing.TypedDict` fields, extracted from a dict literal.
+    TypedDictFieldsSchema(TypedDictFieldsSchema<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9312,6 +9332,11 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) => {}
         // CollectionsNamedTupleDefaultsSchema only contains a count, no types to visit.
         KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {}
+        KnownInstanceType::TypedDictFieldsSchema(schema) => {
+            for (_, field_ty, _) in schema.fields(db) {
+                visitor.visit_type(db, *field_ty);
+            }
+        }
     }
 }
 
@@ -9367,6 +9392,9 @@ impl<'db> KnownInstanceType<'db> {
             }
             Self::CollectionsNamedTupleDefaultsSchema(schema) => {
                 Self::CollectionsNamedTupleDefaultsSchema(schema.normalized_impl(db, visitor))
+            }
+            Self::TypedDictFieldsSchema(schema) => {
+                Self::TypedDictFieldsSchema(schema.normalized_impl(db, visitor))
             }
         }
     }
@@ -9441,6 +9469,20 @@ impl<'db> KnownInstanceType<'db> {
             Self::CollectionsNamedTupleDefaultsSchema(schema) => {
                 Some(Self::CollectionsNamedTupleDefaultsSchema(schema))
             }
+            Self::TypedDictFieldsSchema(schema) => {
+                // Normalize the field types.
+                let normalized_fields: Option<Box<[_]>> = schema
+                    .fields(db)
+                    .iter()
+                    .map(|(name, ty, is_required)| {
+                        ty.recursive_type_normalized_impl(db, div, true)
+                            .map(|normalized_ty| (name.clone(), normalized_ty, *is_required))
+                    })
+                    .collect();
+                normalized_fields.map(|fields| {
+                    Self::TypedDictFieldsSchema(TypedDictFieldsSchema::new(db, fields))
+                })
+            }
         }
     }
 
@@ -9470,7 +9512,8 @@ impl<'db> KnownInstanceType<'db> {
             // Internal types, no corresponding known class.
             Self::TypingNamedTupleFieldsSchema(_)
             | Self::CollectionsNamedTupleFieldsSchema(_)
-            | Self::CollectionsNamedTupleDefaultsSchema(_) => KnownClass::Object,
+            | Self::CollectionsNamedTupleDefaultsSchema(_)
+            | Self::TypedDictFieldsSchema(_) => KnownClass::Object,
         }
     }
 
@@ -10028,6 +10071,39 @@ impl get_size2::GetSize for CollectionsNamedTupleDefaultsSchema<'_> {}
 impl CollectionsNamedTupleDefaultsSchema<'_> {
     pub(crate) fn normalized_impl(self, _db: &dyn Db, _visitor: &NormalizedVisitor<'_>) -> Self {
         self
+    }
+}
+
+/// Schema for TypedDict fields, extracted from a dict literal in a functional TypedDict call.
+/// Each field includes its name, type, and whether it's required:
+/// - `Some(true)`: field marked with `Required[T]`
+/// - `Some(false)`: field marked with `NotRequired[T]`
+/// - `None`: no qualifier, will use the `total` parameter
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct TypedDictFieldsSchema<'db> {
+    #[returns(ref)]
+    pub fields: Box<[(Name, Type<'db>, Option<bool>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for TypedDictFieldsSchema<'_> {}
+
+impl<'db> TypedDictFieldsSchema<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        TypedDictFieldsSchema::new(
+            db,
+            self.fields(db)
+                .iter()
+                .map(|(name, ty, required_qualifier)| {
+                    (
+                        name.clone(),
+                        ty.normalized_impl(db, visitor),
+                        *required_qualifier,
+                    )
+                })
+                .collect::<Box<[_]>>(),
+        )
     }
 }
 
@@ -12606,7 +12682,7 @@ impl TypeRelation<'_> {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, get_size2::GetSize)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, get_size2::GetSize)]
 pub enum Truthiness {
     /// For an object `x`, `bool(x)` will always return `True`
     AlwaysTrue,
