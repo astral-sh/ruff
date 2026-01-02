@@ -1,5 +1,6 @@
 import abc
-from abc import abstractmethod, ABCMeta
+from abc import abstractmethod, ABCMeta, ABC
+from abc import ABC as ABCAlternativeName
 
 
 # Errors
@@ -52,7 +53,14 @@ class A6(abc.ABC):
     @abstractmethod
     def foo(self): pass
 
+class A7(ABC):
+    @abstractmethod
+    def foo(self): pass
 
-class A7(B0, abc.ABC, B1):
+class A8(ABCAlternativeName):
+    @abstractmethod
+    def foo(self): pass
+
+class A9(B0, abc.ABC, B1):
     @abstractmethod
     def foo(self): pass

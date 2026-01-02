@@ -2,7 +2,8 @@ use itertools::Itertools;
 
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{Expr, StmtClassDef};
+use ruff_python_ast::{StmtClassDef};
+use ruff_python_semantic::analyze;
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::checkers::ast::Checker;
@@ -97,23 +98,19 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         )?;
 
         // Check the `abc.ABC` is in base classes.
-        let is_has_abc = class_def.bases().iter().any(|base| {
-            matches!(base, Expr::Name(_) | Expr::Attribute(_))
-                && checker
-                    .semantic()
-                    .resolve_qualified_name(base)
-                    .is_some_and(
-                        |qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"])
-                    )
-        });
+        let has_abc = analyze::class::any_qualified_base_class(
+            class_def,
+            checker.semantic(),
+            &|qualified_name| matches!(qualified_name.segments(), ["abc", "ABC"]),
+        );
 
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
-            // keyword.
-            let rest = if is_has_abc {
-                vec![]
+            // keyword, but only if it not already presented.
+            let rest: &[Edit] = if has_abc {
+                &[]
             } else {
-                vec![
+                &[
                     Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
                     import_edit,
                 ]
@@ -124,25 +121,20 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                     class_def.keywords()[position - 1].end(),
                     keyword.end(),
                 )),
-                // Insert `abc.ABC` before the first keyword.
-                rest,
+                // Insert `abc.ABC` before the first keyword if needed.
+                rest.iter().cloned(),
                 applicability,
             )
         } else {
-
             // If class already inherits the `abc.ABC` we need to delete the entire
             // `metaclass` argument, otherwise, replace metaclass-keyword with `abc.ABC`.
-            let edit_action = if is_has_abc {
-                Edit::deletion(keyword.start(), keyword.end())
+            let edit_action = if has_abc {
+                Edit::range_deletion(keyword.range)
             } else {
                 Edit::range_replacement(binding, keyword.range)
             };
 
-            Fix::applicable_edits(
-                edit_action,
-                [import_edit],
-                applicability,
-            )
+            Fix::applicable_edits(edit_action, [import_edit], applicability)
         })
     });
 }

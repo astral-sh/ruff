@@ -2,76 +2,76 @@
 source: crates/ruff_linter/src/rules/refurb/mod.rs
 ---
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
- --> FURB180.py:7:10
-  |
-5 | # Errors
-6 |
-7 | class A0(metaclass=abc.ABCMeta):
-  |          ^^^^^^^^^^^^^^^^^^^^^
-8 |     @abstractmethod
-9 |     def foo(self): pass
-  |
+  --> FURB180.py:8:10
+   |
+ 6 | # Errors
+ 7 |
+ 8 | class A0(metaclass=abc.ABCMeta):
+   |          ^^^^^^^^^^^^^^^^^^^^^
+ 9 |     @abstractmethod
+10 |     def foo(self): pass
+   |
 help: Replace with `abc.ABC`
-4  | 
-5  | # Errors
-6  | 
+5  | 
+6  | # Errors
+7  | 
    - class A0(metaclass=abc.ABCMeta):
-7  + class A0(abc.ABC):
-8  |     @abstractmethod
-9  |     def foo(self): pass
-10 | 
-
-FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-  --> FURB180.py:12:10
-   |
-12 | class A1(metaclass=ABCMeta):
-   |          ^^^^^^^^^^^^^^^^^
-13 |     @abstractmethod
-14 |     def foo(self): pass
-   |
-help: Replace with `abc.ABC`
-9  |     def foo(self): pass
-10 | 
+8  + class A0(ABCAlternativeName):
+9  |     @abstractmethod
+10 |     def foo(self): pass
 11 | 
-   - class A1(metaclass=ABCMeta):
-12 + class A1(abc.ABC):
-13 |     @abstractmethod
-14 |     def foo(self): pass
-15 | 
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-  --> FURB180.py:26:18
+  --> FURB180.py:13:10
    |
-26 | class A2(B0, B1, metaclass=ABCMeta):
-   |                  ^^^^^^^^^^^^^^^^^
-27 |     @abstractmethod
-28 |     def foo(self): pass
+13 | class A1(metaclass=ABCMeta):
+   |          ^^^^^^^^^^^^^^^^^
+14 |     @abstractmethod
+15 |     def foo(self): pass
    |
 help: Replace with `abc.ABC`
-23 |     pass
-24 | 
+10 |     def foo(self): pass
+11 | 
+12 | 
+   - class A1(metaclass=ABCMeta):
+13 + class A1(ABCAlternativeName):
+14 |     @abstractmethod
+15 |     def foo(self): pass
+16 | 
+
+FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+  --> FURB180.py:27:18
+   |
+27 | class A2(B0, B1, metaclass=ABCMeta):
+   |                  ^^^^^^^^^^^^^^^^^
+28 |     @abstractmethod
+29 |     def foo(self): pass
+   |
+help: Replace with `abc.ABC`
+24 |     pass
 25 | 
+26 | 
    - class A2(B0, B1, metaclass=ABCMeta):
-26 + class A2(B0, B1, abc.ABC):
-27 |     @abstractmethod
-28 |     def foo(self): pass
-29 | 
+27 + class A2(B0, B1, ABCAlternativeName):
+28 |     @abstractmethod
+29 |     def foo(self): pass
+30 | 
 note: This is an unsafe fix and may change runtime behavior
 
 FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
-  --> FURB180.py:31:34
+  --> FURB180.py:32:34
    |
-31 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
+32 | class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
    |                                  ^^^^^^^^^^^^^^^^^^^^^
-32 |     pass
+33 |     pass
    |
 help: Replace with `abc.ABC`
-28 |     def foo(self): pass
-29 | 
+29 |     def foo(self): pass
 30 | 
+31 | 
    - class A3(B0, before_metaclass=1, metaclass=abc.ABCMeta):
-31 + class A3(B0, abc.ABC, before_metaclass=1):
-32 |     pass
-33 | 
+32 + class A3(B0, ABCAlternativeName, before_metaclass=1):
+33 |     pass
 34 | 
+35 | 
 note: This is an unsafe fix and may change runtime behavior
