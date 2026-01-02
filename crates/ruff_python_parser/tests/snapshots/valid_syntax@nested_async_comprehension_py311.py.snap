@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/ok/nested_async_comprehension_py311.py
 ---
 ## AST
 

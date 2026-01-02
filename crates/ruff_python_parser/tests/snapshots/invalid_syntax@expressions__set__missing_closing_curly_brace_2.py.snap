@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/invalid/expressions/set/missing_closing_curly_brace_2.py
 ---
 ## AST
 

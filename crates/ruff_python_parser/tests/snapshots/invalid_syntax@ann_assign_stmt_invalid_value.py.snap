@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_parser/tests/fixtures.rs
+input_file: crates/ruff_python_parser/resources/inline/err/ann_assign_stmt_invalid_value.py
 ---
 ## AST
 

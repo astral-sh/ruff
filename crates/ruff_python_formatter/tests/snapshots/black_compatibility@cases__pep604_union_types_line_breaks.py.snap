@@ -1,5 +1,6 @@
 ---
 source: crates/ruff_python_formatter/tests/fixtures.rs
+input_file: crates/ruff_python_formatter/resources/test/fixtures/black/cases/pep604_union_types_line_breaks.py
 ---
 ## Input
 
