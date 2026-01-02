@@ -1158,7 +1158,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 let place = self.expect_place(&rhs_place_expr);
-                constraints.insert(place, narrowed);
+                constraints.insert(place, narrowed.into());
             }
         }
 
