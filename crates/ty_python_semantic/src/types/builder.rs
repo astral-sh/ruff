@@ -40,8 +40,8 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
-    TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, IntersectionType, KnownClass, NegativeIntersectionElements,
+    StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -960,7 +960,7 @@ impl<'db> IntersectionBuilder<'db> {
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
-    negative: FxOrderSet<Type<'db>>,
+    negative: NegativeIntersectionElements<'db>,
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
