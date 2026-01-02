@@ -1,6 +1,5 @@
 import abc
-from abc import abstractmethod, ABCMeta, ABC
-from abc import ABC as ABCAlternativeName
+from abc import abstractmethod, ABCMeta
 
 
 # Errors
@@ -53,14 +52,32 @@ class A6(abc.ABC):
     @abstractmethod
     def foo(self): pass
 
-class A7(ABC):
+
+class A7(B0, abc.ABC, B1):
     @abstractmethod
     def foo(self): pass
 
-class A8(ABCAlternativeName):
-    @abstractmethod
-    def foo(self): pass
 
-class A9(B0, abc.ABC, B1):
+# Regression tests for https://github.com/astral-sh/ruff/issues/17162
+class A8(abc.ABC, metaclass=ABCMeta):  # FURB180
     @abstractmethod
-    def foo(self): pass
+    def foo(self):
+        pass
+
+
+def a9():
+    from abc import ABC
+
+    class A9(ABC, metaclass=ABCMeta):  # FURB180
+        @abstractmethod
+        def foo(self):
+            pass
+
+
+def a10():
+    from abc import ABC as ABCAlternativeName
+
+    class A10(ABCAlternativeName, metaclass=ABCMeta):  # FURB180
+        @abstractmethod
+        def foo(self):
+            pass
