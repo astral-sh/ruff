@@ -1050,7 +1050,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let place = self.expect_place(&subscript_place_expr);
                 constraints.insert(
                     place,
-                    NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                    NarrowingConstraint::typeguard(UnionType::from_elements(self.db, filtered)),
                 );
             }
         }
@@ -1664,7 +1664,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             let place = self.expect_place(&subscript_place_expr);
             Some((
                 place,
-                NarrowingConstraint::regular(UnionType::from_elements(self.db, filtered)),
+                NarrowingConstraint::typeguard(UnionType::from_elements(self.db, filtered)),
             ))
         } else {
             None
