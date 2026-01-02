@@ -238,15 +238,6 @@ def g(_: Callable[[int | float | complex], Bar]): ...
 g(Bar)
 ```
 
-Arithmetic also works:
-
-```py
-reveal_type(Foo(3.14) < Foo(42))  # revealed: bool
-reveal_type(Foo(3.14) == Foo(42))  # revealed: bool
-reveal_type(Foo(3.14) + Foo(42))  # revealed: int | float
-reveal_type(Foo(3.14) / Foo(42))  # revealed: int | float
-```
-
 ## `NewType`s in arithmetic and comparison expressions might or might not act as their base
 
 These expressions are valid because `Foo` acts as its base type, `int`:
