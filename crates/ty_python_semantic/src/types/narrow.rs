@@ -1122,7 +1122,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 let requires_key = |td: &TypedDictType<'db>| -> bool {
                     td.items(self.db)
                         .get(key_name)
-                        .is_some_and(|field| field.is_required())
+                        .is_some_and(super::typed_dict::TypedDictField::is_required)
                 };
 
                 let narrowed = match rhs_type {
