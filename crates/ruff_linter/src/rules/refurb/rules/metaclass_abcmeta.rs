@@ -107,10 +107,10 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         Ok(if position > 0 {
             // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
             // keyword, but only if it not already presented.
-            let rest: &[Edit] = if has_abc {
-                &[]
+            let rest = if has_abc {
+                vec![]
             } else {
-                &[
+                vec![
                     Edit::insertion(format!("{binding}, "), class_def.keywords()[0].start()),
                     import_edit,
                 ]
@@ -122,7 +122,7 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                     keyword.end(),
                 )),
                 // Insert `abc.ABC` before the first keyword if needed.
-                rest.iter().cloned(),
+                rest,
                 applicability,
             )
         } else {
