@@ -140,15 +140,18 @@ pub(crate) fn repeated_equality_comparison(checker: &Checker, bool_op: &ast::Exp
                 continue;
             }
 
-            let first_comparable = ComparableExpr::from(comparators[0]);
-            if comparators
-                .iter()
-                .skip(1)
-                .all(|&c| ComparableExpr::from(c) == first_comparable)
-            {
-                // Do not flag if all members are identical
-                continue;
+            if let Some((&first, rest)) = comparators.split_first() {
+                let first_comparable = ComparableExpr::from(first);
+
+                if rest
+                    .iter()
+                    .all(|&c| ComparableExpr::from(c) == first_comparable)
+                {
+                    // Do not flag if all members are identical
+                    continue;
+                }
             }
+
             // if we can determine that all the values are hashable, we can use a set
             // TODO: improve with type inference
             let all_hashable = comparators
