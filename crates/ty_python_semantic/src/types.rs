@@ -14376,8 +14376,135 @@ pub struct IntersectionType<'db> {
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
     #[returns(ref)]
-    negative: FxOrderSet<Type<'db>>,
+    negative: NegativeIntersectionElements<'db>,
 }
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update, Default)]
+pub enum NegativeIntersectionElements<'db> {
+    #[default]
+    Empty,
+    Single(Type<'db>),
+    Multiple(FxOrderSet<Type<'db>>),
+}
+
+impl<'db> NegativeIntersectionElements<'db> {
+    pub(crate) fn iter(&self) -> NegativeIntersectionElementsIterator<'_, 'db> {
+        match self {
+            Self::Empty => NegativeIntersectionElementsIterator::EmptyOrOne(None),
+            Self::Single(ty) => NegativeIntersectionElementsIterator::EmptyOrOne(Some(ty)),
+            Self::Multiple(set) => NegativeIntersectionElementsIterator::Multiple(set.iter()),
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::Single(_) => 1,
+            Self::Multiple(set) => set.len(),
+        }
+    }
+
+    pub(crate) fn contains(&self, ty: &Type<'db>) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Single(existing) => existing == ty,
+            Self::Multiple(set) => set.contains(ty),
+        }
+    }
+
+    pub(crate) const fn is_empty(&self) -> bool {
+        matches!(self, Self::Empty)
+    }
+
+    pub(crate) fn insert(&mut self, ty: Type<'db>) {
+        match self {
+            Self::Empty => *self = Self::Single(ty),
+            Self::Single(existing) => {
+                *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
+            }
+            Self::Multiple(set) => {
+                set.insert(ty);
+            }
+        }
+    }
+
+    pub(crate) fn shrink_to_fit(&mut self) {
+        match self {
+            Self::Empty | Self::Single(_) => {}
+            Self::Multiple(set) => set.shrink_to_fit(),
+        }
+    }
+
+    pub(crate) fn sort_unstable_by(
+        &mut self,
+        compare: impl FnMut(&Type<'db>, &Type<'db>) -> std::cmp::Ordering,
+    ) {
+        match self {
+            Self::Empty | Self::Single(_) => {}
+            Self::Multiple(set) => {
+                set.sort_unstable_by(compare);
+            }
+        }
+    }
+
+    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Single(existing) => {
+                if existing == ty {
+                    *self = Self::Empty;
+                    true
+                } else {
+                    false
+                }
+            }
+            Self::Multiple(set) => set.swap_remove(ty),
+        }
+    }
+
+    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
+        match self {
+            Self::Empty => None,
+            Self::Single(existing) => {
+                if index == 0 {
+                    let ty = *existing;
+                    *self = Self::Empty;
+                    Some(ty)
+                } else {
+                    None
+                }
+            }
+            Self::Multiple(set) => set.swap_remove_index(index),
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
+    type Item = &'a Type<'db>;
+    type IntoIter = NegativeIntersectionElementsIterator<'a, 'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+pub enum NegativeIntersectionElementsIterator<'a, 'db> {
+    EmptyOrOne(Option<&'a Type<'db>>),
+    Multiple(ordermap::set::Iter<'a, Type<'db>>),
+}
+
+impl<'a, 'db> Iterator for NegativeIntersectionElementsIterator<'a, 'db> {
+    type Item = &'a Type<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            NegativeIntersectionElementsIterator::EmptyOrOne(opt) => opt.take(),
+            NegativeIntersectionElementsIterator::Multiple(iter) => iter.next(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {}
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
@@ -14430,11 +14557,19 @@ impl<'db> IntersectionType<'db> {
             elements
         }
 
-        IntersectionType::new(
-            db,
-            normalized_set(db, self.positive(db), visitor),
-            normalized_set(db, self.negative(db), visitor),
-        )
+        let positive = normalized_set(db, self.positive(db), visitor);
+
+        let negative = match self.negative(db) {
+            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
+            NegativeIntersectionElements::Single(ty) => {
+                NegativeIntersectionElements::Single(ty.normalized_impl(db, visitor))
+            }
+            NegativeIntersectionElements::Multiple(set) => {
+                NegativeIntersectionElements::Multiple(normalized_set(db, set, visitor))
+            }
+        };
+
+        IntersectionType::new(db, positive, negative)
     }
 
     pub(crate) fn recursive_type_normalized_impl(
@@ -14475,10 +14610,25 @@ impl<'db> IntersectionType<'db> {
         } else {
             normalized_set(db, self.positive(db), div, nested)
         };
-        let negative = if nested {
-            opt_normalized_set(db, self.negative(db), div, nested)?
-        } else {
-            normalized_set(db, self.negative(db), div, nested)
+        let negative = match self.negative(db) {
+            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
+            NegativeIntersectionElements::Single(ty) => {
+                let ty = if nested {
+                    ty.recursive_type_normalized_impl(db, div, nested)?
+                } else {
+                    ty.recursive_type_normalized_impl(db, div, nested)
+                        .unwrap_or(div)
+                };
+                NegativeIntersectionElements::Single(ty)
+            }
+            NegativeIntersectionElements::Multiple(set) => {
+                let negative_set = if nested {
+                    opt_normalized_set(db, set, div, nested)?
+                } else {
+                    normalized_set(db, set, div, nested)
+                };
+                NegativeIntersectionElements::Multiple(negative_set)
+            }
         };
 
         Some(IntersectionType::new(db, positive, negative))
