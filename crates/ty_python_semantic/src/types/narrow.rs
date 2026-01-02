@@ -1027,8 +1027,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             && rhs_ty.is_singleton(self.db)
         {
             let is_positive_check = is_positive == (ops[0] == ast::CmpOp::Is);
-            let filtered: Vec<_> = union
-                .elements(self.db)
+            let union_elements = union.elements(self.db);
+            let filtered: Vec<_> = union_elements
                 .iter()
                 .filter(|elem| {
                     elem.as_nominal_instance()
@@ -1046,7 +1046,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 })
                 .copied()
                 .collect();
-            if filtered.len() < union.elements(self.db).len() {
+            if filtered.len() < union_elements.len() {
                 let place = self.expect_place(&subscript_place_expr);
                 constraints.insert(
                     place,
@@ -1639,8 +1639,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
 
         // Filter the union based on whether each tuple element at the index could match the rhs.
-        let filtered: Vec<_> = union
-            .elements(self.db)
+        let union_elements = union.elements(self.db);
+        let filtered: Vec<_> = union_elements
             .iter()
             .filter(|elem| {
                 elem.as_nominal_instance()
@@ -1660,7 +1660,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             .collect();
 
         // Only create a constraint if we actually narrowed something.
-        if filtered.len() < union.elements(self.db).len() {
+        if filtered.len() < union_elements.len() {
             let place = self.expect_place(&subscript_place_expr);
             Some((
                 place,
