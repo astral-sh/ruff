@@ -146,19 +146,17 @@ fn check_class_declaration<'db>(
 
     let mut subclass_overrides_superclass_declaration = false;
     let mut has_dynamic_superclass = false;
-    let mut has_typeddict_in_mro = false;
     let mut liskov_diagnostic_emitted = false;
     let mut overridden_final_method = None;
+
+    // Check if this class is a TypedDict upfront so we can fall back to TypedDictFallback.
+    let is_typed_dict = literal.is_typed_dict(db);
 
     for class_base in class.iter_mro(db).skip(1) {
         let superclass = match class_base {
             ClassBase::Protocol | ClassBase::Generic => continue,
             ClassBase::Dynamic(_) => {
                 has_dynamic_superclass = true;
-                continue;
-            }
-            ClassBase::TypedDict => {
-                has_typeddict_in_mro = true;
                 continue;
             }
             ClassBase::Class(class) => class,
@@ -286,7 +284,7 @@ fn check_class_declaration<'db>(
     }
 
     if !subclass_overrides_superclass_declaration && !has_dynamic_superclass {
-        if has_typeddict_in_mro {
+        if is_typed_dict {
             if !KnownClass::TypedDictFallback
                 .to_instance(db)
                 .member(db, &member.name)
