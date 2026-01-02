@@ -24,7 +24,9 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 use type_ordering::union_or_intersection_elements_ordering;
 
 pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
-pub(crate) use self::class::{FunctionalClassLiteral, FunctionalNamedTupleLiteral};
+pub(crate) use self::class::{
+    FunctionalClassLiteral, FunctionalDataclassLiteral, FunctionalNamedTupleLiteral,
+};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
@@ -2258,6 +2260,40 @@ impl<'db> Type<'db> {
                 Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)),
                 Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema),
             ) if relation.is_assignability() => ConstraintSet::from(true),
+
+            (
+                Type::KnownInstance(KnownInstanceType::MakeDataclassFieldsSchema(_)),
+                Type::SpecialForm(SpecialFormType::MakeDataclassFieldsSchema),
+            ) if relation.is_assignability() => ConstraintSet::from(true),
+
+            // Iterable[str | tuple[str, Any] | tuple[str, Any, Any]] is assignable to
+            // MakeDataclassFieldsSchema. This allows passing fields via variables:
+            //
+            //   fields = [("x", int), ("y", str)]
+            //   make_dataclass("Point", fields)
+            //
+            // Without this, only literal lists would type-check.
+            (_, Type::SpecialForm(SpecialFormType::MakeDataclassFieldsSchema))
+                if relation.is_assignability() =>
+            {
+                let expected_element = UnionType::from_elements(
+                    db,
+                    [
+                        KnownClass::Str.to_instance(db),
+                        Type::heterogeneous_tuple(
+                            db,
+                            [KnownClass::Str.to_instance(db), Type::any()],
+                        ),
+                        Type::heterogeneous_tuple(
+                            db,
+                            [KnownClass::Str.to_instance(db), Type::any(), Type::any()],
+                        ),
+                    ],
+                );
+                let expected_iterable =
+                    KnownClass::Iterable.to_specialized_instance(db, [expected_element]);
+                ConstraintSet::from(self.is_assignable_to(db, expected_iterable))
+            }
 
             // Dynamic is only a subtype of `object` and only a supertype of `Never`; both were
             // handled above. It's always assignable, though.
@@ -6154,6 +6190,67 @@ impl<'db> Type<'db> {
                 )
                 .into(),
 
+                // dataclasses.make_dataclass(cls_name, fields, ...)
+                // The `fields` parameter accepts either:
+                // - A list or tuple literal (inferred as MakeDataclassFieldsSchema)
+                // - Any Iterable (fallback for variables containing fields)
+                Some(KnownFunction::MakeDataclass) => Binding::single(
+                    self,
+                    Signature::new(
+                        Parameters::new(
+                            db,
+                            [
+                                Parameter::positional_or_keyword(Name::new_static("cls_name"))
+                                    .with_annotated_type(KnownClass::Str.to_instance(db)),
+                                Parameter::positional_or_keyword(Name::new_static("fields"))
+                                    .with_annotated_type(Type::SpecialForm(
+                                        SpecialFormType::MakeDataclassFieldsSchema,
+                                    )),
+                                // Additional optional parameters have defaults.
+                                Parameter::keyword_only(Name::new_static("bases"))
+                                    .with_default_type(Type::empty_tuple(db)),
+                                Parameter::keyword_only(Name::new_static("namespace"))
+                                    .with_default_type(Type::none(db)),
+                                Parameter::keyword_only(Name::new_static("init"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(true)),
+                                Parameter::keyword_only(Name::new_static("repr"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(true)),
+                                Parameter::keyword_only(Name::new_static("eq"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(true)),
+                                Parameter::keyword_only(Name::new_static("order"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("unsafe_hash"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("frozen"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("match_args"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(true)),
+                                Parameter::keyword_only(Name::new_static("kw_only"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("slots"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("weakref_slot"))
+                                    .with_annotated_type(KnownClass::Bool.to_instance(db))
+                                    .with_default_type(Type::BooleanLiteral(false)),
+                                Parameter::keyword_only(Name::new_static("module"))
+                                    .with_default_type(Type::none(db)),
+                            ],
+                        ),
+                        // Return type is `type` when we can't synthesize a specific dataclass.
+                        Some(KnownClass::Type.to_instance(db)),
+                    ),
+                )
+                .into(),
+
                 _ => CallableBinding::from_overloads(
                     self,
                     function_type.signature(db).overloads.iter().cloned(),
@@ -7761,7 +7858,8 @@ impl<'db> Type<'db> {
                 // Internal types, should never appear in user code.
                 KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => Ok(Type::unknown()),
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::MakeDataclassFieldsSchema(_) => Ok(Type::unknown()),
             },
 
             Type::SpecialForm(special_form) => match special_form {
@@ -7899,7 +7997,8 @@ impl<'db> Type<'db> {
                 // Internal types, should never appear in user code.
                 SpecialFormType::TypingNamedTupleFieldsSchema
                 | SpecialFormType::CollectionsNamedTupleFieldsSchema
-                | SpecialFormType::CollectionsNamedTupleDefaultsSchema => Ok(Type::unknown()),
+                | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+                | SpecialFormType::MakeDataclassFieldsSchema => Ok(Type::unknown()),
             },
 
             Type::Union(union) => {
@@ -8179,7 +8278,8 @@ impl<'db> Type<'db> {
                 KnownInstanceType::NewType(_) |
                 KnownInstanceType::TypingNamedTupleFieldsSchema(_) |
                 KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) |
-                KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) |
+                KnownInstanceType::MakeDataclassFieldsSchema(_) => {
                     // TODO: For some of these, we may need to apply the type mapping to inner types.
                     self
                 },
@@ -8578,7 +8678,8 @@ impl<'db> Type<'db> {
                 | KnownInstanceType::NewType(_)
                 | KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::MakeDataclassFieldsSchema(_) => {
                     // TODO: For some of these, we may need to try to find legacy typevars in inner types.
                 }
             },
@@ -9257,6 +9358,11 @@ pub enum KnownInstanceType<'db> {
 
     /// Schema for `collections.namedtuple` defaults count, extracted from a list or tuple literal.
     CollectionsNamedTupleDefaultsSchema(CollectionsNamedTupleDefaultsSchema<'db>),
+
+    /// Schema for `dataclasses.make_dataclass` fields.
+    /// When a list or tuple literal is passed as the `fields` argument to `make_dataclass()`,
+    /// the literal is inferred as this schema type.
+    MakeDataclassFieldsSchema(MakeDataclassFieldsSchema<'db>),
 }
 
 fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
@@ -9312,6 +9418,14 @@ fn walk_known_instance_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
         KnownInstanceType::CollectionsNamedTupleFieldsSchema(_) => {}
         // CollectionsNamedTupleDefaultsSchema only contains a count, no types to visit.
         KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {}
+        KnownInstanceType::MakeDataclassFieldsSchema(schema) => {
+            for (_, field_ty, default_ty) in schema.fields(db) {
+                visitor.visit_type(db, *field_ty);
+                if let Some(default) = default_ty {
+                    visitor.visit_type(db, *default);
+                }
+            }
+        }
     }
 }
 
@@ -9367,6 +9481,9 @@ impl<'db> KnownInstanceType<'db> {
             }
             Self::CollectionsNamedTupleDefaultsSchema(schema) => {
                 Self::CollectionsNamedTupleDefaultsSchema(schema.normalized_impl(db, visitor))
+            }
+            Self::MakeDataclassFieldsSchema(schema) => {
+                Self::MakeDataclassFieldsSchema(schema.normalized_impl(db, visitor))
             }
         }
     }
@@ -9441,6 +9558,28 @@ impl<'db> KnownInstanceType<'db> {
             Self::CollectionsNamedTupleDefaultsSchema(schema) => {
                 Some(Self::CollectionsNamedTupleDefaultsSchema(schema))
             }
+            Self::MakeDataclassFieldsSchema(schema) => {
+                // Normalize the field types.
+                let normalized_fields: Option<Box<[_]>> = schema
+                    .fields(db)
+                    .iter()
+                    .map(|(name, ty, default)| {
+                        ty.recursive_type_normalized_impl(db, div, true)
+                            .and_then(|normalized_ty| {
+                                let normalized_default = match default {
+                                    Some(d) => {
+                                        Some(d.recursive_type_normalized_impl(db, div, true)?)
+                                    }
+                                    None => None,
+                                };
+                                Some((name.clone(), normalized_ty, normalized_default))
+                            })
+                    })
+                    .collect();
+                normalized_fields.map(|fields| {
+                    Self::MakeDataclassFieldsSchema(MakeDataclassFieldsSchema::new(db, fields))
+                })
+            }
         }
     }
 
@@ -9470,7 +9609,8 @@ impl<'db> KnownInstanceType<'db> {
             // Internal types, no corresponding known class.
             Self::TypingNamedTupleFieldsSchema(_)
             | Self::CollectionsNamedTupleFieldsSchema(_)
-            | Self::CollectionsNamedTupleDefaultsSchema(_) => KnownClass::Object,
+            | Self::CollectionsNamedTupleDefaultsSchema(_)
+            | Self::MakeDataclassFieldsSchema(_) => KnownClass::Object,
         }
     }
 
@@ -10028,6 +10168,40 @@ impl get_size2::GetSize for CollectionsNamedTupleDefaultsSchema<'_> {}
 impl CollectionsNamedTupleDefaultsSchema<'_> {
     pub(crate) fn normalized_impl(self, _db: &dyn Db, _visitor: &NormalizedVisitor<'_>) -> Self {
         self
+    }
+}
+
+/// Internal schema for the `fields` argument to `dataclasses.make_dataclass()`.
+///
+/// When a list or tuple literal is passed as the `fields` argument to `make_dataclass()`,
+/// the literal is inferred as this schema type instead of a regular list or tuple type.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct MakeDataclassFieldsSchema<'db> {
+    /// The fields as (name, type, default) tuples extracted from the literal.
+    /// The default is `None` if no default was provided.
+    #[returns(ref)]
+    pub fields: Box<[(Name, Type<'db>, Option<Type<'db>>)]>,
+}
+
+// The Salsa heap is tracked separately.
+impl get_size2::GetSize for MakeDataclassFieldsSchema<'_> {}
+
+impl<'db> MakeDataclassFieldsSchema<'db> {
+    pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        MakeDataclassFieldsSchema::new(
+            db,
+            self.fields(db)
+                .iter()
+                .map(|(name, ty, default)| {
+                    (
+                        name.clone(),
+                        ty.normalized_impl(db, visitor),
+                        default.map(|d| d.normalized_impl(db, visitor)),
+                    )
+                })
+                .collect::<Box<[_]>>(),
+        )
     }
 }
 

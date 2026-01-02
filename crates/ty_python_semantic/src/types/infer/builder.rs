@@ -111,10 +111,10 @@ use crate::types::{
     CallableTypeKind, ClassType, CollectionsNamedTupleDefaultsSchema,
     CollectionsNamedTupleFieldsSchema, DataclassParams, DynamicType, InternedType,
     IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
-    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
-    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
-    StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
-    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    LintDiagnosticGuard, MakeDataclassFieldsSchema, MemberLookupPolicy, MetaclassCandidate,
+    PEP695TypeAliasType, ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature,
+    SpecialFormType, StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type,
+    TypeAliasType, TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
     TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, TypingNamedTupleFieldsSchema,
     UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
@@ -5845,6 +5845,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Extract fields from a list or tuple literal for `dataclasses.make_dataclass`.
+    ///
+    /// Each element can be:
+    /// - A string literal (field name only, type is Any)
+    /// - A 2-tuple of (name, type)
+    /// - A 3-tuple of (name, type, field)
+    fn infer_make_dataclass_fields_schema(
+        &mut self,
+        field_elts: &[ast::Expr],
+    ) -> Option<MakeDataclassFieldsSchema<'db>> {
+        let db = self.db();
+        let mut fields: Vec<(ast::name::Name, Type<'db>, Option<Type<'db>>)> =
+            Vec::with_capacity(field_elts.len());
+
+        for elt in field_elts {
+            // Handle string literal (field name only, type is Any).
+            if let ast::Expr::StringLiteral(string_lit) = elt {
+                let field_name = ast::name::Name::new(string_lit.value.to_str());
+                fields.push((field_name, Type::any(), None));
+                continue;
+            }
+
+            // Handle tuple: (name, type) or (name, type, field).
+            let ast::Expr::Tuple(tuple_expr) = elt else {
+                return None;
+            };
+
+            if tuple_expr.elts.len() < 2 {
+                return None;
+            }
+
+            // First element: field name (string literal).
+            let field_name_expr = &tuple_expr.elts[0];
+            let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
+            let field_name_lit = field_name_ty.as_string_literal()?;
+            let field_name = ast::name::Name::new(field_name_lit.value(db));
+
+            // Second element: field type annotation.
+            let field_type_expr = &tuple_expr.elts[1];
+            let field_type_ty = self.infer_type_expression(field_type_expr);
+
+            // Third element (optional): default value or field() specification.
+            let default_ty = if tuple_expr.elts.len() >= 3 {
+                let default_expr = &tuple_expr.elts[2];
+                Some(self.infer_expression(default_expr, TypeContext::default()))
+            } else {
+                None
+            };
+
+            fields.push((field_name, field_type_ty, default_ty));
+        }
+
+        Some(MakeDataclassFieldsSchema::new(
+            db,
+            fields.into_boxed_slice(),
+        ))
+    }
+
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
         let ast::Expr::Call(ast::ExprCall {
@@ -7847,6 +7905,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        // Extract fields for typing.NamedTuple.
         if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
             tcx.annotation
         {
@@ -7867,6 +7926,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Extract defaults count for collections.namedtuple.
         if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
             tcx.annotation
         {
@@ -7877,6 +7937,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
                 schema,
             ));
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::MakeDataclassFieldsSchema)) = tcx.annotation
+        {
+            if let Some(schema) = self.infer_make_dataclass_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::MakeDataclassFieldsSchema(schema));
+            }
         }
 
         // Remove any union elements of that are unrelated to the tuple type.
@@ -7927,6 +7994,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             ctx: _,
         } = list;
 
+        // Extract fields for typing.NamedTuple.
         if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
             tcx.annotation
         {
@@ -7947,6 +8015,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             }
         }
 
+        // Extract defaults count for collections.namedtuple.
         if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
             tcx.annotation
         {
@@ -7957,6 +8026,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
                 schema,
             ));
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::MakeDataclassFieldsSchema)) = tcx.annotation
+        {
+            if let Some(schema) = self.infer_make_dataclass_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::MakeDataclassFieldsSchema(schema));
+            }
         }
 
         let elts = elts.iter().map(|elt| [Some(elt)]);
