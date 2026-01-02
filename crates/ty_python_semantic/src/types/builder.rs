@@ -112,14 +112,14 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| {
                         let ty = Type::IntLiteral(*literal);
                         // it's tempting to use `|=` but then the r.h.s. wouldn't be lazily evaluated
-                        ignore = ignore || other_type.is_subtype_of(db, ty);
+                        ignore = ignore || other_type.is_redundant_with(db, ty);
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_redundant_with(db, other_type)
                     });
                     some_literals_remain = !literals.is_empty();
                 } else {
                     return ReduceResult::KeepIf(
-                        !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::IntLiteral(literals[0]).is_redundant_with(db, other_type),
                     );
                 }
             }
@@ -128,14 +128,14 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| {
                         let ty = Type::StringLiteral(*literal);
                         // it's tempting to use `|=` but then the r.h.s. wouldn't be lazily evaluated
-                        ignore = ignore || other_type.is_subtype_of(db, ty);
+                        ignore = ignore || other_type.is_redundant_with(db, ty);
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_redundant_with(db, other_type)
                     });
                     some_literals_remain = !literals.is_empty();
                 } else {
                     return ReduceResult::KeepIf(
-                        !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::StringLiteral(literals[0]).is_redundant_with(db, other_type),
                     );
                 }
             }
@@ -144,14 +144,14 @@ impl<'db> UnionElement<'db> {
                     literals.retain(|literal| {
                         let ty = Type::BytesLiteral(*literal);
                         // it's tempting to use `|=` but then the r.h.s. wouldn't be lazily evaluated
-                        ignore = ignore || other_type.is_subtype_of(db, ty);
+                        ignore = ignore || other_type.is_redundant_with(db, ty);
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
-                        !ty.is_subtype_of(db, other_type)
+                        !ty.is_redundant_with(db, other_type)
                     });
                     some_literals_remain = !literals.is_empty();
                 } else {
                     return ReduceResult::KeepIf(
-                        !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type),
+                        !Type::BytesLiteral(literals[0]).is_redundant_with(db, other_type),
                     );
                 }
             }
@@ -361,10 +361,10 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::Type(existing) => {
                             // e.g. `existing` could be `Literal[""] & Any`,
                             // and `ty` could be `Literal[""]`
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
@@ -406,12 +406,12 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
                             // e.g. `existing` could be `Literal[b""] & Any`,
                             // and `ty` could be `Literal[b""]`
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
@@ -453,12 +453,12 @@ impl<'db> UnionBuilder<'db> {
                             continue;
                         }
                         UnionElement::Type(existing) => {
-                            if ty.is_subtype_of(self.db, *existing) {
+                            if ty.is_redundant_with(self.db, *existing) {
                                 return;
                             }
                             // e.g. `existing` could be `Literal[1] & Any`,
                             // and `ty` could be `Literal[1]`
-                            if existing.is_subtype_of(self.db, ty) {
+                            if existing.is_redundant_with(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
                             }
@@ -510,7 +510,7 @@ impl<'db> UnionBuilder<'db> {
                     .elements
                     .iter()
                     .filter_map(UnionElement::to_type_element)
-                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
+                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_redundant_with(self.db, ty))
                 {
                     self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases);
                 }
