@@ -27,7 +27,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
-use crate::types::class::FunctionalTypedDictLiteral;
+use crate::types::class::{FunctionalTypedDictFieldsEvaluation, FunctionalTypedDictLiteral};
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -1606,7 +1606,12 @@ impl<'db> Bindings<'db> {
                                     })
                                     .collect();
 
-                                let typeddict = FunctionalTypedDictLiteral::new(db, name, fields);
+                                let typeddict = FunctionalTypedDictLiteral::new(
+                                    db,
+                                    name,
+                                    None,
+                                    Some(FunctionalTypedDictFieldsEvaluation::Eager(fields)),
+                                );
                                 let return_type = Type::ClassLiteral(
                                     ClassLiteral::FunctionalTypedDict(typeddict),
                                 );
@@ -1623,68 +1628,68 @@ impl<'db> Bindings<'db> {
                                 .map(|s| Name::new(s.value(db)));
 
                             // Check if fields_type is a TypingNamedTupleFieldsSchema (from literal inference).
-                            let fields: Option<Box<[(Name, Type<'db>, Option<Type<'db>>)]>> =
-                                if let Type::KnownInstance(
-                                    KnownInstanceType::TypingNamedTupleFieldsSchema(schema),
-                                ) = fields_type
-                                {
-                                    // Extract fields from the schema.
-                                    Some(
-                                        schema
-                                            .fields(db)
-                                            .iter()
-                                            .map(|(name, ty)| (name.clone(), *ty, None))
-                                            .collect(),
-                                    )
-                                } else {
-                                    // Fall back to extracting from a tuple type for the variable case:
-                                    //   fields = (("x", int), ("y", str))
-                                    //   NamedTuple("Foo", fields)
-                                    let extract_field = |field_tuple: &Type<'db>| -> Option<(
-                                        Name,
-                                        Type<'db>,
-                                        Option<Type<'db>>,
-                                    )> {
-                                        let field_spec =
-                                            field_tuple.exact_tuple_instance_spec(db)?;
-                                        let elements: Vec<_> =
-                                            field_spec.fixed_elements().collect();
-                                        if elements.len() != 2 {
-                                            return None;
+                            #[expect(clippy::type_complexity)]
+                            let fields: Option<
+                                Box<[(Name, Type<'db>, Option<Type<'db>>)]>,
+                            > = if let Type::KnownInstance(
+                                KnownInstanceType::TypingNamedTupleFieldsSchema(schema),
+                            ) = fields_type
+                            {
+                                // Extract fields from the schema.
+                                Some(
+                                    schema
+                                        .fields(db)
+                                        .iter()
+                                        .map(|(name, ty)| (name.clone(), *ty, None))
+                                        .collect(),
+                                )
+                            } else {
+                                // Fall back to extracting from a tuple type for the variable case:
+                                //   fields = (("x", int), ("y", str))
+                                //   NamedTuple("Foo", fields)
+                                let extract_field = |field_tuple: &Type<'db>| -> Option<(
+                                    Name,
+                                    Type<'db>,
+                                    Option<Type<'db>>,
+                                )> {
+                                    let field_spec = field_tuple.exact_tuple_instance_spec(db)?;
+                                    let elements: Vec<_> = field_spec.fixed_elements().collect();
+                                    if elements.len() != 2 {
+                                        return None;
+                                    }
+                                    let field_name = elements[0]
+                                        .as_string_literal()
+                                        .map(|s| Name::new(s.value(db)))?;
+                                    let field_ty = elements[1];
+                                    let resolved_ty = match field_ty {
+                                        Type::ClassLiteral(class) => {
+                                            class.to_non_generic_instance(db)
                                         }
-                                        let field_name = elements[0]
-                                            .as_string_literal()
-                                            .map(|s| Name::new(s.value(db)))?;
-                                        let field_ty = elements[1];
-                                        let resolved_ty = match field_ty {
-                                            Type::ClassLiteral(class) => {
-                                                class.to_non_generic_instance(db)
-                                            }
-                                            Type::GenericAlias(alias) => {
-                                                Type::instance(db, ClassType::Generic(*alias))
-                                            }
-                                            Type::SubclassOf(subclass_of) => {
-                                                match subclass_of.subclass_of() {
-                                                    SubclassOfInner::Class(class) => {
-                                                        Type::instance(db, class)
-                                                    }
-                                                    _ => *field_ty,
+                                        Type::GenericAlias(alias) => {
+                                            Type::instance(db, ClassType::Generic(*alias))
+                                        }
+                                        Type::SubclassOf(subclass_of) => {
+                                            match subclass_of.subclass_of() {
+                                                SubclassOfInner::Class(class) => {
+                                                    Type::instance(db, class)
                                                 }
+                                                _ => *field_ty,
                                             }
-                                            ty => *ty,
-                                        };
-                                        Some((field_name, resolved_ty, None))
+                                        }
+                                        ty => *ty,
                                     };
-
-                                    fields_type.exact_tuple_instance_spec(db).and_then(
-                                        |tuple_spec| {
-                                            tuple_spec
-                                                .fixed_elements()
-                                                .map(extract_field)
-                                                .collect::<Option<Box<[_]>>>()
-                                        },
-                                    )
+                                    Some((field_name, resolved_ty, None))
                                 };
+
+                                fields_type
+                                    .exact_tuple_instance_spec(db)
+                                    .and_then(|tuple_spec| {
+                                        tuple_spec
+                                            .fixed_elements()
+                                            .map(extract_field)
+                                            .collect::<Option<Box<[_]>>>()
+                                    })
+                            };
 
                             if let (Some(name), Some(fields)) = (name, fields) {
                                 let namedtuple = FunctionalNamedTupleLiteral::new(db, name, fields);

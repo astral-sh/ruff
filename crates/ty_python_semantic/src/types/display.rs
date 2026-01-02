@@ -822,7 +822,20 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             },
             Type::SpecialForm(special_form) => {
                 f.set_invalid_type_annotation();
-                write!(f.with_type(self.ty), "<special-form '{special_form}'>")
+                // Display internal schema types with user-friendly names.
+                match special_form {
+                    SpecialFormType::TypedDictFieldsSchema => {
+                        f.with_type(self.ty).write_str("dict[str, type]")
+                    }
+                    SpecialFormType::TypingNamedTupleFieldsSchema
+                    | SpecialFormType::CollectionsNamedTupleFieldsSchema => {
+                        f.with_type(self.ty).write_str("Iterable[tuple[str, type]]")
+                    }
+                    SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
+                        f.with_type(self.ty).write_str("Iterable[object]")
+                    }
+                    _ => write!(f.with_type(self.ty), "<special-form '{special_form}'>"),
+                }
             }
             Type::KnownInstance(known_instance) => known_instance
                 .display_with(self.db, self.settings.clone())

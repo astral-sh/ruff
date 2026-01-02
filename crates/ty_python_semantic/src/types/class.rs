@@ -664,7 +664,7 @@ pub enum ClassLiteral<'db> {
     /// A namedtuple created via the functional form `namedtuple(name, fields)` or
     /// `NamedTuple(name, fields)`.
     FunctionalNamedTuple(FunctionalNamedTupleLiteral<'db>),
-    /// A TypedDict created via the functional form `TypedDict("Name", {"key": Type, ...})`.
+    /// A `TypedDict` created via the functional form `TypedDict("Name", {"key": Type, ...})`.
     FunctionalTypedDict(FunctionalTypedDictLiteral<'db>),
 }
 
@@ -1054,9 +1054,11 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StmtClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalTypedDict(_)) => None,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalTypedDict(_),
+            ) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
         }
     }
@@ -1070,9 +1072,11 @@ impl<'db> ClassType<'db> {
     ) -> Option<(StmtClassLiteral<'db>, Option<Specialization<'db>>)> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalTypedDict(_)) => None,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalTypedDict(_),
+            ) => None,
             Self::Generic(generic) => Some((
                 generic.origin(db),
                 Some(
@@ -2114,9 +2118,11 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => stmt.variance_of(db, typevar),
-            Self::NonGeneric(ClassLiteral::Functional(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(_))
-            | Self::NonGeneric(ClassLiteral::FunctionalTypedDict(_)) => TypeVarVariance::Bivariant,
+            Self::NonGeneric(
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalTypedDict(_),
+            ) => TypeVarVariance::Bivariant,
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
     }
@@ -4676,10 +4682,10 @@ fn synthesize_namedtuple_class_member<'db>(
     }
 }
 
-/// Synthesize a class member for a TypedDict.
+/// Synthesize a class member for a `TypedDict`.
 ///
-/// This is a shared implementation used by both declarative TypedDicts (class-based)
-/// and functional TypedDicts (`TypedDict("Name", {...})`).
+/// This is a shared implementation used by both declarative `TypedDict`s (class-based)
+/// and functional `TypedDict`s (`TypedDict("Name", {...})`).
 fn synthesize_typed_dict_class_member<'db>(
     db: &'db dyn Db,
     name: &str,
@@ -4707,14 +4713,12 @@ fn synthesize_typed_dict_class_member<'db>(
         }
         "__annotations__" => {
             // dict mapping field names to their types.
-            Some(
-                KnownClass::Dict
-                    .to_class_literal(db)
-                    .as_class_literal()
-                    .expect("dict should be a class literal")
-                    .default_specialization(db)
-                    .into(),
-            )
+            let dict_class = KnownClass::Dict
+                .to_class_literal(db)
+                .as_class_literal()
+                .expect("dict should be a class literal")
+                .default_specialization(db);
+            Some(Type::instance(db, dict_class))
         }
         "__total__" => {
             // `__total__` is `True` if all fields are required, `False` otherwise.
@@ -5070,6 +5074,7 @@ fn synthesize_typed_dict_class_member<'db>(
                     .with_annotated_type(instance_ty),
             ];
 
+            #[expect(clippy::explicit_iter_loop)]
             for (field_name, field) in items.iter() {
                 let mut param = Parameter::keyword_only(field_name.clone())
                     .with_annotated_type(field.declared_ty());
@@ -5136,6 +5141,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     /// Get the metaclass of this functional namedtuple.
     ///
     /// Namedtuples always have `type` as their metaclass.
+    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Type.to_class_literal(db)
     }
@@ -5159,7 +5165,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     /// Look up an instance member by name.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // First check if it's one of the field names.
-        for (field_name, field_ty, _) in self.fields(db).iter() {
+        for (field_name, field_ty, _) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
                 return Place::bound(create_field_property(db, *field_ty)).into();
             }
@@ -5182,7 +5188,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
         }
 
         // Check if it's a field name (returns a property descriptor).
-        for (field_name, field_ty, _) in self.fields(db).iter() {
+        for (field_name, field_ty, _) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
                 return Place::bound(create_field_property(db, *field_ty)).into();
             }
@@ -5223,6 +5229,15 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     }
 }
 
+/// Whether fields are eagerly specified or lazily evaluated.
+#[derive(Clone, Debug, Hash, PartialEq, Eq, salsa::Update, get_size2::GetSize)]
+pub enum FunctionalTypedDictFieldsEvaluation<'db> {
+    /// Field types need to be lazily evaluated.
+    Lazy,
+    /// The fields are eagerly specified with their types already resolved.
+    Eager(Box<[(Name, Type<'db>, bool)]>),
+}
+
 /// A TypedDict created via the functional form `TypedDict("Name", {"key": Type, ...})`.
 ///
 /// For example:
@@ -5239,22 +5254,157 @@ pub struct FunctionalTypedDictLiteral<'db> {
     #[returns(ref)]
     pub name: Name,
 
-    /// The fields as (name, type, is_required) tuples.
-    #[returns(ref)]
-    pub fields: Box<[(Name, Type<'db>, bool)]>,
+    /// The definition where this TypedDict was created. Used for lazy field type resolution.
+    definition: Option<Definition<'db>>,
+
+    /// The fields. Don't use this field directly; use the `fields()` method instead
+    /// (to evaluate any lazy fields).
+    _fields: Option<FunctionalTypedDictFieldsEvaluation<'db>>,
 }
 
 impl get_size2::GetSize for FunctionalTypedDictLiteral<'_> {}
 
+fn lazy_fields_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    _id: salsa::Id,
+    _typeddict: FunctionalTypedDictLiteral<'db>,
+) -> Box<[(Name, Type<'db>, bool)]> {
+    Box::new([])
+}
+
+#[expect(clippy::borrowed_box)]
+fn lazy_fields_cycle_recover<'db>(
+    _db: &'db dyn Db,
+    _cycle: &salsa::Cycle,
+    _previous: &Box<[(Name, Type<'db>, bool)]>,
+    current: Box<[(Name, Type<'db>, bool)]>,
+    _typeddict: FunctionalTypedDictLiteral<'db>,
+) -> Box<[(Name, Type<'db>, bool)]> {
+    // Cycle recovery for recursive `TypedDict`s. The `current` value contains the fields
+    // resolved so far, which may include self-references that resolved to the `TypedDict`
+    // type being defined. This is the correct behavior for recursive types like:
+    // `RecursiveMovie = TypedDict("RecursiveMovie", {"predecessor": "RecursiveMovie"})`
+    current
+}
+
+#[salsa::tracked]
 impl<'db> FunctionalTypedDictLiteral<'db> {
-    /// Get the metaclass of this functional TypedDict.
+    /// Get the resolved fields of this `TypedDict`.
     ///
-    /// TypedDicts always have `type` as their metaclass.
+    /// Returns the fields as `(name, type, is_required)` tuples.
+    /// If fields are lazily evaluated, this will trigger resolution.
+    pub(crate) fn fields(self, db: &'db dyn Db) -> Box<[(Name, Type<'db>, bool)]> {
+        match self._fields(db) {
+            Some(FunctionalTypedDictFieldsEvaluation::Eager(fields)) => fields,
+            Some(FunctionalTypedDictFieldsEvaluation::Lazy) => self.lazy_fields(db),
+            None => Box::new([]),
+        }
+    }
+
+    #[salsa::tracked(
+        cycle_fn=lazy_fields_cycle_recover,
+        cycle_initial=lazy_fields_cycle_initial,
+        heap_size=ruff_memory_usage::heap_size
+    )]
+    fn lazy_fields(self, db: &'db dyn Db) -> Box<[(Name, Type<'db>, bool)]> {
+        let Some(definition) = self.definition(db) else {
+            return Box::new([]);
+        };
+
+        let module = parsed_module(db, definition.file(db)).load(db);
+
+        let DefinitionKind::Assignment(assignment) = definition.kind(db) else {
+            return Box::new([]);
+        };
+
+        let value = assignment.value(&module);
+        let ast::Expr::Call(call_expr) = value else {
+            return Box::new([]);
+        };
+
+        // Determine the `total` parameter value (default is true).
+        let is_total = call_expr
+            .arguments
+            .find_keyword("total")
+            .map(|kw| {
+                let ty = definition_expression_type(db, definition, &kw.value);
+                ty.bool(db).is_always_true()
+            })
+            .unwrap_or(true);
+
+        // Find the fields argument (second positional argument or 'fields' keyword).
+        let fields_arg = call_expr.arguments.find_positional(1).or_else(|| {
+            call_expr
+                .arguments
+                .find_keyword("fields")
+                .map(|kw| &kw.value)
+        });
+
+        let Some(ast::Expr::Dict(dict_expr)) = fields_arg else {
+            return Box::new([]);
+        };
+
+        // Build fields by extracting names and types from the dict literal.
+        let mut fields: Vec<(Name, Type<'db>, bool)> = Vec::with_capacity(dict_expr.items.len());
+
+        for item in &dict_expr.items {
+            // Each key should be a string literal.
+            let Some(key_expr) = &item.key else {
+                continue;
+            };
+            let key_ty = definition_expression_type(db, definition, key_expr);
+            let Some(key_lit) = key_ty.as_string_literal() else {
+                continue;
+            };
+            let field_name = Name::new(key_lit.value(db));
+
+            // Get the field type.
+            let field_ty = definition_expression_type(db, definition, &item.value);
+
+            // Determine is_required by examining the AST for Required/NotRequired syntax.
+            let is_required = detect_required_from_ast(&item.value).unwrap_or(is_total);
+
+            fields.push((field_name, field_ty, is_required));
+        }
+
+        fields.into_boxed_slice()
+    }
+}
+
+/// Detect whether an expression has `Required` or `NotRequired` qualifier syntactically.
+/// Returns `Some(true)` for `Required`, `Some(false)` for `NotRequired`, `None` otherwise.
+fn detect_required_from_ast(expr: &ast::Expr) -> Option<bool> {
+    // Check for Required[...] or NotRequired[...] syntax.
+    let ast::Expr::Subscript(subscript) = expr else {
+        return None;
+    };
+
+    let qualifier_name = match subscript.value.as_ref() {
+        ast::Expr::Attribute(attr) => Some(attr.attr.id()),
+        ast::Expr::Name(name) => Some(name.id()),
+        _ => None,
+    }?;
+
+    if qualifier_name == "Required" {
+        Some(true)
+    } else if qualifier_name == "NotRequired" {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+impl<'db> FunctionalTypedDictLiteral<'db> {
+    /// Get the metaclass of this functional `TypedDict`.
+    ///
+    /// `TypedDict`s always have `type` as their metaclass.
+    #[expect(clippy::unused_self)]
     pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
         KnownClass::Type.to_class_literal(db)
     }
 
-    /// Compute the dict base type that this TypedDict inherits from.
+    /// Compute the dict base type that this `TypedDict` inherits from.
+    #[expect(clippy::unused_self)]
     pub(crate) fn dict_base_type(self, db: &'db dyn Db) -> ClassType<'db> {
         KnownClass::Dict
             .to_class_literal(db)
@@ -5266,7 +5416,7 @@ impl<'db> FunctionalTypedDictLiteral<'db> {
     /// Look up an instance member by name.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // First check if it's one of the field names.
-        for (field_name, field_ty, _is_required) in self.fields(db).iter() {
+        for (field_name, field_ty, _is_required) in self.fields(db).as_ref() {
             if field_name.as_str() == name {
                 return Place::bound(*field_ty).into();
             }
@@ -5301,7 +5451,7 @@ impl<'db> FunctionalTypedDictLiteral<'db> {
             .class_member(db, name, policy)
     }
 
-    /// Generate synthesized class members for TypedDicts.
+    /// Generate synthesized class members for `TypedDict`s.
     fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
         let typed_dict_type = TypedDictType::new(ClassType::NonGeneric(self.into()));
         let items = typed_dict_type.items(db);
@@ -5309,14 +5459,14 @@ impl<'db> FunctionalTypedDictLiteral<'db> {
         synthesize_typed_dict_class_member(db, name, instance_ty, items)
     }
 
-    /// Returns an instance type for this functional TypedDict.
+    /// Returns an instance type for this functional `TypedDict`.
     pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
         Type::instance(db, ClassType::NonGeneric(self.into()))
     }
 
-    /// Create a `Type::TypedDict` instance type from this functional TypedDict.
+    /// Create a `Type::TypedDict` instance type from this functional `TypedDict`.
     ///
-    /// This creates a `TypedDictType::Class` variant, which allows TypedDict operations
+    /// This creates a `TypedDictType::Class` variant, which allows `TypedDict` operations
     /// like subscript access to work correctly via synthesized `__getitem__`.
     pub(crate) fn to_typed_dict_type(self, _db: &'db dyn Db) -> Type<'db> {
         Type::typed_dict(ClassType::NonGeneric(self.into()))

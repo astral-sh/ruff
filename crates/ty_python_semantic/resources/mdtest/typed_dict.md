@@ -1297,6 +1297,9 @@ class Person(TypedDict):
 reveal_type(Person.__total__)  # revealed: Literal[True]
 reveal_type(Person.__required_keys__)  # revealed: tuple[Literal["age"], Literal["name"]]
 reveal_type(Person.__optional_keys__)  # revealed: tuple[()]
+reveal_type(Person.__annotations__)  # revealed: dict[Unknown, Unknown]
+# Calling .keys() on __annotations__ should work.
+reveal_type(Person.__annotations__.keys())  # revealed: dict_keys[Unknown, Unknown]
 ```
 
 These attributes cannot be accessed on inhabitants:
