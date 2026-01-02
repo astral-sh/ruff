@@ -2227,6 +2227,41 @@ def match_with_dict(u: Foo | Bar | dict):
             reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
 ```
 
+## Only annotated declarations are allowed in the class body
+
+<!-- snapshot-diagnostics -->
+
+`TypedDict` class bodies are very restricted in what kinds of statements they can contain. Besides
+annotated items, the only allowed statements are docstrings and `pass`. Annotated items are are also
+not allowed to have a value.
+
+```py
+from typing import TypedDict
+
+class Foo(TypedDict):
+    """docstring"""
+
+    pass
+
+class Bar(TypedDict):
+    a: int
+    # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+    42
+    # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+    b: str = "hello"
+    # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+    def bar(self): ...
+```
+
+These rules are also enforced for `TypedDict` classes that don't directly inherit from `TypedDict`:
+
+```py
+class Baz(Bar):
+    # error: [invalid-typed-dict-statement]
+    def baz(self):
+        pass
+```
+
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
 [`typeddict`]: https://typing.python.org/en/latest/spec/typeddict.html
