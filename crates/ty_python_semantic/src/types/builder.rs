@@ -104,6 +104,7 @@ impl<'db> UnionElement<'db> {
             || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(db));
         let mut collapse = false;
         let mut ignore = false;
+        let some_literals_remain: bool;
 
         match self {
             UnionElement::IntLiterals(literals) => {
@@ -115,17 +116,11 @@ impl<'db> UnionElement<'db> {
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    some_literals_remain = !literals.is_empty();
                 } else {
-                    ReduceResult::KeepIf(
+                    return ReduceResult::KeepIf(
                         !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    );
                 }
             }
             UnionElement::StringLiterals(literals) => {
@@ -137,17 +132,11 @@ impl<'db> UnionElement<'db> {
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    some_literals_remain = !literals.is_empty();
                 } else {
-                    ReduceResult::KeepIf(
+                    return ReduceResult::KeepIf(
                         !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    );
                 }
             }
             UnionElement::BytesLiterals(literals) => {
@@ -159,20 +148,22 @@ impl<'db> UnionElement<'db> {
                         collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
                         !ty.is_subtype_of(db, other_type)
                     });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    some_literals_remain = !literals.is_empty();
                 } else {
-                    ReduceResult::KeepIf(
+                    return ReduceResult::KeepIf(
                         !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    );
                 }
             }
-            UnionElement::Type(existing) => ReduceResult::Type(*existing),
+            UnionElement::Type(existing) => return ReduceResult::Type(*existing),
+        }
+
+        if ignore {
+            ReduceResult::Ignore
+        } else if collapse {
+            ReduceResult::CollapseToObject
+        } else {
+            ReduceResult::KeepIf(some_literals_remain)
         }
     }
 }
