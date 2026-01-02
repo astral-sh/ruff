@@ -1487,7 +1487,51 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionBuilder::new(db).add_negative(*self).build()
+        match self {
+            // Defer to the intersection builder for anything that might be simplifiable when negated.
+            Type::TypeAlias(_)  // might be expanded by the intersection builder
+            | Type::EnumLiteral(_)  // `~Literal[Foo.BAR]` could be simplified to `~Foo` for single-member enums
+            | Type::NominalInstance(_)  // `~object` is simplified to `Never`
+            | Type::Union(_)
+            | Type::Intersection(_) => IntersectionBuilder::new(db).add_negative(*self).build(),
+
+            // For most other types, there is no need to go via the intersection builder, however;
+            // negating these types is trivial.
+            Type::Never => Type::object(),
+            Type::Dynamic(_) => *self,
+            Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::BooleanLiteral(_)
+            | Type::KnownBoundMethod(_)
+            | Type::KnownInstance(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::FunctionLiteral(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeVar(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::PropertyInstance(_)
+            | Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::LiteralString
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_)
+            | Type::WrapperDescriptor(_)
+            | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
+                db,
+                FxOrderSet::default(),
+                FxOrderSet::from_iter([*self]),
+            )),
+        }
     }
 
     #[must_use]
