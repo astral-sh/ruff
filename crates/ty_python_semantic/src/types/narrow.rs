@@ -1099,7 +1099,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
-        // Narrow unions and intersections of `TypedDict` in cases where requires keys are
+        // Narrow unions and intersections of `TypedDict` in cases where required keys are
         // excluded:
         //
         // class Foo(TypedDict):
@@ -1153,18 +1153,6 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                             .copied()
                             .collect();
                         UnionType::from_elements(self.db, filtered)
-                    }
-                    Type::Intersection(intersection) => {
-                        let intersection_requires_key =
-                            intersection.positive(self.db).iter().any(|ty| match ty {
-                                Type::TypedDict(td) => requires_key(td),
-                                _ => false,
-                            });
-                        if intersection_requires_key {
-                            Type::Never
-                        } else {
-                            rhs_type
-                        }
                     }
                     _ => rhs_type,
                 };
