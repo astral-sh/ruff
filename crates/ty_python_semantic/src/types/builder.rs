@@ -957,6 +957,23 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
+/// Result of attempting to intersect two fixed-length tuples element-wise.
+enum TupleIntersectionResult<'db> {
+    /// The new type is not a fixed-length tuple, or no existing tuple matches.
+    NotApplicable,
+    /// One tuple is a subtype of the other; let normal subsumption handle it.
+    SubtypeRelationship,
+    /// Element-wise intersection resulted in `Never` (disjoint element types).
+    Never,
+    /// Successfully computed the element-wise intersection.
+    Intersected {
+        /// The resulting tuple type.
+        tuple: Type<'db>,
+        /// Index of the existing positive type to replace.
+        replace_index: usize,
+    },
+}
+
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
@@ -1002,6 +1019,27 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 if known_instance == Some(KnownClass::Object) {
                     // `object & T` -> `T`; it is always redundant to add `object` to an intersection
                     return;
+                }
+
+                // Handle tuple intersection: tuple[A, B] & tuple[C, D] -> tuple[A & C, B & D]
+                match self.try_intersect_tuples(db, new_positive) {
+                    TupleIntersectionResult::Never => {
+                        self.positive.clear();
+                        self.negative.clear();
+                        self.positive.insert(Type::Never);
+                        return;
+                    }
+                    TupleIntersectionResult::Intersected {
+                        tuple,
+                        replace_index,
+                    } => {
+                        self.positive.swap_remove_index(replace_index);
+                        self.positive.insert(tuple);
+                        return;
+                    }
+                    // Not applicable or subtype relationship: continue with normal processing
+                    TupleIntersectionResult::NotApplicable
+                    | TupleIntersectionResult::SubtypeRelationship => {}
                 }
 
                 let addition_is_bool_instance = known_instance == Some(KnownClass::Bool);
@@ -1101,6 +1139,106 @@ impl<'db> InnerIntersectionBuilder<'db> {
                 self.positive.insert(new_positive);
             }
         }
+    }
+
+    /// Try to intersect two tuples element-wise.
+    ///
+    /// For fixed-length tuples: `tuple[A, B] & tuple[C, D]` -> `tuple[A & C, B & D]`
+    /// For variable-length tuples: `tuple[A, ...] & tuple[B, ...]` -> `tuple[A & B, ...]`
+    fn try_intersect_tuples(
+        &self,
+        db: &'db dyn Db,
+        new_positive: Type<'db>,
+    ) -> TupleIntersectionResult<'db> {
+        use crate::types::tuple::TupleSpec;
+
+        let Some(new_instance) = new_positive.as_nominal_instance() else {
+            return TupleIntersectionResult::NotApplicable;
+        };
+        let Some(new_tuple_spec) = new_instance.own_tuple_spec(db) else {
+            return TupleIntersectionResult::NotApplicable;
+        };
+
+        // Find an existing positive tuple to intersect with.
+        for (index, existing_positive) in self.positive.iter().enumerate() {
+            let Some(existing_instance) = existing_positive.as_nominal_instance() else {
+                continue;
+            };
+            let Some(existing_spec) = existing_instance.own_tuple_spec(db) else {
+                continue;
+            };
+
+            // Optimization: if one tuple is a subtype of the other, the intersection
+            // is just the subtype, so we can skip element-wise intersection and let
+            // the normal subsumption logic handle it. This also prevents potential
+            // infinite recursion when element-wise intersection would recursively
+            // create the same intersection we're already building.
+            if new_positive.is_subtype_of(db, *existing_positive)
+                || existing_positive.is_subtype_of(db, new_positive)
+            {
+                return TupleIntersectionResult::SubtypeRelationship;
+            }
+
+            match (existing_spec.as_ref(), new_tuple_spec.as_ref()) {
+                (TupleSpec::Fixed(existing_fixed), TupleSpec::Fixed(new_fixed)) => {
+                    if existing_fixed.len() != new_fixed.len() {
+                        continue;
+                    }
+
+                    let intersected_elements: Vec<_> = existing_fixed
+                        .all_elements()
+                        .iter()
+                        .zip(new_fixed.all_elements())
+                        .map(|(a, b)| {
+                            IntersectionBuilder::new(db)
+                                .add_positive(*a)
+                                .add_positive(*b)
+                                .build()
+                        })
+                        .collect();
+
+                    if intersected_elements.iter().any(Type::is_never) {
+                        return TupleIntersectionResult::Never;
+                    }
+
+                    return TupleIntersectionResult::Intersected {
+                        tuple: Type::heterogeneous_tuple(db, intersected_elements),
+                        replace_index: index,
+                    };
+                }
+
+                (TupleSpec::Variable(existing_var), TupleSpec::Variable(new_var)) => {
+                    // Only handle simple homogeneous tuples (no prefix/suffix) for now
+                    if !existing_var.prefix_elements().is_empty()
+                        || !existing_var.suffix_elements().is_empty()
+                        || !new_var.prefix_elements().is_empty()
+                        || !new_var.suffix_elements().is_empty()
+                    {
+                        continue;
+                    }
+
+                    let intersected_variable = IntersectionBuilder::new(db)
+                        .add_positive(*existing_var.variable_element())
+                        .add_positive(*new_var.variable_element())
+                        .build();
+
+                    let intersected_tuple = if intersected_variable.is_never() {
+                        Type::empty_tuple(db)
+                    } else {
+                        Type::homogeneous_tuple(db, intersected_variable)
+                    };
+
+                    return TupleIntersectionResult::Intersected {
+                        tuple: intersected_tuple,
+                        replace_index: index,
+                    };
+                }
+
+                _ => continue,
+            }
+        }
+
+        TupleIntersectionResult::NotApplicable
     }
 
     /// Adds a negative type to this intersection.
