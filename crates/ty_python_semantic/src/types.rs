@@ -1463,9 +1463,48 @@ impl<'db> Type<'db> {
         // Avoid calling the cached function for negations that are trivial.
         match self {
             Type::Never => Type::object(),
+
             Type::Dynamic(_) => *self,
+
             Type::NominalInstance(instance) if instance.is_object() => Type::Never,
-            _ => cached_negate(db, *self, ()),
+
+            Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::BooleanLiteral(_)
+            | Type::KnownBoundMethod(_)
+            | Type::KnownInstance(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::FunctionLiteral(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeVar(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::PropertyInstance(_)
+            | Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::LiteralString
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_)
+            | Type::WrapperDescriptor(_)
+            | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
+                db,
+                FxOrderSet::default(),
+                FxOrderSet::from_iter([*self]),
+            )),
+
+            Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) | Type::EnumLiteral(_) => {
+                cached_negate(db, *self, ())
+            }
         }
     }
 
