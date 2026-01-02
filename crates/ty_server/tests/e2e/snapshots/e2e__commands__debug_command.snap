@@ -9,6 +9,7 @@ Position encoding: UTF16
 Global settings: GlobalSettings {
     diagnostic_mode: OpenFilesOnly,
     experimental: ExperimentalSettings,
+    show_syntax_errors: true,
 }
 Open text documents: 0
 
@@ -149,6 +150,9 @@ Settings: Settings {
                 ),
             },
         },
+    },
+    analysis: AnalysisSettings {
+        respect_type_ignore_comments: true,
     },
     overrides: [],
 }

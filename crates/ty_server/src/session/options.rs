@@ -125,6 +125,12 @@ impl ClientOptions {
     }
 
     #[must_use]
+    pub fn with_show_syntax_errors(mut self, show_syntax_errors: bool) -> Self {
+        self.global.show_syntax_errors = Some(show_syntax_errors);
+        self
+    }
+
+    #[must_use]
     pub fn with_unknown(mut self, unknown: HashMap<String, Value>) -> Self {
         self.unknown = unknown;
         self
@@ -143,6 +149,12 @@ pub struct GlobalOptions {
 
     /// Experimental features that the server provides on an opt-in basis.
     pub(crate) experimental: Option<Experimental>,
+
+    /// If `true` or [`None`], show syntax errors as diagnostics.
+    ///
+    /// This is useful when using ty with other language servers, allowing the user to refer
+    /// to syntax errors from only one source.
+    pub(crate) show_syntax_errors: Option<bool>,
 }
 
 impl GlobalOptions {
@@ -155,6 +167,7 @@ impl GlobalOptions {
         GlobalSettings {
             diagnostic_mode: self.diagnostic_mode.unwrap_or_default(),
             experimental,
+            show_syntax_errors: self.show_syntax_errors.unwrap_or(true),
         }
     }
 }

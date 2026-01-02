@@ -1,0 +1,114 @@
+---
+source: crates/ruff_linter/src/rules/airflow/mod.rs
+---
+AIR303 `create_asset` signature is changed in Airflow 3.0
+ --> AIR303.py:7:5
+  |
+5 | # airflow.lineage.hook
+6 | hlc = HookLineageCollector()
+7 | hlc.create_asset("there")
+  |     ^^^^^^^^^^^^
+8 | hlc.create_asset("should", "be", "no", "posarg")
+9 | hlc.create_asset(name="but", uri="kwargs are ok")
+  |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:8:5
+   |
+ 6 | hlc = HookLineageCollector()
+ 7 | hlc.create_asset("there")
+ 8 | hlc.create_asset("should", "be", "no", "posarg")
+   |     ^^^^^^^^^^^^
+ 9 | hlc.create_asset(name="but", uri="kwargs are ok")
+10 | hlc.create_asset()
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:13:24
+   |
+12 | HookLineageCollector().create_asset(name="but", uri="kwargs are ok")
+13 | HookLineageCollector().create_asset("there")
+   |                        ^^^^^^^^^^^^
+14 | HookLineageCollector().create_asset("should", "be", "no", "posarg")
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:14:24
+   |
+12 | HookLineageCollector().create_asset(name="but", uri="kwargs are ok")
+13 | HookLineageCollector().create_asset("there")
+14 | HookLineageCollector().create_asset("should", "be", "no", "posarg")
+   |                        ^^^^^^^^^^^^
+15 |
+16 | args = ["uri_value"]
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:17:5
+   |
+16 | args = ["uri_value"]
+17 | hlc.create_asset(*args)
+   |     ^^^^^^^^^^^^
+18 | HookLineageCollector().create_asset(*args)
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:18:24
+   |
+16 | args = ["uri_value"]
+17 | hlc.create_asset(*args)
+18 | HookLineageCollector().create_asset(*args)
+   |                        ^^^^^^^^^^^^
+19 |
+20 | # Literal unpacking
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:21:5
+   |
+20 | # Literal unpacking
+21 | hlc.create_asset(*["literal_uri"])
+   |     ^^^^^^^^^^^^
+22 | HookLineageCollector().create_asset(*["literal_uri"])
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:22:24
+   |
+20 | # Literal unpacking
+21 | hlc.create_asset(*["literal_uri"])
+22 | HookLineageCollector().create_asset(*["literal_uri"])
+   |                        ^^^^^^^^^^^^
+23 |
+24 | # starred args with keyword args
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:25:5
+   |
+24 | # starred args with keyword args
+25 | hlc.create_asset(*args, extra="value")
+   |     ^^^^^^^^^^^^
+26 | HookLineageCollector().create_asset(*args, extra="value")
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)
+
+AIR303 `create_asset` signature is changed in Airflow 3.0
+  --> AIR303.py:26:24
+   |
+24 | # starred args with keyword args
+25 | hlc.create_asset(*args, extra="value")
+26 | HookLineageCollector().create_asset(*args, extra="value")
+   |                        ^^^^^^^^^^^^
+27 |
+28 | # Double-starred keyword arguments
+   |
+help: Pass positional arguments as keyword arguments (e.g., `create_asset(uri=...)`)

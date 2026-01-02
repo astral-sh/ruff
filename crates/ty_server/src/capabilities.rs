@@ -36,6 +36,7 @@ bitflags::bitflags! {
         const WORKSPACE_CONFIGURATION = 1 << 15;
         const COMPLETION_ITEM_LABEL_DETAILS_SUPPORT = 1 << 16;
         const DIAGNOSTIC_RELATED_INFORMATION = 1 << 17;
+        const PREFER_MARKDOWN_IN_COMPLETION = 1 << 18;
     }
 }
 
@@ -173,6 +174,11 @@ impl ResolvedClientCapabilities {
         self.contains(Self::COMPLETION_ITEM_LABEL_DETAILS_SUPPORT)
     }
 
+    /// Returns `true` if the client prefers Markdown over plain text in completion items.
+    pub(crate) const fn prefers_markdown_in_completion(self) -> bool {
+        self.contains(Self::PREFER_MARKDOWN_IN_COMPLETION)
+    }
+
     pub(super) fn new(client_capabilities: &ClientCapabilities) -> Self {
         let mut flags = Self::empty();
 
@@ -264,6 +270,24 @@ impl ResolvedClientCapabilities {
             .unwrap_or_default()
         {
             flags |= Self::PREFER_MARKDOWN_IN_HOVER;
+        }
+
+        if text_document
+            .and_then(|text_document| {
+                Some(
+                    text_document
+                        .completion
+                        .as_ref()?
+                        .completion_item
+                        .as_ref()?
+                        .documentation_format
+                        .as_ref()?
+                        .contains(&MarkupKind::Markdown),
+                )
+            })
+            .unwrap_or_default()
+        {
+            flags |= Self::PREFER_MARKDOWN_IN_COMPLETION;
         }
 
         if text_document

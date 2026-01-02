@@ -197,7 +197,7 @@ impl Display for RuleCodeAndBody<'_> {
                         f,
                         "{fix}{body}",
                         fix = format_args!("[{}] ", "*".cyan()),
-                        body = self.message.body(),
+                        body = self.message.concise_message(),
                     );
                 }
             }
@@ -208,14 +208,14 @@ impl Display for RuleCodeAndBody<'_> {
                 f,
                 "{code} {body}",
                 code = code.red().bold(),
-                body = self.message.body(),
+                body = self.message.concise_message(),
             )
         } else {
             write!(
                 f,
                 "{code}: {body}",
                 code = self.message.id().as_str().red().bold(),
-                body = self.message.body(),
+                body = self.message.concise_message(),
             )
         }
     }

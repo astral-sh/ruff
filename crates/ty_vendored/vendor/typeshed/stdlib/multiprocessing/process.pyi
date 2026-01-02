@@ -13,6 +13,10 @@ class BaseProcess:
 
     name: str
     daemon: bool
+    """
+    Return whether process is a daemon
+    """
+
     authkey: bytes
     _identity: tuple[int, ...]  # undocumented
     def __init__(

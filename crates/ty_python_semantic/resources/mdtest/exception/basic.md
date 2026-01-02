@@ -104,10 +104,12 @@ def silence[T: type[BaseException]](
     except exception_type as e:
         reveal_type(e)  # revealed: T'instance@silence
 
-def silence2[T: (
-    type[ValueError],
-    type[TypeError],
-)](func: Callable[[], None], exception_type: T,):
+def silence2[
+    T: (
+        type[ValueError],
+        type[TypeError],
+    )
+](func: Callable[[], None], exception_type: T,):
     try:
         func()
     except exception_type as e:

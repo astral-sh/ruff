@@ -5,7 +5,7 @@
 ```py
 class C: ...
 
-C = 1  # error: "Implicit shadowing of class `C`"
+C = 1  # error: [invalid-assignment]
 ```
 
 ## Explicit

@@ -25,6 +25,8 @@ pub(crate) struct MarkdownTestConfig {
 
     pub(crate) log: Option<Log>,
 
+    pub(crate) analysis: Option<Analysis>,
+
     /// The [`ruff_db::system::System`] to use for tests.
     ///
     /// Defaults to the case-sensitive [`ruff_db::system::InMemorySystem`].
@@ -101,6 +103,13 @@ pub(crate) struct Environment {
     /// information and third-party imports.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub python: Option<SystemPathBuf>,
+}
+
+#[derive(Deserialize, Default, Debug, Clone)]
+#[serde(rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) struct Analysis {
+    /// Whether ty should support `type: ignore` comments.
+    pub(crate) respect_type_ignore_comments: Option<bool>,
 }
 
 #[derive(Deserialize, Debug, Clone)]

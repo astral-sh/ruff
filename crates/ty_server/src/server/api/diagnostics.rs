@@ -18,8 +18,8 @@ use ty_project::{Db as _, ProjectDatabase};
 
 use crate::capabilities::ResolvedClientCapabilities;
 use crate::document::{FileRangeExt, ToRangeExt};
-use crate::session::DocumentHandle;
 use crate::session::client::Client;
+use crate::session::{DocumentHandle, GlobalSettings};
 use crate::system::{AnySystemPath, file_to_url};
 use crate::{DIAGNOSTIC_NAME, Db, DiagnosticMode};
 use crate::{PositionEncoding, Session};
@@ -61,6 +61,7 @@ impl Diagnostics {
         &self,
         db: &ProjectDatabase,
         client_capabilities: ResolvedClientCapabilities,
+        global_settings: &GlobalSettings,
     ) -> LspDiagnostics {
         if let Some(notebook_document) = db.notebook_document(self.file_or_notebook) {
             let mut cell_diagnostics: FxHashMap<Url, Vec<Diagnostic>> = FxHashMap::default();
@@ -72,8 +73,15 @@ impl Diagnostics {
             }
 
             for diagnostic in &self.items {
-                let (url, lsp_diagnostic) =
-                    to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities);
+                let Some((url, lsp_diagnostic)) = to_lsp_diagnostic(
+                    db,
+                    diagnostic,
+                    self.encoding,
+                    client_capabilities,
+                    global_settings,
+                ) else {
+                    continue;
+                };
 
                 let Some(url) = url else {
                     tracing::warn!("Unable to find notebook cell");
@@ -91,8 +99,17 @@ impl Diagnostics {
             LspDiagnostics::TextDocument(
                 self.items
                     .iter()
-                    .map(|diagnostic| {
-                        to_lsp_diagnostic(db, diagnostic, self.encoding, client_capabilities).1
+                    .filter_map(|diagnostic| {
+                        Some(
+                            to_lsp_diagnostic(
+                                db,
+                                diagnostic,
+                                self.encoding,
+                                client_capabilities,
+                                global_settings,
+                            )?
+                            .1,
+                        )
                     })
                     .collect(),
             )
@@ -197,7 +214,11 @@ pub(super) fn publish_diagnostics(document: &DocumentHandle, session: &Session, 
         });
     };
 
-    match diagnostics.to_lsp_diagnostics(db, session.client_capabilities()) {
+    match diagnostics.to_lsp_diagnostics(
+        db,
+        session.client_capabilities(),
+        session.global_settings(),
+    ) {
         LspDiagnostics::TextDocument(diagnostics) => {
             publish_diagnostics_notification(document.url().clone(), diagnostics);
         }
@@ -232,49 +253,71 @@ pub(crate) fn publish_settings_diagnostics(
 
     let session_encoding = session.position_encoding();
     let client_capabilities = session.client_capabilities();
-    let state = session.project_state_mut(&AnySystemPath::System(path));
-    let db = &state.db;
-    let project = db.project();
-    let settings_diagnostics = project.check_settings(db);
 
-    // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
-    // These will both almost always be empty so this function will almost always be a no-op.
-    if settings_diagnostics.is_empty() && state.untracked_files_with_pushed_diagnostics.is_empty() {
-        return;
-    }
+    let project_path = AnySystemPath::System(path);
 
-    // Group diagnostics by URL
-    let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
-    for diagnostic in settings_diagnostics {
-        if let Some(span) = diagnostic.primary_span() {
-            let file = span.expect_ty_file();
-            let Some(url) = file_to_url(db, file) else {
-                tracing::debug!("Failed to convert file to URL at {}", file.path(db));
-                continue;
-            };
-            diagnostics_by_url.entry(url).or_default().push(diagnostic);
+    let (mut diagnostics_by_url, old_untracked) = {
+        let state = session.project_state_mut(&project_path);
+        let db = &state.db;
+        let project = db.project();
+        let settings_diagnostics = project.check_settings(db);
+
+        // We need to send diagnostics if we have non-empty ones, or we have ones to clear.
+        // These will both almost always be empty so this function will almost always be a no-op.
+        if settings_diagnostics.is_empty()
+            && state.untracked_files_with_pushed_diagnostics.is_empty()
+        {
+            return;
         }
-    }
 
-    // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
-    // the next time we publish settings diagnostics!
-    let old_untracked = std::mem::replace(
-        &mut state.untracked_files_with_pushed_diagnostics,
-        diagnostics_by_url.keys().cloned().collect(),
-    );
+        // Group diagnostics by URL
+        let mut diagnostics_by_url: FxHashMap<Url, Vec<_>> = FxHashMap::default();
+        for diagnostic in settings_diagnostics {
+            if let Some(span) = diagnostic.primary_span() {
+                let file = span.expect_ty_file();
+                let Some(url) = file_to_url(db, file) else {
+                    tracing::debug!("Failed to convert file to URL at {}", file.path(db));
+                    continue;
+                };
+                diagnostics_by_url.entry(url).or_default().push(diagnostic);
+            }
+        }
+
+        // Record the URLs we're sending non-empty diagnostics for, so we know to clear them
+        // the next time we publish settings diagnostics!
+        let old_untracked = std::mem::replace(
+            &mut state.untracked_files_with_pushed_diagnostics,
+            diagnostics_by_url.keys().cloned().collect(),
+        );
+
+        (diagnostics_by_url, old_untracked)
+    };
 
     // Add empty diagnostics for any files that had diagnostics before but don't now.
     // This will clear them (either the file is no longer relevant to us or fixed!)
     for url in old_untracked {
         diagnostics_by_url.entry(url).or_default();
     }
+
+    let db = session.project_db(&project_path);
+    let global_settings = session.global_settings();
+
     // Send the settings diagnostics!
     for (url, file_diagnostics) in diagnostics_by_url {
         // Convert diagnostics to LSP format
         let lsp_diagnostics = file_diagnostics
             .into_iter()
-            .map(|diagnostic| {
-                to_lsp_diagnostic(db, &diagnostic, session_encoding, client_capabilities).1
+            .filter_map(|diagnostic| {
+                Some(
+                    to_lsp_diagnostic(
+                        db,
+                        &diagnostic,
+                        session_encoding,
+                        client_capabilities,
+                        global_settings,
+                    )?
+                    .1,
+                )
             })
             .collect::<Vec<_>>();
 
@@ -315,7 +358,12 @@ pub(super) fn to_lsp_diagnostic(
     diagnostic: &ruff_db::diagnostic::Diagnostic,
     encoding: PositionEncoding,
     client_capabilities: ResolvedClientCapabilities,
-) -> (Option<lsp_types::Url>, Diagnostic) {
+    global_settings: &GlobalSettings,
+) -> Option<(Option<lsp_types::Url>, Diagnostic)> {
+    if diagnostic.is_invalid_syntax() && !global_settings.show_syntax_errors() {
+        return None;
+    }
+
     let supports_related_information =
         client_capabilities.supports_diagnostic_related_information();
 
@@ -388,7 +436,7 @@ pub(super) fn to_lsp_diagnostic(
 
     let data = DiagnosticData::try_from_diagnostic(db, diagnostic, encoding);
 
-    (
+    Some((
         url,
         Diagnostic {
             range,
@@ -414,7 +462,7 @@ pub(super) fn to_lsp_diagnostic(
             related_information,
             data: serde_json::to_value(data).ok(),
         },
-    )
+    ))
 }
 
 /// Converts an [`Annotation`] to a [`DiagnosticRelatedInformation`].

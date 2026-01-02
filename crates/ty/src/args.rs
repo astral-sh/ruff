@@ -142,7 +142,7 @@ pub(crate) struct CheckCommand {
     pub(crate) watch: bool,
 
     /// Respect file exclusions via `.gitignore` and other standard ignore files.
-    /// Use `--no-respect-gitignore` to disable.
+    /// Use `--no-respect-ignore-files` to disable.
     #[arg(
         long,
         overrides_with("no_respect_ignore_files"),
