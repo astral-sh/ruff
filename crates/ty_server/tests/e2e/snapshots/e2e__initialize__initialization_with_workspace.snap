@@ -7,7 +7,10 @@ expression: initialization_result
     "positionEncoding": "utf-16",
     "textDocumentSync": {
       "openClose": true,
-      "change": 2
+      "change": 2,
+      "save": {
+        "includeText": false
+      }
     },
     "notebookDocumentSync": {
       "notebookSelector": [
