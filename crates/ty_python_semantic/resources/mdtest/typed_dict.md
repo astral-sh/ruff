@@ -2136,8 +2136,7 @@ def disappointment(u: Foo | Bar):
         reveal_type(u)  # revealed: Foo | Bar
     else:
         # ...(even though we *can* narrow it here)...
-        # TODO: This should narrow to `Bar`, because "foo" is required in `Foo`.
-        reveal_type(u)  # revealed: Foo | Bar
+        reveal_type(u)  # revealed: Bar
 
 # ...because `u` could turn out to be one of these.
 class FooBar(TypedDict):
@@ -2146,6 +2145,17 @@ class FooBar(TypedDict):
 
 static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
+```
+
+We can also narrow unions that contain intersections with `TypedDict` in the same way:
+
+```py
+from collections.abc import Mapping
+from ty_extensions import Intersection, is_assignable_to, static_assert
+
+def _(u: Foo | Intersection[Bar, Mapping[str, int]]):
+    if "bar" not in u:
+        reveal_type(u)  # revealed: Foo
 ```
 
 TODO: The narrowing that we didn't do above will become possible when we add support for

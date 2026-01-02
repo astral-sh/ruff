@@ -1099,6 +1099,81 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
             }
         }
 
+        // Narrow unions and intersections of `TypedDict` in cases where requires keys are
+        // excluded:
+        //
+        // class Foo(TypedDict):
+        //     foo: int
+        // class Bar(TypedDict):
+        //     bar: int
+        //
+        // def _(u: Foo | Bar):
+        //     if "foo" not in u:
+        //         reveal_type(u)  # revealed: Bar
+        if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
+            && let ast::Expr::StringLiteral(key_literal) = &**left
+            && let Some(rhs_place_expr) = place_expr(&comparators[0])
+            && let rhs_type = inference.expression_type(&comparators[0])
+            && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
+        {
+            let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
+            if is_negative_check {
+                let key_name = key_literal.value.to_str();
+                let requires_key = |td: &TypedDictType<'db>| -> bool {
+                    td.items(self.db)
+                        .get(key_name)
+                        .is_some_and(|field| field.is_required())
+                };
+
+                let narrowed = match rhs_type {
+                    Type::TypedDict(td) => {
+                        if requires_key(&td) {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Union(union) => {
+                        // remove all members of the union that would require the key
+                        let filtered: Vec<_> = union
+                            .elements(self.db)
+                            .iter()
+                            .filter(|ty| match ty {
+                                Type::TypedDict(td) => !requires_key(td),
+                                Type::Intersection(intersection) => {
+                                    let intersection_requires_key =
+                                        intersection.positive(self.db).iter().any(|ty| match ty {
+                                            Type::TypedDict(td) => requires_key(td),
+                                            _ => false,
+                                        });
+                                    !intersection_requires_key
+                                }
+                                _ => true,
+                            })
+                            .copied()
+                            .collect();
+                        UnionType::from_elements(self.db, filtered)
+                    }
+                    Type::Intersection(intersection) => {
+                        let intersection_requires_key =
+                            intersection.positive(self.db).iter().any(|ty| match ty {
+                                Type::TypedDict(td) => requires_key(td),
+                                _ => false,
+                            });
+                        if intersection_requires_key {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    _ => rhs_type,
+                };
+
+                let place = self.expect_place(&rhs_place_expr);
+                constraints.insert(place, narrowed);
+            }
+        }
+
         let mut last_rhs_ty: Option<Type> = None;
 
         for (op, (left, right)) in std::iter::zip(&**ops, comparator_tuples) {
