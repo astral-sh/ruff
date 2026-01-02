@@ -664,6 +664,8 @@ pub enum ClassLiteral<'db> {
     /// A namedtuple created via the functional form `namedtuple(name, fields)` or
     /// `NamedTuple(name, fields)`.
     FunctionalNamedTuple(FunctionalNamedTupleLiteral<'db>),
+    /// A dataclass created via the functional form `make_dataclass(name, fields)`.
+    FunctionalDataclass(FunctionalDataclassLiteral<'db>),
 }
 
 impl<'db> ClassLiteral<'db> {
@@ -673,6 +675,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.name(db),
             Self::Functional(functional) => functional.name(db),
             Self::FunctionalNamedTuple(namedtuple) => namedtuple.name(db),
+            Self::FunctionalDataclass(dataclass) => dataclass.name(db),
         }
     }
 
@@ -698,6 +701,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.metaclass(db),
             Self::Functional(functional) => functional.metaclass(db),
             Self::FunctionalNamedTuple(namedtuple) => namedtuple.metaclass(db),
+            Self::FunctionalDataclass(dataclass) => dataclass.metaclass(db),
         }
     }
 
@@ -713,6 +717,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.class_member(db, name, policy),
             Self::Functional(functional) => functional.class_member(db, name, policy),
             Self::FunctionalNamedTuple(namedtuple) => namedtuple.class_member(db, name, policy),
+            Self::FunctionalDataclass(dataclass) => dataclass.class_member(db, name, policy),
         }
     }
 
@@ -728,7 +733,7 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Stmt(stmt) => stmt.class_member_from_mro(db, name, policy, mro_iter),
-            Self::Functional(_) | Self::FunctionalNamedTuple(_) => {
+            Self::Functional(_) | Self::FunctionalNamedTuple(_) | Self::FunctionalDataclass(_) => {
                 // Functional classes don't have inherited generic context and are never `object`.
                 let result = MroLookup::new(db, mro_iter).class_member(name, policy, None, false);
                 match result {
@@ -781,7 +786,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         match self {
             Self::Stmt(stmt) => stmt.is_tuple(db),
-            Self::Functional(_) => false,
+            Self::Functional(_) | Self::FunctionalDataclass(_) => false,
             // Functional namedtuples are tuple subclasses.
             Self::FunctionalNamedTuple(_) => true,
         }
@@ -793,6 +798,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.metaclass_instance_type(db),
             Self::Functional(functional) => functional.metaclass(db),
             Self::FunctionalNamedTuple(namedtuple) => namedtuple.metaclass(db),
+            Self::FunctionalDataclass(dataclass) => dataclass.metaclass(db),
         }
     }
 
@@ -815,7 +821,9 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn as_stmt(self) -> Option<StmtClassLiteral<'db>> {
         match self {
             Self::Stmt(stmt) => Some(stmt),
-            Self::Functional(_) | Self::FunctionalNamedTuple(_) => None,
+            Self::Functional(_) | Self::FunctionalNamedTuple(_) | Self::FunctionalDataclass(_) => {
+                None
+            }
         }
     }
 
@@ -823,7 +831,7 @@ impl<'db> ClassLiteral<'db> {
     pub(crate) fn as_functional_namedtuple(self) -> Option<FunctionalNamedTupleLiteral<'db>> {
         match self {
             Self::FunctionalNamedTuple(namedtuple) => Some(namedtuple),
-            Self::Stmt(_) | Self::Functional(_) => None,
+            Self::Stmt(_) | Self::Functional(_) | Self::FunctionalDataclass(_) => None,
         }
     }
 
@@ -835,6 +843,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(_) => None,
             Self::Functional(f) => Some(ClassType::NonGeneric(f.into())),
             Self::FunctionalNamedTuple(n) => Some(ClassType::NonGeneric(n.into())),
+            Self::FunctionalDataclass(d) => Some(ClassType::NonGeneric(d.into())),
         }
     }
 
@@ -903,6 +912,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.instance_member(db, specialization, name),
             Self::Functional(functional) => functional.instance_member(db, name),
             Self::FunctionalNamedTuple(namedtuple) => namedtuple.instance_member(db, name),
+            Self::FunctionalDataclass(dataclass) => dataclass.instance_member(db, name),
         }
     }
 
@@ -912,6 +922,7 @@ impl<'db> ClassLiteral<'db> {
             Self::Stmt(stmt) => stmt.top_materialization(db),
             Self::Functional(functional) => ClassType::NonGeneric(functional.into()),
             Self::FunctionalNamedTuple(namedtuple) => ClassType::NonGeneric(namedtuple.into()),
+            Self::FunctionalDataclass(dataclass) => ClassType::NonGeneric(dataclass.into()),
         }
     }
 
@@ -926,7 +937,9 @@ impl<'db> ClassLiteral<'db> {
     ) -> PlaceAndQualifiers<'db> {
         match self {
             Self::Stmt(stmt) => stmt.typed_dict_member(db, specialization, name, policy),
-            Self::Functional(_) | Self::FunctionalNamedTuple(_) => Place::Undefined.into(),
+            Self::Functional(_) | Self::FunctionalNamedTuple(_) | Self::FunctionalDataclass(_) => {
+                Place::Undefined.into()
+            }
         }
     }
 }
@@ -946,6 +959,12 @@ impl<'db> From<FunctionalClassLiteral<'db>> for ClassLiteral<'db> {
 impl<'db> From<FunctionalNamedTupleLiteral<'db>> for ClassLiteral<'db> {
     fn from(namedtuple: FunctionalNamedTupleLiteral<'db>) -> Self {
         ClassLiteral::FunctionalNamedTuple(namedtuple)
+    }
+}
+
+impl<'db> From<FunctionalDataclassLiteral<'db>> for ClassLiteral<'db> {
+    fn from(dataclass: FunctionalDataclassLiteral<'db>) -> Self {
+        ClassLiteral::FunctionalDataclass(dataclass)
     }
 }
 
@@ -1040,7 +1059,9 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
             Self::NonGeneric(
-                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalDataclass(_),
             ) => None,
             Self::Generic(generic) => Some((generic.origin(db), Some(generic.specialization(db)))),
         }
@@ -1056,7 +1077,9 @@ impl<'db> ClassType<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => Some((stmt, None)),
             Self::NonGeneric(
-                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalDataclass(_),
             ) => None,
             Self::Generic(generic) => Some((
                 generic.origin(db),
@@ -1789,6 +1812,9 @@ impl<'db> ClassType<'db> {
             Self::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => {
                 namedtuple.instance_member(db, name)
             }
+            Self::NonGeneric(ClassLiteral::FunctionalDataclass(dataclass)) => {
+                dataclass.instance_member(db, name)
+            }
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => {
                 if stmt.is_typed_dict(db) {
                     return Place::Undefined.into();
@@ -1820,6 +1846,17 @@ impl<'db> ClassType<'db> {
                     if field_name.as_str() == name {
                         return Member {
                             inner: Place::bound(create_field_property(db, *field_ty)).into(),
+                        };
+                    }
+                }
+                Member::unbound()
+            }
+            Self::NonGeneric(ClassLiteral::FunctionalDataclass(dataclass)) => {
+                // For functional dataclasses, the field attributes are "own" instance members.
+                for (field_name, field_ty, _) in dataclass.fields(db).as_ref() {
+                    if field_name.as_str() == name {
+                        return Member {
+                            inner: Place::bound(*field_ty).into(),
                         };
                     }
                 }
@@ -2081,6 +2118,12 @@ impl<'db> From<FunctionalNamedTupleLiteral<'db>> for Type<'db> {
     }
 }
 
+impl<'db> From<FunctionalDataclassLiteral<'db>> for Type<'db> {
+    fn from(dataclass: FunctionalDataclassLiteral<'db>) -> Type<'db> {
+        Type::ClassLiteral(dataclass.into())
+    }
+}
+
 impl<'db> From<ClassType<'db>> for Type<'db> {
     fn from(class: ClassType<'db>) -> Type<'db> {
         match class {
@@ -2095,7 +2138,9 @@ impl<'db> VarianceInferable<'db> for ClassType<'db> {
         match self {
             Self::NonGeneric(ClassLiteral::Stmt(stmt)) => stmt.variance_of(db, typevar),
             Self::NonGeneric(
-                ClassLiteral::Functional(_) | ClassLiteral::FunctionalNamedTuple(_),
+                ClassLiteral::Functional(_)
+                | ClassLiteral::FunctionalNamedTuple(_)
+                | ClassLiteral::FunctionalDataclass(_),
             ) => TypeVarVariance::Bivariant,
             Self::Generic(generic) => generic.variance_of(db, typevar),
         }
@@ -4701,7 +4746,9 @@ impl<'db> VarianceInferable<'db> for ClassLiteral<'db> {
     fn variance_of(self, db: &'db dyn Db, typevar: BoundTypeVarInstance<'db>) -> TypeVarVariance {
         match self {
             Self::Stmt(stmt) => stmt.variance_of(db, typevar),
-            Self::Functional(_) | Self::FunctionalNamedTuple(_) => TypeVarVariance::Bivariant,
+            Self::Functional(_) | Self::FunctionalNamedTuple(_) | Self::FunctionalDataclass(_) => {
+                TypeVarVariance::Bivariant
+            }
         }
     }
 }
@@ -5087,7 +5134,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
     /// Look up an instance member by name.
     pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
         // First check if it's one of the field names.
-        for (field_name, field_ty, _) in self.fields(db).as_ref() {
+        for (field_name, field_ty, _) in self.fields(db) {
             if field_name.as_str() == name {
                 return Place::bound(create_field_property(db, *field_ty)).into();
             }
@@ -5110,7 +5157,7 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
         }
 
         // Check if it's a field name (returns a property descriptor).
-        for (field_name, field_ty, _) in self.fields(db).as_ref() {
+        for (field_name, field_ty, _) in self.fields(db) {
             if field_name.as_str() == name {
                 return Place::bound(create_field_property(db, *field_ty)).into();
             }
@@ -5147,6 +5194,345 @@ impl<'db> FunctionalNamedTupleLiteral<'db> {
                     TypeContext::default(),
                 )
             })
+        }
+    }
+}
+
+/// A dataclass created dynamically via `dataclasses.make_dataclass()`.
+///
+/// For example:
+/// ```python
+/// from dataclasses import make_dataclass
+/// Point = make_dataclass("Point", [("x", int), ("y", int)])
+/// ```
+///
+/// The type of `Point` would be `<class 'Point'>` where `Point` is a `FunctionalDataclassLiteral`.
+#[salsa::interned(debug, heap_size = ruff_memory_usage::heap_size)]
+#[derive(PartialOrd, Ord)]
+pub struct FunctionalDataclassLiteral<'db> {
+    /// The name of the dataclass (from the first argument).
+    #[returns(ref)]
+    pub name: Name,
+
+    /// The fields as (name, type, default) tuples.
+    /// Types come from the field definitions; defaults are optional.
+    #[returns(ref)]
+    pub fields: Box<[(Name, Type<'db>, Option<Type<'db>>)]>,
+
+    /// The base classes (from the `bases` keyword argument).
+    #[returns(ref)]
+    pub bases: Box<[ClassBase<'db>]>,
+
+    /// The dataclass parameters (init, repr, eq, etc.).
+    pub params: DataclassParams<'db>,
+}
+
+impl get_size2::GetSize for FunctionalDataclassLiteral<'_> {}
+
+impl<'db> FunctionalDataclassLiteral<'db> {
+    /// Returns an instance type for this functional dataclass.
+    pub(crate) fn to_instance(self, db: &'db dyn Db) -> Type<'db> {
+        Type::instance(db, ClassType::NonGeneric(self.into()))
+    }
+
+    /// Get the metaclass of this functional dataclass.
+    ///
+    /// Derives the metaclass from base classes: finds the most derived metaclass
+    /// that is a subclass of all other base metaclasses.
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
+    pub(crate) fn metaclass(self, db: &'db dyn Db) -> Type<'db> {
+        self.try_metaclass(db)
+            .unwrap_or_else(|_| SubclassOfType::subclass_of_unknown())
+    }
+
+    /// Try to get the metaclass of this functional dataclass.
+    ///
+    /// Returns `Err(FunctionalMetaclassConflict)` if there's a metaclass conflict
+    /// (i.e., two base classes have metaclasses that are not in a subclass relationship).
+    ///
+    /// See <https://docs.python.org/3/reference/datamodel.html#determining-the-appropriate-metaclass>
+    pub(crate) fn try_metaclass(
+        self,
+        db: &'db dyn Db,
+    ) -> Result<Type<'db>, FunctionalMetaclassConflict<'db>> {
+        let bases = self.bases(db);
+
+        // If no bases, metaclass is `type`.
+        if bases.is_empty() {
+            return Ok(KnownClass::Type.to_instance(db));
+        }
+
+        // Start with the first base's metaclass as the candidate.
+        // Track which base the candidate metaclass came from.
+        let mut candidate = bases[0].metaclass(db);
+        let mut candidate_base = bases[0];
+
+        // Reconcile with other bases' metaclasses.
+        for base in &bases[1..] {
+            let base_metaclass = base.metaclass(db);
+
+            // Get the ClassType for comparison.
+            let Some(candidate_class) = candidate.to_class_type(db) else {
+                // If candidate isn't a class type, keep it as is.
+                continue;
+            };
+            let Some(base_metaclass_class) = base_metaclass.to_class_type(db) else {
+                continue;
+            };
+
+            // If base's metaclass is more derived, use it.
+            if base_metaclass_class.is_subclass_of(db, candidate_class) {
+                candidate = base_metaclass;
+                candidate_base = *base;
+                continue;
+            }
+
+            // If candidate is already more derived, keep it.
+            if candidate_class.is_subclass_of(db, base_metaclass_class) {
+                continue;
+            }
+
+            // Conflict: neither metaclass is a subclass of the other.
+            // Python raises `TypeError: metaclass conflict` at runtime.
+            return Err(FunctionalMetaclassConflict {
+                metaclass1: candidate_class,
+                base1: candidate_base,
+                metaclass2: base_metaclass_class,
+                base2: *base,
+            });
+        }
+
+        Ok(candidate)
+    }
+
+    /// Look up an instance member by name.
+    pub(crate) fn instance_member(self, db: &'db dyn Db, name: &str) -> PlaceAndQualifiers<'db> {
+        // First check if it's one of the field names.
+        for (field_name, field_ty, _) in self.fields(db) {
+            if field_name.as_str() == name {
+                return Place::bound(*field_ty).into();
+            }
+        }
+
+        // Check for synthesized instance members.
+        if let Some(ty) = self.synthesized_instance_member(db, name) {
+            return Place::bound(ty).into();
+        }
+
+        // Check base classes for inherited instance members.
+        for base in self.bases(db) {
+            if let ClassBase::Class(class) = base {
+                let member = class.instance_member(db, name);
+                if !member.place.is_undefined() {
+                    return member;
+                }
+            }
+        }
+
+        // Fall back to object for other attributes.
+        Type::object().instance_member(db, name)
+    }
+
+    /// Look up a class-level member by name.
+    pub(crate) fn class_member(
+        self,
+        db: &'db dyn Db,
+        name: &str,
+        policy: MemberLookupPolicy,
+    ) -> PlaceAndQualifiers<'db> {
+        // Check for synthesized class members like __init__.
+        if let Some(ty) = self.synthesized_class_member(db, name) {
+            return Place::bound(ty).into();
+        }
+
+        // Check if it's a field name (returns the type directly for class access).
+        for (field_name, field_ty, _) in self.fields(db) {
+            if field_name.as_str() == name {
+                return Place::bound(*field_ty).into();
+            }
+        }
+
+        // Check base classes for inherited class members.
+        for base in self.bases(db) {
+            if let ClassBase::Class(class) = base {
+                let member = class.class_member(db, name, policy);
+                if !member.place.is_undefined() {
+                    return member;
+                }
+            }
+        }
+
+        // Fall back to object class members.
+        Type::object()
+            .to_class_type(db)
+            .map(|class| class.class_member(db, name, policy))
+            .unwrap_or_else(|| Place::Undefined.into())
+    }
+
+    /// Helper to check if a dataclass flag is set.
+    fn has_flag(self, db: &'db dyn Db, flag: DataclassFlags) -> bool {
+        self.params(db).flags(db).contains(flag)
+    }
+
+    /// Synthesize instance members for functional dataclasses.
+    fn synthesized_instance_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        match name {
+            "__match_args__" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                if !self.has_flag(db, DataclassFlags::MATCH_ARGS) {
+                    return None;
+                }
+
+                let kw_only_default = self.has_flag(db, DataclassFlags::KW_ONLY);
+
+                // For functional dataclasses, we don't have per-field kw_only info,
+                // so we use the class-level default.
+                let match_args = if kw_only_default {
+                    // All fields are kw_only, so __match_args__ is empty.
+                    Vec::new()
+                } else {
+                    self.fields(db)
+                        .iter()
+                        .map(|(name, _, _)| Type::string_literal(db, name))
+                        .collect()
+                };
+                Some(Type::heterogeneous_tuple(db, match_args))
+            }
+            "__slots__" if Program::get(db).python_version(db) >= PythonVersion::PY310 => {
+                if !self.has_flag(db, DataclassFlags::SLOTS) {
+                    return None;
+                }
+                let slots = self
+                    .fields(db)
+                    .iter()
+                    .map(|(name, _, _)| Type::string_literal(db, name));
+                Some(Type::heterogeneous_tuple(db, slots))
+            }
+            "__weakref__" if Program::get(db).python_version(db) >= PythonVersion::PY311 => {
+                if !self.has_flag(db, DataclassFlags::WEAKREF_SLOT)
+                    || !self.has_flag(db, DataclassFlags::SLOTS)
+                {
+                    return None;
+                }
+                Some(UnionType::from_elements(db, [Type::any(), Type::none(db)]))
+            }
+            _ => None,
+        }
+    }
+
+    /// Synthesize class members like __init__ for functional dataclasses.
+    fn synthesized_class_member(self, db: &'db dyn Db, name: &str) -> Option<Type<'db>> {
+        let instance_ty = self.to_instance(db);
+
+        match name {
+            "__init__" => {
+                // Only synthesize __init__ if the dataclass has init=True.
+                if !self.has_flag(db, DataclassFlags::INIT) {
+                    return None;
+                }
+
+                // __init__(self, field1, field2, ...) -> None
+                let kw_only_default = self.has_flag(db, DataclassFlags::KW_ONLY);
+                let mut parameters = vec![
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                        .with_annotated_type(instance_ty),
+                ];
+
+                for (field_name, field_ty, default_ty) in self.fields(db) {
+                    let mut param = if kw_only_default {
+                        Parameter::keyword_only(field_name.clone())
+                    } else {
+                        Parameter::positional_or_keyword(field_name.clone())
+                    }
+                    .with_annotated_type(*field_ty);
+                    if let Some(default) = default_ty {
+                        param = param.with_default_type(*default);
+                    }
+                    parameters.push(param);
+                }
+
+                let signature =
+                    Signature::new(Parameters::new(db, parameters), Some(Type::none(db)));
+                Some(Type::function_like_callable(db, signature))
+            }
+            "__lt__" | "__le__" | "__gt__" | "__ge__" => {
+                if !self.has_flag(db, DataclassFlags::ORDER) {
+                    return None;
+                }
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("other"))
+                                .with_annotated_type(instance_ty),
+                        ],
+                    ),
+                    Some(KnownClass::Bool.to_instance(db)),
+                );
+                Some(Type::function_like_callable(db, signature))
+            }
+            "__hash__" => {
+                let unsafe_hash = self.has_flag(db, DataclassFlags::UNSAFE_HASH);
+                let frozen = self.has_flag(db, DataclassFlags::FROZEN);
+                let eq = self.has_flag(db, DataclassFlags::EQ);
+
+                if unsafe_hash || (frozen && eq) {
+                    let signature = Signature::new(
+                        Parameters::new(
+                            db,
+                            [Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty)],
+                        ),
+                        Some(KnownClass::Int.to_instance(db)),
+                    );
+                    Some(Type::function_like_callable(db, signature))
+                } else if eq && !frozen {
+                    Some(Type::none(db))
+                } else {
+                    // No `__hash__` is generated, fall back to `object.__hash__`.
+                    None
+                }
+            }
+            "__setattr__" => {
+                if !self.has_flag(db, DataclassFlags::FROZEN) {
+                    return None;
+                }
+                let signature = Signature::new(
+                    Parameters::new(
+                        db,
+                        [
+                            Parameter::positional_or_keyword(Name::new_static("self"))
+                                .with_annotated_type(instance_ty),
+                            Parameter::positional_or_keyword(Name::new_static("name")),
+                            Parameter::positional_or_keyword(Name::new_static("value")),
+                        ],
+                    ),
+                    Some(Type::Never),
+                );
+                Some(Type::function_like_callable(db, signature))
+            }
+            "__replace__" if Program::get(db).python_version(db) >= PythonVersion::PY313 => {
+                // __replace__(self, **kwargs) -> Self
+                let mut parameters = vec![
+                    Parameter::positional_or_keyword(Name::new_static("self"))
+                        .with_annotated_type(instance_ty),
+                ];
+
+                // Add keyword-only parameters for each field.
+                for (field_name, field_ty, _) in self.fields(db) {
+                    parameters.push(
+                        Parameter::keyword_only(field_name.clone())
+                            .with_annotated_type(*field_ty)
+                            .with_default_type(*field_ty),
+                    );
+                }
+
+                let signature = Signature::new(Parameters::new(db, parameters), Some(instance_ty));
+                Some(Type::function_like_callable(db, signature))
+            }
+            _ => None,
         }
     }
 }

@@ -48,11 +48,11 @@ use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, ClassType, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    FieldInstance, FunctionalClassLiteral, FunctionalNamedTupleLiteral, KnownBoundMethodType,
-    KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
-    SpecialFormType, StmtClassLiteral, TrackedConstraintSet, TypeAliasType, TypeContext,
-    TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
-    todo_type,
+    FieldInstance, FunctionalClassLiteral, FunctionalDataclassLiteral, FunctionalNamedTupleLiteral,
+    KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType,
+    PropertyInstanceType, SpecialFormType, StmtClassLiteral, TrackedConstraintSet, TypeAliasType,
+    TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums,
+    list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -1291,6 +1291,157 @@ impl<'db> Bindings<'db> {
                                 overload.set_return_type(
                                     KnownClass::NamedTupleFallback.to_class_literal(db),
                                 );
+                            }
+                        }
+
+                        Some(KnownFunction::MakeDataclass) => {
+                            // Handle dataclasses.make_dataclass(cls_name, fields, ...)
+                            if let [Some(name_type), Some(fields_type), ..] =
+                                overload.parameter_types()
+                            {
+                                let name = name_type
+                                    .as_string_literal()
+                                    .map(|s| Name::new(s.value(db)));
+
+                                // Extract fields from the schema type inferred from the literal.
+                                let fields: Option<Vec<(Name, Type<'db>, Option<Type<'db>>)>> =
+                                    if let Type::KnownInstance(
+                                        KnownInstanceType::MakeDataclassFieldsSchema(schema),
+                                    ) = fields_type
+                                    {
+                                        Some(
+                                            schema
+                                                .fields(db)
+                                                .iter()
+                                                .map(|(name, ty, default)| {
+                                                    (name.clone(), *ty, *default)
+                                                })
+                                                .collect(),
+                                        )
+                                    } else {
+                                        None
+                                    };
+
+                                // Extract bases from keyword argument.
+                                let bases: Box<[ClassBase<'db>]> = overload
+                                    .parameter_type_by_name("bases", false)
+                                    .ok()
+                                    .flatten()
+                                    .and_then(|bases_type| {
+                                        bases_type.exact_tuple_instance_spec(db).map(|tuple_spec| {
+                                            tuple_spec
+                                                .fixed_elements()
+                                                .filter_map(|ty| match ty {
+                                                    Type::ClassLiteral(literal) => {
+                                                        Some(ClassBase::Class(
+                                                            literal.default_specialization(db),
+                                                        ))
+                                                    }
+                                                    Type::GenericAlias(generic) => {
+                                                        Some(ClassBase::Class(ClassType::Generic(
+                                                            *generic,
+                                                        )))
+                                                    }
+                                                    _ => None,
+                                                })
+                                                .collect()
+                                        })
+                                    })
+                                    .unwrap_or_default();
+
+                                // Extract dataclass flags from keyword arguments.
+                                let mut flags = DataclassFlags::empty();
+                                let init = overload
+                                    .parameter_type_by_name("init", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&init, true) {
+                                    flags |= DataclassFlags::INIT;
+                                }
+                                let repr = overload
+                                    .parameter_type_by_name("repr", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&repr, true) {
+                                    flags |= DataclassFlags::REPR;
+                                }
+                                let eq =
+                                    overload.parameter_type_by_name("eq", false).ok().flatten();
+                                if to_bool(&eq, true) {
+                                    flags |= DataclassFlags::EQ;
+                                }
+                                let order = overload
+                                    .parameter_type_by_name("order", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&order, false) {
+                                    flags |= DataclassFlags::ORDER;
+                                }
+                                let unsafe_hash = overload
+                                    .parameter_type_by_name("unsafe_hash", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&unsafe_hash, false) {
+                                    flags |= DataclassFlags::UNSAFE_HASH;
+                                }
+                                let frozen = overload
+                                    .parameter_type_by_name("frozen", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&frozen, false) {
+                                    flags |= DataclassFlags::FROZEN;
+                                }
+                                let match_args = overload
+                                    .parameter_type_by_name("match_args", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&match_args, true) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::MATCH_ARGS;
+                                    }
+                                }
+                                let kw_only = overload
+                                    .parameter_type_by_name("kw_only", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&kw_only, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::KW_ONLY;
+                                    }
+                                }
+                                let slots = overload
+                                    .parameter_type_by_name("slots", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&slots, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY310 {
+                                        flags |= DataclassFlags::SLOTS;
+                                    }
+                                }
+                                let weakref_slot = overload
+                                    .parameter_type_by_name("weakref_slot", false)
+                                    .ok()
+                                    .flatten();
+                                if to_bool(&weakref_slot, false) {
+                                    if Program::get(db).python_version(db) >= PythonVersion::PY311 {
+                                        flags |= DataclassFlags::WEAKREF_SLOT;
+                                    }
+                                }
+
+                                let params = DataclassParams::from_flags(db, flags);
+
+                                if let (Some(name), Some(fields)) = (name, fields) {
+                                    let dataclass = FunctionalDataclassLiteral::new(
+                                        db,
+                                        name,
+                                        fields.into_boxed_slice(),
+                                        bases,
+                                        params,
+                                    );
+                                    overload.set_return_type(Type::ClassLiteral(
+                                        ClassLiteral::FunctionalDataclass(dataclass),
+                                    ));
+                                }
                             }
                         }
 

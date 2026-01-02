@@ -199,7 +199,8 @@ impl<'db> ClassBase<'db> {
                 // Internal types, should never be a base.
                 | KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => None,
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::MakeDataclassFieldsSchema(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
@@ -244,7 +245,8 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::AlwaysFalsy
                 | SpecialFormType::TypingNamedTupleFieldsSchema
                 | SpecialFormType::CollectionsNamedTupleFieldsSchema
-                | SpecialFormType::CollectionsNamedTupleDefaultsSchema => None,
+                | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+                | SpecialFormType::MakeDataclassFieldsSchema => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),

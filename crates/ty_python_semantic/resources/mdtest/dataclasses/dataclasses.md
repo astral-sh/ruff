@@ -1688,3 +1688,254 @@ reveal_type(ordered_foo())  # revealed: @Todo(Type::Intersection.call)
 # TODO: should be `Any`
 reveal_type(ordered_foo() < ordered_foo())  # revealed: @Todo(Type::Intersection.call)
 ```
+
+## `dataclasses.make_dataclass`
+
+The `make_dataclass` function creates dataclasses dynamically.
+
+### Basic usage
+
+Using tuple syntax for fields (recommended for best type inference):
+
+```py
+from dataclasses import make_dataclass
+
+Point = make_dataclass("Point", (("x", int), ("y", int)))
+
+reveal_type(Point)  # revealed: <class 'Point'>
+
+p = Point(1, 2)
+reveal_type(p)  # revealed: Point
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+
+# The constructor accepts keyword arguments.
+p2 = Point(x=3, y=4)
+reveal_type(p2)  # revealed: Point
+```
+
+### Fields with types
+
+Fields can be specified as `(name, type)` tuples:
+
+```py
+from dataclasses import make_dataclass
+
+Person = make_dataclass("Person", (("name", str), ("age", int)))
+
+alice = Person("Alice", 30)
+reveal_type(alice.name)  # revealed: str
+reveal_type(alice.age)  # revealed: int
+
+# error: [missing-argument] "No argument provided for required parameter `age`"
+Person("Bob")
+
+# error: [too-many-positional-arguments]
+Person("Eve", 20, "extra")
+```
+
+### List syntax
+
+List syntax works the same as tuple syntax:
+
+```py
+from dataclasses import make_dataclass
+
+Point = make_dataclass("Point", [("x", int), ("y", int)])
+reveal_type(Point)  # revealed: <class 'Point'>
+
+p = Point(1, 2)
+reveal_type(p)  # revealed: Point
+reveal_type(p.x)  # revealed: int
+reveal_type(p.y)  # revealed: int
+```
+
+### Fields with defaults
+
+Fields can have default values using the 3-tuple syntax `(name, type, default)`:
+
+```py
+from dataclasses import make_dataclass
+
+Person = make_dataclass("Person", [("name", str), ("age", int, 0)])
+
+# With default, `age` is optional.
+bob = Person("Bob")
+reveal_type(bob)  # revealed: Person
+reveal_type(bob.name)  # revealed: str
+reveal_type(bob.age)  # revealed: int
+
+# Can still provide all arguments.
+alice = Person("Alice", 30)
+reveal_type(alice.age)  # revealed: int
+
+# Keyword arguments work too.
+charlie = Person(name="Charlie", age=25)
+reveal_type(charlie)  # revealed: Person
+```
+
+### String-only fields
+
+Fields can be specified as just a string (field name only, type is `Any`):
+
+```py
+from dataclasses import make_dataclass
+
+# String-only fields have type Any.
+Flexible = make_dataclass("Flexible", ["x", "y"])
+
+f = Flexible(1, "hello")
+reveal_type(f)  # revealed: Flexible
+reveal_type(f.x)  # revealed: Any
+reveal_type(f.y)  # revealed: Any
+```
+
+### Base classes
+
+The `bases` keyword argument specifies base classes:
+
+```py
+from dataclasses import make_dataclass
+
+class Base:
+    def greet(self) -> str:
+        return "Hello"
+
+Derived = make_dataclass("Derived", [("value", int)], bases=(Base,))
+
+d = Derived(42)
+reveal_type(d)  # revealed: Derived
+reveal_type(d.value)  # revealed: int
+reveal_type(d.greet())  # revealed: str
+```
+
+### The `order` parameter
+
+When `order=True`, comparison methods are generated:
+
+```py
+from dataclasses import make_dataclass
+
+Ordered = make_dataclass("Ordered", [("x", int)], order=True)
+
+a = Ordered(1)
+b = Ordered(2)
+
+reveal_type(a < b)  # revealed: bool
+reveal_type(a <= b)  # revealed: bool
+reveal_type(a > b)  # revealed: bool
+reveal_type(a >= b)  # revealed: bool
+```
+
+When `order=False` (the default), comparison methods are not generated:
+
+```py
+from dataclasses import make_dataclass
+
+Unordered = make_dataclass("Unordered", [("x", int)])
+
+a = Unordered(1)
+b = Unordered(2)
+
+# error: [unsupported-operator] "Operator `<` is not supported between two objects of type `Unordered`"
+a < b
+```
+
+### The `frozen` parameter
+
+When `frozen=True`, the dataclass is immutable and hashable:
+
+```py
+from dataclasses import make_dataclass
+
+Frozen = make_dataclass("Frozen", [("x", int)], frozen=True)
+
+f = Frozen(1)
+reveal_type(hash(f))  # revealed: int
+```
+
+### The `eq` parameter
+
+When `eq=False`, the `__eq__` method is not generated, and `__hash__` falls back to
+`object.__hash__`:
+
+```py
+from dataclasses import make_dataclass
+
+NoEq = make_dataclass("NoEq", [("x", int)], eq=False)
+
+a = NoEq(1)
+# __hash__ is inherited from object.
+reveal_type(hash(a))  # revealed: int
+```
+
+### The `init` parameter
+
+When `init=False`, no `__init__` is generated and calling the class with arguments fails:
+
+```py
+from dataclasses import make_dataclass
+
+NoInit = make_dataclass("NoInit", [("x", int)], init=False)
+
+# error: [possibly-missing-implicit-call] "`__init__` method is missing on type `<class 'NoInit'>`. Make sure your `object` in typeshed has its definition."
+NoInit(1)
+```
+
+### The `kw_only` parameter
+
+When `kw_only=True`, all fields are keyword-only:
+
+```py
+from dataclasses import make_dataclass
+
+KwOnly = make_dataclass("KwOnly", [("x", int), ("y", str)], kw_only=True)
+
+# Positional arguments are not allowed.
+# error: [missing-argument] "No arguments provided for required parameters `x`, `y`"
+# error: [too-many-positional-arguments]
+KwOnly(1, "hello")
+
+# Keyword arguments work.
+k = KwOnly(x=1, y="hello")
+reveal_type(k)  # revealed: KwOnly
+```
+
+### The `unsafe_hash` parameter
+
+When `unsafe_hash=True`, a `__hash__` method is generated even if `eq=True` and `frozen=False`:
+
+```py
+from dataclasses import make_dataclass
+
+UnsafeHash = make_dataclass("UnsafeHash", [("x", int)], unsafe_hash=True)
+
+u = UnsafeHash(1)
+reveal_type(hash(u))  # revealed: int
+```
+
+### Non-literal fields
+
+When fields are passed as a variable rather than a literal, we cannot synthesize the dataclass
+fields. The return type is `type` instead of the specific dataclass class:
+
+```py
+from dataclasses import make_dataclass
+
+fields = [("x", int), ("y", str)]
+Dynamic = make_dataclass("Dynamic", fields)
+
+# When fields is a variable, we cannot infer the class structure.
+reveal_type(Dynamic)  # revealed: type
+```
+
+### Invalid fields type
+
+When an invalid type is passed as fields (not an iterable of field specs), we emit an error:
+
+```py
+from dataclasses import make_dataclass
+
+# error: [invalid-argument-type]
+Invalid = make_dataclass("Invalid", 42)
+```

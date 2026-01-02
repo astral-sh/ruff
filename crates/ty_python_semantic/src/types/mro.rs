@@ -509,6 +509,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::FunctionalNamedTuple(namedtuple) => {
                 ClassBase::Class(ClassType::NonGeneric(namedtuple.into()))
             }
+            ClassLiteral::FunctionalDataclass(dataclass) => {
+                ClassBase::Class(ClassType::NonGeneric(dataclass.into()))
+            }
         }
     }
 
@@ -537,6 +540,26 @@ impl<'db> MroIterator<'db> {
                     let tuple_base = namedtuple.tuple_base_type(self.db);
                     let elements: Vec<_> = tuple_base.iter_mro(self.db).collect();
                     SubsequentMroElements::Owned(elements.into_iter())
+                }
+                ClassLiteral::FunctionalDataclass(dataclass) => {
+                    // Dataclasses inherit from their base classes plus object.
+                    // For simplicity, we just use object's MRO if no bases.
+                    let bases = dataclass.bases(self.db);
+                    if bases.is_empty() {
+                        let object_class = KnownClass::Object
+                            .to_class_literal(self.db)
+                            .as_class_literal()
+                            .expect("Object should be a class literal");
+                        let elements: Vec<_> = object_class.iter_mro(self.db).collect();
+                        SubsequentMroElements::Owned(elements.into_iter())
+                    } else {
+                        // Use the first base's MRO.
+                        let elements: Vec<_> = match bases[0] {
+                            ClassBase::Class(class) => class.iter_mro(self.db).collect(),
+                            _ => vec![ClassBase::Class(ClassType::object(self.db))],
+                        };
+                        SubsequentMroElements::Owned(elements.into_iter())
+                    }
                 }
             })
     }

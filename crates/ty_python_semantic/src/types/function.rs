@@ -1407,6 +1407,9 @@ pub enum KnownFunction {
     Dataclass,
     /// `dataclasses.field`
     Field,
+    /// `dataclasses.make_dataclass`
+    #[strum(serialize = "make_dataclass")]
+    MakeDataclass,
 
     /// `inspect.getattr_static`
     GetattrStatic,
@@ -1493,7 +1496,7 @@ impl KnownFunction {
             Self::AsyncContextManager => {
                 matches!(module, KnownModule::Contextlib)
             }
-            Self::Dataclass | Self::Field => {
+            Self::Dataclass | Self::Field | Self::MakeDataclass => {
                 matches!(module, KnownModule::Dataclasses)
             }
             Self::GetattrStatic => module.is_inspect(),
@@ -2038,7 +2041,9 @@ pub(crate) mod tests {
 
                 KnownFunction::AsyncContextManager => KnownModule::Contextlib,
 
-                KnownFunction::Dataclass | KnownFunction::Field => KnownModule::Dataclasses,
+                KnownFunction::Dataclass | KnownFunction::Field | KnownFunction::MakeDataclass => {
+                    KnownModule::Dataclasses
+                }
 
                 KnownFunction::GetattrStatic => KnownModule::Inspect,
 

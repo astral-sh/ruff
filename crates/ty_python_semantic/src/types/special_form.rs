@@ -139,6 +139,12 @@ pub enum SpecialFormType {
 
     /// Internal annotation for `collections.namedtuple` defaults parameter.
     CollectionsNamedTupleDefaultsSchema,
+
+    /// An internal type representing the fields argument to `dataclasses.make_dataclass`.
+    /// When a list or tuple literal is passed as the `fields` argument, it gets inferred as a
+    /// `KnownInstanceType::MakeDataclassFieldsSchema` instead of a regular list or tuple type.
+    /// This allows bind.rs to extract field information without AST access.
+    MakeDataclassFieldsSchema,
 }
 
 impl SpecialFormType {
@@ -196,7 +202,8 @@ impl SpecialFormType {
             | Self::AlwaysFalsy
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => KnownClass::Object,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::MakeDataclassFieldsSchema => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -283,7 +290,8 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => module.is_ty_extensions(),
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::MakeDataclassFieldsSchema => module.is_ty_extensions(),
         }
     }
 
@@ -347,7 +355,8 @@ impl SpecialFormType {
             | Self::Generic
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => false,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::MakeDataclassFieldsSchema => false,
         }
     }
 
@@ -405,7 +414,8 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => None,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::MakeDataclassFieldsSchema => None,
         }
     }
 
@@ -460,7 +470,8 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => false,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::MakeDataclassFieldsSchema => false,
         }
     }
 
@@ -518,6 +529,7 @@ impl SpecialFormType {
             SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
                 "_CollectionsNamedTupleDefaultsSchema"
             }
+            SpecialFormType::MakeDataclassFieldsSchema => "_MakeDataclassFieldsSchema",
         }
     }
 
@@ -571,7 +583,8 @@ impl SpecialFormType {
             | SpecialFormType::Bottom
             | SpecialFormType::TypingNamedTupleFieldsSchema
             | SpecialFormType::CollectionsNamedTupleFieldsSchema
-            | SpecialFormType::CollectionsNamedTupleDefaultsSchema => &[KnownModule::TyExtensions],
+            | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+            | SpecialFormType::MakeDataclassFieldsSchema => &[KnownModule::TyExtensions],
         }
     }
 
