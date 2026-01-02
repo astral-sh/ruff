@@ -108,15 +108,16 @@ use crate::types::typed_dict::{
 use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundTypeVarIdentity, BoundTypeVarInstance, CallDunderError, CallableBinding, CallableType,
-    CallableTypeKind, ClassType, DataclassParams, DynamicType, InternedType, IntersectionBuilder,
-    IntersectionType, KnownClass, KnownInstanceType, KnownUnion, LintDiagnosticGuard,
-    MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType, ParamSpecAttrKind, Parameter,
-    ParameterForm, Parameters, Signature, SpecialFormType, StmtClassLiteral, SubclassOfType,
-    TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers, TypeContext,
-    TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
-    TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    CallableTypeKind, ClassType, CollectionsNamedTupleDefaultsSchema,
+    CollectionsNamedTupleFieldsSchema, DataclassParams, DynamicType, InternedType,
+    IntersectionBuilder, IntersectionType, KnownClass, KnownInstanceType, KnownUnion,
+    LintDiagnosticGuard, MemberLookupPolicy, MetaclassCandidate, PEP695TypeAliasType,
+    ParamSpecAttrKind, Parameter, ParameterForm, Parameters, Signature, SpecialFormType,
+    StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
+    TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
+    TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, TypingNamedTupleFieldsSchema,
+    UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5786,6 +5787,64 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         )))
     }
 
+    /// Extract fields from a list or tuple literal for `typing.NamedTuple`.
+    fn infer_typing_namedtuple_fields_schema(
+        &mut self,
+        field_elts: &[ast::Expr],
+    ) -> Option<TypingNamedTupleFieldsSchema<'db>> {
+        let db = self.db();
+        let mut fields: Vec<(ast::name::Name, Type<'db>)> = Vec::with_capacity(field_elts.len());
+
+        for elt in field_elts {
+            // Each element should be a tuple like ("field_name", type).
+            let ast::Expr::Tuple(tuple_expr) = elt else {
+                return None;
+            };
+
+            if tuple_expr.elts.len() != 2 {
+                return None;
+            }
+
+            // First element: field name (string literal).
+            let field_name_expr = &tuple_expr.elts[0];
+            let field_name_ty = self.infer_expression(field_name_expr, TypeContext::default());
+            let field_name_lit = field_name_ty.as_string_literal()?;
+            let field_name = ast::name::Name::new(field_name_lit.value(db));
+
+            // Second element: field type.
+            let field_type_expr = &tuple_expr.elts[1];
+            let field_type_ty = self.infer_type_expression(field_type_expr);
+
+            fields.push((field_name, field_type_ty));
+        }
+
+        Some(TypingNamedTupleFieldsSchema::new(
+            db,
+            fields.into_boxed_slice(),
+        ))
+    }
+
+    /// Extract field names from a list or tuple literal for `collections.namedtuple`.
+    fn infer_collections_namedtuple_fields_schema(
+        &mut self,
+        field_elts: &[ast::Expr],
+    ) -> Option<CollectionsNamedTupleFieldsSchema<'db>> {
+        let db = self.db();
+        let mut field_names: Vec<ast::name::Name> = Vec::with_capacity(field_elts.len());
+
+        for elt in field_elts {
+            // Each element should be a string literal (field name).
+            let field_ty = self.infer_expression(elt, TypeContext::default());
+            let field_lit = field_ty.as_string_literal()?;
+            field_names.push(ast::name::Name::new(field_lit.value(db)));
+        }
+
+        Some(CollectionsNamedTupleFieldsSchema::new(
+            db,
+            field_names.into_boxed_slice(),
+        ))
+    }
+
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
         let ast::Expr::Call(ast::ExprCall {
@@ -7788,6 +7847,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             parenthesized: _,
         } = tuple;
 
+        if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_typing_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::TypingNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_collections_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
+            tcx.annotation
+        {
+            for elt in elts {
+                self.infer_expression(elt, TypeContext::default());
+            }
+            let schema = CollectionsNamedTupleDefaultsSchema::new(self.db(), elts.len());
+            return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
+                schema,
+            ));
+        }
+
         // Remove any union elements of that are unrelated to the tuple type.
         let tcx = tcx.map(|annotation| {
             let inferable = KnownClass::Tuple
@@ -7835,6 +7926,38 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             elts,
             ctx: _,
         } = list;
+
+        if let Some(Type::SpecialForm(SpecialFormType::TypingNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_typing_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::TypingNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleFieldsSchema)) =
+            tcx.annotation
+        {
+            if let Some(schema) = self.infer_collections_namedtuple_fields_schema(elts) {
+                return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleFieldsSchema(
+                    schema,
+                ));
+            }
+        }
+
+        if let Some(Type::SpecialForm(SpecialFormType::CollectionsNamedTupleDefaultsSchema)) =
+            tcx.annotation
+        {
+            for elt in elts {
+                self.infer_expression(elt, TypeContext::default());
+            }
+            let schema = CollectionsNamedTupleDefaultsSchema::new(self.db(), elts.len());
+            return Type::KnownInstance(KnownInstanceType::CollectionsNamedTupleDefaultsSchema(
+                schema,
+            ));
+        }
 
         let elts = elts.iter().map(|elt| [Some(elt)]);
         let infer_elt_ty = |builder: &mut Self, elt, tcx| builder.infer_expression(elt, tcx);

@@ -1860,9 +1860,16 @@ impl KnownFunction {
                         }
 
                         if self == KnownFunction::IsInstance {
-                            overload.set_return_type(
-                                is_instance_truthiness(db, *first_arg, *class).into_type(db),
-                            );
+                            if let Some(stmt_class) = class.as_stmt() {
+                                overload.set_return_type(
+                                    is_instance_truthiness(
+                                        db,
+                                        *first_arg,
+                                        ClassLiteral::Stmt(stmt_class),
+                                    )
+                                    .into_type(db),
+                                );
+                            }
                         }
                     }
                     // The special-casing here is necessary because we recognise the symbol `typing.Any` as an

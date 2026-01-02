@@ -90,11 +90,32 @@ Alternative functional syntax:
 Person2 = NamedTuple("Person", [("id", int), ("name", str)])
 alice2 = Person2(1, "Alice")
 
-# TODO: should be an error
+# error: [missing-argument] "No argument provided for required parameter `name`"
 Person2(1)
 
-reveal_type(alice2.id)  # revealed: @Todo(functional `NamedTuple` syntax)
-reveal_type(alice2.name)  # revealed: @Todo(functional `NamedTuple` syntax)
+reveal_type(alice2.id)  # revealed: int
+reveal_type(alice2.name)  # revealed: str
+```
+
+### Functional syntax with variable fields
+
+When fields are passed via a variable (not a literal), we fall back to `NamedTupleFallback` which
+allows any attribute access. This is a regression test for accessing `Self` attributes in methods of
+classes that inherit from namedtuples with dynamic fields:
+
+```py
+from typing import NamedTuple
+from typing_extensions import Self
+
+fields = [("host", str), ("port", int)]
+
+class Url(NamedTuple("Url", fields)):
+    def with_port(self, port: int) -> Self:
+        # Attribute access on Self works via NamedTupleFallback.__getattr__.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
 ```
 
 ### Definition
@@ -305,10 +326,156 @@ reveal_type(IntBox(1)._replace(content=42))  # revealed: IntBox
 ```py
 from collections import namedtuple
 
-Person = namedtuple("Person", ["id", "name", "age"], defaults=[None])
+Person = namedtuple("Person", ["id", "name"])
 
-alice = Person(1, "Alice", 42)
-bob = Person(2, "Bob")
+alice = Person(1, "Alice")
+
+# Field access returns Any (no type information available).
+reveal_type(alice.id)  # revealed: Any
+reveal_type(alice.name)  # revealed: Any
+
+# Alternative field specifications.
+Point1 = namedtuple("Point1", ["x", "y"])
+Point2 = namedtuple("Point2", "x y")
+Point3 = namedtuple("Point3", "x, y")
+
+p1 = Point1(1, 2)
+p2 = Point2(3, 4)
+p3 = Point3(5, 6)
+
+reveal_type(p1.x)  # revealed: Any
+reveal_type(p2.x)  # revealed: Any
+reveal_type(p3.x)  # revealed: Any
+```
+
+## `collections.namedtuple` with variable field names
+
+When field names are passed via a variable (not a literal), we fall back to `NamedTupleFallback`
+which allows any attribute access. This is a regression test for accessing `Self` attributes in
+methods of classes that inherit from namedtuples with dynamic fields:
+
+```py
+from collections import namedtuple
+from typing_extensions import Self
+
+field_names = ["host", "port"]
+
+class Url(namedtuple("Url", field_names)):
+    def with_port(self, port: int) -> Self:
+        # Attribute access on Self works via NamedTupleFallback.__getattr__.
+        reveal_type(self.host)  # revealed: Any
+        reveal_type(self.port)  # revealed: Any
+        reveal_type(self.unknown)  # revealed: Any
+        return self._replace(port=port)
+```
+
+## `collections.namedtuple` with defaults
+
+The `defaults` parameter provides default values for the rightmost fields:
+
+```py
+from collections import namedtuple
+
+# Two fields, one default (applies to 'y').
+Point = namedtuple("Point", ["x", "y"], defaults=[0])
+
+# Can be called with both arguments.
+p1 = Point(1, 2)
+reveal_type(p1)  # revealed: Point
+
+# Can be called with just the required argument.
+p2 = Point(1)
+reveal_type(p2)  # revealed: Point
+
+# error: [missing-argument] "No argument provided for required parameter `x`"
+Point()
+
+# All fields have defaults.
+Point3D = namedtuple("Point3D", ["x", "y", "z"], defaults=[0, 0, 0])
+p3 = Point3D()
+reveal_type(p3)  # revealed: Point3D
+
+# Namedtuples with defaults are still compatible with tuple types.
+def takes_tuple(t: tuple[int, int]) -> None:
+    pass
+
+takes_tuple(Point(1, 2))
+```
+
+## `collections.namedtuple` with rename
+
+The `rename` parameter replaces invalid field names with positional names (`_0`, `_1`, etc.):
+
+```py
+from collections import namedtuple
+
+# Fields with Python keywords are renamed when rename=True.
+NT1 = namedtuple("NT1", ["abc", "def"], rename=True)
+nt1 = NT1(abc="x", _1="y")
+reveal_type(nt1)  # revealed: NT1
+
+# Fields starting with underscore are renamed when rename=True.
+NT2 = namedtuple("NT2", ["abc", "_d"], rename=True)
+nt2 = NT2(abc="x", _1="y")
+reveal_type(nt2)  # revealed: NT2
+
+# Duplicate field names are renamed when rename=True.
+NT3 = namedtuple("NT3", ["a", "a", "a"], rename=True)
+nt3 = NT3(a="x", _1="y", _2="z")
+reveal_type(nt3)  # revealed: NT3
+
+# Without rename=True, the original field names are used.
+NT4 = namedtuple("NT4", ["abc", "xyz"])
+nt4 = NT4(abc="x", xyz="y")
+reveal_type(nt4)  # revealed: NT4
+```
+
+## `collections.namedtuple` attributes
+
+Functional namedtuples have synthesized attributes similar to class-based namedtuples:
+
+```py
+from collections import namedtuple
+
+Person = namedtuple("Person", ["name", "age"])
+
+reveal_type(Person._fields)  # revealed: tuple[Literal["name"], Literal["age"]]
+reveal_type(Person._field_defaults)  # revealed: dict[str, Any]
+reveal_type(Person._make)  # revealed: bound method <class 'Person'>._make(iterable: Iterable[Any]) -> Person
+reveal_type(Person._asdict)  # revealed: def _asdict(self) -> dict[str, Any]
+reveal_type(Person._replace)  # revealed: (self: Self, *, name: Any = ..., age: Any = ...) -> Self
+
+# _make creates instances from an iterable.
+reveal_type(Person._make(["Alice", 30]))  # revealed: Person
+
+# _asdict converts to a dictionary.
+person = Person("Alice", 30)
+reveal_type(person._asdict())  # revealed: dict[str, Any]
+
+# _replace creates a copy with replaced fields.
+reveal_type(person._replace(name="Bob"))  # revealed: Person
+```
+
+## `collections.namedtuple` tuple compatibility
+
+Functional namedtuples inherit from tuple with `Any` element types since `collections.namedtuple`
+doesn't provide type information:
+
+```py
+from collections import namedtuple
+from ty_extensions import static_assert, is_subtype_of
+
+Person = namedtuple("Person", ["name", "age"])
+
+# Functional namedtuples inherit from tuple[Any, Any, ...].
+static_assert(is_subtype_of(Person, tuple[object, object]))
+
+def takes_tuple(t: tuple[str, int]) -> None:
+    pass
+
+# Instances are assignable to tuple types since fields are Any.
+p = Person("Alice", 30)
+takes_tuple(p)
 ```
 
 ## The symbol `NamedTuple` itself

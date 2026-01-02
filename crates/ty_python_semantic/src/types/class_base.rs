@@ -195,7 +195,11 @@ impl<'db> ClassBase<'db> {
                 // A class inheriting from a newtype would make intuitive sense, but newtype
                 // wrappers are just identity callables at runtime, so this sort of inheritance
                 // doesn't work and isn't allowed.
-                | KnownInstanceType::NewType(_) => None,
+                | KnownInstanceType::NewType(_)
+                // Internal types, should never be a base.
+                | KnownInstanceType::TypingNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => None,
                 KnownInstanceType::TypeGenericAlias(_) => {
                     Self::try_from_type(db, KnownClass::Type.to_class_literal(db), subclass)
                 }
@@ -237,7 +241,10 @@ impl<'db> ClassBase<'db> {
                 | SpecialFormType::TypeOf
                 | SpecialFormType::CallableTypeOf
                 | SpecialFormType::AlwaysTruthy
-                | SpecialFormType::AlwaysFalsy => None,
+                | SpecialFormType::AlwaysFalsy
+                | SpecialFormType::TypingNamedTupleFieldsSchema
+                | SpecialFormType::CollectionsNamedTupleFieldsSchema
+                | SpecialFormType::CollectionsNamedTupleDefaultsSchema => None,
 
                 SpecialFormType::Any => Some(Self::Dynamic(DynamicType::Any)),
                 SpecialFormType::Unknown => Some(Self::unknown()),
