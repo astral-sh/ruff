@@ -89,7 +89,7 @@ RUF070 Comparison `a + b == 1.0` should be replaced by `math.isclose()` or `nump
 25 | assert (a + b) == 1.0
    |         ^^^^^^^^^^^^^
 26 | assert -x == 1.0
-27 | assert -x == 1.0
+27 | assert -x == -1.0
    |
 
 RUF070 Comparison `-x == 1.0` should be replaced by `math.isclose()` or `numpy.isclose()`
@@ -99,17 +99,17 @@ RUF070 Comparison `-x == 1.0` should be replaced by `math.isclose()` or `numpy.i
 25 | assert (a + b) == 1.0
 26 | assert -x == 1.0
    |        ^^^^^^^^^
-27 | assert -x == 1.0
+27 | assert -x == -1.0
 28 | assert x**2 == 4.0
    |
 
-RUF070 Comparison `-x == 1.0` should be replaced by `math.isclose()` or `numpy.isclose()`
+RUF070 Comparison `-x == -1.0` should be replaced by `math.isclose()` or `numpy.isclose()`
   --> RUF070.py:27:8
    |
 25 | assert (a + b) == 1.0
 26 | assert -x == 1.0
-27 | assert -x == 1.0
-   |        ^^^^^^^^^
+27 | assert -x == -1.0
+   |        ^^^^^^^^^^
 28 | assert x**2 == 4.0
 29 | assert x / 2 == 1.5
    |
@@ -118,7 +118,7 @@ RUF070 Comparison `x**2 == 4.0` should be replaced by `math.isclose()` or `numpy
   --> RUF070.py:28:8
    |
 26 | assert -x == 1.0
-27 | assert -x == 1.0
+27 | assert -x == -1.0
 28 | assert x**2 == 4.0
    |        ^^^^^^^^^^^
 29 | assert x / 2 == 1.5
@@ -128,7 +128,7 @@ RUF070 Comparison `x**2 == 4.0` should be replaced by `math.isclose()` or `numpy
 RUF070 Comparison `x / 2 == 1.5` should be replaced by `math.isclose()` or `numpy.isclose()`
   --> RUF070.py:29:8
    |
-27 | assert -x == 1.0
+27 | assert -x == -1.0
 28 | assert x**2 == 4.0
 29 | assert x / 2 == 1.5
    |        ^^^^^^^^^^^^

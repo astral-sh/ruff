@@ -24,7 +24,7 @@ print(1.0 == x == 2)
 assert x == float(1)
 assert (a + b) == 1.0
 assert -x == 1.0
-assert -x == 1.0
+assert -x == -1.0
 assert x**2 == 4.0
 assert x / 2 == 1.5
 assert (y := x + 1.0) == 2.0
