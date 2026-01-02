@@ -137,3 +137,22 @@ help: Replace with `abc.ABC`
 82 |         def foo(self):
 83 |             pass
 note: This is an unsafe fix and may change runtime behavior
+
+FURB180 [*] Use of `metaclass=abc.ABCMeta` to define abstract base class
+  --> FURB180.py:89:24
+   |
+89 | class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
+   |                        ^^^^^^^^^^^^^^^^^
+90 |     @abstractmethod
+91 |     def foo(self):
+   |
+help: Replace with `abc.ABC`
+86 | class MyMetaClass(abc.ABC): ...
+87 | 
+88 | 
+   - class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
+89 + class A11(MyMetaClass, ):  # FURB180
+90 |     @abstractmethod
+91 |     def foo(self):
+92 |         pass
+note: This is an unsafe fix and may change runtime behavior

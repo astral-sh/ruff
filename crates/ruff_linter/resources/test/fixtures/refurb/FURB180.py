@@ -81,3 +81,12 @@ def a10():
         @abstractmethod
         def foo(self):
             pass
+
+
+class MyMetaClass(abc.ABC): ...
+
+
+class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
+    @abstractmethod
+    def foo(self):
+        pass
