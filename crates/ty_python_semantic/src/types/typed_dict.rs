@@ -9,7 +9,7 @@ use ruff_python_ast::Arguments;
 use ruff_python_ast::{self as ast, AnyNodeRef, StmtClassDef, name::Name};
 use ruff_text_size::Ranged;
 
-use super::class::{ClassType, CodeGeneratorKind, Field};
+use super::class::{ClassLiteral, ClassType, CodeGeneratorKind, Field};
 use super::context::InferContext;
 use super::diagnostic::{
     self, INVALID_ARGUMENT_TYPE, INVALID_ASSIGNMENT, report_invalid_key_on_typed_dict,
@@ -74,6 +74,20 @@ impl<'db> TypedDictType<'db> {
     pub(crate) fn items(self, db: &'db dyn Db) -> &'db TypedDictSchema<'db> {
         #[salsa::tracked(returns(ref), heap_size=ruff_memory_usage::heap_size)]
         fn class_based_items<'db>(db: &'db dyn Db, class: ClassType<'db>) -> TypedDictSchema<'db> {
+            // Handle functional TypedDicts.
+            if let ClassType::NonGeneric(ClassLiteral::FunctionalTypedDict(typeddict)) = class {
+                return typeddict
+                    .fields(db)
+                    .iter()
+                    .map(|(name, ty, is_required)| {
+                        let field = TypedDictFieldBuilder::new(*ty)
+                            .required(*is_required)
+                            .build();
+                        (name.clone(), field)
+                    })
+                    .collect();
+            }
+
             let Some((class_literal, specialization)) = class.stmt_class_literal(db) else {
                 return TypedDictSchema::default();
             };
@@ -966,6 +980,10 @@ pub struct TypedDictField<'db> {
 }
 
 impl<'db> TypedDictField<'db> {
+    pub(crate) const fn declared_ty(&self) -> Type<'db> {
+        self.declared_ty
+    }
+
     pub(crate) const fn is_required(&self) -> bool {
         self.flags.contains(TypedDictFieldFlags::REQUIRED)
     }

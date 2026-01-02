@@ -509,6 +509,9 @@ impl<'db> MroIterator<'db> {
             ClassLiteral::FunctionalNamedTuple(namedtuple) => {
                 ClassBase::Class(ClassType::NonGeneric(namedtuple.into()))
             }
+            ClassLiteral::FunctionalTypedDict(typeddict) => {
+                ClassBase::Class(ClassType::NonGeneric(typeddict.into()))
+            }
         }
     }
 
@@ -536,6 +539,13 @@ impl<'db> MroIterator<'db> {
                     // `[Point, tuple[int, str], tuple, object]`.
                     let tuple_base = namedtuple.tuple_base_type(self.db);
                     let elements: Vec<_> = tuple_base.iter_mro(self.db).collect();
+                    SubsequentMroElements::Owned(elements.into_iter())
+                }
+                ClassLiteral::FunctionalTypedDict(typeddict) => {
+                    // TypedDicts inherit from dict.
+                    // The MRO after self is the full MRO of dict.
+                    let dict_base = typeddict.dict_base_type(self.db);
+                    let elements: Vec<_> = dict_base.iter_mro(self.db).collect();
                     SubsequentMroElements::Owned(elements.into_iter())
                 }
             })

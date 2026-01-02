@@ -1294,9 +1294,9 @@ class Person(TypedDict):
     name: str
     age: int | None
 
-reveal_type(Person.__total__)  # revealed: bool
-reveal_type(Person.__required_keys__)  # revealed: frozenset[str]
-reveal_type(Person.__optional_keys__)  # revealed: frozenset[str]
+reveal_type(Person.__total__)  # revealed: Literal[True]
+reveal_type(Person.__required_keys__)  # revealed: tuple[Literal["age"], Literal["name"]]
+reveal_type(Person.__optional_keys__)  # revealed: tuple[()]
 ```
 
 These attributes cannot be accessed on inhabitants:
@@ -1322,9 +1322,9 @@ But they *can* be accessed on `type[Person]`, because this function would accept
 
 ```py
 def accepts_typed_dict_class(t_person: type[Person]) -> None:
-    reveal_type(t_person.__total__)  # revealed: bool
-    reveal_type(t_person.__required_keys__)  # revealed: frozenset[str]
-    reveal_type(t_person.__optional_keys__)  # revealed: frozenset[str]
+    reveal_type(t_person.__total__)  # revealed: Literal[True]
+    reveal_type(t_person.__required_keys__)  # revealed: tuple[Literal["age"], Literal["name"]]
+    reveal_type(t_person.__optional_keys__)  # revealed: tuple[()]
 
 accepts_typed_dict_class(Person)
 ```
@@ -1548,25 +1548,94 @@ def _(node: Node, person: Person):
 _: Node = Person(name="Alice", parent=Node(name="Bob", parent=Person(name="Charlie", parent=None)))
 ```
 
-## Function/assignment syntax
+## Functional syntax
 
-This is not yet supported. Make sure that we do not emit false positives for this syntax:
+TypedDicts can also be created using the functional form.
+
+### Basic functional syntax
 
 ```py
-from typing_extensions import TypedDict, Required
+from typing import TypedDict
 
-# Alternative syntax
-Message = TypedDict("Message", {"id": Required[int], "content": str}, total=False)
+Movie = TypedDict("Movie", {"name": str, "year": int})
 
-msg = Message(id=1, content="Hello")
+reveal_type(Movie)  # revealed: <class 'Movie'>
+```
 
-# No errors for yet-unsupported features (`closed`):
-OtherMessage = TypedDict("OtherMessage", {"id": int, "content": str}, closed=True)
+### Functional syntax with total=False
 
-reveal_type(Message.__required_keys__)  # revealed: @Todo(Support for functional `TypedDict`)
+```py
+from typing import TypedDict
 
-# TODO: this should be an error
-msg.content
+# All fields are optional when total=False.
+PartialMovie = TypedDict("PartialMovie", {"name": str, "year": int}, total=False)
+
+reveal_type(PartialMovie)  # revealed: <class 'PartialMovie'>
+```
+
+### Special attributes
+
+```py
+from typing import TypedDict
+
+Person = TypedDict("Person", {"name": str, "age": int})
+
+reveal_type(Person.__required_keys__)  # revealed: tuple[Literal["age"], Literal["name"]]
+reveal_type(Person.__optional_keys__)  # revealed: tuple[()]
+reveal_type(Person.__total__)  # revealed: Literal[True]
+```
+
+### Required keys with total=False
+
+```py
+from typing import TypedDict
+
+OptionalPerson = TypedDict("OptionalPerson", {"name": str, "age": int}, total=False)
+
+reveal_type(OptionalPerson.__required_keys__)  # revealed: tuple[()]
+reveal_type(OptionalPerson.__optional_keys__)  # revealed: tuple[Literal["age"], Literal["name"]]
+reveal_type(OptionalPerson.__total__)  # revealed: Literal[False]
+```
+
+### Instance creation and subscript access
+
+```py
+from typing import TypedDict
+
+Movie = TypedDict("Movie", {"name": str, "year": int})
+
+reveal_type(Movie)  # revealed: <class 'Movie'>
+
+movie = Movie(name="The Matrix", year=1999)
+reveal_type(movie)  # revealed: Movie
+reveal_type(movie["name"])  # revealed: str
+reveal_type(movie["year"])  # revealed: int
+```
+
+### Required and NotRequired wrappers
+
+```py
+from typing import TypedDict
+from typing_extensions import Required, NotRequired
+
+# With total=False (default optional), Required makes a field required.
+PartialMovie = TypedDict("PartialMovie", {"name": Required[str], "year": int}, total=False)
+
+reveal_type(PartialMovie.__required_keys__)  # revealed: tuple[Literal["name"]]
+reveal_type(PartialMovie.__optional_keys__)  # revealed: tuple[Literal["year"]]
+reveal_type(PartialMovie.__total__)  # revealed: Literal[False]
+```
+
+```py
+from typing import TypedDict
+from typing_extensions import Required, NotRequired
+
+# With total=True (default required), NotRequired makes a field optional.
+Movie = TypedDict("Movie", {"name": str, "year": NotRequired[int]})
+
+reveal_type(Movie.__required_keys__)  # revealed: tuple[Literal["name"]]
+reveal_type(Movie.__optional_keys__)  # revealed: tuple[Literal["year"]]
+reveal_type(Movie.__total__)  # revealed: Literal[False]
 ```
 
 ## Error cases

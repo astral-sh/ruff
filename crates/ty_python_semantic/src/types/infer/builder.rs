@@ -116,8 +116,9 @@ use crate::types::{
     StmtClassLiteral, SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType,
     TypeAndQualifiers, TypeContext, TypeQualifiers, TypeVarBoundOrConstraints,
     TypeVarBoundOrConstraintsEvaluation, TypeVarDefaultEvaluation, TypeVarIdentity,
-    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictType, TypingNamedTupleFieldsSchema,
-    UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types, todo_type,
+    TypeVarInstance, TypeVarKind, TypeVarVariance, TypedDictFieldsSchema, TypedDictType,
+    TypingNamedTupleFieldsSchema, UnionBuilder, UnionType, UnionTypeInstance, binding_type,
+    infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -5845,6 +5846,46 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         ))
     }
 
+    /// Extract fields from a dict literal for `typing.TypedDict` functional form.
+    fn infer_typed_dict_fields_schema(
+        &mut self,
+        items: &[ast::DictItem],
+    ) -> Option<TypedDictFieldsSchema<'db>> {
+        let db = self.db();
+        let mut fields: Vec<(ast::name::Name, Type<'db>, Option<bool>)> =
+            Vec::with_capacity(items.len());
+
+        for item in items {
+            // Each key should be a string literal.
+            let key_expr = item.key.as_ref()?;
+            let key_ty = self.infer_expression(key_expr, TypeContext::default());
+            let key_lit = key_ty.as_string_literal()?;
+            let field_name = ast::name::Name::new(key_lit.value(db));
+
+            // Get the field type using annotation expression inference to capture qualifiers.
+            let field_type_and_qualifiers =
+                self.infer_annotation_expression(&item.value, DeferredExpressionState::None);
+            let field_type_ty = field_type_and_qualifiers.inner_type();
+            let qualifiers = field_type_and_qualifiers.qualifiers();
+
+            // Determine required_qualifier based on Required/NotRequired qualifiers:
+            // - Some(true): field marked with Required[T]
+            // - Some(false): field marked with NotRequired[T]
+            // - None: no qualifier, will use the `total` parameter
+            let required_qualifier = if qualifiers.contains(TypeQualifiers::REQUIRED) {
+                Some(true)
+            } else if qualifiers.contains(TypeQualifiers::NOT_REQUIRED) {
+                Some(false)
+            } else {
+                None
+            };
+
+            fields.push((field_name, field_type_ty, required_qualifier));
+        }
+
+        Some(TypedDictFieldsSchema::new(db, fields.into_boxed_slice()))
+    }
+
     fn infer_assignment_deferred(&mut self, value: &ast::Expr) {
         // Infer deferred bounds/constraints/defaults of a legacy TypeVar / ParamSpec / NewType.
         let ast::Expr::Call(ast::ExprCall {
@@ -7989,6 +8030,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             items,
         } = dict;
 
+        // Extract fields for typing.TypedDict functional form.
+        if let Some(Type::SpecialForm(SpecialFormType::TypedDictFieldsSchema)) = tcx.annotation {
+            if let Some(schema) = self.infer_typed_dict_fields_schema(items) {
+                return Type::KnownInstance(KnownInstanceType::TypedDictFieldsSchema(schema));
+            }
+        }
+
         let mut item_types = FxHashMap::default();
 
         // Validate `TypedDict` dictionary literal assignments.
@@ -8915,29 +8963,26 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // the `try_call` path below.
             // TODO: it should be possible to move these special cases into the `try_call_constructor`
             // path instead, or even remove some entirely once we support overloads fully.
-            let has_special_cased_constructor = matches!(
-                class.known(self.db()),
-                Some(
-                    KnownClass::Bool
-                        | KnownClass::Str
-                        | KnownClass::Type
-                        | KnownClass::Object
-                        | KnownClass::Property
-                        | KnownClass::Super
-                        | KnownClass::TypeAliasType
-                        | KnownClass::Deprecated
-                )
-            ) || (
-                // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
-                // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
-                // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
-                // in `ClassType::own_class_member()`).
-                class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
-            ) || class
-                .stmt_class_literal(self.db())
-                .is_some_and(|(class_literal, specialization)| {
-                    CodeGeneratorKind::TypedDict.matches(self.db(), class_literal, specialization)
-                });
+            let has_special_cased_constructor =
+                matches!(
+                    class.known(self.db()),
+                    Some(
+                        KnownClass::Bool
+                            | KnownClass::Str
+                            | KnownClass::Type
+                            | KnownClass::Object
+                            | KnownClass::Property
+                            | KnownClass::Super
+                            | KnownClass::TypeAliasType
+                            | KnownClass::Deprecated
+                    )
+                ) || (
+                    // Constructor calls to `tuple` and subclasses of `tuple` are handled in `Type::Bindings`,
+                    // but constructor calls to `tuple[int]`, `tuple[int, ...]`, `tuple[int, *tuple[str, ...]]` (etc.)
+                    // are handled by the default constructor-call logic (we synthesize a `__new__` method for them
+                    // in `ClassType::own_class_member()`).
+                    class.is_known(self.db(), KnownClass::Tuple) && !class.is_generic()
+                ) || class.class_literal(self.db()).is_typed_dict(self.db());
 
             // temporary special-casing for all subclasses of `enum.Enum`
             // until we support the functional syntax for creating enum classes

@@ -666,6 +666,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     (ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)), _) => {
                         f.with_type(self.ty).write_str(namedtuple.name(self.db).as_str())
                     },
+                    (ClassType::NonGeneric(ClassLiteral::FunctionalTypedDict(typeddict)), _) => {
+                        f.with_type(self.ty).write_str(typeddict.name(self.db).as_str())
+                    },
                     (ClassType::Generic(alias), _) => alias.display_with(self.db, self.settings.clone()).fmt_detailed(f),
                 }
             }
@@ -680,6 +683,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                     ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => f
                         .with_type(self.ty)
                         .write_str(namedtuple.name(self.db).as_str()),
+                    ClassType::NonGeneric(ClassLiteral::FunctionalTypedDict(typeddict)) => f
+                        .with_type(self.ty)
+                        .write_str(typeddict.name(self.db).as_str()),
                     ClassType::Generic(alias) => alias
                         .display_with(self.db, self.settings.clone())
                         .fmt_detailed(f),
@@ -732,6 +738,10 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         // Functional namedtuples don't have qualified names; just use the name.
                         f.write_str(namedtuple.name(self.db))?;
                     }
+                    ClassLiteral::FunctionalTypedDict(typeddict) => {
+                        // Functional TypedDicts don't have qualified names; just use the name.
+                        f.write_str(typeddict.name(self.db))?;
+                    }
                 }
                 f.write_str("'>")
             }
@@ -770,6 +780,15 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                         .write_str("type")?;
                     f.write_char('[')?;
                     f.write_str(namedtuple.name(self.db).as_str())?;
+                    f.write_char(']')
+                }
+                SubclassOfInner::Class(ClassType::NonGeneric(
+                    ClassLiteral::FunctionalTypedDict(typeddict),
+                )) => {
+                    f.with_type(KnownClass::Type.to_class_literal(self.db))
+                        .write_str("type")?;
+                    f.write_char('[')?;
+                    f.write_str(typeddict.name(self.db).as_str())?;
                     f.write_char(']')
                 }
                 SubclassOfInner::Class(ClassType::Generic(alias)) => {
@@ -1065,6 +1084,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
                 ClassType::NonGeneric(ClassLiteral::FunctionalNamedTuple(namedtuple)) => f
                     .with_type(self.ty)
                     .write_str(namedtuple.name(self.db).as_str()),
+                ClassType::NonGeneric(ClassLiteral::FunctionalTypedDict(typeddict)) => f
+                    .with_type(self.ty)
+                    .write_str(typeddict.name(self.db).as_str()),
                 ClassType::Generic(alias) => alias
                     .display_with(self.db, self.settings.clone())
                     .fmt_detailed(f),
@@ -2653,6 +2675,30 @@ impl<'db> FmtDetailed<'db> for DisplayKnownInstanceRepr<'db> {
                     "<namedtuple-defaults-schema count={}>",
                     schema.count(self.db)
                 )
+            }
+            KnownInstanceType::TypedDictFieldsSchema(schema) => {
+                f.set_invalid_type_annotation();
+                f.write_str("<typeddict-fields-schema {")?;
+                let mut first = true;
+                for (name, field_ty, required_qualifier) in schema.fields(self.db) {
+                    if first {
+                        first = false;
+                    } else {
+                        f.write_str(", ")?;
+                    }
+                    let required_str = match required_qualifier {
+                        Some(true) => " (required)",
+                        Some(false) => " (not-required)",
+                        None => "",
+                    };
+                    write!(
+                        f.with_type(*field_ty),
+                        "{name}: {}{}",
+                        field_ty.display(self.db),
+                        required_str
+                    )?;
+                }
+                f.write_str("}>")
             }
         }
     }

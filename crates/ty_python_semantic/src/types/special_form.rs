@@ -139,6 +139,9 @@ pub enum SpecialFormType {
 
     /// Internal annotation for `collections.namedtuple` defaults parameter.
     CollectionsNamedTupleDefaultsSchema,
+
+    /// Internal annotation for `typing.TypedDict` fields parameter.
+    TypedDictFieldsSchema,
 }
 
 impl SpecialFormType {
@@ -196,7 +199,8 @@ impl SpecialFormType {
             | Self::AlwaysFalsy
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => KnownClass::Object,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::TypedDictFieldsSchema => KnownClass::Object,
 
             Self::NamedTuple => KnownClass::FunctionType,
         }
@@ -283,7 +287,8 @@ impl SpecialFormType {
             | Self::CallableTypeOf
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => module.is_ty_extensions(),
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::TypedDictFieldsSchema => module.is_ty_extensions(),
         }
     }
 
@@ -347,7 +352,8 @@ impl SpecialFormType {
             | Self::Generic
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => false,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::TypedDictFieldsSchema => false,
         }
     }
 
@@ -405,7 +411,8 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => None,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::TypedDictFieldsSchema => None,
         }
     }
 
@@ -460,7 +467,8 @@ impl SpecialFormType {
             | Self::Unpack
             | Self::TypingNamedTupleFieldsSchema
             | Self::CollectionsNamedTupleFieldsSchema
-            | Self::CollectionsNamedTupleDefaultsSchema => false,
+            | Self::CollectionsNamedTupleDefaultsSchema
+            | Self::TypedDictFieldsSchema => false,
         }
     }
 
@@ -518,6 +526,7 @@ impl SpecialFormType {
             SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
                 "_CollectionsNamedTupleDefaultsSchema"
             }
+            SpecialFormType::TypedDictFieldsSchema => "_TypedDictFieldsSchema",
         }
     }
 
@@ -571,7 +580,8 @@ impl SpecialFormType {
             | SpecialFormType::Bottom
             | SpecialFormType::TypingNamedTupleFieldsSchema
             | SpecialFormType::CollectionsNamedTupleFieldsSchema
-            | SpecialFormType::CollectionsNamedTupleDefaultsSchema => &[KnownModule::TyExtensions],
+            | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+            | SpecialFormType::TypedDictFieldsSchema => &[KnownModule::TyExtensions],
         }
     }
 

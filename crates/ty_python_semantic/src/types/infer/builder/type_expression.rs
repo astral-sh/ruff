@@ -1036,7 +1036,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                 // Internal types, should never appear in user code.
                 KnownInstanceType::TypingNamedTupleFieldsSchema(_)
                 | KnownInstanceType::CollectionsNamedTupleFieldsSchema(_)
-                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_) => {
+                | KnownInstanceType::CollectionsNamedTupleDefaultsSchema(_)
+                | KnownInstanceType::TypedDictFieldsSchema(_) => {
                     self.infer_type_expression(&subscript.slice);
                     Type::unknown()
                 }
@@ -1598,7 +1599,8 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             | SpecialFormType::NamedTuple
             | SpecialFormType::TypingNamedTupleFieldsSchema
             | SpecialFormType::CollectionsNamedTupleFieldsSchema
-            | SpecialFormType::CollectionsNamedTupleDefaultsSchema => {
+            | SpecialFormType::CollectionsNamedTupleDefaultsSchema
+            | SpecialFormType::TypedDictFieldsSchema => {
                 self.infer_type_expression(arguments_slice);
 
                 if let Some(builder) = self.context.report_lint(&INVALID_TYPE_FORM, subscript) {

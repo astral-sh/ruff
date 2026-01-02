@@ -27,6 +27,7 @@ use crate::db::Db;
 use crate::dunder_all::dunder_all_names;
 use crate::place::{Definedness, Place, known_module_symbol};
 use crate::types::call::arguments::{Expansion, is_expandable_type};
+use crate::types::class::FunctionalTypedDictLiteral;
 use crate::types::class_base::ClassBase;
 use crate::types::constraints::ConstraintSet;
 use crate::types::diagnostic::{
@@ -52,7 +53,6 @@ use crate::types::{
     KnownClass, KnownInstanceType, MemberLookupPolicy, NominalInstanceType, PropertyInstanceType,
     SpecialFormType, StmtClassLiteral, TrackedConstraintSet, TypeAliasType, TypeContext,
     TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind, enums, list_members,
-    todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -342,7 +342,6 @@ impl<'db> Bindings<'db> {
 
     /// Evaluates the return type of certain known callables, where we have special-case logic to
     /// determine the return type in a way that isn't directly expressible in the type system.
-    #[allow(clippy::type_complexity)]
     fn evaluate_known_cases(
         &mut self,
         db: &'db dyn Db,
@@ -1574,7 +1573,46 @@ impl<'db> Bindings<'db> {
                     },
 
                     Type::SpecialForm(SpecialFormType::TypedDict) => {
-                        overload.set_return_type(todo_type!("Support for functional `TypedDict`"));
+                        if let [Some(name_type), Some(fields_type), ..] = overload.parameter_types()
+                        {
+                            let name = name_type
+                                .as_string_literal()
+                                .map(|s| Name::new(s.value(db)));
+
+                            if let (
+                                Some(name),
+                                Type::KnownInstance(KnownInstanceType::TypedDictFieldsSchema(
+                                    schema,
+                                )),
+                            ) = (name, fields_type)
+                            {
+                                // Determine default `is_required` based on `total` parameter.
+                                // The total parameter is keyword-only with a default of True.
+                                let is_total = match overload.parameter_type_by_name("total", true)
+                                {
+                                    Ok(Some(Type::BooleanLiteral(value))) => value,
+                                    _ => true,
+                                };
+
+                                // Convert schema fields to TypedDict fields.
+                                let fields: Box<[(Name, Type<'db>, bool)]> = schema
+                                    .fields(db)
+                                    .iter()
+                                    .map(|(field_name, field_ty, required_qualifier)| {
+                                        // If there's an explicit `Required` or `NotRequired` qualifier,
+                                        // use it. Otherwise, use the `total` parameter.
+                                        let is_required = required_qualifier.unwrap_or(is_total);
+                                        (field_name.clone(), *field_ty, is_required)
+                                    })
+                                    .collect();
+
+                                let typeddict = FunctionalTypedDictLiteral::new(db, name, fields);
+                                let return_type = Type::ClassLiteral(
+                                    ClassLiteral::FunctionalTypedDict(typeddict),
+                                );
+                                overload.set_return_type(return_type);
+                            }
+                        }
                     }
 
                     Type::SpecialForm(SpecialFormType::NamedTuple) => {
