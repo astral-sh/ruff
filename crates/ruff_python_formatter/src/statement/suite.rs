@@ -2,13 +2,15 @@ use ruff_formatter::{
     FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
+use ruff_python_ast::token::TokenKind;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
 use ruff_text_size::{Ranged, TextRange};
 
 use crate::comments::{
-    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
+    Comments, LeadingDanglingTrailingComments, has_skip_comment, leading_comments,
+    trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
@@ -17,8 +19,10 @@ use crate::preview::{
     is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
 };
 use crate::statement::stmt_expr::FormatStmtExpr;
+use crate::statement::trailing_semicolon;
 use crate::verbatim::{
-    suppressed_node, write_suppressed_statements_starting_with_leading_comment,
+    suppressed_node, write_skipped_statements,
+    write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -152,7 +156,21 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let first_comments = comments.leading_dangling_trailing(first);
 
-        let (mut preceding, mut empty_line_after_docstring) = if first_comments
+        let (mut preceding, mut empty_line_after_docstring) = if let Some(verbatim_range) =
+            skip_range(first.statement(), iter.clone(), f)
+        {
+            let preceding =
+                write_skipped_statements(first.statement(), &mut iter, verbatim_range, f)?;
+
+            // Insert a newline after a module level docstring, but treat
+            // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
+            let empty_line_after_docstring =
+                matches!(self.kind, SuiteKind::TopLevel | SuiteKind::Class)
+                    && DocstringStmt::try_from_statement(preceding, self.kind, f.context())
+                        .is_some();
+
+            (preceding, empty_line_after_docstring)
+        } else if first_comments
             .leading
             .iter()
             .any(|comment| comment.is_suppression_off_comment(source))
@@ -391,7 +409,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            if following_comments
+            if let Some(verbatim_range) = skip_range(following, iter.clone(), f) {
+                preceding = write_skipped_statements(following, &mut iter, verbatim_range, f)?;
+                preceding_comments = comments.leading_dangling_trailing(preceding);
+            } else if following_comments
                 .leading
                 .iter()
                 .any(|comment| comment.is_suppression_off_comment(source))
@@ -935,6 +956,40 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
             SuiteChildStatement::Docstring(docstring) => docstring.fmt(f),
             SuiteChildStatement::Other(statement) => statement.format().fmt(f),
         }
+    }
+}
+
+fn skip_range(
+    first: &Stmt,
+    statements: std::slice::Iter<'_, Stmt>,
+    f: &mut PyFormatter,
+) -> Option<TextRange> {
+    let start = first.start();
+    let mut last_statement = first;
+
+    let tokens = f.context().tokens();
+    let comments = f.context().comments();
+    let source = f.context().source();
+
+    for statement in statements {
+        if tokens
+            .in_range(TextRange::new(last_statement.end(), statement.start()))
+            .iter()
+            .any(|tok| matches!(tok.kind(), TokenKind::Newline))
+        {
+            break;
+        }
+        last_statement = statement;
+    }
+
+    if has_skip_comment(comments.trailing(last_statement), source) {
+        Some(TextRange::new(
+            start,
+            trailing_semicolon(last_statement.into(), source)
+                .map_or_else(|| last_statement.end(), ruff_text_size::TextRange::end),
+        ))
+    } else {
+        None
     }
 }
 
