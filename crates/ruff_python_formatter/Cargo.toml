@@ -33,7 +33,6 @@ clap = { workspace = true }
 countme = { workspace = true }
 itertools = { workspace = true }
 memchr = { workspace = true }
-regex = { workspace = true }
 rustc-hash = { workspace = true }
 salsa = { workspace = true }
 schemars = { workspace = true, optional = true }
