@@ -7,45 +7,11 @@ expression: env.render_diagnostics(&diagnostics)
     <testsuite name="/fib.py" tests="2" disabled="0" errors="0" failures="2" package="org.ruff">
         <testcase name="org.ruff.F401" classname="/fib" line="1" column="8">
             <failure message="`os` imported but unused">
-                error: `os` imported but unused
-                  --&gt; /fib.py:1:8
-                   |
-                 1 | import os
-                   |        ^^
-                 2 |
-                 3 |
-                 4 | def fibonacci(n):
-                 5 |     &quot;&quot;&quot;Compute the nth number in the Fibonacci sequence.&quot;&quot;&quot;
-                 6 |     x = 1
-                 7 |     if n == 0:
-                 8 |         return 0
-                 9 |     elif n == 1:
-                10 |         return 1
-                11 |     else:
-                12 |         return fibonacci(n - 1) + fibonacci(n - 2)
-                   |
                 help: Remove unused import: `os`
             </failure>
         </testcase>
         <testcase name="org.ruff.F841" classname="/fib" line="6" column="5">
             <failure message="Local variable `x` is assigned to but never used">
-                error: Local variable `x` is assigned to but never used
-                  --&gt; /fib.py:6:5
-                   |
-                 1 | import os
-                 2 |
-                 3 |
-                 4 | def fibonacci(n):
-                 5 |     &quot;&quot;&quot;Compute the nth number in the Fibonacci sequence.&quot;&quot;&quot;
-                 6 |     x = 1
-                   |     ^
-                 7 |     if n == 0:
-                 8 |         return 0
-                 9 |     elif n == 1:
-                10 |         return 1
-                11 |     else:
-                12 |         return fibonacci(n - 1) + fibonacci(n - 2)
-                   |
                 help: Remove assignment to unused variable `x`
             </failure>
         </testcase>
@@ -53,12 +19,6 @@ expression: env.render_diagnostics(&diagnostics)
     <testsuite name="/undef.py" tests="1" disabled="0" errors="0" failures="1" package="org.ruff">
         <testcase name="org.ruff.F821" classname="/undef" line="1" column="4">
             <failure message="Undefined name `a`">
-                error: Undefined name `a`
-                 --&gt; /undef.py:1:4
-                  |
-                1 | if a == 1: pass
-                  |    ^
-                  |
 
             </failure>
         </testcase>

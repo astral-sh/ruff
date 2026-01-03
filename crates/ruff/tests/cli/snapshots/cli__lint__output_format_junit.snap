@@ -20,38 +20,17 @@ exit_code: 1
 <testsuites name="ruff" tests="3" failures="3" errors="0">
     <testsuite name="[TMP]/input.py" tests="3" disabled="0" errors="0" failures="3" package="org.ruff">
         <testcase name="org.ruff.F401" classname="[TMP]/input" line="1" column="8">
-            <failure message="`os` imported but unused"[TMP]/input.py:1:8
-                  |
-                1 | import os  # F401
-                  |        ^^
-                2 | x = y      # F821
-                3 | match 42:  # invalid-syntax
-                4 |     case _: ...
-                  |
+            <failure message="`os` imported but unused">
                 help: Remove unused import: `os`
             </failure>
         </testcase>
         <testcase name="org.ruff.F821" classname="[TMP]/input" line="2" column="5">
-            <failure message="Undefined name `y`"[TMP]/input.py:2:5
-                  |
-                1 | import os  # F401
-                2 | x = y      # F821
-                  |     ^
-                3 | match 42:  # invalid-syntax
-                4 |     case _: ...
-                  |
+            <failure message="Undefined name `y`">
 
             </failure>
         </testcase>
         <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="3" column="1">
-            <failure message="Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)"[TMP]/input.py:3:1
-                  |
-                1 | import os  # F401
-                2 | x = y      # F821
-                3 | match 42:  # invalid-syntax
-                  | ^^^^^
-                4 |     case _: ...
-                  |
+            <failure message="Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)">
 
             </failure>
         </testcase>

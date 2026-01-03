@@ -7,31 +7,11 @@ expression: env.render_diagnostics(&diagnostics)
     <testsuite name="/syntax_errors.py" tests="2" disabled="0" errors="0" failures="2" package="org.ruff">
         <testcase name="org.ruff.invalid-syntax" classname="/syntax_errors" line="1" column="15">
             <failure message="Expected one or more symbol names after import">
-                error: Expected one or more symbol names after import
-                 --&gt; /syntax_errors.py:1:15
-                  |
-                1 | from os import
-                  |               ^
-                2 |
-                3 | if call(foo
-                4 |     def bar():
-                5 |         pass
-                  |
 
             </failure>
         </testcase>
         <testcase name="org.ruff.invalid-syntax" classname="/syntax_errors" line="3" column="12">
             <failure message="Expected &apos;)&apos;, found newline">
-                error: Expected &apos;)&apos;, found newline
-                 --&gt; /syntax_errors.py:3:12
-                  |
-                1 | from os import
-                2 |
-                3 | if call(foo
-                  |            ^
-                4 |     def bar():
-                5 |         pass
-                  |
 
             </failure>
         </testcase>
