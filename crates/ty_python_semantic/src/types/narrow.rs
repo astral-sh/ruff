@@ -926,10 +926,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .build();
 
             // Keep order: first literal complement, then broader arms.
-            let result = UnionBuilder::new(self.db)
-                .add(narrowed_single)
-                .add(rest_union)
-                .build();
+            let result = UnionType::from_elements(self.db, [narrowed_single, rest_union]);
             Some(result)
         } else {
             None
