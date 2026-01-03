@@ -1061,7 +1061,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         Some much-updated docs  
           
         **version-added:** *3.0*  
@@ -1089,7 +1089,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         **wow this is some changes deprecated:** *1.2.3*  
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
         ");
@@ -1157,7 +1157,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         wow this is some code  
         ```````````abc
             x = 2
@@ -1233,7 +1233,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description  
           
         ```````````python
@@ -1262,7 +1262,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description  
           
         ```````````python
@@ -1285,7 +1285,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         ```````````python
         >>> thing.do_thing()
         wow it did the thing
@@ -1311,7 +1311,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description:    
         ```````````python
             >>> thing.do_thing()
@@ -1335,7 +1335,7 @@ mod tests {
 
         let docstring = Docstring::new(docstring.to_owned());
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         And so you can see that  
         ```````````python
             >>> thing.do_thing()
@@ -1372,7 +1372,7 @@ mod tests {
         );
         assert_eq!(&param_docs["param3"], "A parameter without type annotation");
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1385,7 +1385,7 @@ mod tests {
             str: The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1437,7 +1437,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1456,7 +1456,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1579,7 +1579,7 @@ mod tests {
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1592,7 +1592,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1636,7 +1636,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         :param str param1: The first parameter description
@@ -1647,7 +1647,7 @@ mod tests {
         :rtype: str
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         :param str param1: The first parameter description  
@@ -1697,7 +1697,7 @@ mod tests {
             "NumPy-style parameter"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1712,7 +1712,7 @@ mod tests {
             NumPy-style parameter
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1766,7 +1766,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1785,7 +1785,7 @@ mod tests {
             The return value description
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1839,7 +1839,7 @@ mod tests {
             "A parameter without type annotation"
         );
 
-        assert_snapshot!(docstring.render_plaintext(), @r"
+        assert_snapshot!(docstring.render_plaintext(), @"
         This is a function description.
 
         Parameters
@@ -1853,7 +1853,7 @@ mod tests {
                 A parameter without type annotation
         ");
 
-        assert_snapshot!(docstring.render_markdown(), @r"
+        assert_snapshot!(docstring.render_markdown(), @"
         This is a function description.  
           
         Parameters  
@@ -1905,7 +1905,7 @@ mod tests {
             Some(&"The first parameter".to_string())
         );
 
-        assert_snapshot!(docstring_windows.render_plaintext(), @r"
+        assert_snapshot!(docstring_windows.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1913,7 +1913,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_windows.render_markdown(), @r"
+        assert_snapshot!(docstring_windows.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1921,7 +1921,7 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_mac.render_plaintext(), @r"
+        assert_snapshot!(docstring_mac.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1929,7 +1929,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_mac.render_markdown(), @r"
+        assert_snapshot!(docstring_mac.render_markdown(), @"
         This is a function description.  
           
         Args:  
@@ -1937,7 +1937,7 @@ mod tests {
         &nbsp;&nbsp;&nbsp;&nbsp;param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_unix.render_plaintext(), @r"
+        assert_snapshot!(docstring_unix.render_plaintext(), @"
         This is a function description.
 
         Args:
@@ -1945,7 +1945,7 @@ mod tests {
             param2 (int): The second parameter
         ");
 
-        assert_snapshot!(docstring_unix.render_markdown(), @r"
+        assert_snapshot!(docstring_unix.render_markdown(), @"
         This is a function description.  
           
         Args:  

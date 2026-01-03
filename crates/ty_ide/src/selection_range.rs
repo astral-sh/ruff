@@ -64,7 +64,7 @@ x = 1 + <CURSOR>2
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
          --> main.py:1:1
           |
@@ -153,7 +153,7 @@ def my_<CURSOR>function():
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
          --> main.py:1:1
           |
@@ -195,7 +195,7 @@ class My<CURSOR>Class:
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
          --> main.py:1:1
           |
@@ -238,7 +238,7 @@ result = [(lambda x: x[key.<CURSOR>attr])(item) for item in data if item is not 
             )
             .build();
 
-        assert_snapshot!(test.selection_range(), @r"
+        assert_snapshot!(test.selection_range(), @"
         info[selection-range]: Selection Range 0
          --> main.py:1:1
           |

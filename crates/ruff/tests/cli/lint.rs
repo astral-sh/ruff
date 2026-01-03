@@ -39,7 +39,7 @@ inline-quotes = "single"
             .arg("ruff.toml")
             .args(["--stdin-filename", "test.py"])
             .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -76,18 +76,18 @@ inline-quotes = "single"
             .arg("--config")
             .arg("ruff.toml")
             .arg("-")
-            .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        -:1:5: Q000 [*] Double quotes found but single quotes preferred
-        -:1:5: B005 Using `.strip()` with multi-character strings is misleading
-        -:1:19: Q000 [*] Double quotes found but single quotes preferred
-        Found 3 errors.
-        [*] 2 fixable with the `--fix` option.
+            .pass_stdin(r#"a = "abcba".strip("aba")"#), @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    -:1:5: Q000 [*] Double quotes found but single quotes preferred
+    -:1:5: B005 Using `.strip()` with multi-character strings is misleading
+    -:1:19: Q000 [*] Double quotes found but single quotes preferred
+    Found 3 errors.
+    [*] 2 fixable with the `--fix` option.
 
-        ----- stderr -----
-        ");
+    ----- stderr -----
+    ");
 
     Ok(())
 }
@@ -110,7 +110,7 @@ inline-quotes = "single"
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -150,7 +150,7 @@ inline-quotes = "single"
         .arg("--config")
         .arg("ruff.toml")
         .arg("-")
-        .pass_stdin(r#"a = "abcba".strip("aba")"#), @r"
+        .pass_stdin(r#"a = "abcba".strip("aba")"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -220,7 +220,7 @@ OTHER = "OTHER"
             // Explicitly pass test.py, should be linted regardless of it being excluded by lint.exclude
             .arg("test.py")
             // Lint all other files in the directory, should respect the `exclude` and `lint.exclude` options
-            .arg("."), @r"
+            .arg("."), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -259,16 +259,16 @@ exclude = ["main.py"]
             .arg(".")
             // Explicitly pass main.py, should be linted regardless of it being excluded by lint.exclude
             .arg("main.py"),
-        @r"
-        success: false
-        exit_code: 1
-        ----- stdout -----
-        main.py:1:8: F401 [*] `os` imported but unused
-        Found 1 error.
-        [*] 1 fixable with the `--fix` option.
+        @"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    main.py:1:8: F401 [*] `os` imported but unused
+    Found 1 error.
+    [*] 1 fixable with the `--fix` option.
 
-        ----- stderr -----
-        "
+    ----- stderr -----
+    "
     );
 
     Ok(())
@@ -299,7 +299,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -340,7 +340,7 @@ max-line-length = 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜"
 # longer than 100
 _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜亜亜亜亜亜亜亜"
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -381,7 +381,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -422,7 +422,7 @@ from test import say_hy
 
 if __name__ == "__main__":
     say_hy("dear Ruff contributor")
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -461,7 +461,7 @@ ignore = ["D203", "D212"]
     assert_cmd_snapshot!(fixture
         .check_command()
         .current_dir(fixture.root().join("subdirectory"))
-        , @r"
+        , @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -478,7 +478,7 @@ ignore = ["D203", "D212"]
 fn nonexistent_config_file() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo.toml", "."]), @r"
+        .args(["--config", "foo.toml", "."]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -501,7 +501,7 @@ fn nonexistent_config_file() {
 fn config_override_rejected_if_invalid_toml() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "foo = bar", "."]), @r"
+        .args(["--config", "foo = bar", "."]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -537,7 +537,7 @@ fn too_many_config_files() -> Result<()> {
         .arg("ruff.toml")
         .arg("--config")
         .arg("ruff2.toml")
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -556,7 +556,7 @@ fn too_many_config_files() -> Result<()> {
 fn extend_passed_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
-        .args(["--config", "extend = 'foo.toml'", "."]), @r"
+        .args(["--config", "extend = 'foo.toml'", "."]), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -588,17 +588,17 @@ extend = "ruff3.toml"
     )?;
 
     assert_cmd_snapshot!(fixture
-        .check_command(), @r"
-        success: false
-        exit_code: 2
-        ----- stdout -----
+        .check_command(), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
 
-        ----- stderr -----
-        ruff failed
-          Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
-          Cause: Failed to read [TMP]/ruff3.toml
-          Cause: No such file or directory (os error 2)
-        ");
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load extended configuration `[TMP]/ruff3.toml` (`[TMP]/ruff.toml` extends `[TMP]/ruff2.toml` extends `[TMP]/ruff3.toml`)
+      Cause: Failed to read [TMP]/ruff3.toml
+      Cause: No such file or directory (os error 2)
+    ");
 
     Ok(())
 }
@@ -627,7 +627,7 @@ extend = "ruff.toml"
 
     assert_cmd_snapshot!(fixture
         .check_command(),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -659,7 +659,7 @@ select = [E501]
 
     assert_cmd_snapshot!(
         fixture.check_command(),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -688,7 +688,7 @@ fn config_file_and_isolated() -> Result<()> {
         .arg("--config")
         .arg("ruff.toml")
         .arg("--isolated")
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -742,7 +742,7 @@ x = "longer_than_90_charactersssssssssssssssssssssssssssssssssssssssssssssssssss
         .args(["--config", "lint.extend-select=['E501', 'F841']"])
         .args(["--config", "lint.isort.combine-as-imports = false"])
         .arg("-")
-        .pass_stdin(test_code), @r"
+        .pass_stdin(test_code), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -761,7 +761,7 @@ fn valid_toml_but_nonexistent_option_provided_via_config_argument() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", "extend-select=['F481']"]),  // No such code as F481!
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -788,7 +788,7 @@ fn each_toml_option_requires_a_new_flag_1() {
         // commas can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'], line-length=90"]),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -819,7 +819,7 @@ fn each_toml_option_requires_a_new_flag_2() {
         // spaces *also* can't be used to delimit different config overrides;
         // you need a new --config flag for each override
         .args([".", "--config", "extend-select=['F841'] line-length=90"]),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -886,7 +886,7 @@ fn value_given_to_table_key_is_not_inline_table_2() {
     assert_cmd_snapshot!(Command::new(get_cargo_bin(BIN_NAME))
         .args(STDIN_BASE_OPTIONS)
         .args([".", "--config", r#"lint=123"#]),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -953,7 +953,7 @@ select=["E501"]
         .arg("ruff.toml")
         .args(["--config", "line-length=110"])
         .arg("-")
-        .pass_stdin(test_code), @r"
+        .pass_stdin(test_code), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -976,7 +976,7 @@ fn complex_config_setting_overridden_via_cli() -> Result<()> {
         .args(["--config", "lint.per-file-ignores = {'generated.py' = ['N801']}"])
         .args(["--stdin-filename", "generated.py"])
         .arg("-")
-        .pass_stdin(test_code), @r"
+        .pass_stdin(test_code), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -993,7 +993,7 @@ fn deprecated_config_option_overridden_via_cli() {
         .args(STDIN_BASE_OPTIONS)
         .args(["--config", "select=['N801']", "-"])
         .pass_stdin("class lowercase: ..."),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1061,7 +1061,7 @@ include = ["*.ipy"]
         .check_command()
         .args(["--config", "ruff.toml"])
         .args(["--extension", "ipy:ipynb"])
-        .arg("."), @r"
+        .arg("."), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1111,7 +1111,7 @@ external = ["AAA"]
         .pass_stdin(r#"
 # flake8: noqa: AAA101, BBB102
 import os
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1147,7 +1147,7 @@ required-version = "0.1.0"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1184,7 +1184,7 @@ required-version = "{version}"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1222,7 +1222,7 @@ required-version = ">{version}"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r"
+"#), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1252,7 +1252,7 @@ required-version = ">=0.1.0"
         .arg("-")
         .pass_stdin(r#"
 import os
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1289,7 +1289,7 @@ import os
 
 def func():
     x = 1
-"#), @r"
+"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1323,7 +1323,7 @@ fn negated_per_file_ignores() -> Result<()> {
         .arg("ruff.toml")
         .arg("--select")
         .arg("RUF901")
-        , @r"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1355,7 +1355,7 @@ fn negated_per_file_ignores_absolute() -> Result<()> {
         .arg("ruff.toml")
         .arg("--select")
         .arg("RUF901")
-        , @r"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1389,7 +1389,7 @@ fn negated_per_file_ignores_overlap() -> Result<()> {
         .arg("ruff.toml")
         .arg("--select")
         .arg("RUF901")
-        , @r"
+        , @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1423,7 +1423,7 @@ import os  # F401
 def function():
     import os  # F811
     print(os.name)
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1466,7 +1466,7 @@ import sys
         .check_command()
         .args(["--config", "ruff.toml"])
         .arg("noqa.py"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1482,7 +1482,7 @@ import sys
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .args(["--preview"]),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1497,7 +1497,7 @@ import sys
         .args(["--config", "ruff.toml"])
         .arg("noqa.py")
         .args(["--ignore-noqa", "--preview"]),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1539,7 +1539,7 @@ def first_square():
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1551,7 +1551,8 @@ def first_square():
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     def first_square():
         return [x * x for x in range(20)][0]  # noqa: RUF015
     ");
@@ -1587,7 +1588,7 @@ def unused(x):
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1599,7 +1600,8 @@ def unused(x):
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     def unused(x):  # noqa: ANN001, ANN201, D103
         pass
     ");
@@ -1635,7 +1637,7 @@ import a
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1647,7 +1649,8 @@ import a
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     import z  # noqa: I001
     import c
     import a
@@ -1684,7 +1687,7 @@ def unused(x):  # noqa: ANN001, ARG001, D103
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1696,7 +1699,8 @@ def unused(x):  # noqa: ANN001, ARG001, D103
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     def unused(x):  # noqa: ANN001, ANN201, ARG001, D103
         pass
     ");
@@ -1732,7 +1736,7 @@ import os
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1743,7 +1747,8 @@ import os
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     # ruff: noqa F401
     import os
     ");
@@ -1779,7 +1784,7 @@ import os
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1790,7 +1795,8 @@ import os
     let test_code =
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
-    insta::assert_snapshot!(test_code, @r"
+    insta::assert_snapshot!(test_code, @"
+
     # ruff: disable[F401]
     import os
     ");
@@ -1831,7 +1837,7 @@ print(
         .arg("-")
         .pass_stdin(r#"
 
-"#), @r"
+"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1844,6 +1850,7 @@ print(
         fs::read_to_string(fixture.root().join("noqa.py")).expect("should read test file");
 
     insta::assert_snapshot!(test_code, @r#"
+
     print(
         """First line
         second line
@@ -1886,7 +1893,7 @@ def first_square():
 
     assert_cmd_snapshot!(fixture
         .check_command()
-        .args(["--add-noqa"]), @r"
+        .args(["--add-noqa"]), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1915,7 +1922,7 @@ from foo import (  # noqa: F401
         .check_command()
         .arg("--add-noqa")
         .arg("--select=F401")
-        .arg("noqa.py"), @r"
+        .arg("noqa.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1942,7 +1949,7 @@ def foo():
         .check_command()
         .arg("--add-noqa=TODO: fix")
         .arg("--select=F401,F841")
-        .arg("test.py"), @r"
+        .arg("test.py"), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -1952,12 +1959,12 @@ def foo():
     ");
 
     let content = fs::read_to_string(fixture.root().join("test.py"))?;
-    insta::assert_snapshot!(content, @r"
-import os  # noqa: F401 TODO: fix
+    insta::assert_snapshot!(content, @"
+    import os  # noqa: F401 TODO: fix
 
-def foo():
-    x = 1  # noqa: F841 TODO: fix
-");
+    def foo():
+        x = 1  # noqa: F841 TODO: fix
+    ");
 
     Ok(())
 }
@@ -1971,7 +1978,7 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
         .check_command()
         .arg("--add-noqa=line1\nline2")
         .arg("--select=F401")
-        .arg("test.py"), @r###"
+        .arg("test.py"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -1979,7 +1986,7 @@ fn add_noqa_with_newline_in_reason() -> Result<()> {
     ----- stderr -----
     ruff failed
       Cause: --add-noqa <reason> cannot contain newline characters
-    "###);
+    ");
 
     Ok(())
 }
@@ -2003,7 +2010,7 @@ select = ["UP006"]
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
-        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2030,7 +2037,7 @@ select = ["UP006"]
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
-        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2061,7 +2068,7 @@ select = ["UP006"]
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
-        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2094,7 +2101,7 @@ select = ["UP006"]
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
-        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2127,7 +2134,7 @@ select = ["UP006"]
         .arg("pyproject.toml")
         .args(["--stdin-filename", "test.py"])
         .arg("-")
-        .pass_stdin(r#"from typing import List; foo: List[int]"#), @r"
+        .pass_stdin(r#"from typing import List; foo: List[int]"#), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2263,7 +2270,7 @@ requires-python = ">= 3.11"
         .check_command()
         .args(["--select","UP007"])
         .arg(".")
-        , @r###"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2272,7 +2279,7 @@ requires-python = ">= 3.11"
     [*] 1 fixable with the `--fix` option.
 
     ----- stderr -----
-    "###);
+    ");
     Ok(())
 }
 
@@ -2348,7 +2355,7 @@ from typing import Union;foo: Union[int, str] = 1"#,
     assert_cmd_snapshot!(fixture
         .check_command()
         .arg("test.py")
-        , @r"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2591,7 +2598,7 @@ fn checks_notebooks_in_stable() -> anyhow::Result<()> {
         .check_command()
         .arg("--select")
         .arg("F401")
-        , @r"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2619,7 +2626,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .check_command()
         .arg("--select")
         .arg("INP")
-        , @r"
+        , @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2633,7 +2640,7 @@ fn nested_implicit_namespace_package() -> Result<()> {
         .arg("--select")
         .arg("INP")
         .arg("--preview")
-        , @r"
+        , @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2764,7 +2771,7 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
         .arg("ruff.toml")
         .arg("-")
         .pass_stdin("")
-        , @r###"
+        , @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -2772,7 +2779,7 @@ fn flake8_import_convention_nfkc_normalization() -> Result<()> {
     ----- stderr -----
     ruff failed
       Cause: Invalid alias for module 'test.module': alias normalizes to '__debug__', which is not allowed.
-    "###);
+    ");
     Ok(())
 }
 
@@ -2822,7 +2829,7 @@ fn pyupgrade_up026_respects_isort_required_import_fix() {
             .arg("--fix")
             .arg("--no-cache")
             .pass_stdin("1\n"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2849,7 +2856,7 @@ fn pyupgrade_up026_respects_isort_required_import_from_fix() {
             .arg("--fix")
             .arg("--no-cache")
             .pass_stdin("from mock import mock\n"),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2883,7 +2890,7 @@ d: Literal[None,] | Literal[None]
         .arg("--preview")
         .arg("--diff")
         .arg("-")
-        .pass_stdin(snippet), @r"
+        .pass_stdin(snippet), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -2937,7 +2944,7 @@ def func(t: _T) -> _T:
     return x
 "#
         ),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -2976,7 +2983,7 @@ class Foo[_T, __T]:
     pass
 "#
         ),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3041,7 +3048,7 @@ fn a005_module_shadowing_strict() -> Result<()> {
         .arg("--config")
         .arg(r#"lint.flake8-builtins.strict-checking = true"#)
         .args(["--select", "A005"]),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3069,7 +3076,7 @@ fn a005_module_shadowing_non_strict() -> Result<()> {
         .arg("--config")
         .arg(r#"lint.flake8-builtins.strict-checking = false"#)
         .args(["--select", "A005"]),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3094,7 +3101,7 @@ fn a005_module_shadowing_strict_default() -> Result<()> {
 
     assert_cmd_snapshot!(fixture.check_command()
         .args(["--select", "A005"]),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3127,7 +3134,7 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3157,7 +3164,7 @@ T = TypeVar("T")
 class A(Generic[T]):
     var: T
 "#),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3177,7 +3184,7 @@ fn walrus_before_py38() {
         .arg("--target-version=py38")
         .arg("-")
         .pass_stdin(r#"(x := 1)"#),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3195,7 +3202,7 @@ fn walrus_before_py38() {
         .arg("--preview")
         .arg("-")
         .pass_stdin(r#"(x := 1)"#),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3222,7 +3229,7 @@ match 2:
         print("it's one")
 "#
         ),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3245,7 +3252,7 @@ match 2:
         print("it's one")
 "#
         ),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3270,7 +3277,7 @@ match 2:
         print("it's one")
 "#
         ),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3296,7 +3303,7 @@ fn cache_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3309,7 +3316,7 @@ fn cache_syntax_errors() -> Result<()> {
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3345,14 +3352,14 @@ fn cookiecutter_globbing() -> Result<()> {
 
     assert_cmd_snapshot!(fixture
         .check_command()
-        .arg("--select=F811"), @r"
-		success: true
-		exit_code: 0
-		----- stdout -----
-		All checks passed!
+        .arg("--select=F811"), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-		----- stderr -----
-		");
+    ----- stderr -----
+    ");
 
     // after removing the config file with the ignore, F811 applies, so the glob worked above
     fs::remove_file(
@@ -3363,7 +3370,7 @@ fn cookiecutter_globbing() -> Result<()> {
 
     assert_cmd_snapshot!(fixture
         .check_command()
-        .arg("--select=F811"), @r"
+        .arg("--select=F811"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3388,15 +3395,15 @@ fn cookiecutter_globbing_no_project_root() -> Result<()> {
     assert_cmd_snapshot!(fixture
         .check_command()
         .current_dir(fixture.root().join("{{cookiecutter.repo_name}}"))
-        .args(["--extend-per-file-ignores", "generated.py:Q"]), @r"
-	success: true
-	exit_code: 0
-	----- stdout -----
-	All checks passed!
+        .args(["--extend-per-file-ignores", "generated.py:Q"]), @"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
 
-	----- stderr -----
-	warning: No Python files found under the given path(s)
-	");
+    ----- stderr -----
+    warning: No Python files found under the given path(s)
+    ");
 
     Ok(())
 }
@@ -3417,7 +3424,7 @@ fn semantic_syntax_errors() -> Result<()> {
 
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3431,7 +3438,7 @@ fn semantic_syntax_errors() -> Result<()> {
     // this should *not* be cached, like normal parse errors
     assert_cmd_snapshot!(
         cmd,
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3449,7 +3456,7 @@ fn semantic_syntax_errors() -> Result<()> {
             .arg("--preview")
             .arg("-")
             .pass_stdin(contents),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3483,7 +3490,7 @@ class Foo:
             .arg("--target-version=py39")
             .arg("-")
             .pass_stdin(contents),
-        @r"
+        @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -3581,7 +3588,7 @@ nested_optional: Optional[Optional[Optional[str]]] = None
             .args(["--select", "UP045", "--diff", "--target-version", "py312"])
             .arg("-")
             .pass_stdin(contents),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3606,7 +3613,7 @@ fn show_fixes_in_full_output_with_preview_enabled() {
             .arg("--preview")
             .arg("-")
             .pass_stdin("import math"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3637,7 +3644,7 @@ fn rule_panic_mixed_results_concise() -> Result<()> {
         fixture.check_command()
             .args(["--select", "RUF9", "--preview"])
             .args(["normal.py", "panic.py"]),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -3672,7 +3679,7 @@ fn rule_panic_mixed_results_full() -> Result<()> {
         fixture.command()
             .args(["check", "--select", "RUF9", "--preview", "--output-format=full", "--no-cache"])
             .args(["normal.py", "panic.py"]),
-        @r"
+        @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -3781,7 +3788,7 @@ fn supported_file_extensions() -> Result<()> {
         fixture.check_command()
             .args(["--select", "F401"])
             .arg("src"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -3861,7 +3868,7 @@ fn supported_file_extensions_preview_enabled() -> Result<()> {
         fixture.check_command()
             .args(["--select", "F401", "--preview"])
             .arg("src"),
-        @r"
+        @"
     success: false
     exit_code: 1
     ----- stdout -----

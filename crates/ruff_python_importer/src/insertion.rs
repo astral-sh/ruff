@@ -572,7 +572,8 @@ from collections import Counter
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import Counter, defaultdict
         ",
         );
@@ -582,7 +583,8 @@ from collections import Counter, OrderedDict
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import Counter, OrderedDict, defaultdict
         ",
         );
@@ -592,7 +594,10 @@ from collections import (Counter)
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import (Counter, defaultdict)",
+            @"
+
+        from collections import (Counter, defaultdict)
+        ",
         );
 
         let source = r#"
@@ -600,7 +605,10 @@ from collections import (Counter, OrderedDict)
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import (Counter, OrderedDict, defaultdict)",
+            @"
+
+        from collections import (Counter, OrderedDict, defaultdict)
+        ",
         );
 
         let source = r#"
@@ -608,7 +616,10 @@ from collections import (Counter,)
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import (Counter, defaultdict,)",
+            @"
+
+        from collections import (Counter, defaultdict,)
+        ",
         );
 
         let source = r#"
@@ -616,7 +627,10 @@ from collections import (Counter, OrderedDict,)
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import (Counter, OrderedDict, defaultdict,)",
+            @"
+
+        from collections import (Counter, OrderedDict, defaultdict,)
+        ",
         );
 
         let source = r#"
@@ -626,7 +640,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict
         )
@@ -640,7 +655,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict,
         )
@@ -655,7 +671,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter,
           OrderedDict, defaultdict
@@ -671,7 +688,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter,
           OrderedDict, defaultdict,
@@ -686,6 +704,7 @@ from collections import \
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
             @r"
+
         from collections import \
           Counter, defaultdict
         ",
@@ -698,6 +717,7 @@ from collections import \
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
             @r"
+
         from collections import \
           Counter, OrderedDict, defaultdict
         ",
@@ -711,6 +731,7 @@ from collections import \
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
             @r"
+
         from collections import \
           Counter, \
           OrderedDict, defaultdict
@@ -745,7 +766,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict # comment
         )
@@ -759,7 +781,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict, # comment
         )
@@ -774,7 +797,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict # comment
           ,
@@ -791,7 +815,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           Counter, defaultdict
           # comment
@@ -809,7 +834,8 @@ from collections import (
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @r"
+            @"
+
         from collections import (
           # comment 1
           Counter, defaultdict # comment 2
@@ -823,7 +849,10 @@ from collections import Counter # comment
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import Counter, defaultdict # comment",
+            @"
+
+        from collections import Counter, defaultdict # comment
+        ",
         );
 
         let source = r#"
@@ -831,7 +860,10 @@ from collections import Counter, OrderedDict # comment
 "#;
         insta::assert_snapshot!(
             snapshot(source, "defaultdict"),
-            @"from collections import Counter, OrderedDict, defaultdict # comment",
+            @"
+
+        from collections import Counter, OrderedDict, defaultdict # comment
+        ",
         );
     }
 }

@@ -1392,7 +1392,7 @@ class Foo:
 def quux():
     baz = 1
 ").exports(),
-            @r"
+            @"
         FOO :: Constant
         foo :: Variable
         frob :: Variable
@@ -1415,9 +1415,7 @@ def quux():
             public_test("\
 _foo = 1
 ").exports(),
-            @r"
-        _foo :: Variable
-        ",
+            @"_foo :: Variable",
         );
     }
 
@@ -1429,7 +1427,7 @@ foo = 1
 if True:
     bar = 1
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1445,7 +1443,7 @@ foo = 1
 if False:
     bar = 1
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1463,7 +1461,7 @@ foo = 1
 if sys.version < (3, 5):
     bar = 1
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1480,7 +1478,7 @@ foo = 1
 if TYPE_CHECKING:
     bar = 1
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1499,7 +1497,7 @@ if True:
 else:
     __all__ = ['foo', 'bar']
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1515,7 +1513,7 @@ bar = 1
 __all__ = ['foo']
 __all__ = ['foo', 'bar']
 ").exports(),
-            @r"
+            @"
         foo :: Variable
         bar :: Variable
         ",
@@ -1528,7 +1526,7 @@ __all__ = ['foo', 'bar']
             public_test("\
 import collections
 ").exports(),
-            @r"",
+            @"",
         );
     }
 
@@ -1538,7 +1536,7 @@ import collections
             public_test("\
 import numpy as np
 ").exports(),
-            @r"",
+            @"",
         );
     }
 
@@ -1548,7 +1546,7 @@ import numpy as np
             public_test("\
 from collections import defaultdict
 ").exports(),
-            @r"",
+            @"",
         );
     }
 
@@ -1558,7 +1556,7 @@ from collections import defaultdict
             public_test("\
 from collections import defaultdict as dd
 ").exports(),
-            @r"",
+            @"",
         );
     }
 
@@ -1680,7 +1678,7 @@ __all__.extend(['defaultdict'])
 from collections import defaultdict
 __all__.extend(['defaultdict'])
 ").exports(),
-            @r"",
+            @"",
         );
     }
 
@@ -1892,7 +1890,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         ZQZQZQ :: Constant
         __all__ :: Variable
         ",
@@ -2008,7 +2006,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable
         TRICKSY :: Constant
         ",
@@ -2062,7 +2060,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable
         defaultdict :: Variable
         ",
@@ -2157,7 +2155,7 @@ class X:
         // `from foo import *` will try to import it anyway.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         __all__ :: Variable
         TRICKSY :: Constant
         ",
@@ -2276,7 +2274,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2305,7 +2303,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2334,7 +2332,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2364,7 +2362,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2394,7 +2392,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2424,7 +2422,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2454,7 +2452,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2484,7 +2482,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZQZQZQ :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2516,7 +2514,7 @@ class X:
             .build();
         insta::assert_snapshot!(
             test.exports_for("a.py"),
-            @r"
+            @"
         _ZBZBZB :: Constant
         _ZAZAZA :: Constant
         ",
@@ -2561,7 +2559,7 @@ class X:
         // `_ZBZBZB` instead of `_ZFZFZF`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant
         _ZYZYZY :: Constant
         ",
@@ -2602,7 +2600,7 @@ class X:
         // answer should just be `_ZFZFZF` and `_ZYZYZY`.
         insta::assert_snapshot!(
             test.exports_for("test.py"),
-            @r"
+            @"
         _ZFZFZF :: Constant
         foo :: Module
         _ZYZYZY :: Constant

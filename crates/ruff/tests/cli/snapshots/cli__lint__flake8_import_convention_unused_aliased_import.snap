@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/tests/lint.rs
+source: crates/ruff/tests/cli/lint.rs
 info:
   program: ruff
   args:
@@ -17,7 +17,6 @@ info:
     - "--fix"
     - "-"
   stdin: "1"
-snapshot_kind: text
 ---
 success: false
 exit_code: 2

@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: mro.md - Method Resolution Order tests - `__bases__` lists with duplicate bases
 mdtest path: crates/ty_python_semantic/resources/mdtest/mro.md

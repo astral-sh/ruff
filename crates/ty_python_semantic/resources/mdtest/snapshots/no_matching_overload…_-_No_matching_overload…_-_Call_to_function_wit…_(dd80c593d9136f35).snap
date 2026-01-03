@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: no_matching_overload.md - No matching overload diagnostics - Call to function with many unmatched overloads
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/no_matching_overload.md

@@ -326,7 +326,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -373,7 +373,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> mymodule.pyi:2:7
           |
@@ -427,7 +427,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:3:5
           |
@@ -486,7 +486,7 @@ class MyOtherClass:
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:4:3
           |
@@ -589,7 +589,7 @@ class MyClass: ...
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:2:22
           |
@@ -623,7 +623,7 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:23
           |
@@ -661,7 +661,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:23
           |
@@ -699,7 +699,7 @@ my_func(my_other_func(ab=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:5:23
           |
@@ -737,7 +737,7 @@ my_func(my_other_func(a<CURSOR>b=5, y=2), 0)
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:6:23
           |
@@ -1088,7 +1088,7 @@ a <CURSOR>+ b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:3
            |
@@ -1125,7 +1125,7 @@ B() <CURSOR>+ A()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:8:5
           |
@@ -1164,7 +1164,7 @@ a<CURSOR>+b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:2
            |
@@ -1203,7 +1203,7 @@ a+<CURSOR>b
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
           --> main.py:10:3
            |
@@ -1262,7 +1262,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1300,7 +1300,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1337,7 +1337,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1374,7 +1374,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:2
           |
@@ -1412,7 +1412,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1449,7 +1449,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |
@@ -1490,7 +1490,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:8:1
           |
@@ -1530,7 +1530,7 @@ a = Test()
             )
             .build();
 
-        assert_snapshot!(test.goto_definition(), @r"
+        assert_snapshot!(test.goto_definition(), @"
         info[goto-definition]: Go to definition
          --> main.py:7:1
           |

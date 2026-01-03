@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: version_related_syntax_errors.md - Version-related syntax error diagnostics - `match` statement - Before 3.10
 mdtest path: crates/ty_python_semantic/resources/mdtest/diagnostics/version_related_syntax_errors.md

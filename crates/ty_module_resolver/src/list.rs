@@ -1766,9 +1766,7 @@ not_a_directory
 
         insta::assert_debug_snapshot!(
             list_snapshot(&db),
-            @r#"
-        []
-        "#,
+            @"[]",
         );
     }
 

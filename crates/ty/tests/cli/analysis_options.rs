@@ -13,7 +13,7 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
     )?;
 
     // Assert that there's an `unresolved-reference` diagnostic (error).
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: true
     exit_code: 0
     ----- stdout -----
@@ -22,7 +22,7 @@ fn respect_type_ignore_comments_is_turned_off() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(case.command().arg("--config").arg("analysis.respect-type-ignore-comments=false"), @r"
+    assert_cmd_snapshot!(case.command().arg("--config").arg("analysis.respect-type-ignore-comments=false"), @"
     success: false
     exit_code: 1
     ----- stdout -----

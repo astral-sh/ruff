@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: new_types.md - NewType - Trying to subclass a `NewType` produces an error matching CPython
 mdtest path: crates/ty_python_semantic/resources/mdtest/annotations/new_types.md

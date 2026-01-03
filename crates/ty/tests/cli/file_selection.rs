@@ -27,7 +27,7 @@ fn exclude_argument() -> anyhow::Result<()> {
     ])?;
 
     // Test that exclude argument is recognized and works
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -50,10 +50,10 @@ fn exclude_argument() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple exclude patterns
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/").arg("--exclude").arg("temp_*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/").arg("--exclude").arg("temp_*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -68,7 +68,7 @@ fn exclude_argument() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -106,7 +106,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -121,7 +121,7 @@ fn configuration_include() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple include patterns via configuration
     case.write_file(
@@ -132,7 +132,7 @@ fn configuration_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -155,7 +155,7 @@ fn configuration_include() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -193,7 +193,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -216,7 +216,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test multiple exclude patterns via configuration
     case.write_file(
@@ -227,7 +227,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -242,7 +242,7 @@ fn configuration_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -281,7 +281,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -296,7 +296,7 @@ fn exclude_precedence_over_include() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -334,7 +334,7 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("tests/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -349,7 +349,7 @@ fn exclude_argument_precedence_include_argument() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -373,7 +373,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     ])?;
 
     // By default, 'dist' directory should be excluded (see default excludes)
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -388,7 +388,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Now override the default exclude by using a negated pattern to re-include 'dist'
     case.write_file(
@@ -399,7 +399,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
         "#,
     )?;
 
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -422,7 +422,7 @@ fn remove_default_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -455,7 +455,7 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     )?;
 
     // Verify that build/ is excluded by configuration
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -470,10 +470,10 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Now remove the configuration exclude via CLI negation
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("!build/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("!build/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -496,7 +496,7 @@ fn cli_removes_config_exclude() -> anyhow::Result<()> {
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -533,7 +533,7 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     ])?;
 
     // dist is excluded by default and `tests/generated` is excluded in the project, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -548,10 +548,10 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Explicitly checking a file in an excluded directory should still check that file
-    assert_cmd_snapshot!(case.command().arg("tests/generated.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -566,10 +566,10 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     // Explicitly checking the entire excluded directory should check all files in it
-    assert_cmd_snapshot!(case.command().arg("dist/"), @r###"
+    assert_cmd_snapshot!(case.command().arg("dist/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -584,7 +584,7 @@ fn explicit_path_overrides_exclude() -> anyhow::Result<()> {
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -621,7 +621,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     ])?;
 
     // Explicitly checking a file in an excluded directory should still check that file
-    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py"), @r"
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -647,7 +647,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     ");
 
     // Except when `--force-exclude` is set.
-    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py").arg("--force-exclude"), @r"
+    assert_cmd_snapshot!(case.command().arg("tests/generated.py").arg("src/main.py").arg("--force-exclude"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -665,7 +665,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     ");
 
     // Explicitly checking the entire excluded directory should check all files in it
-    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py"), @r"
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -691,7 +691,7 @@ fn explicit_path_overrides_exclude_force_exclude() -> anyhow::Result<()> {
     ");
 
     // Except when using `--force-exclude`
-    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py").arg("--force-exclude"), @r"
+    assert_cmd_snapshot!(case.command().arg("dist/").arg("src/main.py").arg("--force-exclude"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -741,7 +741,7 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
         ),
     ])?;
 
-    assert_cmd_snapshot!(case.command(), @r"
+    assert_cmd_snapshot!(case.command(), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -766,7 +766,7 @@ fn cli_and_configuration_exclude() -> anyhow::Result<()> {
     ----- stderr -----
     ");
 
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("my_dist/"), @r"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("my_dist/"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -807,7 +807,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -823,7 +823,7 @@ fn invalid_include_pattern() -> anyhow::Result<()> {
       |     ^^^^^^^^^^^^^ Too many stars at position 5
     5 | ]
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -849,7 +849,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--output-format").arg("concise"), @"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -857,7 +857,7 @@ fn invalid_include_pattern_concise_output() -> anyhow::Result<()> {
     ----- stderr -----
     ty failed
       Cause: ty.toml:4:5: error[invalid-glob] Invalid include pattern: Too many stars at position 5
-    "###);
+    ");
 
     Ok(())
 }
@@ -883,7 +883,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
     ])?;
 
     // By default, dist/ is excluded, so only src/main.py should be checked
-    assert_cmd_snapshot!(case.command(), @r###"
+    assert_cmd_snapshot!(case.command(), @r#"
     success: false
     exit_code: 2
     ----- stdout -----
@@ -899,7 +899,7 @@ fn invalid_exclude_pattern() -> anyhow::Result<()> {
       |     ^^^^^^^^ The parent directory operator (`..`) at position 1 is not allowed
     5 | ]
       |
-    "###);
+    "#);
 
     Ok(())
 }
@@ -951,7 +951,7 @@ print(other_undefined)  # error: unresolved-reference
 
     // Change to the bazel-out directory and run ty from there
     // The symlinks should be followed and errors should be found
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -976,10 +976,10 @@ print(other_undefined)  # error: unresolved-reference
     Found 2 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test that when checking a specific symlinked file from the bazel-out directory, it works correctly
-    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")).arg("main.py"), @r###"
+    assert_cmd_snapshot!(case.command().current_dir(case.project_dir.join("bazel-out/k8-fastbuild/bin")).arg("main.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -995,7 +995,7 @@ print(other_undefined)  # error: unresolved-reference
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }
@@ -1034,7 +1034,7 @@ print(regular_undefined)  # error: unresolved-reference
     case.write_symlink("src/utils.py", "generated_utils.py")?;
 
     // Exclude pattern should match on the symlink name (generated_*), not the target name
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1067,10 +1067,10 @@ print(regular_undefined)  # error: unresolved-reference
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Exclude pattern on target path should not affect symlinks with different names
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("src/*.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("src/*.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1103,10 +1103,10 @@ print(regular_undefined)  # error: unresolved-reference
     Found 3 diagnostics
 
     ----- stderr -----
-    "###);
+    ");
 
     // Test that explicitly passing a symlink always checks it, even if excluded
-    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py").arg("generated_module.py"), @r###"
+    assert_cmd_snapshot!(case.command().arg("--exclude").arg("generated_*.py").arg("generated_module.py"), @"
     success: false
     exit_code: 1
     ----- stdout -----
@@ -1122,7 +1122,7 @@ print(regular_undefined)  # error: unresolved-reference
     Found 1 diagnostic
 
     ----- stderr -----
-    "###);
+    ");
 
     Ok(())
 }

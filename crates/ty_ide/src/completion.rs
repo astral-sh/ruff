@@ -2162,7 +2162,7 @@ mod tests {
     fn token_suffixes_match() {
         insta::assert_debug_snapshot!(
             token_suffix_by_kinds(&tokenize("foo.x"), [TokenKind::Newline]),
-            @r"
+            @"
         Some(
             [
                 Newline 5..5,
@@ -2173,7 +2173,7 @@ mod tests {
 
         insta::assert_debug_snapshot!(
             token_suffix_by_kinds(&tokenize("foo.x"), [TokenKind::Name, TokenKind::Newline]),
-            @r"
+            @"
         Some(
             [
                 Name 4..5,
@@ -2191,7 +2191,7 @@ mod tests {
         ];
         insta::assert_debug_snapshot!(
             token_suffix_by_kinds(&tokenize("foo.x"), all),
-            @r"
+            @"
         Some(
             [
                 Name 0..3,
@@ -2265,7 +2265,7 @@ mod tests {
 
         assert_snapshot!(
             test.skip_builtins().build().snapshot(),
-            @r"
+            @"
         and
         as
         assert
@@ -2329,7 +2329,7 @@ type<CURSOR>
 
         assert_snapshot!(
             test.type_signatures().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         TypeError :: <class 'TypeError'>
         type :: <class 'type'>
         ",
@@ -2555,9 +2555,7 @@ def foo(): ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2588,9 +2586,7 @@ def foo():
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2605,7 +2601,7 @@ def foo():
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         foo
         foofoo
         ");
@@ -2639,9 +2635,7 @@ def foo():
         // matches the current cursor's indentation. This seems fraught
         // however. It's not clear to me that we can always assume a
         // correspondence between scopes and indentation level.
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2657,9 +2651,9 @@ def foo():
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            foofoo
+            @"
+        foo
+        foofoo
         ");
     }
 
@@ -2675,9 +2669,9 @@ def foo():
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            foofoo
+            @"
+        foo
+        foofoo
         ");
     }
 
@@ -2695,10 +2689,10 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            foofoo
-            frob
+            @"
+        foo
+        foofoo
+        frob
         ");
     }
 
@@ -2716,9 +2710,9 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            frob
+            @"
+        foo
+        frob
         ");
     }
 
@@ -2736,11 +2730,11 @@ def frob(): ...
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            foofoo
-            foofoofoo
-            frob
+            @"
+        foo
+        foofoo
+        foofoofoo
+        frob
         ");
     }
 
@@ -2764,9 +2758,7 @@ def foo():
         // account for the indented whitespace, or some other technique
         // needs to be used to get the scope containing `foofoo` but not
         // `foofoofoo`.
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2780,9 +2772,7 @@ def foo():
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"foo");
     }
 
     #[test]
@@ -2798,7 +2788,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         foo
         frob
         ");
@@ -2818,7 +2808,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         foo
         frob
         ");
@@ -2839,7 +2829,7 @@ def frob(): ...
         );
 
         // FIXME: Should include `foofoo` (but not `foofoofoo`).
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         foo
         frob
         ");
@@ -3026,7 +3016,7 @@ class Foo:
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         bar
         frob
         ",
@@ -3066,9 +3056,7 @@ class Foo:
         //
         // These don't work for similar reasons as other
         // tests above with the <CURSOR> inside of whitespace.
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        Foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"Foo");
     }
 
     #[test]
@@ -3085,9 +3073,7 @@ class Foo:
         // FIXME: Should include `bar`, `quux` and `frob`.
         // (Unclear if `Foo` should be included, but a false
         // positive isn't the end of the world.)
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
-        Foo
-        ");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"Foo");
     }
 
     #[test]
@@ -3101,7 +3087,7 @@ class Foo(<CURSOR>):
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
         Foo
         metaclass=
@@ -3119,7 +3105,7 @@ class Bar: ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
         Foo
         metaclass=
@@ -3137,7 +3123,7 @@ class Bar: ...
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
         Foo
         metaclass=
@@ -3153,7 +3139,7 @@ class Bar: ...
 class Foo(<CURSOR>",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         Bar
         Foo
         metaclass=
@@ -3325,7 +3311,7 @@ quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
         foo :: Unknown | Literal[1]
@@ -3371,7 +3357,7 @@ quux.b<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         bar :: Unknown | Literal[2]
         baz :: Unknown | Literal[3]
         __getattribute__ :: bound method Quux.__getattribute__(name: str, /) -> Any
@@ -3396,7 +3382,7 @@ C.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         meta_attr :: int
         mro :: bound method <class 'C'>.mro() -> list[type]
         __annotate__ :: (() -> dict[str, Any]) | None
@@ -3442,7 +3428,7 @@ C.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        "###);
+        ");
     }
 
     #[test]
@@ -3468,7 +3454,7 @@ Meta.<CURSOR>
             filters => [(r"(?m)\s*__(annotations|new|annotate)__.+$", "")]},
             {
                 assert_snapshot!(
-                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
                 meta_attr :: property
                 mro :: def mro(self) -> list[type]
                 __base__ :: type | None
@@ -3529,7 +3515,7 @@ class Quux:
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         bar
         baz
         foo
@@ -3591,7 +3577,7 @@ Quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r###"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         mro :: bound method <class 'Quux'>.mro() -> list[type]
         some_attribute :: int
         some_class_method :: bound method <class 'Quux'>.some_class_method() -> int
@@ -3641,7 +3627,7 @@ Quux.<CURSOR>
         __text_signature__ :: str | None
         __type_params__ :: tuple[TypeVar | ParamSpec | TypeVarTuple, ...]
         __weakrefoffset__ :: int
-        "###);
+        ");
     }
 
     #[test]
@@ -3664,7 +3650,7 @@ Answer.<CURSOR>
             filters => [(r"(?m)\s*__(call|reduce_ex|annotate|signature)__.+$", "")]},
             {
                 assert_snapshot!(
-                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+                    builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
                 NO :: Literal[Answer.NO]
                 YES :: Literal[Answer.YES]
                 mro :: bound method <class 'Answer'>.mro() -> list[type]
@@ -3752,7 +3738,7 @@ quux.<CURSOR>
         );
 
         assert_snapshot!(
-            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @r"
+            builder.skip_keywords().skip_builtins().type_signatures().build().snapshot(), @"
         count :: bound method Quux.count(value: Any, /) -> int
         index :: bound method Quux.index(value: Any, start: SupportsIndex = 0, stop: SupportsIndex = ..., /) -> int
         x :: int
@@ -3817,7 +3803,7 @@ bar(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         foo
         okay=
         "
@@ -3838,7 +3824,7 @@ bar(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         foo
         okay=
         "
@@ -3857,7 +3843,7 @@ foo(b<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         bar=
         barbaz=
         baz=
@@ -3953,7 +3939,7 @@ bar(o<CURSOR>
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         foo
         okay=
         okay_abc=
@@ -3974,7 +3960,7 @@ bar(<CURSOR>
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         bar
         foo
         okay=
@@ -4018,9 +4004,9 @@ class C:
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
-            foo
-            self
+            @"
+        foo
+        self
         ");
     }
 
@@ -4054,7 +4040,7 @@ class C:
         // `self`.
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
-            @r"
+            @"
         foo
         self
         ");
@@ -4276,9 +4262,7 @@ b.a.<CURSOR>
         );
 
         assert_snapshot!(builder.skip_dunders().build().snapshot(),
-        @r"
-        x
-        ");
+        @"x");
     }
 
     #[test]
@@ -4473,7 +4457,7 @@ q<CURSOR>.foo.xyz
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
         __annotations__
         __class__
         __delattr__
@@ -4534,7 +4518,7 @@ A.<CURSOR>
 
         assert_snapshot!(
             builder.filter(|c| c.name.contains("FOO") || c.name.contains("foo")).build().snapshot(),
-            @r"
+            @"
         FOO
         foo
         __FOO__
@@ -4587,7 +4571,7 @@ def m(): pass
 ",
         );
 
-        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @r"m");
+        assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"m");
     }
 
     // Ref: https://github.com/astral-sh/ty/issues/572
@@ -4777,7 +4761,7 @@ f = Foo()
 
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"<No completions found>",
+            @"<No completions found>",
         );
     }
 
@@ -4966,7 +4950,7 @@ from ? import <CURSOR>
         );
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().build().snapshot(),
-            @r"<No completions found>",
+            @"<No completions found>",
         );
     }
 
@@ -5302,7 +5286,7 @@ from os.<CURSOR>
             .filter(|c| c.name.contains("Kadabra"))
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         Kadabra :: Literal[1] :: <no import required>
         AbraKadabra :: Unavailable :: package
         ");
@@ -7000,7 +6984,7 @@ if foo:
 
         // Even though long_namea is alphabetically before long_nameb,
         // long_nameb is currently imported and should be preferred.
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         long_nameb :: Literal[1] :: <no import required>
         long_namea :: Unavailable :: foo
         ");
@@ -7017,7 +7001,7 @@ if foo:
 
         // Here we favour `Protocol` over the other completions
         // because `Protocol` has been imported, and the other completions are builtin.
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         Protocol
         PendingDeprecationWarning
         PermissionError
@@ -7127,9 +7111,7 @@ from .<CURSOR>
 ",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
-        import
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
     #[test]
@@ -7145,9 +7127,7 @@ from .imp<CURSOR>
 ",
             )
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
-        import
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
     #[test]
@@ -7168,7 +7148,7 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/sub2/bar.py", "from ...<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
         ");
@@ -7183,7 +7163,7 @@ from .imp<CURSOR>
             .source("package/foo/baz.py", "")
             .source("package/sub1/sub2/bar.py", "from ...foo.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         bar
         baz
         ");
@@ -7196,9 +7176,7 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/sub2/bar.py", "from.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
-        import
-        ");
+        assert_snapshot!(builder.build().snapshot(), @"import");
     }
 
     #[test]
@@ -7208,7 +7186,7 @@ from .imp<CURSOR>
             .source("package/foo.py", "")
             .source("package/sub1/bar.py", "from ..<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         import
         foo
         ");
@@ -7233,7 +7211,7 @@ from .imp<CURSOR>
             .source("package/foo/baz.py", "")
             .source("package/sub1/sub2/bar.py", "from ...foo.ba<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         bar
         baz
         ");
@@ -7247,7 +7225,7 @@ from .imp<CURSOR>
             .source("package/imposition.py", "")
             .source("package/sub1/sub2/bar.py", "from ...im<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         import
         imposition
         ");
@@ -7262,7 +7240,7 @@ from .imp<CURSOR>
             .source("package/sub1/imposition.py", "")
             .source("package/sub1/bar.py", "from ..sub1.<CURSOR>")
             .completion_test_builder();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         bar
         foo
         imposition
@@ -7288,7 +7266,7 @@ from .imp<CURSOR>
             .source("foo.py", "from typing<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         typing :: <no import required>
         typing_extensions :: <no import required>
         ");
@@ -7301,7 +7279,7 @@ from .imp<CURSOR>
             .source("foo.py", "deprecated<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         deprecated :: typing_extensions
         deprecated :: warnings
         ");
@@ -7313,7 +7291,7 @@ from .imp<CURSOR>
             .source("foo.pyi", "from typing<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         typing :: <no import required>
         typing_extensions :: <no import required>
         ");
@@ -7325,7 +7303,7 @@ from .imp<CURSOR>
             .source("foo.pyi", "deprecated<CURSOR>")
             .completion_test_builder()
             .module_names();
-        assert_snapshot!(builder.build().snapshot(), @r"
+        assert_snapshot!(builder.build().snapshot(), @"
         deprecated :: typing_extensions
         deprecated :: warnings
         ");
@@ -7406,7 +7384,7 @@ ZQ<CURSOR>
             .module_names()
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         ZQZQ :: bar
         ZQZQ :: foo
         ");
@@ -7435,9 +7413,7 @@ ZQ<CURSOR>
             .snapshot();
         // We specifically do not want `ZQZQ2` here, since
         // it is not part of `__all__`.
-        assert_snapshot!(snapshot, @r"
-        ZQZQ1 :: bar
-        ");
+        assert_snapshot!(snapshot, @"ZQZQ1 :: bar");
     }
 
     // This test confirms current behavior (as of 2025-12-04), but
@@ -7469,7 +7445,7 @@ bar.ZQ<CURSOR>
             .snapshot();
         // We specifically do not want `ZQZQ2` here, since
         // it is not part of `__all__`.
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         ZQZQ1 :: <no import required>
         ZQZQ2 :: <no import required>
         ");
@@ -7519,7 +7495,7 @@ ZQ<CURSOR>
             .module_names()
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         ZQZQ1 :: _foo
         ZQZQ1 :: bar
         ");
@@ -7537,7 +7513,7 @@ multiprocess<CURSOR>
             .completion_test_builder()
             .build()
             .snapshot();
-        assert_snapshot!(snapshot, @r"
+        assert_snapshot!(snapshot, @"
         multiprocessing
         multiprocessing.connection
         multiprocessing.context
@@ -7608,7 +7584,7 @@ def foo():
         );
         assert_snapshot!(
             builder.skip_auto_import().build().snapshot(),
-            @r"
+            @"
         variable_global
         variable_local
         ",
@@ -7634,7 +7610,7 @@ def fun1():
         );
         assert_snapshot!(
             builder.skip_auto_import().build().snapshot(),
-            @r"
+            @"
         variable_1
         variable_2
         variable_3
@@ -7755,7 +7731,7 @@ TypedDi<CURSOR>
         );
         assert_snapshot!(
             builder.imports().build().snapshot(),
-            @r"
+            @"
         TypedDict :: , TypedDict
         is_typeddict :: , is_typeddict
         _FilterConfigurationTypedDict :: from logging.config import _FilterConfigurationTypedDict

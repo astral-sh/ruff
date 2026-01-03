@@ -202,7 +202,7 @@ ABCDEFGHIJKLMNOP = 'https://api.example.com'
             )
             .build();
 
-        assert_snapshot!(test.all_symbols("acegikmo"), @r"
+        assert_snapshot!(test.all_symbols("acegikmo"), @"
         info[all-symbols]: AllSymbolInfo
          --> constants.py:2:1
           |
