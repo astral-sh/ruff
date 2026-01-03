@@ -104,22 +104,21 @@ SIM105 [*] Use `contextlib.suppress(BaseException)` instead of `try`-`except`-`p
    |
 help: Replace `try`-`except`-`pass` with `with contextlib.suppress(BaseException): ...`
 1  + import contextlib
-2  + import builtins
-3  | def foo():
-4  |     pass
-5  | 
+2  | def foo():
+3  |     pass
+4  | 
 --------------------------------------------------------------------------------
-24 |     pass
-25 | 
-26 | # SIM105
+23 |     pass
+24 | 
+25 | # SIM105
    - try:
-27 + with contextlib.suppress(builtins.BaseException):
-28 |     foo()
+26 + with contextlib.suppress(BaseException):
+27 |     foo()
    - except:
    -     pass
-29 | 
-30 | # SIM105
-31 | try:
+28 | 
+29 | # SIM105
+30 | try:
 note: This is an unsafe fix and may change runtime behavior
 
 SIM105 [*] Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`
