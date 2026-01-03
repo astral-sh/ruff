@@ -476,7 +476,12 @@ impl<'db> BoundSuperType<'db> {
             },
             Type::SpecialForm(SpecialFormType::Protocol) => ClassBase::Protocol,
             Type::SpecialForm(SpecialFormType::Generic) => ClassBase::Generic,
-            Type::SpecialForm(SpecialFormType::TypedDict) => ClassBase::TypedDict,
+            Type::SpecialForm(SpecialFormType::TypedDict) => {
+                match KnownClass::Dict.to_class_literal(db).to_class_type(db) {
+                    Some(dict_class) => ClassBase::Class(dict_class),
+                    None => ClassBase::unknown(),
+                }
+            }
             Type::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
             _ => {
                 return Err(BoundSuperError::InvalidPivotClassType {
@@ -491,7 +496,7 @@ impl<'db> BoundSuperType<'db> {
             let pivot_class = pivot_class.class_literal(db).0;
             if !owner_class.iter_mro(db).any(|superclass| match superclass {
                 ClassBase::Dynamic(_) => true,
-                ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
+                ClassBase::Generic | ClassBase::Protocol => false,
                 ClassBase::Class(superclass) => superclass.class_literal(db).0 == pivot_class,
             }) {
                 return Err(BoundSuperError::FailingConditionCheck {

@@ -552,9 +552,7 @@ class MyTypedDict(TypedDict):
     x: int
 
     @override
-    # TODO: it's invalid to define a method on a `TypedDict` class,
-    # so we should emit a diagnostic here.
-    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
+    # error: [invalid-method-override] "Invalid override of method `copy`: Definition is incompatible with `dict.copy`"
     def copy(self) -> Self: ...
 
 class Grandparent(Any): ...
