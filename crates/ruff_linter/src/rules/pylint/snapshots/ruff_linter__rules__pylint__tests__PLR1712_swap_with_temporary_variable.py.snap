@@ -1,0 +1,46 @@
+---
+source: crates/ruff_linter/src/rules/pylint/mod.rs
+---
+PLR1712 [*] Consider swapping `x` and `y` by using tuple unpacking
+ --> swap_with_temporary_variable.py:3:5
+  |
+1 |   # safe fix
+2 |   def foo(x: int, y: int):
+3 | /     temp: int = x
+4 | |     x = y
+5 | |     y = temp
+  | |____________^
+  |
+help: Use `x, y = y, x` instead
+1 | # safe fix
+2 | def foo(x: int, y: int):
+  -     temp: int = x
+  -     x = y
+  -     y = temp
+3 +     x, y = y, x
+4 | 
+5 | 
+6 | # unsafe fix because the swap statements contain a comment
+
+PLR1712 [*] Consider swapping `x` and `y` by using tuple unpacking
+  --> swap_with_temporary_variable.py:10:5
+   |
+ 8 |   # unsafe fix because the swap statements contain a comment
+ 9 |   def bar(x: int, y: int):
+10 | /     temp: int = x  # comment
+11 | |     x = y
+12 | |     y = temp
+   | |____________^
+   |
+help: Use `x, y = y, x` instead
+7  | 
+8  | # unsafe fix because the swap statements contain a comment
+9  | def bar(x: int, y: int):
+   -     temp: int = x  # comment
+   -     x = y
+   -     y = temp
+10 +     x, y = y, x
+11 | 
+12 | 
+13 | # not a swap statement
+note: This is an unsafe fix and may change runtime behavior
