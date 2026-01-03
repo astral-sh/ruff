@@ -1150,8 +1150,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 };
 
                 if narrowed != rhs_type {
-	                let place = self.expect_place(&rhs_place_expr);
-	                constraints.insert(place, NarrowingConstraint::typeguard(narrowed));
+                    let place = self.expect_place(&rhs_place_expr);
+                    constraints.insert(place, NarrowingConstraint::typeguard(narrowed));
                 }
             }
         }
