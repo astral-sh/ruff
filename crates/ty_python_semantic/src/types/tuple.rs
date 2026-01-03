@@ -1707,14 +1707,17 @@ pub(crate) struct TupleUnpacker<'db> {
 
 impl<'db> TupleUnpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
-        let new_builders = |len: usize| std::iter::repeat_with(|| UnionBuilder::new(db)).take(len);
+        let new_builders = |len: usize| {
+            std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
+                .take(len)
+        };
         let targets = match len {
             TupleLength::Fixed(len) => {
                 Tuple::Fixed(FixedLengthTuple::from_elements(new_builders(len)))
             }
             TupleLength::Variable(prefix, suffix) => VariableLengthTuple::mixed(
                 new_builders(prefix),
-                UnionBuilder::new(db),
+                UnionBuilder::new(db, RecursivelyDefined::default()),
                 new_builders(suffix),
             ),
         };

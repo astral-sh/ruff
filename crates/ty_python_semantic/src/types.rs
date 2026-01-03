@@ -23,7 +23,7 @@ use ty_module_resolver::{KnownModule, Module, ModuleName, resolve_module};
 
 use type_ordering::union_or_intersection_elements_ordering;
 
-pub(crate) use self::builder::{IntersectionBuilder, UnionBuilder};
+pub(crate) use self::builder::{IntersectionBuilder, RecursivelyDefined, UnionBuilder};
 pub use self::cyclic::CycleDetector;
 pub(crate) use self::cyclic::{PairVisitor, TypeTransformer};
 pub(crate) use self::diagnostic::register_lints;
@@ -46,7 +46,6 @@ use crate::semantic_index::scope::ScopeId;
 use crate::semantic_index::{imported_modules, place_table, semantic_index};
 use crate::suppression::check_suppressions;
 use crate::types::bound_super::BoundSuperType;
-use crate::types::builder::RecursivelyDefined;
 use crate::types::call::{Binding, Bindings, CallArguments, CallableBinding};
 pub(crate) use crate::types::class_base::ClassBase;
 use crate::types::constraints::{
@@ -7730,7 +7729,7 @@ impl<'db> Type<'db> {
             },
 
             Type::Union(union) => {
-                let mut builder = UnionBuilder::new(db);
+                let mut builder = UnionBuilder::new(db, RecursivelyDefined::default());
                 let mut invalid_expressions = smallvec::SmallVec::default();
                 for element in union.elements(db) {
                     match element.in_type_expression(db, scope_id, typevar_binding_context) {
@@ -10783,7 +10782,7 @@ impl<'db> TypeVarConstraints<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, RecursivelyDefined::default());
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
@@ -11008,7 +11007,7 @@ impl<'db> UnionTypeInstance<'db> {
         scope_id: ScopeId<'db>,
         typevar_binding_context: Option<Definition<'db>>,
     ) -> Type<'db> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, RecursivelyDefined::default());
         for ty in &value_expr_types {
             match ty.in_type_expression(db, scope_id, typevar_binding_context) {
                 Ok(ty) => builder.add_in_place(ty),
@@ -13990,9 +13989,10 @@ impl<'db> UnionType<'db> {
     {
         elements
             .into_iter()
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element.into())
-            })
+            .fold(
+                UnionBuilder::new(db, RecursivelyDefined::default()),
+                |builder, element| builder.add(element.into()),
+            )
             .build()
     }
 
@@ -14005,7 +14005,7 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
+                UnionBuilder::new(db, RecursivelyDefined::default()).unpack_aliases(false),
                 |builder, element| builder.add(element.into()),
             )
             .build()
@@ -14019,7 +14019,7 @@ impl<'db> UnionType<'db> {
         elements
             .into_iter()
             .fold(
-                UnionBuilder::new(db).cycle_recovery(true),
+                UnionBuilder::new(db, RecursivelyDefined::default()).cycle_recovery(true),
                 |builder, element| builder.add(element.into()),
             )
             .build()
@@ -14035,7 +14035,7 @@ impl<'db> UnionType<'db> {
         I: IntoIterator<Item = Option<T>>,
         T: Into<Type<'db>>,
     {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, RecursivelyDefined::default());
         for element in elements {
             builder = builder.add(element?.into());
         }
@@ -14052,10 +14052,10 @@ impl<'db> UnionType<'db> {
         self.elements(db)
             .iter()
             .map(transform_fn)
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(element)
-            })
-            .recursively_defined(self.recursively_defined(db))
+            .fold(
+                UnionBuilder::new(db, self.recursively_defined(db)),
+                UnionBuilder::add,
+            )
             .build()
     }
 
@@ -14069,10 +14069,9 @@ impl<'db> UnionType<'db> {
             .iter()
             .map(transform_fn)
             .fold(
-                UnionBuilder::new(db).unpack_aliases(false),
+                UnionBuilder::new(db, self.recursively_defined(db)).unpack_aliases(false),
                 UnionBuilder::add,
             )
-            .recursively_defined(self.recursively_defined(db))
             .build()
     }
 
@@ -14088,11 +14087,10 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         transform_fn: impl FnMut(&Type<'db>) -> Option<Type<'db>>,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, self.recursively_defined(db));
         for element in self.elements(db).iter().map(transform_fn) {
             builder = builder.add(element?);
         }
-        builder = builder.recursively_defined(self.recursively_defined(db));
         Some(builder.build())
     }
 
@@ -14108,10 +14106,10 @@ impl<'db> UnionType<'db> {
         self.elements(db)
             .iter()
             .filter(|ty| f(ty))
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(*element)
-            })
-            .recursively_defined(self.recursively_defined(db))
+            .fold(
+                UnionBuilder::new(db, self.recursively_defined(db)),
+                |builder, element| builder.add(*element),
+            )
             .build()
     }
 
@@ -14120,7 +14118,7 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> Place<'db>,
     ) -> Place<'db> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, self.recursively_defined(db));
 
         let mut all_unbound = true;
         let mut possibly_unbound = false;
@@ -14147,9 +14145,7 @@ impl<'db> UnionType<'db> {
             Place::Undefined
         } else {
             Place::Defined(
-                builder
-                    .recursively_defined(self.recursively_defined(db))
-                    .build(),
+                builder.build(),
                 origin,
                 if possibly_unbound {
                     Definedness::PossiblyUndefined
@@ -14166,7 +14162,7 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut transform_fn: impl FnMut(&Type<'db>) -> PlaceAndQualifiers<'db>,
     ) -> PlaceAndQualifiers<'db> {
-        let mut builder = UnionBuilder::new(db);
+        let mut builder = UnionBuilder::new(db, self.recursively_defined(db));
         let mut qualifiers = TypeQualifiers::empty();
 
         let mut all_unbound = true;
@@ -14198,9 +14194,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined
             } else {
                 Place::Defined(
-                    builder
-                        .recursively_defined(self.recursively_defined(db))
-                        .build(),
+                    builder.build(),
                     origin,
                     if possibly_unbound {
                         Definedness::PossiblyUndefined
@@ -14231,12 +14225,11 @@ impl<'db> UnionType<'db> {
             .iter()
             .map(|ty| ty.normalized_impl(db, visitor))
             .fold(
-                UnionBuilder::new(db)
+                UnionBuilder::new(db, self.recursively_defined(db))
                     .order_elements(true)
                     .unpack_aliases(true),
                 UnionBuilder::add,
             )
-            .recursively_defined(self.recursively_defined(db))
             .build()
     }
 
@@ -14246,11 +14239,10 @@ impl<'db> UnionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Type<'db>> {
-        let mut builder = UnionBuilder::new(db)
+        let mut builder = UnionBuilder::new(db, self.recursively_defined(db))
             .order_elements(false)
             .unpack_aliases(false)
-            .cycle_recovery(true)
-            .recursively_defined(self.recursively_defined(db));
+            .cycle_recovery(true);
         let mut empty = true;
         for ty in self.elements(db) {
             if nested {

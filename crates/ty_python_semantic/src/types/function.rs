@@ -83,7 +83,7 @@ use crate::types::{
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
+    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionType, binding_type,
     definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
@@ -1537,10 +1537,12 @@ impl KnownFunction {
 
         match self {
             KnownFunction::RevealType => {
-                let revealed_type = overload
-                    .arguments_for_parameter(call_arguments, 0)
-                    .fold(UnionBuilder::new(db), |builder, (_, ty)| builder.add(ty))
-                    .build();
+                let revealed_type = UnionType::from_elements(
+                    db,
+                    overload
+                        .arguments_for_parameter(call_arguments, 0)
+                        .map(|(_, ty)| ty),
+                );
                 if let Some(builder) =
                     context.report_diagnostic(DiagnosticId::RevealedType, Severity::Info)
                 {

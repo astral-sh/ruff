@@ -14,8 +14,8 @@ use crate::semantic_index::{
 use crate::semantic_index::{DeclarationWithConstraint, global_scope, use_def_map};
 use crate::types::{
     ApplyTypeMappingVisitor, DynamicType, KnownClass, MaterializationKind, MemberLookupPolicy,
-    Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder, UnionType, binding_type,
-    declaration_type, todo_type,
+    RecursivelyDefined, Truthiness, Type, TypeAndQualifiers, TypeQualifiers, UnionBuilder,
+    UnionType, binding_type, declaration_type, todo_type,
 };
 use crate::{Db, FxOrderSet, Program};
 
@@ -1305,7 +1305,7 @@ impl<'db> PublicTypeBuilder<'db> {
         PublicTypeBuilder {
             db,
             queue: None,
-            builder: UnionBuilder::new(db),
+            builder: UnionBuilder::new(db, RecursivelyDefined::default()),
         }
     }
 

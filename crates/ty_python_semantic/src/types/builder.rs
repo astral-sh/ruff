@@ -202,9 +202,10 @@ enum ReduceResult<'db> {
     Type(Type<'db>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, Default)]
 pub enum RecursivelyDefined {
     Yes,
+    #[default]
     No,
 }
 
@@ -239,14 +240,14 @@ pub(crate) struct UnionBuilder<'db> {
 }
 
 impl<'db> UnionBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, recursively_defined: RecursivelyDefined) -> Self {
         Self {
             db,
             elements: vec![],
             unpack_aliases: true,
             order_elements: false,
             cycle_recovery: false,
-            recursively_defined: RecursivelyDefined::No,
+            recursively_defined,
         }
     }
 
@@ -1345,7 +1346,7 @@ mod tests {
     use crate::db::tests::setup_db;
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
-    use crate::types::{KnownClass, Truthiness};
+    use crate::types::{KnownClass, RecursivelyDefined, Truthiness};
 
     use test_case::test_case;
     use ty_module_resolver::KnownModule;
@@ -1353,8 +1354,7 @@ mod tests {
     #[test]
     fn build_union_no_elements() {
         let db = setup_db();
-
-        let empty_union = UnionBuilder::new(&db).build();
+        let empty_union = UnionBuilder::new(&db, RecursivelyDefined::default()).build();
         assert_eq!(empty_union, Type::Never);
     }
 

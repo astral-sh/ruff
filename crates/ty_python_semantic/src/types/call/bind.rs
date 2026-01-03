@@ -45,9 +45,9 @@ use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
-    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType, WrapperDescriptorKind,
-    enums, list_members, todo_type,
+    NominalInstanceType, PropertyInstanceType, RecursivelyDefined, SpecialFormType,
+    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
 use crate::{DisplaySettings, Program};
@@ -2011,9 +2011,10 @@ impl<'db> CallableBinding<'db> {
             }
         }
 
-        let mut union_argument_type_builders = std::iter::repeat_with(|| UnionBuilder::new(db))
-            .take(max_parameter_count)
-            .collect::<Vec<_>>();
+        let mut union_argument_type_builders =
+            std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
+                .take(max_parameter_count)
+                .collect::<Vec<_>>();
 
         // The following loop is trying to construct a tuple of argument types that correspond to
         // the participating parameter indexes. Considering the following example:
@@ -2083,9 +2084,10 @@ impl<'db> CallableBinding<'db> {
                 continue;
             }
 
-            let mut union_parameter_types = std::iter::repeat_with(|| UnionBuilder::new(db))
-                .take(max_parameter_count)
-                .collect::<Vec<_>>();
+            let mut union_parameter_types =
+                std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
+                    .take(max_parameter_count)
+                    .collect::<Vec<_>>();
 
             // The number of parameters that have been skipped because they don't participate in
             // the filtering process. This is used to make sure the types are added to the

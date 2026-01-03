@@ -9,8 +9,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
-        NominalInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner, Type,
-        TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+        NominalInstanceType, NormalizedVisitor, RecursivelyDefined, SpecialFormType,
+        SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         todo_type, visitor,
@@ -346,9 +346,10 @@ impl<'db> BoundSuperType<'db> {
                 return Ok(union
                     .elements(db)
                     .iter()
-                    .try_fold(UnionBuilder::new(db), |builder, element| {
-                        delegate_to(*element).map(|ty| builder.add(ty))
-                    })?
+                    .try_fold(
+                        UnionBuilder::new(db, RecursivelyDefined::default()),
+                        |builder, element| delegate_to(*element).map(|ty| builder.add(ty)),
+                    )?
                     .build());
             }
             Type::Intersection(intersection) => {
@@ -427,8 +428,8 @@ impl<'db> BoundSuperType<'db> {
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
                 // but here it seems like it's probably sound?
-                let mut key_builder = UnionBuilder::new(db);
-                let mut value_builder = UnionBuilder::new(db);
+                let mut key_builder = UnionBuilder::new(db, RecursivelyDefined::default());
+                let mut value_builder = UnionBuilder::new(db, RecursivelyDefined::default());
                 for (name, field) in td.items(db) {
                     key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
