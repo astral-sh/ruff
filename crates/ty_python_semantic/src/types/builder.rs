@@ -39,11 +39,10 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, NegativeIntersectionElements,
-    StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, ClassLiteral, ClassType, EnumLiteralType, IntersectionType, KnownClass,
+    NegativeIntersectionElements, StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
-use rustc_hash::FxHashSet;
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +50,7 @@ enum LiteralKind {
     Int,
     String,
     Bytes,
+    Enum,
 }
 
 impl<'db> Type<'db> {
@@ -61,6 +61,7 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(_), LiteralKind::String) => true,
             (Type::BytesLiteral(_), LiteralKind::Bytes) => true,
             (Type::IntLiteral(_), LiteralKind::Int) => true,
+            (Type::EnumLiteral(_), LiteralKind::Enum) => true,
             (Type::Intersection(intersection), _) => {
                 intersection
                     .positive(db)
@@ -85,17 +86,14 @@ enum UnionElement<'db> {
     IntLiterals(FxOrderSet<i64>),
     StringLiterals(FxOrderSet<StringLiteralType<'db>>),
     BytesLiterals(FxOrderSet<BytesLiteralType<'db>>),
+    EnumLiterals {
+        enum_class: ClassLiteral<'db>,
+        literals: FxOrderSet<EnumLiteralType<'db>>,
+    },
     Type(Type<'db>),
 }
 
 impl<'db> UnionElement<'db> {
-    const fn to_type_element(&self) -> Option<Type<'db>> {
-        match self {
-            UnionElement::Type(ty) => Some(*ty),
-            _ => None,
-        }
-    }
-
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
         let mut other_type_negated_cache = None;
@@ -158,6 +156,17 @@ impl<'db> UnionElement<'db> {
                     !literals.is_empty()
                 } else {
                     !Type::BytesLiteral(literals[0]).is_redundant_with(db, other_type)
+                }
+            }
+            UnionElement::EnumLiterals {
+                enum_class,
+                literals,
+            } => {
+                if other_type.splits_literals(db, LiteralKind::Enum) {
+                    literals.retain(|literal| should_retain_type(Type::EnumLiteral(*literal)));
+                    !literals.is_empty()
+                } else {
+                    !Type::EnumLiteral(literals[0]).is_subtype_of(db, other_type)
                 }
             }
             UnionElement::Type(existing) => return ReduceResult::Type(*existing),
@@ -280,6 +289,9 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::BytesLiterals(_) => {
                     replace_with.push(KnownClass::Bytes.to_instance(self.db));
                 }
+                UnionElement::EnumLiterals { enum_class, .. } => {
+                    replace_with.push(Type::instance(self.db, ClassType::NonGeneric(*enum_class)));
+                }
                 UnionElement::Type(_) => {}
             }
         }
@@ -327,6 +339,7 @@ impl<'db> UnionBuilder<'db> {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
                         UnionElement::BytesLiterals(literals) => acc + literals.len(),
+                        UnionElement::EnumLiterals { literals, .. } => acc + literals.len(),
                         UnionElement::Type(_) => acc,
                     });
                     if should_widen(literals, self.recursively_defined) {
@@ -492,32 +505,69 @@ impl<'db> UnionBuilder<'db> {
                 let metadata =
                     enum_metadata(self.db, enum_class).expect("Class of enum literal is an enum");
 
-                let enum_members_in_union = self
-                    .elements
-                    .iter()
-                    .filter_map(UnionElement::to_type_element)
-                    .filter_map(Type::as_enum_literal)
-                    .map(|literal| literal.name(self.db))
-                    .chain(std::iter::once(enum_member_to_add.name(self.db)))
-                    .collect::<FxHashSet<_>>();
+                if metadata.members.len() == 1 {
+                    let enum_class_instance =
+                        Type::instance(self.db, ClassType::NonGeneric(enum_class));
+                    self.add_in_place_impl(enum_class_instance, seen_aliases);
+                    return;
+                }
 
-                let all_members_are_in_union = metadata
-                    .members
-                    .keys()
-                    .all(|name| enum_members_in_union.contains(name));
-
-                if all_members_are_in_union {
-                    self.add_in_place_impl(
-                        enum_member_to_add.enum_class_instance(self.db),
-                        seen_aliases,
-                    );
-                } else if !self
-                    .elements
-                    .iter()
-                    .filter_map(UnionElement::to_type_element)
-                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
-                {
-                    self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases);
+                let mut found = None;
+                let mut to_remove = None;
+                for (index, element) in self.elements.iter_mut().enumerate() {
+                    match element {
+                        UnionElement::EnumLiterals {
+                            enum_class: existing_enum_class,
+                            literals,
+                        } => {
+                            if *existing_enum_class != enum_class {
+                                continue;
+                            }
+                            if should_widen(literals.len(), self.recursively_defined) {
+                                let replace_with =
+                                    Type::instance(self.db, ClassType::NonGeneric(enum_class));
+                                self.add_in_place_impl(replace_with, seen_aliases);
+                                return;
+                            }
+                            found = Some(literals);
+                            continue;
+                        }
+                        UnionElement::Type(existing) => {
+                            if ty.is_subtype_of(self.db, *existing) {
+                                return;
+                            }
+                            // e.g. `existing` could be `Literal[1] & Any`,
+                            // and `ty` could be `Literal[1]`
+                            if existing.is_subtype_of(self.db, ty) {
+                                to_remove = Some(index);
+                                continue;
+                            }
+                            if ty_negated().is_subtype_of(self.db, *existing) {
+                                // The type that includes both this new element, and its negation
+                                // (or a supertype of its negation), must be simply `object`.
+                                self.collapse_to_object();
+                                return;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if let Some(found) = found {
+                    let newly_added = found.insert(enum_member_to_add);
+                    if newly_added && found.len() == metadata.members.len() {
+                        let enum_class_instance =
+                            Type::instance(self.db, ClassType::NonGeneric(enum_class));
+                        self.add_in_place_impl(enum_class_instance, seen_aliases);
+                        return;
+                    }
+                } else {
+                    self.elements.push(UnionElement::EnumLiterals {
+                        enum_class,
+                        literals: FxOrderSet::from_iter([enum_member_to_add]),
+                    });
+                }
+                if let Some(index) = to_remove {
+                    self.elements.swap_remove(index);
                 }
             }
             // Adding `object` to a union results in `object`.
@@ -635,6 +685,9 @@ impl<'db> UnionBuilder<'db> {
                 }
                 UnionElement::BytesLiterals(literals) => {
                     types.extend(literals.into_iter().map(Type::BytesLiteral));
+                }
+                UnionElement::EnumLiterals { literals, .. } => {
+                    types.extend(literals.into_iter().map(Type::EnumLiteral));
                 }
                 UnionElement::Type(ty) => types.push(ty),
             }
