@@ -160,6 +160,65 @@ fn configuration_include() -> anyhow::Result<()> {
     Ok(())
 }
 
+/// Files without extensions can be included by adding a literal glob to `include` that matches
+/// the path exactly. A literal glob is a glob without any meta characters.
+#[test]
+fn configuration_include_no_extension() -> anyhow::Result<()> {
+    let case = CliTest::with_files([(
+        "src/main",
+        r#"
+            print(undefined_var)  # error: unresolved-reference
+            "#,
+    )])?;
+
+    // By default, `src/main` is excluded because the file has no supported extension.
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: true
+    exit_code: 0
+    ----- stdout -----
+    All checks passed!
+
+    ----- stderr -----
+    WARN No python files found under the given path(s)
+    ");
+
+    // The file can be included by adding an exactly matching pattern
+    case.write_file(
+        "ty.toml",
+        r#"
+        [src]
+        include = ["src", "src/main"]
+        "#,
+    )?;
+
+    assert_cmd_snapshot!(case.command(), @r"
+    success: false
+    exit_code: 1
+    ----- stdout -----
+    error[unresolved-reference]: Name `undefined_var` used when not defined
+     --> src/main:2:7
+      |
+    2 | print(undefined_var)  # error: unresolved-reference
+      |       ^^^^^^^^^^^^^
+      |
+    info: rule `unresolved-reference` is enabled by default
+
+    Found 1 diagnostic
+
+    ----- stderr -----
+    ");
+
+    Ok(())
+}
+
 /// Test configuration file exclude functionality
 #[test]
 fn configuration_exclude() -> anyhow::Result<()> {
