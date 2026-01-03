@@ -47,13 +47,14 @@ use crate::semantic_index::ast_ids::node_key::ExpressionNodeKey;
 use crate::semantic_index::definition::Definition;
 use crate::semantic_index::expression::Expression;
 use crate::semantic_index::scope::ScopeId;
-use crate::semantic_index::{SemanticIndex, semantic_index};
+use crate::semantic_index::{SemanticIndex, semantic_index, use_def_map};
+use crate::types::builder::RecursivelyDefined;
 use crate::types::diagnostic::TypeCheckDiagnostics;
 use crate::types::function::FunctionType;
 use crate::types::generics::Specialization;
 use crate::types::unpacker::{UnpackResult, Unpacker};
 use crate::types::{
-    ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, declaration_type,
+    ClassLiteral, KnownClass, Truthiness, Type, TypeAndQualifiers, UnionBuilder, declaration_type,
 };
 use crate::unpack::Unpack;
 use builder::TypeInferenceBuilder;
@@ -546,6 +547,9 @@ struct ScopeInferenceExtra<'db> {
 
     /// The diagnostics for this region.
     diagnostics: TypeCheckDiagnostics,
+
+    /// The returned types, if it is a function body.
+    return_types: Vec<Type<'db>>,
 }
 
 impl<'db> ScopeInference<'db> {
@@ -568,6 +572,23 @@ impl<'db> ScopeInference<'db> {
         for (expr, ty) in &mut self.expressions {
             let previous_ty = previous_inference.expression_type(*expr);
             *ty = ty.cycle_normalized(db, previous_ty, cycle);
+        }
+
+        if let Some(extra) = &mut self.extra {
+            for (i, return_ty) in extra.return_types.iter_mut().enumerate() {
+                match previous_inference.extra.as_ref() {
+                    Some(previous_extra) => {
+                        if let Some(previous_return_ty) = previous_extra.return_types.get(i) {
+                            *return_ty = return_ty.cycle_normalized(db, *previous_return_ty, cycle);
+                        } else {
+                            *return_ty = return_ty.recursive_type_normalized(db, cycle);
+                        }
+                    }
+                    None => {
+                        *return_ty = return_ty.recursive_type_normalized(db, cycle);
+                    }
+                }
+            }
         }
 
         self
@@ -604,6 +625,41 @@ impl<'db> ScopeInference<'db> {
         };
 
         extra.string_annotations.contains(&expression.into())
+    }
+
+    /// Returns the inferred return type of this function body (union of all possible return types),
+    /// or `None` if the region is not a function body.
+    /// In the case of methods, the return type of the superclass method is further unioned.
+    /// If there is no superclass method and this method is not `final`, it will be unioned with `Unknown`.
+    pub(crate) fn infer_return_type(&self, db: &'db dyn Db, scope: ScopeId<'db>) -> Type<'db> {
+        // TODO: coroutine function type inference
+        // TODO: generator function type inference
+        if scope.is_coroutine_function(db) || scope.is_generator_function(db) {
+            return Type::unknown();
+        }
+
+        let mut union = UnionBuilder::new(db);
+        // If this method is called early in the query cycle of `infer_scope_types`, `extra.return_types` will be empty.
+        // To properly propagate divergence, we must add `Divergent` to the union type.
+        if let Some(divergent) = self.fallback_type() {
+            union = union.recursively_defined(RecursivelyDefined::Yes);
+            union = union.add(divergent);
+        }
+
+        let Some(extra) = &self.extra else {
+            unreachable!(
+                "infer_return_type should only be called on a function body scope inference"
+            );
+        };
+        for return_ty in &extra.return_types {
+            union = union.add(*return_ty);
+        }
+        let use_def = use_def_map(db, scope);
+        if use_def.can_implicitly_return_none(db) {
+            union = union.add(Type::none(db));
+        }
+
+        union.build()
     }
 }
 

@@ -616,6 +616,14 @@ class X[T]:
 
 x1: X[int | None] = X()
 reveal_type(x1)  # revealed: X[None]
+
+class Y[T]:
+    def __init__(self: Y[None]) -> None: ...
+    def pop(self) -> T:
+        raise NotImplementedError
+
+y1: Y[int | None] = Y()
+reveal_type(y1)  # revealed: Y[None]
 ```
 
 ## Declared type preference sees through subtyping
