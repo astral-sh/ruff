@@ -7267,10 +7267,7 @@ impl<'db> Type<'db> {
             }
 
             (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
-                let callable = UnionBuilder::new(db)
-                    .add(*new_method)
-                    .add(*init_method)
-                    .build();
+                let callable = UnionType::from_elements(db, [new_method, init_method]);
 
                 let new_method_bindings = new_method
                     .bindings(db)
@@ -10758,11 +10755,7 @@ fn walk_type_var_constraints<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 impl<'db> TypeVarConstraints<'db> {
     fn as_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut builder = UnionBuilder::new(db);
-        for ty in self.elements(db) {
-            builder = builder.add(*ty);
-        }
-        builder.build()
+        UnionType::from_elements(db, self.elements(db))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
