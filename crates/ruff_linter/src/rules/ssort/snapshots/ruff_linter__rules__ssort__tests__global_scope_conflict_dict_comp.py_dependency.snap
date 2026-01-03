@@ -1,0 +1,21 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> global_scope_conflict_dict_comp.py:1:1
+  |
+1 | / def f():
+2 | |     g()
+3 | |     return {g: 1 for g in range(10)}
+4 | | def g():
+5 | |     pass
+  | |________^
+  |
+help: Organize statements
+1 + def g():
+2 +     pass
+3 | def f():
+4 |     g()
+5 |     return {g: 1 for g in range(10)}
+  - def g():
+  -     pass

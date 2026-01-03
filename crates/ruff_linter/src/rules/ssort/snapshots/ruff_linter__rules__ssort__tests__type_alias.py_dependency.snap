@@ -1,0 +1,27 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+ --> type_alias.py:1:1
+  |
+1 | / from decimal import Decimal
+2 | |
+3 | | roundint(3.14)
+4 | |
+5 | | def roundint(n: N) -> int:
+6 | |     return int(round(n))
+7 | |
+8 | | type N = Decimal | float
+  | |________________________^
+  |
+help: Organize statements
+1 | from decimal import Decimal
+2 | 
+  - roundint(3.14)
+  - 
+3 | def roundint(n: N) -> int:
+4 |     return int(round(n))
+5 | 
+6 + roundint(3.14)
+7 + 
+8 | type N = Decimal | float

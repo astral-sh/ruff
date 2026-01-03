@@ -1,0 +1,34 @@
+---
+source: crates/ruff_linter/src/rules/ssort/mod.rs
+---
+SS001 [*] Statements are unsorted
+  --> nested_class.py:1:1
+   |
+ 1 | / class Outer:
+ 2 | |     def outer_function(self):
+ 3 | |         return Inner().inner_function()
+ 4 | |
+ 5 | |     class Inner:
+ 6 | |         def inner_function(self):
+ 7 | |             return inner_dependency()
+ 8 | |
+ 9 | |         def inner_dependency():
+10 | |             return 100
+   | |______________________^
+   |
+help: Organize statements
+1  | class Outer:
+   -     def outer_function(self):
+   -         return Inner().inner_function()
+2  +     class Inner:
+3  +         def inner_dependency():
+4  +             return 100
+5  | 
+   -     class Inner:
+6  |         def inner_function(self):
+7  |             return inner_dependency()
+8  | 
+   -         def inner_dependency():
+   -             return 100
+9  +     def outer_function(self):
+10 +         return Inner().inner_function()

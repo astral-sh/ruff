@@ -1,0 +1,8 @@
+# test case 4
+def a():
+    return b()
+def b():
+    return c()
+def c():
+    return 42
+
