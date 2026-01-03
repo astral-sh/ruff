@@ -1135,24 +1135,16 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     }
                     Type::Union(union) => {
                         // remove all members of the union that would require the key
-                        let filtered: Vec<_> = union
-                            .elements(self.db)
-                            .iter()
-                            .filter(|ty| match ty {
-                                Type::TypedDict(td) => !requires_key(td),
-                                Type::Intersection(intersection) => {
-                                    let intersection_requires_key =
-                                        intersection.positive(self.db).iter().any(|ty| match ty {
-                                            Type::TypedDict(td) => requires_key(td),
-                                            _ => false,
-                                        });
-                                    !intersection_requires_key
-                                }
-                                _ => true,
-                            })
-                            .copied()
-                            .collect();
-                        UnionType::from_elements(self.db, filtered)
+                        union.filter(self.db, |ty| match ty {
+                            Type::TypedDict(td) => !requires_key(td),
+                            Type::Intersection(intersection) => {
+                                !intersection.positive(self.db).iter().any(|ty| match ty {
+                                    Type::TypedDict(td) => requires_key(td),
+                                    _ => false,
+                                })
+                            }
+                            _ => true,
+                        })
                     }
                     _ => rhs_type,
                 };
