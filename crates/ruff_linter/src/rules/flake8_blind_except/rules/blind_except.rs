@@ -199,7 +199,7 @@ fn is_exc_info_enabled(
         arguments.find_keyword("exc_info").is_some_and(|keyword| {
             Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
                 .into_bool()
-                .unwrap_or(true) // into_bool() can only return None if contained value is Truthiness::Unknown which can be exception object
+                != Some(false)
         })
     } else {
         false
