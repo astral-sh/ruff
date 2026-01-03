@@ -4279,7 +4279,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         self.validate_subscript_deletion_impl(
                             target,
                             full_object_ty.or(Some(object_ty)),
-                            *element_ty,
+                            element_ty,
                             slice_ty,
                         );
                     }
