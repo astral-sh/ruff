@@ -551,10 +551,8 @@ class MyNamedTupleChild(MyNamedTupleParent):
 class MyTypedDict(TypedDict):
     x: int
 
+    # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
     @override
-    # TODO: it's invalid to define a method on a `TypedDict` class,
-    # so we should emit a diagnostic here.
-    # It shouldn't be an `invalid-explicit-override` diagnostic, however.
     def copy(self) -> Self: ...
 
 class Grandparent(Any): ...

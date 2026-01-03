@@ -1,0 +1,97 @@
+---
+source: crates/ty_test/src/lib.rs
+expression: snapshot
+---
+
+---
+mdtest name: typed_dict.md - `TypedDict` - Only annotated declarations are allowed in the class body
+mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
+---
+
+# Python source files
+
+## mdtest_snippet.py
+
+```
+ 1 | from typing import TypedDict
+ 2 | 
+ 3 | class Foo(TypedDict):
+ 4 |     """docstring"""
+ 5 | 
+ 6 |     pass
+ 7 | 
+ 8 | class Bar(TypedDict):
+ 9 |     a: int
+10 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+11 |     42
+12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+13 |     b: str = "hello"
+14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+15 |     def bar(self): ...
+16 | class Baz(Bar):
+17 |     # error: [invalid-typed-dict-statement]
+18 |     def baz(self):
+19 |         pass
+```
+
+# Diagnostics
+
+```
+error[invalid-typed-dict-statement]: invalid statement in TypedDict class body
+  --> src/mdtest_snippet.py:11:5
+   |
+ 9 |     a: int
+10 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+11 |     42
+   |     ^^
+12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+13 |     b: str = "hello"
+   |
+info: Only annotated declarations (`<name>: <type>`) are allowed.
+info: rule `invalid-typed-dict-statement` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-statement]: TypedDict items cannot have a value
+  --> src/mdtest_snippet.py:13:14
+   |
+11 |     42
+12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+13 |     b: str = "hello"
+   |              ^^^^^^^
+14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+15 |     def bar(self): ...
+   |
+info: rule `invalid-typed-dict-statement` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-statement]: TypedDict classes cannot have methods
+  --> src/mdtest_snippet.py:15:5
+   |
+13 |     b: str = "hello"
+14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+15 |     def bar(self): ...
+   |     ^^^^^^^^^^^^^^^^^^
+16 | class Baz(Bar):
+17 |     # error: [invalid-typed-dict-statement]
+   |
+info: rule `invalid-typed-dict-statement` is enabled by default
+
+```
+
+```
+error[invalid-typed-dict-statement]: TypedDict classes cannot have methods
+  --> src/mdtest_snippet.py:18:5
+   |
+16 |   class Baz(Bar):
+17 |       # error: [invalid-typed-dict-statement]
+18 | /     def baz(self):
+19 | |         pass
+   | |____________^
+   |
+info: rule `invalid-typed-dict-statement` is enabled by default
+
+```

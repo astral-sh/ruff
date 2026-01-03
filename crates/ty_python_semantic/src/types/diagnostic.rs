@@ -120,6 +120,7 @@ pub(crate) fn register_lints(registry: &mut LintRegistryBuilder) {
     registry.register_lint(&REDUNDANT_CAST);
     registry.register_lint(&UNRESOLVED_GLOBAL);
     registry.register_lint(&MISSING_TYPED_DICT_KEY);
+    registry.register_lint(&INVALID_TYPED_DICT_STATEMENT);
     registry.register_lint(&INVALID_METHOD_OVERRIDE);
     registry.register_lint(&INVALID_EXPLICIT_OVERRIDE);
     registry.register_lint(&SUPER_CALL_IN_NAMED_TUPLE_METHOD);
@@ -2163,6 +2164,30 @@ declare_lint! {
     pub(crate) static MISSING_TYPED_DICT_KEY = {
         summary: "detects missing required keys in `TypedDict` constructors",
         status: LintStatus::stable("0.0.1-alpha.20"),
+        default_level: Level::Error,
+    }
+}
+
+declare_lint! {
+    /// ## What it does
+    /// Detects statements other than annotated declarations in `TypedDict` class bodies.
+    ///
+    /// ## Why is this bad?
+    /// `TypedDict` class bodies aren't allowed to contain any other types of statements, and for
+    /// example method definitions and field values aren't allowed. None of these will be present
+    /// on instances at runtime (which are of type `dict`).
+    ///
+    /// ## Example
+    /// ```python
+    /// from typing import TypedDict
+    ///
+    /// class Foo(TypedDict):
+    ///     def bar(self):  # error: [invalid-typed-dict-statement]
+    ///         pass
+    /// ```
+    pub(crate) static INVALID_TYPED_DICT_STATEMENT = {
+        summary: "detects invalid statements in `TypedDict` class bodies",
+        status: LintStatus::stable("0.0.9"),
         default_level: Level::Error,
     }
 }
