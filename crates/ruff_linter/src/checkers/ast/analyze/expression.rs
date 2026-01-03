@@ -54,7 +54,8 @@ pub(crate) fn expression(expr: &Expr, checker: &Checker) {
                             || checker.target_version() >= PythonVersion::PY310
                             || (checker.target_version() >= PythonVersion::PY37
                                 && checker.semantic.future_annotations_or_stub()
-                                && checker.semantic.in_annotation()
+                                && (checker.semantic.in_annotation()
+                                    || checker.semantic.in_string_type_definition())
                                 && !checker.settings().pyupgrade.keep_runtime_typing)
                         {
                             pyupgrade::rules::non_pep604_annotation(checker, expr, slice, operator);
