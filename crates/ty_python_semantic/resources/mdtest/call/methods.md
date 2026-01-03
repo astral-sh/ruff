@@ -623,9 +623,9 @@ from typing_extensions import Self
 
 reveal_type(object.__new__)  # revealed: def __new__(cls) -> Self@__new__
 reveal_type(object().__new__)  # revealed: def __new__(cls) -> Self@__new__
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: ConvertibleToInt = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type(int.__new__)
-# revealed: Overload[(cls, x: str | Buffer | SupportsInt | SupportsIndex | SupportsTrunc = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
+# revealed: Overload[(cls, x: ConvertibleToInt = 0, /) -> Self@__new__, (cls, x: str | bytes | bytearray, /, base: SupportsIndex) -> Self@__new__]
 reveal_type((42).__new__)
 
 class X:

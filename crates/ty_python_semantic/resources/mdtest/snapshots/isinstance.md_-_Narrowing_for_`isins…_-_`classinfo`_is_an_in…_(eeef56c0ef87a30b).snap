@@ -24,8 +24,17 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/narrow/isinstance.md
 10 |     # error: [invalid-argument-type]
 11 |     elif isinstance(x, Any | NamedTuple | list[int]):
 12 |         reveal_type(x)  # revealed: int | list[int] | bytes
-13 |     else:
-14 |         reveal_type(x)  # revealed: int | list[int] | bytes
+13 |     # TODO: This should be an error
+14 |     elif isinstance(x, (list[int] | bytes, int)):
+15 |         reveal_type(x)  # revealed: int | list[int] | bytes
+16 |     # TODO: This should be an error
+17 |     elif isinstance(x, (int, str | Literal[42])):
+18 |         reveal_type(x)  # revealed: int | list[int] | bytes
+19 |     # TODO: This should be an error
+20 |     elif isinstance(x, (int, (str, (bytes, memoryview | Literal[42])))):
+21 |         reveal_type(x)  # revealed: int | list[int] | bytes
+22 |     else:
+23 |         reveal_type(x)  # revealed: int | list[int] | bytes
 ```
 
 # Diagnostics
@@ -79,7 +88,7 @@ error[invalid-argument-type]: Invalid second argument to `isinstance`
    |                        |
    |                        This `UnionType` instance contains non-class elements
 12 |         reveal_type(x)  # revealed: int | list[int] | bytes
-13 |     else:
+13 |     # TODO: This should be an error
    |
 info: A `UnionType` instance can only be used as the second argument to `isinstance` if all elements are class objects
 info: Element `<special-form 'typing.Any'>` in the union, and 2 more elements, are not class objects
