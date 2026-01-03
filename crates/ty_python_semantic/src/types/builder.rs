@@ -40,8 +40,8 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, NegativeIntersectionElements,
-    StringLiteralType, Type, TypeVarBoundOrConstraints, UnionType,
+    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
+    TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
 use rustc_hash::FxHashSet;
@@ -960,7 +960,7 @@ impl<'db> IntersectionBuilder<'db> {
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
-    negative: NegativeIntersectionElements<'db>,
+    negative: NegativeIntersectionElementsBuilder<'db>,
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
@@ -1325,18 +1325,145 @@ impl<'db> InnerIntersectionBuilder<'db> {
             (1, 0) => self.positive[0],
             _ => {
                 self.positive.shrink_to_fit();
-                self.negative.shrink_to_fit();
                 if order_elements {
                     self.positive
                         .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
                     self.negative
                         .sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
                 }
-                Type::Intersection(IntersectionType::new(db, self.positive, self.negative))
+                Type::Intersection(IntersectionType::new(
+                    db,
+                    self.positive,
+                    self.negative
+                        .iter()
+                        .copied()
+                        .collect::<smallvec::SmallVec<_>>(),
+                ))
             }
         }
     }
 }
+
+/// To avoid unnecessary allocations for the common case of 0-1 negative elements,
+/// we use this enum to represent the negative elements of an intersection type.
+///
+/// It should otherwise have identical behavior to `FxOrderSet<Type<'db>>`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update, Default)]
+pub enum NegativeIntersectionElementsBuilder<'db> {
+    #[default]
+    Empty,
+    Single(Type<'db>),
+    Multiple(FxOrderSet<Type<'db>>),
+}
+
+impl<'db> NegativeIntersectionElementsBuilder<'db> {
+    pub(crate) fn iter(&self) -> NegativeIntersectionElementsIterator<'_, 'db> {
+        match self {
+            Self::Empty => NegativeIntersectionElementsIterator::EmptyOrOne(None),
+            Self::Single(ty) => NegativeIntersectionElementsIterator::EmptyOrOne(Some(ty)),
+            Self::Multiple(set) => NegativeIntersectionElementsIterator::Multiple(set.iter()),
+        }
+    }
+
+    pub(crate) fn len(&self) -> usize {
+        match self {
+            Self::Empty => 0,
+            Self::Single(_) => 1,
+            Self::Multiple(set) => set.len(),
+        }
+    }
+
+    pub(crate) fn insert(&mut self, ty: Type<'db>) {
+        match self {
+            Self::Empty => *self = Self::Single(ty),
+            Self::Single(existing) => {
+                if ty != *existing {
+                    *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
+                }
+            }
+            Self::Multiple(set) => {
+                set.insert(ty);
+            }
+        }
+    }
+
+    pub(crate) fn sort_unstable_by(
+        &mut self,
+        compare: impl FnMut(&Type<'db>, &Type<'db>) -> std::cmp::Ordering,
+    ) {
+        match self {
+            Self::Empty | Self::Single(_) => {}
+            Self::Multiple(set) => {
+                set.sort_unstable_by(compare);
+            }
+        }
+    }
+
+    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
+        match self {
+            Self::Empty => false,
+            Self::Single(existing) => {
+                if existing == ty {
+                    *self = Self::Empty;
+                    true
+                } else {
+                    false
+                }
+            }
+            // We don't try to maintain the invariant here that length-0 collections
+            // are *always* `Self::Empty` and length-1 collections are *always*
+            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
+            Self::Multiple(set) => set.swap_remove(ty),
+        }
+    }
+
+    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
+        match self {
+            Self::Empty => None,
+            Self::Single(existing) => {
+                if index == 0 {
+                    let ty = *existing;
+                    *self = Self::Empty;
+                    Some(ty)
+                } else {
+                    None
+                }
+            }
+            // We don't try to maintain the invariant here that length-0 collections
+            // are *always* `Self::Empty` and length-1 collections are *always*
+            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
+            Self::Multiple(set) => set.swap_remove_index(index),
+        }
+    }
+}
+
+impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElementsBuilder<'db> {
+    type Item = &'a Type<'db>;
+    type IntoIter = NegativeIntersectionElementsIterator<'a, 'db>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[derive(Debug)]
+pub enum NegativeIntersectionElementsIterator<'a, 'db> {
+    EmptyOrOne(Option<&'a Type<'db>>),
+    Multiple(ordermap::set::Iter<'a, Type<'db>>),
+}
+
+impl<'a, 'db> Iterator for NegativeIntersectionElementsIterator<'a, 'db> {
+    type Item = &'a Type<'db>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            NegativeIntersectionElementsIterator::EmptyOrOne(opt) => opt.take(),
+            NegativeIntersectionElementsIterator::Multiple(iter) => iter.next(),
+        }
+    }
+}
+
+impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {}
 
 #[cfg(test)]
 mod tests {

@@ -1,4 +1,5 @@
 use compact_str::CompactString;
+use get_size2::GetSize;
 use infer::nearest_enclosing_class;
 use itertools::{Either, Itertools};
 use ruff_diagnostics::{Edit, Fix};
@@ -14383,160 +14384,8 @@ pub struct IntersectionType<'db> {
     /// narrowing along with intersections (e.g. `if not isinstance(...)`), so we represent them
     /// directly in intersections rather than as a separate type.
     #[returns(ref)]
-    negative: NegativeIntersectionElements<'db>,
+    negative: smallvec::SmallVec<[Type<'db>; 1]>,
 }
-
-/// To avoid unnecessary allocations for the common case of 0-1 negative elements,
-/// we use this enum to represent the negative elements of an intersection type.
-///
-/// It should otherwise have identical behavior to `FxOrderSet<Type<'db>>`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update, Default)]
-pub enum NegativeIntersectionElements<'db> {
-    #[default]
-    Empty,
-    Single(Type<'db>),
-    Multiple(FxOrderSet<Type<'db>>),
-}
-
-impl<'db> NegativeIntersectionElements<'db> {
-    pub(crate) fn iter(&self) -> NegativeIntersectionElementsIterator<'_, 'db> {
-        match self {
-            Self::Empty => NegativeIntersectionElementsIterator::EmptyOrOne(None),
-            Self::Single(ty) => NegativeIntersectionElementsIterator::EmptyOrOne(Some(ty)),
-            Self::Multiple(set) => NegativeIntersectionElementsIterator::Multiple(set.iter()),
-        }
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        match self {
-            Self::Empty => 0,
-            Self::Single(_) => 1,
-            Self::Multiple(set) => set.len(),
-        }
-    }
-
-    pub(crate) fn contains(&self, ty: &Type<'db>) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Single(existing) => existing == ty,
-            Self::Multiple(set) => set.contains(ty),
-        }
-    }
-
-    pub(crate) fn is_empty(&self) -> bool {
-        // We could try to maintain the invariant that length-0 collections are always
-        // represented using `Self::Empty`, in which case this could just be
-        // `matches!(self, Self::Empty)`. But maintaining that invariant seems like
-        // it could add unnecessary overhead.
-        self.len() == 0
-    }
-
-    pub(crate) fn insert(&mut self, ty: Type<'db>) {
-        match self {
-            Self::Empty => *self = Self::Single(ty),
-            Self::Single(existing) => {
-                if ty != *existing {
-                    *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
-                }
-            }
-            Self::Multiple(set) => {
-                set.insert(ty);
-            }
-        }
-    }
-
-    pub(crate) fn heap_size(&self) -> usize {
-        match self {
-            Self::Empty => 0,
-            Self::Single(ty) => get_size2::heap_size(ty),
-            Self::Multiple(set) => ruff_memory_usage::order_set_heap_size(set),
-        }
-    }
-
-    pub(crate) fn shrink_to_fit(&mut self) {
-        match self {
-            Self::Empty | Self::Single(_) => {}
-            Self::Multiple(set) => set.shrink_to_fit(),
-        }
-    }
-
-    pub(crate) fn sort_unstable_by(
-        &mut self,
-        compare: impl FnMut(&Type<'db>, &Type<'db>) -> std::cmp::Ordering,
-    ) {
-        match self {
-            Self::Empty | Self::Single(_) => {}
-            Self::Multiple(set) => {
-                set.sort_unstable_by(compare);
-            }
-        }
-    }
-
-    pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
-        match self {
-            Self::Empty => false,
-            Self::Single(existing) => {
-                if existing == ty {
-                    *self = Self::Empty;
-                    true
-                } else {
-                    false
-                }
-            }
-            // We don't try to maintain the invariant here that length-0 collections
-            // are *always* `Self::Empty` and length-1 collections are *always*
-            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
-            Self::Multiple(set) => set.swap_remove(ty),
-        }
-    }
-
-    pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
-        match self {
-            Self::Empty => None,
-            Self::Single(existing) => {
-                if index == 0 {
-                    let ty = *existing;
-                    *self = Self::Empty;
-                    Some(ty)
-                } else {
-                    None
-                }
-            }
-            // We don't try to maintain the invariant here that length-0 collections
-            // are *always* `Self::Empty` and length-1 collections are *always*
-            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
-            Self::Multiple(set) => set.swap_remove_index(index),
-        }
-    }
-}
-
-impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
-    type Item = &'a Type<'db>;
-    type IntoIter = NegativeIntersectionElementsIterator<'a, 'db>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-#[derive(Debug)]
-pub enum NegativeIntersectionElementsIterator<'a, 'db> {
-    EmptyOrOne(Option<&'a Type<'db>>),
-    Multiple(ordermap::set::Iter<'a, Type<'db>>),
-}
-
-impl<'a, 'db> Iterator for NegativeIntersectionElementsIterator<'a, 'db> {
-    type Item = &'a Type<'db>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            NegativeIntersectionElementsIterator::EmptyOrOne(opt) => opt.take(),
-            NegativeIntersectionElementsIterator::Multiple(iter) => iter.next(),
-        }
-    }
-}
-
-impl std::iter::FusedIterator for NegativeIntersectionElementsIterator<'_, '_> {}
 
 // The Salsa heap is tracked separately.
 impl get_size2::GetSize for IntersectionType<'_> {}
@@ -14575,31 +14424,20 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        fn normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            visitor: &NormalizedVisitor<'db>,
-        ) -> FxOrderSet<Type<'db>> {
-            let mut elements: FxOrderSet<Type<'db>> = elements
-                .iter()
-                .map(|ty| ty.normalized_impl(db, visitor))
-                .collect();
+        let mut positive: FxOrderSet<Type<'db>> = self
+            .positive(db)
+            .iter()
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
 
-            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-            elements
-        }
+        let mut negative: smallvec::SmallVec<[Type<'db>; 1]> = self
+            .negative(db)
+            .iter()
+            .map(|n| n.normalized_impl(db, visitor))
+            .collect();
 
-        let positive = normalized_set(db, self.positive(db), visitor);
-
-        let negative = match self.negative(db) {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                NegativeIntersectionElements::Single(ty.normalized_impl(db, visitor))
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                NegativeIntersectionElements::Multiple(normalized_set(db, set, visitor))
-            }
-        };
+        positive.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+        negative.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
 
         IntersectionType::new(db, positive, negative)
     }
@@ -14610,57 +14448,34 @@ impl<'db> IntersectionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        fn opt_normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            div: Type<'db>,
-            nested: bool,
-        ) -> Option<FxOrderSet<Type<'db>>> {
-            elements
+        let positive: FxOrderSet<Type<'db>> = if nested {
+            self.positive(db)
                 .iter()
                 .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
-                .collect()
-        }
-
-        fn normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            div: Type<'db>,
-            nested: bool,
-        ) -> FxOrderSet<Type<'db>> {
-            elements
+                .collect::<Option<_>>()?
+        } else {
+            self.positive(db)
                 .iter()
                 .map(|ty| {
                     ty.recursive_type_normalized_impl(db, div, nested)
                         .unwrap_or(div)
                 })
                 .collect()
-        }
-
-        let positive = if nested {
-            opt_normalized_set(db, self.positive(db), div, nested)?
-        } else {
-            normalized_set(db, self.positive(db), div, nested)
         };
-        let negative = match self.negative(db) {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                let ty = if nested {
-                    ty.recursive_type_normalized_impl(db, div, nested)?
-                } else {
+
+        let negative: smallvec::SmallVec<[Type<'db>; 1]> = if nested {
+            self.positive(db)
+                .iter()
+                .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                .collect::<Option<_>>()?
+        } else {
+            self.positive(db)
+                .iter()
+                .map(|ty| {
                     ty.recursive_type_normalized_impl(db, div, nested)
                         .unwrap_or(div)
-                };
-                NegativeIntersectionElements::Single(ty)
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                let negative_set = if nested {
-                    opt_normalized_set(db, set, div, nested)?
-                } else {
-                    normalized_set(db, set, div, nested)
-                };
-                NegativeIntersectionElements::Multiple(negative_set)
-            }
+                })
+                .collect()
         };
 
         Some(IntersectionType::new(db, positive, negative))
@@ -14837,9 +14652,9 @@ impl<'db> IntersectionType<'db> {
     }
 
     fn heap_size(
-        (positive, negative): &(FxOrderSet<Type<'db>>, NegativeIntersectionElements<'db>),
+        (positive, negative): &(FxOrderSet<Type<'db>>, smallvec::SmallVec<[Type<'db>; 1]>),
     ) -> usize {
-        ruff_memory_usage::order_set_heap_size(positive) + negative.heap_size()
+        positive.get_heap_size() + negative.get_heap_size()
     }
 }
 
