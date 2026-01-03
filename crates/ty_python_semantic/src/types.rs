@@ -14424,7 +14424,9 @@ impl<'db> NegativeIntersectionElements<'db> {
         match self {
             Self::Empty => *self = Self::Single(ty),
             Self::Single(existing) => {
-                *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
+                if ty != *existing {
+                    *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
+                }
             }
             Self::Multiple(set) => {
                 set.insert(ty);
