@@ -12,7 +12,7 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::typed_dict::{
-    SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
+    SynthesizedTypedDictType, TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
@@ -1111,23 +1111,35 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         //     if "foo" not in u:
         //         reveal_type(u)  # revealed: Bar
         if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
-            && let ast::Expr::StringLiteral(key_literal) = &**left
+            && let Type::StringLiteral(key) = inference.expression_type(&**left)
             && let Some(rhs_place_expr) = place_expr(&comparators[0])
             && let rhs_type = inference.expression_type(&comparators[0])
             && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
         {
             let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
             if is_negative_check {
-                let key_name = key_literal.value.to_str();
-                let requires_key = |td: &TypedDictType<'db>| -> bool {
+                let requires_key = |td: TypedDictType<'db>| -> bool {
                     td.items(self.db)
-                        .get(key_name)
-                        .is_some_and(super::typed_dict::TypedDictField::is_required)
+                        .get(key.value(self.db))
+                        .is_some_and(TypedDictField::is_required)
                 };
 
                 let narrowed = match rhs_type {
                     Type::TypedDict(td) => {
-                        if requires_key(&td) {
+                        if requires_key(td) {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Intersection(intersection) => {
+                        if intersection
+                            .positive(self.db)
+                            .iter()
+                            .copied()
+                            .filter_map(Type::as_typed_dict)
+                            .any(requires_key)
+                        {
                             Type::Never
                         } else {
                             rhs_type
@@ -1136,13 +1148,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                     Type::Union(union) => {
                         // remove all members of the union that would require the key
                         union.filter(self.db, |ty| match ty {
-                            Type::TypedDict(td) => !requires_key(td),
-                            Type::Intersection(intersection) => {
-                                !intersection.positive(self.db).iter().any(|ty| match ty {
-                                    Type::TypedDict(td) => requires_key(td),
-                                    _ => false,
-                                })
-                            }
+                            Type::TypedDict(td) => !requires_key(*td),
+                            Type::Intersection(intersection) => !intersection
+                                .positive(self.db)
+                                .iter()
+                                .copied()
+                                .filter_map(Type::as_typed_dict)
+                                .any(requires_key),
                             _ => true,
                         })
                     }
@@ -1734,18 +1746,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
-        Type::Union(union) => {
-            union
-                .elements(db)
-                .iter()
-                .any(|union_member_ty| match union_member_ty {
-                    Type::TypedDict(_) => true,
-                    Type::Intersection(intersection) => {
-                        intersection.positive(db).iter().any(Type::is_typed_dict)
-                    }
-                    _ => false,
-                })
+        Type::Intersection(intersection) => {
+            intersection.positive(db).iter().any(Type::is_typed_dict)
         }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
         _ => false,
     }
 }
