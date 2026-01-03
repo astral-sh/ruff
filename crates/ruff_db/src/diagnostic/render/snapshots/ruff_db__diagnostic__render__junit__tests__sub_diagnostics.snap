@@ -7,6 +7,7 @@ expression: env.render_diagnostics(&diagnostics)
     <testsuite name="/call.py" tests="1" disabled="0" errors="0" failures="1" package="org.ruff">
         <testcase name="org.ruff.F821" classname="/call" line="1" column="1">
             <failure message="Undefined name `f`">
+                line 1, col 1, Undefined name `f`
                 info: `f` is defined here → /some/path/def.py:1:5
             </failure>
         </testcase>
