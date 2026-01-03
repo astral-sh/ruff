@@ -1,12 +1,12 @@
 use itertools::Itertools;
-
 use ruff_diagnostics::Applicability;
 use ruff_macros::{ViolationMetadata, derive_message_formats};
-use ruff_python_ast::{StmtClassDef};
+use ruff_python_ast::StmtClassDef;
 use ruff_python_semantic::analyze;
-use ruff_text_size::{Ranged, TextRange};
+use ruff_text_size::Ranged;
 
 use crate::checkers::ast::Checker;
+use crate::fix::edits::{Parentheses, remove_argument};
 use crate::importer::ImportRequest;
 use crate::{AlwaysFixableViolation, Edit, Fix};
 
@@ -64,6 +64,12 @@ impl AlwaysFixableViolation for MetaClassABCMeta {
 
 /// FURB180
 pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
+
+    // Determine whether the class definition contains at least one attribute.
+    let Some(arguments) = &class_def.arguments.as_ref() else {
+        return;
+    };
+
     // Identify the `metaclass` keyword.
     let Some((position, keyword)) = class_def.keywords().iter().find_position(|&keyword| {
         keyword
@@ -105,9 +111,9 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
         );
 
         Ok(if position > 0 {
-            // When the `abc.ABCMeta` is not the first keyword, put `abc.ABC` before the first
-            // keyword, but only if it not already presented.
-            let rest = if has_abc {
+            // When the `abc.ABCMeta` is not the first keyword and `abc.ABC` is not
+            // in base classes put `abc.ABC` before the first keyword argument.
+            let edits = if has_abc {
                 vec![]
             } else {
                 vec![
@@ -115,22 +121,32 @@ pub(crate) fn metaclass_abcmeta(checker: &Checker, class_def: &StmtClassDef) {
                     import_edit,
                 ]
             };
+
             Fix::applicable_edits(
-                // Delete from the previous argument, to the end of the `metaclass` argument.
-                Edit::range_deletion(TextRange::new(
-                    class_def.keywords()[position - 1].end(),
-                    keyword.end(),
-                )),
-                // Insert `abc.ABC` before the first keyword if needed.
-                rest,
+                // Delete the `metaclass` keyword.
+                remove_argument(
+                    keyword,
+                    arguments,
+                    Parentheses::Remove,
+                    checker.source(),
+                    checker.tokens(),
+                )?,
+                // Add `abc.ABC` if needed.
+                edits,
                 applicability,
             )
         } else {
-            // If class already inherits the `abc.ABC` we need to delete the entire
-            // `metaclass` argument, otherwise, replace metaclass-keyword with `abc.ABC`.
             let edit_action = if has_abc {
-                Edit::range_deletion(keyword.range)
+                // Class already inherits the `abc.ABC`, delete the `metaclass` keyword only.
+                remove_argument(
+                    keyword,
+                    arguments,
+                    Parentheses::Remove,
+                    checker.source(),
+                    checker.tokens(),
+                )?
             } else {
+                // Replace `metaclass` keyword by `abc.ABC`.
                 Edit::range_replacement(binding, keyword.range)
             };
 

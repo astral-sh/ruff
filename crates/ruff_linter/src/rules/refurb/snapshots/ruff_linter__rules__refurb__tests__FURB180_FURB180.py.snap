@@ -90,7 +90,7 @@ help: Replace with `abc.ABC`
 60 | 
 61 | # Regression tests for https://github.com/astral-sh/ruff/issues/17162
    - class A8(abc.ABC, metaclass=ABCMeta):  # FURB180
-62 + class A8(abc.ABC, ):  # FURB180
+62 + class A8(abc.ABC):  # FURB180
 63 |     @abstractmethod
 64 |     def foo(self):
 65 |         pass
@@ -111,7 +111,7 @@ help: Replace with `abc.ABC`
 69 |     from abc import ABC
 70 | 
    -     class A9(ABC, metaclass=ABCMeta):  # FURB180
-71 +     class A9(ABC, ):  # FURB180
+71 +     class A9(ABC):  # FURB180
 72 |         @abstractmethod
 73 |         def foo(self):
 74 |             pass
@@ -132,7 +132,7 @@ help: Replace with `abc.ABC`
 78 |     from abc import ABC as ABCAlternativeName
 79 | 
    -     class A10(ABCAlternativeName, metaclass=ABCMeta):  # FURB180
-80 +     class A10(ABCAlternativeName, ):  # FURB180
+80 +     class A10(ABCAlternativeName):  # FURB180
 81 |         @abstractmethod
 82 |         def foo(self):
 83 |             pass
@@ -151,7 +151,7 @@ help: Replace with `abc.ABC`
 87 | 
 88 | 
    - class A11(MyMetaClass, metaclass=ABCMeta):  # FURB180
-89 + class A11(MyMetaClass, ):  # FURB180
+89 + class A11(MyMetaClass):  # FURB180
 90 |     @abstractmethod
 91 |     def foo(self):
 92 |         pass
