@@ -149,6 +149,24 @@ pub(crate) fn add_to_dunder_all<'a>(
     expr: &Expr,
     stylist: &Stylist,
 ) -> Vec<Edit> {
+    let elts = match expr {
+        Expr::List(ast::ExprList { elts, .. }) => Some(elts),
+        Expr::Tuple(ast::ExprTuple { elts, .. }) => Some(elts),
+        _ => None,
+    };
+
+    let existing_names: std::collections::HashSet<&str> = elts
+        .iter()
+        .flat_map(|elts| elts.iter())
+        .filter_map(|elt| {
+            if let Expr::StringLiteral(ast::ExprStringLiteral { value, .. }) = elt {
+                Some(value.to_str())
+            } else {
+                None
+            }
+        })
+        .collect();
+
     let (insertion_point, export_prefix_length) = match expr {
         Expr::List(ExprList { elts, .. }) => (
             elts.last().map_or(expr.end() - "]".text_len(), Ranged::end),
@@ -175,6 +193,7 @@ pub(crate) fn add_to_dunder_all<'a>(
     };
     let quote = stylist.quote();
     let mut edits: Vec<_> = names
+        .filter(|name| !existing_names.contains(*name))
         .enumerate()
         .map(|(offset, name)| match export_prefix_length + offset {
             0 => Edit::insertion(format!("{quote}{name}{quote}"), insertion_point),
@@ -182,7 +201,7 @@ pub(crate) fn add_to_dunder_all<'a>(
         })
         .collect();
     if let Expr::Tuple(tup) = expr {
-        if tup.parenthesized && export_prefix_length + edits.len() == 1 {
+        if !edits.is_empty() && tup.parenthesized && export_prefix_length + edits.len() == 1 {
             edits.push(Edit::insertion(",".to_string(), insertion_point));
         }
     }
@@ -722,6 +741,9 @@ x = 1 \
     #[test_case(r#"["a", "b",]"#, &["x"],      r#"["a", "b", "x",]"#       ; "1 into nonempty list w/trailing comma")]
     #[test_case(r#"["a", "b"]"#,  &["x", "y"], r#"["a", "b", "x", "y"]"#   ; "2 into nonempty list")]
     #[test_case(r#"["a", "b"]"#,  &["x"],      r#"["a", "b", "x"]"#        ; "1 into nonempty list")]
+    #[test_case(r#"["a"]"#,       &["a", "b"], r#"["a", "b"]"#             ; "add one new, one duplicate to list")]
+    #[test_case(r#"("a",)"#,      &["a", "b"], r#"("a", "b",)"#            ; "add one new, one duplicate to tuple")]
+    #[test_case(r#"["a", "b"]"#,  &["b", "c"], r#"["a", "b", "c"]"#        ; "add one new, one duplicate to multi-item list")]
     fn add_to_dunder_all_test(raw: &str, names: &[&str], expect: &str) -> Result<()> {
         let locator = Locator::new(raw);
         let edits = {
