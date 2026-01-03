@@ -2,6 +2,7 @@ use std::borrow::Cow;
 use std::iter::FusedIterator;
 use std::slice::Iter;
 
+use itertools::PeekingNext;
 use ruff_formatter::{FormatError, write};
 use ruff_python_ast::AnyNodeRef;
 use ruff_python_ast::Stmt;
@@ -449,6 +450,40 @@ fn write_suppressed_statements<'a>(
             return Ok(statement.statement());
         }
     }
+}
+
+#[cold]
+pub(crate) fn write_skipped_statements<'a>(
+    first_skipped: &'a Stmt,
+    statements: &mut std::slice::Iter<'a, Stmt>,
+    verbatim_range: TextRange,
+    f: &mut PyFormatter,
+) -> FormatResult<&'a Stmt> {
+    let comments = f.context().comments().clone();
+    comments.mark_verbatim_node_comments_formatted(first_skipped.into());
+
+    let mut preceding = first_skipped;
+
+    while let Some(prec) = statements.peeking_next(|next| next.end() <= verbatim_range.end()) {
+        comments.mark_verbatim_node_comments_formatted(prec.into());
+        preceding = prec;
+    }
+
+    let first_leading = comments.leading(first_skipped);
+    let preceding_trailing = comments.trailing(preceding);
+
+    // Write the outer comments and format the node as verbatim
+    write!(
+        f,
+        [
+            leading_comments(first_leading),
+            source_position(verbatim_range.start()),
+            verbatim_text(verbatim_range),
+            source_position(verbatim_range.end()),
+            trailing_comments(preceding_trailing)
+        ]
+    )?;
+    Ok(preceding)
 }
 
 #[derive(Copy, Clone, Debug)]
