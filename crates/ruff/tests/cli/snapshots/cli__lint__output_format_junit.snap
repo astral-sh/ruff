@@ -21,17 +21,18 @@ exit_code: 1
     <testsuite name="[TMP]/input.py" tests="3" disabled="0" errors="0" failures="3" package="org.ruff">
         <testcase name="org.ruff.F401" classname="[TMP]/input" line="1" column="8">
             <failure message="`os` imported but unused">
+                line 1, col 8, `os` imported but unused
                 help: Remove unused import: `os`
             </failure>
         </testcase>
         <testcase name="org.ruff.F821" classname="[TMP]/input" line="2" column="5">
             <failure message="Undefined name `y`">
-
+                line 2, col 5, Undefined name `y`
             </failure>
         </testcase>
         <testcase name="org.ruff.invalid-syntax" classname="[TMP]/input" line="3" column="1">
             <failure message="Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)">
-
+                line 3, col 1, Cannot use `match` statement on Python 3.9 (syntax was added in Python 3.10)
             </failure>
         </testcase>
     </testsuite>
