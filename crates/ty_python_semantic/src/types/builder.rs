@@ -202,23 +202,86 @@ enum ReduceResult<'db> {
     Type(Type<'db>),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, get_size2::GetSize, Default)]
-pub enum RecursivelyDefined {
-    Yes,
-    #[default]
-    No,
+bitflags::bitflags! {
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, salsa::Update)]
+    struct UnionSettingsInner: u8 {
+        const UNPACK_ALIASES = 1 << 0;
+        const RECURSIVELY_DEFINED = 1 << 1;
+        const ORDER_ELEMENTS = 1 << 2;
+        const CYCLE_RECOVERY = 1 << 3;
+    }
 }
 
-impl RecursivelyDefined {
-    const fn is_yes(self) -> bool {
-        matches!(self, RecursivelyDefined::Yes)
+impl get_size2::GetSize for UnionSettingsInner {}
+
+impl Default for UnionSettingsInner {
+    fn default() -> Self {
+        Self::UNPACK_ALIASES
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, salsa::Update, get_size2::GetSize)]
+pub struct UnionSettings(UnionSettingsInner);
+
+impl UnionSettings {
+    #[must_use]
+    pub(crate) fn set_recursively_defined(mut self, value: bool) -> Self {
+        self.0.set(UnionSettingsInner::RECURSIVELY_DEFINED, value);
+        self
     }
 
-    const fn or(self, other: RecursivelyDefined) -> RecursivelyDefined {
-        match (self, other) {
-            (RecursivelyDefined::Yes, _) | (_, RecursivelyDefined::Yes) => RecursivelyDefined::Yes,
-            _ => RecursivelyDefined::No,
+    #[must_use]
+    pub(super) fn set_order_elements(mut self, value: bool) -> Self {
+        self.0.set(UnionSettingsInner::ORDER_ELEMENTS, value);
+        self
+    }
+
+    /// This is enabled when joining types in a `cycle_recovery` function.
+    /// Since a cycle cannot be created within a `cycle_recovery` function
+    /// execution of `is_redundant_with` is skipped.
+    #[must_use]
+    pub(crate) fn set_cycle_recovery(mut self, value: bool) -> Self {
+        if value {
+            self.0.insert(UnionSettingsInner::CYCLE_RECOVERY);
+            self.0.remove(UnionSettingsInner::UNPACK_ALIASES);
+        } else {
+            self.0.remove(UnionSettingsInner::CYCLE_RECOVERY);
         }
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn set_unpack_aliases(mut self, value: bool) -> Self {
+        self.0.set(UnionSettingsInner::UNPACK_ALIASES, value);
+        self
+    }
+
+    #[must_use]
+    pub(crate) fn should_unpack_aliases(self) -> bool {
+        self.0.contains(UnionSettingsInner::UNPACK_ALIASES)
+    }
+
+    #[must_use]
+    pub(crate) fn is_recursively_defined(self) -> bool {
+        self.0.contains(UnionSettingsInner::RECURSIVELY_DEFINED)
+    }
+
+    #[must_use]
+    fn should_order_elements(self) -> bool {
+        self.0.contains(UnionSettingsInner::ORDER_ELEMENTS)
+    }
+
+    #[must_use]
+    fn in_cycle_recovery(self) -> bool {
+        self.0.contains(UnionSettingsInner::CYCLE_RECOVERY)
+    }
+
+    #[must_use]
+    fn merge_recursively_defined(mut self, other: UnionSettings) -> Self {
+        if other.is_recursively_defined() {
+            self.0.insert(UnionSettingsInner::RECURSIVELY_DEFINED);
+        }
+        self
     }
 }
 
@@ -231,47 +294,16 @@ const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
-    unpack_aliases: bool,
-    order_elements: bool,
-    // This is enabled when joining types in a `cycle_recovery` function.
-    // Since a cycle cannot be created within a `cycle_recovery` function, execution of `is_redundant_with` is skipped.
-    cycle_recovery: bool,
-    recursively_defined: RecursivelyDefined,
+    pub(crate) settings: UnionSettings,
 }
 
 impl<'db> UnionBuilder<'db> {
-    pub(crate) fn new(db: &'db dyn Db, recursively_defined: RecursivelyDefined) -> Self {
+    pub(crate) fn new(db: &'db dyn Db, settings: UnionSettings) -> Self {
         Self {
             db,
             elements: vec![],
-            unpack_aliases: true,
-            order_elements: false,
-            cycle_recovery: false,
-            recursively_defined,
+            settings,
         }
-    }
-
-    pub(crate) fn unpack_aliases(mut self, val: bool) -> Self {
-        self.unpack_aliases = val;
-        self
-    }
-
-    pub(crate) fn order_elements(mut self, val: bool) -> Self {
-        self.order_elements = val;
-        self
-    }
-
-    pub(crate) fn cycle_recovery(mut self, val: bool) -> Self {
-        self.cycle_recovery = val;
-        if self.cycle_recovery {
-            self.unpack_aliases = false;
-        }
-        self
-    }
-
-    pub(crate) fn recursively_defined(mut self, val: RecursivelyDefined) -> Self {
-        self.recursively_defined = val;
-        self
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -317,9 +349,9 @@ impl<'db> UnionBuilder<'db> {
     }
 
     pub(crate) fn add_in_place_impl(&mut self, ty: Type<'db>, seen_aliases: &mut Vec<Type<'db>>) {
-        let cycle_recovery = self.cycle_recovery;
-        let should_widen = |literals, recursively_defined: RecursivelyDefined| {
-            if recursively_defined.is_yes() && cycle_recovery {
+        let cycle_recovery = self.settings.in_cycle_recovery();
+        let should_widen = |literals, settings: UnionSettings| {
+            if settings.is_recursively_defined() && cycle_recovery {
                 literals >= MAX_RECURSIVE_UNION_LITERALS
             } else {
                 literals >= MAX_NON_RECURSIVE_UNION_LITERALS
@@ -336,24 +368,24 @@ impl<'db> UnionBuilder<'db> {
                 for element in new_elements {
                     self.add_in_place_impl(*element, seen_aliases);
                 }
-                self.recursively_defined = self
-                    .recursively_defined
-                    .or(union.recursively_defined(self.db));
-                if self.cycle_recovery && self.recursively_defined.is_yes() {
+                self.settings = self
+                    .settings
+                    .merge_recursively_defined(union.settings(self.db));
+                if self.settings.in_cycle_recovery() && self.settings.is_recursively_defined() {
                     let literals = self.elements.iter().fold(0, |acc, elem| match elem {
                         UnionElement::IntLiterals(literals) => acc + literals.len(),
                         UnionElement::StringLiterals(literals) => acc + literals.len(),
                         UnionElement::BytesLiterals(literals) => acc + literals.len(),
                         UnionElement::Type(_) => acc,
                     });
-                    if should_widen(literals, self.recursively_defined) {
+                    if should_widen(literals, self.settings) {
                         self.widen_literal_types(seen_aliases);
                     }
                 }
             }
             // Adding `Never` to a union is a no-op.
             Type::Never => {}
-            Type::TypeAlias(alias) if self.unpack_aliases => {
+            Type::TypeAlias(alias) if self.settings.should_unpack_aliases() => {
                 if seen_aliases.contains(&ty) {
                     // Union contains itself recursively via a type alias. This is an error, just
                     // leave out the recursive alias. TODO surface this error.
@@ -372,7 +404,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::StringLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
+                            if should_widen(literals.len(), self.settings) {
                                 let replace_with = KnownClass::Str.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -419,7 +451,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::BytesLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
+                            if should_widen(literals.len(), self.settings) {
                                 let replace_with = KnownClass::Bytes.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -466,7 +498,7 @@ impl<'db> UnionBuilder<'db> {
                 for (index, element) in self.elements.iter_mut().enumerate() {
                     match element {
                         UnionElement::IntLiterals(literals) => {
-                            if should_widen(literals.len(), self.recursively_defined) {
+                            if should_widen(literals.len(), self.settings) {
                                 let replace_with = KnownClass::Int.to_instance(self.db);
                                 self.add_in_place_impl(replace_with, seen_aliases);
                                 return;
@@ -557,7 +589,8 @@ impl<'db> UnionBuilder<'db> {
         // If an alias gets here, it means we aren't unpacking aliases, and we also
         // shouldn't try to simplify aliases out of the union, because that will require
         // unpacking them.
-        let should_simplify_full = !matches!(ty, Type::TypeAlias(_)) && !self.cycle_recovery;
+        let should_simplify_full =
+            !matches!(ty, Type::TypeAlias(_)) && !self.settings.in_cycle_recovery();
 
         let mut ty_negated: Option<Type> = None;
         let mut to_remove = SmallVec::<[usize; 2]>::new();
@@ -656,7 +689,7 @@ impl<'db> UnionBuilder<'db> {
                 UnionElement::Type(ty) => types.push(ty),
             }
         }
-        if self.order_elements {
+        if self.settings.should_order_elements() {
             types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
         }
         match types.len() {
@@ -665,7 +698,7 @@ impl<'db> UnionBuilder<'db> {
             _ => Some(Type::Union(UnionType::new(
                 self.db,
                 types.into_boxed_slice(),
-                self.recursively_defined,
+                self.settings,
             ))),
         }
     }
@@ -780,7 +813,7 @@ impl<'db> IntersectionBuilder<'db> {
                             enum_member_literals(db, instance.class_literal(db), None)
                                 .expect("Calling `enum_member_literals` on an enum class")
                                 .collect::<Box<[_]>>(),
-                            RecursivelyDefined::No,
+                            UnionSettings::default(),
                         )),
                         seen_aliases,
                     )
@@ -1346,7 +1379,7 @@ mod tests {
     use crate::db::tests::setup_db;
     use crate::place::known_module_symbol;
     use crate::types::enums::enum_member_literals;
-    use crate::types::{KnownClass, RecursivelyDefined, Truthiness};
+    use crate::types::{KnownClass, Truthiness, UnionSettings};
 
     use test_case::test_case;
     use ty_module_resolver::KnownModule;
@@ -1354,7 +1387,7 @@ mod tests {
     #[test]
     fn build_union_no_elements() {
         let db = setup_db();
-        let empty_union = UnionBuilder::new(&db, RecursivelyDefined::default()).build();
+        let empty_union = UnionBuilder::new(&db, UnionSettings::default()).build();
         assert_eq!(empty_union, Type::Never);
     }
 

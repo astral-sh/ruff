@@ -24,7 +24,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use crate::semantic_index::definition::Definition;
 use crate::subscript::{Nth, OutOfBoundsError, PyIndex, PySlice, StepSizeZeroError};
-use crate::types::builder::RecursivelyDefined;
+use crate::types::builder::UnionSettings;
 use crate::types::class::{ClassType, KnownClass};
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
@@ -1650,7 +1650,7 @@ impl<'db> Tuple<Type<'db>> {
             // those techniques ensure that union elements are deduplicated and unions are eagerly simplified
             // into other types where necessary. Here, however, we know that there are no duplicates
             // in this union, so it's probably more efficient to use `UnionType::new()` directly.
-            Type::Union(UnionType::new(db, elements, RecursivelyDefined::No))
+            Type::Union(UnionType::new(db, elements, UnionSettings::default()))
         };
 
         TupleSpec::heterogeneous([
@@ -1708,8 +1708,7 @@ pub(crate) struct TupleUnpacker<'db> {
 impl<'db> TupleUnpacker<'db> {
     pub(crate) fn new(db: &'db dyn Db, len: TupleLength) -> Self {
         let new_builders = |len: usize| {
-            std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
-                .take(len)
+            std::iter::repeat_with(|| UnionBuilder::new(db, UnionSettings::default())).take(len)
         };
         let targets = match len {
             TupleLength::Fixed(len) => {
@@ -1717,7 +1716,7 @@ impl<'db> TupleUnpacker<'db> {
             }
             TupleLength::Variable(prefix, suffix) => VariableLengthTuple::mixed(
                 new_builders(prefix),
-                UnionBuilder::new(db, RecursivelyDefined::default()),
+                UnionBuilder::new(db, UnionSettings::default()),
                 new_builders(suffix),
             ),
         };

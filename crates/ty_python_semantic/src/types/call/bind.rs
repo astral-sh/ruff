@@ -45,8 +45,8 @@ use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
     FieldInstance, KnownBoundMethodType, KnownClass, KnownInstanceType, MemberLookupPolicy,
-    NominalInstanceType, PropertyInstanceType, RecursivelyDefined, SpecialFormType,
-    TrackedConstraintSet, TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionType,
+    NominalInstanceType, PropertyInstanceType, SpecialFormType, TrackedConstraintSet,
+    TypeAliasType, TypeContext, TypeVarVariance, UnionBuilder, UnionSettings, UnionType,
     WrapperDescriptorKind, enums, list_members, todo_type,
 };
 use crate::unpack::EvaluationMode;
@@ -2012,7 +2012,7 @@ impl<'db> CallableBinding<'db> {
         }
 
         let mut union_argument_type_builders =
-            std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
+            std::iter::repeat_with(|| UnionBuilder::new(db, UnionSettings::default()))
                 .take(max_parameter_count)
                 .collect::<Vec<_>>();
 
@@ -2085,7 +2085,7 @@ impl<'db> CallableBinding<'db> {
             }
 
             let mut union_parameter_types =
-                std::iter::repeat_with(|| UnionBuilder::new(db, RecursivelyDefined::default()))
+                std::iter::repeat_with(|| UnionBuilder::new(db, UnionSettings::default()))
                     .take(max_parameter_count)
                     .collect::<Vec<_>>();
 

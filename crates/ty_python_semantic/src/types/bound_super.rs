@@ -9,8 +9,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers},
     types::{
         ClassBase, ClassType, DynamicType, IntersectionBuilder, KnownClass, MemberLookupPolicy,
-        NominalInstanceType, NormalizedVisitor, RecursivelyDefined, SpecialFormType,
-        SubclassOfInner, Type, TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder,
+        NominalInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner, Type,
+        TypeVarBoundOrConstraints, TypeVarInstance, UnionBuilder, UnionSettings,
         context::InferContext,
         diagnostic::{INVALID_SUPER_ARGUMENT, UNAVAILABLE_IMPLICIT_SUPER_ARGUMENTS},
         todo_type, visitor,
@@ -347,7 +347,7 @@ impl<'db> BoundSuperType<'db> {
                     .elements(db)
                     .iter()
                     .try_fold(
-                        UnionBuilder::new(db, RecursivelyDefined::default()),
+                        UnionBuilder::new(db, union.settings(db)),
                         |builder, element| delegate_to(*element).map(|ty| builder.add(ty)),
                     )?
                     .build());
@@ -428,8 +428,8 @@ impl<'db> BoundSuperType<'db> {
             Type::TypedDict(td) => {
                 // In general it isn't sound to upcast a `TypedDict` to a `dict`,
                 // but here it seems like it's probably sound?
-                let mut key_builder = UnionBuilder::new(db, RecursivelyDefined::default());
-                let mut value_builder = UnionBuilder::new(db, RecursivelyDefined::default());
+                let mut key_builder = UnionBuilder::new(db, UnionSettings::default());
+                let mut value_builder = UnionBuilder::new(db, UnionSettings::default());
                 for (name, field) in td.items(db) {
                     key_builder = key_builder.add(Type::string_literal(db, name));
                     value_builder = value_builder.add(field.declared_ty);
