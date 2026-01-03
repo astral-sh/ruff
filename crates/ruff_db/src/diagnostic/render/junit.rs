@@ -55,9 +55,7 @@ impl<'a> JunitRenderer<'a> {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
-                    let indent = " ".repeat(4 * 4);
-
-                    let output = diagnostic
+                    let mut output = diagnostic
                         .sub_diagnostics()
                         .iter()
                         .map(|sub_diagnostic| {
@@ -116,16 +114,14 @@ impl<'a> JunitRenderer<'a> {
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
                     let status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
                     let classname = Path::new(filename).with_extension("");
-                    case.set_classname(classname.to_str().unwrap());
-                    case.status
-                        .set_message(diagnostic.concise_message().to_str());
-                    case.status.set_description(format!(
-                        "\n{output}\n{after_indent}",
-                        after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
-                    ));
+                    case.set_classname(classname.to_str().unwrap_or(filename));
+                    let msg = diagnostic.concise_message().to_str();
+                    case.status.set_message(msg.clone());
 
+                    let mut diagnostic_loc = String::new();
                     if let Some(location) = location {
                         case.extra.insert(
                             XmlString::new("line"),
@@ -135,11 +131,20 @@ impl<'a> JunitRenderer<'a> {
                             XmlString::new("column"),
                             XmlString::new(location.column.to_string()),
                         );
+                        diagnostic_loc = format!(
+                            "line {row}, col {col}, ",
+                            row = location.line,
+                            col = location.column,
+                        );
                     }
+
+                    if !output.is_empty() {
+                        output.push('\n');
+                    }
+
                     case.status.set_description(format!(
-                        "\n{indent}{diagnostic_loc}{body}{sub_diags}\n{after_indent}",
+                        "\n{indent}{diagnostic_loc}{msg}\n{output}{after_indent}",
                         after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
-                        body = diagnostic.concise_message().to_str(),
                     ));
                     test_suite.add_test_case(case);
                 }
