@@ -75,6 +75,89 @@ def _(x: Literal["foo", ""] | tuple[int, ...]):
         reveal_type(x)  # revealed: Literal[""] | (tuple[int, ...] & ~AlwaysTruthy)
 ```
 
+## Custom types that can be narrowed
+
+If a custom type defines a `__len__` method and a `__bool__` method, and both return `Literal`
+types, and the truthiness of the `__len__` return type is consistent with the truthiness of the
+`__bool__` return type, narrowing can still safely take place:
+
+```py
+from typing import Literal
+
+class Foo:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+    def __len__(self) -> Literal[42]:
+        return 42
+
+class Bar:
+    def __bool__(self) -> Literal[False]:
+        return False
+
+    def __len__(self) -> Literal[0]:
+        return 0
+
+class Inconsistent1:
+    def __bool__(self) -> Literal[True]:
+        return True
+
+    def __len__(self) -> Literal[0]:
+        return 0
+
+class Inconsistent2:
+    def __bool__(self) -> Literal[False]:
+        return False
+
+    def __len__(self) -> Literal[42]:
+        return 42
+
+def f(
+    a: Foo | list[int],
+    b: Bar | list[int],
+    c: Foo | Bar,
+    d: Inconsistent1 | list[int],
+    e: Inconsistent2 | list[int],
+):
+    if len(a):
+        reveal_type(a)  # revealed: Foo | list[int]
+    else:
+        reveal_type(a)  # revealed: list[int]
+
+    if not len(a):
+        reveal_type(a)  # revealed: list[int]
+    else:
+        reveal_type(a)  # revealed: Foo | list[int]
+
+    if len(b):
+        reveal_type(b)  # revealed: list[int]
+    else:
+        reveal_type(b)  # revealed: Bar | list[int]
+
+    if not len(b):
+        reveal_type(b)  # revealed: Bar | list[int]
+    else:
+        reveal_type(b)  # revealed: list[int]
+
+    if len(c):
+        reveal_type(c)  # revealed: Foo
+    else:
+        reveal_type(c)  # revealed: Bar
+
+    # No narrowing can take place for `d` or `e`,
+    # because the `__len__` and `__bool__` methods are inconsistent
+    # for both `Inconsistent1` and `Inconsistent2`.
+    if len(d):
+        reveal_type(d)  # revealed: Inconsistent1 | list[int]
+    else:
+        reveal_type(d)  # revealed: Inconsistent1 | list[int]
+
+    if len(e):
+        reveal_type(e)  # revealed: Inconsistent2 | list[int]
+    else:
+        reveal_type(e)  # revealed: Inconsistent2 | list[int]
+```
+
 ## Types that are not narrowed
 
 For `str`, `list`, and other types where a subclass could have a `__bool__` that disagrees with
