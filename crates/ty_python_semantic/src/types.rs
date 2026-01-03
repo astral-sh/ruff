@@ -7211,8 +7211,40 @@ impl<'db> Type<'db> {
             _ => (None, None, self),
         };
 
-        // As of now we do not model custom `__call__` on meta-classes, so the code below
-        // only deals with interplay between `__new__` and `__init__` methods.
+        // Check for a custom `__call__` on the metaclass. Following pyright's behavior:
+        // 1. If the metaclass has a custom `__call__` with a declared return type, validate it first
+        // 2. If there are argument errors, report them and return
+        // 3. If the return type is not assignable to the instance type, skip `__new__`/`__init__`
+        // 4. Otherwise, also validate `__new__`/`__init__`
+        let metaclass_dunder_call = self_type.member_lookup_with_policy(
+            db,
+            "__call__".into(),
+            MemberLookupPolicy::NO_INSTANCE_FALLBACK
+                | MemberLookupPolicy::META_CLASS_NO_TYPE_FALLBACK,
+        );
+
+        // Extract metaclass `__call__` info if it exists and has a declared return type.
+        let metaclass_call_info =
+            if let Place::Defined(Type::BoundMethod(metaclass_dunder_call), _, boundness, _) =
+                metaclass_dunder_call.place
+            {
+                let signature = metaclass_dunder_call.function(db).signature(db);
+                // Only use metaclass `__call__` if it has a declared return type.
+                // If return type is unannotated, fall through to `__new__`/`__init__`.
+                let has_declared_return = signature
+                    .overloads
+                    .iter()
+                    .any(|sig| sig.return_ty.is_some());
+                if has_declared_return {
+                    Some((metaclass_dunder_call, boundness))
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+        // The code below deals with interplay between `__new__` and `__init__` methods.
         // The logic is roughly as follows:
         // 1. If `__new__` is defined anywhere in the MRO (except for `object`, since it is always
         //    present), we call it and analyze outcome. We then analyze `__init__` call, but only
@@ -7223,10 +7255,8 @@ impl<'db> Type<'db> {
         //    the way to `object` (single `self` argument call). This time it is correct to
         //    fallback to `object.__init__`, since it will indeed check that no arguments are
         //    passed.
-        //
-        // Note that we currently ignore `__new__` return type, since we do not yet support `Self`
-        // and most builtin classes use it as return type annotation. We always return the instance
-        // type.
+        // 3. If `__new__` returns a type that is not assignable to the class instance type
+        //    (e.g., `int` or `int | A`), we use that return type instead of the instance type.
 
         // Lookup `__new__` method in the MRO up to, but not including, `object`. Also, we must
         // avoid `__new__` on `type` since per descriptor protocol, if `__new__` is not defined on
@@ -7251,41 +7281,104 @@ impl<'db> Type<'db> {
             MemberLookupPolicy::NO_INSTANCE_FALLBACK | MemberLookupPolicy::MRO_NO_OBJECT_FALLBACK,
         );
 
-        // Infer the call argument types, using both `__new__` and `__init__` for type-context.
-        let bindings = match (
-            new_method.as_ref().map(|method| &method.place),
-            &init_method.place,
-        ) {
-            (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
-                new_method
-                    .bindings(db)
-                    .map(|binding| binding.with_bound_type(self_type)),
-            ),
+        // Infer the call argument types using the appropriate bindings for type-context.
+        // If metaclass `__call__` has a declared return type, use its bindings.
+        // Otherwise, use combined `__new__` and `__init__` bindings.
+        let bindings = if metaclass_call_info.is_some() {
+            // Use metaclass `__call__` bindings for argument inference.
+            metaclass_call_info
+                .as_ref()
+                .map(|(method, _)| Type::BoundMethod(*method).bindings(db))
+        } else {
+            // Use `__new__` and `__init__` bindings for argument inference.
+            match (
+                new_method.as_ref().map(|method| &method.place),
+                &init_method.place,
+            ) {
+                (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
+                    new_method
+                        .bindings(db)
+                        .map(|binding| binding.with_bound_type(self_type)),
+                ),
 
-            (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
-                Some(init_method.bindings(db))
+                (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
+                    Some(init_method.bindings(db))
+                }
+
+                (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
+                    let callable = UnionBuilder::new(db)
+                        .add(*new_method)
+                        .add(*init_method)
+                        .build();
+
+                    let new_method_bindings = new_method
+                        .bindings(db)
+                        .map(|binding| binding.with_bound_type(self_type));
+
+                    Some(Bindings::from_union(
+                        callable,
+                        [new_method_bindings, init_method.bindings(db)],
+                    ))
+                }
+
+                _ => None,
             }
-
-            (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
-                let callable = UnionBuilder::new(db)
-                    .add(*new_method)
-                    .add(*init_method)
-                    .build();
-
-                let new_method_bindings = new_method
-                    .bindings(db)
-                    .map(|binding| binding.with_bound_type(self_type));
-
-                Some(Bindings::from_union(
-                    callable,
-                    [new_method_bindings, init_method.bindings(db)],
-                ))
-            }
-
-            _ => None,
         };
 
         let argument_types = infer_argument_types(bindings);
+
+        // If metaclass `__call__` exists with a declared return type, validate it first.
+        // Following pyright's behavior:
+        // - If there are argument errors, return the metaclass error
+        // - If the return type is not assignable to the instance type, return the metaclass result
+        // - Otherwise, continue to validate `__new__`/`__init__`
+        if let Some((metaclass_dunder_call, boundness)) = metaclass_call_info {
+            let bindings = Type::BoundMethod(metaclass_dunder_call).bindings(db);
+
+            let call_result = bindings
+                .clone()
+                .match_parameters(db, &argument_types)
+                .check_types(db, &argument_types, tcx, &[]);
+
+            let metaclass_return_type = call_result
+                .as_ref()
+                .map_or_else(|err| err.1.return_type(db), |b| b.return_type(db));
+
+            // Get the instance type for comparison.
+            let instance_ty = self
+                .to_instance(db)
+                .expect("type should be convertible to instance type");
+
+            // Check if we should skip `__new__`/`__init__` evaluation.
+            // Skip if: return type is not assignable to instance, is Never, or contains Any.
+            let skip_new_init = !metaclass_return_type.is_assignable_to(db, instance_ty)
+                || metaclass_return_type.is_never()
+                || matches!(metaclass_return_type, Type::Dynamic(DynamicType::Any));
+
+            // If there are argument errors or we should skip `__new__`/`__init__`, return metaclass result.
+            if call_result.is_err() || skip_new_init {
+                let call_result = call_result
+                    .map_err(CallDunderError::from)
+                    .and_then(|bindings| {
+                        if boundness == Definedness::PossiblyUndefined {
+                            Err(CallDunderError::PossiblyUnbound(Box::new(bindings)))
+                        } else {
+                            Ok(bindings)
+                        }
+                    });
+
+                return match call_result {
+                    Ok(bindings) => Ok(bindings.return_type(db)),
+                    Err(error) => Err(ConstructorCallError::MetaclassCall(
+                        error.fallback_return_type(db),
+                        error,
+                    )),
+                };
+            }
+
+            // Metaclass `__call__` succeeded and returns instance type.
+            // Continue to validate `__new__`/`__init__` below.
+        }
 
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
@@ -7307,6 +7400,7 @@ impl<'db> Type<'db> {
             }
         });
 
+        // Call `__init__` if `__new__` was not called, or if `__init__` is explicitly defined.
         let init_call_outcome = if new_call_outcome.is_none() || !init_method.is_undefined() {
             let call_result = match init_ty
                 .member_lookup_with_policy(
@@ -7346,6 +7440,28 @@ impl<'db> Type<'db> {
         let instance_ty = self
             .to_instance(db)
             .expect("type should be convertible to instance type");
+
+        // Extract the return type from `__new__` if it was called successfully.
+        // Filter out:
+        // 1. Dynamic types (`Unknown`, `Any`) since they indicate the `__new__` method doesn't
+        //    have an explicit return type annotation (e.g., synthesized methods like tuple's
+        //    `__new__`) or is inherited from `Any`.
+        // 2. Types containing unresolved type variables (like `Self`) since they need to be
+        //    resolved by the constructor machinery, not used directly.
+        let new_return_type = new_call_outcome
+            .as_ref()
+            .and_then(|result| result.as_ref().ok())
+            .map(|bindings| bindings.return_type(db))
+            .map(|ty| ty.filter_union(db, |elem| !elem.is_dynamic()))
+            .filter(|ty| !ty.is_dynamic() && !ty.has_typevar(db));
+
+        // Determine the return type based on `__new__` return type.
+        // Only use the `__new__` return type if it returns something that is not a subclass of
+        // the class being constructed (e.g., `int | A`). Otherwise, use the instance type so that
+        // proper generic specialization can be applied.
+        let return_ty = new_return_type
+            .filter(|return_ty| !return_ty.is_assignable_to(db, instance_ty))
+            .unwrap_or(instance_ty);
 
         match (generic_origin, new_call_outcome, init_call_outcome) {
             // All calls are successful or not called at all
@@ -7388,26 +7504,25 @@ impl<'db> Type<'db> {
                             generic_origin.apply_specialization(db, |_| specialization),
                         )
                     })
-                    .unwrap_or(instance_ty);
+                    // Use the `__new__` return type if available, otherwise use instance_ty.
+                    .unwrap_or(return_ty);
                 Ok(specialized)
             }
 
-            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(instance_ty),
+            (None, None | Some(Ok(_)), None | Some(Ok(_))) => Ok(return_ty),
 
             (_, None | Some(Ok(_)), Some(Err(error))) => {
-                // no custom `__new__` or it was called and succeeded, but `__init__` failed.
-                Err(ConstructorCallError::Init(instance_ty, error))
+                // No custom `__new__` or it was called and succeeded, but `__init__` failed.
+                Err(ConstructorCallError::Init(return_ty, error))
             }
             (_, Some(Err(error)), None | Some(Ok(_))) => {
-                // custom `__new__` was called and failed, but init is ok
-                Err(ConstructorCallError::New(instance_ty, error))
+                // Custom `__new__` was called and failed, but init is ok.
+                Err(ConstructorCallError::New(return_ty, error))
             }
             (_, Some(Err(new_error)), Some(Err(init_error))) => {
-                // custom `__new__` was called and failed, and `__init__` is also not ok
+                // Custom `__new__` was called and failed, and `__init__` is also not ok.
                 Err(ConstructorCallError::NewAndInit(
-                    instance_ty,
-                    new_error,
-                    init_error,
+                    return_ty, new_error, init_error,
                 ))
             }
         }
@@ -12040,6 +12155,7 @@ enum ConstructorCallError<'db> {
     Init(Type<'db>, CallDunderError<'db>),
     New(Type<'db>, DunderNewCallError<'db>),
     NewAndInit(Type<'db>, DunderNewCallError<'db>, CallDunderError<'db>),
+    MetaclassCall(Type<'db>, CallDunderError<'db>),
 }
 
 impl<'db> ConstructorCallError<'db> {
@@ -12048,6 +12164,7 @@ impl<'db> ConstructorCallError<'db> {
             Self::Init(ty, _) => *ty,
             Self::New(ty, _) => *ty,
             Self::NewAndInit(ty, _, _) => *ty,
+            Self::MetaclassCall(ty, _) => *ty,
         }
     }
 
@@ -12109,6 +12226,30 @@ impl<'db> ConstructorCallError<'db> {
             }
         };
 
+        let report_metaclass_call_error =
+            |call_dunder_error: &CallDunderError<'db>| match call_dunder_error {
+                CallDunderError::MethodNotAvailable => {
+                    unreachable!(
+                        "MethodNotAvailable should not occur when metaclass `__call__` was found"
+                    )
+                }
+                CallDunderError::PossiblyUnbound(bindings) => {
+                    if let Some(builder) = context
+                        .report_lint(&POSSIBLY_MISSING_IMPLICIT_CALL, context_expression_node)
+                    {
+                        builder.into_diagnostic(format_args!(
+                            "Method `__call__` on type `{}` may be missing.",
+                            context_expression_type.display(context.db()),
+                        ));
+                    }
+
+                    bindings.report_diagnostics(context, context_expression_node);
+                }
+                CallDunderError::CallError(_, bindings) => {
+                    bindings.report_diagnostics(context, context_expression_node);
+                }
+            };
+
         match self {
             Self::Init(_, init_call_dunder_error) => {
                 report_init_error(init_call_dunder_error);
@@ -12119,6 +12260,9 @@ impl<'db> ConstructorCallError<'db> {
             Self::NewAndInit(_, new_call_error, init_call_dunder_error) => {
                 report_new_error(new_call_error);
                 report_init_error(init_call_dunder_error);
+            }
+            Self::MetaclassCall(_, metaclass_call_error) => {
+                report_metaclass_call_error(metaclass_call_error);
             }
         }
     }

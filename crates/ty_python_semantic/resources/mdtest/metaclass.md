@@ -1,3 +1,152 @@
+## Custom `__call__` on metaclass
+
+When a metaclass defines a custom `__call__` method, it controls what happens when the class is
+called. The return type and parameter types of the metaclass `__call__` are used instead of the
+class's `__new__` and `__init__` methods.
+
+### Basic metaclass `__call__`
+
+```py
+class Meta(type):
+    def __call__(cls, x: int, y: str) -> str:
+        return y
+
+class Foo(metaclass=Meta): ...
+
+reveal_type(Foo(1, "hello"))  # revealed: str
+
+a: str = Foo(1, "hello")  # OK
+```
+
+### Metaclass `__call__` with wrong arguments
+
+```py
+class Meta(type):
+    def __call__(cls, x: int) -> int:
+        return x
+
+class Foo(metaclass=Meta): ...
+
+Foo("wrong")  # error: [invalid-argument-type]
+Foo()  # error: [missing-argument]
+Foo(1, 2)  # error: [too-many-positional-arguments]
+```
+
+### Metaclass `__call__` takes precedence over `__init__`
+
+```py
+class Meta(type):
+    def __call__(cls) -> str:
+        return "hello"
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int, y: int) -> None:
+        pass
+
+# The metaclass __call__ takes precedence, so no arguments are needed
+# and the return type is str, not Foo.
+reveal_type(Foo())  # revealed: str
+```
+
+### Metaclass `__call__` with TypeVar return type
+
+When the metaclass `__call__` returns a TypeVar bound to the class type, it's essentially a
+pass-through to the normal constructor machinery. In this case, we should still check the `__new__`
+and `__init__` signatures.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    def __call__(cls: type[T], *args, **kwargs) -> T:
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# The metaclass __call__ returns T (bound to Foo), so we check __init__ parameters.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Metaclass `__call__` with no return type annotation
+
+When the metaclass `__call__` has no return type annotation (returns `Unknown`), we should still
+check the `__new__` and `__init__` signatures.
+
+```py
+class Meta(type):
+    def __call__(cls, *args, **kwargs):
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# No return type annotation means we fall through to check __init__ parameters.
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Metaclass `__call__` with specific parameters
+
+When the metaclass `__call__` has specific parameters (not just `*args, **kwargs`), we should check
+the metaclass `__call__` signature, even if the return type is the instance type.
+
+```py
+from typing import TypeVar
+
+T = TypeVar("T")
+
+class Meta(type):
+    def __call__(cls: type[T], x: int) -> T:
+        return object.__new__(cls)
+
+class Foo(metaclass=Meta):
+    def __init__(self, x: int) -> None:
+        pass
+
+# The metaclass __call__ has specific parameters, so we check them.
+Foo("wrong")  # error: [invalid-argument-type]
+Foo()  # error: [missing-argument]
+reveal_type(Foo(1))  # revealed: Foo
+```
+
+### Metaclass `__call__` returning bare `type`
+
+When the metaclass `__call__` is annotated as returning `type`, we use that return type. This is
+stricter than mypy and pyright, which ignore the `-> type` annotation in this case.
+
+```py
+from typing import Any
+
+class Singleton(type):
+    _instances: dict["Singleton", object] = {}
+
+    def __call__(cls, *args: Any, **kwargs: Any) -> type:
+        if cls not in cls._instances:
+            cls._instances[cls] = super().__call__(*args, **kwargs)
+        # error: [invalid-return-type]
+        return cls._instances[cls]
+
+class MyConfig(metaclass=Singleton):
+    def __init__(self, x: int) -> None:
+        pass
+
+    def get(self, key: str) -> str:
+        return key
+
+# The metaclass `__call__` returns `type`, so that's what we infer.
+reveal_type(MyConfig(1))  # revealed: type
+
+# Instance methods are not available on `type`.
+# error: [unresolved-attribute]
+MyConfig(1).get("key")
+```
+
 ## Default
 
 ```py

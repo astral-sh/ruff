@@ -163,7 +163,7 @@ static PANDAS: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    4000,
+    4057,
 );
 
 static PYDANTIC: Benchmark = Benchmark::new(
@@ -194,7 +194,7 @@ static SYMPY: Benchmark = Benchmark::new(
         max_dep_date: "2025-06-17",
         python_version: PythonVersion::PY312,
     },
-    13116,
+    13253,
 );
 
 static TANJUN: Benchmark = Benchmark::new(
