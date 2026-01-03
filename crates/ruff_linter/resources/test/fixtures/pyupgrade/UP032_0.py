@@ -276,5 +276,8 @@ if __name__ == "__main__":
     string = "{}".format(number := number + 1)
     print(string)
 
-# Unicode escape
+# Unicode escape in regular string, should convert.
 "\N{angle}AOB = {angle}°".format(angle=180)
+
+# Raw string with \N{...} - both {angle} are format placeholders, should convert.
+r"\N{angle}AOB = {angle}°".format(angle=180)

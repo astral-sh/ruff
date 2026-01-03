@@ -589,12 +589,14 @@ impl FormatString {
         Ok((first_char, chars.as_str()))
     }
 
-    fn parse_literal(text: &str) -> Result<(FormatPart, &str), FormatParseError> {
+    fn parse_literal(text: &str, is_raw: bool) -> Result<(FormatPart, &str), FormatParseError> {
         let mut cur_text = text;
         let mut result_string = String::new();
         let mut pending_escape = false;
         while !cur_text.is_empty() {
-            if pending_escape
+            // Raw strings: \N{...} is literal, not a Unicode escape
+            if !is_raw
+                && pending_escape
                 && let Some((unicode_string, remaining)) =
                     FormatString::parse_escaped_unicode_string(cur_text)
             {
@@ -697,6 +699,22 @@ impl FormatString {
             (&text[..end_idx], &text[end_idx..])
         })
     }
+
+    pub fn parse(text: &str, is_raw: bool) -> Result<Self, FormatParseError> {
+        let mut cur_text: &str = text;
+        let mut parts: Vec<FormatPart> = Vec::new();
+        while !cur_text.is_empty() {
+            cur_text = FormatString::parse_literal(cur_text, is_raw)
+                .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
+                .map(|(part, new_text)| {
+                    parts.push(part);
+                    new_text
+                })?;
+        }
+        Ok(FormatString {
+            format_parts: parts,
+        })
+    }
 }
 
 pub trait FromTemplate<'a>: Sized {
@@ -708,21 +726,7 @@ impl<'a> FromTemplate<'a> for FormatString {
     type Err = FormatParseError;
 
     fn from_str(text: &'a str) -> Result<Self, Self::Err> {
-        let mut cur_text: &str = text;
-        let mut parts: Vec<FormatPart> = Vec::new();
-        while !cur_text.is_empty() {
-            // Try to parse both literals and bracketed format parts until we
-            // run out of text
-            cur_text = FormatString::parse_literal(cur_text)
-                .or_else(|_| FormatString::parse_spec(cur_text, AllowPlaceholderNesting::Yes))
-                .map(|(part, new_text)| {
-                    parts.push(part);
-                    new_text
-                })?;
-        }
-        Ok(FormatString {
-            format_parts: parts,
-        })
+        FormatString::parse(text, false)
     }
 }
 
