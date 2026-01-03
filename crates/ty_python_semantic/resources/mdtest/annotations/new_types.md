@@ -178,6 +178,7 @@ and we accept the unions they expand into.
 
 ```py
 from typing import NewType
+from ty_extensions import static_assert, is_assignable_to
 
 Foo = NewType("Foo", float)
 Foo(3.14)
@@ -186,6 +187,15 @@ Foo("hello")  # error: [invalid-argument-type] "Argument is incorrect: Expected 
 
 reveal_type(Foo(3.14).__class__)  # revealed: type[int] | type[float]
 reveal_type(Foo(42).__class__)  # revealed: type[int] | type[float]
+static_assert(is_assignable_to(Foo, float))
+static_assert(is_assignable_to(Foo, int | float))
+static_assert(is_assignable_to(Foo, int | float | None))
+# The assignments above require treating `Foo` as its underlying union type. Each of its members is
+# assignable to the union on the right, so `Foo` is assignable to the union, even though `Foo` as a
+# whole isn't assignable to any one member. However, we need to be sure that this treatment doesn't
+# break cases like the assignment below, where `Foo` *is* assignable to the union on the right, even
+# though its members *aren't*.
+static_assert(is_assignable_to(Foo, Foo | None))
 
 Bar = NewType("Bar", complex)
 Bar(1 + 2j)
@@ -196,6 +206,11 @@ Bar("goodbye")  # error: [invalid-argument-type]
 reveal_type(Bar(1 + 2j).__class__)  # revealed: type[int] | type[float] | type[complex]
 reveal_type(Bar(3.14).__class__)  # revealed: type[int] | type[float] | type[complex]
 reveal_type(Bar(42).__class__)  # revealed: type[int] | type[float] | type[complex]
+static_assert(is_assignable_to(Bar, complex))
+static_assert(is_assignable_to(Bar, int | float | complex))
+static_assert(is_assignable_to(Bar, int | float | complex | None))
+# See the `Foo | None` case above.
+static_assert(is_assignable_to(Bar, Bar | None))
 ```
 
 We don't currently try to distinguish between an implicit union (e.g. `float`) and the equivalent
@@ -221,6 +236,56 @@ f(Foo)
 def g(_: Callable[[int | float | complex], Bar]): ...
 
 g(Bar)
+```
+
+## `NewType`s in arithmetic and comparison expressions might or might not act as their base
+
+These expressions are valid because `Foo` acts as its base type, `int`:
+
+```py
+from typing import NewType
+
+Foo = NewType("Foo", int)
+
+reveal_type(Foo(42) + 1)  # revealed: int
+reveal_type(1 + Foo(42))  # revealed: int
+reveal_type(Foo(42) + Foo(42))  # revealed: int
+reveal_type(Foo(42) == 42)  # revealed: bool
+reveal_type(42 == Foo(42))  # revealed: bool
+reveal_type(Foo(42) == Foo(42))  # revealed: bool
+```
+
+However, we can't always substitute `int` for `Foo` to evaluate expressions like these. In the
+following cases, only `Foo` itself is valid:
+
+```py
+class Bar:
+    def __add__(self, other: Foo) -> Foo:
+        return other
+
+    def __radd__(self, other: Foo) -> Foo:
+        return other
+
+    def __lt__(self, other: Foo) -> bool:
+        return True
+
+    def __gt__(self, other: Foo) -> bool:
+        return True
+
+    def __contains__(self, key: Foo) -> bool:
+        return True
+
+reveal_type(Foo(42) + Bar())  # revealed: Foo
+reveal_type(Bar() + Foo(42))  # revealed: Foo
+reveal_type(Foo(42) < Bar())  # revealed: bool
+reveal_type(Bar() < Foo(42))  # revealed: bool
+reveal_type(Foo(42) in Bar())  # revealed: bool
+
+42 + Bar()  # error: [unsupported-operator]
+Bar() + 42  # error: [unsupported-operator]
+42 < Bar()  # error: [unsupported-operator]
+Bar() < 42  # error: [unsupported-operator]
+42 in Bar()  # error: [unsupported-operator]
 ```
 
 ## A `NewType` definition must be a simple variable assignment
