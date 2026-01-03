@@ -14100,19 +14100,21 @@ impl<'db> UnionType<'db> {
         self.try_map(db, |element| element.to_instance(db))
     }
 
-    pub(crate) fn filter(
-        self,
-        db: &'db dyn Db,
-        mut f: impl FnMut(&Type<'db>) -> bool,
-    ) -> Type<'db> {
-        self.elements(db)
-            .iter()
-            .filter(|ty| f(ty))
-            .fold(UnionBuilder::new(db), |builder, element| {
-                builder.add(*element)
-            })
-            .recursively_defined(self.recursively_defined(db))
-            .build()
+    pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
+        let current = self.elements(db);
+        let new: Vec<Type<'db>> = current.iter().copied().filter(f).collect();
+        match new.len() {
+            0 => Type::Never,
+            1 => new[0],
+            len if len == current.len() => Type::Union(self),
+            _ => new
+                .iter()
+                .fold(UnionBuilder::new(db), |builder, element| {
+                    builder.add(*element)
+                })
+                .recursively_defined(self.recursively_defined(db))
+                .build(),
+        }
     }
 
     pub(crate) fn map_with_boundness(
