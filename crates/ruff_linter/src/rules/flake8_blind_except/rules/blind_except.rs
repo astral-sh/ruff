@@ -197,8 +197,7 @@ fn is_exc_info_enabled(
         || matches!(method_name, "error" | "critical")
     {
         arguments.find_keyword("exc_info").is_some_and(|keyword| {
-            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id))
-                .into_bool()
+            Truthiness::from_expr(&keyword.value, |id| semantic.has_builtin_binding(id)).into_bool()
                 != Some(false)
         })
     } else {
