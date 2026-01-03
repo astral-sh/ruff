@@ -15,9 +15,9 @@ use crate::types::string_annotation::parse_string_annotation;
 use crate::types::tuple::{TupleSpecBuilder, TupleType};
 use crate::types::{
     BindingContext, CallableType, DynamicType, GenericContext, IntersectionBuilder, KnownClass,
-    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, RecursivelyDefined,
-    SpecialFormType, SubclassOfType, Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType,
-    TypeMapping, TypeVarKind, UnionBuilder, UnionType, any_over_type, todo_type,
+    KnownInstanceType, LintDiagnosticGuard, Parameter, Parameters, SpecialFormType, SubclassOfType,
+    Type, TypeAliasType, TypeContext, TypeGuardType, TypeIsType, TypeMapping, TypeVarKind,
+    UnionBuilder, UnionSettings, UnionType, any_over_type, todo_type,
 };
 
 /// Type expressions
@@ -1673,7 +1673,7 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
             }
             ast::Expr::Tuple(tuple) if !tuple.parenthesized => {
                 let mut errors = vec![];
-                let mut builder = UnionBuilder::new(self.db(), RecursivelyDefined::default());
+                let mut builder = UnionBuilder::new(self.db(), UnionSettings::default());
                 for elt in tuple {
                     match self.infer_literal_parameter_type(elt) {
                         Ok(ty) => {

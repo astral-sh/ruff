@@ -16,8 +16,8 @@ use crate::types::typed_dict::{
 };
 use crate::types::{
     CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
-    KnownInstanceType, RecursivelyDefined, SpecialFormType, SubclassOfInner, SubclassOfType,
-    Truthiness, Type, TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, UnionSettings, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -853,7 +853,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .ok()?
                 .homogeneous_element_type(self.db);
 
-            let mut builder = UnionBuilder::new(self.db, RecursivelyDefined::default());
+            let mut builder = UnionBuilder::new(self.db, UnionSettings::default());
 
             // Add the narrowed values from the RHS first, to keep literals before broader types.
             builder = builder.add(rhs_values);
@@ -900,8 +900,8 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         } else if lhs_ty.is_union_with_single_valued(self.db) {
             // Split LHS into single-valued portion and the rest. Exclude RHS values from the
             // single-valued portion, keep the rest intact.
-            let mut single_builder = UnionBuilder::new(self.db, RecursivelyDefined::default());
-            let mut rest_builder = UnionBuilder::new(self.db, RecursivelyDefined::default());
+            let mut single_builder = UnionBuilder::new(self.db, UnionSettings::default());
+            let mut rest_builder = UnionBuilder::new(self.db, UnionSettings::default());
 
             if let Some(lhs_union) = lhs_ty.as_union() {
                 for element in lhs_union.elements(self.db) {

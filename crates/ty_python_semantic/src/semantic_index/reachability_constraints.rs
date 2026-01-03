@@ -208,8 +208,8 @@ use crate::semantic_index::predicate::{
     Predicates, ScopedPredicateId,
 };
 use crate::types::{
-    CallableTypes, IntersectionBuilder, RecursivelyDefined, Truthiness, Type, TypeContext,
-    UnionBuilder, UnionType, infer_expression_type, static_expression_truthiness,
+    CallableTypes, IntersectionBuilder, Truthiness, Type, TypeContext, UnionBuilder, UnionSettings,
+    UnionType, infer_expression_type, static_expression_truthiness,
 };
 
 /// A ternary formula that defines under what conditions a binding is visible. (A ternary formula
@@ -358,7 +358,7 @@ fn type_excluded_by_previous_patterns<'db>(
     db: &'db dyn Db,
     mut predicate: PatternPredicate<'db>,
 ) -> Type<'db> {
-    let mut builder = UnionBuilder::new(db, RecursivelyDefined::No);
+    let mut builder = UnionBuilder::new(db, UnionSettings::default());
     while let Some(previous) = predicate.previous_predicate(db) {
         predicate = *previous;
 
