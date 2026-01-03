@@ -5,10 +5,12 @@ use ruff_python_ast::helpers::is_compound_statement;
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
-use ruff_text_size::{Ranged, TextRange};
+use ruff_source_file::LineRanges;
+use ruff_text_size::{Ranged, TextRange, TextSize};
 
 use crate::comments::{
-    Comments, LeadingDanglingTrailingComments, leading_comments, trailing_comments,
+    Comments, LeadingDanglingTrailingComments, has_skip_comment, leading_comments,
+    trailing_comments,
 };
 use crate::context::{NodeLevel, TopLevelStatementPosition, WithIndentLevel, WithNodeLevel};
 use crate::other::string_literal::StringLiteralKind;
@@ -16,9 +18,9 @@ use crate::prelude::*;
 use crate::preview::{
     is_allow_newline_after_block_open_enabled, is_blank_line_before_decorated_class_in_stub_enabled,
 };
-use crate::statement::stmt_expr::FormatStmtExpr;
+use crate::statement::trailing_semicolon;
 use crate::verbatim::{
-    suppressed_node, write_suppressed_statements_starting_with_leading_comment,
+    LogicalLinesIter, verbatim_text, write_suppressed_statements_starting_with_leading_comment,
     write_suppressed_statements_starting_with_trailing_comment,
 };
 
@@ -93,7 +95,13 @@ pub struct FormatSuite {
 
 impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
     fn fmt(&self, statements: &Suite, f: &mut PyFormatter) -> FormatResult<()> {
+        let comments = f.context().comments().clone();
+        let source = f.context().source();
+        let source_type = f.options().source_type();
+
         let mut iter = statements.iter();
+        let mut next_skip_range = compute_next_skip_range(statements.as_slice(), f);
+
         let Some(first) = iter.next() else {
             return Ok(());
         };
@@ -110,10 +118,6 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 NodeLevel::CompoundStatement
             }
         };
-
-        let comments = f.context().comments().clone();
-        let source = f.context().source();
-        let source_type = f.options().source_type();
 
         let f = WithNodeLevel::new(node_level, f);
         let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
@@ -152,7 +156,51 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
 
         let first_comments = comments.leading_dangling_trailing(first);
 
-        let (mut preceding, mut empty_line_after_docstring) = if first_comments
+        let (mut preceding, mut empty_line_after_docstring) = if let Some(SkipSignal {
+            verbatim_range,
+            last_statement_end,
+        }) = next_skip_range
+            && first.start() == verbatim_range.start()
+        {
+            comments.mark_verbatim_node_comments_formatted(first.into());
+
+            let preceding = if first.end() == last_statement_end {
+                first.statement()
+            } else {
+                loop {
+                    if let Some(nxt) = iter.next() {
+                        comments.mark_verbatim_node_comments_formatted(nxt.into());
+
+                        if nxt.end() == last_statement_end {
+                            break nxt;
+                        }
+                    }
+                }
+            };
+
+            let preceding_comments = comments.leading_dangling_trailing(preceding);
+
+            // Write the outer comments and format the node as verbatim
+            write!(
+                f,
+                [
+                    leading_comments(first_comments.leading),
+                    source_position(verbatim_range.start()),
+                    verbatim_text(verbatim_range),
+                    source_position(verbatim_range.end()),
+                    trailing_comments(preceding_comments.trailing)
+                ]
+            )?;
+            // Insert a newline after a module level docstring, but treat
+            // it as a docstring otherwise. See: https://github.com/psf/black/pull/3932.
+            let empty_line_after_docstring =
+                matches!(self.kind, SuiteKind::TopLevel | SuiteKind::Class)
+                    && DocstringStmt::try_from_statement(preceding, self.kind, f.context())
+                        .is_some();
+            // Compute the next skip range
+            next_skip_range = compute_next_skip_range(iter.as_slice(), f);
+            (preceding, empty_line_after_docstring)
+        } else if first_comments
             .leading
             .iter()
             .any(|comment| comment.is_suppression_off_comment(source))
@@ -294,7 +342,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                     }
                 }
             } else if is_compound_statement(preceding) {
-                // Handles the case where a body has trailing comments. The issue is that RustPython does not include
+                // Handles the case where a body has trailing comments. The issue is that our parser does not include
                 // the comments in the range of the suite. This means, the body ends right after the last statement in the body.
                 // ```python
                 // def test():
@@ -391,7 +439,47 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            if following_comments
+            if let Some(SkipSignal {
+                verbatim_range,
+                last_statement_end,
+            }) = next_skip_range
+                && following.start() == verbatim_range.start()
+            {
+                comments.mark_verbatim_node_comments_formatted(following.into());
+
+                let first_comments = following_comments;
+
+                preceding = if following.end() == last_statement_end {
+                    following
+                } else {
+                    loop {
+                        if let Some(nxt) = iter.next() {
+                            comments.mark_verbatim_node_comments_formatted(nxt.into());
+
+                            if nxt.end() == last_statement_end {
+                                break nxt;
+                            }
+                        }
+                    }
+                };
+
+                preceding_comments = comments.leading_dangling_trailing(preceding);
+
+                // Write the outer comments and format the node as verbatim
+                write!(
+                    f,
+                    [
+                        leading_comments(first_comments.leading),
+                        source_position(verbatim_range.start()),
+                        verbatim_text(verbatim_range),
+                        source_position(verbatim_range.end()),
+                        trailing_comments(preceding_comments.trailing)
+                    ]
+                )?;
+
+                // Compute next skip range
+                next_skip_range = compute_next_skip_range(iter.as_slice(), f);
+            } else if following_comments
                 .leading
                 .iter()
                 .any(|comment| comment.is_suppression_off_comment(source))
@@ -840,61 +928,57 @@ impl Format<PyFormatContext<'_>> for DocstringStmt<'_> {
         let comments = f.context().comments().clone();
         let node_comments = comments.leading_dangling_trailing(self.docstring);
 
-        if FormatStmtExpr.is_suppressed(node_comments.trailing, f.context()) {
-            suppressed_node(self.docstring).fmt(f)
-        } else {
-            // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
-            let string_literal = self
-                .docstring
-                .as_expr_stmt()
-                .unwrap()
-                .value
-                .as_string_literal_expr()
-                .unwrap();
+        // SAFETY: Safe because `DocStringStmt` guarantees that it only ever wraps a `ExprStmt` containing a `ExprStringLiteral`.
+        let string_literal = self
+            .docstring
+            .as_expr_stmt()
+            .unwrap()
+            .value
+            .as_string_literal_expr()
+            .unwrap();
 
-            // We format the expression, but the statement carries the comments
-            write!(
-                f,
-                [
-                    leading_comments(node_comments.leading),
-                    f.options()
-                        .source_map_generation()
-                        .is_enabled()
-                        .then_some(source_position(self.docstring.start())),
-                    string_literal
-                        .format()
-                        .with_options(StringLiteralKind::Docstring),
-                    f.options()
-                        .source_map_generation()
-                        .is_enabled()
-                        .then_some(source_position(self.docstring.end())),
-                ]
-            )?;
+        // We format the expression, but the statement carries the comments
+        write!(
+            f,
+            [
+                leading_comments(node_comments.leading),
+                f.options()
+                    .source_map_generation()
+                    .is_enabled()
+                    .then_some(source_position(self.docstring.start())),
+                string_literal
+                    .format()
+                    .with_options(StringLiteralKind::Docstring),
+                f.options()
+                    .source_map_generation()
+                    .is_enabled()
+                    .then_some(source_position(self.docstring.end())),
+            ]
+        )?;
 
-            if self.suite_kind == SuiteKind::Class {
-                // Comments after class docstrings need a newline between the docstring and the
-                // comment (https://github.com/astral-sh/ruff/issues/7948).
-                // ```python
-                // class ModuleBrowser:
-                //     """Browse module classes and functions in IDLE."""
-                //     # ^ Insert a newline above here
-                //
-                //     def __init__(self, master, path, *, _htest=False, _utest=False):
-                //         pass
-                // ```
-                if let Some(own_line) = node_comments
-                    .trailing
-                    .iter()
-                    .find(|comment| comment.line_position().is_own_line())
-                {
-                    if lines_before(own_line.start(), f.context().source()) < 2 {
-                        empty_line().fmt(f)?;
-                    }
+        if self.suite_kind == SuiteKind::Class {
+            // Comments after class docstrings need a newline between the docstring and the
+            // comment (https://github.com/astral-sh/ruff/issues/7948).
+            // ```python
+            // class ModuleBrowser:
+            //     """Browse module classes and functions in IDLE."""
+            //     # ^ Insert a newline above here
+            //
+            //     def __init__(self, master, path, *, _htest=False, _utest=False):
+            //         pass
+            // ```
+            if let Some(own_line) = node_comments
+                .trailing
+                .iter()
+                .find(|comment| comment.line_position().is_own_line())
+            {
+                if lines_before(own_line.start(), f.context().source()) < 2 {
+                    empty_line().fmt(f)?;
                 }
             }
-
-            trailing_comments(node_comments.trailing).fmt(f)
         }
+
+        trailing_comments(node_comments.trailing).fmt(f)
     }
 }
 
@@ -936,6 +1020,80 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
             SuiteChildStatement::Other(statement) => statement.format().fmt(f),
         }
     }
+}
+
+struct SkipSignal {
+    verbatim_range: TextRange,
+    last_statement_end: TextSize,
+}
+
+fn compute_next_skip_range(statements: &[Stmt], f: &mut PyFormatter) -> Option<SkipSignal> {
+    let comments = f.context().comments().clone();
+    let source = f.context().source();
+
+    // Find the next skip comment
+    let statements_until_skip = {
+        let skip_position = statements
+            .iter()
+            .position(|stmt| has_skip_comment(comments.trailing(stmt), source))?;
+        &statements[..=skip_position]
+    };
+
+    let last_statement_in_skip = &statements_until_skip[statements_until_skip.len() - 1];
+
+    let end = trailing_semicolon(last_statement_in_skip.into(), source).map_or_else(
+        || last_statement_in_skip.end(),
+        ruff_text_size::TextRange::end,
+    );
+
+    let mut start = last_statement_in_skip.start();
+
+    let mut line_start =
+        source.line_start(statements_until_skip[statements_until_skip.len() - 1].start());
+
+    let mut lookback = statements_until_skip.iter().rev().peekable();
+
+    // The following logic advances backwards from the skip comment
+    // to the start of the logical line that it is on
+    while let Some(stmt) = lookback.next_if(|stmt| {
+        // This is a cheap check for the common case, e.g. this:
+        // ```
+        // x=1 ;x=2 # fmt: skip
+        //   ^
+        // ```
+        // and even this:
+        // ```
+        // x=['1'
+        // ] ;x=2 # fmt: skip
+        // ^
+        // ```
+        stmt.end() >= line_start
+            || LogicalLinesIter::new(
+                f.context()
+                    .tokens()
+                    .in_range(TextRange::new(stmt.end(), last_statement_in_skip.start()))
+                    .iter(),
+                TextRange::new(stmt.end(), last_statement_in_skip.start()),
+            )
+            .next()
+            .is_some_and(|line| line.is_ok_and(|ln| ln.end() >= line_start))
+    }) {
+        // If the statement takes up multiple physical lines,
+        // keep going from the start of _that_ line
+        // ```python
+        // x= ['1',
+        // ];x=2 # fmt: skip
+        // ```
+        if stmt.start() < line_start {
+            line_start = source.line_start(stmt.start());
+        }
+        start = stmt.start();
+    }
+
+    Some(SkipSignal {
+        verbatim_range: TextRange::new(start, end),
+        last_statement_end: last_statement_in_skip.end(),
+    })
 }
 
 #[cfg(test)]
