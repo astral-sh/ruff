@@ -3,7 +3,6 @@ use std::{collections::BTreeMap, ops::Deref};
 
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite, XmlString};
 
-use ruff_annotate_snippets::{Level, Renderer, Snippet};
 use ruff_source_file::LineColumn;
 
 use crate::diagnostic::{Diagnostic, SecondaryCode, render::FileResolver};
@@ -58,7 +57,7 @@ impl<'a> JunitRenderer<'a> {
                     } = diagnostic;
                     let indent = " ".repeat(4 * 4);
 
-                    let mut output = diagnostic
+                    let output = diagnostic
                         .sub_diagnostics()
                         .iter()
                         .map(|sub_diagnostic| {
@@ -123,8 +122,7 @@ impl<'a> JunitRenderer<'a> {
                     case.status
                         .set_message(diagnostic.concise_message().to_str());
                     case.status.set_description(format!(
-                        "\n{snippet}\n{output}\n{after_indent}",
-                        snippet = self.render_snippet(diagnostic, Some(indent.len())),
+                        "\n{output}\n{after_indent}",
                         after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
                     ));
 
@@ -151,79 +149,6 @@ impl<'a> JunitRenderer<'a> {
 
         let adapter = FmtAdapter { fmt: f };
         report.serialize(adapter).map_err(|_| std::fmt::Error)
-    }
-
-    fn render_snippet(&self, diagnostic: &Diagnostic, indentation: Option<usize>) -> String {
-        let (source_text, filename) = if let Some(span) = diagnostic.primary_span_ref() {
-            let file = span.file();
-            let source = file.diagnostic_source(self.resolver);
-            let filename = match file {
-                crate::diagnostic::UnifiedFile::Ty(file) => self.resolver.path(*file),
-                crate::diagnostic::UnifiedFile::Ruff(file) => file.name(),
-            };
-            (
-                source.as_source_code().text().to_string(),
-                filename.to_string(),
-            )
-        } else {
-            return String::new();
-        };
-
-        let mut snippet = Snippet::source(&source_text)
-            .line_start(1)
-            .origin(&filename);
-
-        let mut annotations = vec![];
-        if let Some(primary) = diagnostic.primary_annotation() {
-            if let Some(range) = primary.get_span().range() {
-                annotations.push(
-                    Level::Error
-                        .span(range.into())
-                        // Message next to the location of the problem
-                        .label(primary.get_message().unwrap_or_default()),
-                );
-            }
-        }
-
-        for secondary in diagnostic.secondary_annotations() {
-            if let Some(range) = secondary.get_span().range() {
-                annotations.push(
-                    Level::Info
-                        .span(range.into())
-                        // Message at related location involved in the problem
-                        .label(secondary.get_message().unwrap_or_default()),
-                );
-            }
-        }
-
-        for sub in diagnostic.sub_diagnostics() {
-            if let Some(primary) = sub.primary_annotation() {
-                if let Some(range) = primary.get_span().range() {
-                    annotations.push(
-                        Level::Help
-                            .span(range.into())
-                            // Help message goes here usually
-                            .label(primary.get_message().unwrap_or_default()),
-                    );
-                }
-            }
-        }
-        snippet = snippet.annotations(annotations);
-
-        let message = Level::Error.title(diagnostic.body()).snippet(snippet);
-        let renderer = Renderer::plain();
-        let rendered = renderer.render(message).to_string();
-
-        if let Some(indentation) = indentation {
-            let indent = " ".repeat(indentation);
-            rendered
-                .lines()
-                .map(|line| format!("{indent}{line}"))
-                .collect::<Vec<_>>()
-                .join("\n")
-        } else {
-            rendered
-        }
     }
 }
 
