@@ -55,8 +55,6 @@ impl<'a> JunitRenderer<'a> {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
-                    let indent = " ".repeat(4 * 4);
-
                     let output = diagnostic
                         .sub_diagnostics()
                         .iter()
@@ -116,16 +114,16 @@ impl<'a> JunitRenderer<'a> {
                         .secondary_code()
                         .map_or_else(|| diagnostic.name(), SecondaryCode::as_str);
                     let status = TestCaseStatus::non_success(NonSuccessKind::Failure);
+
                     let mut case = TestCase::new(format!("org.ruff.{code}"), status);
                     let classname = Path::new(filename).with_extension("");
-                    case.set_classname(classname.to_str().unwrap());
+                    case.set_classname(classname.to_str().unwrap_or(filename));
                     case.status
                         .set_message(diagnostic.concise_message().to_str());
                     case.status.set_description(format!(
                         "\n{output}\n{after_indent}",
                         after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
                     ));
-
                     if let Some(location) = location {
                         case.extra.insert(
                             XmlString::new("line"),
@@ -136,11 +134,6 @@ impl<'a> JunitRenderer<'a> {
                             XmlString::new(location.column.to_string()),
                         );
                     }
-                    case.status.set_description(format!(
-                        "\n{indent}{diagnostic_loc}{body}{sub_diags}\n{after_indent}",
-                        after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
-                        body = diagnostic.concise_message().to_str(),
-                    ));
                     test_suite.add_test_case(case);
                 }
                 report.add_test_suite(test_suite);
