@@ -14423,8 +14423,12 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
-    pub(crate) const fn is_empty(&self) -> bool {
-        matches!(self, Self::Empty)
+    pub(crate) fn is_empty(&self) -> bool {
+        // We could try to maintain the invariant that length-0 collections are always
+        // represented using `Self::Empty`, in which case this could just be
+        // `matches!(self, Self::Empty)`. But maintaining that invariant seems like
+        // it could add unnecessary overhead.
+        self.len() == 0
     }
 
     pub(crate) fn insert(&mut self, ty: Type<'db>) {
@@ -14479,6 +14483,9 @@ impl<'db> NegativeIntersectionElements<'db> {
                     false
                 }
             }
+            // We don't try to maintain the invariant here that length-0 collections
+            // are *always* `Self::Empty` and length-1 collections are *always*
+            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
             Self::Multiple(set) => set.swap_remove(ty),
         }
     }
@@ -14495,6 +14502,9 @@ impl<'db> NegativeIntersectionElements<'db> {
                     None
                 }
             }
+            // We don't try to maintain the invariant here that length-0 collections
+            // are *always* `Self::Empty` and length-1 collections are *always*
+            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
             Self::Multiple(set) => set.swap_remove_index(index),
         }
     }
