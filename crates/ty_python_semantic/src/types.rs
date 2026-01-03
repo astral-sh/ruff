@@ -11860,12 +11860,18 @@ impl<'db> UnionType<'db> {
 
     pub(crate) fn filter(self, db: &'db dyn Db, f: impl FnMut(&Type<'db>) -> bool) -> Type<'db> {
         let current = self.elements(db);
-        let new: Box<[Type<'db>]> = current.iter().copied().filter(f).collect();
+        let new: Vec<Type<'db>> = current.iter().copied().filter(f).collect();
         match new.len() {
             0 => Type::Never,
             1 => new[0],
             len if len == current.len() => Type::Union(self),
-            _ => Type::Union(UnionType::new(db, new, self.recursively_defined(db))),
+            _ => new
+                .iter()
+                .fold(UnionBuilder::new(db), |builder, element| {
+                    builder.add(*element)
+                })
+                .recursively_defined(self.recursively_defined(db))
+                .build(),
         }
     }
 
