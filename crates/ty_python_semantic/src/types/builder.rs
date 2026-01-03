@@ -40,7 +40,7 @@
 use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::type_ordering::union_or_intersection_elements_ordering;
 use crate::types::{
-    BytesLiteralType, IntersectionType, KnownClass, StringLiteralType, Type,
+    BytesLiteralType, IntersectionElements, IntersectionType, KnownClass, StringLiteralType, Type,
     TypeVarBoundOrConstraints, UnionType,
 };
 use crate::{Db, FxOrderSet};
@@ -959,8 +959,8 @@ impl<'db> IntersectionBuilder<'db> {
 
 #[derive(Debug, Clone, Default)]
 struct InnerIntersectionBuilder<'db> {
-    positive: FxOrderSet<Type<'db>>,
-    negative: FxOrderSet<Type<'db>>,
+    positive: IntersectionElements<'db>,
+    negative: IntersectionElements<'db>,
 }
 
 impl<'db> InnerIntersectionBuilder<'db> {
