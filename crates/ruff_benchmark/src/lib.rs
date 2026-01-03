@@ -4,6 +4,19 @@ use std::path::PathBuf;
 pub mod criterion;
 pub mod real_world_projects;
 
+pub static SKIP_CLASSES: TestFile =
+    TestFile::new("skip/big.py", include_str!("../resources/skip/big.py"));
+
+pub static SKIP_TOP_LEVEL: TestFile = TestFile::new(
+    "skip/big_top.py",
+    include_str!("../resources/skip/big_top.py"),
+);
+
+pub static SKIP_NO_SKIP: TestFile = TestFile::new(
+    "skip/no_skips_many_comments.py",
+    include_str!("../resources/skip/no_skips_many_comments.py"),
+);
+
 pub static NUMPY_GLOBALS: TestFile = TestFile::new(
     "numpy/globals.py",
     include_str!("../resources/numpy/globals.py"),

@@ -5,7 +5,8 @@ use ruff_benchmark::criterion::{
 };
 
 use ruff_benchmark::{
-    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, TestCase, UNICODE_PYPINYIN,
+    LARGE_DATASET, NUMPY_CTYPESLIB, NUMPY_GLOBALS, PYDANTIC_TYPES, SKIP_CLASSES, SKIP_NO_SKIP,
+    SKIP_TOP_LEVEL, TestCase, UNICODE_PYPINYIN,
 };
 use ruff_python_formatter::{PreviewMode, PyFormatOptions, format_module_ast};
 use ruff_python_parser::{Mode, ParseOptions, parse};
@@ -35,6 +36,9 @@ fn create_test_cases() -> Vec<TestCase> {
         TestCase::normal(PYDANTIC_TYPES.clone()),
         TestCase::normal(NUMPY_CTYPESLIB.clone()),
         TestCase::slow(LARGE_DATASET.clone()),
+        TestCase::slow(SKIP_CLASSES.clone()),
+        TestCase::slow(SKIP_TOP_LEVEL.clone()),
+        TestCase::slow(SKIP_NO_SKIP.clone()),
     ]
 }
 
