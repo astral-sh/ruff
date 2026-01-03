@@ -14112,6 +14112,9 @@ impl<'db> UnionType<'db> {
         db: &'db dyn Db,
         mut f: impl FnMut(&Type<'db>) -> bool,
     ) -> Type<'db> {
+        if self.elements(db).iter().all(|ty| f(ty)) {
+            return Type::Union(self);
+        }
         self.elements(db)
             .iter()
             .filter(|ty| f(ty))
