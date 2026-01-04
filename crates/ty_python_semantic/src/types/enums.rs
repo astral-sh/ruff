@@ -2,7 +2,7 @@ use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
 use crate::{
-    Db, FxIndexMap,
+    Db, FxOrderMap,
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
@@ -13,7 +13,7 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, salsa::Update)]
 pub(crate) struct EnumMetadata<'db> {
-    pub(crate) members: FxIndexMap<Name, Type<'db>>,
+    pub(crate) members: FxOrderMap<Name, Type<'db>>,
     pub(crate) aliases: FxHashMap<Name, Name>,
 }
 
@@ -22,7 +22,7 @@ impl get_size2::GetSize for EnumMetadata<'_> {}
 impl EnumMetadata<'_> {
     fn empty() -> Self {
         EnumMetadata {
-            members: FxIndexMap::default(),
+            members: FxOrderMap::default(),
             aliases: FxHashMap::default(),
         }
     }
@@ -253,7 +253,7 @@ pub(crate) fn enum_metadata<'db>(
 
             Some((name.clone(), value_ty))
         })
-        .collect::<FxIndexMap<_, _>>();
+        .collect::<FxOrderMap<_, _>>();
 
     if members.is_empty() {
         // Enum subclasses without members are not considered enums.

@@ -8,6 +8,7 @@ use super::{
     SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
+use crate::FxOrderMap;
 use crate::place::TypeOrigin;
 use crate::semantic_index::definition::{Definition, DefinitionState};
 use crate::semantic_index::scope::{NodeWithScopeKind, Scope, ScopeKind};
@@ -161,8 +162,8 @@ fn fields_cycle_initial<'db>(
     _self: ClassLiteral<'db>,
     _specialization: Option<Specialization<'db>>,
     _field_policy: CodeGeneratorKind<'db>,
-) -> FxIndexMap<Name, Field<'db>> {
-    FxIndexMap::default()
+) -> FxOrderMap<Name, Field<'db>> {
+    FxOrderMap::default()
 }
 
 /// A category of classes with code generation capabilities (with synthesized methods).
@@ -3147,7 +3148,7 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind<'db>,
-    ) -> FxIndexMap<Name, Field<'db>> {
+    ) -> FxOrderMap<Name, Field<'db>> {
         if field_policy == CodeGeneratorKind::NamedTuple {
             // NamedTuples do not allow multiple inheritance, so it is sufficient to enumerate the
             // fields of this class only.
@@ -3195,8 +3196,8 @@ impl<'db> ClassLiteral<'db> {
         db: &'db dyn Db,
         specialization: Option<Specialization<'db>>,
         field_policy: CodeGeneratorKind,
-    ) -> FxIndexMap<Name, Field<'db>> {
-        let mut attributes = FxIndexMap::default();
+    ) -> FxOrderMap<Name, Field<'db>> {
+        let mut attributes = FxOrderMap::default();
 
         let class_body_scope = self.body_scope(db);
         let table = place_table(db, class_body_scope);

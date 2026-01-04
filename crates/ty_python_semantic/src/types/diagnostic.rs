@@ -31,7 +31,7 @@ use crate::types::{
     protocol_class::ProtocolClass,
 };
 use crate::types::{DataclassFlags, KnownInstanceType, MemberLookupPolicy, TypeVarInstance};
-use crate::{Db, DisplaySettings, FxIndexMap, Program, declare_lint};
+use crate::{Db, DisplaySettings, FxOrderMap, Program, declare_lint};
 use itertools::Itertools;
 use ruff_db::{
     diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity},
@@ -3001,7 +3001,7 @@ pub(crate) fn report_instance_layout_conflict(
 /// The inner data is an `IndexMap` to ensure that diagnostics regarding conflicting disjoint bases
 /// are reported in a stable order.
 #[derive(Debug, Default)]
-pub(super) struct IncompatibleBases<'db>(FxIndexMap<DisjointBase<'db>, IncompatibleBaseInfo<'db>>);
+pub(super) struct IncompatibleBases<'db>(FxOrderMap<DisjointBase<'db>, IncompatibleBaseInfo<'db>>);
 
 impl<'db> IncompatibleBases<'db> {
     pub(super) fn insert(
