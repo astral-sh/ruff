@@ -8,13 +8,11 @@ expression: env.render_diagnostics(&diagnostics)
         <testcase name="org.ruff.F401" classname="/fib" line="1" column="8">
             <failure message="`os` imported but unused">
                 line 1, col 8, `os` imported but unused
-                help: Remove unused import: `os`
             </failure>
         </testcase>
         <testcase name="org.ruff.F841" classname="/fib" line="6" column="5">
             <failure message="Local variable `x` is assigned to but never used">
                 line 6, col 5, Local variable `x` is assigned to but never used
-                help: Remove assignment to unused variable `x`
             </failure>
         </testcase>
     </testsuite>

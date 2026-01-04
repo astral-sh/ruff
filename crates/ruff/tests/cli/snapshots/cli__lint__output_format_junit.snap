@@ -22,7 +22,6 @@ exit_code: 1
         <testcase name="org.ruff.F401" classname="[TMP]/input" line="1" column="8">
             <failure message="`os` imported but unused">
                 line 1, col 8, `os` imported but unused
-                help: Remove unused import: `os`
             </failure>
         </testcase>
         <testcase name="org.ruff.F821" classname="[TMP]/input" line="2" column="5">
