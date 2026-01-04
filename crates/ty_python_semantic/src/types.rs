@@ -14379,7 +14379,7 @@ pub struct IntersectionType<'db> {
     negative: NegativeIntersectionElements<'db>,
 }
 
-/// To avoid unnecessary allocations for the common case of 0-1 negative elements,
+/// To avoid unnecessary allocations for the common case of 1 negative elements,
 /// we use this enum to represent the negative elements of an intersection type.
 ///
 /// It should otherwise have identical behavior to `FxOrderSet<Type<'db>>`.
