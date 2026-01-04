@@ -193,15 +193,16 @@ impl<'db> Completions<'db> {
     /// when the completion context determines that the given suggestion
     /// is never valid.
     fn add_skip_query(&mut self, mut completion: Completion<'db>) -> bool {
-        // Tags completions with whether they are known to be usable in
-        // a `raise` context.
+        // Tags completions with context-specific if they are
+        // known to be usable in a `raise` context and we have
+        // determined a raisable type `raisable_ty`.
         //
         // It's possible that some completions are usable in a `raise`
         // but aren't marked here. That is, false negatives are
         // possible but false positives are not.
         if let Some(raisable_ty) = self.context.raisable_ty {
             if let Some(ty) = completion.ty {
-                completion.is_context_specific = ty.is_assignable_to(self.db, raisable_ty);
+                completion.is_context_specific |= ty.is_assignable_to(self.db, raisable_ty);
             }
         }
         if self.context.exclude(self.db, &completion) {
