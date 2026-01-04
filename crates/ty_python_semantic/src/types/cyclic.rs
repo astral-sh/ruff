@@ -98,20 +98,19 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
             return val.clone();
         }
 
+        // Check depth limit to prevent stack overflow from recursive generic types
+        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
+        let current_depth = self.depth.get();
+        if current_depth >= MAX_RECURSION_DEPTH {
+            return self.fallback.clone();
+        }
+
         // We hit a cycle
         if !self.seen.borrow_mut().insert(item.clone()) {
             return self.fallback.clone();
         }
 
-        // Check depth limit to prevent stack overflow from recursive generic types
-        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
-        let current_depth = self.depth.get();
-        if current_depth >= MAX_RECURSION_DEPTH {
-            self.seen.borrow_mut().remove(&item);
-            return self.fallback.clone();
-        }
         self.depth.set(current_depth + 1);
-
         let ret = func();
 
         self.depth.set(current_depth);
@@ -126,18 +125,18 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
             return Some(val.clone());
         }
 
+        // Check depth limit to prevent stack overflow from recursive generic protocols
+        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
+        let current_depth = self.depth.get();
+        if current_depth >= MAX_RECURSION_DEPTH {
+            return Some(self.fallback.clone());
+        }
+
         // We hit a cycle
         if !self.seen.borrow_mut().insert(item.clone()) {
             return Some(self.fallback.clone());
         }
 
-        // Check depth limit to prevent stack overflow from recursive generic protocols
-        // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
-        let current_depth = self.depth.get();
-        if current_depth >= MAX_RECURSION_DEPTH {
-            self.seen.borrow_mut().remove(&item);
-            return Some(self.fallback.clone());
-        }
         self.depth.set(current_depth + 1);
 
         let ret = func()?;
