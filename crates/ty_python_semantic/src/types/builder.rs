@@ -109,7 +109,7 @@ impl<'db> UnionElement<'db> {
             // it's tempting to use `|=` but then the r.h.s. wouldn't be lazily evaluated
             ignore = ignore || other_type.is_subtype_of(db, ty);
             collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
-            !ty.is_subtype_of(db, other_type)
+            ignore || collapse || !ty.is_subtype_of(db, other_type)
         };
 
         let should_keep = match self {
