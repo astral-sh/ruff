@@ -24,9 +24,8 @@ use std::cmp::Eq;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::FxIndexSet;
 use crate::types::Type;
 
 /// Maximum recursion depth for cycle detection.
@@ -64,7 +63,7 @@ pub struct CycleDetector<Tag, T, R> {
     /// If the type we're visiting is present in `seen`, it indicates that we've hit a cycle (due
     /// to a recursive type); we need to immediately short circuit the whole operation and return
     /// the fallback value. That's why we pop items off the end of `seen` after we've visited them.
-    seen: RefCell<FxIndexSet<T>>,
+    seen: RefCell<FxHashSet<T>>,
 
     /// Unlike `seen`, this field is a pure performance optimisation (and an essential one). If the
     /// type we're trying to normalize is present in `cache`, it doesn't necessarily mean we've hit
@@ -86,7 +85,7 @@ pub struct CycleDetector<Tag, T, R> {
 impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
     pub fn new(fallback: R) -> Self {
         CycleDetector {
-            seen: RefCell::new(FxIndexSet::default()),
+            seen: RefCell::new(FxHashSet::default()),
             cache: RefCell::new(FxHashMap::default()),
             depth: Cell::new(0),
             fallback,
@@ -108,7 +107,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
         let current_depth = self.depth.get();
         if current_depth >= MAX_RECURSION_DEPTH {
-            self.seen.borrow_mut().pop();
+            self.seen.borrow_mut().remove(&item);
             return self.fallback.clone();
         }
         self.depth.set(current_depth + 1);
@@ -116,7 +115,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         let ret = func();
 
         self.depth.set(current_depth);
-        self.seen.borrow_mut().pop();
+        self.seen.borrow_mut().remove(&item);
         self.cache.borrow_mut().insert(item, ret.clone());
 
         ret
@@ -136,7 +135,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         // with growing specializations (e.g., C[set[T]] -> C[set[set[T]]] -> ...)
         let current_depth = self.depth.get();
         if current_depth >= MAX_RECURSION_DEPTH {
-            self.seen.borrow_mut().pop();
+            self.seen.borrow_mut().remove(&item);
             return Some(self.fallback.clone());
         }
         self.depth.set(current_depth + 1);
@@ -144,7 +143,7 @@ impl<Tag, T: Hash + Eq + Clone, R: Clone> CycleDetector<Tag, T, R> {
         let ret = func()?;
 
         self.depth.set(current_depth);
-        self.seen.borrow_mut().pop();
+        self.seen.borrow_mut().remove(&item);
         self.cache.borrow_mut().insert(item, ret.clone());
 
         Some(ret)
