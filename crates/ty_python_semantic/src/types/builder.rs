@@ -46,22 +46,35 @@ use crate::{Db, FxOrderSet};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum LiteralKind {
+enum LiteralKind<'db> {
     Int,
     String,
     Bytes,
-    Enum,
+    Enum { enum_class: ClassLiteral<'db> },
 }
 
 impl<'db> Type<'db> {
     /// Return `true` if this type can be a supertype of some literals of `kind` and not others.
     fn splits_literals(self, db: &'db dyn Db, kind: LiteralKind) -> bool {
         match (self, kind) {
+            // Note that as of 2026-01-04, `AlwaysFalsy` and `AlwaysTruthy` never split
+            // enum literals, but that could change in the future. `Literal[Foo.X]` could
+            // plausibly be understood by ty as a subtype of `AlwaysFalsy` in the following
+            // snippet, because `Foo` is an IntEnum that does not override `__bool__` and
+            // `Foo.X` has a falsy value whereas `Foo.Y` does not:
+            //
+            // ```py
+            // class Foo(enum.IntEnum):
+            //     X = 0
+            //     Y = 1
+            // ```
             (Type::AlwaysFalsy | Type::AlwaysTruthy, _) => true,
             (Type::StringLiteral(_), LiteralKind::String) => true,
             (Type::BytesLiteral(_), LiteralKind::Bytes) => true,
             (Type::IntLiteral(_), LiteralKind::Int) => true,
-            (Type::EnumLiteral(_), LiteralKind::Enum) => true,
+            (Type::EnumLiteral(enum_literal), LiteralKind::Enum { enum_class }) => {
+                enum_literal.enum_class(db) == enum_class
+            }
             (Type::Intersection(intersection), _) => {
                 intersection
                     .positive(db)
@@ -162,7 +175,10 @@ impl<'db> UnionElement<'db> {
                 enum_class,
                 literals,
             } => {
-                if other_type.splits_literals(db, LiteralKind::Enum) {
+                let literal_kind = LiteralKind::Enum {
+                    enum_class: *enum_class,
+                };
+                if other_type.splits_literals(db, literal_kind) {
                     literals.retain(|literal| should_retain_type(Type::EnumLiteral(*literal)));
                     !literals.is_empty()
                 } else {
@@ -214,19 +230,26 @@ impl RecursivelyDefined {
     }
 }
 
-/// If the value ​​is defined recursively, widening is performed from fewer literal elements, resulting in faster convergence of the fixed-point iteration.
+/// If the value ​​is defined recursively, widening is performed from fewer literal elements,
+/// resulting in faster convergence of the fixed-point iteration.
 const MAX_RECURSIVE_UNION_LITERALS: usize = 10;
 /// If the value ​​is defined non-recursively, the fixed-point iteration will converge in one go,
-/// so in principle we can have as many literal elements as we want, but to avoid unintended huge computational loads, we limit it to 256.
+/// so in principle we can have as many literal elements as we want,
+/// but to avoid unintended huge computational loads, we limit it to 256.
 const MAX_NON_RECURSIVE_UNION_LITERALS: usize = 256;
+/// However, we set a much larger limit for enum literals than for other kinds of literals.
+/// Huge enums are not uncommon (especially in generated code), and it's annoying
+/// if reachability analysis etc. fails when analysing these enums.
+const MAX_NON_RECURSIVE_UNION_ENUM_LITERALS: usize = 8192;
 
 pub(crate) struct UnionBuilder<'db> {
     elements: Vec<UnionElement<'db>>,
     db: &'db dyn Db,
     unpack_aliases: bool,
     order_elements: bool,
-    // This is enabled when joining types in a `cycle_recovery` function.
-    // Since a cycle cannot be created within a `cycle_recovery` function, execution of `is_redundant_with` is skipped.
+    /// This is enabled when joining types in a `cycle_recovery` function.
+    /// Since a cycle cannot be created within a `cycle_recovery` function,
+    /// execution of `is_redundant_with` is skipped.
     cycle_recovery: bool,
     recursively_defined: RecursivelyDefined,
 }
@@ -523,15 +546,13 @@ impl<'db> UnionBuilder<'db> {
                             if *existing_enum_class != enum_class {
                                 continue;
                             }
-                            // We don't use the `should_widen` closure here because we want a larger
-                            // limit for enum literals than for other kinds of literals. Huge enums
-                            // are not uncommon (especially in generated code), and it's annoying
-                            // if reachability analysis etc. fails when analysing these enums.
+                            // See the doc-comment above `MAX_NON_RECURSIVE_UNION_ENUM_LITERALS`
+                            // for why we avoid using the `should_widen` closure here.
                             let enum_literals_limit =
                                 if self.recursively_defined.is_yes() && cycle_recovery {
                                     MAX_RECURSIVE_UNION_LITERALS
                                 } else {
-                                    8192
+                                    MAX_NON_RECURSIVE_UNION_ENUM_LITERALS
                                 };
                             if literals.len() >= enum_literals_limit {
                                 let replace_with =
