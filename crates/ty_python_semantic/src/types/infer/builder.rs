@@ -594,14 +594,9 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
     fn check_class_definitions(&mut self) {
         let class_definitions = self.declarations.iter().filter_map(|(definition, ty)| {
-            // Filter out class literals that result from imports.
+            // Filter out class literals that result from imports
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
-                // Use the undecorated type if available (for decorated classes), otherwise
-                // fall back to the declared type.
-                let class_ty = infer_definition_types(self.db(), *definition)
-                    .undecorated_type()
-                    .unwrap_or_else(|| ty.inner_type());
-                class_ty
+                ty.inner_type()
                     .as_class_literal()
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
@@ -2889,7 +2884,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             Some(KnownModule::Typing | KnownModule::TypingExtensions)
         );
 
-        let mut inferred_ty = match (maybe_known_class, &*name.id) {
+        let inferred_ty = match (maybe_known_class, &*name.id) {
             (None, "NamedTuple") if in_typing_module => {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
@@ -2906,22 +2901,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )),
         };
 
-        if !decorator_types_and_nodes.is_empty() {
-            self.undecorated_type = Some(inferred_ty);
-        }
-
-        // Apply decorators in reverse order (bottom-up).
+        // Validate decorator calls (but don't use return types yet).
         for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
-            inferred_ty = match decorator_ty
-                .try_call(self.db(), &CallArguments::positional([inferred_ty]))
-                .map(|bindings| bindings.return_type(self.db()))
+            if let Err(CallError(_, bindings)) =
+                decorator_ty.try_call(self.db(), &CallArguments::positional([inferred_ty]))
             {
-                Ok(return_ty) => return_ty,
-                Err(CallError(_, bindings)) => {
-                    bindings.report_diagnostics(&self.context, (*decorator_node).into());
-                    bindings.return_type(self.db())
-                }
-            };
+                bindings.report_diagnostics(&self.context, (*decorator_node).into());
+            }
         }
 
         self.add_declaration_with_binding(
