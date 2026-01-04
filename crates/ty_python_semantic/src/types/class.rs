@@ -1940,7 +1940,16 @@ impl<'db> ClassType<'db> {
             .to_class_type(db)
             .is_some_and(|enum_class| self.is_subclass_of(db, enum_class));
 
-        !has_special_cased_constructor && !is_enum_subclass
+        // Use regular `try_call` for `typing._SpecialForm` and its subclasses. The typeshed
+        // stub for `_SpecialForm` doesn't include `__init__`, but the runtime implementation
+        // does accept a callable. Classes like `typing_extensions._ExtensionsSpecialForm`
+        // inherit from `_SpecialForm` and are used as decorators.
+        let is_special_form_subclass = KnownClass::SpecialForm
+            .to_class_literal(db)
+            .to_class_type(db)
+            .is_some_and(|special_form_class| self.is_subclass_of(db, special_form_class));
+
+        !has_special_cased_constructor && !is_enum_subclass && !is_special_form_subclass
     }
 }
 
