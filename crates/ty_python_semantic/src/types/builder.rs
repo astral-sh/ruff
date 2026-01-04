@@ -523,7 +523,17 @@ impl<'db> UnionBuilder<'db> {
                             if *existing_enum_class != enum_class {
                                 continue;
                             }
-                            if should_widen(literals.len(), self.recursively_defined) {
+                            // We don't use the `should_widen` closure here because we want a larger
+                            // limit for enum literals than for other kinds of literals. Huge enums
+                            // are not uncommon (especially in generated code), and it's annoying
+                            // if reachability analysis etc. fails when analysing these enums.
+                            let enum_literals_limit =
+                                if self.recursively_defined.is_yes() && cycle_recovery {
+                                    MAX_RECURSIVE_UNION_LITERALS
+                                } else {
+                                    8192
+                                };
+                            if literals.len() >= enum_literals_limit {
                                 let replace_with =
                                     Type::instance(self.db, ClassType::NonGeneric(enum_class));
                                 self.add_in_place_impl(replace_with, seen_aliases);
