@@ -557,6 +557,60 @@ fn benchmark_many_enum_members(criterion: &mut Criterion) {
     });
 }
 
+fn benchmark_many_enum_members_2(criterion: &mut Criterion) {
+    const NUM_ENUM_MEMBERS: usize = 48;
+
+    setup_rayon();
+
+    let mut code = "\
+from enum import Enum
+from typing_extensions import assert_never
+
+class E(Enum):
+"
+    .to_string();
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        writeln!(&mut code, "    m{i} = {i}").ok();
+    }
+
+    code.push_str(
+        "
+    def method(self):
+        match self:",
+    );
+
+    for i in 0..NUM_ENUM_MEMBERS {
+        write!(
+            &mut code,
+            "
+            case E.m{i}:
+                pass"
+        )
+        .ok();
+    }
+
+    write!(
+        &mut code,
+        "
+            case _:
+                assert_never(self)"
+    )
+    .ok();
+
+    criterion.bench_function("ty_micro[many_enum_members_2]", |b| {
+        b.iter_batched_ref(
+            || setup_micro_case(&code),
+            |case| {
+                let Case { db, .. } = case;
+                let result = db.check();
+                assert_eq!(result.len(), 0);
+            },
+            BatchSize::SmallInput,
+        );
+    });
+}
+
 struct ProjectBenchmark<'a> {
     project: InstalledProject<'a>,
     fs: MemoryFileSystem,
@@ -717,6 +771,7 @@ criterion_group!(
     benchmark_complex_constrained_attributes_2,
     benchmark_complex_constrained_attributes_3,
     benchmark_many_enum_members,
+    benchmark_many_enum_members_2,
 );
 criterion_group!(project, anyio, attrs, hydra, datetype);
 criterion_main!(check_file, micro, project);
