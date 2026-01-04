@@ -424,12 +424,14 @@ pub enum ClassType<'db> {
 #[salsa::tracked]
 impl<'db> ClassType<'db> {
     /// Return a `ClassType` representing the class `builtins.object`
-    #[salsa::tracked]
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .unwrap()
+        ClassType::NonGeneric(
+            KnownClass::Object
+                .to_class_literal(db)
+                .as_class_literal()
+                .expect("`object` should always be a non-generic class in typeshed"),
+        )
     }
 
     pub(super) const fn is_generic(self) -> bool {
