@@ -115,7 +115,7 @@ fn check_name(checker: &Checker, expr: &Expr, range: TextRange) {
     };
 
     let replacement = match qualified_name.segments() {
-        // airflow.utils
+        // airflow.utils.setup_teardown
         [
             "airflow",
             "utils",
