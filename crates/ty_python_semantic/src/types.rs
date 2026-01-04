@@ -14433,20 +14433,29 @@ impl<'db> NegativeIntersectionElements<'db> {
         self.len() == 0
     }
 
-    pub(crate) fn insert(&mut self, ty: Type<'db>) {
+    /// Insert the type into the collection.
+    ///
+    /// Returns `true` if the elements was newly added.
+    /// Returns `false` if the element was already present in the collection.
+    pub(crate) fn insert(&mut self, ty: Type<'db>) -> bool {
         match self {
-            Self::Empty => *self = Self::Single(ty),
+            Self::Empty => {
+                *self = Self::Single(ty);
+                true
+            }
             Self::Single(existing) => {
                 if ty != *existing {
                     *self = Self::Multiple(FxOrderSet::from_iter([*existing, ty]));
+                    true
+                } else {
+                    false
                 }
             }
-            Self::Multiple(set) => {
-                set.insert(ty);
-            }
+            Self::Multiple(set) => set.insert(ty),
         }
     }
 
+    /// Shrink the capacity of the collection as much as possible.
     pub(crate) fn shrink_to_fit(&mut self) {
         match self {
             Self::Empty | Self::Single(_) => {}
@@ -14454,6 +14463,7 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
+    /// Sort the collection's types in place using the comparison function `cmp`.
     pub(crate) fn sort_unstable_by(
         &mut self,
         compare: impl FnMut(&Type<'db>, &Type<'db>) -> std::cmp::Ordering,
@@ -14466,6 +14476,15 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
+    /// Remove `ty` from the collection.
+    ///
+    /// Returns `true` if `ty` was previously in the collection and has now been removed.
+    /// Returns `false` if `ty` was never present in the collection.
+    ///
+    /// If `ty` was previously present in the collection,
+    /// the last element in the collection is popped off the end of the collection
+    /// and placed at the index where `ty` was previously, allowing this method to complete
+    /// in O(1) time (average).
     pub(crate) fn swap_remove(&mut self, ty: &Type<'db>) -> bool {
         match self {
             Self::Empty => false,
@@ -14483,6 +14502,11 @@ impl<'db> NegativeIntersectionElements<'db> {
         }
     }
 
+    /// Remove the element at `index` from the collection.
+    ///
+    /// The element is removed by swapping it with the last element
+    /// of the collection and popping it off, allowing this method to complete
+    /// in O(1) time (average).
     pub(crate) fn swap_remove_index(&mut self, index: usize) -> Option<Type<'db>> {
         match self {
             Self::Empty => None,
