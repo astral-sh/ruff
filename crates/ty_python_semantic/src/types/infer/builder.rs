@@ -594,9 +594,14 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
     /// [metaclass]: https://docs.python.org/3/reference/datamodel.html#metaclasses
     fn check_class_definitions(&mut self) {
         let class_definitions = self.declarations.iter().filter_map(|(definition, ty)| {
-            // Filter out class literals that result from imports
+            // Filter out class literals that result from imports.
             if let DefinitionKind::Class(class) = definition.kind(self.db()) {
-                ty.inner_type()
+                // Use the undecorated type if available (for decorated classes), otherwise
+                // fall back to the declared type.
+                let class_ty = infer_definition_types(self.db(), *definition)
+                    .undecorated_type()
+                    .unwrap_or_else(|| ty.inner_type());
+                class_ty
                     .as_class_literal()
                     .map(|class_literal| (class_literal, class.node(self.module())))
             } else {
@@ -2797,6 +2802,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             body: _,
         } = class_node;
 
+        let mut decorator_types_and_nodes: Vec<(Type<'db>, &ast::Decorator)> =
+            Vec::with_capacity(decorator_list.len());
         let mut deprecated = None;
         let mut type_check_only = false;
         let mut dataclass_params = None;
@@ -2831,6 +2838,20 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 continue;
             }
 
+            // Skip identity decorators to avoid salsa cycles on typeshed.
+            if decorator_ty.as_function_literal().is_some_and(|function| {
+                matches!(
+                    function.known(self.db()),
+                    Some(
+                        KnownFunction::Final
+                            | KnownFunction::DisjointBase
+                            | KnownFunction::RuntimeCheckable
+                    )
+                )
+            }) {
+                continue;
+            }
+
             if let Type::FunctionLiteral(f) = decorator_ty {
                 // We do not yet detect or flag `@dataclass_transform` applied to more than one
                 // overload, or an overload and the implementation both. Nevertheless, this is not
@@ -2852,6 +2873,8 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 dataclass_transformer_params = Some(params);
                 continue;
             }
+
+            decorator_types_and_nodes.push((decorator_ty, decorator));
         }
 
         let body_scope = self
@@ -2861,18 +2884,16 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let in_typing_module = || {
-            matches!(
-                file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
-                Some(KnownModule::Typing | KnownModule::TypingExtensions)
-            )
-        };
+        let in_typing_module = matches!(
+            file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
+            Some(KnownModule::Typing | KnownModule::TypingExtensions)
+        );
 
-        let ty = match (maybe_known_class, &*name.id) {
-            (None, "NamedTuple") if in_typing_module() => {
+        let mut inferred_ty = match (maybe_known_class, &*name.id) {
+            (None, "NamedTuple") if in_typing_module => {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
-            (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
+            (None, "Any") if in_typing_module => Type::SpecialForm(SpecialFormType::Any),
             _ => Type::from(ClassLiteral::new(
                 self.db(),
                 name.id.clone(),
@@ -2885,10 +2906,28 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             )),
         };
 
+        if !decorator_types_and_nodes.is_empty() {
+            self.undecorated_type = Some(inferred_ty);
+        }
+
+        // Apply decorators in reverse order (bottom-up).
+        for (decorator_ty, decorator_node) in decorator_types_and_nodes.iter().rev() {
+            inferred_ty = match decorator_ty
+                .try_call(self.db(), &CallArguments::positional([inferred_ty]))
+                .map(|bindings| bindings.return_type(self.db()))
+            {
+                Ok(return_ty) => return_ty,
+                Err(CallError(_, bindings)) => {
+                    bindings.report_diagnostics(&self.context, (*decorator_node).into());
+                    bindings.return_type(self.db())
+                }
+            };
+        }
+
         self.add_declaration_with_binding(
             class_node.into(),
             definition,
-            &DeclaredAndInferredType::are_the_same_type(ty),
+            &DeclaredAndInferredType::are_the_same_type(inferred_ty),
         );
 
         // if there are type parameters, then the keywords and bases are within that scope

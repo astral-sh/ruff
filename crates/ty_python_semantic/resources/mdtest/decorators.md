@@ -234,3 +234,47 @@ def takes_no_argument() -> str:
 @takes_no_argument
 def g(x): ...
 ```
+
+## Class decorators
+
+Class decorators work similarly to function decorators. The decorated class is passed to the
+decorator, and the decorator's return type determines the type of the decorated class:
+
+```py
+def class_decorator(cls) -> int:
+    return 1
+
+@class_decorator
+class Foo: ...
+
+reveal_type(Foo)  # revealed: int
+```
+
+## Class decorator with type checking
+
+A decorator can enforce type constraints on the class being decorated. When the class does not
+satisfy these constraints, an error should be emitted:
+
+```py
+def decorator(cls: type[int]) -> type[int]:
+    return cls
+
+# error: [invalid-argument-type]
+@decorator
+class Foo: ...
+
+reveal_type(Foo)  # revealed: type[int]
+```
+
+The equivalent explicit assignment produces an error as expected:
+
+```py
+def decorator(cls: type[int]) -> type[int]:
+    return cls
+
+class Foo: ...
+
+# error: [invalid-argument-type]
+# error: [invalid-assignment]
+Foo = decorator(Foo)
+```
