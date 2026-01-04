@@ -14383,7 +14383,18 @@ pub struct IntersectionType<'db> {
 /// we use this enum to represent the negative elements of an intersection type.
 ///
 /// It should otherwise have identical behavior to `FxOrderSet<Type<'db>>`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, get_size2::GetSize, salsa::Update, Default)]
+///
+/// Note that we do not try to maintain the invariant that length-0 collections
+/// are always represented using `Self::Empty`, and that length-1 collections
+/// are always represented using `Self::Single`: `Self::Multiple` is permitted
+/// to have 0-1 elements in its wrapped data, and this could happen if you called
+/// `Self::swap_remove` or `Self::swap_remove_index` on an instance that is
+/// already the `Self::Multiple` variant. Maintaining the invariant that
+/// 0-length or 1-length collections are always represented using `Self::Empty`
+/// and `Self::Single` would add overhead to methods like `Self::swap_remove`,
+/// and would have little value. At the point when you're calling that method, a
+/// heap allocation has already taken place.
+#[derive(Debug, Clone, get_size2::GetSize, salsa::Update, Default)]
 pub enum NegativeIntersectionElements<'db> {
     #[default]
     Empty,
@@ -14417,10 +14428,8 @@ impl<'db> NegativeIntersectionElements<'db> {
     }
 
     pub(crate) fn is_empty(&self) -> bool {
-        // We could try to maintain the invariant that length-0 collections are always
-        // represented using `Self::Empty`, in which case this could just be
-        // `matches!(self, Self::Empty)`. But maintaining that invariant seems like
-        // it could add unnecessary overhead.
+        // See struct-level comment: we don't try to maintain the invariant that empty
+        // collections are representend as `Self::Empty`
         self.len() == 0
     }
 
@@ -14468,9 +14477,8 @@ impl<'db> NegativeIntersectionElements<'db> {
                     false
                 }
             }
-            // We don't try to maintain the invariant here that length-0 collections
-            // are *always* `Self::Empty` and length-1 collections are *always*
-            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
+            // See struct-level comment: we don't try to maintain the invariant that collections
+            // with size 0 or 1 are represented as `Empty` or `Single`.
             Self::Multiple(set) => set.swap_remove(ty),
         }
     }
@@ -14487,9 +14495,8 @@ impl<'db> NegativeIntersectionElements<'db> {
                     None
                 }
             }
-            // We don't try to maintain the invariant here that length-0 collections
-            // are *always* `Self::Empty` and length-1 collections are *always*
-            // `Self::Single`. It's unnecessary to do so, and would probably add overhead.
+            // See struct-level comment: we don't try to maintain the invariant that collections
+            // with size 0 or 1 are represented as `Empty` or `Single`.
             Self::Multiple(set) => set.swap_remove_index(index),
         }
     }
@@ -14501,6 +14508,40 @@ impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
 
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
+    }
+}
+
+impl PartialEq for NegativeIntersectionElements<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Empty, Self::Empty) => true,
+            (Self::Empty, Self::Single(_)) | (Self::Single(_), Self::Empty) => false,
+            (Self::Single(left), Self::Single(right)) => left == right,
+            (Self::Multiple(left), Self::Multiple(right)) => left == right,
+            (Self::Single(single), Self::Multiple(multiple))
+            | (Self::Multiple(multiple), Self::Single(single)) => {
+                multiple.len() == 1 && multiple[0] == *single
+            }
+            (Self::Empty, Self::Multiple(set)) | (Self::Multiple(set), Self::Empty) => {
+                set.is_empty()
+            }
+        }
+    }
+}
+
+impl Eq for NegativeIntersectionElements<'_> {}
+
+impl std::hash::Hash for NegativeIntersectionElements<'_> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Empty => 0_u8.hash(state),
+            Self::Single(single) => single.hash(state),
+            Self::Multiple(set) => match set.len() {
+                0 => 0_u8.hash(state),
+                1 => set[0].hash(state),
+                _ => set.hash(state),
+            },
+        }
     }
 }
 
