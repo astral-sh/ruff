@@ -55,60 +55,6 @@ impl<'a> JunitRenderer<'a> {
                         diagnostic,
                         start_location: location,
                     } = diagnostic;
-                    let mut output = diagnostic
-                        .sub_diagnostics()
-                        .iter()
-                        .map(|sub_diagnostic| {
-                            // Hydrates the sub-diagnostic with information from the
-                            // parent and formats it for rendering into the XML structure
-
-                            let message = sub_diagnostic.concise_message().to_string();
-                            let severity =
-                                format!("{:?}", sub_diagnostic.inner.severity).to_lowercase();
-                            let mut annotations = vec![];
-
-                            // Add function/method/etc definition location
-                            // Such as: "Function defined here: /Path/to/file.py:123:456"
-                            for annotation in sub_diagnostic.annotations() {
-                                let file = annotation.span.file();
-                                let path = file.path(self.resolver);
-                                let source = file.diagnostic_source(self.resolver);
-
-                                // NOTE: (@cetanu)
-                                // It would be possible to rename the test cases, suite,
-                                // and report here, to either Ty or Ruff,
-                                // but I'm not sure if this should be done.
-                                //
-                                // match source {
-                                //     DiagnosticSource::Ty(_) => (),
-                                //     DiagnosticSource::Ruff(_) => (),
-                                // };
-
-                                let sub_message = match annotation.get_message() {
-                                    Some(m) => m,
-                                    None => message.as_str(),
-                                };
-
-                                let mut sub_diag_loc = String::new();
-                                if let Some(span) = annotation.span.range() {
-                                    let loc = source.as_source_code().line_column(span.start());
-                                    sub_diag_loc = format!(
-                                        ":{line}:{column}",
-                                        line = loc.line,
-                                        column = loc.column
-                                    );
-                                }
-                                annotations.push(format!(
-                                    "{indent}{severity}: {sub_message} → {path}{sub_diag_loc}",
-                                ));
-                            }
-                            if annotations.is_empty() {
-                                annotations.push(format!("{indent}{severity}: {message}"));
-                            }
-                            annotations.join("\n")
-                        })
-                        .collect::<Vec<String>>()
-                        .join("\n");
 
                     let code = diagnostic
                         .secondary_code()
@@ -138,12 +84,8 @@ impl<'a> JunitRenderer<'a> {
                         );
                     }
 
-                    if !output.is_empty() {
-                        output.push('\n');
-                    }
-
                     case.status.set_description(format!(
-                        "\n{indent}{diagnostic_loc}{msg}\n{output}{after_indent}",
+                        "\n{indent}{diagnostic_loc}{msg}\n{after_indent}",
                         after_indent = " ".repeat(4 * 3), // <failure> tag closes one indent less
                     ));
                     test_suite.add_test_case(case);
