@@ -1759,7 +1759,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         }
         let subscript_place_expr = PlaceExpr::try_from_expr(subscript_value_expr)?;
         let key_literal = subscript_key_type.as_string_literal()?;
-        if !is_supported_tag_literal(rhs_type) {
+        if !is_supported_tag_literal(self.db, rhs_type) {
             return None;
         }
 
@@ -1835,7 +1835,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         let index = i32::try_from(index).ok()?;
 
         // The comparison value must be a supported literal type.
-        if !is_supported_tag_literal(rhs_type) {
+        if !is_supported_tag_literal(self.db, rhs_type) {
             return None;
         }
 
@@ -1925,17 +1925,18 @@ fn is_or_contains_typeddict<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     }
 }
 
-fn is_supported_tag_literal(ty: Type) -> bool {
-    matches!(
-        ty.as_literal_value_kind(),
-        // TODO: We'd like to support `EnumLiteral` also, but we have to be careful with types like
-        // `IntEnum` and `StrEnum` that have custom `__eq__` methods.
+fn is_supported_tag_literal<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
+    match ty.as_literal_value_kind() {
         Some(
             LiteralValueTypeKind::String(_)
-                | LiteralValueTypeKind::Bytes(_)
-                | LiteralValueTypeKind::Int(_)
-        )
-    )
+            | LiteralValueTypeKind::Bytes(_)
+            | LiteralValueTypeKind::Int(_),
+        ) => true,
+        // Enum literals are supported as long as the enum class does not override
+        // `__eq__` or `__ne__` with a custom implementation.
+        Some(LiteralValueTypeKind::Enum(_)) => !ty.overrides_equality(db),
+        _ => false,
+    }
 }
 
 // Return true if the given type is a `TypedDict` whose `field_name` field has a supported tag literal
@@ -1952,7 +1953,7 @@ fn all_matching_typeddict_fields_have_literal_types<'db>(
         typeddict
             .items(db)
             .get(field_name)
-            .is_none_or(|field| is_supported_tag_literal(field.declared_ty))
+            .is_none_or(|field| is_supported_tag_literal(db, field.declared_ty))
     };
 
     match ty {
@@ -2049,7 +2050,7 @@ fn all_matching_tuple_elements_have_literal_types<'db>(
         elem.as_nominal_instance()
             .and_then(|inst| inst.tuple_spec(db))
             .and_then(|spec| spec.py_index(db, index).ok())
-            .is_none_or(is_supported_tag_literal)
+            .is_none_or(|ty| is_supported_tag_literal(db, ty))
     })
 }
 
