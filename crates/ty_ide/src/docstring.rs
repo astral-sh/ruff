@@ -1095,6 +1095,36 @@ mod tests {
         ");
     }
 
+    // We should not parse the contents of a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_ps1_contents() {
+        let docstring = r#"
+        My cool func:
+        
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ```python  
+        ```````````python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        ```````````
+        ");
+    }
+
     // `.. code::` is a literal block and the `.. code::` should be deleted
     #[test]
     fn code_block() {
