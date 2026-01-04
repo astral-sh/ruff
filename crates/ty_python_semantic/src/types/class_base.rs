@@ -75,10 +75,7 @@ impl<'db> ClassBase<'db> {
 
     /// Return a `ClassBase` representing the class `builtins.object`
     pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .map_or(Self::unknown(), Self::Class)
+        Self::Class(ClassType::object(db))
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
