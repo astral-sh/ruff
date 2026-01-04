@@ -13,9 +13,9 @@ use crate::types::generics::{InferableTypeVars, walk_specialization};
 use crate::types::protocol_class::{ProtocolClass, walk_protocol_interface};
 use crate::types::tuple::{TupleSpec, TupleType, walk_tuple_type};
 use crate::types::{
-    ApplyTypeMappingVisitor, ClassBase, ClassLiteral, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeMapping, TypeRelation, VarianceInferable,
+    ApplyTypeMappingVisitor, ClassLiteral, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
+    IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext, TypeMapping,
+    TypeRelation, VarianceInferable,
 };
 use crate::{Db, FxOrderSet};
 
@@ -273,7 +273,7 @@ impl<'db> NominalInstanceType<'db> {
                 }
                 class
                     .iter_mro(db)
-                    .filter_map(ClassBase::into_class)
+                    .filter_map(|base| base.into_class(db))
                     .find_map(|class| match class.known(db)? {
                         // N.B. this is a pure optimisation: iterating through the MRO would give us
                         // the correct tuple spec for `sys._version_info`, since we special-case the class

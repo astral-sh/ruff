@@ -161,6 +161,7 @@ fn check_class_declaration<'db>(
                 has_typeddict_in_mro = true;
                 continue;
             }
+            ClassBase::Object => ClassType::object(db),
             ClassBase::Class(class) => class,
         };
 

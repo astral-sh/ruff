@@ -80,7 +80,7 @@ use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
-    ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
+    ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
@@ -1220,7 +1220,7 @@ fn is_instance_truthiness<'db>(
             && instance
                 .class(db)
                 .iter_mro(db)
-                .filter_map(ClassBase::into_class)
+                .filter_map(|base| base.into_class(db))
                 .any(|c| match c {
                     ClassType::Generic(c) => c.origin(db) == class,
                     ClassType::NonGeneric(c) => c == class,
@@ -1816,7 +1816,7 @@ impl KnownFunction {
                             message.push_str(&class.display(db).to_string());
                             // Omit the comma for the last element (which is always `object`)
                             if class
-                                .into_class()
+                                .into_class(db)
                                 .is_none_or(|base| !base.is_object(context.db()))
                             {
                                 message.push_str(", ");

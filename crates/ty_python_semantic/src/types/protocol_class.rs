@@ -12,11 +12,11 @@ use crate::{
     place::{Definedness, Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
-        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
-        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
+        ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassLiteral, ClassType,
+        FindLegacyTypeVarsVisitor, HasRelationToVisitor, InstanceFallbackShadowsNonDataDescriptor,
+        IsDisjointVisitor, KnownFunction, MemberLookupPolicy, NormalizedVisitor,
+        PropertyInstanceType, Signature, Type, TypeMapping, TypeQualifiers, TypeRelation,
+        TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
@@ -97,26 +97,26 @@ impl<'db> ProtocolClass<'db> {
                 continue;
             }
 
-            let has_declaration =
-                self.iter_mro(db)
-                    .filter_map(ClassBase::into_class)
-                    .any(|superclass| {
-                        let superclass_scope = superclass.class_literal(db).0.body_scope(db);
-                        let Some(scoped_symbol_id) =
-                            place_table(db, superclass_scope).symbol_id(symbol_name)
-                        else {
-                            return false;
-                        };
-                        !place_from_declarations(
-                            db,
-                            use_def_map(db, superclass_scope)
-                                .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
-                        )
-                        .into_place_and_conflicting_declarations()
-                        .0
-                        .place
-                        .is_undefined()
-                    });
+            let has_declaration = self
+                .iter_mro(db)
+                .filter_map(|base| base.into_class(db))
+                .any(|superclass| {
+                    let superclass_scope = superclass.class_literal(db).0.body_scope(db);
+                    let Some(scoped_symbol_id) =
+                        place_table(db, superclass_scope).symbol_id(symbol_name)
+                    else {
+                        return false;
+                    };
+                    !place_from_declarations(
+                        db,
+                        use_def_map(db, superclass_scope)
+                            .end_of_scope_declarations(ScopedPlaceId::Symbol(scoped_symbol_id)),
+                    )
+                    .into_place_and_conflicting_declarations()
+                    .0
+                    .place
+                    .is_undefined()
+                });
 
             if has_declaration {
                 continue;
@@ -876,7 +876,7 @@ fn cached_protocol_interface<'db>(
 
     for (parent_protocol, specialization) in class
         .iter_mro(db)
-        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.into_class(db))
         .filter_map(|class| {
             let (class, specialization) = class.class_literal(db);
             Some((class.into_protocol_class(db)?, specialization))

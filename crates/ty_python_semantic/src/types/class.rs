@@ -123,7 +123,6 @@ fn try_mro_cycle_initial<'db>(
     specialization: Option<Specialization<'db>>,
 ) -> Result<Mro<'db>, MroError<'db>> {
     Err(MroError::cycle(
-        db,
         self_.apply_optional_specialization(db, specialization),
     ))
 }
@@ -196,7 +195,7 @@ impl<'db> CodeGeneratorKind<'db> {
                 Some(CodeGeneratorKind::DataclassLike(Some(transformer_params)))
             } else if let Some(transformer_params) =
                 class.iter_mro(db, specialization).skip(1).find_map(|base| {
-                    base.into_class().and_then(|class| {
+                    base.into_class(db).and_then(|class| {
                         class.class_literal(db).0.dataclass_transformer_params(db)
                     })
                 })
@@ -632,6 +631,7 @@ impl<'db> ClassType<'db> {
     ) -> ConstraintSet<'db> {
         self.iter_mro(db).when_any(db, |base| {
             match base {
+                ClassBase::Object => ConstraintSet::from(other == ClassType::object(db)),
                 ClassBase::Dynamic(_) => match relation {
                     TypeRelation::Subtyping
                     | TypeRelation::Redundancy
@@ -717,7 +717,7 @@ impl<'db> ClassType<'db> {
     /// Returns `None` if this class does not have any disjoint bases in its MRO.
     pub(super) fn nearest_disjoint_base(self, db: &'db dyn Db) -> Option<DisjointBase<'db>> {
         self.iter_mro(db)
-            .filter_map(ClassBase::into_class)
+            .filter_map(|base| base.into_class(db))
             .find_map(|base| base.as_disjoint_base(db))
     }
 
@@ -725,7 +725,7 @@ impl<'db> ClassType<'db> {
     pub(super) fn could_exist_in_mro_of(self, db: &'db dyn Db, other: Self) -> bool {
         other
             .iter_mro(db)
-            .filter_map(ClassBase::into_class)
+            .filter_map(|base| base.into_class(db))
             .any(|class| match (self, class) {
                 (ClassType::NonGeneric(this_class), ClassType::NonGeneric(other_class)) => {
                     this_class == other_class
@@ -1931,8 +1931,12 @@ impl<'db> ClassLiteral<'db> {
     ) -> bool {
         // `is_subclass_of` is checking the subtype relation, in which gradual types do not
         // participate, so we should not return `True` if we find `Any/Unknown` in the MRO.
-        self.iter_mro(db, specialization)
-            .contains(&ClassBase::Class(other))
+        if other.is_object(db) {
+            true
+        } else {
+            self.iter_mro(db, specialization)
+                .contains(&ClassBase::Class(other))
+        }
     }
 
     /// Return `true` if this class constitutes a typed dict specification (inherits from
@@ -2175,45 +2179,26 @@ impl<'db> ClassLiteral<'db> {
             Err(LookupError::Undefined(TypeQualifiers::empty()));
 
         for superclass in mro_iter {
-            match superclass {
+            let class = match superclass {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
+                    continue;
                 }
-                ClassBase::Dynamic(_) => {
+                ClassBase::Dynamic(dynamic) => {
                     // Note: calling `Type::from(superclass).member()` would be incorrect here.
                     // What we'd really want is a `Type::Any.own_class_member()` method,
                     // but adding such a method wouldn't make much sense -- it would always return `Any`!
-                    dynamic_type_to_intersect_with.get_or_insert(Type::from(superclass));
+                    dynamic_type_to_intersect_with.get_or_insert(Type::Dynamic(dynamic));
+                    continue;
                 }
-                ClassBase::Class(class) => {
-                    let known = class.known(db);
-
-                    if known == Some(KnownClass::Object)
-                        // Only exclude `object` members if this is not an `object` class itself
-                        && (policy.mro_no_object_fallback() && !self.is_known(db, KnownClass::Object))
-                    {
-                        continue;
-                    }
-
-                    if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
-                        continue;
-                    }
-
-                    if matches!(known, Some(KnownClass::Int | KnownClass::Str))
-                        && policy.mro_no_int_or_str_fallback()
-                    {
-                        continue;
-                    }
-
-                    lookup_result = lookup_result.or_else(|lookup_error| {
-                        lookup_error.or_fall_back_to(
-                            db,
-                            class
-                                .own_class_member(db, self.inherited_generic_context(db), name)
-                                .inner,
-                        )
-                    });
+                ClassBase::Object
+                    if policy.mro_no_object_fallback()
+                        && !self.is_known(db, KnownClass::Object) =>
+                {
+                    continue;
                 }
+                ClassBase::Object => ClassType::object(db),
+                ClassBase::Class(class) => class,
                 ClassBase::TypedDict => {
                     return KnownClass::TypedDictFallback
                         .to_class_literal(db)
@@ -2234,7 +2219,27 @@ impl<'db> ClassLiteral<'db> {
                             )
                         });
                 }
+            };
+            let known = class.known(db);
+
+            if known == Some(KnownClass::Type) && policy.meta_class_no_type_fallback() {
+                continue;
             }
+
+            if matches!(known, Some(KnownClass::Int | KnownClass::Str))
+                && policy.mro_no_int_or_str_fallback()
+            {
+                continue;
+            }
+
+            lookup_result = lookup_result.or_else(|lookup_error| {
+                lookup_error.or_fall_back_to(
+                    db,
+                    class
+                        .own_class_member(db, self.inherited_generic_context(db), name)
+                        .inner,
+                )
+            });
             if lookup_result.is_ok() {
                 break;
             }
@@ -2687,7 +2692,7 @@ impl<'db> ClassLiteral<'db> {
                                     self,
                                     specialization,
                                     |base| {
-                                        base.into_class()
+                                        base.into_class(db)
                                             .is_some_and(|c| c.is_known(db, KnownClass::Tuple))
                                     },
                                 ),
@@ -3157,7 +3162,7 @@ impl<'db> ClassLiteral<'db> {
         let matching_classes_in_mro: Vec<_> = self
             .iter_mro(db, specialization)
             .filter_map(|superclass| {
-                if let Some(class) = superclass.into_class() {
+                if let Some(class) = superclass.into_class(db) {
                     let (class_literal, specialization) = class.class_literal(db);
                     if field_policy.matches(db, class_literal, specialization) {
                         Some((class_literal, specialization))
@@ -3364,40 +3369,18 @@ impl<'db> ClassLiteral<'db> {
         let mut is_definitely_bound = false;
 
         for superclass in self.iter_mro(db, specialization) {
-            match superclass {
+            let class = match superclass {
                 ClassBase::Generic | ClassBase::Protocol => {
                     // Skip over these very special class bases that aren't really classes.
+                    continue;
                 }
                 ClassBase::Dynamic(_) => {
                     return PlaceAndQualifiers::todo(
                         "instance attribute on class with dynamic base",
                     );
                 }
-                ClassBase::Class(class) => {
-                    if let member @ PlaceAndQualifiers {
-                        place: Place::Defined(ty, origin, boundness, _),
-                        qualifiers,
-                    } = class.own_instance_member(db, name).inner
-                    {
-                        if boundness == Definedness::AlwaysDefined {
-                            if origin.is_declared() {
-                                // We found a definitely-declared attribute. Discard possibly collected
-                                // inferred types from subclasses and return the declared type.
-                                return member;
-                            }
-
-                            is_definitely_bound = true;
-                        }
-
-                        // If the attribute is not definitely declared on this class, keep looking higher
-                        // up in the MRO, and build a union of all inferred types (and possibly-declared
-                        // types):
-                        union = union.add(ty);
-
-                        // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
-                        union_qualifiers |= qualifiers;
-                    }
-                }
+                ClassBase::Class(class) => class,
+                ClassBase::Object => ClassType::object(db),
                 ClassBase::TypedDict => {
                     return KnownClass::TypedDictFallback
                         .to_instance(db)
@@ -3415,6 +3398,29 @@ impl<'db> ClassLiteral<'db> {
                             )
                         });
                 }
+            };
+            if let member @ PlaceAndQualifiers {
+                place: Place::Defined(ty, origin, boundness, _),
+                qualifiers,
+            } = class.own_instance_member(db, name).inner
+            {
+                if boundness == Definedness::AlwaysDefined {
+                    if origin.is_declared() {
+                        // We found a definitely-declared attribute. Discard possibly collected
+                        // inferred types from subclasses and return the declared type.
+                        return member;
+                    }
+
+                    is_definitely_bound = true;
+                }
+
+                // If the attribute is not definitely declared on this class, keep looking higher
+                // up in the MRO, and build a union of all inferred types (and possibly-declared
+                // types):
+                union = union.add(ty);
+
+                // TODO: We could raise a diagnostic here if there are conflicting type qualifiers
+                union_qualifiers |= qualifiers;
             }
         }
 

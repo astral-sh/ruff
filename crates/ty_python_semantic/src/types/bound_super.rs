@@ -265,7 +265,7 @@ pub(super) fn walk_bound_super_type<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
     bound_super: BoundSuperType<'db>,
     visitor: &V,
 ) {
-    visitor.visit_type(db, Type::from(bound_super.pivot_class(db)));
+    visitor.visit_type(db, bound_super.pivot_class(db).to_type(db));
     visitor.visit_type(db, Type::from(bound_super.owner(db)));
 }
 
@@ -462,6 +462,9 @@ impl<'db> BoundSuperType<'db> {
         // - There are objects that are not valid in a class's bases list
         //   but are valid as pivot classes, e.g. unsubscripted `typing.Generic`
         let pivot_class = match pivot_class_type {
+            Type::ClassLiteral(class) if class.is_known(db, KnownClass::Object) => {
+                ClassBase::Object
+            }
             Type::ClassLiteral(class) => ClassBase::Class(ClassType::NonGeneric(class)),
             Type::SubclassOf(subclass_of) => match subclass_of.subclass_of() {
                 SubclassOfInner::Dynamic(dynamic) => ClassBase::Dynamic(dynamic),
@@ -485,7 +488,7 @@ impl<'db> BoundSuperType<'db> {
             }
         };
 
-        if let Some(pivot_class) = pivot_class.into_class()
+        if let Some(pivot_class) = pivot_class.into_class(db)
             && let Some(owner_class) = owner.into_class(db)
         {
             let pivot_class = pivot_class.class_literal(db).0;
@@ -493,6 +496,7 @@ impl<'db> BoundSuperType<'db> {
                 ClassBase::Dynamic(_) => true,
                 ClassBase::Generic | ClassBase::Protocol | ClassBase::TypedDict => false,
                 ClassBase::Class(superclass) => superclass.class_literal(db).0 == pivot_class,
+                ClassBase::Object => pivot_class == ClassType::object(db).class_literal(db).0,
             }) {
                 return Err(BoundSuperError::FailingConditionCheck {
                     pivot_class: pivot_class_type,
@@ -518,7 +522,7 @@ impl<'db> BoundSuperType<'db> {
         db: &'db dyn Db,
         mro_iter: impl Iterator<Item = ClassBase<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
-        let Some(pivot_class) = self.pivot_class(db).into_class() else {
+        let Some(pivot_class) = self.pivot_class(db).into_class(db) else {
             return Either::Left(ClassBase::Dynamic(DynamicType::Unknown).mro(db, None));
         };
 
@@ -527,7 +531,7 @@ impl<'db> BoundSuperType<'db> {
         Either::Right(mro_iter.skip_while(move |superclass| {
             if pivot_found {
                 false
-            } else if Some(pivot_class) == superclass.into_class() {
+            } else if Some(pivot_class) == superclass.into_class(db) {
                 pivot_found = true;
                 true
             } else {

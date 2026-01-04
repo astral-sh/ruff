@@ -7,9 +7,7 @@ use crate::semantic_index::definition::DefinitionKind;
 use crate::semantic_index::{attribute_scopes, global_scope, semantic_index, use_def_map};
 use crate::types::call::{CallArguments, MatchedArgument};
 use crate::types::signatures::{ParameterKind, Signature};
-use crate::types::{
-    CallDunderError, CallableTypes, ClassBase, KnownUnion, Type, TypeContext, UnionType,
-};
+use crate::types::{CallDunderError, CallableTypes, KnownUnion, Type, TypeContext, UnionType};
 use crate::{Db, DisplaySettings, HasType, SemanticModel};
 use ruff_db::files::FileRange;
 use ruff_db::parsed::parsed_module;
@@ -275,7 +273,7 @@ pub fn definitions_for_attribute<'db>(
         // Walk the MRO: include class and its ancestors, but stop when we find a match
         'scopes: for ancestor in class_literal
             .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
+            .filter_map(|base| base.into_class(db))
             .map(|cls| cls.class_literal(db).0)
         {
             let class_scope = ancestor.body_scope(db);

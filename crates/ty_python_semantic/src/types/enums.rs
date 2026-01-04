@@ -6,8 +6,8 @@ use crate::{
     place::{Place, PlaceAndQualifiers, place_from_bindings, place_from_declarations},
     semantic_index::{place_table, use_def_map},
     types::{
-        ClassBase, ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy,
-        Type, TypeQualifiers,
+        ClassLiteral, DynamicType, EnumLiteralType, KnownClass, MemberLookupPolicy, Type,
+        TypeQualifiers,
     },
 };
 
@@ -145,7 +145,7 @@ pub(crate) fn enum_metadata<'db>(
                                         class
                                             .iter_mro(db, None)
                                             .skip(1)
-                                            .filter_map(ClassBase::into_class)
+                                            .filter_map(|base| base.into_class(db))
                                             .filter(|class| {
                                                 !Type::from(*class).is_subtype_of(
                                                     db,

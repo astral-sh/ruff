@@ -176,6 +176,9 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (ClassBase::TypedDict, _) => Ordering::Less,
                 (_, ClassBase::TypedDict) => Ordering::Greater,
 
+                (ClassBase::Object, _) => Ordering::Less,
+                (_, ClassBase::Object) => Ordering::Greater,
+
                 (ClassBase::Dynamic(left), ClassBase::Dynamic(right)) => {
                     dynamic_elements_ordering(left, right)
                 }

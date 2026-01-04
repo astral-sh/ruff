@@ -55,17 +55,17 @@ impl<'db> Mro<'db> {
         // Special-case `NotImplementedType`: typeshed says that it inherits from `Any`,
         // but this causes more problems than it fixes.
         if class_literal.is_known(db, KnownClass::NotImplementedType) {
-            return Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]));
+            return Ok(Self::from([ClassBase::Class(class), ClassBase::Object]));
         }
         Self::of_class_impl(db, class, class_literal.explicit_bases(db), specialization)
-            .map_err(|err| err.into_mro_error(db, class))
+            .map_err(|err| err.into_mro_error(class))
     }
 
-    pub(super) fn from_error(db: &'db dyn Db, class: ClassType<'db>) -> Self {
+    pub(super) fn from_error(class: ClassType<'db>) -> Self {
         Self::from([
             ClassBase::Class(class),
             ClassBase::unknown(),
-            ClassBase::object(db),
+            ClassBase::Object,
         ])
     }
 
@@ -111,7 +111,7 @@ impl<'db> Mro<'db> {
             // the only class in Python that has an MRO with length <2
             [] if class.is_object(db) => Ok(Self::from([
                 // object is not generic, so the default specialization should be a no-op
-                ClassBase::Class(class),
+                ClassBase::Object,
             ])),
 
             // All other classes in Python have an MRO with length >=2.
@@ -133,10 +133,10 @@ impl<'db> Mro<'db> {
                     Ok(Self::from([
                         ClassBase::Class(class),
                         ClassBase::Generic,
-                        ClassBase::object(db),
+                        ClassBase::Object,
                     ]))
                 } else {
-                    Ok(Self::from([ClassBase::Class(class), ClassBase::object(db)]))
+                    Ok(Self::from([ClassBase::Class(class), ClassBase::Object]))
                 }
             }
 
@@ -279,6 +279,7 @@ impl<'db> Mro<'db> {
                             ClassBase::Class(_)
                             | ClassBase::Generic
                             | ClassBase::Protocol
+                            | ClassBase::Object
                             | ClassBase::TypedDict => {
                                 errors.push(DuplicateBaseError {
                                     duplicate_base: base,
@@ -295,7 +296,7 @@ impl<'db> Mro<'db> {
 
                 if duplicate_bases.is_empty() {
                     if duplicate_dynamic_bases {
-                        Ok(Mro::from_error(db, class))
+                        Ok(Mro::from_error(class))
                     } else {
                         Err(MroErrorKind::UnresolvableMro {
                             bases_list: original_bases.iter().copied().collect(),
@@ -431,8 +432,8 @@ pub(super) struct MroError<'db> {
 
 impl<'db> MroError<'db> {
     /// Construct an MRO error of kind `InheritanceCycle`.
-    pub(super) fn cycle(db: &'db dyn Db, class: ClassType<'db>) -> Self {
-        MroErrorKind::InheritanceCycle.into_mro_error(db, class)
+    pub(super) fn cycle(class: ClassType<'db>) -> Self {
+        MroErrorKind::InheritanceCycle.into_mro_error(class)
     }
 
     pub(super) fn is_cycle(&self) -> bool {
@@ -484,10 +485,10 @@ pub(super) enum MroErrorKind<'db> {
 }
 
 impl<'db> MroErrorKind<'db> {
-    pub(super) fn into_mro_error(self, db: &'db dyn Db, class: ClassType<'db>) -> MroError<'db> {
+    pub(super) fn into_mro_error(self, class: ClassType<'db>) -> MroError<'db> {
         MroError {
             kind: self,
-            fallback_mro: Mro::from_error(db, class),
+            fallback_mro: Mro::from_error(class),
         }
     }
 }

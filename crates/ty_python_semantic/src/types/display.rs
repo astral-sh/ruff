@@ -984,7 +984,9 @@ impl<'db> FmtDetailed<'db> for DisplayRepresentation<'db> {
             Type::BoundSuper(bound_super) => {
                 f.set_invalid_type_annotation();
                 f.write_str("<super: ")?;
-                Type::from(bound_super.pivot_class(self.db))
+                bound_super
+                    .pivot_class(self.db)
+                    .to_type(self.db)
                     .display_with(self.db, self.settings.singleline())
                     .fmt_detailed(f)?;
                 f.write_str(", ")?;

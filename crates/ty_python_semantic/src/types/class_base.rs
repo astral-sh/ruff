@@ -28,6 +28,10 @@ pub enum ClassBase<'db> {
     /// `Protocol[T]`, or bare `Protocol`.
     Generic,
     TypedDict,
+    /// `ClassBase::Object` *could* just be represented with the `ClassBase::Class`
+    /// variant; this is a pure optimisation that allows us to lookup the `object`
+    /// class in typeshed less frequentluy
+    Object,
 }
 
 impl<'db> ClassBase<'db> {
@@ -39,7 +43,7 @@ impl<'db> ClassBase<'db> {
         match self {
             Self::Dynamic(dynamic) => Self::Dynamic(dynamic.normalized()),
             Self::Class(class) => Self::Class(class.normalized_impl(db, visitor)),
-            Self::Protocol | Self::Generic | Self::TypedDict => self,
+            Self::Protocol | Self::Generic | Self::TypedDict | Self::Object => self,
         }
     }
 
@@ -54,7 +58,7 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => Some(Self::Class(
                 class.recursive_type_normalized_impl(db, div, nested)?,
             )),
-            Self::Protocol | Self::Generic | Self::TypedDict => Some(self),
+            Self::Protocol | Self::Generic | Self::TypedDict | Self::Object => Some(self),
         }
     }
 
@@ -70,15 +74,8 @@ impl<'db> ClassBase<'db> {
             ClassBase::Protocol => "Protocol",
             ClassBase::Generic => "Generic",
             ClassBase::TypedDict => "TypedDict",
+            ClassBase::Object => "object",
         }
-    }
-
-    /// Return a `ClassBase` representing the class `builtins.object`
-    pub(super) fn object(db: &'db dyn Db) -> Self {
-        KnownClass::Object
-            .to_class_literal(db)
-            .to_class_type(db)
-            .map_or(Self::unknown(), Self::Class)
     }
 
     pub(super) const fn is_typed_dict(self) -> bool {
@@ -95,6 +92,9 @@ impl<'db> ClassBase<'db> {
     ) -> Option<Self> {
         match ty {
             Type::Dynamic(dynamic) => Some(Self::Dynamic(dynamic)),
+            Type::ClassLiteral(literal) if literal.is_known(db, KnownClass::Object) => {
+                Some(Self::Object)
+            }
             Type::ClassLiteral(literal) => Some(Self::Class(literal.default_specialization(db))),
             Type::GenericAlias(generic) => Some(Self::Class(ClassType::Generic(generic))),
             Type::NominalInstance(instance)
@@ -305,9 +305,10 @@ impl<'db> ClassBase<'db> {
         }
     }
 
-    pub(super) fn into_class(self) -> Option<ClassType<'db>> {
+    pub(super) fn into_class(self, db: &'db dyn Db) -> Option<ClassType<'db>> {
         match self {
             Self::Class(class) => Some(class),
+            Self::Object => KnownClass::Object.to_class_literal(db).to_class_type(db),
             Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => None,
         }
     }
@@ -323,7 +324,9 @@ impl<'db> ClassBase<'db> {
             Self::Class(class) => {
                 Self::Class(class.apply_type_mapping_impl(db, type_mapping, tcx, visitor))
             }
-            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict => self,
+            Self::Dynamic(_) | Self::Generic | Self::Protocol | Self::TypedDict | Self::Object => {
+                self
+            }
         }
     }
 
@@ -368,6 +371,7 @@ impl<'db> ClassBase<'db> {
             ClassBase::Dynamic(_)
             | ClassBase::Generic
             | ClassBase::Protocol
+            | ClassBase::Object
             | ClassBase::TypedDict => false,
         }
     }
@@ -379,9 +383,10 @@ impl<'db> ClassBase<'db> {
         additional_specialization: Option<Specialization<'db>>,
     ) -> impl Iterator<Item = ClassBase<'db>> {
         match self {
-            ClassBase::Protocol => ClassBaseMroIterator::length_3(db, self, ClassBase::Generic),
+            ClassBase::Object => ClassBaseMroIterator::Length1(Some(ClassBase::Object)),
+            ClassBase::Protocol => ClassBaseMroIterator::length_3(self, ClassBase::Generic),
             ClassBase::Dynamic(_) | ClassBase::Generic | ClassBase::TypedDict => {
-                ClassBaseMroIterator::length_2(db, self)
+                ClassBaseMroIterator::length_2(self)
             }
             ClassBase::Class(class) => {
                 ClassBaseMroIterator::from_class(db, class, additional_specialization)
@@ -400,6 +405,7 @@ impl<'db> ClassBase<'db> {
                 match self.base {
                     ClassBase::Dynamic(dynamic) => dynamic.fmt(f),
                     ClassBase::Class(class) => Type::from(class).display(self.db).fmt(f),
+                    ClassBase::Object => f.write_str("<class 'object'>"),
                     ClassBase::Protocol => f.write_str("typing.Protocol"),
                     ClassBase::Generic => f.write_str("typing.Generic"),
                     ClassBase::TypedDict => f.write_str("typing.TypedDict"),
@@ -409,6 +415,17 @@ impl<'db> ClassBase<'db> {
 
         ClassBaseDisplay { db, base: self }
     }
+
+    pub(super) fn to_type(self, db: &'db dyn Db) -> Type<'db> {
+        match self {
+            ClassBase::Class(class) => Type::from(class),
+            ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
+            ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
+            ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
+            ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
+            ClassBase::Object => KnownClass::Object.to_class_literal(db),
+        }
+    }
 }
 
 impl<'db> From<ClassType<'db>> for ClassBase<'db> {
@@ -417,26 +434,9 @@ impl<'db> From<ClassType<'db>> for ClassBase<'db> {
     }
 }
 
-impl<'db> From<ClassBase<'db>> for Type<'db> {
-    fn from(value: ClassBase<'db>) -> Self {
-        match value {
-            ClassBase::Dynamic(dynamic) => Type::Dynamic(dynamic),
-            ClassBase::Class(class) => class.into(),
-            ClassBase::Protocol => Type::SpecialForm(SpecialFormType::Protocol),
-            ClassBase::Generic => Type::SpecialForm(SpecialFormType::Generic),
-            ClassBase::TypedDict => Type::SpecialForm(SpecialFormType::TypedDict),
-        }
-    }
-}
-
-impl<'db> From<&ClassBase<'db>> for Type<'db> {
-    fn from(value: &ClassBase<'db>) -> Self {
-        Self::from(*value)
-    }
-}
-
 /// An iterator over the MRO of a class base.
 enum ClassBaseMroIterator<'db> {
+    Length1(Option<ClassBase<'db>>),
     Length2(core::array::IntoIter<ClassBase<'db>, 2>),
     Length3(core::array::IntoIter<ClassBase<'db>, 3>),
     FromClass(MroIterator<'db>),
@@ -444,13 +444,13 @@ enum ClassBaseMroIterator<'db> {
 
 impl<'db> ClassBaseMroIterator<'db> {
     /// Iterate over an MRO of length 2 that consists of `first_element` and then `object`.
-    fn length_2(db: &'db dyn Db, first_element: ClassBase<'db>) -> Self {
-        ClassBaseMroIterator::Length2([first_element, ClassBase::object(db)].into_iter())
+    fn length_2(first_element: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length2([first_element, ClassBase::Object].into_iter())
     }
 
     /// Iterate over an MRO of length 3 that consists of `first_element`, then `second_element`, then `object`.
-    fn length_3(db: &'db dyn Db, element_1: ClassBase<'db>, element_2: ClassBase<'db>) -> Self {
-        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::object(db)].into_iter())
+    fn length_3(element_1: ClassBase<'db>, element_2: ClassBase<'db>) -> Self {
+        ClassBaseMroIterator::Length3([element_1, element_2, ClassBase::Object].into_iter())
     }
 
     /// Iterate over the MRO of an arbitrary class. The MRO may be of any length.
@@ -468,6 +468,7 @@ impl<'db> Iterator for ClassBaseMroIterator<'db> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self {
+            Self::Length1(iter) => iter.take(),
             Self::Length2(iter) => iter.next(),
             Self::Length3(iter) => iter.next(),
             Self::FromClass(iter) => iter.next(),

@@ -20,7 +20,7 @@ use crate::{
         semantic_index, use_def_map,
     },
     types::{
-        ClassBase, ClassLiteral, KnownClass, KnownInstanceType, SubclassOfInner, Type,
+        ClassLiteral, KnownClass, KnownInstanceType, SubclassOfInner, Type,
         TypeVarBoundOrConstraints, class::CodeGeneratorKind, generics::Specialization,
     },
 };
@@ -411,7 +411,7 @@ impl<'db> AllMembers<'db> {
     ) {
         for parent in class_literal
             .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
+            .filter_map(|base| base.into_class(db))
             .map(|class| class.class_literal(db).0)
         {
             let parent_scope = parent.body_scope(db);
@@ -436,7 +436,7 @@ impl<'db> AllMembers<'db> {
     ) {
         for parent in class_literal
             .iter_mro(db, None)
-            .filter_map(ClassBase::into_class)
+            .filter_map(|base| base.into_class(db))
             .map(|class| class.class_literal(db).0)
         {
             let class_body_scope = parent.body_scope(db);

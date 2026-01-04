@@ -7133,7 +7133,7 @@ impl<'db> Type<'db> {
         // from the `Generator` protocol, such as `types.GeneratorType`.
 
         let from_class_base = |base: ClassBase<'db>| {
-            let class = base.into_class()?;
+            let class = base.into_class(db)?;
             if class.is_known(db, KnownClass::Generator) {
                 if let Some(specialization) = class.class_literal_specialized(db, None).1 {
                     if let [_, _, return_ty] = specialization.types(db) {
@@ -14947,7 +14947,7 @@ pub(super) fn determine_upper_bound<'db>(
     let upper_bound = class_literal
         .iter_mro(db, specialization)
         .take_while(|base| !is_known_base(*base))
-        .filter_map(ClassBase::into_class)
+        .filter_map(|base| base.into_class(db))
         .last()
         .unwrap_or_else(|| class_literal.unknown_specialization(db));
     Type::instance(db, upper_bound)
