@@ -93,6 +93,7 @@ get-size2 = { version = "0.7.3", features = [
     "smallvec",
     "hashbrown",
     "compact-str",
+    "ordermap"
 ] }
 getrandom = { version = "0.3.1" }
 glob = { version = "0.3.1" }
