@@ -2879,16 +2879,18 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
-        let in_typing_module = matches!(
-            file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
-            Some(KnownModule::Typing | KnownModule::TypingExtensions)
-        );
+        let in_typing_module = || {
+            matches!(
+                file_to_module(self.db(), self.file()).and_then(|module| module.known(self.db())),
+                Some(KnownModule::Typing | KnownModule::TypingExtensions)
+            )
+        };
 
         let inferred_ty = match (maybe_known_class, &*name.id) {
-            (None, "NamedTuple") if in_typing_module => {
+            (None, "NamedTuple") if in_typing_module() => {
                 Type::SpecialForm(SpecialFormType::NamedTuple)
             }
-            (None, "Any") if in_typing_module => Type::SpecialForm(SpecialFormType::Any),
+            (None, "Any") if in_typing_module() => Type::SpecialForm(SpecialFormType::Any),
             _ => Type::from(ClassLiteral::new(
                 self.db(),
                 name.id.clone(),
