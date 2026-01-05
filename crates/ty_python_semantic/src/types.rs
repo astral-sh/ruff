@@ -14524,6 +14524,59 @@ impl<'db> NegativeIntersectionElements<'db> {
             Self::Multiple(set) => set.swap_remove_index(index),
         }
     }
+
+    fn normalized_impl(&self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
+        match self {
+            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
+            NegativeIntersectionElements::Single(ty) => {
+                NegativeIntersectionElements::Single(ty.normalized_impl(db, visitor))
+            }
+            NegativeIntersectionElements::Multiple(set) => {
+                let mut set: FxOrderSet<Type<'db>> = set
+                    .iter()
+                    .map(|ty| ty.normalized_impl(db, visitor))
+                    .collect();
+
+                set.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
+                NegativeIntersectionElements::Multiple(set)
+            }
+        }
+    }
+
+    fn recursive_type_normalized_impl(
+        &self,
+        db: &'db dyn Db,
+        div: Type<'db>,
+        nested: bool,
+    ) -> Option<Self> {
+        match self {
+            NegativeIntersectionElements::Empty => Some(NegativeIntersectionElements::Empty),
+            NegativeIntersectionElements::Single(ty) => {
+                let ty = if nested {
+                    ty.recursive_type_normalized_impl(db, div, nested)?
+                } else {
+                    ty.recursive_type_normalized_impl(db, div, nested)
+                        .unwrap_or(div)
+                };
+                Some(NegativeIntersectionElements::Single(ty))
+            }
+            NegativeIntersectionElements::Multiple(set) => {
+                let set = if nested {
+                    set.iter()
+                        .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
+                        .collect::<Option<FxOrderSet<Type<'db>>>>()?
+                } else {
+                    set.iter()
+                        .map(|ty| {
+                            ty.recursive_type_normalized_impl(db, div, nested)
+                                .unwrap_or(div)
+                        })
+                        .collect()
+                };
+                Some(NegativeIntersectionElements::Multiple(set))
+            }
+        }
+    }
 }
 
 impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
@@ -14625,31 +14678,15 @@ impl<'db> IntersectionType<'db> {
     }
 
     pub(crate) fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
-        fn normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            visitor: &NormalizedVisitor<'db>,
-        ) -> FxOrderSet<Type<'db>> {
-            let mut elements: FxOrderSet<Type<'db>> = elements
-                .iter()
-                .map(|ty| ty.normalized_impl(db, visitor))
-                .collect();
+        let mut positive: FxOrderSet<Type<'db>> = self
+            .positive(db)
+            .iter()
+            .map(|ty| ty.normalized_impl(db, visitor))
+            .collect();
 
-            elements.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
-            elements
-        }
+        positive.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(db, l, r));
 
-        let positive = normalized_set(db, self.positive(db), visitor);
-
-        let negative = match self.negative(db) {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                NegativeIntersectionElements::Single(ty.normalized_impl(db, visitor))
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                NegativeIntersectionElements::Multiple(normalized_set(db, set, visitor))
-            }
-        };
+        let negative = self.negative(db).normalized_impl(db, visitor);
 
         IntersectionType::new(db, positive, negative)
     }
@@ -14660,58 +14697,24 @@ impl<'db> IntersectionType<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        fn opt_normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            div: Type<'db>,
-            nested: bool,
-        ) -> Option<FxOrderSet<Type<'db>>> {
-            elements
+        let positive = if nested {
+            self.positive(db)
                 .iter()
                 .map(|ty| ty.recursive_type_normalized_impl(db, div, nested))
-                .collect()
-        }
-
-        fn normalized_set<'db>(
-            db: &'db dyn Db,
-            elements: &FxOrderSet<Type<'db>>,
-            div: Type<'db>,
-            nested: bool,
-        ) -> FxOrderSet<Type<'db>> {
-            elements
+                .collect::<Option<FxOrderSet<Type<'db>>>>()?
+        } else {
+            self.positive(db)
                 .iter()
                 .map(|ty| {
                     ty.recursive_type_normalized_impl(db, div, nested)
                         .unwrap_or(div)
                 })
                 .collect()
-        }
+        };
 
-        let positive = if nested {
-            opt_normalized_set(db, self.positive(db), div, nested)?
-        } else {
-            normalized_set(db, self.positive(db), div, nested)
-        };
-        let negative = match self.negative(db) {
-            NegativeIntersectionElements::Empty => NegativeIntersectionElements::Empty,
-            NegativeIntersectionElements::Single(ty) => {
-                let ty = if nested {
-                    ty.recursive_type_normalized_impl(db, div, nested)?
-                } else {
-                    ty.recursive_type_normalized_impl(db, div, nested)
-                        .unwrap_or(div)
-                };
-                NegativeIntersectionElements::Single(ty)
-            }
-            NegativeIntersectionElements::Multiple(set) => {
-                let negative_set = if nested {
-                    opt_normalized_set(db, set, div, nested)?
-                } else {
-                    normalized_set(db, set, div, nested)
-                };
-                NegativeIntersectionElements::Multiple(negative_set)
-            }
-        };
+        let negative = self
+            .negative(db)
+            .recursive_type_normalized_impl(db, div, nested)?;
 
         Some(IntersectionType::new(db, positive, negative))
     }
