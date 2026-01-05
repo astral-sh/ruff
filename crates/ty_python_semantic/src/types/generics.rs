@@ -1669,17 +1669,15 @@ impl<'db> SpecializationBuilder<'db> {
                             // therefore not a valid specialization.
                             continue;
                         }
-                        if !lower.is_never() {
-                            self.add_type_mapping(bound_typevar, lower, variance, &mut f);
-                            continue;
-                        }
 
                         let upper = IntersectionType::from_elements(
                             self.db,
                             std::iter::chain(bounds.upper, [bound]),
                         );
-                        if !upper.is_object() {
+                        if upper != bound {
                             self.add_type_mapping(bound_typevar, upper, variance, &mut f);
+                        } else if !lower.is_never() {
+                            self.add_type_mapping(bound_typevar, lower, variance, &mut f);
                         }
                     }
 
