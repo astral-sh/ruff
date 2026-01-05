@@ -99,92 +99,77 @@ impl<'db> UnionElement<'db> {
 
     /// Try reducing this `UnionElement` given the presence in the same union of `other_type`.
     fn try_reduce(&mut self, db: &'db dyn Db, other_type: Type<'db>) -> ReduceResult<'db> {
-        match self {
+        let mut other_type_negated_cache = None;
+        let mut other_type_negated =
+            || *other_type_negated_cache.get_or_insert_with(|| other_type.negate(db));
+
+        let mut collapse = false;
+        let mut ignore = false;
+
+        // A closure called for each element in a set of literals
+        // to determine whether the element should be retained in the set.
+        //
+        // If `ignore` or `collapse` is `true` for any element in the set,
+        // we no longer need to do any expensive subtyping checks for any
+        // further elements in the set:
+        //
+        // - if `ignore` is `true`, this indicates that `other_type` is a
+        //   subtype of one of the literals in this set. Given this fact,
+        //   it cannot be possible for any other literals in this set to be
+        //   a subtype of `other_type`.
+        // - if `collapse` is `true`, all literals of this kind will be
+        //   removed from the union, so it's irrelevant to answer the
+        //   question of which literals should remain in this set.
+        //
+        // We therefore only ask if `ty` is a subtype of `other_type` if
+        // both `ignore` and `collapse` are `false`. If either is `true`,
+        // we skip the expensive subtype check and return `true`.
+        let mut should_retain_type = |ty| {
+            if ignore || other_type.is_subtype_of(db, ty) {
+                ignore = true;
+                return true;
+            }
+            if collapse || other_type_negated().is_subtype_of(db, ty) {
+                collapse = true;
+                return true;
+            }
+            !ty.is_subtype_of(db, other_type)
+        };
+
+        let should_keep = match self {
             UnionElement::IntLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Int) {
-                    let mut collapse = false;
-                    let mut ignore = false;
-                    let negated = other_type.negate(db);
-                    literals.retain(|literal| {
-                        let ty = Type::IntLiteral(*literal);
-                        if negated.is_subtype_of(db, ty) {
-                            collapse = true;
-                        }
-                        if other_type.is_subtype_of(db, ty) {
-                            ignore = true;
-                        }
-                        !ty.is_subtype_of(db, other_type)
-                    });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    literals.retain(|literal| should_retain_type(Type::IntLiteral(*literal)));
+                    !literals.is_empty()
                 } else {
-                    ReduceResult::KeepIf(
-                        !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    !Type::IntLiteral(literals[0]).is_subtype_of(db, other_type)
                 }
             }
             UnionElement::StringLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::String) {
-                    let mut collapse = false;
-                    let mut ignore = false;
-                    let negated = other_type.negate(db);
-                    literals.retain(|literal| {
-                        let ty = Type::StringLiteral(*literal);
-                        if negated.is_subtype_of(db, ty) {
-                            collapse = true;
-                        }
-                        if other_type.is_subtype_of(db, ty) {
-                            ignore = true;
-                        }
-                        !ty.is_subtype_of(db, other_type)
-                    });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    literals.retain(|literal| should_retain_type(Type::StringLiteral(*literal)));
+                    !literals.is_empty()
                 } else {
-                    ReduceResult::KeepIf(
-                        !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    !Type::StringLiteral(literals[0]).is_subtype_of(db, other_type)
                 }
             }
             UnionElement::BytesLiterals(literals) => {
                 if other_type.splits_literals(db, LiteralKind::Bytes) {
-                    let mut collapse = false;
-                    let mut ignore = false;
-                    let negated = other_type.negate(db);
-                    literals.retain(|literal| {
-                        let ty = Type::BytesLiteral(*literal);
-                        if negated.is_subtype_of(db, ty) {
-                            collapse = true;
-                        }
-                        if other_type.is_subtype_of(db, ty) {
-                            ignore = true;
-                        }
-                        !ty.is_subtype_of(db, other_type)
-                    });
-                    if ignore {
-                        ReduceResult::Ignore
-                    } else if collapse {
-                        ReduceResult::CollapseToObject
-                    } else {
-                        ReduceResult::KeepIf(!literals.is_empty())
-                    }
+                    literals.retain(|literal| should_retain_type(Type::BytesLiteral(*literal)));
+                    !literals.is_empty()
                 } else {
-                    ReduceResult::KeepIf(
-                        !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type),
-                    )
+                    !Type::BytesLiteral(literals[0]).is_subtype_of(db, other_type)
                 }
             }
-            UnionElement::Type(existing) => ReduceResult::Type(*existing),
+            UnionElement::Type(existing) => return ReduceResult::Type(*existing),
+        };
+
+        if ignore {
+            ReduceResult::Ignore
+        } else if collapse {
+            ReduceResult::CollapseToObject
+        } else {
+            ReduceResult::KeepIf(should_keep)
         }
     }
 }
