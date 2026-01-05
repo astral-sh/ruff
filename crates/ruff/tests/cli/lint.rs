@@ -1137,9 +1137,9 @@ required-version = "0.1.0"
 "#,
     )?;
 
-    insta::with_settings!({
-        filters => vec![(version, "[VERSION]")]
-    }, {
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
     assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
@@ -1154,6 +1154,7 @@ import os
 
     ----- stderr -----
     ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Required version `==0.1.0` does not match the running version `[VERSION]`
     ");
     });
@@ -1212,9 +1213,9 @@ required-version = ">{version}"
         ),
     )?;
 
-    insta::with_settings!({
-        filters => vec![(version, "[VERSION]")]
-    }, {
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
     assert_cmd_snapshot!(fixture
         .check_command()
         .arg("--config")
@@ -1229,6 +1230,48 @@ import os
 
     ----- stderr -----
     ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
+      Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
+    ");
+    });
+
+    Ok(())
+}
+
+#[test]
+fn required_version_precedes_rule_validation() -> Result<()> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    let fixture = CliTest::with_file(
+        "ruff.toml",
+        &format!(
+            r#"
+required-version = ">{version}"
+
+[lint]
+select = ["RUF999"]
+"#
+        ),
+    )?;
+
+    let mut settings = insta::Settings::clone_current();
+    settings.add_filter(version, "[VERSION]");
+    settings.bind(|| {
+    assert_cmd_snapshot!(fixture
+        .check_command()
+        .arg("--config")
+        .arg("ruff.toml")
+        .arg("-")
+        .pass_stdin(r#"
+import os
+"#), @"
+    success: false
+    exit_code: 2
+    ----- stdout -----
+
+    ----- stderr -----
+    ruff failed
+      Cause: Failed to load configuration `[TMP]/ruff.toml`
       Cause: Required version `>[VERSION]` does not match the running version `[VERSION]`
     ");
     });

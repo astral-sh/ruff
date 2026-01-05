@@ -8,9 +8,9 @@ use pep440_rs::{Operator, Version, VersionSpecifiers};
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
-use ruff_linter::settings::types::PythonVersion;
+use ruff_linter::settings::types::{PythonVersion, RequiredVersion};
 
-use crate::options::Options;
+use crate::options::{Options, validate_required_version};
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 struct Tools {
@@ -45,6 +45,7 @@ fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
     let path = path.as_ref();
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
+    check_required_version(&contents, path, &[])?;
     toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
@@ -53,6 +54,7 @@ fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
     let path = path.as_ref();
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
+    check_required_version(&contents, path, &["tool", "ruff"])?;
     toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
 }
 
@@ -96,6 +98,34 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
         }
     }
     Ok(None)
+}
+
+fn check_required_version(contents: &str, path: &Path, table_path: &[&str]) -> Result<()> {
+    let value: toml::Value =
+        toml::from_str(contents).with_context(|| format!("Failed to parse {}", path.display()))?;
+    let mut current = &value;
+    for key in table_path {
+        match current.get(*key) {
+            Some(next) => {
+                current = next;
+            }
+            None => return Ok(()),
+        }
+    }
+
+    let required_version = current
+        .get("required-version")
+        .or_else(|| current.get("required_version"))
+        .and_then(|value| value.as_str());
+
+    let Some(required_version) = required_version else {
+        return Ok(());
+    };
+
+    let required_version = RequiredVersion::try_from(required_version.to_string())
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+    validate_required_version(&required_version)?;
+    Ok(())
 }
 
 /// Derive target version from `required-version` in `pyproject.toml`, if
