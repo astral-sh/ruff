@@ -12368,6 +12368,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(todo_type!("Subscript expressions on intersections"))
             }
 
+            (Type::TypeAlias(alias), _) => Some(self.infer_subscript_expression_types(
+                subscript,
+                alias.value_type(db),
+                slice_ty,
+                expr_context,
+            )),
+
             // Ex) Given `("a", "b", "c", "d")[1]`, return `"b"`
             (Type::NominalInstance(nominal), Type::IntLiteral(i64_int)) => nominal
                 .tuple_spec(db)

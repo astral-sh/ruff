@@ -172,6 +172,25 @@ def _(x: X, y: tuple[Literal[1], Literal[3]]):
     reveal_type(x < y)  # revealed: Literal[True]
 ```
 
+## In subscripts
+
+Subscript operations should work through type aliases.
+
+```py
+class C:
+    def __getitem__(self, index: int) -> int:
+        return 1
+
+class D:
+    def __getitem__(self, index: int) -> int:
+        return 1
+
+type CD = C | D
+
+def _(x: CD):
+    reveal_type(x[1])  # revealed: int
+```
+
 ## `TypeAliasType` properties
 
 Two `TypeAliasType`s are distinct and disjoint, even if they refer to the same type
