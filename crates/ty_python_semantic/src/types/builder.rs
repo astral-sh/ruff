@@ -659,8 +659,31 @@ impl<'db> UnionBuilder<'db> {
             types.sort_unstable_by(|l, r| union_or_intersection_elements_ordering(self.db, l, r));
         }
         match types.len() {
-            0 => None,
-            1 => Some(types[0]),
+            0 => {
+                if self.recursively_defined.is_yes() {
+                    // See the comment below for why this is necessary.
+                    Some(Type::Union(UnionType::new(
+                        self.db,
+                        Box::from([Type::Never]),
+                        self.recursively_defined,
+                    )))
+                } else {
+                    None
+                }
+            }
+            1 => {
+                if self.recursively_defined.is_yes() {
+                    // We need to mark this type with a "recursively-defined" marker, so build it as a single-element recursively-defined union type.
+                    // This will only happen very early in the fixed-point iteration, and a single-element union type should never appear in the final converged type.
+                    Some(Type::Union(UnionType::new(
+                        self.db,
+                        Box::from([types[0]]),
+                        self.recursively_defined,
+                    )))
+                } else {
+                    Some(types[0])
+                }
+            }
             _ => Some(Type::Union(UnionType::new(
                 self.db,
                 types.into_boxed_slice(),
@@ -696,6 +719,14 @@ impl<'db> IntersectionBuilder<'db> {
             db,
             order_elements: false,
             intersections: vec![],
+        }
+    }
+
+    fn extend(&mut self, sub: Self) {
+        for inner in sub.intersections {
+            if !self.intersections.contains(&inner) {
+                self.intersections.push(inner);
+            }
         }
     }
 
@@ -735,7 +766,7 @@ impl<'db> IntersectionBuilder<'db> {
                     .iter()
                     .map(|elem| self.clone().add_positive_impl(*elem, seen_aliases))
                     .fold(IntersectionBuilder::empty(self.db), |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     })
             }
@@ -859,7 +890,7 @@ impl<'db> IntersectionBuilder<'db> {
                 positive_side.chain(negative_side).fold(
                     IntersectionBuilder::empty(self.db),
                     |mut builder, sub| {
-                        builder.intersections.extend(sub.intersections);
+                        builder.extend(sub);
                         builder
                     },
                 )
@@ -957,7 +988,7 @@ impl<'db> IntersectionBuilder<'db> {
     }
 }
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 struct InnerIntersectionBuilder<'db> {
     positive: FxOrderSet<Type<'db>>,
     negative: FxOrderSet<Type<'db>>,

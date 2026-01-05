@@ -3151,9 +3151,18 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 return None;
             }
 
-            // TODO: Ideally we would infer the annotated type _before_ the arguments if this call is part of an
-            // annotated assignment, to closer match the order of any unions written in the type annotation.
-            builder.infer(return_ty, call_expression_tcx).ok()?;
+            // For `__init__`, do not the use type context to widen the return type,
+            // as it can lead to argument assignability errors if the type variable
+            // is constrained by a narrower parameter type.
+            if self
+                .signature_type
+                .as_bound_method()
+                .is_none_or(|method| !method.is_init(self.db))
+            {
+                // TODO: Ideally we would infer the annotated type _before_ the arguments if this call is part of an
+                // annotated assignment, to closer match the order of any unions written in the type annotation.
+                builder.infer(return_ty, call_expression_tcx).ok()?;
+            }
 
             // Otherwise, build the specialization again after inferring the complete type context.
             let specialization = builder
@@ -3674,10 +3683,15 @@ impl<'db> Binding<'db> {
                 }
             }
         }
+
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        self.return_ty = self.signature.return_ty.unwrap_or_else(|| {
+            self.callable_type
+                .infer_return_type(db)
+                .unwrap_or(Type::unknown())
+        });
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;

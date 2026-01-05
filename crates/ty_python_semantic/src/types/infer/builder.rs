@@ -13003,6 +13003,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
     pub(super) fn finish_scope(mut self) -> ScopeInference<'db> {
         self.infer_region();
+        let db = self.db();
 
         let Self {
             context,
@@ -13029,21 +13030,27 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             called_functions: _,
             index: _,
             region: _,
-            return_types_and_ranges: _,
+            return_types_and_ranges,
         } = self;
 
-        let _ = scope;
         let diagnostics = context.finish();
 
-        let extra =
-            (!string_annotations.is_empty() || !diagnostics.is_empty() || cycle_recovery.is_some())
-                .then(|| {
-                    Box::new(ScopeInferenceExtra {
-                        string_annotations,
-                        cycle_recovery,
-                        diagnostics,
-                    })
-                });
+        let extra = (!string_annotations.is_empty()
+            || !diagnostics.is_empty()
+            || cycle_recovery.is_some()
+            || scope.is_non_lambda_function(db))
+        .then(|| {
+            let return_types = return_types_and_ranges
+                .into_iter()
+                .map(|ty_range| ty_range.ty)
+                .collect();
+            Box::new(ScopeInferenceExtra {
+                string_annotations,
+                cycle_recovery,
+                diagnostics,
+                return_types,
+            })
+        });
 
         expressions.shrink_to_fit();
 

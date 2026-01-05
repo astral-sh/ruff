@@ -295,6 +295,331 @@ def f(cond: bool) -> int:
         return 2
 ```
 
+## Inferred return type
+
+### Free function
+
+If a function's return type is not annotated, it is inferred. The inferred type is the union of all
+possible return types.
+
+```py
+def f():
+    return 1
+
+reveal_type(f())  # revealed: Literal[1]
+# TODO: should be `def f() -> Literal[1]`
+reveal_type(f)  # revealed: def f() -> Unknown
+
+def g(cond: bool):
+    if cond:
+        return 1
+    else:
+        return "a"
+
+reveal_type(g(True))  # revealed: Literal[1, "a"]
+
+# This function implicitly returns `None`.
+def h(x: int, y: str):
+    if x > 10:
+        return x
+    elif x > 5:
+        return y
+
+reveal_type(h(1, "a"))  # revealed: int | str | None
+
+lambda_func = lambda: 1
+# TODO: lambda function type inference
+# Should be `Literal[1]`
+reveal_type(lambda_func())  # revealed: Unknown
+
+def generator():
+    yield 1
+    yield 2
+    return None
+
+# TODO: Should be `Generator[Literal[1, 2], Any, None]`
+reveal_type(generator())  # revealed: Unknown
+
+async def async_generator():
+    yield
+
+# TODO: Should be `AsyncGenerator[None, Any]`
+reveal_type(async_generator())  # revealed: Unknown
+
+async def coroutine():
+    return
+
+# TODO: Should be `CoroutineType[Any, Any, None]`
+reveal_type(coroutine())  # revealed: Unknown
+```
+
+The return type of a recursive function is also inferred. When the return type inference would
+diverge, it is truncated and replaced with the special dynamic type `Divergent`.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+def fibonacci(n: int):
+    if n == 0:
+        return 0
+    elif n == 1:
+        return 1
+    else:
+        return fibonacci(n - 1) + fibonacci(n - 2)
+
+reveal_type(fibonacci(5))  # revealed: int
+
+def even(n: int):
+    if n == 0:
+        return True
+    else:
+        return odd(n - 1)
+
+def odd(n: int):
+    if n == 0:
+        return False
+    else:
+        return even(n - 1)
+
+reveal_type(even(1))  # revealed: bool
+reveal_type(odd(1))  # revealed: bool
+
+def repeat_a(n: int):
+    if n <= 0:
+        return ""
+    else:
+        return repeat_a(n - 1) + "a"
+
+reveal_type(repeat_a(3))  # revealed: str
+
+def divergent(value):
+    if type(value) is tuple:
+        return (divergent(value[0]),)
+    else:
+        return None
+
+# tuple[tuple[tuple[...] | None] | None] | None => tuple[Divergent] | None
+reveal_type(divergent((1,)))  # revealed: tuple[Divergent] | None
+
+def call_divergent(x: int):
+    return (divergent((1, 2, 3)), x)
+
+reveal_type(call_divergent(1))  # revealed: tuple[tuple[Divergent] | None, int]
+
+def list1[T](x: T) -> list[T]:
+    return [x]
+
+def divergent2(value):
+    if type(value) is tuple:
+        return (divergent2(value[0]),)
+    elif type(value) is list:
+        return list1(divergent2(value[0]))
+    else:
+        return None
+
+reveal_type(divergent2((1,)))  # revealed: tuple[Divergent] | list[Divergent] | None
+
+def list_int(x: int):
+    if x > 0:
+        return list1(list_int(x - 1))
+    else:
+        return list1(x)
+
+# TODO: should be `list[int]`
+reveal_type(list_int(1))  # revealed: list[Divergent] | list[Divergent] | list[int]
+
+def tuple_obj(cond: bool):
+    if cond:
+        x = object()
+    else:
+        x = tuple_obj(cond)
+    return (x,)
+
+reveal_type(tuple_obj(True))  # revealed: tuple[object]
+
+def get_non_empty(node):
+    for child in node.children:
+        node = get_non_empty(child)
+        if node is not None:
+            return node
+    return None
+
+reveal_type(get_non_empty(None))  # revealed: (Divergent & ~None) | None
+
+def nested_scope():
+    def inner():
+        return nested_scope()
+    return inner()
+
+reveal_type(nested_scope())  # revealed: Divergent
+
+def eager_nested_scope():
+    class A:
+        x = eager_nested_scope()
+
+    return A.x
+
+reveal_type(eager_nested_scope())  # revealed: Unknown
+
+class C:
+    def flip(self) -> "D":
+        return D()
+
+class D(C):
+    # error: [invalid-method-override]
+    def flip(self) -> "C":
+        return C()
+
+def c_or_d(n: int):
+    if n == 0:
+        return D()
+    else:
+        return c_or_d(n - 1).flip()
+
+# In fixed-point iteration of the return type inference, the return type is monotonically widened.
+# For example, once the return type of `c_or_d` is determined to be `C`,
+# it will never be determined to be a subtype `D` in the subsequent iterations.
+reveal_type(c_or_d(1))  # revealed: C
+```
+
+### Class method
+
+If a method's return type is not annotated, it is also inferred, but the inferred type is a union of
+all possible return types and `Unknown`. This is because a method of a class may be overridden by
+its subtypes. For example, if the return type of a method is inferred to be `int`, the type the
+coder really intended might be `int | None`, in which case it would be impossible for the overridden
+method to return `None`.
+
+```py
+class C:
+    def f(self):
+        return 1
+
+class D(C):
+    def f(self):
+        return None
+
+reveal_type(C().f())  # revealed: Literal[1] | Unknown
+reveal_type(D().f())  # revealed: None | Literal[1] | Unknown
+```
+
+However, in the following cases, `Unknown` is not included in the inferred return type because there
+is no ambiguity in the subclass.
+
+- The class or the method is marked as `final`.
+
+```py
+from typing import final
+
+@final
+class C:
+    def f(self):
+        return 1
+
+class D:
+    @final
+    def f(self):
+        return "a"
+
+reveal_type(C().f())  # revealed: Literal[1]
+reveal_type(D().f())  # revealed: Literal["a"]
+```
+
+- The method overrides the methods of the base classes, and the return types of the base class
+    methods are known (In this case, the return type of the method is the intersection of the return
+    types of the methods in the base classes).
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from typing import Literal
+
+class C:
+    def f(self) -> int:
+        return 1
+
+    def g[T](self, x: T) -> T:
+        return x
+
+    def h[T: int](self, x: T) -> T:
+        return x
+
+    def i[T: int](self, x: T) -> list[T]:
+        return [x]
+
+class D(C):
+    def f(self):
+        return 2
+    # TODO: This should be an invalid-override error.
+    def g(self, x: int):
+        return 2
+    # A strict application of the Liskov Substitution Principle would consider
+    # this an invalid override because it violates the guarantee that the method returns
+    # the same type as its input type (any type smaller than int),
+    # but neither mypy nor pyright will throw an error for this.
+    def h(self, x: int):
+        return 2
+
+    def i(self, x: int):
+        return [2]
+
+class E(D):
+    def f(self):
+        return 3
+
+reveal_type(C().f())  # revealed: int
+reveal_type(D().f())  # revealed: int
+reveal_type(E().f())  # revealed: int
+reveal_type(C().g(1))  # revealed: Literal[1]
+reveal_type(D().g(1))  # revealed: Literal[2] | Unknown
+reveal_type(C().h(1))  # revealed: Literal[1]
+reveal_type(D().h(1))  # revealed: Literal[2] | Unknown
+reveal_type(C().h(True))  # revealed: Literal[True]
+reveal_type(D().h(True))  # revealed: Literal[2] | Unknown
+reveal_type(C().i(1))  # revealed: list[int]
+# TODO: better type for list elements
+reveal_type(D().i(1))  # revealed: list[Unknown | int] | list[Unknown]
+
+class F:
+    def f(self) -> Literal[1, 2]:
+        return 2
+
+class G:
+    def f(self) -> Literal[2, 3]:
+        return 2
+
+class H(F, G):
+    # TODO: should be an invalid-override error
+    def f(self):
+        raise NotImplementedError
+
+class I(F, G):
+    # TODO: should be an invalid-override error
+    @final
+    def f(self):
+        raise NotImplementedError
+
+# We use a return type of `F.f` according to the MRO.
+reveal_type(H().f())  # revealed: Literal[1, 2]
+reveal_type(I().f())  # revealed: Never
+
+class C2[T]:
+    def f(self, x: T) -> T:
+        return x
+
+class D2(C2[int]):
+    def f(self, x: int):
+        return x
+
+reveal_type(D2().f(1))  # revealed: int
+```
+
 ## Invalid return type
 
 <!-- snapshot-diagnostics -->

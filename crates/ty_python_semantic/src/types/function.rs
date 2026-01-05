@@ -84,7 +84,7 @@ use crate::types::{
     HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
     NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
     TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    definition_expression_type, infer_definition_types, walk_signature,
+    definition_expression_type, infer_definition_types, infer_scope_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
 use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
@@ -1204,6 +1204,32 @@ impl<'db> FunctionType<'db> {
             updated_last_definition_signature,
         ))
     }
+
+    /// Infers this function scope's types and returns the inferred return type.
+    #[salsa::tracked(cycle_fn=return_type_cycle_recover, cycle_initial=return_type_cycle_initial, heap_size=get_size2::heap_size)]
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let scope = self.literal(db).last_definition(db).body_scope(db);
+        let inference = infer_scope_types(db, scope);
+        inference.infer_return_type(db, scope)
+    }
+}
+
+fn return_type_cycle_recover<'db>(
+    db: &'db dyn Db,
+    cycle: &salsa::Cycle,
+    previous_return_type: &Type<'db>,
+    return_type: Type<'db>,
+    _self: FunctionType<'db>,
+) -> Type<'db> {
+    return_type.cycle_normalized(db, *previous_return_type, cycle)
+}
+
+fn return_type_cycle_initial<'db>(
+    _db: &'db dyn Db,
+    id: salsa::Id,
+    _function: FunctionType<'db>,
+) -> Type<'db> {
+    Type::divergent(id)
 }
 
 /// Evaluate an `isinstance` call. Return `Truthiness::AlwaysTrue` if we can definitely infer that

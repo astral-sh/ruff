@@ -1419,6 +1419,13 @@ impl<'db> Type<'db> {
         matches!(self, Type::FunctionLiteral(..))
     }
 
+    pub(crate) const fn as_bound_method(self) -> Option<BoundMethodType<'db>> {
+        match self {
+            Type::BoundMethod(bound_method_type) => Some(bound_method_type),
+            _ => None,
+        }
+    }
+
     /// Detects types which are valid to appear inside a `Literal[…]` type annotation.
     pub(crate) fn is_literal_or_union_of_literals(&self, db: &'db dyn Db) -> bool {
         match self {
@@ -6621,6 +6628,19 @@ impl<'db> Type<'db> {
             | Type::TypeIs(_)
             | Type::TypeGuard(_)
             | Type::TypedDict(_) => CallableBinding::not_callable(self).into(),
+        }
+    }
+
+    /// Returns the inferred return type of `self` if it is a function literal / bound method.
+    fn infer_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        match self {
+            Type::FunctionLiteral(function_type) if !function_type.file(db).is_stub(db) => {
+                Some(function_type.infer_return_type(db))
+            }
+            Type::BoundMethod(method_type) if !method_type.function(db).file(db).is_stub(db) => {
+                Some(method_type.infer_return_type(db))
+            }
+            _ => None,
         }
     }
 
@@ -12443,6 +12463,88 @@ impl<'db> BoundMethodType<'db> {
             ),
             CallableTypeKind::FunctionLike,
         )
+    }
+
+    /// Infers this method scope's types and returns the inferred return type.
+    pub(crate) fn infer_return_type(self, db: &'db dyn Db) -> Type<'db> {
+        let inferred_return_type = self.function(db).infer_return_type(db);
+        // If the method is not final and the typing is implicit, the inferred return type should be unioned with `Unknown`.
+        // If any method in a base class does not have an annotated return type, `base_return_type` will include `Unknown`.
+        // On the other hand, if the return types of all methods in the base classes are annotated, there is no need to include `Unknown`.
+        if !self.is_final(db) {
+            UnionType::from_elements(
+                db,
+                [
+                    inferred_return_type,
+                    self.base_return_type(db).unwrap_or(Type::unknown()),
+                ],
+            )
+        } else {
+            inferred_return_type
+        }
+    }
+
+    #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
+    fn class_definition(self, db: &'db dyn Db) -> Option<Definition<'db>> {
+        let definition_scope = self.function(db).definition(db).scope(db);
+        let index = semantic_index(db, definition_scope.file(db));
+        Some(index.expect_single_definition(definition_scope.node(db).as_class()?))
+    }
+
+    fn is_final(self, db: &'db dyn Db) -> bool {
+        if self
+            .function(db)
+            .has_known_decorator(db, FunctionDecorators::FINAL)
+        {
+            return true;
+        }
+        let Some(class_ty) = self
+            .class_definition(db)
+            .and_then(|class| binding_type(db, class).as_class_literal())
+        else {
+            return false;
+        };
+        class_ty
+            .known_function_decorators(db)
+            .any(|deco| deco == KnownFunction::Final)
+    }
+
+    fn is_init(self, db: &'db dyn Db) -> bool {
+        self.function(db).name(db) == "__init__"
+    }
+
+    fn base_return_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
+        let class = binding_type(db, self.class_definition(db)?).to_class_type(db)?;
+        let name = self.function(db).name(db);
+
+        let base = class
+            .iter_mro(db)
+            .nth(1)
+            .and_then(class_base::ClassBase::into_class)?;
+        let base_member = base.class_member(db, name, MemberLookupPolicy::default());
+        if let Place::Defined(Type::FunctionLiteral(base_func), _, _, _) = base_member.place {
+            if let [signature] = base_func.signature(db).overloads.as_slice() {
+                let unspecialized_return_ty = signature.return_ty.unwrap_or_else(|| {
+                    let base_method_ty =
+                        base_func.into_bound_method_type(db, Type::instance(db, class));
+                    base_method_ty.infer_return_type(db)
+                });
+                if let Some(generic_context) = signature.generic_context.as_ref() {
+                    // If the return type of the base method contains a type variable, replace it with `Unknown` to avoid dangling type variables.
+                    Some(
+                        unspecialized_return_ty
+                            .apply_specialization(db, generic_context.unknown_specialization(db)),
+                    )
+                } else {
+                    Some(unspecialized_return_ty)
+                }
+            } else {
+                // TODO: Handle overloaded base methods.
+                None
+            }
+        } else {
+            None
+        }
     }
 
     fn normalized_impl(self, db: &'db dyn Db, visitor: &NormalizedVisitor<'db>) -> Self {
