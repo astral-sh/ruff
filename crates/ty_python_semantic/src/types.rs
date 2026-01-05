@@ -1499,7 +1499,7 @@ impl<'db> Type<'db> {
             | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
                 db,
                 FxOrderSet::default(),
-                FxOrderSet::from_iter([*self]),
+                NegativeIntersectionElements::Single(*self),
             )),
 
             Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) | Type::EnumLiteral(_) => {
