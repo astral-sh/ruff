@@ -4,15 +4,22 @@
 
 ```py
 from b import __file__ as module_path
+from stub import __file__ as stub_path
 
 reveal_type(__file__)  # revealed: str
 reveal_type(module_path)  # revealed: str
+reveal_type(stub_path)  # revealed: str | None
 ```
 
 `b.py`:
 
 ```py
 
+```
+
+`stub.pyi`:
+
+```pyi
 ```
 
 ## Import failed

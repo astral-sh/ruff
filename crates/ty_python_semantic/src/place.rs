@@ -1114,7 +1114,19 @@ fn symbol_impl<'db>(
     } else if name == "__file__" && file_to_module(db, scope.file(db)).is_some() {
         // We special-case `__file__` here because we know that for a successfully imported
         // Python module, it is always a string, even though typeshed says `str | None`.
-        return Place::bound(KnownClass::Str.to_instance(db)).into();
+        // This is not assumed to be the case for stubs though, where we will stick with typeshed
+        // TODO: This needs to actually consider the value type
+        //       for cases of override to fix moduletype_attrs.md failing testcase
+        if let Some(module) = file_to_module(db, scope.file(db)) {
+            match module.file(db) {
+                Some(f) => {
+                    if !f.is_stub(db) {
+                        return Place::bound(KnownClass::Str.to_instance(db)).into();
+                    }
+                }
+                None => {}
+            }
+        }
     }
 
     place_table(db, scope)
