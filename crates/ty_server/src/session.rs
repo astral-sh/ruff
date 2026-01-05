@@ -113,6 +113,10 @@ pub(crate) struct Session {
     /// Registrations is a set of LSP methods that have been dynamically registered with the
     /// client.
     registrations: HashSet<String>,
+
+    /// The name of the client (editor) that connected to this server.
+    /// This is used to provide editor-specific guidance in error messages.
+    client_name: Option<String>,
 }
 
 /// LSP State for a Project
@@ -148,6 +152,7 @@ impl Session {
         workspace_urls: Vec<Url>,
         initialization_options: InitializationOptions,
         native_system: Arc<dyn System + 'static + Send + Sync + RefUnwindSafe>,
+        client_name: Option<String>,
         in_test: bool,
     ) -> crate::Result<Self> {
         let index = Arc::new(Index::new());
@@ -176,6 +181,7 @@ impl Session {
             suspended_workspace_diagnostics_request: None,
             revision: 0,
             registrations: HashSet::new(),
+            client_name,
         })
     }
 
@@ -823,6 +829,7 @@ impl Session {
                 .unwrap_or_else(|| Arc::new(WorkspaceSettings::default())),
             position_encoding: self.position_encoding,
             document: document_handle,
+            client_name: self.client_name.clone(),
         })
     }
 
@@ -841,6 +848,7 @@ impl Session {
             in_test: self.in_test,
             resolved_client_capabilities: self.resolved_client_capabilities,
             revision: self.revision,
+            client_name: self.client_name.clone(),
         }
     }
 
@@ -972,6 +980,10 @@ impl Session {
     pub(crate) fn position_encoding(&self) -> PositionEncoding {
         self.position_encoding
     }
+
+    pub(crate) fn client_name(&self) -> Option<&str> {
+        self.client_name.as_deref()
+    }
 }
 
 /// A guard that holds the only reference to the index and allows modifying it.
@@ -1021,6 +1033,7 @@ pub(crate) struct DocumentSnapshot {
     workspace_settings: Arc<WorkspaceSettings>,
     position_encoding: PositionEncoding,
     document: DocumentHandle,
+    client_name: Option<String>,
 }
 
 impl DocumentSnapshot {
@@ -1067,6 +1080,10 @@ impl DocumentSnapshot {
     pub(crate) fn notebook_or_file_path(&self) -> &AnySystemPath {
         self.document.notebook_or_file_path()
     }
+
+    pub(crate) fn client_name(&self) -> Option<&str> {
+        self.client_name.as_deref()
+    }
 }
 
 /// An immutable snapshot of the current state of [`Session`].
@@ -1077,6 +1094,7 @@ pub(crate) struct SessionSnapshot {
     resolved_client_capabilities: ResolvedClientCapabilities,
     in_test: bool,
     revision: u64,
+    client_name: Option<String>,
 
     /// IMPORTANT: It's important that the databases come last, or at least,
     /// after any `Arc` that we try to extract or mutate in-place using `Arc::into_inner`
@@ -1117,6 +1135,24 @@ impl SessionSnapshot {
 
     pub(crate) fn revision(&self) -> u64 {
         self.revision
+    }
+
+    pub(crate) fn client_name(&self) -> Option<&str> {
+        self.client_name.as_deref()
+    }
+}
+
+/// Returns editor-specific guidance for finding logs.
+///
+/// Different editors have different ways to access language server logs,
+/// so we provide tailored instructions based on the connected client.
+pub(crate) fn log_guidance(client_name: Option<&str>) -> &'static str {
+    match client_name {
+        Some("Zed") => {
+            "Check the logs for more details (find logs via the command palette: `zed: open language server logs`)."
+        }
+        // Generic message for other editors. VS Code has a "Show Logs" button via the ty extension.
+        _ => "Check the logs for more details.",
     }
 }
 

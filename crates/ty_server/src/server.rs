@@ -47,6 +47,7 @@ impl Server {
             initialization_options,
             capabilities: client_capabilities,
             workspace_folders,
+            client_info,
             ..
         } = serde_json::from_value(init_value)
             .context("Failed to deserialize initialization parameters")?;
@@ -65,6 +66,7 @@ impl Server {
             tracing::error!("Failed to deserialize initialization options: {error}");
         }
 
+        tracing::debug!("Client info: {client_info:#?}");
         tracing::debug!("Initialization options: {initialization_options:#?}");
 
         let resolved_client_capabilities = ResolvedClientCapabilities::new(&client_capabilities);
@@ -144,6 +146,8 @@ impl Server {
             workspace_urls
         };
 
+        let client_name = client_info.map(|info| info.name);
+
         Ok(Self {
             connection,
             worker_threads,
@@ -155,6 +159,7 @@ impl Server {
                 workspace_urls,
                 initialization_options,
                 native_system,
+                client_name,
                 in_test,
             )?,
         })
