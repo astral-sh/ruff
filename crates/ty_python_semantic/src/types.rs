@@ -1455,12 +1455,7 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        #[salsa::tracked(heap_size=ruff_memory_usage::heap_size)]
-        fn cached_negate<'db>(db: &'db dyn Db, ty: Type<'db>, _: ()) -> Type<'db> {
-            IntersectionBuilder::new(db).add_negative(ty).build()
-        }
-
-        // Avoid calling the cached function for negations that are trivial.
+        // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
         match self {
             Type::Never => Type::object(),
 
@@ -1503,7 +1498,7 @@ impl<'db> Type<'db> {
             )),
 
             Type::Union(_) | Type::Intersection(_) | Type::TypeAlias(_) | Type::EnumLiteral(_) => {
-                cached_negate(db, *self, ())
+                IntersectionBuilder::new(db).add_negative(*self).build()
             }
         }
     }
