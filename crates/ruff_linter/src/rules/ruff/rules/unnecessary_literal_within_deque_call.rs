@@ -46,7 +46,7 @@ use crate::{Fix, FixAvailability, Violation};
 /// ## References
 /// - [Python documentation: `collections.deque`](https://docs.python.org/3/library/collections.html#collections.deque)
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.9.0")]
+#[violation_metadata(preview_since = "0.9.0", safety = "unsafe")]
 pub(crate) struct UnnecessaryEmptyIterableWithinDequeCall {
     has_maxlen: bool,
 }

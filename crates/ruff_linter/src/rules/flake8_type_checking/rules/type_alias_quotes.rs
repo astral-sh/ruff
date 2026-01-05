@@ -49,7 +49,7 @@ use ruff_python_ast::token::parenthesized_range;
 ///
 /// [PEP 613]: https://peps.python.org/pep-0613/
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.10.0")]
+#[violation_metadata(stable_since = "0.10.0", safety = "unsafe")]
 pub(crate) struct UnquotedTypeAlias;
 
 impl Violation for UnquotedTypeAlias {
@@ -134,7 +134,7 @@ impl Violation for UnquotedTypeAlias {
 /// [PYI020]: https://docs.astral.sh/ruff/rules/quoted-annotation-in-stub/
 /// [UP037]: https://docs.astral.sh/ruff/rules/quoted-annotation/
 #[derive(ViolationMetadata)]
-#[violation_metadata(preview_since = "0.8.1")]
+#[violation_metadata(preview_since = "0.8.1", safety = "unsafe")]
 pub(crate) struct QuotedTypeAlias;
 
 impl AlwaysFixableViolation for QuotedTypeAlias {

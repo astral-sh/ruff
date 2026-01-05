@@ -62,7 +62,7 @@ use crate::rules::flake8_return::visitor::{ReturnVisitor, Stack};
 ///
 /// - `lint.pydocstyle.property-decorators`
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", safety = "unsafe")]
 pub(crate) struct UnnecessaryReturnNone;
 
 impl AlwaysFixableViolation for UnnecessaryReturnNone {
@@ -143,7 +143,7 @@ impl AlwaysFixableViolation for ImplicitReturnValue {
 ///     return None
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", safety = "unsafe")]
 pub(crate) struct ImplicitReturn;
 
 impl AlwaysFixableViolation for ImplicitReturn {
@@ -179,7 +179,7 @@ impl AlwaysFixableViolation for ImplicitReturn {
 ///     return 1
 /// ```
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "v0.0.154")]
+#[violation_metadata(stable_since = "v0.0.154", safety = "unsafe")]
 pub(crate) struct UnnecessaryAssign {
     name: String,
 }

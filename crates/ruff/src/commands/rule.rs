@@ -2,6 +2,7 @@ use std::fmt::Write as _;
 use std::io::{self, BufWriter, Write};
 
 use anyhow::Result;
+use ruff_diagnostics::Applicability;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use strum::IntoEnumIterator;
@@ -21,6 +22,7 @@ struct Explanation<'a> {
     message_formats: &'a [&'a str],
     fix: String,
     fix_availability: FixAvailability,
+    fix_safety: Applicability,
     #[expect(clippy::struct_field_names)]
     explanation: Option<&'a str>,
     preview: bool,
@@ -41,6 +43,7 @@ impl<'a> Explanation<'a> {
             message_formats: rule.message_formats(),
             fix,
             fix_availability: rule.fixable(),
+            fix_safety: rule.applicability(),
             explanation: rule.explanation(),
             preview: rule.is_preview(),
             status: rule.group(),

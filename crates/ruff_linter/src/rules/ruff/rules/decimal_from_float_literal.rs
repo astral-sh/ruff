@@ -33,7 +33,7 @@ use crate::{AlwaysFixableViolation, Edit, Fix};
 /// of the `Decimal` instance that is constructed. This can lead to unexpected
 /// behavior if your program relies on the previous value (whether deliberately or not).
 #[derive(ViolationMetadata)]
-#[violation_metadata(stable_since = "0.9.0")]
+#[violation_metadata(stable_since = "0.9.0", safety = "unsafe")]
 pub(crate) struct DecimalFromFloatLiteral;
 
 impl AlwaysFixableViolation for DecimalFromFloatLiteral {
