@@ -2,7 +2,7 @@ use ruff_formatter::{
     FormatContext, FormatOwnedWithRule, FormatRefWithRule, FormatRuleWithOptions, write,
 };
 use ruff_python_ast::helpers::is_compound_statement;
-use ruff_python_ast::token::TokenKind;
+use ruff_python_ast::token::{Token as AstToken, TokenKind};
 use ruff_python_ast::{self as ast, Expr, PySourceType, Stmt, Suite};
 use ruff_python_ast::{AnyNodeRef, StmtExpr};
 use ruff_python_trivia::{lines_after, lines_after_ignoring_end_of_line_trivia, lines_before};
@@ -118,6 +118,10 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let comments = f.context().comments().clone();
         let source = f.context().source();
         let source_type = f.options().source_type();
+        let tokens = f.context().tokens().in_range(TextRange::new(
+            first.start(),
+            statements.last().unwrap().end(),
+        ));
 
         let f = WithNodeLevel::new(node_level, f);
         let f = &mut WithIndentLevel::new(f.context().indent_level().increment(), f);
@@ -157,7 +161,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
         let first_comments = comments.leading_dangling_trailing(first);
 
         let (mut preceding, mut empty_line_after_docstring) = if let Some(verbatim_range) =
-            skip_range(first.statement(), iter.clone(), f)
+            skip_range(first.statement(), iter.clone(), tokens, f)
         {
             let preceding =
                 write_skipped_statements(first.statement(), &mut iter, verbatim_range, f)?;
@@ -409,7 +413,7 @@ impl FormatRule<Suite, PyFormatContext<'_>> for FormatSuite {
                 }
             }
 
-            if let Some(verbatim_range) = skip_range(following, iter.clone(), f) {
+            if let Some(verbatim_range) = skip_range(following, iter.clone(), tokens, f) {
                 preceding = write_skipped_statements(following, &mut iter, verbatim_range, f)?;
                 preceding_comments = comments.leading_dangling_trailing(preceding);
             } else if following_comments
@@ -962,18 +966,19 @@ impl Format<PyFormatContext<'_>> for SuiteChildStatement<'_> {
 fn skip_range(
     first: &Stmt,
     statements: std::slice::Iter<'_, Stmt>,
+    mut tokens: &[AstToken],
     f: &mut PyFormatter,
 ) -> Option<TextRange> {
     let start = first.start();
     let mut last_statement = first;
 
-    let tokens = f.context().tokens();
     let comments = f.context().comments();
     let source = f.context().source();
 
     for statement in statements {
-        if tokens
-            .after(last_statement.end())
+        let after = tokens.partition_point(|tok| tok.start() < last_statement.end());
+
+        if tokens[after..]
             .iter()
             .take_while(|tok| tok.start() < statement.start())
             .any(|tok| matches!(tok.kind(), TokenKind::Newline))
@@ -981,6 +986,7 @@ fn skip_range(
             break;
         }
         last_statement = statement;
+        tokens = &tokens[after..];
     }
 
     if has_skip_comment(comments.trailing(last_statement), source) {
