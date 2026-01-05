@@ -1131,19 +1131,6 @@ fn symbol_impl<'db>(
         if let Some(module) = file_to_module(db, scope.file(db)) {
             if let Some(f) = module.file(db) {
                 if !f.is_stub(db) {
-                    let place = place_table(db, scope)
-                        .symbol_id(name)
-                        .map(|symbol| {
-                            place_by_id(
-                                db,
-                                scope,
-                                symbol.into(),
-                                requires_explicit_reexport,
-                                considered_definitions,
-                            )
-                        })
-                        .unwrap_or_default();
-
                     let implicit_type = KnownClass::Str.to_instance(db);
 
                     match place.place {
