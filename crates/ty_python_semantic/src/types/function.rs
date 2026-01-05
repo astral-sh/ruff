@@ -57,6 +57,7 @@ use ruff_db::files::{File, FileRange};
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
 use ruff_python_ast::{self as ast, ParameterWithDefault};
 use ruff_text_size::Ranged;
+use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 use crate::place::{Definedness, Place, place_from_bindings};
 use crate::semantic_index::ast_ids::HasScopedUseId;
@@ -76,18 +77,19 @@ use crate::types::generics::{GenericContext, InferableTypeVars, typing_self};
 use crate::types::infer::nearest_enclosing_class;
 use crate::types::list_members::all_members;
 use crate::types::narrow::ClassInfoConstraintFunction;
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
+};
 use crate::types::signatures::{CallableSignature, Signature};
 use crate::types::visitor::any_over_type;
 use crate::types::{
     ApplyTypeMappingVisitor, BoundMethodType, BoundTypeVarInstance, CallableType, CallableTypeKind,
     ClassBase, ClassLiteral, ClassType, DeprecatedInstance, DynamicType, FindLegacyTypeVarsVisitor,
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, KnownClass, KnownInstanceType,
-    NormalizedVisitor, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
-    TypeContext, TypeMapping, TypeRelation, TypeVarBoundOrConstraints, UnionBuilder, binding_type,
-    definition_expression_type, infer_definition_types, walk_signature,
+    KnownClass, KnownInstanceType, NormalizedVisitor, SpecialFormType, SubclassOfInner,
+    SubclassOfType, Truthiness, Type, TypeContext, TypeMapping, TypeVarBoundOrConstraints,
+    UnionBuilder, binding_type, definition_expression_type, infer_definition_types, walk_signature,
 };
 use crate::{Db, FxOrderSet};
-use ty_module_resolver::{KnownModule, ModuleName, file_to_module, resolve_module};
 
 /// A collection of useful spans for annotating functions.
 ///

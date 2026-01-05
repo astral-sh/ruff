@@ -3,6 +3,7 @@ use std::collections::BTreeMap;
 use std::ops::{Deref, DerefMut};
 
 use bitflags::bitflags;
+use ordermap::OrderSet;
 use ruff_db::diagnostic::{Annotation, Diagnostic, Span, SubDiagnostic, SubDiagnosticSeverity};
 use ruff_db::parsed::parsed_module;
 use ruff_python_ast::Arguments;
@@ -21,12 +22,10 @@ use crate::semantic_index::definition::Definition;
 use crate::types::class::FieldKind;
 use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::InferableTypeVars;
-use crate::types::{
-    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, NormalizedVisitor, TypeContext,
-    TypeRelation,
+use crate::types::relation::{
+    HasRelationToVisitor, IsDisjointVisitor, IsEquivalentVisitor, TypeRelation,
 };
-
-use ordermap::OrderSet;
+use crate::types::{NormalizedVisitor, TypeContext};
 
 bitflags! {
     /// Used for `TypedDict` class parameters.

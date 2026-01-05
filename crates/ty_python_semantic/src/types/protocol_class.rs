@@ -6,6 +6,7 @@ use itertools::Itertools;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashMap;
 
+use crate::types::relation::{HasRelationToVisitor, IsDisjointVisitor, TypeRelation};
 use crate::types::{CallableTypeKind, TypeContext};
 use crate::{
     Db, FxOrderSet,
@@ -13,10 +14,9 @@ use crate::{
     semantic_index::{definition::Definition, place::ScopedPlaceId, place_table, use_def_map},
     types::{
         ApplyTypeMappingVisitor, BoundTypeVarInstance, CallableType, ClassBase, ClassLiteral,
-        ClassType, FindLegacyTypeVarsVisitor, HasRelationToVisitor,
-        InstanceFallbackShadowsNonDataDescriptor, IsDisjointVisitor, KnownFunction,
-        MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature, Type, TypeMapping,
-        TypeQualifiers, TypeRelation, TypeVarVariance, VarianceInferable,
+        ClassType, FindLegacyTypeVarsVisitor, InstanceFallbackShadowsNonDataDescriptor,
+        KnownFunction, MemberLookupPolicy, NormalizedVisitor, PropertyInstanceType, Signature,
+        Type, TypeMapping, TypeQualifiers, TypeVarVariance, VarianceInferable,
         constraints::{ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension},
         context::InferContext,
         diagnostic::report_undeclared_protocol_member,
