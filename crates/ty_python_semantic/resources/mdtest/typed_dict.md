@@ -2255,7 +2255,7 @@ class Bar(TypedDict):
     42
     # error: [invalid-typed-dict-statement] "TypedDict item cannot have a value"
     b: str = "hello"
-    # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+    # error: [invalid-typed-dict-statement] "TypedDict class cannot have methods"
     def bar(self): ...
 ```
 

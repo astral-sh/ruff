@@ -1082,13 +1082,13 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                         }
                         // Pass statements are allowed.
                         ast::Stmt::Pass(_) => continue,
-                        // Docstrings are allowed.
                         ast::Stmt::Expr(expr) => {
+                            // Docstrings are allowed.
                             if matches!(*expr.value, ast::Expr::StringLiteral(_)) {
                                 continue;
                             }
-                            // As a non-standard but common extension, we interpret `...` as
-                            // equivalent to `pass` here.
+                            // As a non-standard but common extension, we also interpret `...` as
+                            // equivalent to `pass`.
                             if matches!(*expr.value, ast::Expr::EllipsisLiteral(_)) {
                                 continue;
                             }
@@ -1102,7 +1102,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                     {
                         if matches!(stmt, ast::Stmt::FunctionDef(_)) {
                             builder.into_diagnostic(format_args!(
-                                "TypedDict classes cannot have methods"
+                                "TypedDict class cannot have methods"
                             ));
                         } else {
                             let mut diagnostic = builder.into_diagnostic(format_args!(
