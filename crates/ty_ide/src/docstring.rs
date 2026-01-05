@@ -196,6 +196,7 @@ fn render_markdown(docstring: &str) -> String {
     let mut first_line = true;
     let mut block_indent = 0;
     let mut in_doctest = false;
+    let mut in_markdown_with_fence = None;
     let mut starting_literal = None;
     let mut in_literal = false;
     let mut in_any_code = false;
@@ -252,6 +253,34 @@ fn render_markdown(docstring: &str) -> String {
             // TODO: is there something more specific? `pycon`?
             output.push_str(FENCE);
             output.push_str("python\n");
+        }
+
+        // If we're not in a codeblock and we see a markdown codefence, start one
+        let has_tick_fence = line.starts_with("```");
+        let has_tilde_fence = line.starts_with("~~~");
+        if !in_any_code && (has_tick_fence || has_tilde_fence) {
+            let without_leading_fence = if has_tick_fence {
+                line.trim_start_matches('`')
+            } else {
+                line.trim_start_matches('~')
+            };
+            let fence_len = line.len() - without_leading_fence.len();
+            let fence = &line[..fence_len];
+            // If we don't see this amount of ticks again on the line, assume we're opening a markdown block
+            // (We *don't* want to consider ```hello``` as a codefence, that's inline code!)
+            if !without_leading_fence.contains(fence) {
+                // Unlike other blocks we don't need to emit fences because it's already markdown
+                block_indent = line_indent;
+                in_any_code = true;
+                in_markdown_with_fence = Some(fence.to_owned());
+            }
+        // If we're in a markdown code fence and this line seems to terminate it, end the block
+        } else if let Some(fence) = &in_markdown_with_fence
+            && line.starts_with(fence)
+        {
+            in_any_code = false;
+            block_indent = 0;
+            in_markdown_with_fence = None;
         }
 
         // If we're not in a codeblock and we see something that signals a literal block, start one
@@ -423,7 +452,11 @@ fn render_markdown(docstring: &str) -> String {
     // Flush codeblock
     if in_any_code {
         output.push('\n');
-        output.push_str(FENCE);
+        if let Some(fence) = &in_markdown_with_fence {
+            output.push_str(fence);
+        } else {
+            output.push_str(FENCE);
+        }
     }
 
     output
@@ -1092,6 +1125,174 @@ mod tests {
         assert_snapshot!(docstring.render_markdown(), @r"
         **wow this is some changes deprecated:** *1.2.3*  
         &nbsp;&nbsp;&nbsp;&nbsp;x = 2
+        ");
+    }
+
+    // We should not parse the contents of a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_ps1_contents() {
+        let docstring = r#"
+        My cool func:
+        
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ```python
+        >>> thing.do_thing()
+        wow it did the thing
+        >>> thing.do_other_thing()
+        it sure did the thing
+        ```
+        ");
+    }
+
+    // We should not parse the contents of a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_underscore_contents_tick() {
+        let docstring = r#"
+        My cool func:
+        
+        `````python
+        x_y = thing_do();
+        ``` # this should't close the fence!
+        a_b = other_thing();
+        `````
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        `````python
+        x_y = thing_do();
+        ``` # this should't close the fence!
+        a_b = other_thing();
+        `````
+        ");
+    }
+
+    // `~~~` also starts a markdown codefence
+    #[test]
+    fn explicit_markdown_block_with_underscore_contents_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+        ~~~~~python
+        x_y = thing_do();
+        ~~~ # this should't close the fence!
+        a_b = other_thing();
+        ~~~~~
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ~~~~~python
+        x_y = thing_do();
+        ~~~ # this should't close the fence!
+        a_b = other_thing();
+        ~~~~~
+        ");
+    }
+
+    // What do we do when we hit the end of the docstring with an unclosed markdown block?
+    #[test]
+    fn explicit_markdown_block_with_unclosed_fence_tick() {
+        let docstring = r#"
+        My cool func:
+        
+        ````python
+        x_y = thing_do();
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ````python
+        x_y = thing_do();
+        ````
+        ");
+    }
+
+    // What do we do when we hit the end of the docstring with an unclosed markdown block?
+    #[test]
+    fn explicit_markdown_block_with_unclosed_fence_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+        ~~~~~python
+        x_y = thing_do();
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+        ~~~~~python
+        x_y = thing_do();
+        ~~~~~
+        ");
+    }
+
+    // Demonstration of where we're unreasonably lax about markdown block parsing.
+    // It's fine to break this test, it's not particularly intentional behaviour.
+    #[test]
+    fn explicit_markdown_block_messy_corners_tick() {
+        let docstring = r#"
+        My cool func:
+        
+                ``````we still think this is a codefence```
+            x_y = thing_do();
+        ```````````` and are sloppy as heck with indentation and closing shrugggg
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+                ``````we still think this is a codefence```
+            x_y = thing_do();
+        ```````````` and are sloppy as heck with indentation and closing shrugggg
+        ");
+    }
+
+    // Demonstration of where we're unreasonably lax about markdown block parsing.
+    // It's fine to break this test, it's not particularly intentional behaviour.
+    #[test]
+    fn explicit_markdown_block_messy_corners_tilde() {
+        let docstring = r#"
+        My cool func:
+        
+                ~~~~~~we still think this is a codefence~~~
+            x_y = thing_do();
+        ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
+        "#;
+
+        let docstring = Docstring::new(docstring.to_owned());
+
+        assert_snapshot!(docstring.render_markdown(), @r"
+        My cool func:  
+          
+                ~~~~~~we still think this is a codefence~~~
+            x_y = thing_do();
+        ~~~~~~~~~~~~~ and are sloppy as heck with indentation and closing shrugggg
         ");
     }
 
