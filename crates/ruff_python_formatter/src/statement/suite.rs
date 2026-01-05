@@ -973,8 +973,9 @@ fn skip_range(
 
     for statement in statements {
         if tokens
-            .in_range(TextRange::new(last_statement.end(), statement.start()))
+            .after(last_statement.end())
             .iter()
+            .take_while(|tok| tok.start() < statement.start())
             .any(|tok| matches!(tok.kind(), TokenKind::Newline))
         {
             break;
