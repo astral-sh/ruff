@@ -40,8 +40,8 @@ use crate::types::{
     DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
     IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
     MaterializationKind, NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext,
-    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
-    declaration_type, determine_upper_bound,
+    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, UnionSettings, VarianceInferable,
+    binding_type, declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -2478,7 +2478,7 @@ impl<'db> ClassLiteral<'db> {
                         // this attribute is determined by possible `value` parameter types with which
                         // the `__set__` method can be called. We build a union of all possible options
                         // to account for possible overloads.
-                        let mut value_types = UnionBuilder::new(db);
+                        let mut value_types = UnionBuilder::new(db, UnionSettings::default());
                         for binding in &dunder_set.bindings(db) {
                             for overload in binding {
                                 if let Some(value_param) =
@@ -3359,7 +3359,7 @@ impl<'db> ClassLiteral<'db> {
             return Place::Undefined.into();
         }
 
-        let mut union = UnionBuilder::new(db);
+        let mut union = UnionBuilder::new(db, UnionSettings::default());
         let mut union_qualifiers = TypeQualifiers::empty();
         let mut is_definitely_bound = false;
 
@@ -3470,7 +3470,7 @@ impl<'db> ClassLiteral<'db> {
         // any method, we build a union of `Unknown` with the inferred types of all bindings of
         // that attribute. We include `Unknown` in that union to account for the fact that the
         // attribute might be externally modified.
-        let mut union_of_inferred_types = UnionBuilder::new(db);
+        let mut union_of_inferred_types = UnionBuilder::new(db, UnionSettings::default());
         let mut qualifiers = TypeQualifiers::IMPLICIT_INSTANCE_ATTRIBUTE;
 
         let mut is_attribute_bound = false;

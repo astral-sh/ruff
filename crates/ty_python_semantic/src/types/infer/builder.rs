@@ -113,8 +113,8 @@ use crate::types::{
     SubclassOfType, TrackedConstraintSet, Truthiness, Type, TypeAliasType, TypeAndQualifiers,
     TypeContext, TypeQualifiers, TypeVarBoundOrConstraints, TypeVarBoundOrConstraintsEvaluation,
     TypeVarDefaultEvaluation, TypeVarIdentity, TypeVarInstance, TypeVarKind, TypeVarVariance,
-    TypedDictType, UnionBuilder, UnionType, UnionTypeInstance, binding_type, infer_scope_types,
-    todo_type,
+    TypedDictType, UnionBuilder, UnionSettings, UnionType, UnionTypeInstance, binding_type,
+    infer_scope_types, todo_type,
 };
 use crate::types::{CallableTypes, overrides};
 use crate::types::{ClassBase, add_inferred_python_version_hint_to_diagnostic};
@@ -3194,7 +3194,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         // If it's an `except*` handler, this won't actually be the type of the bound symbol;
         // it will actually be the type of the generic parameters to `BaseExceptionGroup` or `ExceptionGroup`.
         let symbol_ty = if let Some(tuple_spec) = node_ty.tuple_instance_spec(self.db()) {
-            let mut builder = UnionBuilder::new(self.db());
+            let mut builder = UnionBuilder::new(self.db(), UnionSettings::default());
             let mut invalid_elements = vec![];
 
             for (index, element) in tuple_spec.all_elements().iter().enumerate() {
@@ -9124,7 +9124,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 ApplicableConstraints::ConstrainedBindings(bindings) => {
                     let reachability_constraints = bindings.reachability_constraints;
                     let predicates = bindings.predicates;
-                    let mut union = UnionBuilder::new(db);
+                    let mut union = UnionBuilder::new(db, UnionSettings::default());
                     for binding in bindings {
                         let static_reachability = reachability_constraints.evaluate(
                             db,
@@ -9401,7 +9401,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             // definition of this name visible to us (would be `LOAD_DEREF` at runtime.)
             // Note that we skip the scope containing the use that we are resolving, since we
             // already looked for the place there up above.
-            let mut nonlocal_union_builder = UnionBuilder::new(db);
+            let mut nonlocal_union_builder = UnionBuilder::new(db, UnionSettings::default());
             let mut found_some_definition = false;
             for (enclosing_scope_file_id, _) in self.index.ancestor_scopes(file_scope_id).skip(1) {
                 // If the current enclosing scope is global, no place lookup is performed here,
@@ -11021,7 +11021,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
         let comparison_result = match (left, right) {
             (Type::Union(union), other) => {
-                let mut builder = UnionBuilder::new(self.db());
+                let mut builder = UnionBuilder::new(self.db(), union.settings(self.db()));
                 for element in union.elements(self.db()) {
                     builder =
                         builder.add(self.infer_binary_type_comparison(*element, op, other, range, visitor)?);
@@ -11029,7 +11029,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 Some(Ok(builder.build()))
             }
             (other, Type::Union(union)) => {
-                let mut builder = UnionBuilder::new(self.db());
+                let mut builder = UnionBuilder::new(self.db(), union.settings(self.db()));
                 for element in union.elements(self.db()) {
                     builder =
                         builder.add(self.infer_binary_type_comparison(other, op, *element, range, visitor)?);
@@ -11509,7 +11509,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         let left_iter = left.iter_all_elements();
         let right_iter = right.iter_all_elements();
 
-        let mut builder = UnionBuilder::new(self.db());
+        let mut builder = UnionBuilder::new(self.db(), UnionSettings::default());
 
         for (l_ty, r_ty) in left_iter.zip(right_iter) {
             let pairwise_eq_result = self
