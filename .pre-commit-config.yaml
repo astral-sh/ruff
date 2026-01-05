@@ -37,7 +37,7 @@ repos:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==5.1.1
+          - mdformat-mkdocs==5.0.0
           - mdformat-footnote==0.1.2
         exclude: |
           (?x)^(
