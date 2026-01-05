@@ -3961,6 +3961,7 @@ mod tests {
 
     use crate::db::tests::setup_db;
     use crate::types::{BoundTypeVarInstance, KnownClass, TypeVarVariance};
+    use ruff_python_ast::name::Name;
 
     #[test]
     fn test_display_graph_output() {
@@ -3994,8 +3995,10 @@ mod tests {
         .trim_end();
 
         let db = setup_db();
-        let t = BoundTypeVarInstance::synthetic(&db, "T", TypeVarVariance::Invariant);
-        let u = BoundTypeVarInstance::synthetic(&db, "U", TypeVarVariance::Invariant);
+        let t =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("T"), TypeVarVariance::Invariant);
+        let u =
+            BoundTypeVarInstance::synthetic(&db, Name::new_static("U"), TypeVarVariance::Invariant);
         let bool_type = KnownClass::Bool.to_instance(&db);
         let str_type = KnownClass::Str.to_instance(&db);
         let t_str = ConstraintSet::range(&db, str_type, t, str_type);

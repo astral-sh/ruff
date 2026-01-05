@@ -4,8 +4,8 @@ use std::sync::{LazyLock, Mutex};
 
 use super::TypeVarVariance;
 use super::{
-    BoundTypeVarInstance, IntersectionBuilder, MemberLookupPolicy, Mro, MroError, MroIterator,
-    SpecialFormType, SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
+    BoundTypeVarInstance, MemberLookupPolicy, Mro, MroError, MroIterator, SpecialFormType,
+    SubclassOfType, Truthiness, Type, TypeQualifiers, class_base::ClassBase,
     function::FunctionType,
 };
 use crate::place::TypeOrigin;
@@ -37,11 +37,11 @@ use crate::types::visitor::{TypeCollector, TypeVisitor, walk_type_with_recursion
 use crate::types::{
     ApplyTypeMappingVisitor, Binding, BindingContext, BoundSuperType, CallableType,
     CallableTypeKind, CallableTypes, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
-    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IsDisjointVisitor,
-    IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType, MaterializationKind,
-    NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext, TypeMapping, TypeRelation,
-    TypedDictParams, UnionBuilder, VarianceInferable, binding_type, declaration_type,
-    determine_upper_bound,
+    DeprecatedInstance, FindLegacyTypeVarsVisitor, HasRelationToVisitor, IntersectionType,
+    IsDisjointVisitor, IsEquivalentVisitor, KnownInstanceType, ManualPEP695TypeAliasType,
+    MaterializationKind, NormalizedVisitor, PropertyInstanceType, TypeAliasType, TypeContext,
+    TypeMapping, TypeRelation, TypedDictParams, UnionBuilder, VarianceInferable, binding_type,
+    declaration_type, determine_upper_bound,
 };
 use crate::{
     Db, FxIndexMap, FxIndexSet, FxOrderSet, Program,
@@ -1940,7 +1940,7 @@ impl<'db> ClassLiteral<'db> {
     #[salsa::tracked(cycle_initial=is_typed_dict_cycle_initial,
         heap_size=ruff_memory_usage::heap_size
     )]
-    pub(super) fn is_typed_dict(self, db: &'db dyn Db) -> bool {
+    pub fn is_typed_dict(self, db: &'db dyn Db) -> bool {
         if let Some(known) = self.known(db) {
             return known.is_typed_dict_subclass();
         }
@@ -2252,13 +2252,8 @@ impl<'db> ClassLiteral<'db> {
                     qualifiers,
                 },
                 Some(dynamic_type),
-            ) => Place::bound(
-                IntersectionBuilder::new(db)
-                    .add_positive(ty)
-                    .add_positive(dynamic_type)
-                    .build(),
-            )
-            .with_qualifiers(qualifiers),
+            ) => Place::bound(IntersectionType::from_elements(db, [ty, dynamic_type]))
+                .with_qualifiers(qualifiers),
 
             (
                 PlaceAndQualifiers {
@@ -2911,8 +2906,11 @@ impl<'db> ClassLiteral<'db> {
                             }),
                         );
 
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         let get_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
@@ -2958,8 +2956,11 @@ impl<'db> ClassLiteral<'db> {
                         )
                     }))
                     .chain(std::iter::once({
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),
@@ -3015,8 +3016,11 @@ impl<'db> ClassLiteral<'db> {
                         );
 
                         // `.pop()` with a default value
-                        let t_default =
-                            BoundTypeVarInstance::synthetic(db, "T", TypeVarVariance::Covariant);
+                        let t_default = BoundTypeVarInstance::synthetic(
+                            db,
+                            Name::new_static("T"),
+                            TypeVarVariance::Covariant,
+                        );
 
                         let pop_with_default_sig = Signature::new_generic(
                             Some(GenericContext::from_typevar_instances(db, [t_default])),

@@ -16,17 +16,17 @@ license = { workspace = true }
 ruff_cache = { workspace = true }
 ruff_db = { workspace = true, features = ["junit", "serde"] }
 ruff_diagnostics = { workspace = true, features = ["serde"] }
-ruff_notebook = { workspace = true }
 ruff_macros = { workspace = true }
+ruff_notebook = { workspace = true }
 ruff_python_ast = { workspace = true, features = ["serde", "cache"] }
 ruff_python_codegen = { workspace = true }
 ruff_python_importer = { workspace = true }
 ruff_python_index = { workspace = true }
 ruff_python_literal = { workspace = true }
+ruff_python_parser = { workspace = true }
 ruff_python_semantic = { workspace = true }
 ruff_python_stdlib = { workspace = true }
 ruff_python_trivia = { workspace = true }
-ruff_python_parser = { workspace = true }
 ruff_source_file = { workspace = true, features = ["serde"] }
 ruff_text_size = { workspace = true }
 
@@ -44,8 +44,8 @@ imperative = { workspace = true }
 is-macro = { workspace = true }
 is-wsl = { workspace = true }
 itertools = { workspace = true }
-libcst = { workspace = true }
 jiff = { workspace = true }
+libcst = { workspace = true }
 log = { workspace = true }
 memchr = { workspace = true }
 natord = { workspace = true }
@@ -67,17 +67,17 @@ strum_macros = { workspace = true }
 thiserror = { workspace = true }
 toml = { workspace = true }
 typed-arena = { workspace = true }
+unicode-normalization = { workspace = true }
 unicode-width = { workspace = true }
 unicode_names2 = { workspace = true }
-unicode-normalization = { workspace = true }
 url = { workspace = true }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["filters", "json", "redactions"] }
-test-case = { workspace = true }
 # Disable colored output in tests
 colored = { workspace = true, features = ["no-color"] }
+insta = { workspace = true, features = ["filters", "json", "redactions"] }
 tempfile = { workspace = true }
+test-case = { workspace = true }
 
 [features]
 default = []

@@ -4,8 +4,8 @@ use crate::place::{builtins_symbol, known_module_symbol};
 use crate::types::enums::is_single_member_enum;
 use crate::types::tuple::TupleType;
 use crate::types::{
-    BoundMethodType, EnumLiteralType, IntersectionBuilder, KnownClass, Parameter, Parameters,
-    Signature, SpecialFormType, SubclassOfType, Type, UnionType,
+    BoundMethodType, EnumLiteralType, IntersectionBuilder, IntersectionType, KnownClass, Parameter,
+    Parameters, Signature, SpecialFormType, SubclassOfType, Type, UnionType,
 };
 use quickcheck::{Arbitrary, Gen};
 use ruff_python_ast::name::Name;
@@ -579,11 +579,7 @@ pub(crate) fn intersection<'db>(
     db: &'db TestDb,
     tys: impl IntoIterator<Item = Type<'db>>,
 ) -> Type<'db> {
-    let mut builder = IntersectionBuilder::new(db);
-    for ty in tys {
-        builder = builder.add_positive(ty);
-    }
-    builder.build()
+    IntersectionType::from_elements(db, tys)
 }
 
 pub(crate) fn union<'db>(db: &'db TestDb, tys: impl IntoIterator<Item = Type<'db>>) -> Type<'db> {

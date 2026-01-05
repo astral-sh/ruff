@@ -2447,6 +2447,7 @@ class LabeledScale(Frame):
         """
     # destroy is overridden, signature does not change
     value: Any
+    """Return current scale value."""
 
 class OptionMenu(Menubutton):
     """Themed OptionMenu, based after tkinter's OptionMenu, which allows

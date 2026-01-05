@@ -870,6 +870,8 @@ class error(Exception): ...
 @final
 class window:  # undocumented
     encoding: str
+    """the typecode character used to create the array"""
+
     @overload
     def addch(self, ch: _ChType, attr: int = ...) -> None:
         """addch([y, x,] ch, [attr=_curses.A_NORMAL])

@@ -33,8 +33,8 @@ crossbeam = { workspace = true }
 get-size2 = { workspace = true }
 globset = { workspace = true }
 notify = { workspace = true }
-pep440_rs = { workspace = true, features = ["version-ranges"] }
 ordermap = { workspace = true, features = ["serde"] }
+pep440_rs = { workspace = true, features = ["version-ranges"] }
 rayon = { workspace = true }
 regex = { workspace = true }
 regex-automata = { workspace = true }
@@ -48,8 +48,8 @@ toml = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
-ruff_db = { workspace = true, features = ["testing"] }
 insta = { workspace = true, features = ["redactions", "ron"] }
+ruff_db = { workspace = true, features = ["testing"] }
 
 [features]
 default = ["zstd"]

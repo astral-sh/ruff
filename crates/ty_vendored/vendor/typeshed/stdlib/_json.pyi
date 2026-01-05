@@ -60,11 +60,21 @@ class make_scanner:
     """JSON scanner object"""
 
     object_hook: Any
+    """object_hook"""
+
     object_pairs_hook: Any
     parse_int: Any
+    """parse_int"""
+
     parse_constant: Any
+    """parse_constant"""
+
     parse_float: Any
+    """parse_float"""
+
     strict: bool
+    """strict"""
+
     # TODO: 'context' needs the attrs above (ducktype), but not __call__.
     def __new__(cls, context: make_scanner) -> Self: ...
     def __call__(self, string: str, index: int) -> tuple[Any, int]:

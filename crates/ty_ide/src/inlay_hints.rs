@@ -723,13 +723,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:6:5
@@ -801,13 +801,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:10:6
@@ -881,13 +881,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -919,13 +919,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:24
@@ -1061,13 +1061,13 @@ mod tests {
 
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -1099,13 +1099,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:24
@@ -1259,13 +1259,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:11
@@ -1297,13 +1297,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:23
@@ -1486,13 +1486,13 @@ mod tests {
         x4[: int], (y4[: str], z4[: int]) = (x3, (y3, z3))
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:6
@@ -1524,13 +1524,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:25
@@ -1562,13 +1562,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:8:47
@@ -1735,13 +1735,13 @@ mod tests {
         w[: int] = z
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:6:5
@@ -2442,13 +2442,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:5:20
@@ -5525,13 +5525,13 @@ mod tests {
             y[: Literal[1, 2, 3, "hello"] | None] = x
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
           --> main2.py:13:9
@@ -5615,13 +5615,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
           --> main2.py:13:37
@@ -6294,12 +6294,12 @@ mod tests {
         a[: <module 'foo'>] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:423:7
+           --> stdlib/types.pyi:431:7
             |
-        422 | @disjoint_base
-        423 | class ModuleType:
+        430 | @disjoint_base
+        431 | class ModuleType:
             |       ^^^^^^^^^^
-        424 |     """Create a module object.
+        432 |     """Create a module object.
             |
         info: Source
          --> main2.py:4:6
@@ -6342,13 +6342,13 @@ mod tests {
         a[: <special-form 'Literal["a", "b", "c"]'>] = Literal['a', 'b', 'c']
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:351:1
+           --> stdlib/typing.pyi:487:1
             |
-        349 | Final: _SpecialForm
-        350 |
-        351 | Literal: _SpecialForm
+        485 | """
+        486 |
+        487 | Literal: _SpecialForm
             | ^^^^^^^
-        352 | TypedDict: _SpecialForm
+        488 | """Special typing form to define literal types (a.k.a. value types).
             |
         info: Source
          --> main2.py:4:20
@@ -6430,13 +6430,13 @@ mod tests {
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:670:7
+           --> stdlib/types.pyi:690:7
             |
-        669 | @final
-        670 | class WrapperDescriptorType:
+        689 | @final
+        690 | class WrapperDescriptorType:
             |       ^^^^^^^^^^^^^^^^^^^^^
-        671 |     @property
-        672 |     def __name__(self) -> str: ...
+        691 |     @property
+        692 |     def __name__(self) -> str: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6482,13 +6482,13 @@ mod tests {
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:684:7
+           --> stdlib/types.pyi:704:7
             |
-        683 | @final
-        684 | class MethodWrapperType:
+        703 | @final
+        704 | class MethodWrapperType:
             |       ^^^^^^^^^^^^^^^^^
-        685 |     @property
-        686 |     def __self__(self) -> object: ...
+        705 |     @property
+        706 |     def __self__(self) -> object: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6500,13 +6500,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:134:9
+           --> stdlib/types.pyi:139:9
             |
-        132 |         ) -> Self: ...
-        133 |
-        134 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        137 |         ) -> Self: ...
+        138 |
+        139 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
             |         ^^^^^^^^
-        135 |         """Call self as a function."""
+        140 |         """Call self as a function."""
             |
         info: Source
          --> main2.py:4:22
@@ -6573,14 +6573,14 @@ mod tests {
         Y[: <NewType pseudo-class 'N'>] = N
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:615:11
-            |
-        613 |     TypeGuard: _SpecialForm
-        614 |
-        615 |     class NewType:
-            |           ^^^^^^^
-        616 |         """NewType creates simple unique types with almost zero runtime overhead.
-            |
+            --> stdlib/typing.pyi:1040:11
+             |
+        1038 |     """
+        1039 |
+        1040 |     class NewType:
+             |           ^^^^^^^
+        1041 |         """NewType creates simple unique types with almost zero runtime overhead.
+             |
         info: Source
          --> main2.py:4:6
           |
@@ -6614,15 +6614,15 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:637:28
-            |
-        635 |         """
-        636 |
-        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-            |                            ^^^^
-        638 |         if sys.version_info >= (3, 11):
-        639 |             @staticmethod
-            |
+            --> stdlib/typing.pyi:1062:28
+             |
+        1060 |         """
+        1061 |
+        1062 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+             |                            ^^^^
+        1063 |         if sys.version_info >= (3, 11):
+        1064 |             @staticmethod
+             |
         info: Source
          --> main2.py:4:44
           |
@@ -6635,15 +6635,15 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:637:39
-            |
-        635 |         """
-        636 |
-        637 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
-            |                                       ^^
-        638 |         if sys.version_info >= (3, 11):
-        639 |             @staticmethod
-            |
+            --> stdlib/typing.pyi:1062:39
+             |
+        1060 |         """
+        1061 |
+        1062 |         def __init__(self, name: str, tp: Any) -> None: ...  # AnnotationForm
+             |                                       ^^
+        1063 |         if sys.version_info >= (3, 11):
+        1064 |             @staticmethod
+             |
         info: Source
          --> main2.py:4:56
           |
@@ -6656,14 +6656,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:615:11
-            |
-        613 |     TypeGuard: _SpecialForm
-        614 |
-        615 |     class NewType:
-            |           ^^^^^^^
-        616 |         """NewType creates simple unique types with almost zero runtime overhead.
-            |
+            --> stdlib/typing.pyi:1040:11
+             |
+        1038 |     """
+        1039 |
+        1040 |     class NewType:
+             |           ^^^^^^^
+        1041 |         """NewType creates simple unique types with almost zero runtime overhead.
+             |
         info: Source
          --> main2.py:6:6
           |
@@ -6749,7 +6749,7 @@ mod tests {
         Strange = Protocol[T]",
         );
 
-        assert_snapshot!(test.inlay_hints(), @r"
+        assert_snapshot!(test.inlay_hints(), @r#"
         from typing import Protocol, TypeVar
         T = TypeVar([name=]'T')
         Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
@@ -6774,13 +6774,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:341:1
+           --> stdlib/typing.pyi:346:1
             |
-        340 | Union: _SpecialForm
-        341 | Protocol: _SpecialForm
+        344 | """
+        345 |
+        346 | Protocol: _SpecialForm
             | ^^^^^^^^
-        342 | Callable: _SpecialForm
-        343 | Type: _SpecialForm
+        347 | """Base class for protocol classes.
             |
         info: Source
          --> main2.py:4:26
@@ -6807,7 +6807,7 @@ mod tests {
         4 | Strange[: <special-form 'typing.Protocol[T]'>] = Protocol[T]
           |                                          ^
           |
-        ");
+        "#);
     }
 
     #[test]
@@ -6823,14 +6823,14 @@ mod tests {
         P = ParamSpec([name=]'P')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:552:17
+           --> stdlib/typing.pyi:901:17
             |
-        550 |             def __new__(
-        551 |                 cls,
-        552 |                 name: str,
+        899 |             def __new__(
+        900 |                 cls,
+        901 |                 name: str,
             |                 ^^^^
-        553 |                 *,
-        554 |                 bound: Any | None = None,  # AnnotationForm
+        902 |                 *,
+        903 |                 bound: Any | None = None,  # AnnotationForm
             |
         info: Source
          --> main2.py:3:16
@@ -6855,14 +6855,14 @@ mod tests {
         A = TypeAliasType([name=]'A', [value=]str)
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2037:26
+            --> stdlib/typing.pyi:2546:26
              |
-        2035 |         """
-        2036 |
-        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2544 |         """
+        2545 |
+        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                          ^^^^
-        2038 |         @property
-        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2547 |         @property
+        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:20
@@ -6873,14 +6873,14 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-            --> stdlib/typing.pyi:2037:37
+            --> stdlib/typing.pyi:2546:37
              |
-        2035 |         """
-        2036 |
-        2037 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
+        2544 |         """
+        2545 |
+        2546 |         def __new__(cls, name: str, value: Any, *, type_params: tuple[_TypeParameter, ...] = ()) -> Self: ...
              |                                     ^^^^^
-        2038 |         @property
-        2039 |         def __value__(self) -> Any: ...  # AnnotationForm
+        2547 |         @property
+        2548 |         def __value__(self) -> Any: ...  # AnnotationForm
              |
         info: Source
          --> main2.py:3:32
@@ -6905,14 +6905,14 @@ mod tests {
         Ts = TypeVarTuple([name=]'Ts')
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/typing.pyi:412:30
+           --> stdlib/typing.pyi:761:30
             |
-        410 |             def has_default(self) -> bool: ...
-        411 |         if sys.version_info >= (3, 13):
-        412 |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
+        759 |             def has_default(self) -> bool: ...
+        760 |         if sys.version_info >= (3, 13):
+        761 |             def __new__(cls, name: str, *, default: Any = ...) -> Self: ...  # AnnotationForm
             |                              ^^^^
-        413 |         elif sys.version_info >= (3, 12):
-        414 |             def __new__(cls, name: str) -> Self: ...
+        762 |         elif sys.version_info >= (3, 12):
+        763 |             def __new__(cls, name: str) -> Self: ...
             |
         info: Source
          --> main2.py:3:20

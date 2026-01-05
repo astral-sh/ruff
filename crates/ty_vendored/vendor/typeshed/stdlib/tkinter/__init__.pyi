@@ -6172,7 +6172,11 @@ class Image(_Image):
     def __setitem__(self, key, value) -> None: ...
     def __getitem__(self, key): ...
     configure: Incomplete
+    """Configure the image."""
+
     config: Incomplete
+    """Configure the image."""
+
     def type(self):
         """Return the type of the image, e.g. "photo" or "bitmap"."""
 

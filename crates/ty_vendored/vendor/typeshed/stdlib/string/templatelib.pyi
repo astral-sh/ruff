@@ -11,7 +11,10 @@ class Template:  # TODO: consider making `Template` generic on `TypeVarTuple`
     """Template object"""
 
     strings: tuple[str, ...]
+    """Strings"""
+
     interpolations: tuple[Interpolation, ...]
+    """Interpolations"""
 
     def __new__(cls, *args: str | Interpolation) -> Template: ...
     def __iter__(self) -> Iterator[str | Interpolation]:
@@ -32,9 +35,16 @@ class Interpolation:
     """Interpolation object"""
 
     value: Any  # TODO: consider making `Interpolation` generic in runtime
+    """Value"""
+
     expression: str
+    """Expression"""
+
     conversion: Literal["a", "r", "s"] | None
+    """Conversion"""
+
     format_spec: str
+    """Format specifier"""
 
     __match_args__ = ("value", "expression", "conversion", "format_spec")
 

@@ -12,7 +12,6 @@ license = { workspace = true }
 
 [dependencies]
 get-size2 = { workspace = true }
-ordermap = { workspace = true }
 
 [lints]
 workspace = true

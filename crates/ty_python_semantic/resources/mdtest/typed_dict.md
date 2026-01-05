@@ -2124,20 +2124,26 @@ shows up in a subset of the union members) is present, but that isn't generally 
 field, it could be *assigned to* with another `TypedDict` that does:
 
 ```py
+from typing_extensions import Literal
+
 class Foo(TypedDict):
     foo: int
 
 class Bar(TypedDict):
     bar: int
 
-def disappointment(u: Foo | Bar):
+def disappointment(u: Foo | Bar, v: Literal["foo"]):
     if "foo" in u:
         # We can't narrow the union here...
         reveal_type(u)  # revealed: Foo | Bar
     else:
         # ...(even though we *can* narrow it here)...
-        # TODO: This should narrow to `Bar`, because "foo" is required in `Foo`.
+        reveal_type(u)  # revealed: Bar
+
+    if v in u:
         reveal_type(u)  # revealed: Foo | Bar
+    else:
+        reveal_type(u)  # revealed: Bar
 
 # ...because `u` could turn out to be one of these.
 class FooBar(TypedDict):
@@ -2148,8 +2154,117 @@ static_assert(is_assignable_to(FooBar, Foo))
 static_assert(is_assignable_to(FooBar, Bar))
 ```
 
+`not in` works in the opposite way to `in`: we can narrow in the positive case, but we cannot narrow
+in the negative case. The following snippet also tests our narrowing behaviour for intersections
+that contain `TypedDict`s, and unions that contain intersections that contain `TypedDict`s:
+
+```py
+from typing_extensions import Literal, Any
+from ty_extensions import Intersection, is_assignable_to, static_assert
+
+def _(t: Bar, u: Foo | Intersection[Bar, Any], v: Intersection[Bar, Any], w: Literal["bar"]):
+    reveal_type(u)  # revealed: Foo | (Bar & Any)
+    reveal_type(v)  # revealed: Bar & Any
+
+    if "bar" not in t:
+        reveal_type(t)  # revealed: Never
+    else:
+        reveal_type(t)  # revealed: Bar
+
+    if "bar" not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
+
+    if "bar" not in v:
+        reveal_type(v)  # revealed: Never
+    else:
+        reveal_type(v)  # revealed: Bar & Any
+
+    if w not in u:
+        reveal_type(u)  # revealed: Foo
+    else:
+        reveal_type(u)  # revealed: Foo | (Bar & Any)
+```
+
 TODO: The narrowing that we didn't do above will become possible when we add support for
 `closed=True`. This is [one of the main use cases][closed] that motivated the `closed` feature.
+
+## Narrowing tagged unions of `TypedDict`s with `match` statements
+
+Just like with `if` statements, we can narrow tagged unions of `TypedDict`s in `match` statements:
+
+```toml
+[environment]
+python-version = "3.10"
+```
+
+```py
+from typing import TypedDict, Literal
+
+class Foo(TypedDict):
+    tag: Literal["foo"]
+
+class Bar(TypedDict):
+    tag: Literal[42]
+
+class Baz(TypedDict):
+    tag: Literal[b"baz"]
+
+class Bing(TypedDict):
+    tag: Literal["bing"]
+
+def match_statements(u: Foo | Bar | Baz | Bing):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case 42:
+            reveal_type(u)  # revealed: Bar
+        case b"baz":
+            reveal_type(u)  # revealed: Baz
+        case _:
+            reveal_type(u)  # revealed: Bing
+```
+
+We can also narrow a single `TypedDict` type to `Never`:
+
+```py
+def match_single(u: Foo):
+    match u["tag"]:
+        case "foo":
+            reveal_type(u)  # revealed: Foo
+        case _:
+            reveal_type(u)  # revealed: Never
+```
+
+Narrowing is restricted to `Literal` tags:
+
+```py
+from ty_extensions import is_assignable_to, static_assert
+
+class NonLiteralTD(TypedDict):
+    tag: int
+
+def match_non_literal(u: Foo | NonLiteralTD):
+    match u["tag"]:
+        case "foo":
+            # We can't narrow the union here...
+            reveal_type(u)  # revealed: Foo | NonLiteralTD
+        case _:
+            # ...(but we *can* narrow here)...
+            reveal_type(u)  # revealed: NonLiteralTD
+```
+
+We can still narrow `Literal` tags even when non-`TypedDict` types are present in the union:
+
+```py
+def match_with_dict(u: Foo | Bar | dict):
+    match u["tag"]:
+        case "foo":
+            # TODO: `dict & ~<TypedDict ...>` should simplify to `dict` here, but that's currently a
+            # false negative in `is_disjoint_impl`.
+            reveal_type(u)  # revealed: Foo | (dict[Unknown, Unknown] & ~<TypedDict with items 'tag'>)
+```
 
 [closed]: https://peps.python.org/pep-0728/#disallowing-extra-items-explicitly
 [subtyping section]: https://typing.python.org/en/latest/spec/typeddict.html#subtyping-between-typeddict-types
