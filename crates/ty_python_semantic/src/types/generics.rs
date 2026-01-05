@@ -1672,7 +1672,7 @@ impl<'db> SpecializationBuilder<'db> {
 
                         let upper = IntersectionType::from_elements(
                             self.db,
-                            std::iter::chain(bounds.upper, [bound]),
+                            bounds.upper.into_iter().chain([bound]),
                         );
                         if upper != bound {
                             self.add_type_mapping(bound_typevar, upper, variance, &mut f);
