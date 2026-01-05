@@ -2,6 +2,7 @@
 source: crates/ty_test/src/lib.rs
 expression: snapshot
 ---
+
 ---
 mdtest name: super.md - Super - Invalid Usages - Diagnostic when the invalid type is rendered very verbosely
 mdtest path: crates/ty_python_semantic/resources/mdtest/class/super.md

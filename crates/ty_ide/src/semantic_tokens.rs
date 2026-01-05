@@ -1138,9 +1138,7 @@ mod tests {
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "foo" @ 4..7: Function [definition]
-        "###);
+        assert_snapshot!(test.to_snapshot(&tokens), @r#""foo" @ 4..7: Function [definition]"#);
     }
 
     #[test]
@@ -1149,9 +1147,7 @@ mod tests {
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
-        "MyClass" @ 6..13: Class [definition]
-        "###);
+        assert_snapshot!(test.to_snapshot(&tokens), @r#""MyClass" @ 6..13: Class [definition]"#);
     }
 
     #[test]
@@ -1163,11 +1159,11 @@ mod tests {
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "Foo" @ 6..9: Class [definition]
         "x" @ 12..13: Variable
         "m" @ 15..16: Variable
-        "###);
+        "#);
     }
 
     #[test]
@@ -2702,7 +2698,7 @@ class MyClass:
 
         let tokens = test.highlight_file();
 
-        assert_snapshot!(test.to_snapshot(&tokens), @r###"
+        assert_snapshot!(test.to_snapshot(&tokens), @r#"
         "staticmethod" @ 2..14: Decorator
         "property" @ 16..24: Decorator
         "app" @ 26..29: Variable
@@ -2711,7 +2707,7 @@ class MyClass:
         "my_function" @ 49..60: Function [definition]
         "dataclass" @ 75..84: Decorator
         "MyClass" @ 91..98: Class [definition]
-        "###);
+        "#);
     }
 
     #[test]

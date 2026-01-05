@@ -1326,7 +1326,7 @@ mod tests {
     fn noqa_all() {
         let source = "# noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1347,7 +1347,7 @@ mod tests {
     fn noqa_no_code() {
         let source = "# noqa:";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1359,7 +1359,7 @@ mod tests {
     fn noqa_no_code_invalid_suffix() {
         let source = "# noqa: foo";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1371,7 +1371,7 @@ mod tests {
     fn noqa_no_code_trailing_content() {
         let source = "# noqa:  # Foo";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1383,7 +1383,7 @@ mod tests {
     fn malformed_code_1() {
         let source = "# noqa: F";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -1422,7 +1422,7 @@ mod tests {
     fn malformed_code_3() {
         let source = "# noqa: RUF001F";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -1492,7 +1492,7 @@ mod tests {
     fn noqa_all_case_insensitive() {
         let source = "# NOQA";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1625,7 +1625,7 @@ mod tests {
     fn noqa_all_no_space() {
         let source = "#noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1704,7 +1704,7 @@ mod tests {
     fn noqa_all_multi_space() {
         let source = "#  noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1837,7 +1837,7 @@ mod tests {
     fn noqa_all_leading_comment() {
         let source = "# Some comment describing the noqa # noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1916,7 +1916,7 @@ mod tests {
     fn noqa_all_trailing_comment() {
         let source = "# noqa # Some comment describing the noqa";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -1995,7 +1995,7 @@ mod tests {
     fn noqa_invalid_codes() {
         let source = "# noqa: unused-import, F401, some other code";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2139,7 +2139,7 @@ mod tests {
     fn noqa_code_invalid_code_suffix() {
         let source = "# noqa: F401abc";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2151,7 +2151,7 @@ mod tests {
     fn noqa_invalid_suffix() {
         let source = "# noqa[F401]";
         let directive = lex_inline_noqa(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidSuffix,
         )
@@ -2163,7 +2163,7 @@ mod tests {
     fn flake8_exemption_all() {
         let source = "# flake8: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2184,7 +2184,7 @@ mod tests {
     fn flake8_noqa_no_code() {
         let source = "# flake8: noqa:";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2196,7 +2196,7 @@ mod tests {
     fn flake8_noqa_no_code_invalid_suffix() {
         let source = "# flake8: noqa: foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2208,7 +2208,7 @@ mod tests {
     fn flake8_noqa_no_code_trailing_content() {
         let source = "# flake8: noqa:  # Foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2220,7 +2220,7 @@ mod tests {
     fn flake8_malformed_code_1() {
         let source = "# flake8: noqa: F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2259,7 +2259,7 @@ mod tests {
     fn flake8_malformed_code_3() {
         let source = "# flake8: noqa: RUF001F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2271,7 +2271,7 @@ mod tests {
     fn ruff_exemption_all() {
         let source = "# ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2292,7 +2292,7 @@ mod tests {
     fn ruff_noqa_no_code() {
         let source = "# ruff: noqa:";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2304,7 +2304,7 @@ mod tests {
     fn ruff_noqa_no_code_invalid_suffix() {
         let source = "# ruff: noqa: foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2316,7 +2316,7 @@ mod tests {
     fn ruff_noqa_no_code_trailing_content() {
         let source = "# ruff: noqa:  # Foo";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             MissingCodes,
         )
@@ -2328,7 +2328,7 @@ mod tests {
     fn ruff_malformed_code_1() {
         let source = "# ruff: noqa: F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             MissingCodes,
         )
@@ -2367,7 +2367,7 @@ mod tests {
     fn ruff_malformed_code_3() {
         let source = "# ruff: noqa: RUF001F";
         let directive = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(directive, @r"
+        assert_debug_snapshot!(directive, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2379,7 +2379,7 @@ mod tests {
     fn flake8_exemption_all_no_space() {
         let source = "#flake8:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2400,7 +2400,7 @@ mod tests {
     fn ruff_exemption_all_no_space() {
         let source = "#ruff:noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2619,7 +2619,7 @@ mod tests {
     fn ruff_exemption_invalid_code_suffix() {
         let source = "# ruff: noqa: F401abc";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Err(
             InvalidCodeSuffix,
         )
@@ -2685,7 +2685,7 @@ mod tests {
     fn ruff_exemption_all_leading_comment() {
         let source = "# Leading comment # ruff: noqa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2706,7 +2706,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment() {
         let source = "# ruff: noqa # Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2754,7 +2754,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment_no_space() {
         let source = "# ruff: noqa# Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2775,7 +2775,7 @@ mod tests {
     fn ruff_exemption_all_trailing_comment_no_hash() {
         let source = "# ruff: noqa Trailing comment";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2823,7 +2823,7 @@ mod tests {
     fn flake8_exemption_all_case_insensitive() {
         let source = "# flake8: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {
@@ -2844,7 +2844,7 @@ mod tests {
     fn ruff_exemption_all_case_insensitive() {
         let source = "# ruff: NoQa";
         let exemption = lex_file_exemption(TextRange::up_to(source.text_len()), source);
-        assert_debug_snapshot!(exemption, @r"
+        assert_debug_snapshot!(exemption, @"
         Ok(
             Some(
                 NoqaLexerOutput {

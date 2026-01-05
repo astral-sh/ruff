@@ -132,29 +132,29 @@ fn dependents() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [],
-              "ruff/b.py": [
-                "ruff/a.py"
-              ],
-              "ruff/c.py": [
-                "ruff/b.py"
-              ],
-              "ruff/d.py": [
-                "ruff/c.py"
-              ],
-              "ruff/e.py": [
-                "ruff/d.py"
-              ]
-            }
+        assert_cmd_snapshot!(command().arg("--direction").arg("dependents").current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [],
+          "ruff/b.py": [
+            "ruff/a.py"
+          ],
+          "ruff/c.py": [
+            "ruff/b.py"
+          ],
+          "ruff/d.py": [
+            "ruff/c.py"
+          ],
+          "ruff/e.py": [
+            "ruff/d.py"
+          ]
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     Ok(())
@@ -184,21 +184,21 @@ fn string_detection() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
-            success: true
-            exit_code: 0
-            ----- stdout -----
-            {
-              "ruff/__init__.py": [],
-              "ruff/a.py": [
-                "ruff/b.py"
-              ],
-              "ruff/b.py": [],
-              "ruff/c.py": []
-            }
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
+        success: true
+        exit_code: 0
+        ----- stdout -----
+        {
+          "ruff/__init__.py": [],
+          "ruff/a.py": [
+            "ruff/b.py"
+          ],
+          "ruff/b.py": [],
+          "ruff/c.py": []
+        }
 
-            ----- stderr -----
-            "###);
+        ----- stderr -----
+        "#);
     });
 
     insta::with_settings!({
@@ -319,7 +319,7 @@ fn globs() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -340,7 +340,7 @@ fn globs() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -368,7 +368,7 @@ fn exclude() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -381,7 +381,7 @@ fn exclude() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -421,7 +421,7 @@ fn wildcard() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -443,7 +443,7 @@ fn wildcard() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -639,7 +639,7 @@ fn venv() -> Result<()> {
     }, {
         assert_cmd_snapshot!(
             command().args(["--python", "none"]).arg("packages/albatross").current_dir(&root),
-            @r"
+            @"
         success: false
         exit_code: 2
         ----- stdout -----
@@ -695,7 +695,7 @@ fn notebook_basic() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -708,7 +708,7 @@ fn notebook_basic() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())
@@ -765,7 +765,7 @@ fn notebook_with_magic() -> Result<()> {
     insta::with_settings!({
         filters => INSTA_FILTERS.to_vec(),
     }, {
-        assert_cmd_snapshot!(command().current_dir(&root), @r###"
+        assert_cmd_snapshot!(command().current_dir(&root), @r#"
         success: true
         exit_code: 0
         ----- stdout -----
@@ -778,7 +778,7 @@ fn notebook_with_magic() -> Result<()> {
         }
 
         ----- stderr -----
-        "###);
+        "#);
     });
 
     Ok(())

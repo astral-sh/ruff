@@ -200,7 +200,7 @@ fn swap_cells() -> anyhow::Result<()> {
     let notebook = builder.open(&mut server);
 
     let diagnostics = server.collect_publish_diagnostic_notifications(3);
-    assert_json_snapshot!(diagnostics, @r###"
+    assert_json_snapshot!(diagnostics, @r#"
     {
       "vscode-notebook-cell://src/test.ipynb#0": [
         {
@@ -226,7 +226,7 @@ fn swap_cells() -> anyhow::Result<()> {
       "vscode-notebook-cell://src/test.ipynb#1": [],
       "vscode-notebook-cell://src/test.ipynb#2": []
     }
-    "###);
+    "#);
 
     // Re-order the cells from `b`, `a`, `c` to `a`, `b`, `c` (swapping cell 1 and 2)
     server.send_notification::<lsp_types::notification::DidChangeNotebookDocument>(
@@ -269,13 +269,13 @@ fn swap_cells() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(3);
 
-    assert_json_snapshot!(diagnostics, @r###"
+    assert_json_snapshot!(diagnostics, @r#"
     {
       "vscode-notebook-cell://src/test.ipynb#0": [],
       "vscode-notebook-cell://src/test.ipynb#1": [],
       "vscode-notebook-cell://src/test.ipynb#2": []
     }
-    "###);
+    "#);
 
     Ok(())
 }
@@ -460,12 +460,12 @@ fn invalid_syntax_with_syntax_errors_disabled() -> anyhow::Result<()> {
 
     let diagnostics = server.collect_publish_diagnostic_notifications(2);
 
-    assert_json_snapshot!(diagnostics, @r###"
+    assert_json_snapshot!(diagnostics, @r#"
     {
       "vscode-notebook-cell://src/test.ipynb#0": [],
       "vscode-notebook-cell://src/test.ipynb#1": []
     }
-    "###);
+    "#);
 
     Ok(())
 }

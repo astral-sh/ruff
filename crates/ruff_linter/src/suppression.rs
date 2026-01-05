@@ -662,7 +662,7 @@ print('hello')
 ";
         assert_debug_snapshot!(
             Suppressions::debug(source),
-            @r"
+            @"
         Suppressions {
             valid: [],
             invalid: [],
@@ -680,7 +680,7 @@ print('hello')
 ";
         assert_debug_snapshot!(
             Suppressions::debug(source),
-            @r"
+            @"
         Suppressions {
             valid: [],
             invalid: [],
@@ -1324,7 +1324,7 @@ def bar():
     fn parse_unrelated_comment() {
         assert_debug_snapshot!(
             parse_suppression_comment("# hello world"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: NotASuppression,
@@ -1339,7 +1339,7 @@ def bar():
     fn parse_invalid_action() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: lol[hi]"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: UnknownAction,
@@ -1354,7 +1354,7 @@ def bar():
     fn parse_missing_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: MissingCodes,
@@ -1369,7 +1369,7 @@ def bar():
     fn parse_empty_codes() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[]"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: MissingCodes,
@@ -1384,7 +1384,7 @@ def bar():
     fn parse_missing_bracket() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: MissingBracket,
@@ -1399,7 +1399,7 @@ def bar():
     fn parse_missing_comma() {
         assert_debug_snapshot!(
             parse_suppression_comment("# ruff: disable[foo bar]"),
-            @r"
+            @"
         Err(
             ParseError {
                 kind: MissingComma,

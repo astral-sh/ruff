@@ -528,7 +528,8 @@ def ab(a: str): ...
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -583,7 +584,8 @@ def ab(a: str):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int) -> Unknown
         ---------------------------------------------
@@ -638,7 +640,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -691,7 +694,8 @@ def ab(a: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, b: int) -> Unknown
         ---------------------------------------------
@@ -750,7 +754,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, b: int) -> Unknown
         ---------------------------------------------
@@ -815,7 +820,8 @@ def ab(a: int, *, c: int):
             )
             .build();
 
-        assert_snapshot!(test.signature_help_render(), @r"
+        assert_snapshot!(test.signature_help_render(), @"
+
         ============== active signature =============
         (a: int, *, c: int) -> Unknown
         ---------------------------------------------
