@@ -18,34 +18,40 @@ mdtest path: crates/ty_python_semantic/resources/mdtest/typed_dict.md
  3 | class Foo(TypedDict):
  4 |     """docstring"""
  5 | 
- 6 |     pass
- 7 | 
- 8 | class Bar(TypedDict):
- 9 |     a: int
-10 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
-11 |     42
-12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
-13 |     b: str = "hello"
-14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
-15 |     def bar(self): ...
-16 | class Baz(Bar):
-17 |     # error: [invalid-typed-dict-statement]
-18 |     def baz(self):
-19 |         pass
+ 6 |     annotated_item: int
+ 7 |     """attribute docstring"""
+ 8 | 
+ 9 |     pass
+10 | 
+11 |     # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
+12 |     ...
+13 | 
+14 | class Bar(TypedDict):
+15 |     a: int
+16 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+17 |     42
+18 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+19 |     b: str = "hello"
+20 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+21 |     def bar(self): ...
+22 | class Baz(Bar):
+23 |     # error: [invalid-typed-dict-statement]
+24 |     def baz(self):
+25 |         pass
 ```
 
 # Diagnostics
 
 ```
 error[invalid-typed-dict-statement]: invalid statement in TypedDict class body
-  --> src/mdtest_snippet.py:11:5
+  --> src/mdtest_snippet.py:17:5
    |
- 9 |     a: int
-10 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
-11 |     42
+15 |     a: int
+16 |     # error: [invalid-typed-dict-statement] "invalid statement in TypedDict class body"
+17 |     42
    |     ^^
-12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
-13 |     b: str = "hello"
+18 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+19 |     b: str = "hello"
    |
 info: Only annotated declarations (`<name>: <type>`) are allowed.
 info: rule `invalid-typed-dict-statement` is enabled by default
@@ -54,14 +60,14 @@ info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 error[invalid-typed-dict-statement]: TypedDict items cannot have a value
-  --> src/mdtest_snippet.py:13:14
+  --> src/mdtest_snippet.py:19:14
    |
-11 |     42
-12 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
-13 |     b: str = "hello"
+17 |     42
+18 |     # error: [invalid-typed-dict-statement] "TypedDict items cannot have a value"
+19 |     b: str = "hello"
    |              ^^^^^^^
-14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
-15 |     def bar(self): ...
+20 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+21 |     def bar(self): ...
    |
 info: rule `invalid-typed-dict-statement` is enabled by default
 
@@ -69,14 +75,14 @@ info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 error[invalid-typed-dict-statement]: TypedDict classes cannot have methods
-  --> src/mdtest_snippet.py:15:5
+  --> src/mdtest_snippet.py:21:5
    |
-13 |     b: str = "hello"
-14 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
-15 |     def bar(self): ...
+19 |     b: str = "hello"
+20 |     # error: [invalid-typed-dict-statement] "TypedDict classes cannot have methods"
+21 |     def bar(self): ...
    |     ^^^^^^^^^^^^^^^^^^
-16 | class Baz(Bar):
-17 |     # error: [invalid-typed-dict-statement]
+22 | class Baz(Bar):
+23 |     # error: [invalid-typed-dict-statement]
    |
 info: rule `invalid-typed-dict-statement` is enabled by default
 
@@ -84,12 +90,12 @@ info: rule `invalid-typed-dict-statement` is enabled by default
 
 ```
 error[invalid-typed-dict-statement]: TypedDict classes cannot have methods
-  --> src/mdtest_snippet.py:18:5
+  --> src/mdtest_snippet.py:24:5
    |
-16 |   class Baz(Bar):
-17 |       # error: [invalid-typed-dict-statement]
-18 | /     def baz(self):
-19 | |         pass
+22 |   class Baz(Bar):
+23 |       # error: [invalid-typed-dict-statement]
+24 | /     def baz(self):
+25 | |         pass
    | |____________^
    |
 info: rule `invalid-typed-dict-statement` is enabled by default

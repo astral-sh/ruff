@@ -1087,6 +1087,11 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                             if matches!(*expr.value, ast::Expr::StringLiteral(_)) {
                                 continue;
                             }
+                            // As a non-standard but common extension, we interpret `...` as
+                            // equivalent to `pass` here.
+                            if matches!(*expr.value, ast::Expr::EllipsisLiteral(_)) {
+                                continue;
+                            }
                         }
                         // Everything else is forbidden.
                         _ => {}

@@ -2241,7 +2241,13 @@ from typing import TypedDict
 class Foo(TypedDict):
     """docstring"""
 
+    annotated_item: int
+    """attribute docstring"""
+
     pass
+
+    # As a non-standard but common extension, we interpret `...` as equivalent to `pass`.
+    ...
 
 class Bar(TypedDict):
     a: int
