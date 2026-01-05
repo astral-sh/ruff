@@ -105,11 +105,35 @@ impl<'db> UnionElement<'db> {
 
         let mut collapse = false;
         let mut ignore = false;
+
+        // A closure called for each element in a set of literals
+        // to determine whether the element should be retained in the set.
+        //
+        // If `ignore` or `collapse` is `true` for any element in the set,
+        // we no longer need to do any expensive subtyping checks for any
+        // further elements in the set:
+        //
+        // - if `ignore` is `true`, this indicates that `other_type` is a
+        //   subtype of one of the literals in this set. Given this fact,
+        //   it cannot be possible for any other literals in this set to be
+        //   a subtype of `other_type`.
+        // - if `collapse` is `true`, all literals of this kind will be
+        //   removed from the union, so it's irrelevant to answer the
+        //   question of which literals should remain in this set.
+        //
+        // We therefore only ask if `ty` is a subtype of `other_type` if
+        // both `ignore` and `collapse` are `false`. If either is `true`,
+        // we skip the expensive subtype check and return `true`.
         let mut should_retain_type = |ty| {
-            // it's tempting to use `|=` but then the r.h.s. wouldn't be lazily evaluated
-            ignore = ignore || other_type.is_subtype_of(db, ty);
-            collapse = collapse || ignore || other_type_negated().is_subtype_of(db, ty);
-            ignore || collapse || !ty.is_subtype_of(db, other_type)
+            if ignore || other_type.is_subtype_of(db, ty) {
+                ignore = true;
+                return true;
+            }
+            if collapse || other_type_negated().is_subtype_of(db, ty) {
+                collapse = true;
+                return true;
+            }
+            !ty.is_subtype_of(db, other_type)
         };
 
         let should_keep = match self {
