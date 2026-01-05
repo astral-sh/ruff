@@ -8144,7 +8144,8 @@ impl<'db> Type<'db> {
                     }
                 });
 
-                let mapped = alias.apply_function_specialization(db, value_type).apply_type_mapping_impl(db, type_mapping, tcx, visitor);
+                let value_type = alias.apply_function_specialization(db, value_type);
+                let mapped = visitor.visit(value_type, || value_type.apply_type_mapping_impl(db, type_mapping, tcx, visitor));
                 let is_recursive = any_over_type(db, alias.raw_value_type(db).expand_eagerly(db), &|ty| ty.is_divergent(), false);
 
                 // If the type mapping does not result in any change to this (non-recursive) type alias, do not expand it.
