@@ -1118,13 +1118,10 @@ fn symbol_impl<'db>(
         // TODO: This needs to actually consider the value type
         //       for cases of override to fix moduletype_attrs.md failing testcase
         if let Some(module) = file_to_module(db, scope.file(db)) {
-            match module.file(db) {
-                Some(f) => {
-                    if !f.is_stub(db) {
-                        return Place::bound(KnownClass::Str.to_instance(db)).into();
-                    }
+            if let Some(f) = module.file(db) {
+                if !f.is_stub(db) {
+                    return Place::bound(KnownClass::Str.to_instance(db)).into();
                 }
-                None => {}
             }
         }
     }
