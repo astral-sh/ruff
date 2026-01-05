@@ -63,11 +63,11 @@ use crate::types::diagnostic::{
     INVALID_LEGACY_TYPE_VARIABLE, INVALID_METACLASS, INVALID_NAMED_TUPLE, INVALID_NEWTYPE,
     INVALID_OVERLOAD, INVALID_PARAMETER_DEFAULT, INVALID_PARAMSPEC, INVALID_PROTOCOL,
     INVALID_TYPE_ARGUMENTS, INVALID_TYPE_FORM, INVALID_TYPE_GUARD_CALL,
-    INVALID_TYPE_VARIABLE_CONSTRAINTS, IncompatibleBases, NOT_SUBSCRIPTABLE,
-    POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL, POSSIBLY_MISSING_IMPORT,
-    SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL, UNRESOLVED_ATTRIBUTE,
-    UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE, UNSUPPORTED_OPERATOR,
-    USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
+    INVALID_TYPE_VARIABLE_CONSTRAINTS, INVALID_TYPED_DICT_STATEMENT, IncompatibleBases,
+    NOT_SUBSCRIPTABLE, POSSIBLY_MISSING_ATTRIBUTE, POSSIBLY_MISSING_IMPLICIT_CALL,
+    POSSIBLY_MISSING_IMPORT, SUBCLASS_OF_FINAL_CLASS, TypedDictDeleteErrorKind, UNDEFINED_REVEAL,
+    UNRESOLVED_ATTRIBUTE, UNRESOLVED_GLOBAL, UNRESOLVED_IMPORT, UNRESOLVED_REFERENCE,
+    UNSUPPORTED_OPERATOR, USELESS_OVERLOAD_BODY, hint_if_stdlib_attribute_exists_on_other_versions,
     hint_if_stdlib_submodule_exists_on_other_versions, report_attempted_protocol_instantiation,
     report_bad_dunder_set_call, report_bad_frozen_dataclass_inheritance,
     report_cannot_delete_typed_dict_key, report_cannot_pop_required_field_on_typed_dict,
@@ -1053,6 +1053,67 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
 
             if let Some(protocol) = class.into_protocol_class(self.db()) {
                 protocol.validate_members(&self.context);
+            }
+
+            // (9) If it's a `TypedDict` class, check that it doesn't include any invalid
+            // statements: https://typing.python.org/en/latest/spec/typeddict.html#class-based-syntax
+            //
+            //     The body of the class definition defines the items of the `TypedDict` type. It
+            //     may also contain a docstring or pass statements (primarily to allow the creation
+            //     of an empty `TypedDict`). No other statements are allowed, and type checkers
+            //     should report an error if any are present.
+            if class.is_typed_dict(self.db()) {
+                for stmt in &class_node.body {
+                    match stmt {
+                        // Annotated assignments are allowed (that's the whole point), but they're
+                        // not allowed to have a value.
+                        ast::Stmt::AnnAssign(ann_assign) => {
+                            if let Some(value) = &ann_assign.value {
+                                if let Some(builder) = self
+                                    .context
+                                    .report_lint(&INVALID_TYPED_DICT_STATEMENT, &**value)
+                                {
+                                    builder.into_diagnostic(format_args!(
+                                        "TypedDict item cannot have a value"
+                                    ));
+                                }
+                            }
+                            continue;
+                        }
+                        // Pass statements are allowed.
+                        ast::Stmt::Pass(_) => continue,
+                        ast::Stmt::Expr(expr) => {
+                            // Docstrings are allowed.
+                            if matches!(*expr.value, ast::Expr::StringLiteral(_)) {
+                                continue;
+                            }
+                            // As a non-standard but common extension, we also interpret `...` as
+                            // equivalent to `pass`.
+                            if matches!(*expr.value, ast::Expr::EllipsisLiteral(_)) {
+                                continue;
+                            }
+                        }
+                        // Everything else is forbidden.
+                        _ => {}
+                    }
+                    if let Some(builder) = self
+                        .context
+                        .report_lint(&INVALID_TYPED_DICT_STATEMENT, stmt)
+                    {
+                        if matches!(stmt, ast::Stmt::FunctionDef(_)) {
+                            builder.into_diagnostic(format_args!(
+                                "TypedDict class cannot have methods"
+                            ));
+                        } else {
+                            let mut diagnostic = builder.into_diagnostic(format_args!(
+                                "invalid statement in TypedDict class body"
+                            ));
+                            diagnostic.info(
+                                "Only annotated declarations (`<name>: <type>`) are allowed.",
+                            );
+                        }
+                    }
+                }
             }
         }
     }
