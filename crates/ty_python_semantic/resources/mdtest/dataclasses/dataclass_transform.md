@@ -1123,4 +1123,34 @@ reveal_type(B)  # revealed: <class 'A[int]'>
 B(1)
 ```
 
+### Decorator factory with class parameter
+
+When a `@dataclass_transform()` decorated function takes a class as a parameter but is used as a
+decorator factory (returns a decorator), the dataclass behavior should be applied to the decorated
+class, not to the parameter class.
+
+```py
+from typing_extensions import dataclass_transform
+
+@dataclass_transform()
+def hydrated_dataclass[T](target: type[T], *, frozen: bool = False):
+    def decorator[U](cls: type[U]) -> type[U]:
+        return cls
+    return decorator
+
+class Target:
+    pass
+
+decorator = hydrated_dataclass(Target)
+reveal_type(decorator)  # revealed: <decorator produced by dataclass-like function>
+
+@hydrated_dataclass(Target)
+class Model:
+    x: int
+
+# Model should be a dataclass-like class with x as a field
+Model(x=1)
+reveal_type(Model.__init__)  # revealed: (self: Model, x: int) -> None
+```
+
 [`typing.dataclass_transform`]: https://docs.python.org/3/library/typing.html#typing.dataclass_transform
