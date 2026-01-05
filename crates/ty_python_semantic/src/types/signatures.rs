@@ -924,8 +924,18 @@ impl<'db> Signature<'db> {
         let mut return_ty = self.return_ty;
         let binding_context = self.definition.map(BindingContext::Definition);
         if let Some(self_type) = self_type {
+            // For classmethods, self_type is a class object (e.g., type[Child] or ClassLiteral[Child]).
+            // However, `Self` in return types (like `-> Iterator[Self]`) should be the *instance* type,
+            // not the class object. So we use `to_instance()` to get the instance type for `Self` binding.
+            // For regular methods, self_type is already an instance, so we use it directly.
+            let is_classmethod = self_type.is_class_object();
+            let self_type_for_binding = if is_classmethod {
+                self_type.to_instance(db).unwrap_or(self_type)
+            } else {
+                self_type
+            };
             let self_mapping = TypeMapping::BindSelf {
-                self_type,
+                self_type: self_type_for_binding,
                 binding_context,
             };
             parameters = parameters.apply_type_mapping_impl(
