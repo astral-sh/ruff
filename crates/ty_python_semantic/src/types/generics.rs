@@ -1663,6 +1663,7 @@ impl<'db> SpecializationBuilder<'db> {
                     .require_bound_or_constraints(self.db)
                 {
                     TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        let bound = bound.top_materialization(self.db);
                         let lower = UnionType::from_elements(self.db, bounds.lower);
                         if !lower.is_assignable_to(self.db, bound) {
                             // This path does not satisfy the typevar's upper bound, and is
