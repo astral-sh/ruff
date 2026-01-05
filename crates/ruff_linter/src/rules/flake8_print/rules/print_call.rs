@@ -44,7 +44,7 @@ use crate::{Fix, FixAvailability, Violation};
 ///     return a + b < 4
 ///
 ///
-/// def main():
+/// if __name__ == "__main__":
 ///     logging.basicConfig(level=logging.INFO)
 /// ```
 ///
