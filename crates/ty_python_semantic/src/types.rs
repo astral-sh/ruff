@@ -14590,19 +14590,8 @@ impl<'a, 'db> IntoIterator for &'a NegativeIntersectionElements<'db> {
 
 impl PartialEq for NegativeIntersectionElements<'_> {
     fn eq(&self, other: &Self) -> bool {
-        match (self, other) {
-            (Self::Empty, Self::Empty) => true,
-            (Self::Empty, Self::Single(_)) | (Self::Single(_), Self::Empty) => false,
-            (Self::Single(left), Self::Single(right)) => left == right,
-            (Self::Multiple(left), Self::Multiple(right)) => left == right,
-            (Self::Single(single), Self::Multiple(multiple))
-            | (Self::Multiple(multiple), Self::Single(single)) => {
-                multiple.len() == 1 && multiple[0] == *single
-            }
-            (Self::Empty, Self::Multiple(set)) | (Self::Multiple(set), Self::Empty) => {
-                set.is_empty()
-            }
-        }
+        // Same implementation as `OrderSet::eq`
+        self.len() == other.len() && self.iter().eq(other)
     }
 }
 
@@ -14610,14 +14599,10 @@ impl Eq for NegativeIntersectionElements<'_> {}
 
 impl std::hash::Hash for NegativeIntersectionElements<'_> {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            Self::Empty => 0_u8.hash(state),
-            Self::Single(single) => single.hash(state),
-            Self::Multiple(set) => match set.len() {
-                0 => 0_u8.hash(state),
-                1 => set[0].hash(state),
-                _ => set.hash(state),
-            },
+        // Same implementation as `OrderSet::hash`
+        self.len().hash(state);
+        for value in self {
+            value.hash(state);
         }
     }
 }
