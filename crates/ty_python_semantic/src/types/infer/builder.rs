@@ -1074,7 +1074,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                                     .report_lint(&INVALID_TYPED_DICT_STATEMENT, &**value)
                                 {
                                     builder.into_diagnostic(format_args!(
-                                        "TypedDict items cannot have a value"
+                                        "TypedDict item cannot have a value"
                                     ));
                                 }
                             }

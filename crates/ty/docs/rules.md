@@ -965,7 +965,7 @@ class D(A):
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.35">0.0.1-alpha.35</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-frozen-dataclass-subclass" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2293" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2294" target="_blank">View source</a>
 </small>
 
 
@@ -1185,7 +1185,7 @@ class B(metaclass=f): ...
 Default level: <a href="../../rules#rule-levels" title="This lint has a default level of 'error'."><code>error</code></a> ·
 Added in <a href="https://github.com/astral-sh/ty/releases/tag/0.0.1-alpha.20">0.0.1-alpha.20</a> ·
 <a href="https://github.com/astral-sh/ty/issues?q=sort%3Aupdated-desc%20is%3Aissue%20is%3Aopen%20invalid-method-override" target="_blank">Related issues</a> ·
-<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2195" target="_blank">View source</a>
+<a href="https://github.com/astral-sh/ruff/blob/main/crates%2Fty_python_semantic%2Fsrc%2Ftypes%2Fdiagnostic.rs#L2196" target="_blank">View source</a>
 </small>
 
 
@@ -1934,9 +1934,10 @@ Detects statements other than annotated declarations in `TypedDict` class bodies
 
 **Why is this bad?**
 
-`TypedDict` class bodies aren't allowed to contain any other types of statements, and for
-example method definitions and field values aren't allowed. None of these will be present
-on instances at runtime (which are of type `dict`).
+`TypedDict` class bodies aren't allowed to contain any other types of statements. For
+example, method definitions and field values aren't allowed. None of these will be available
+on "instances of the TypedDict" at runtime (as `dict` is the runtime class of all
+"TypedDict instances").
 
 **Example**
 
