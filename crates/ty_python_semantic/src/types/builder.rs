@@ -567,8 +567,8 @@ impl<'db> UnionBuilder<'db> {
                             if ty.is_subtype_of(self.db, *existing) {
                                 return;
                             }
-                            // e.g. `existing` could be `Literal[1] & Any`,
-                            // and `ty` could be `Literal[1]`
+                            // e.g. `existing` could be `Literal[Foo.X] & Any`,
+                            // and `ty` could be `Literal[Foo.X]`
                             if existing.is_subtype_of(self.db, ty) {
                                 to_remove = Some(index);
                                 continue;
