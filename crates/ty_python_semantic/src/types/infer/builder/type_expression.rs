@@ -1085,13 +1085,9 @@ impl<'db> TypeInferenceBuilder<'db, '_> {
                     &mut self.inner_expression_inference_state,
                     InnerExpressionInferenceState::Get,
                 );
-                let union = union
-                    .elements(self.db())
-                    .iter()
-                    .fold(UnionBuilder::new(self.db()), |builder, elem| {
-                        builder.add(self.infer_subscript_type_expression(subscript, *elem))
-                    })
-                    .build();
+                let union = union.map(self.db(), |element| {
+                    self.infer_subscript_type_expression(subscript, *element)
+                });
                 self.inner_expression_inference_state = previous_slice_inference_state;
                 union
             }

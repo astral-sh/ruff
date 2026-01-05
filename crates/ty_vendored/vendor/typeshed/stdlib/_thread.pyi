@@ -53,6 +53,8 @@ class RLock:
         to be available for other threads.
         """
     __enter__ = acquire
+    """Lock the lock."""
+
     def __exit__(self, t: type[BaseException] | None, v: BaseException | None, tb: TracebackType | None) -> None:
         """Release the lock."""
     if sys.version_info >= (3, 14):

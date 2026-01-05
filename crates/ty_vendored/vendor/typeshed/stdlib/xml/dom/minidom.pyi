@@ -743,6 +743,7 @@ class Document(Node, DocumentLS):
     documentURI: str | None
     doctype: DocumentType | None
     documentElement: Element | None
+    """Top-level element of this document."""
 
     def __init__(self) -> None: ...
     def appendChild(self, node: _DocumentChildrenVar) -> _DocumentChildrenVar: ...  # type: ignore[override]

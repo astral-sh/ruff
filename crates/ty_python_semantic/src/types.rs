@@ -7269,10 +7269,7 @@ impl<'db> Type<'db> {
             }
 
             (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
-                let callable = UnionBuilder::new(db)
-                    .add(*new_method)
-                    .add(*init_method)
-                    .build();
+                let callable = UnionType::from_elements(db, [new_method, init_method]);
 
                 let new_method_bindings = new_method
                     .bindings(db)
@@ -7642,13 +7639,13 @@ impl<'db> Type<'db> {
                 // but it appears to be what users often expect, and it improves compatibility with
                 // other type checkers such as mypy.
                 // See conversation in https://github.com/astral-sh/ruff/pull/19915.
-                SpecialFormType::NamedTuple => Ok(IntersectionBuilder::new(db)
-                    .positive_elements([
+                SpecialFormType::NamedTuple => Ok(IntersectionType::from_elements(
+                    db,
+                    [
                         Type::homogeneous_tuple(db, Type::object()),
                         KnownClass::NamedTupleLike.to_instance(db),
-                    ])
-                    .build()),
-
+                    ],
+                )),
                 SpecialFormType::TypingSelf => {
                     let index = semantic_index(db, scope_id.file(db));
                     let Some(class) = nearest_enclosing_class(db, index, scope_id) else {
@@ -10770,11 +10767,7 @@ fn walk_type_var_constraints<'db, V: visitor::TypeVisitor<'db> + ?Sized>(
 
 impl<'db> TypeVarConstraints<'db> {
     fn as_type(self, db: &'db dyn Db) -> Type<'db> {
-        let mut builder = UnionBuilder::new(db);
-        for ty in self.elements(db) {
-            builder = builder.add(*ty);
-        }
-        builder.build()
+        UnionType::from_elements(db, self.elements(db))
     }
 
     fn to_instance(self, db: &'db dyn Db) -> Option<TypeVarConstraints<'db>> {
@@ -14703,7 +14696,7 @@ impl KnownUnion {
     }
 }
 
-#[salsa::interned(debug, heap_size=IntersectionType::heap_size)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct IntersectionType<'db> {
     /// The intersection type includes only values in all of these types.
     #[returns(ref)]
@@ -14991,11 +14984,6 @@ impl<'db> IntersectionType<'db> {
 
     pub(crate) fn is_simple_negation(self, db: &'db dyn Db) -> bool {
         self.positive(db).is_empty() && self.negative(db).len() == 1
-    }
-
-    fn heap_size((positive, negative): &(FxOrderSet<Type<'db>>, FxOrderSet<Type<'db>>)) -> usize {
-        ruff_memory_usage::order_set_heap_size(positive)
-            + ruff_memory_usage::order_set_heap_size(negative)
     }
 }
 
@@ -15367,16 +15355,10 @@ pub(crate) mod tests {
         // salsa, but that would mean we would have to pass in `db` everywhere.
 
         // A union of several `Todo` types collapses to a single `Todo` type:
-        assert!(UnionType::from_elements(&db, vec![todo1, todo2]).is_todo());
+        assert!(UnionType::from_elements(&db, [todo1, todo2]).is_todo());
 
         // And similar for intersection types:
-        assert!(
-            IntersectionBuilder::new(&db)
-                .add_positive(todo1)
-                .add_positive(todo2)
-                .build()
-                .is_todo()
-        );
+        assert!(IntersectionType::from_elements(&db, [todo1, todo2]).is_todo());
         assert!(
             IntersectionBuilder::new(&db)
                 .add_positive(todo1)
@@ -15461,16 +15443,10 @@ pub(crate) mod tests {
         assert_eq!(normalized.display(&db).to_string(), "int");
 
         // The same can be said about intersections for the `Never` type.
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(Type::Never)
-            .add_positive(div)
-            .build();
+        let intersection = IntersectionType::from_elements(&db, [Type::Never, div]);
         assert_eq!(intersection.display(&db).to_string(), "Never");
 
-        let intersection = IntersectionBuilder::new(&db)
-            .add_positive(div)
-            .add_positive(Type::Never)
-            .build();
+        let intersection = IntersectionType::from_elements(&db, [div, Type::Never]);
         assert_eq!(intersection.display(&db).to_string(), "Never");
     }
 

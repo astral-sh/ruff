@@ -2442,13 +2442,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
          --> main2.py:5:20
@@ -5615,13 +5615,13 @@ mod tests {
            |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:950:11
+           --> stdlib/types.pyi:974:11
             |
-        948 | if sys.version_info >= (3, 10):
-        949 |     @final
-        950 |     class NoneType:
+        972 | if sys.version_info >= (3, 10):
+        973 |     @final
+        974 |     class NoneType:
             |           ^^^^^^^^
-        951 |         """The type of the None singleton."""
+        975 |         """The type of the None singleton."""
             |
         info: Source
           --> main2.py:13:37
@@ -6294,12 +6294,12 @@ mod tests {
         a[: <module 'foo'>] = foo
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:423:7
+           --> stdlib/types.pyi:431:7
             |
-        422 | @disjoint_base
-        423 | class ModuleType:
+        430 | @disjoint_base
+        431 | class ModuleType:
             |       ^^^^^^^^^^
-        424 |     """Create a module object.
+        432 |     """Create a module object.
             |
         info: Source
          --> main2.py:4:6
@@ -6430,13 +6430,13 @@ mod tests {
         a[: <wrapper-descriptor '__get__' of 'function' objects>] = FunctionType.__get__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:670:7
+           --> stdlib/types.pyi:690:7
             |
-        669 | @final
-        670 | class WrapperDescriptorType:
+        689 | @final
+        690 | class WrapperDescriptorType:
             |       ^^^^^^^^^^^^^^^^^^^^^
-        671 |     @property
-        672 |     def __name__(self) -> str: ...
+        691 |     @property
+        692 |     def __name__(self) -> str: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6482,13 +6482,13 @@ mod tests {
         a[: <method-wrapper '__call__' of function 'f'>] = f.__call__
         ---------------------------------------------
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:684:7
+           --> stdlib/types.pyi:704:7
             |
-        683 | @final
-        684 | class MethodWrapperType:
+        703 | @final
+        704 | class MethodWrapperType:
             |       ^^^^^^^^^^^^^^^^^
-        685 |     @property
-        686 |     def __self__(self) -> object: ...
+        705 |     @property
+        706 |     def __self__(self) -> object: ...
             |
         info: Source
          --> main2.py:4:6
@@ -6500,13 +6500,13 @@ mod tests {
           |
 
         info[inlay-hint-location]: Inlay Hint Target
-           --> stdlib/types.pyi:134:9
+           --> stdlib/types.pyi:139:9
             |
-        132 |         ) -> Self: ...
-        133 |
-        134 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
+        137 |         ) -> Self: ...
+        138 |
+        139 |     def __call__(self, *args: Any, **kwargs: Any) -> Any:
             |         ^^^^^^^^
-        135 |         """Call self as a function."""
+        140 |         """Call self as a function."""
             |
         info: Source
          --> main2.py:4:22

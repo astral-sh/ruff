@@ -572,7 +572,10 @@ class _patch_dict:
     def __exit__(self, *args: object) -> Any:
         """Unpatch the dict."""
     start: Any
+    """Activate a patch, returning any created mock."""
+
     stop: Any
+    """Stop an active patch."""
 
 # This class does not exist at runtime, it's a hack to add methods to the
 # patch() function.

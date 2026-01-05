@@ -12,10 +12,6 @@ license = { workspace = true }
 
 [lib]
 
-[[test]]
-name = "fixtures"
-harness = false
-
 [dependencies]
 ruff_python_ast = { workspace = true, features = ["get-size"] }
 ruff_python_trivia = { workspace = true }
@@ -29,8 +25,8 @@ memchr = { workspace = true }
 rustc-hash = { workspace = true }
 static_assertions = { workspace = true }
 unicode-ident = { workspace = true }
-unicode_names2 = { workspace = true }
 unicode-normalization = { workspace = true }
+unicode_names2 = { workspace = true }
 
 [dev-dependencies]
 ruff_annotate_snippets = { workspace = true }
@@ -44,6 +40,10 @@ itertools = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 walkdir = { workspace = true }
+
+[[test]]
+name = "fixtures"
+harness = false
 
 [lints]
 workspace = true

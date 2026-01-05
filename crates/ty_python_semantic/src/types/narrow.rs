@@ -12,12 +12,12 @@ use crate::types::enums::{enum_member_literals, enum_metadata};
 use crate::types::function::KnownFunction;
 use crate::types::infer::{ExpressionInference, infer_same_file_expression_type};
 use crate::types::typed_dict::{
-    SynthesizedTypedDictType, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
+    SynthesizedTypedDictType, TypedDictField, TypedDictFieldBuilder, TypedDictSchema, TypedDictType,
 };
 use crate::types::{
-    CallableType, ClassLiteral, ClassType, IntersectionBuilder, KnownClass, KnownInstanceType,
-    SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type, TypeContext,
-    TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
+    CallableType, ClassLiteral, ClassType, IntersectionBuilder, IntersectionType, KnownClass,
+    KnownInstanceType, SpecialFormType, SubclassOfInner, SubclassOfType, Truthiness, Type,
+    TypeContext, TypeVarBoundOrConstraints, UnionBuilder, infer_expression_types,
 };
 
 use ruff_db::parsed::{ParsedModuleRef, parsed_module};
@@ -343,18 +343,12 @@ impl<'db> NarrowingConstraint<'db> {
         };
 
         let new_regular_disjunct = self.regular_disjunct.map(|regular_disjunct| {
-            IntersectionBuilder::new(db)
-                .add_positive(regular_disjunct)
-                .add_positive(other_regular_disjunct)
-                .build()
+            IntersectionType::from_elements(db, [regular_disjunct, other_regular_disjunct])
         });
 
         let additional_typeguard_disjuncts =
             self.typeguard_disjuncts.iter().map(|typeguard_disjunct| {
-                IntersectionBuilder::new(db)
-                    .add_positive(*typeguard_disjunct)
-                    .add_positive(other_regular_disjunct)
-                    .build()
+                IntersectionType::from_elements(db, [*typeguard_disjunct, other_regular_disjunct])
             });
 
         let mut new_typeguard_disjuncts = other.typeguard_disjuncts;
@@ -932,10 +926,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 .build();
 
             // Keep order: first literal complement, then broader arms.
-            let result = UnionBuilder::new(self.db)
-                .add(narrowed_single)
-                .add(rest_union)
-                .build();
+            let result = UnionType::from_elements(self.db, [narrowed_single, rest_union]);
             Some(result)
         } else {
             None
@@ -954,10 +945,7 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
         match op {
             ast::CmpOp::IsNot => {
                 if rhs_ty.is_singleton(self.db) {
-                    let ty = IntersectionBuilder::new(self.db)
-                        .add_negative(rhs_ty)
-                        .build();
-                    Some(ty)
+                    Some(rhs_ty.negate(self.db))
                 } else {
                     // Non-singletons cannot be safely narrowed using `is not`
                     None
@@ -1105,6 +1093,75 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
                 constrain_with_equality,
             ) {
                 constraints.insert(place, constraint);
+            }
+        }
+
+        // Narrow unions and intersections of `TypedDict` in cases where required keys are
+        // excluded:
+        //
+        // class Foo(TypedDict):
+        //     foo: int
+        // class Bar(TypedDict):
+        //     bar: int
+        //
+        // def _(u: Foo | Bar):
+        //     if "foo" not in u:
+        //         reveal_type(u)  # revealed: Bar
+        if matches!(&**ops, [ast::CmpOp::In | ast::CmpOp::NotIn])
+            && let Type::StringLiteral(key) = inference.expression_type(&**left)
+            && let Some(rhs_place_expr) = place_expr(&comparators[0])
+            && let rhs_type = inference.expression_type(&comparators[0])
+            && is_typeddict_or_union_with_typeddicts(self.db, rhs_type)
+        {
+            let is_negative_check = is_positive == (ops[0] == ast::CmpOp::NotIn);
+            if is_negative_check {
+                let requires_key = |td: TypedDictType<'db>| -> bool {
+                    td.items(self.db)
+                        .get(key.value(self.db))
+                        .is_some_and(TypedDictField::is_required)
+                };
+
+                let narrowed = match rhs_type {
+                    Type::TypedDict(td) => {
+                        if requires_key(td) {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Intersection(intersection) => {
+                        if intersection
+                            .positive(self.db)
+                            .iter()
+                            .copied()
+                            .filter_map(Type::as_typed_dict)
+                            .any(requires_key)
+                        {
+                            Type::Never
+                        } else {
+                            rhs_type
+                        }
+                    }
+                    Type::Union(union) => {
+                        // remove all members of the union that would require the key
+                        union.filter(self.db, |ty| match ty {
+                            Type::TypedDict(td) => !requires_key(*td),
+                            Type::Intersection(intersection) => !intersection
+                                .positive(self.db)
+                                .iter()
+                                .copied()
+                                .filter_map(Type::as_typed_dict)
+                                .any(requires_key),
+                            _ => true,
+                        })
+                    }
+                    _ => rhs_type,
+                };
+
+                if narrowed != rhs_type {
+                    let place = self.expect_place(&rhs_place_expr);
+                    constraints.insert(place, NarrowingConstraint::typeguard(narrowed));
+                }
             }
         }
 
@@ -1686,18 +1743,13 @@ impl<'db, 'ast> NarrowingConstraintsBuilder<'db, 'ast> {
 fn is_typeddict_or_union_with_typeddicts<'db>(db: &'db dyn Db, ty: Type<'db>) -> bool {
     match ty {
         Type::TypedDict(_) => true,
-        Type::Union(union) => {
-            union
-                .elements(db)
-                .iter()
-                .any(|union_member_ty| match union_member_ty {
-                    Type::TypedDict(_) => true,
-                    Type::Intersection(intersection) => {
-                        intersection.positive(db).iter().any(Type::is_typed_dict)
-                    }
-                    _ => false,
-                })
+        Type::Intersection(intersection) => {
+            intersection.positive(db).iter().any(Type::is_typed_dict)
         }
+        Type::Union(union) => union
+            .elements(db)
+            .iter()
+            .any(|union_member_ty| is_typeddict_or_union_with_typeddicts(db, *union_member_ty)),
         _ => false,
     }
 }

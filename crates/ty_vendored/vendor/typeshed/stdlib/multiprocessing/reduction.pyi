@@ -103,6 +103,8 @@ class AbstractReducer(metaclass=ABCMeta):
 
     ForkingPickler = _ForkingPickler
     register = _register
+    """Register a reduce function for a type."""
+
     dump = _dump
     send_handle = _send_handle
     recv_handle = _recv_handle

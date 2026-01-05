@@ -32,13 +32,13 @@ repos:
       - id: validate-pyproject
 
   - repo: https://github.com/executablebooks/mdformat
-    rev: 0.7.22
+    rev: 1.0.0
     hooks:
       - id: mdformat
         language: python # means renovate will also update `additional_dependencies`
         additional_dependencies:
-          - mdformat-mkdocs==4.0.0
-          - mdformat-footnote==0.1.1
+          - mdformat-mkdocs==5.0.0
+          - mdformat-footnote==0.1.2
         exclude: |
           (?x)^(
             docs/formatter/black\.md
@@ -135,6 +135,3 @@ repos:
     rev: v0.11.0.1
     hooks:
       - id: shellcheck
-
-ci:
-  skip: [cargo-fmt, dev-generate-all]

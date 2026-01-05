@@ -1117,6 +1117,8 @@ class TarInfo:
     )
     name: str
     path: str
+    """In pax headers, "name" is called "path"."""
+
     size: int
     mtime: int | float
     chksum: int

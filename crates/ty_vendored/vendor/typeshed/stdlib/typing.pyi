@@ -379,41 +379,41 @@ Protocol classes can be generic, they are defined as::
 Callable: _SpecialForm
 """Deprecated alias to collections.abc.Callable.
 
-    Callable[[int], str] signifies a function that takes a single
-    parameter of type int and returns a str.
+Callable[[int], str] signifies a function that takes a single
+parameter of type int and returns a str.
 
-    The subscription syntax must always be used with exactly two
-    values: the argument list and the return type.
-    The argument list must be a list of types, a ParamSpec,
-    Concatenate or ellipsis. The return type must be a single type.
+The subscription syntax must always be used with exactly two
+values: the argument list and the return type.
+The argument list must be a list of types, a ParamSpec,
+Concatenate or ellipsis. The return type must be a single type.
 
-    There is no syntax to indicate optional or keyword arguments;
-    such function types are rarely used as callback types.
-    """
+There is no syntax to indicate optional or keyword arguments;
+such function types are rarely used as callback types.
+"""
 
 Type: _SpecialForm
 """Deprecated alias to builtins.type.
 
-    builtins.type or typing.Type can be used to annotate class objects.
-    For example, suppose we have the following classes::
+builtins.type or typing.Type can be used to annotate class objects.
+For example, suppose we have the following classes::
 
-        class User: ...  # Abstract base for User classes
-        class BasicUser(User): ...
-        class ProUser(User): ...
-        class TeamUser(User): ...
+    class User: ...  # Abstract base for User classes
+    class BasicUser(User): ...
+    class ProUser(User): ...
+    class TeamUser(User): ...
 
-    And a function that takes a class argument that's a subclass of
-    User and returns an instance of the corresponding class::
+And a function that takes a class argument that's a subclass of
+User and returns an instance of the corresponding class::
 
-        def new_user[U](user_class: Type[U]) -> U:
-            user = user_class()
-            # (Here we could write the user object to a database)
-            return user
+    def new_user[U](user_class: Type[U]) -> U:
+        user = user_class()
+        # (Here we could write the user object to a database)
+        return user
 
-        joe = new_user(BasicUser)
+    joe = new_user(BasicUser)
 
-    At this point the type checker knows that joe has type BasicUser.
-    """
+At this point the type checker knows that joe has type BasicUser.
+"""
 
 NoReturn: _SpecialForm
 """Special type indicating functions that never return.
@@ -456,14 +456,14 @@ Optional: _SpecialForm
 Tuple: _SpecialForm
 """Deprecated alias to builtins.tuple.
 
-    Tuple[X, Y] is the cross-product type of X and Y.
+Tuple[X, Y] is the cross-product type of X and Y.
 
-    Example: Tuple[T1, T2] is a tuple of two elements corresponding
-    to type variables T1 and T2.  Tuple[int, float, str] is a tuple
-    of an int, a float and a string.
+Example: Tuple[T1, T2] is a tuple of two elements corresponding
+to type variables T1 and T2.  Tuple[int, float, str] is a tuple
+of an int, a float and a string.
 
-    To specify a variable-length tuple of homogeneous type, use Tuple[T, ...].
-    """
+To specify a variable-length tuple of homogeneous type, use Tuple[T, ...].
+"""
 
 Final: _SpecialForm
 """Special typing construct to indicate final names to type checkers.

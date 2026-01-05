@@ -879,7 +879,7 @@ pub(super) fn validate_typed_dict_dict_literal<'db>(
     }
 }
 
-#[salsa::interned(debug)]
+#[salsa::interned(debug, heap_size=ruff_memory_usage::heap_size)]
 pub struct SynthesizedTypedDictType<'db> {
     #[returns(ref)]
     pub(crate) items: TypedDictSchema<'db>,
