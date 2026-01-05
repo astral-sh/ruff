@@ -69,7 +69,7 @@ impl AlwaysFixableViolation for InvalidRuleCode {
         if self.whole_comment {
             format!("Remove the {} comment", self.kind.as_str())
         } else {
-            format!("Remove rule code {}", self.rule_code)
+            format!("Remove the rule code `{}`", self.rule_code)
         }
     }
 }

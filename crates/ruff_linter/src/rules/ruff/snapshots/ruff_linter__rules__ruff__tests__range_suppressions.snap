@@ -578,7 +578,7 @@ RUF102 [*] Invalid rule code in suppression: RQW320
    |                          ------
 97 |     # ruff: enable[YF829]
    |
-help: Remove rule code RQW320
+help: Remove the rule code `RQW320`
 91 | def f():
 92 |     # Unknown rule codes
 93 |     # ruff: disable[YF829]
