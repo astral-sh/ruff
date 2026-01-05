@@ -516,7 +516,7 @@ impl<'db> UnionBuilder<'db> {
                     .elements
                     .iter()
                     .filter_map(UnionElement::to_type_element)
-                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_redundant_with(self.db, ty))
+                    .any(|ty| Type::EnumLiteral(enum_member_to_add).is_subtype_of(self.db, ty))
                 {
                     self.push_type(Type::EnumLiteral(enum_member_to_add), seen_aliases);
                 }
