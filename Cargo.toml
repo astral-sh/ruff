@@ -335,13 +335,10 @@ strip = false
 debug = "full"
 lto = false
 
-# Profile for faster iteration: optimizes for the build + test cycle by
-# skipping debug info and applying minimal optimizations for faster tests.
-[profile.fast-build]
+# Profile for faster iteration: applies minimal optimizations for faster tests.
+[profile.fast-test]
 inherits = "dev"
 opt-level = 1
-debug = 0
-strip = "debuginfo"
 
 # The profile that 'cargo dist' will build with.
 [profile.dist]

@@ -10,6 +10,12 @@ Run all tests (using `nextest` for faster execution):
 cargo nextest run
 ```
 
+For faster test execution, use the `fast-test` profile which enables optimizations while retaining debug info:
+
+```sh
+cargo nextest run --cargo-profile fast-test
+```
+
 Run tests for a specific crate:
 
 ```sh
