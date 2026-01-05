@@ -7754,6 +7754,16 @@ impl<'db> TypeVarInstance<'db> {
         })
     }
 
+    /// Returns the bounds or constraints of this typevar. If the typevar is unbounded, returns
+    /// `object` as its upper bound.
+    pub(crate) fn require_bound_or_constraints(
+        self,
+        db: &'db dyn Db,
+    ) -> TypeVarBoundOrConstraints<'db> {
+        self.bound_or_constraints(db)
+            .unwrap_or_else(|| TypeVarBoundOrConstraints::UpperBound(Type::object()))
+    }
+
     pub(crate) fn default_type(self, db: &'db dyn Db) -> Option<Type<'db>> {
         self._default(db).and_then(|d| match d {
             TypeVarDefaultEvaluation::Eager(ty) => Some(ty),

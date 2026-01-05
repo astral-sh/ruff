@@ -1622,7 +1622,6 @@ impl<'db> SpecializationBuilder<'db> {
         // come out of `PathAssignment`s with identical `source_order`s, but if they do, those
         // "tied" constraints will still be ordered in a stable way. So we need a stable sort to
         // retain that stable per-tie ordering.
-        let constraints = constraints.limit_to_valid_specializations(self.db);
         let mut sorted_paths = Vec::new();
         constraints.for_each_path(self.db, |path| {
             let mut path: Vec<_> = path.positive_constraints().collect();
@@ -1659,14 +1658,53 @@ impl<'db> SpecializationBuilder<'db> {
 
             for (bound_typevar, bounds) in mappings.drain() {
                 let variance = formal.variance_of(self.db, bound_typevar);
-                let upper = IntersectionType::from_elements(self.db, bounds.upper);
-                if !upper.is_object() {
-                    self.add_type_mapping(bound_typevar, upper, variance, &mut f);
-                    continue;
-                }
-                let lower = UnionType::from_elements(self.db, bounds.lower);
-                if !lower.is_never() {
-                    self.add_type_mapping(bound_typevar, lower, variance, &mut f);
+                match bound_typevar
+                    .typevar(self.db)
+                    .require_bound_or_constraints(self.db)
+                {
+                    TypeVarBoundOrConstraints::UpperBound(bound) => {
+                        let lower = UnionType::from_elements(self.db, bounds.lower);
+                        if !lower.is_assignable_to(self.db, bound) {
+                            // This path does not satisfy the typevar's upper bound, and is
+                            // therefore not a valid specialization.
+                            continue;
+                        }
+                        if !lower.is_never() {
+                            self.add_type_mapping(bound_typevar, lower, variance, &mut f);
+                            continue;
+                        }
+
+                        let upper = IntersectionType::from_elements(
+                            self.db,
+                            std::iter::chain(bounds.upper, [bound]),
+                        );
+                        if !upper.is_object() {
+                            self.add_type_mapping(bound_typevar, upper, variance, &mut f);
+                        }
+                    }
+
+                    TypeVarBoundOrConstraints::Constraints(constraints) => {
+                        // Filter out the typevar constraints that aren't satisfied by this path.
+                        let lower = UnionType::from_elements(self.db, bounds.lower);
+                        let upper = IntersectionType::from_elements(self.db, bounds.upper);
+                        let compatible_constraints =
+                            constraints.elements(self.db).iter().filter(|constraint| {
+                                let constraint_lower = constraint.bottom_materialization(self.db);
+                                let constraint_upper = constraint.top_materialization(self.db);
+                                lower.is_assignable_to(self.db, constraint_lower)
+                                    && constraint_upper.is_assignable_to(self.db, upper)
+                            });
+
+                        // If only one constraint remains, that's our specialization for this path.
+                        if let Ok(compatible_constraint) = compatible_constraints.exactly_one() {
+                            self.add_type_mapping(
+                                bound_typevar,
+                                *compatible_constraint,
+                                variance,
+                                &mut f,
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -1942,10 +1980,11 @@ impl<'db> SpecializationBuilder<'db> {
                     return Ok(());
                 }
 
-                let when = actual
-                    .when_constraint_set_assignable_to(self.db, formal, self.inferable)
-                    .limit_to_valid_specializations(self.db);
-                if when.is_never_satisfied(self.db)
+                let when =
+                    actual.when_constraint_set_assignable_to(self.db, formal, self.inferable);
+                if when
+                    .limit_to_valid_specializations(self.db)
+                    .is_never_satisfied(self.db)
                     && (formal.has_typevar(self.db) || actual.has_typevar(self.db))
                 {
                     return Err(SpecializationError::NoSolution {
@@ -1972,8 +2011,7 @@ impl<'db> SpecializationBuilder<'db> {
                                 self.db,
                                 formal_callable,
                                 self.inferable,
-                            )
-                            .limit_to_valid_specializations(self.db);
+                            );
                         self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                     } else {
                         for actual_signature in &actual_callable.signatures(self.db).overloads {
@@ -1982,8 +2020,7 @@ impl<'db> SpecializationBuilder<'db> {
                                     self.db,
                                     formal_callable,
                                     self.inferable,
-                                )
-                                .limit_to_valid_specializations(self.db);
+                                );
                             self.add_type_mappings_from_constraint_set(formal, when, &mut f);
                         }
                     }
