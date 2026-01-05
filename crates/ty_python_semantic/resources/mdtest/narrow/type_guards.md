@@ -46,12 +46,23 @@ A user-defined type guard must accept at least one positional argument (in addit
 for non-static methods).
 
 ```pyi
+from typing import Any, TypeVar
 from typing_extensions import TypeGuard, TypeIs
 
-# TODO: error: [invalid-type-guard-definition]
+T = TypeVar("T")
+
+# Multiple parameters are allowed
+def is_str_list(val: list[object], allow_empty: bool) -> TypeGuard[list[str]]: ...
+def is_set_of(val: set[Any], type: type[T]) -> TypeGuard[set[T]]: ...
+def is_two_element_tuple(val: tuple[object, ...], a: str, b: str) -> TypeIs[tuple[str, str]]: ...
+
+# error: [invalid-type-guard-definition]
 def _() -> TypeGuard[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition]
+def _(*args) -> TypeGuard[str]: ...
+
+# error: [invalid-type-guard-definition]
 def _(**kwargs) -> TypeIs[str]: ...
 
 class _:
@@ -63,14 +74,14 @@ class _:
     def _(a) -> TypeIs[str]: ...
 
     # errors
-    def _(self) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
-    def _(self, /, *, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(self) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition]
+    def _(self, /, *, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition]
     @classmethod
-    def _(cls) -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(cls) -> TypeIs[str]: ...  # error: [invalid-type-guard-definition]
     @classmethod
-    def _() -> TypeIs[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _() -> TypeIs[str]: ...  # error: [invalid-type-guard-definition]
     @staticmethod
-    def _(*, a) -> TypeGuard[str]: ...  # TODO: error: [invalid-type-guard-definition]
+    def _(*, a) -> TypeGuard[str]: ...  # error: [invalid-type-guard-definition]
 ```
 
 For `TypeIs` functions, the narrowed type must be assignable to the declared type of that parameter,
@@ -86,10 +97,10 @@ def _(a: tuple[object]) -> TypeIs[tuple[str]]: ...
 def _(a: str | Any) -> TypeIs[str]: ...
 def _(a) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition]
 def _(a: int) -> TypeIs[str]: ...
 
-# TODO: error: [invalid-type-guard-definition]
+# error: [invalid-type-guard-definition]
 def _(a: bool | str) -> TypeIs[int]: ...
 ```
 
@@ -107,12 +118,12 @@ class C:
     @classmethod
     def g(cls, x: object) -> TypeGuard[int]:
         return True
-    # TODO: this could error at definition time
-    def h(self) -> TypeGuard[str]:
+
+    def h(self) -> TypeGuard[str]:  # error: [invalid-type-guard-definition]
         return True
-    # TODO: this could error at definition time
+
     @classmethod
-    def j(cls) -> TypeGuard[int]:
+    def j(cls) -> TypeGuard[int]:  # error: [invalid-type-guard-definition]
         return True
 
 def _(x: object):
