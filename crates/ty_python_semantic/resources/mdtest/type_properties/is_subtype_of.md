@@ -2260,11 +2260,13 @@ String literals are subtypes of `Sequence[Literal[chars...]]` because strings ar
 characters.
 
 ```py
-from collections.abc import Sequence
-from typing import Literal
+from typing import Literal, Sequence, Iterable, Collection, Reversible
 from ty_extensions import is_subtype_of, static_assert
 
 static_assert(is_subtype_of(Literal["abba"], Sequence[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Iterable[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Collection[Literal["a", "b"]]))
+static_assert(is_subtype_of(Literal["abb"], Reversible[Literal["a", "b"]]))
 static_assert(is_subtype_of(Literal["aaa"], Sequence[Literal["a"]]))
 static_assert(is_subtype_of(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
 static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
