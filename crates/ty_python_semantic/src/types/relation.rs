@@ -1,6 +1,8 @@
 use ruff_python_ast::name::Name;
+use rustc_hash::FxHashSet;
 
 use crate::place::Place;
+use crate::types::builder::RecursivelyDefined;
 use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
 use crate::types::{
@@ -972,13 +974,21 @@ impl<'db> Type<'db> {
                     disjointness_visitor,
                 )
                 .or(db, || {
-                    let spec = UnionType::from_elements(
-                        db,
-                        value
-                            .value(db)
-                            .chars()
-                            .map(|c| Type::string_literal(db, &c.to_string())),
-                    );
+                    // Optimisation: since we know this union will only include string-literal types,
+                    // avoid eagerly creating string-literal types when unnecessary, and avoid going
+                    // via the union-builder.
+                    let mut seen = FxHashSet::default();
+
+                    let union_elements: Box<[Type<'db>]> = value
+                        .value(db)
+                        .chars()
+                        .filter(|c| seen.insert(*c))
+                        .map(|c| Type::string_literal(db, &c.to_string()))
+                        .collect();
+
+                    let spec =
+                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No));
+
                     KnownClass::Sequence
                         .to_specialized_instance(db, [spec])
                         .has_relation_to_impl(
