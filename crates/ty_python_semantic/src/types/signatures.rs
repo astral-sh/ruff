@@ -18,9 +18,7 @@ use smallvec::{SmallVec, smallvec_inline};
 
 use super::{DynamicType, Type, TypeVarVariance, definition_expression_type, semantic_index};
 use crate::semantic_index::definition::Definition;
-use crate::types::constraints::{
-    ConstraintSet, IteratorConstraintsExtension, OptionConstraintsExtension,
-};
+use crate::types::constraints::{ConstraintSet, IteratorConstraintsExtension};
 use crate::types::generics::{GenericContext, InferableTypeVars, walk_generic_context};
 use crate::types::infer::{infer_deferred_types, infer_scope_types};
 use crate::types::relation::{
@@ -177,9 +175,12 @@ impl<'db> CallableSignature<'db> {
                                         )),
                                 ]),
                         ),
-                        return_ty: self_signature
-                            .return_ty
-                            .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                        return_ty: self_signature.return_ty.apply_type_mapping_impl(
+                            db,
+                            type_mapping,
+                            tcx,
+                            visitor,
+                        ),
                     }))
                 }
                 Type::Callable(callable)
@@ -209,9 +210,12 @@ impl<'db> CallableSignature<'db> {
                                         .chain(signature.parameters().iter().cloned()),
                                 )
                             },
-                            return_ty: self_signature.return_ty.map(|ty| {
-                                ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)
-                            }),
+                            return_ty: self_signature.return_ty.apply_type_mapping_impl(
+                                db,
+                                type_mapping,
+                                tcx,
+                                visitor,
+                            ),
                         }),
                     ))
                 }
@@ -327,9 +331,7 @@ impl<'db> CallableSignature<'db> {
         )
     }
 
-    pub(crate) fn is_single_paramspec(
-        &self,
-    ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
+    pub(crate) fn is_single_paramspec(&self) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         Self::signatures_is_single_paramspec(&self.overloads)
     }
 
@@ -338,7 +340,7 @@ impl<'db> CallableSignature<'db> {
     /// along with the return type of the signature.
     fn signatures_is_single_paramspec(
         signatures: &[Signature<'db>],
-    ) -> Option<(BoundTypeVarInstance<'db>, Option<Type<'db>>)> {
+    ) -> Option<(BoundTypeVarInstance<'db>, Type<'db>)> {
         // TODO: This might need updating once we support `Concatenate`
         let [signature] = signatures else {
             return None;
@@ -396,8 +398,37 @@ impl<'db> CallableSignature<'db> {
                         Type::TypeVar(other_bound_typevar),
                         Type::TypeVar(other_bound_typevar),
                     );
-                    let return_types_match = self_return_type.zip(other_return_type).when_some_and(
-                        |(self_return_type, other_return_type)| {
+                    let return_types_match = self_return_type.has_relation_to_impl(
+                        db,
+                        other_return_type,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
+                    return param_spec_matches.and(db, || return_types_match);
+                }
+
+                (Some((self_bound_typevar, self_return_type)), None) => {
+                    let upper = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::from_overloads(other_signatures.iter().map(
+                            |signature| {
+                                Signature::new(signature.parameters().clone(), Type::unknown())
+                            },
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
+                    let param_spec_matches = ConstraintSet::constrain_typevar(
+                        db,
+                        self_bound_typevar,
+                        Type::Never,
+                        upper,
+                    );
+                    let return_types_match = other_signatures
+                        .iter()
+                        .map(|signature| signature.return_ty)
+                        .when_any(db, |other_return_type| {
                             self_return_type.has_relation_to_impl(
                                 db,
                                 other_return_type,
@@ -406,74 +437,39 @@ impl<'db> CallableSignature<'db> {
                                 relation_visitor,
                                 disjointness_visitor,
                             )
-                        },
-                    );
-                    return param_spec_matches.and(db, || return_types_match);
-                }
-
-                (Some((self_bound_typevar, self_return_type)), None) => {
-                    let upper =
-                        Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::from_overloads(other_signatures.iter().map(
-                                |signature| Signature::new(signature.parameters().clone(), None),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
-                    let param_spec_matches = ConstraintSet::constrain_typevar(
-                        db,
-                        self_bound_typevar,
-                        Type::Never,
-                        upper,
-                    );
-                    let return_types_match = self_return_type.when_some_and(|self_return_type| {
-                        other_signatures
-                            .iter()
-                            .filter_map(|signature| signature.return_ty)
-                            .when_any(db, |other_return_type| {
-                                self_return_type.has_relation_to_impl(
-                                    db,
-                                    other_return_type,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
-                    });
+                        });
                     return param_spec_matches.and(db, || return_types_match);
                 }
 
                 (None, Some((other_bound_typevar, other_return_type))) => {
-                    let lower =
-                        Type::Callable(CallableType::new(
-                            db,
-                            CallableSignature::from_overloads(self_signatures.iter().map(
-                                |signature| Signature::new(signature.parameters().clone(), None),
-                            )),
-                            CallableTypeKind::ParamSpecValue,
-                        ));
+                    let lower = Type::Callable(CallableType::new(
+                        db,
+                        CallableSignature::from_overloads(self_signatures.iter().map(
+                            |signature| {
+                                Signature::new(signature.parameters().clone(), Type::unknown())
+                            },
+                        )),
+                        CallableTypeKind::ParamSpecValue,
+                    ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
                         db,
                         other_bound_typevar,
                         lower,
                         Type::object(),
                     );
-                    let return_types_match = other_return_type.when_some_and(|other_return_type| {
-                        self_signatures
-                            .iter()
-                            .filter_map(|signature| signature.return_ty)
-                            .when_any(db, |self_return_type| {
-                                self_return_type.has_relation_to_impl(
-                                    db,
-                                    other_return_type,
-                                    inferable,
-                                    relation,
-                                    relation_visitor,
-                                    disjointness_visitor,
-                                )
-                            })
-                    });
+                    let return_types_match = self_signatures
+                        .iter()
+                        .map(|signature| signature.return_ty)
+                        .when_any(db, |self_return_type| {
+                            self_return_type.has_relation_to_impl(
+                                db,
+                                other_return_type,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        });
                     return param_spec_matches.and(db, || return_types_match);
                 }
 
@@ -601,8 +597,8 @@ pub struct Signature<'db> {
     /// We may get invalid signatures, though, and need to handle them without panicking.
     parameters: Parameters<'db>,
 
-    /// Annotated return type, if any.
-    pub(crate) return_ty: Option<Type<'db>>,
+    /// Return type. If no annotation was provided, this is `Unknown`.
+    pub(crate) return_ty: Type<'db>,
 }
 
 pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
@@ -620,13 +616,11 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
             visitor.visit_type(db, ty);
         }
     }
-    if let Some(return_ty) = &signature.return_ty {
-        visitor.visit_type(db, *return_ty);
-    }
+    visitor.visit_type(db, signature.return_ty);
 }
 
 impl<'db> Signature<'db> {
-    pub(crate) fn new(parameters: Parameters<'db>, return_ty: Option<Type<'db>>) -> Self {
+    pub(crate) fn new(parameters: Parameters<'db>, return_ty: Type<'db>) -> Self {
         Self {
             generic_context: None,
             definition: None,
@@ -638,7 +632,7 @@ impl<'db> Signature<'db> {
     pub(crate) fn new_generic(
         generic_context: Option<GenericContext<'db>>,
         parameters: Parameters<'db>,
-        return_ty: Option<Type<'db>>,
+        return_ty: Type<'db>,
     ) -> Self {
         Self {
             generic_context,
@@ -654,7 +648,7 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             parameters: Parameters::gradual_form(),
-            return_ty: Some(signature_type),
+            return_ty: signature_type,
         }
     }
 
@@ -666,7 +660,7 @@ impl<'db> Signature<'db> {
             generic_context: None,
             definition: None,
             parameters: Parameters::todo(),
-            return_ty: Some(signature_type),
+            return_ty: signature_type,
         }
     }
 
@@ -687,7 +681,8 @@ impl<'db> Signature<'db> {
         let return_ty = function_node
             .returns
             .as_ref()
-            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()));
+            .map(|returns| function_signature_expression_type(db, definition, returns.as_ref()))
+            .unwrap_or_else(Type::unknown);
         let legacy_generic_context =
             GenericContext::from_function_params(db, definition, &parameters, return_ty);
         let full_generic_context = GenericContext::merge_pep695_and_legacy(
@@ -705,21 +700,19 @@ impl<'db> Signature<'db> {
     }
 
     pub(super) fn wrap_coroutine_return_type(self, db: &'db dyn Db) -> Self {
-        let return_ty = self.return_ty.map(|return_ty| {
-            KnownClass::CoroutineType
-                .to_specialized_instance(db, [Type::any(), Type::any(), return_ty])
-        });
+        let return_ty = KnownClass::CoroutineType
+            .to_specialized_instance(db, [Type::any(), Type::any(), self.return_ty]);
         Self { return_ty, ..self }
     }
 
     /// Returns the signature which accepts any parameters and returns an `Unknown` type.
     pub(crate) fn unknown() -> Self {
-        Self::new(Parameters::unknown(), Some(Type::unknown()))
+        Self::new(Parameters::unknown(), Type::unknown())
     }
 
     /// Return the "bottom" signature, subtype of all other fully-static signatures.
     pub(crate) fn bottom() -> Self {
-        Self::new(Parameters::bottom(), Some(Type::Never))
+        Self::new(Parameters::bottom(), Type::Never)
     }
 
     pub(crate) fn with_inherited_generic_context(
@@ -756,9 +749,7 @@ impl<'db> Signature<'db> {
                     .iter()
                     .map(|param| param.normalized_impl(db, visitor)),
             ),
-            return_ty: self
-                .return_ty
-                .map(|return_ty| return_ty.normalized_impl(db, visitor)),
+            return_ty: self.return_ty.normalized_impl(db, visitor),
         }
     }
 
@@ -768,16 +759,13 @@ impl<'db> Signature<'db> {
         div: Type<'db>,
         nested: bool,
     ) -> Option<Self> {
-        let return_ty = match self.return_ty {
-            Some(return_ty) if nested => {
-                Some(return_ty.recursive_type_normalized_impl(db, div, true)?)
-            }
-            Some(return_ty) => Some(
-                return_ty
-                    .recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div),
-            ),
-            None => None,
+        let return_ty = if nested {
+            self.return_ty
+                .recursive_type_normalized_impl(db, div, true)?
+        } else {
+            self.return_ty
+                .recursive_type_normalized_impl(db, div, true)
+                .unwrap_or(div)
         };
         let parameters = {
             let mut parameters = Vec::with_capacity(self.parameters.len());
@@ -811,7 +799,7 @@ impl<'db> Signature<'db> {
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
             return_ty: self
                 .return_ty
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+                .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
         }
     }
 
@@ -830,9 +818,8 @@ impl<'db> Signature<'db> {
                 ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
         }
-        if let Some(ty) = self.return_ty {
-            ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-        }
+        self.return_ty
+            .find_legacy_typevars_impl(db, binding_context, typevars, visitor);
     }
 
     /// Return the parameters in this signature.
@@ -919,8 +906,7 @@ impl<'db> Signature<'db> {
                 TypeContext::default(),
                 &ApplyTypeMappingVisitor::default(),
             );
-            return_ty = return_ty
-                .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
+            return_ty = return_ty.apply_type_mapping(db, &self_mapping, TypeContext::default());
         }
         Self {
             generic_context: self
@@ -943,9 +929,9 @@ impl<'db> Signature<'db> {
             TypeContext::default(),
             &ApplyTypeMappingVisitor::default(),
         );
-        let return_ty = self
-            .return_ty
-            .map(|ty| ty.apply_type_mapping(db, &self_mapping, TypeContext::default()));
+        let return_ty =
+            self.return_ty
+                .apply_type_mapping(db, &self_mapping, TypeContext::default());
         Self {
             generic_context: self.generic_context,
             definition: self.definition,
@@ -1006,16 +992,6 @@ impl<'db> Signature<'db> {
         visitor: &IsEquivalentVisitor<'db>,
     ) -> ConstraintSet<'db> {
         let mut result = ConstraintSet::from(true);
-        let mut check_types = |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-            let self_type = self_type.unwrap_or(Type::unknown());
-            let other_type = other_type.unwrap_or(Type::unknown());
-            !result
-                .intersect(
-                    db,
-                    self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
-                )
-                .is_never_satisfied(db)
-        };
 
         if self.parameters.is_gradual() != other.parameters.is_gradual() {
             return ConstraintSet::from(false);
@@ -1025,9 +1001,29 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(false);
         }
 
-        if !check_types(self.return_ty, other.return_ty) {
+        // Check return type first, before creating check_optional_types closure
+        if result
+            .intersect(
+                db,
+                self.return_ty
+                    .is_equivalent_to_impl(db, other.return_ty, inferable, visitor),
+            )
+            .is_never_satisfied(db)
+        {
             return result;
         }
+
+        let mut check_optional_types =
+            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
+                let self_type = self_type.unwrap_or(Type::unknown());
+                let other_type = other_type.unwrap_or(Type::unknown());
+                !result
+                    .intersect(
+                        db,
+                        self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
+                    )
+                    .is_never_satisfied(db)
+            };
 
         for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
             match (self_parameter.kind(), other_parameter.kind()) {
@@ -1073,7 +1069,7 @@ impl<'db> Signature<'db> {
                 _ => return ConstraintSet::from(false),
             }
 
-            if !check_types(
+            if !check_optional_types(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
@@ -1096,29 +1092,24 @@ impl<'db> Signature<'db> {
         {
             let upper = Type::Callable(CallableType::new(
                 db,
-                CallableSignature::from_overloads(
-                    other
-                        .overloads
-                        .iter()
-                        .map(|signature| Signature::new(signature.parameters().clone(), None)),
-                ),
+                CallableSignature::from_overloads(other.overloads.iter().map(|signature| {
+                    Signature::new(signature.parameters().clone(), Type::unknown())
+                })),
                 CallableTypeKind::ParamSpecValue,
             ));
             let param_spec_matches =
                 ConstraintSet::constrain_typevar(db, self_bound_typevar, Type::Never, upper);
-            let return_types_match = self.return_ty.when_some_and(|self_return_type| {
-                other
-                    .overloads
-                    .iter()
-                    .filter_map(|signature| signature.return_ty)
-                    .when_any(db, |other_return_type| {
-                        self_return_type.when_constraint_set_assignable_to(
-                            db,
-                            other_return_type,
-                            inferable,
-                        )
-                    })
-            });
+            let return_types_match = other
+                .overloads
+                .iter()
+                .map(|signature| signature.return_ty)
+                .when_any(db, |other_return_type| {
+                    self.return_ty.when_constraint_set_assignable_to(
+                        db,
+                        other_return_type,
+                        inferable,
+                    )
+                });
             return param_spec_matches.and(db, || return_types_match);
         }
 
@@ -1258,10 +1249,28 @@ impl<'db> Signature<'db> {
         }
 
         let mut result = ConstraintSet::from(true);
-        let mut check_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
+
+        // Return types are covariant. Check first, before creating check_optional_types closure.
+        if result
+            .intersect(
+                db,
+                self.return_ty.has_relation_to_impl(
+                    db,
+                    other.return_ty,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                ),
+            )
+            .is_never_satisfied(db)
+        {
+            return result;
+        }
+
+        let mut check_optional_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
             let type1 = type1.unwrap_or(Type::unknown());
             let type2 = type2.unwrap_or(Type::unknown());
-
             match (type1, type2) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
@@ -1298,11 +1307,6 @@ impl<'db> Signature<'db> {
                 )
                 .is_never_satisfied(db)
         };
-
-        // Return types are covariant.
-        if !check_types(self.return_ty, other.return_ty) {
-            return result;
-        }
 
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
@@ -1360,7 +1364,10 @@ impl<'db> Signature<'db> {
                 (Some(self_bound_typevar), None) => {
                     let upper = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(other.parameters.clone(), None)),
+                        CallableSignature::single(Signature::new(
+                            other.parameters.clone(),
+                            Type::unknown(),
+                        )),
                         CallableTypeKind::ParamSpecValue,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
@@ -1376,7 +1383,10 @@ impl<'db> Signature<'db> {
                 (None, Some(other_bound_typevar)) => {
                     let lower = Type::Callable(CallableType::new(
                         db,
-                        CallableSignature::single(Signature::new(self.parameters.clone(), None)),
+                        CallableSignature::single(Signature::new(
+                            self.parameters.clone(),
+                            Type::unknown(),
+                        )),
                         CallableTypeKind::ParamSpecValue,
                     ));
                     let param_spec_matches = ConstraintSet::constrain_typevar(
@@ -1462,7 +1472,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return ConstraintSet::from(false);
                             }
-                            if !check_types(
+                            if !check_optional_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1487,7 +1497,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return ConstraintSet::from(false);
                             }
-                            if !check_types(
+                            if !check_optional_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1500,7 +1510,7 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if !check_types(
+                            if !check_optional_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1540,7 +1550,7 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if !check_types(
+                                if !check_optional_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -1551,7 +1561,7 @@ impl<'db> Signature<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !check_types(
+                            if !check_optional_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1633,7 +1643,7 @@ impl<'db> Signature<'db> {
                                 if self_default.is_none() && other_default.is_some() {
                                     return ConstraintSet::from(false);
                                 }
-                                if !check_types(
+                                if !check_optional_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -1645,7 +1655,7 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !check_types(
+                        if !check_optional_types(
                             other_parameter.annotated_type(),
                             self_keyword_variadic_type,
                         ) {
@@ -1661,7 +1671,10 @@ impl<'db> Signature<'db> {
                         // parameter, `self` must also have a keyword variadic parameter.
                         return ConstraintSet::from(false);
                     };
-                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
+                    if !check_optional_types(
+                        other_parameter.annotated_type(),
+                        self_keyword_variadic_type,
+                    ) {
                         return result;
                     }
                 }
@@ -1705,7 +1718,7 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                             .variance_of(db, typevar)
                     }),
                 }),
-            self.return_ty.map(|ty| ty.variance_of(db, typevar)),
+            Some(self.return_ty.variance_of(db, typevar)),
         )
         .collect()
     }
@@ -2654,7 +2667,7 @@ mod tests {
 
         let sig = func.signature(&db);
 
-        assert!(sig.return_ty.is_none());
+        assert!(sig.return_ty.is_unknown());
         assert_params(&sig, &[]);
     }
 
@@ -2679,7 +2692,7 @@ mod tests {
 
         let sig = func.signature(&db);
 
-        assert_eq!(sig.return_ty.unwrap().display(&db).to_string(), "bytes");
+        assert_eq!(sig.return_ty.display(&db).to_string(), "bytes");
         assert_params(
             &sig,
             &[

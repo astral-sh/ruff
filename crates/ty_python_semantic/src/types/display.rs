@@ -1680,7 +1680,7 @@ impl<'db> Signature<'db> {
 pub(crate) struct DisplaySignature<'a, 'db> {
     definition: Option<Definition<'db>>,
     parameters: &'a Parameters<'db>,
-    return_ty: Option<Type<'db>>,
+    return_ty: Type<'db>,
     db: &'db dyn Db,
     settings: DisplaySettings<'db>,
 }
@@ -1727,9 +1727,8 @@ impl<'db> FmtDetailed<'db> for DisplaySignature<'_, 'db> {
             .fmt_detailed(&mut f)?;
 
         // Return type
-        let return_ty = self.return_ty.unwrap_or_else(Type::unknown);
         f.write_str(" -> ")?;
-        return_ty
+        self.return_ty
             .display_with(self.db, self.settings.singleline())
             .fmt_detailed(&mut f)?;
 
@@ -2646,9 +2645,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display(db)
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display(db)
+        .to_string()
     }
 
     fn display_signature_multiline<'db>(
@@ -2656,9 +2658,12 @@ mod tests {
         parameters: impl IntoIterator<Item = Parameter<'db>>,
         return_ty: Option<Type<'db>>,
     ) -> String {
-        Signature::new(Parameters::new(db, parameters), return_ty)
-            .display_with(db, super::DisplaySettings::default().multiline())
-            .to_string()
+        Signature::new(
+            Parameters::new(db, parameters),
+            return_ty.unwrap_or(Type::unknown()),
+        )
+        .display_with(db, super::DisplaySettings::default().multiline())
+        .to_string()
     }
 
     #[test]

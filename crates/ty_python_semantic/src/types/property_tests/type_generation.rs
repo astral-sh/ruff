@@ -239,7 +239,9 @@ impl Ty {
                 db,
                 Signature::new(
                     params.into_parameters(db),
-                    returns.map(|ty| ty.into_type(db)),
+                    returns
+                        .map(|ty| ty.into_type(db))
+                        .unwrap_or(Type::unknown()),
                 ),
             ),
         }

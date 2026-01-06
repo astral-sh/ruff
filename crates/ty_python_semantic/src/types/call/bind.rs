@@ -3011,7 +3011,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         let return_with_tcx = self
             .constructor_instance_type
-            .or(self.signature.return_ty)
+            .or(Some(self.signature.return_ty))
             .zip(self.call_expression_tcx.annotation);
 
         self.inferable_typevars = generic_context.inferable_typevars(self.db);
@@ -3092,10 +3092,9 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
 
         // Attempt to promote any literal types assigned to the specialization.
         let maybe_promote = |identity, typevar, ty: Type<'db>| {
-            let Some(return_ty) = self.constructor_instance_type.or(self.signature.return_ty)
-            else {
-                return ty;
-            };
+            let return_ty = self
+                .constructor_instance_type
+                .unwrap_or(self.signature.return_ty);
 
             let mut combined_tcx = TypeContext::default();
             let mut variance_in_return = TypeVarVariance::Bivariant;
@@ -3692,7 +3691,7 @@ impl<'db> Binding<'db> {
         for (keywords_index, keywords_type) in keywords_arguments {
             matcher.match_keyword_variadic(db, keywords_index, keywords_type);
         }
-        self.return_ty = self.signature.return_ty.unwrap_or(Type::unknown());
+        self.return_ty = self.signature.return_ty;
         self.parameter_tys = vec![None; parameters.len()].into_boxed_slice();
         self.variadic_argument_matched_to_variadic_parameter =
             matcher.variadic_argument_matched_to_variadic_parameter;
@@ -4723,7 +4722,7 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
         .exactly_one()
         .ok()?;
     let signature = &binding.signature;
-    let return_ty = signature.return_ty?;
+    let return_ty = signature.return_ty;
 
     let yield_ty = return_ty
         .try_iterate_with_mode(db, EvaluationMode::Async)
@@ -4741,7 +4740,7 @@ fn asynccontextmanager_return_type<'db>(db: &'db dyn Db, func_ty: Type<'db>) -> 
     });
 
     let new_return_ty = Type::from(context_manager).to_instance(db)?;
-    let new_signature = Signature::new(signature.parameters().clone(), Some(new_return_ty));
+    let new_signature = Signature::new(signature.parameters().clone(), new_return_ty);
 
     Some(Type::Callable(CallableType::new(
         db,
