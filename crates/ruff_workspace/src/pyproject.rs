@@ -5,6 +5,7 @@ use std::path::{Path, PathBuf};
 use anyhow::{Context, Result};
 use log::debug;
 use pep440_rs::{Operator, Version, VersionSpecifiers};
+use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
 
@@ -40,27 +41,38 @@ impl Pyproject {
     }
 }
 
-fn parse_toml<P: AsRef<Path>>(path: P) -> Result<toml::Value> {
+fn parse_toml<P: AsRef<Path>, T: DeserializeOwned>(path: P, table_path: &[&str]) -> Result<T> {
     let path = path.as_ref();
     let contents = std::fs::read_to_string(path)
         .with_context(|| format!("Failed to read {}", path.display()))?;
-    toml::from_str(&contents).with_context(|| format!("Failed to parse {}", path.display()))
+
+    // Parse the TOML document once into a spanned representation so we can:
+    // - Inspect `required-version` without triggering strict deserialization errors.
+    // - Deserialize with precise spans (line/column and excerpt) on errors.
+    let root = toml::de::DeTable::parse(&contents)
+        .with_context(|| format!("Failed to parse {}", path.display()))?;
+
+    check_required_version(root.get_ref(), path, table_path)?;
+
+    let deserializer = toml::de::Deserializer::from(root);
+    T::deserialize(deserializer)
+        .map_err(|mut err| {
+            // `Deserializer::from` doesn't have access to the original input, but we do.
+            // Attach it so TOML errors include line/column and a source excerpt.
+            err.set_input(Some(&contents));
+            err
+        })
+        .with_context(|| format!("Failed to parse {}", path.display()))
 }
 
 /// Parse a `ruff.toml` file.
 fn parse_ruff_toml<P: AsRef<Path>>(path: P) -> Result<Options> {
-    let path = path.as_ref();
-    let toml = parse_toml(path)?;
-    check_required_version(&toml, path, &[])?;
-    toml.try_into().with_context(|| format!("Failed to parse {}", path.display()))
+    parse_toml(path, &[])
 }
 
 /// Parse a `pyproject.toml` file.
 fn parse_pyproject_toml<P: AsRef<Path>>(path: P) -> Result<Pyproject> {
-    let path = path.as_ref();
-    let toml = parse_toml(path)?;
-    check_required_version(&toml, path, &["tool", "ruff"])?;
-    toml.try_into().with_context(|| format!("Failed to parse {}", path.display()))
+    parse_toml(path, &["tool", "ruff"])
 }
 
 /// Return `true` if a `pyproject.toml` contains a `[tool.ruff]` section.
@@ -105,21 +117,25 @@ pub fn find_settings_toml<P: AsRef<Path>>(path: P) -> Result<Option<PathBuf>> {
     Ok(None)
 }
 
-fn check_required_version(value: &toml::Value, path: &Path, table_path: &[&str]) -> Result<()> {
+fn check_required_version(value: &toml::de::DeTable, path: &Path, table_path: &[&str]) -> Result<()> {
     let mut current = value;
     for key in table_path {
-        match current.get(*key) {
-            Some(next) => {
-                current = next;
-            }
-            None => return Ok(()),
-        }
+        let Some(next) = current.get(*key) else {
+            return Ok(());
+        };
+        let toml::de::DeValue::Table(next) = next.get_ref() else {
+            return Ok(());
+        };
+        current = next;
     }
 
     let required_version = current
         .get("required-version")
         .or_else(|| current.get("required_version"))
-        .and_then(|value| value.as_str());
+        .and_then(|value| match value.get_ref() {
+            toml::de::DeValue::String(value) => Some(value.as_ref()),
+            _ => None,
+        });
 
     let Some(required_version) = required_version else {
         return Ok(());
