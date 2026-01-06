@@ -238,8 +238,7 @@ class Foo[T]:
         return self
 
     def method6[S: (Foo[int], Foo[str])](self: S, other: S) -> S:
-        # error: [invalid-super-argument]
-        # revealed: Unknown
+        # revealed: <super: <class 'Foo'>, S@method6> | <super: <class 'Foo'>, S@method6>
         reveal_type(super())
         return self
 

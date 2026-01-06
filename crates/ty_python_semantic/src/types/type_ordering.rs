@@ -190,13 +190,15 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
                 (SuperOwnerKind::Instance(_), _) => Ordering::Less,
                 (_, SuperOwnerKind::Instance(_)) => Ordering::Greater,
                 (
-                    SuperOwnerKind::InstanceTypeVar(left) | SuperOwnerKind::ClassTypeVar(left),
-                    SuperOwnerKind::InstanceTypeVar(right) | SuperOwnerKind::ClassTypeVar(right),
+                    SuperOwnerKind::InstanceTypeVar(left, _)
+                    | SuperOwnerKind::ClassTypeVar(left, _),
+                    SuperOwnerKind::InstanceTypeVar(right, _)
+                    | SuperOwnerKind::ClassTypeVar(right, _),
                 ) => left.cmp(&right),
-                (SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_), _) => {
+                (SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..), _) => {
                     Ordering::Less
                 }
-                (_, SuperOwnerKind::InstanceTypeVar(_) | SuperOwnerKind::ClassTypeVar(_)) => {
+                (_, SuperOwnerKind::InstanceTypeVar(..) | SuperOwnerKind::ClassTypeVar(..)) => {
                     Ordering::Greater
                 }
                 (SuperOwnerKind::Dynamic(left), SuperOwnerKind::Dynamic(right)) => {
