@@ -82,18 +82,9 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 Member {
                     inner: match inferred {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(DefinedPlace {
-                            origin,
-                            definedness,
-                            widening,
-                            ..
-                        }) => Place::Defined(DefinedPlace {
-                            ty,
-                            origin,
-                            definedness,
-                            widening,
-                        })
-                        .with_qualifiers(qualifiers),
+                        Place::Defined(place) => {
+                            Place::Defined(DefinedPlace { ty, ..place }).with_qualifiers(qualifiers)
+                        }
                     },
                 }
             } else {

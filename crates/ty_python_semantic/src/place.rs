@@ -122,7 +122,6 @@ impl<'db> DefinedPlace<'db> {
         self
     }
 
-    #[allow(dead_code)]
     pub(crate) const fn is_definitely_defined(&self) -> bool {
         matches!(self.definedness, Definedness::AlwaysDefined)
     }
@@ -247,34 +246,22 @@ impl<'db> Place<'db> {
     /// This is used to resolve (potential) descriptor attributes.
     pub(crate) fn try_call_dunder_get(self, db: &'db dyn Db, owner: Type<'db>) -> Place<'db> {
         match self {
-            Place::Defined(DefinedPlace {
-                ty: Type::Union(union),
-                origin,
-                definedness,
-                widening,
-            }) => union.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace {
-                    ty: *elem,
-                    origin,
-                    definedness,
-                    widening,
-                })
-                .try_call_dunder_get(db, owner)
+            Place::Defined(
+                place @ DefinedPlace {
+                    ty: Type::Union(union),
+                    ..
+                },
+            ) => union.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
             }),
 
-            Place::Defined(DefinedPlace {
-                ty: Type::Intersection(intersection),
-                origin,
-                definedness,
-                widening,
-            }) => intersection.map_with_boundness(db, |elem| {
-                Place::Defined(DefinedPlace {
-                    ty: *elem,
-                    origin,
-                    definedness,
-                    widening,
-                })
-                .try_call_dunder_get(db, owner)
+            Place::Defined(
+                place @ DefinedPlace {
+                    ty: Type::Intersection(intersection),
+                    ..
+                },
+            ) => intersection.map_with_boundness(db, |elem| {
+                Place::Defined(DefinedPlace { ty: *elem, ..place }).try_call_dunder_get(db, owner)
             }),
 
             Place::Defined(defined) => {
@@ -765,32 +752,17 @@ impl<'db> PlaceAndQualifiers<'db> {
     pub(crate) fn into_lookup_result(self, db: &'db dyn Db) -> LookupResult<'db> {
         match self {
             PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty,
-                        origin,
-                        definedness: Definedness::AlwaysDefined,
-                        widening,
-                    }),
+                place: Place::Defined(place),
                 qualifiers,
             } => {
-                let ty = widening.apply_if_needed(db, ty);
-                Ok(TypeAndQualifiers::new(ty, origin, qualifiers))
-            }
-            PlaceAndQualifiers {
-                place:
-                    Place::Defined(DefinedPlace {
-                        ty,
-                        origin,
-                        definedness: Definedness::PossiblyUndefined,
-                        widening,
-                    }),
-                qualifiers,
-            } => {
-                let ty = widening.apply_if_needed(db, ty);
-                Err(LookupError::PossiblyUndefined(TypeAndQualifiers::new(
-                    ty, origin, qualifiers,
-                )))
+                let ty = place.widening.apply_if_needed(db, place.ty);
+                let type_and_qualifiers = TypeAndQualifiers::new(ty, place.origin, qualifiers);
+                match place.definedness {
+                    Definedness::AlwaysDefined => Ok(type_and_qualifiers),
+                    Definedness::PossiblyUndefined => {
+                        Err(LookupError::PossiblyUndefined(type_and_qualifiers))
+                    }
+                }
             }
             PlaceAndQualifiers {
                 place: Place::Undefined,

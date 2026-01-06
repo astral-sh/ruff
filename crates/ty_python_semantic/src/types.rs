@@ -1849,13 +1849,10 @@ impl<'db> Type<'db> {
                     )
                     .place;
 
-                if let Place::Defined(DefinedPlace {
-                    ty,
-                    definedness: Definedness::AlwaysDefined,
-                    ..
-                }) = call_symbol
+                if let Place::Defined(place) = call_symbol
+                    && place.is_definitely_defined()
                 {
-                    ty.try_upcast_to_callable(db)
+                    place.ty.try_upcast_to_callable(db)
                 } else {
                     None
                 }
@@ -11329,24 +11326,16 @@ impl<'db> ModuleLiteralType<'db> {
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
-            if let Place::Defined(DefinedPlace {
-                ty: getattr_type,
-                origin,
-                definedness: boundness,
-                widening,
-            }) = getattr_symbol.place
-            {
+            if let Place::Defined(place) = getattr_symbol.place {
                 // If we found a __getattr__ function, try to call it with the name argument
-                if let Ok(outcome) = getattr_type.try_call(
+                if let Ok(outcome) = place.ty.try_call(
                     db,
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 ) {
                     return PlaceAndQualifiers {
                         place: Place::Defined(DefinedPlace {
                             ty: outcome.return_type(db),
-                            origin,
-                            definedness: boundness,
-                            widening,
+                            ..place
                         }),
                         qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
                     };
