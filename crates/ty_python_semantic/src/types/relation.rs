@@ -962,47 +962,46 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
+            (Type::StringLiteral(_), Type::NominalInstance(instance))
+                if instance.has_known_class(db, KnownClass::Str) =>
+            {
+                ConstraintSet::from(true)
+            }
+
             // A string literal `Literal["abc"]` is a subtype of `str` *and* of
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            (Type::StringLiteral(value), _) => KnownClass::Str
-                .to_instance(db)
-                .has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-                .or(db, || {
+            (Type::StringLiteral(value), _) => {
+                let chars: FxHashSet<char> = value.value(db).chars().collect();
+
+                let spec = if chars.len() == 1 {
+                    Type::StringLiteral(StringLiteralType::new(
+                        db,
+                        chars.iter().next().unwrap().to_compact_string(),
+                    ))
+                } else {
                     // Optimisation: since we know this union will only include string-literal types,
                     // avoid eagerly creating string-literal types when unnecessary, and avoid going
                     // via the union-builder.
-                    let mut seen = FxHashSet::default();
-
-                    let union_elements: Box<[Type<'db>]> = value
-                        .value(db)
-                        .chars()
-                        .filter(|c| seen.insert(*c))
+                    let union_elements: Box<[Type<'db>]> = chars
+                        .iter()
                         .map(|c| {
                             Type::StringLiteral(StringLiteralType::new(db, c.to_compact_string()))
                         })
                         .collect();
+                    Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                };
 
-                    let spec =
-                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No));
-
-                    KnownClass::Sequence
-                        .to_specialized_instance(db, [spec])
-                        .has_relation_to_impl(
-                            db,
-                            target,
-                            inferable,
-                            relation,
-                            relation_visitor,
-                            disjointness_visitor,
-                        )
-                }),
+                KnownClass::Sequence
+                    .to_specialized_instance(db, [spec])
+                    .has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    )
+            }
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
             // and the enum has only one member.
