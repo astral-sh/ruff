@@ -2254,29 +2254,6 @@ static_assert(not is_subtype_of(Callable[[str], str], CallableTypeOf[identity]))
 static_assert(not is_subtype_of(Callable[[str], int], CallableTypeOf[identity]))
 ```
 
-## String literals and Sequence
-
-String literals are subtypes of `Sequence[Literal[chars...]]` because strings are sequences of their
-characters.
-
-```py
-from typing import Literal, Sequence, Iterable, Collection, Reversible
-from ty_extensions import is_subtype_of, static_assert
-
-static_assert(is_subtype_of(Literal["abba"], Sequence[Literal["a", "b"]]))
-static_assert(is_subtype_of(Literal["abb"], Iterable[Literal["a", "b"]]))
-static_assert(is_subtype_of(Literal["abb"], Collection[Literal["a", "b"]]))
-static_assert(is_subtype_of(Literal["abb"], Reversible[Literal["a", "b"]]))
-static_assert(is_subtype_of(Literal["aaa"], Sequence[Literal["a"]]))
-static_assert(is_subtype_of(Literal[""], Sequence[Literal["a", "b"]]))  # empty string
-static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  # subset of allowed chars
-
-# String literals are NOT subtypes when they contain chars outside the allowed set
-static_assert(not is_subtype_of(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
-static_assert(not is_subtype_of(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
-static_assert(not is_subtype_of(Literal["aa"], Sequence[Literal[""]]))
-```
-
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form
 [gradual tuple]: https://typing.python.org/en/latest/spec/tuples.html#tuple-type-form
 [special case for float and complex]: https://typing.python.org/en/latest/spec/special-types.html#special-cases-for-float-and-complex

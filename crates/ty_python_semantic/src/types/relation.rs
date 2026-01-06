@@ -1035,10 +1035,18 @@ impl<'db> Type<'db> {
             // All `StringLiteral` types are a subtype of `LiteralString`.
             (Type::StringLiteral(_), Type::LiteralString) => ConstraintSet::from(true),
 
-            // A string literal `Literal["abc"]` is a subtype of `str` *and* of
+            // A string literal `Literal["abc"]` is assignable to `str` *and* to
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
-            (Type::StringLiteral(value), Type::NominalInstance(instance)) => {
-                if instance.has_known_class(db, KnownClass::Str) {
+            //
+            // Note that this strictly holds true for all type relations!
+            // However, as an optimisation (to avoid interning many single-character string-literal types),
+            // we only recognise this as being true for assignability.
+            (Type::StringLiteral(value), Type::NominalInstance(instance))
+                if relation.is_assignability() =>
+            {
+                let other_class = instance.class(db);
+
+                if other_class.is_known(db, KnownClass::Str) {
                     return ConstraintSet::from(true);
                 }
 
@@ -1068,15 +1076,17 @@ impl<'db> Type<'db> {
                 };
 
                 KnownClass::Sequence
-                    .to_specialized_instance(db, [spec])
-                    .has_relation_to_impl(
-                        db,
-                        target,
-                        inferable,
-                        relation,
-                        relation_visitor,
-                        disjointness_visitor,
-                    )
+                    .to_specialized_class_type(db, [spec])
+                    .when_some_and(|class| {
+                        class.has_relation_to_impl(
+                            db,
+                            other_class,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
             }
 
             // An instance is a subtype of an enum literal, if it is an instance of the enum class
