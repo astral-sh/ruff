@@ -953,18 +953,14 @@ impl ReachabilityConstraints {
                 )
                 .place
                 {
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::AlwaysDefined,
-                        _,
-                    ) => Truthiness::AlwaysTrue,
-                    crate::place::Place::Defined(
-                        _,
-                        _,
-                        crate::place::Definedness::PossiblyUndefined,
-                        _,
-                    ) => Truthiness::Ambiguous,
+                    crate::place::Place::Defined {
+                        definedness: crate::place::Definedness::AlwaysDefined,
+                        ..
+                    } => Truthiness::AlwaysTrue,
+                    crate::place::Place::Defined {
+                        definedness: crate::place::Definedness::PossiblyUndefined,
+                        ..
+                    } => Truthiness::Ambiguous,
                     crate::place::Place::Undefined => Truthiness::AlwaysFalse,
                 }
             }

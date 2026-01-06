@@ -68,7 +68,7 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
             }
 
             if let PlaceAndQualifiers {
-                place: Place::Defined(ty, _, _, _),
+                place: Place::Defined { ty: ty, origin: _, definedness: _, widening: _ },
                 qualifiers,
             } = place_and_quals
             {
@@ -82,8 +82,8 @@ pub(super) fn class_member<'db>(db: &'db dyn Db, scope: ScopeId<'db>, name: &str
                 Member {
                     inner: match inferred {
                         Place::Undefined => Place::Undefined.with_qualifiers(qualifiers),
-                        Place::Defined(_, origin, boundness, widening) => {
-                            Place::Defined(ty, origin, boundness, widening)
+                        Place::Defined { ty: _, origin: origin, definedness: boundness, widening: widening } => {
+                            Place::Defined { ty: ty, origin: origin, definedness: boundness, widening: widening }
                                 .with_qualifiers(qualifiers)
                         }
                     },

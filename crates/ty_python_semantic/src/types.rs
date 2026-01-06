@@ -1849,7 +1849,7 @@ impl<'db> Type<'db> {
                     )
                     .place;
 
-                if let Place::Defined(ty, _, Definedness::AlwaysDefined, _) = call_symbol {
+                if let Place::Defined { ty: ty, origin: _, definedness: Definedness::AlwaysDefined, widening: _ } = call_symbol {
                     ty.try_upcast_to_callable(db)
                 } else {
                     None
@@ -2540,10 +2540,10 @@ impl<'db> Type<'db> {
     fn static_member(&self, db: &'db dyn Db, name: &str) -> Place<'db> {
         if let Type::ModuleLiteral(module) = self {
             module.static_member(db, name).place
-        } else if let place @ Place::Defined(_, _, _, _) = self.class_member(db, name.into()).place
+        } else if let place @ Place::Defined { ty: _, origin: _, definedness: _, widening: _ } = self.class_member(db, name.into()).place
         {
             place
-        } else if let Some(place @ Place::Defined(_, _, _, _)) =
+        } else if let Some(place @ Place::Defined { ty: _, origin: _, definedness: _, widening: _ }) =
             self.find_name_in_mro(db, name).map(|inner| inner.place)
         {
             place
@@ -2604,7 +2604,7 @@ impl<'db> Type<'db> {
 
         let descr_get = self.class_member(db, "__get__".into()).place;
 
-        if let Place::Defined(descr_get, _, descr_get_boundness, _) = descr_get {
+        if let Place::Defined { ty: descr_get, origin: _, definedness: descr_get_boundness, widening: _ } = descr_get {
             let return_ty = descr_get
                 .try_call(db, &CallArguments::positional([self, instance, owner]))
                 .map(|bindings| {
@@ -2649,23 +2649,24 @@ impl<'db> Type<'db> {
             //
             // The same is true for `Never`.
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Dynamic(_) | Type::Never, _, _, _),
+                place: Place::Defined { ty: Type::Dynamic(_) | Type::Never, origin: _, definedness: _, widening: _ },
                 qualifiers: _,
             } => (attribute, AttributeKind::DataDescriptor),
 
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Union(union), origin, boundness, widening),
+                place: Place::Defined { ty: Type::Union(union), origin: origin, definedness: boundness, widening: widening },
                 qualifiers,
             } => (
                 union
                     .map_with_boundness(db, |elem| {
-                        Place::Defined(
-                            elem.try_call_dunder_get(db, instance, owner)
+                        Place::Defined {
+                            ty: elem
+                                .try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
-                            boundness,
+                            definedness: boundness,
                             widening,
-                        )
+                        }
                     })
                     .with_qualifiers(qualifiers),
                 // TODO: avoid the duplication here:
@@ -2680,18 +2681,19 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Defined(Type::Intersection(intersection), origin, boundness, widening),
+                place: Place::Defined { ty: Type::Intersection(intersection), origin: origin, definedness: boundness, widening: widening },
                 qualifiers,
             } => (
                 intersection
                     .map_with_boundness(db, |elem| {
-                        Place::Defined(
-                            elem.try_call_dunder_get(db, instance, owner)
+                        Place::Defined {
+                            ty: elem
+                                .try_call_dunder_get(db, instance, owner)
                                 .map_or(*elem, |(ty, _)| ty),
                             origin,
-                            boundness,
+                            definedness: boundness,
                             widening,
-                        )
+                        }
                     })
                     .with_qualifiers(qualifiers),
                 // TODO: Discover data descriptors in intersections.
@@ -2699,14 +2701,14 @@ impl<'db> Type<'db> {
             ),
 
             PlaceAndQualifiers {
-                place: Place::Defined(attribute_ty, origin, boundness, widening),
+                place: Place::Defined { ty: attribute_ty, origin: origin, definedness: boundness, widening: widening },
                 qualifiers: _,
             } => {
                 if let Some((return_ty, attribute_kind)) =
                     attribute_ty.try_call_dunder_get(db, instance, owner)
                 {
                     (
-                        Place::Defined(return_ty, origin, boundness, widening).into(),
+                        Place::Defined { ty: return_ty, origin: origin, definedness: boundness, widening: widening }.into(),
                         attribute_kind,
                     )
                 } else {
@@ -2799,14 +2801,14 @@ impl<'db> Type<'db> {
         match (meta_attr, meta_attr_kind, fallback) {
             // The fallback type is unbound, so we can just return `meta_attr` unconditionally,
             // no matter if it's data descriptor, a non-data descriptor, or a normal attribute.
-            (meta_attr @ Place::Defined(_, _, _, _), _, Place::Undefined) => {
+            (meta_attr @ Place::Defined { ty: _, origin: _, definedness: _, widening: _ }, _, Place::Undefined) => {
                 meta_attr.with_qualifiers(meta_attr_qualifiers)
             }
 
             // `meta_attr` is the return type of a data descriptor and definitely bound, so we
             // return it.
             (
-                meta_attr @ Place::Defined(_, _, Definedness::AlwaysDefined, _),
+                meta_attr @ Place::Defined { ty: _, origin: _, definedness: Definedness::AlwaysDefined, widening: _ },
                 AttributeKind::DataDescriptor,
                 _,
             ) => meta_attr.with_qualifiers(meta_attr_qualifiers),
@@ -2815,15 +2817,15 @@ impl<'db> Type<'db> {
             // meta-type is possibly-unbound. This means that we "fall through" to the next
             // stage of the descriptor protocol and union with the fallback type.
             (
-                Place::Defined(meta_attr_ty, meta_origin, Definedness::PossiblyUndefined, _),
+                Place::Defined { ty: meta_attr_ty, origin: meta_origin, definedness: Definedness::PossiblyUndefined, widening: _ },
                 AttributeKind::DataDescriptor,
-                Place::Defined(fallback_ty, fallback_origin, fallback_boundness, fallback_widening),
-            ) => Place::Defined(
-                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                meta_origin.merge(fallback_origin),
-                fallback_boundness,
-                fallback_widening,
-            )
+                Place::Defined { ty: fallback_ty, origin: fallback_origin, definedness: fallback_boundness, widening: fallback_widening },
+            ) => Place::Defined {
+                ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                origin: meta_origin.merge(fallback_origin),
+                definedness: fallback_boundness,
+                widening: fallback_widening,
+            }
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // `meta_attr` is *not* a data descriptor. This means that the `fallback` type has
@@ -2835,9 +2837,12 @@ impl<'db> Type<'db> {
             // would require us to statically infer if an instance attribute is always set, which
             // is something we currently don't attempt to do.
             (
-                Place::Defined(_, _, _, _),
+                Place::Defined { .. },
                 AttributeKind::NormalOrNonDataDescriptor,
-                fallback @ Place::Defined(_, _, Definedness::AlwaysDefined, _),
+                fallback @ Place::Defined {
+                    definedness: Definedness::AlwaysDefined,
+                    ..
+                },
             ) if policy == InstanceFallbackShadowsNonDataDescriptor::Yes => {
                 fallback.with_qualifiers(fallback_qualifiers)
             }
@@ -2846,15 +2851,25 @@ impl<'db> Type<'db> {
             // unbound or the policy argument is `No`. In both cases, the `fallback` type does
             // not completely shadow the non-data descriptor, so we build a union of the two.
             (
-                Place::Defined(meta_attr_ty, meta_origin, meta_attr_boundness, _),
+                Place::Defined {
+                    ty: meta_attr_ty,
+                    origin: meta_origin,
+                    definedness: meta_attr_boundness,
+                    ..
+                },
                 AttributeKind::NormalOrNonDataDescriptor,
-                Place::Defined(fallback_ty, fallback_origin, fallback_boundness, fallback_widening),
-            ) => Place::Defined(
-                UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
-                meta_origin.merge(fallback_origin),
-                meta_attr_boundness.max(fallback_boundness),
-                fallback_widening,
-            )
+                Place::Defined {
+                    ty: fallback_ty,
+                    origin: fallback_origin,
+                    definedness: fallback_boundness,
+                    widening: fallback_widening,
+                },
+            ) => Place::Defined {
+                ty: UnionType::from_elements(db, [meta_attr_ty, fallback_ty]),
+                origin: meta_origin.merge(fallback_origin),
+                definedness: meta_attr_boundness.max(fallback_boundness),
+                widening: fallback_widening,
+            }
             .with_qualifiers(meta_attr_qualifiers.union(fallback_qualifiers)),
 
             // If the attribute is not found on the meta-type, we simply return the fallback.
@@ -3218,11 +3233,11 @@ impl<'db> Type<'db> {
 
                 match result {
                     member @ PlaceAndQualifiers {
-                        place: Place::Defined(_, _, Definedness::AlwaysDefined, _),
+                        place: Place::Defined { ty: _, origin: _, definedness: Definedness::AlwaysDefined, widening: _ },
                         qualifiers: _,
                     } => member,
                     member @ PlaceAndQualifiers {
-                        place: Place::Defined(_, _, Definedness::PossiblyUndefined, _),
+                        place: Place::Defined { ty: _, origin: _, definedness: Definedness::PossiblyUndefined, widening: _ },
                         qualifiers: _,
                     } => member
                         .or_fall_back_to(db, custom_getattribute_result)
@@ -4361,7 +4376,7 @@ impl<'db> Type<'db> {
                     )
                     .place
                 {
-                    Place::Defined(dunder_callable, _, boundness, _) => {
+                    Place::Defined { ty: dunder_callable, origin: _, definedness: boundness, widening: _ } => {
                         let mut bindings = dunder_callable.bindings(db);
                         bindings.replace_callable_type(dunder_callable, self);
                         if boundness == Definedness::PossiblyUndefined {
@@ -4514,7 +4529,7 @@ impl<'db> Type<'db> {
             )
             .place
         {
-            Place::Defined(dunder_callable, _, boundness, _) => {
+            Place::Defined { ty: dunder_callable, origin: _, definedness: boundness, widening: _ } => {
                 let bindings = dunder_callable
                     .bindings(db)
                     .match_parameters(db, argument_types)
@@ -5091,18 +5106,21 @@ impl<'db> Type<'db> {
             new_method.as_ref().map(|method| &method.place),
             &init_method.place,
         ) {
-            (Some(Place::Defined(new_method, ..)), Place::Undefined) => Some(
+            (Some(Place::Defined { ty: new_method, .. }), Place::Undefined) => Some(
                 new_method
                     .bindings(db)
                     .map(|binding| binding.with_bound_type(self_type)),
             ),
 
-            (Some(Place::Undefined) | None, Place::Defined(init_method, ..)) => {
+            (Some(Place::Undefined) | None, Place::Defined { ty: init_method, .. }) => {
                 Some(init_method.bindings(db))
             }
 
-            (Some(Place::Defined(new_method, ..)), Place::Defined(init_method, ..)) => {
-                let callable = UnionType::from_elements(db, [new_method, init_method]);
+            (
+                Some(Place::Defined { ty: new_method, .. }),
+                Place::Defined { ty: init_method, .. },
+            ) => {
+                let callable = UnionType::from_elements(db, [*new_method, *init_method]);
 
                 let new_method_bindings = new_method
                     .bindings(db)
@@ -5121,7 +5139,7 @@ impl<'db> Type<'db> {
 
         let new_call_outcome = new_method.and_then(|new_method| {
             match new_method.place.try_call_dunder_get(db, self_type) {
-                Place::Defined(new_method, _, boundness, _) => {
+                Place::Defined { ty: new_method, origin: _, definedness: boundness, widening: _ } => {
                     let argument_types = argument_types.with_self(Some(self_type));
                     let result = new_method
                         .bindings(db)
@@ -5149,7 +5167,7 @@ impl<'db> Type<'db> {
                 .place
             {
                 Place::Undefined => Err(CallDunderError::MethodNotAvailable),
-                Place::Defined(dunder_callable, _, boundness, _) => {
+                Place::Defined { ty: dunder_callable, origin: _, definedness: boundness, widening: _ } => {
                     let bindings = dunder_callable
                         .bindings(db)
                         .with_constructor_instance_type(init_ty);
@@ -8624,7 +8642,7 @@ impl<'db> TypeVarConstraints<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness, _) => {
+                Place::Defined { ty: ty_member, origin: member_origin, definedness: member_boundness, widening: _ } => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -8639,16 +8657,16 @@ impl<'db> TypeVarConstraints<'db> {
             place: if all_unbound {
                 Place::Undefined
             } else {
-                Place::Defined(
-                    builder.build(),
+                Place::Defined {
+                    ty: builder.build(),
                     origin,
-                    if possibly_unbound {
+                    definedness: if possibly_unbound {
                         Definedness::PossiblyUndefined
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    Widening::None,
-                )
+                    widening: Widening::None,
+                }
             },
             qualifiers,
         }
@@ -11227,7 +11245,7 @@ impl<'db> ModuleLiteralType<'db> {
         // if it exists. First, we need to look up the `__getattr__` function in the module's scope.
         if let Some(file) = self.module(db).file(db) {
             let getattr_symbol = imported_symbol(db, file, "__getattr__", None);
-            if let Place::Defined(getattr_type, origin, boundness, widening) = getattr_symbol.place
+            if let Place::Defined { ty: getattr_type, origin: origin, definedness: boundness, widening: widening } = getattr_symbol.place
             {
                 // If we found a __getattr__ function, try to call it with the name argument
                 if let Ok(outcome) = getattr_type.try_call(
@@ -11235,7 +11253,7 @@ impl<'db> ModuleLiteralType<'db> {
                     &CallArguments::positional([Type::string_literal(db, name)]),
                 ) {
                     return PlaceAndQualifiers {
-                        place: Place::Defined(outcome.return_type(db), origin, boundness, widening),
+                        place: Place::Defined { ty: outcome.return_type(db), origin: origin, definedness: boundness, widening: widening },
                         qualifiers: TypeQualifiers::FROM_MODULE_GETATTR,
                     };
                 }
@@ -11772,7 +11790,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness, _) => {
+                Place::Defined { ty: ty_member, origin: member_origin, definedness: member_boundness, widening: _ } => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -11787,18 +11805,18 @@ impl<'db> UnionType<'db> {
         if all_unbound {
             Place::Undefined
         } else {
-            Place::Defined(
-                builder
+            Place::Defined {
+                ty: builder
                     .recursively_defined(self.recursively_defined(db))
                     .build(),
                 origin,
-                if possibly_unbound {
+                definedness: if possibly_unbound {
                     Definedness::PossiblyUndefined
                 } else {
                     Definedness::AlwaysDefined
                 },
-                Widening::None,
-            )
+                widening: Widening::None,
+            }
         }
     }
 
@@ -11823,7 +11841,7 @@ impl<'db> UnionType<'db> {
                 Place::Undefined => {
                     possibly_unbound = true;
                 }
-                Place::Defined(ty_member, member_origin, member_boundness, _) => {
+                Place::Defined { ty: ty_member, origin: member_origin, definedness: member_boundness, widening: _ } => {
                     origin = origin.merge(member_origin);
                     if member_boundness == Definedness::PossiblyUndefined {
                         possibly_unbound = true;
@@ -11838,18 +11856,18 @@ impl<'db> UnionType<'db> {
             place: if all_unbound {
                 Place::Undefined
             } else {
-                Place::Defined(
-                    builder
+                Place::Defined {
+                    ty: builder
                         .recursively_defined(self.recursively_defined(db))
                         .build(),
                     origin,
-                    if possibly_unbound {
+                    definedness: if possibly_unbound {
                         Definedness::PossiblyUndefined
                     } else {
                         Definedness::AlwaysDefined
                     },
-                    Widening::None,
-                )
+                    widening: Widening::None,
+                }
             },
             qualifiers,
         }
@@ -12407,7 +12425,7 @@ impl<'db> IntersectionType<'db> {
             let ty_member = transform_fn(&ty);
             match ty_member {
                 Place::Undefined => {}
-                Place::Defined(ty_member, member_origin, member_boundness, _) => {
+                Place::Defined { ty: ty_member, origin: member_origin, definedness: member_boundness, widening: _ } => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
                     if member_boundness == Definedness::AlwaysDefined {
@@ -12422,16 +12440,16 @@ impl<'db> IntersectionType<'db> {
         if all_unbound {
             Place::Undefined
         } else {
-            Place::Defined(
-                builder.build(),
+            Place::Defined {
+                ty: builder.build(),
                 origin,
-                if any_definitely_bound {
+                definedness: if any_definitely_bound {
                     Definedness::AlwaysDefined
                 } else {
                     Definedness::PossiblyUndefined
                 },
-                Widening::None,
-            )
+                widening: Widening::None,
+            }
         }
     }
 
@@ -12454,7 +12472,7 @@ impl<'db> IntersectionType<'db> {
             qualifiers |= new_qualifiers;
             match member {
                 Place::Undefined => {}
-                Place::Defined(ty_member, member_origin, member_boundness, _) => {
+                Place::Defined { ty: ty_member, origin: member_origin, definedness: member_boundness, widening: _ } => {
                     origin = origin.merge(member_origin);
                     all_unbound = false;
                     if member_boundness == Definedness::AlwaysDefined {
@@ -12470,16 +12488,16 @@ impl<'db> IntersectionType<'db> {
             place: if all_unbound {
                 Place::Undefined
             } else {
-                Place::Defined(
-                    builder.build(),
+                Place::Defined {
+                    ty: builder.build(),
                     origin,
-                    if any_definitely_bound {
+                    definedness: if any_definitely_bound {
                         Definedness::AlwaysDefined
                     } else {
                         Definedness::PossiblyUndefined
                     },
-                    Widening::None,
-                )
+                    widening: Widening::None,
+                }
             },
             qualifiers,
         }

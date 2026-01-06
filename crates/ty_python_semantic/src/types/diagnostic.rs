@@ -4058,10 +4058,14 @@ pub(super) fn report_invalid_method_override<'db>(
             .place
     };
 
-    if let Place::Defined(Type::FunctionLiteral(subclass_function), _, _, _) =
-        class_member(subclass)
-        && let Place::Defined(Type::FunctionLiteral(superclass_function), _, _, _) =
-            class_member(superclass)
+    if let Place::Defined {
+        ty: Type::FunctionLiteral(subclass_function),
+        ..
+    } = class_member(subclass)
+        && let Place::Defined {
+            ty: Type::FunctionLiteral(superclass_function),
+            ..
+        } = class_member(superclass)
         && let Ok(superclass_function_kind) =
             MethodDecorator::try_from_fn_type(db, superclass_function)
         && let Ok(subclass_function_kind) = MethodDecorator::try_from_fn_type(db, subclass_function)

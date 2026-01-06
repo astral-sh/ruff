@@ -1940,7 +1940,7 @@ impl<'db> Type<'db> {
                 disjointness_visitor.visit((self, other), || {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
-                            Place::Defined(attribute_type, _, _, _) => member
+                            Place::Defined { ty: attribute_type, origin: _, definedness: _, widening: _ } => member
                                 .has_disjoint_type_from(
                                     db,
                                     attribute_type,
