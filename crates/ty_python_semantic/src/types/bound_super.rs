@@ -417,20 +417,14 @@ impl<'db> BoundSuperType<'db> {
                     let typevar = bound_typevar.typevar(db);
                     match typevar.bound_or_constraints(db) {
                         Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                            // For ClassTypeVar, extract the class from the bound.
-                            let class = match bound {
-                                Type::NominalInstance(instance) => Some(instance.class(db)),
-                                _ => bound.to_class_type(db),
-                            };
-                            match class {
-                                Some(class) => SuperOwnerKind::ClassTypeVar(bound_typevar, class),
-                                None => {
-                                    return Err(BoundSuperError::AbstractOwnerType {
-                                        owner_type,
-                                        pivot_class: pivot_class_type,
-                                        typevar_context: Some(typevar),
-                                    });
-                                }
+                            if let Type::NominalInstance(instance) = bound {
+                                SuperOwnerKind::ClassTypeVar(bound_typevar, instance.class(db))
+                            } else {
+                                return Err(BoundSuperError::AbstractOwnerType {
+                                    owner_type,
+                                    pivot_class: pivot_class_type,
+                                    typevar_context: Some(typevar),
+                                });
                             }
                         }
                         Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -443,8 +437,7 @@ impl<'db> BoundSuperType<'db> {
                         }
                         None => {
                             // No bound means the implicit upper bound is `object`.
-                            let class = ClassType::object(db);
-                            SuperOwnerKind::ClassTypeVar(bound_typevar, class)
+                            SuperOwnerKind::ClassTypeVar(bound_typevar, ClassType::object(db))
                         }
                     }
                 }
@@ -502,20 +495,14 @@ impl<'db> BoundSuperType<'db> {
                 let typevar = bound_typevar.typevar(db);
                 match typevar.bound_or_constraints(db) {
                     Some(TypeVarBoundOrConstraints::UpperBound(bound)) => {
-                        // For InstanceTypeVar, extract the class from the bound.
-                        let class = match bound {
-                            Type::NominalInstance(instance) => Some(instance.class(db)),
-                            _ => bound.to_class_type(db),
-                        };
-                        match class {
-                            Some(class) => SuperOwnerKind::InstanceTypeVar(bound_typevar, class),
-                            None => {
-                                return Err(BoundSuperError::AbstractOwnerType {
-                                    owner_type,
-                                    pivot_class: pivot_class_type,
-                                    typevar_context: Some(typevar),
-                                });
-                            }
+                        if let Type::NominalInstance(instance) = bound {
+                            SuperOwnerKind::InstanceTypeVar(bound_typevar, instance.class(db))
+                        } else {
+                            return Err(BoundSuperError::AbstractOwnerType {
+                                owner_type,
+                                pivot_class: pivot_class_type,
+                                typevar_context: Some(typevar),
+                            });
                         }
                     }
                     Some(TypeVarBoundOrConstraints::Constraints(constraints)) => {
@@ -528,8 +515,7 @@ impl<'db> BoundSuperType<'db> {
                     }
                     None => {
                         // No bound means the implicit upper bound is `object`.
-                        let class = ClassType::object(db);
-                        SuperOwnerKind::InstanceTypeVar(bound_typevar, class)
+                        SuperOwnerKind::InstanceTypeVar(bound_typevar, ClassType::object(db))
                     }
                 }
             }

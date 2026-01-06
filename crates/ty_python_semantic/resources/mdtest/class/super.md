@@ -265,6 +265,19 @@ class Foo[T]:
         # revealed: Unknown
         reveal_type(super())
         return self
+    # TypeVar bounded by `type[Foo]` rather than `Foo`
+    def method11[S: type[Foo[int]]](self: S, other: S) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        return self
+    # TypeVar bounded by `type[Foo]`, used in `type[T]` position
+    @classmethod
+    def method12[S: type[Foo[int]]](cls: type[S]) -> S:
+        # error: [invalid-super-argument]
+        # revealed: Unknown
+        reveal_type(super())
+        raise NotImplementedError
 
 type Alias = Bar
 
@@ -669,4 +682,60 @@ reveal_type(A()[0])  # revealed: int
 reveal_type(super(B, B()).__getitem__)  # revealed: bound method B.__getitem__(key: int) -> int
 # error: [not-subscriptable] "Cannot subscript object of type `<super: <class 'B'>, B>` with no `__getitem__` method"
 super(B, B())[0]
+```
+
+## Subclass Using Concrete Type Instead of `Self`
+
+When a parent class uses `Self` in a parameter type and a subclass overrides it with a concrete
+type, passing that parameter to `super().__init__()` is a type error. This is because `Self` in the
+parent could represent a further subclass, but the concrete type is invariant. The fix is to use
+`Self` consistently in the subclass.
+
+```toml
+[environment]
+python-version = "3.12"
+```
+
+```py
+from __future__ import annotations
+from typing import Self
+
+class Parent:
+    def __init__(self, children: dict[str, Self] | None = None) -> None:
+        self.children = children
+
+class Child(Parent):
+    def __init__(self, children: dict[str, Child] | None = None) -> None:
+        # error: [invalid-argument-type] "Argument to bound method `__init__` is incorrect: Expected `dict[str, Self@__init__] | None`, found `dict[str, Child] | None`"
+        super().__init__(children)
+
+# The fix is to use `Self` consistently in the subclass:
+
+class Parent2:
+    def __init__(self, children: dict[str, Self] | None = None) -> None:
+        self.children = children
+
+class Child2(Parent2):
+    def __init__(self, children: dict[str, Self] | None = None) -> None:
+        super().__init__(children)  # OK
+```
+
+## Super in Protocol Classes
+
+Using `super()` in a class that inherits from `typing.Protocol` (similar to beartype's caching
+Protocol):
+
+```py
+from typing import Protocol, Generic, TypeVar
+
+_T_co = TypeVar("_T_co", covariant=True)
+
+class MyProtocol(Protocol, Generic[_T_co]):
+    def __class_getitem__(cls, item):
+        # Accessing parent's __class_getitem__ through super()
+        # TODO: This should work - Protocol-inheriting classes can use super()
+        # error: [invalid-super-argument]
+        parent_method = super().__class_getitem__
+        reveal_type(parent_method)  # revealed: Unknown
+        return parent_method(item)
 ```
