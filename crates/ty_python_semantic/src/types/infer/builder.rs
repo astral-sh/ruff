@@ -11601,84 +11601,121 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
         range: TextRange,
         visitor: &BinaryComparisonVisitor<'db>,
     ) -> Result<Type<'db>, UnsupportedComparisonError<'db>> {
-        // If either tuple is variable length, we can make no assumptions about the relative
-        // lengths of the tuples, and therefore neither about how they compare lexicographically.
-        // TODO: Consider comparing the prefixes of the tuples, since that could give a comparison
-        // result regardless of how long the variable-length tuple is.
-        let (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) = (left, right) else {
-            return Ok(Type::unknown());
-        };
+        match (left, right) {
+            // Both fixed-length: perform full lexicographic comparison.
+            (TupleSpec::Fixed(left), TupleSpec::Fixed(right)) => {
+                let left_iter = left.iter_all_elements();
+                let right_iter = right.iter_all_elements();
 
-        let left_iter = left.iter_all_elements();
-        let right_iter = right.iter_all_elements();
+                let mut builder = UnionBuilder::new(self.db());
 
-        let mut builder = UnionBuilder::new(self.db());
+                for (l_ty, r_ty) in left_iter.zip(right_iter) {
+                    let pairwise_eq_result = self
+                        .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range, visitor)
+                        .expect(
+                            "infer_binary_type_comparison should never return None for `CmpOp::Eq`",
+                        );
 
-        for (l_ty, r_ty) in left_iter.zip(right_iter) {
-            let pairwise_eq_result = self
-                .infer_binary_type_comparison(l_ty, ast::CmpOp::Eq, r_ty, range, visitor)
-                .expect("infer_binary_type_comparison should never return None for `CmpOp::Eq`");
+                    match pairwise_eq_result
+                        .try_bool(self.db())
+                        .unwrap_or_else(|err| {
+                            // TODO: We should, whenever possible, pass the range of the left and right elements
+                            //   instead of the range of the whole tuple.
+                            err.report_diagnostic(&self.context, range);
+                            err.fallback_truthiness()
+                        }) {
+                        // - AlwaysTrue : Continue to the next pair for lexicographic comparison
+                        Truthiness::AlwaysTrue => continue,
+                        // - AlwaysFalse:
+                        // Lexicographic comparisons will always terminate with this pair.
+                        // Complete the comparison and return the result.
+                        // - Ambiguous:
+                        // Lexicographic comparisons might continue to the next pair (if eq_result is true),
+                        // or terminate here (if eq_result is false).
+                        // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
+                        eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
+                            let pairwise_compare_result = match op {
+                                RichCompareOperator::Lt
+                                | RichCompareOperator::Le
+                                | RichCompareOperator::Gt
+                                | RichCompareOperator::Ge => self.infer_binary_type_comparison(
+                                    l_ty,
+                                    op.into(),
+                                    r_ty,
+                                    range,
+                                    visitor,
+                                )?,
+                                // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
+                                // NOTE: The CPython implementation does not account for non-boolean return types
+                                // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
+                                RichCompareOperator::Eq => Type::BooleanLiteral(false),
+                                RichCompareOperator::Ne => Type::BooleanLiteral(true),
+                            };
 
-            match pairwise_eq_result
-                .try_bool(self.db())
-                .unwrap_or_else(|err| {
-                    // TODO: We should, whenever possible, pass the range of the left and right elements
-                    //   instead of the range of the whole tuple.
-                    err.report_diagnostic(&self.context, range);
-                    err.fallback_truthiness()
-                }) {
-                // - AlwaysTrue : Continue to the next pair for lexicographic comparison
-                Truthiness::AlwaysTrue => continue,
-                // - AlwaysFalse:
-                // Lexicographic comparisons will always terminate with this pair.
-                // Complete the comparison and return the result.
-                // - Ambiguous:
-                // Lexicographic comparisons might continue to the next pair (if eq_result is true),
-                // or terminate here (if eq_result is false).
-                // To account for cases where the comparison terminates here, add the pairwise comparison result to the union builder.
-                eq_truthiness @ (Truthiness::AlwaysFalse | Truthiness::Ambiguous) => {
-                    let pairwise_compare_result = match op {
-                        RichCompareOperator::Lt
-                        | RichCompareOperator::Le
-                        | RichCompareOperator::Gt
-                        | RichCompareOperator::Ge => self.infer_binary_type_comparison(
-                            l_ty,
-                            op.into(),
-                            r_ty,
-                            range,
-                            visitor,
-                        )?,
-                        // For `==` and `!=`, we already figure out the result from `pairwise_eq_result`
-                        // NOTE: The CPython implementation does not account for non-boolean return types
-                        // or cases where `!=` is not the negation of `==`, we also do not consider these cases.
-                        RichCompareOperator::Eq => Type::BooleanLiteral(false),
-                        RichCompareOperator::Ne => Type::BooleanLiteral(true),
-                    };
+                            builder = builder.add(pairwise_compare_result);
 
-                    builder = builder.add(pairwise_compare_result);
+                            if eq_truthiness.is_ambiguous() {
+                                continue;
+                            }
 
-                    if eq_truthiness.is_ambiguous() {
-                        continue;
+                            return Ok(builder.build());
+                        }
                     }
-
-                    return Ok(builder.build());
                 }
+
+                // if no more items to compare, we just compare sizes
+                let (left_len, right_len) = (left.len(), right.len());
+
+                builder = builder.add(Type::BooleanLiteral(match op {
+                    RichCompareOperator::Eq => left_len == right_len,
+                    RichCompareOperator::Ne => left_len != right_len,
+                    RichCompareOperator::Lt => left_len < right_len,
+                    RichCompareOperator::Le => left_len <= right_len,
+                    RichCompareOperator::Gt => left_len > right_len,
+                    RichCompareOperator::Ge => left_len >= right_len,
+                }));
+
+                Ok(builder.build())
+            }
+
+            // At least one tuple is variable-length. We can make no assumptions about
+            // the relative lengths of the tuples, and therefore neither about how they
+            // compare lexicographically. However, we still need to verify that the
+            // element types are comparable for ordering comparisons.
+
+            // For equality comparisons (==, !=), any two objects can be compared,
+            // and tuple equality always returns bool regardless of element __eq__ return types.
+            (TupleSpec::Variable(_), _) | (_, TupleSpec::Variable(_))
+                if matches!(op, RichCompareOperator::Eq | RichCompareOperator::Ne) =>
+            {
+                Ok(KnownClass::Bool.to_instance(self.db()))
+            }
+
+            // At least one variable-length: check all elements that could potentially be compared.
+            // We use `try_for_each_element_pair` to iterate over all possible pairings.
+            (left @ TupleSpec::Variable(_), right) | (left, right @ TupleSpec::Variable(_)) => {
+                let mut results = smallvec::SmallVec::<[Type<'db>; 8]>::new();
+                left.try_for_each_element_pair(right, |l_ty, r_ty| {
+                    results.push(self.infer_binary_type_comparison(
+                        l_ty,
+                        op.into(),
+                        r_ty,
+                        range,
+                        visitor,
+                    )?);
+                    Ok::<_, UnsupportedComparisonError<'db>>(())
+                })?;
+
+                let mut builder = UnionBuilder::new(self.db());
+                for result in results {
+                    builder = builder.add(result);
+                }
+                // Length comparison (when all elements are equal) returns bool.
+                builder = builder.add(KnownClass::Bool.to_instance(self.db()));
+
+                Ok(builder.build())
             }
         }
-
-        // if no more items to compare, we just compare sizes
-        let (left_len, right_len) = (left.len(), right.len());
-
-        builder = builder.add(Type::BooleanLiteral(match op {
-            RichCompareOperator::Eq => left_len == right_len,
-            RichCompareOperator::Ne => left_len != right_len,
-            RichCompareOperator::Lt => left_len < right_len,
-            RichCompareOperator::Le => left_len <= right_len,
-            RichCompareOperator::Gt => left_len > right_len,
-            RichCompareOperator::Ge => left_len >= right_len,
-        }));
-
-        Ok(builder.build())
     }
 
     fn infer_subscript_expression(&mut self, subscript: &ast::ExprSubscript) -> Type<'db> {
