@@ -167,6 +167,14 @@ impl<'db> StaticClassLiteral<'db> {
             .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
+    #[salsa::tracked]
+    pub(crate) fn has_own_comparison_methods(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .all(|method| !class_member(db, body_scope, method).is_undefined())
+    }
+
     /// Returns `true` if any class in this class's MRO (excluding `object`) defines an ordering
     /// method (`__lt__`, `__le__`, `__gt__`, `__ge__`). Used by `@total_ordering` validation.
     pub(crate) fn has_ordering_method_in_mro(

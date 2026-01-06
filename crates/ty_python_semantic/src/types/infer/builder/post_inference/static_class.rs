@@ -14,7 +14,7 @@ use crate::{
     place::{place_from_bindings, place_from_declarations},
     types::{
         CallArguments, ClassBase, ClassLiteral, ClassType, GenericAlias, KnownInstanceType,
-        MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
+        DataclassFlags, MemberLookupPolicy, MetaclassCandidate, Parameters, Signature, SpecialFormType,
         StaticClassLiteral, Type, binding_type,
         call::Argument,
         class::{
@@ -29,8 +29,8 @@ use crate::{
             INCONSISTENT_MRO, INVALID_ARGUMENT_TYPE, INVALID_BASE, INVALID_DATACLASS,
             INVALID_GENERIC_CLASS, INVALID_GENERIC_ENUM, INVALID_METACLASS, INVALID_NAMED_TUPLE,
             INVALID_PROTOCOL, INVALID_TYPED_DICT_HEADER, IncompatibleBases,
-            SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT, report_bad_frozen_dataclass_inheritance,
-            report_conflicting_metaclass_from_bases, report_duplicate_bases,
+            SUBCLASS_OF_DATACLASS_WITH_ORDER, SUBCLASS_OF_FINAL_CLASS, UNKNOWN_ARGUMENT,
+            report_bad_frozen_dataclass_inheritance, report_conflicting_metaclass_from_bases, report_duplicate_bases,
             report_instance_layout_conflict, report_invalid_or_unsupported_base,
             report_invalid_total_ordering, report_invalid_type_param_order,
             report_invalid_typevar_default_reference,
@@ -381,6 +381,34 @@ pub(crate) fn check_static_class_definitions<'db>(
                 node,
                 base_is_frozen,
             );
+        }
+
+        if let Some((base_class_literal, _)) = base_class.static_class_literal(db)
+            && let Some(base_dataclass_params) = base_class_literal.dataclass_params(db)
+            && base_dataclass_params.flags(db).contains(DataclassFlags::ORDER)
+            && let Some(node) = source_node
+        {
+            // Suppress the diagnostic if the child class overrides all comparison methods, since
+            // the user has explicitly fixed the LSP violation. This includes the case where the
+            // child class also has `order=True`, which generates all four comparison methods.
+            let child_has_order = class
+                .dataclass_params(db)
+                .is_some_and(|params| params.flags(db).contains(DataclassFlags::ORDER));
+            let all_overridden = child_has_order || class.has_own_comparison_methods(db);
+
+            if !all_overridden
+                && let Some(builder) = context.report_lint(&SUBCLASS_OF_DATACLASS_WITH_ORDER, node)
+            {
+                let mut diagnostic = builder.into_diagnostic(format_args!(
+                    "Class `{}` inherits from dataclass `{}` which has `order=True`",
+                    class.name(db),
+                    base_class.name(db),
+                ));
+                diagnostic.info(
+                    "Comparison of instances of the child class with instances \
+                    of the parent class will raise `TypeError` at runtime",
+                );
+            }
         }
     }
 
