@@ -575,7 +575,7 @@ impl<'db> GenericContext<'db> {
             loop {
                 let mut any_changed = false;
                 for i in 0..len {
-                    let partial = PartialSpecialization {
+                    let partial = ApplySpecialization {
                         generic_context: context,
                         types: &types,
                         // Don't recursively substitute type[i] in itself. Ideally, we could instead
@@ -589,7 +589,7 @@ impl<'db> GenericContext<'db> {
                     };
                     let updated = types[i].apply_type_mapping(
                         db,
-                        &TypeMapping::PartialSpecialization(partial),
+                        &TypeMapping::ApplySpecialization(partial),
                         TypeContext::default(),
                     );
                     if updated != types[i] {
@@ -657,14 +657,14 @@ impl<'db> GenericContext<'db> {
             // Typevars are only allowed to refer to _earlier_ typevars in their defaults. (This is
             // statically enforced for PEP-695 contexts, and is explicitly called out as a
             // requirement for legacy contexts.)
-            let partial = PartialSpecialization {
+            let partial = ApplySpecialization {
                 generic_context: self,
                 types: &expanded[0..idx],
                 skip: None,
             };
             let default = default.apply_type_mapping(
                 db,
-                &TypeMapping::PartialSpecialization(partial),
+                &TypeMapping::ApplySpecialization(partial),
                 TypeContext::default(),
             );
             expanded[idx] = default;
@@ -1477,7 +1477,7 @@ impl<'db> Specialization<'db> {
 /// You will usually use [`Specialization`] instead of this type. This type is used when we need to
 /// substitute types for type variables before we have fully constructed a [`Specialization`].
 #[derive(Clone, Debug, Eq, Hash, PartialEq, get_size2::GetSize)]
-pub struct PartialSpecialization<'a, 'db> {
+pub struct ApplySpecialization<'a, 'db> {
     generic_context: GenericContext<'db>,
     types: &'a [Type<'db>],
     /// An optional typevar to _not_ substitute when applying the specialization. We use this to
@@ -1485,7 +1485,7 @@ pub struct PartialSpecialization<'a, 'db> {
     skip: Option<usize>,
 }
 
-impl<'db> PartialSpecialization<'_, 'db> {
+impl<'db> ApplySpecialization<'_, 'db> {
     /// Returns the type that a typevar is mapped to, or None if the typevar isn't part of this
     /// mapping.
     pub(crate) fn get(

@@ -239,7 +239,7 @@ impl<'db> CallableSignature<'db> {
                     return result;
                 }
             }
-            TypeMapping::PartialSpecialization(partial) => {
+            TypeMapping::ApplySpecialization(partial) => {
                 if let [self_signature] = self.overloads.as_slice()
                     && let Some((prefix_parameters, paramspec)) = self_signature
                         .parameters

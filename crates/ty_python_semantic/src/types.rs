@@ -60,7 +60,7 @@ use crate::types::function::{
 };
 pub(crate) use crate::types::generics::GenericContext;
 use crate::types::generics::{
-    InferableTypeVars, PartialSpecialization, Specialization, SpecializationBuilder, bind_typevar,
+    ApplySpecialization, InferableTypeVars, Specialization, SpecializationBuilder, bind_typevar,
     typing_self, walk_generic_context,
 };
 use crate::types::mro::{Mro, MroError, MroIterator};
@@ -5875,7 +5875,7 @@ impl<'db> Type<'db> {
                             Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context, None))
                         }
                         TypeMapping::Specialization(_) |
-                        TypeMapping::PartialSpecialization(_) |
+                        TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
                         TypeMapping::BindSelf { .. } |
@@ -6084,7 +6084,7 @@ impl<'db> Type<'db> {
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
@@ -6098,7 +6098,7 @@ impl<'db> Type<'db> {
 
             Type::Dynamic(_) => match type_mapping {
                 TypeMapping::Specialization(_) |
-                TypeMapping::PartialSpecialization(_) |
+                TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
                 TypeMapping::BindSelf { .. } |
@@ -6808,8 +6808,8 @@ impl PromoteLiteralsMode {
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
     Specialization(Specialization<'db>),
-    /// Applies a partial specialization to the type
-    PartialSpecialization(PartialSpecialization<'a, 'db>),
+    /// Applies a specialization to the type
+    ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Resets any specializations to contain unique synthetic type variables.
     UniqueSpecialization {
         // A list of synthetic type variables, and the types they replaced.
@@ -6847,7 +6847,7 @@ impl<'db> TypeMapping<'_, 'db> {
     ) -> GenericContext<'db> {
         match self {
             TypeMapping::Specialization(_)
-            | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
@@ -6882,7 +6882,7 @@ impl<'db> TypeMapping<'_, 'db> {
             }
             TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
             TypeMapping::Specialization(_)
-            | TypeMapping::PartialSpecialization(_)
+            | TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
@@ -8490,7 +8490,7 @@ impl<'db> BoundTypeVarInstance<'db> {
                     })
                     .unwrap_or(Type::TypeVar(self))
             }
-            TypeMapping::PartialSpecialization(partial) => {
+            TypeMapping::ApplySpecialization(partial) => {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
