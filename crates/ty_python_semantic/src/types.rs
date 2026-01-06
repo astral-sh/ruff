@@ -5828,7 +5828,7 @@ impl<'db> Type<'db> {
     ) -> Type<'db> {
         let new_specialization = self.apply_type_mapping(
             db,
-            &TypeMapping::Specialization(specialization),
+            &TypeMapping::ApplySpecialization(ApplySpecialization::Specialization(specialization)),
             TypeContext::default(),
         );
         match specialization.materialization_kind(db) {
@@ -5874,7 +5874,6 @@ impl<'db> Type<'db> {
                         TypeMapping::BindLegacyTypevars(binding_context) => {
                             Type::TypeVar(BoundTypeVarInstance::new(db, typevar, *binding_context, None))
                         }
-                        TypeMapping::Specialization(_) |
                         TypeMapping::ApplySpecialization(_) |
                         TypeMapping::UniqueSpecialization { .. } |
                         TypeMapping::PromoteLiterals(_) |
@@ -6083,7 +6082,6 @@ impl<'db> Type<'db> {
             | Type::StringLiteral(_)
             | Type::BytesLiteral(_)
             | Type::EnumLiteral(_) => match type_mapping {
-                TypeMapping::Specialization(_) |
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
@@ -6097,7 +6095,6 @@ impl<'db> Type<'db> {
             }
 
             Type::Dynamic(_) => match type_mapping {
-                TypeMapping::Specialization(_) |
                 TypeMapping::ApplySpecialization(_) |
                 TypeMapping::UniqueSpecialization { .. } |
                 TypeMapping::BindLegacyTypevars(_) |
@@ -6807,8 +6804,6 @@ impl PromoteLiteralsMode {
 #[derive(Clone, Debug, Eq, PartialEq, get_size2::GetSize)]
 pub enum TypeMapping<'a, 'db> {
     /// Applies a specialization to the type
-    Specialization(Specialization<'db>),
-    /// Applies a specialization to the type
     ApplySpecialization(ApplySpecialization<'a, 'db>),
     /// Resets any specializations to contain unique synthetic type variables.
     UniqueSpecialization {
@@ -6846,8 +6841,7 @@ impl<'db> TypeMapping<'_, 'db> {
         context: GenericContext<'db>,
     ) -> GenericContext<'db> {
         match self {
-            TypeMapping::Specialization(_)
-            | TypeMapping::ApplySpecialization(_)
+            TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::PromoteLiterals(_)
             | TypeMapping::BindLegacyTypevars(_)
@@ -6881,8 +6875,7 @@ impl<'db> TypeMapping<'_, 'db> {
                 TypeMapping::Materialize(materialization_kind.flip())
             }
             TypeMapping::PromoteLiterals(mode) => TypeMapping::PromoteLiterals(mode.flip()),
-            TypeMapping::Specialization(_)
-            | TypeMapping::ApplySpecialization(_)
+            TypeMapping::ApplySpecialization(_)
             | TypeMapping::UniqueSpecialization { .. }
             | TypeMapping::BindLegacyTypevars(_)
             | TypeMapping::BindSelf { .. }
@@ -8471,32 +8464,13 @@ impl<'db> BoundTypeVarInstance<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Type<'db> {
         match type_mapping {
-            TypeMapping::Specialization(specialization) => {
+            TypeMapping::ApplySpecialization(specialization) => {
                 let typevar = if self.is_paramspec(db) {
                     self.without_paramspec_attr(db)
                 } else {
                     self
                 };
                 specialization
-                    .get(db, typevar)
-                    .map(|ty| {
-                        if let Some(attr) = self.paramspec_attr(db)
-                            && let Type::TypeVar(typevar) = ty
-                            && typevar.is_paramspec(db)
-                        {
-                            return Type::TypeVar(typevar.with_paramspec_attr(db, attr));
-                        }
-                        ty
-                    })
-                    .unwrap_or(Type::TypeVar(self))
-            }
-            TypeMapping::ApplySpecialization(partial) => {
-                let typevar = if self.is_paramspec(db) {
-                    self.without_paramspec_attr(db)
-                } else {
-                    self
-                };
-                partial
                     .get(db, typevar)
                     .map(|ty| {
                         if let Some(attr) = self.paramspec_attr(db)
