@@ -193,15 +193,16 @@ impl<'db> Completions<'db> {
     /// when the completion context determines that the given suggestion
     /// is never valid.
     fn add_skip_query(&mut self, mut completion: Completion<'db>) -> bool {
-        // Tags completions with whether they are known to be usable in
-        // a `raise` context.
+        // Tags completions with context-specific if they are
+        // known to be usable in a `raise` context and we have
+        // determined a raisable type `raisable_ty`.
         //
         // It's possible that some completions are usable in a `raise`
         // but aren't marked here. That is, false negatives are
         // possible but false positives are not.
         if let Some(raisable_ty) = self.context.raisable_ty {
             if let Some(ty) = completion.ty {
-                completion.is_definitively_raisable = ty.is_assignable_to(self.db, raisable_ty);
+                completion.is_context_specific |= ty.is_assignable_to(self.db, raisable_ty);
             }
         }
         if self.context.exclude(self.db, &completion) {
@@ -285,13 +286,13 @@ pub struct Completion<'db> {
     /// Whether this item only exists for type checking purposes and
     /// will be missing at runtime
     pub is_type_check_only: bool,
-    /// Whether this item can definitively be used in a `raise` context.
+    /// Whether this item can definitively be used in the current context.
     ///
-    /// Note that this may not always be computed. (i.e., Only computed
-    /// when we are in a `raise` context.) And also note that if this
-    /// is `true`, then it's definitively usable in `raise`, but if
-    /// it's `false`, it _may_ still be usable in `raise`.
-    pub is_definitively_raisable: bool,
+    /// Some completions are computed based on contextual information.
+    /// If that's the case, we know this is a very precise completion
+    /// that should always be valid and can be preferred when
+    /// ordering completions.
+    pub is_context_specific: bool,
     /// The documentation associated with this item, if
     /// available.
     pub documentation: Option<Docstring>,
@@ -315,7 +316,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: semantic.builtin,
             is_type_check_only,
-            is_definitively_raisable: false,
+            is_context_specific: false,
             documentation,
         }
     }
@@ -398,7 +399,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: false,
             is_type_check_only: false,
-            is_definitively_raisable: false,
+            is_context_specific: false,
             documentation: None,
         }
     }
@@ -414,7 +415,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: true,
             is_type_check_only: false,
-            is_definitively_raisable: false,
+            is_context_specific: false,
             documentation: None,
         }
     }
@@ -433,7 +434,7 @@ impl<'db> Completion<'db> {
             import: None,
             builtin: false,
             is_type_check_only: false,
-            is_definitively_raisable: false,
+            is_context_specific: true,
             documentation,
         }
     }
@@ -994,7 +995,7 @@ impl<'db> CollectionContext<'db> {
     #[allow(clippy::unused_self)]
     fn rank<'c>(&self, c: &'c Completion<'_>) -> Rank<'c> {
         Rank {
-            definitively_usable: if c.is_definitively_raisable {
+            definitively_usable: if c.is_context_specific {
                 Sort::Higher
             } else {
                 Sort::Even
@@ -1183,7 +1184,6 @@ fn add_function_arg_completions<'db>(
             if p.is_positional_only || set_function_args.contains(&p.name.as_str()) {
                 continue;
             }
-
             completions.add(Completion::argument(
                 &p.name,
                 p.ty,
@@ -1374,7 +1374,7 @@ fn add_unimported_completions<'db>(
             builtin: false,
             // TODO: `is_type_check_only` requires inferring the type of the symbol
             is_type_check_only: false,
-            is_definitively_raisable: false,
+            is_context_specific: false,
             documentation: None,
         });
     }
@@ -3088,9 +3088,9 @@ class Foo(<CURSOR>):
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
+        metaclass=
         Bar
         Foo
-        metaclass=
         ");
     }
 
@@ -3106,9 +3106,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
+        metaclass=
         Bar
         Foo
-        metaclass=
         ");
     }
 
@@ -3124,9 +3124,9 @@ class Bar: ...
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
+        metaclass=
         Bar
         Foo
-        metaclass=
         ");
     }
 
@@ -3140,9 +3140,9 @@ class Foo(<CURSOR>",
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
+        metaclass=
         Bar
         Foo
-        metaclass=
         ");
     }
 
@@ -3804,8 +3804,8 @@ bar(o<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"
-        foo
         okay=
+        foo
         "
         );
     }
@@ -3825,8 +3825,8 @@ bar(o<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"
-        foo
         okay=
+        foo
         "
         );
     }
@@ -3940,10 +3940,10 @@ bar(o<CURSOR>
         assert_snapshot!(
             builder.skip_keywords().skip_builtins().skip_auto_import().build().snapshot(),
             @"
-        foo
         okay=
         okay_abc=
         okay_okay=
+        foo
         "
         );
     }
@@ -3961,9 +3961,9 @@ bar(<CURSOR>
         );
 
         assert_snapshot!(builder.skip_keywords().skip_builtins().build().snapshot(), @"
+        okay=
         bar
         foo
-        okay=
         ");
     }
 

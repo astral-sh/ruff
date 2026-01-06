@@ -2,7 +2,7 @@ use compact_str::ToCompactString;
 use ruff_python_ast::name::Name;
 use rustc_hash::FxHashSet;
 
-use crate::place::Place;
+use crate::place::{DefinedPlace, Place};
 use crate::types::builder::RecursivelyDefined;
 use crate::types::constraints::{IteratorConstraintsExtension, OptionConstraintsExtension};
 use crate::types::enums::is_single_member_enum;
@@ -656,6 +656,79 @@ impl<'db> Type<'db> {
 
             // `Never` is the bottom type, the empty set.
             (_, Type::Never) => ConstraintSet::from(false),
+
+            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(target_newtype)) => {
+                self_newtype.has_relation_to_impl(db, target_newtype)
+            }
+            // In the special cases of `NewType`s of `float` or `complex`, the concrete base type
+            // can be a union (`int | float` or `int | float | complex`). For that reason,
+            // `NewType` assignability to a union needs to consider two different cases. It could
+            // be that we need to treat the `NewType` as the underlying union it's assignable to,
+            // for example:
+            //
+            // ```py
+            // Foo = NewType("Foo", float)
+            // static_assert(is_assignable_to(Foo, float | None))
+            // ```
+            //
+            // The right side there is equivalent to `int | float | None`, but `Foo` as a whole
+            // isn't assignable to any of those three types. However, `Foo`s concrete base type is
+            // `int | float`, which is assignable, because union members on the left side get
+            // checked individually. On the other hand, we need to be careful not to break the
+            // following case, where `int | float` is *not* assignable to the right side:
+            //
+            // ```py
+            // static_assert(is_assignable_to(Foo, Foo | None))
+            // ```
+            //
+            // To handle both cases, we have to check that *either* `Foo` as a whole is assignable
+            // (or subtypeable etc.) *or* that its concrete base type is. Note that this match arm
+            // needs to take precedence over the `Type::Union` arms immediately below.
+            (Type::NewTypeInstance(self_newtype), Type::Union(union)) => {
+                // First the normal "assign to union" case, unfortunately duplicated from below.
+                union
+                    .elements(db)
+                    .iter()
+                    .when_any(db, |&elem_ty| {
+                        self.has_relation_to_impl(
+                            db,
+                            elem_ty,
+                            inferable,
+                            relation,
+                            relation_visitor,
+                            disjointness_visitor,
+                        )
+                    })
+                    // Failing that, if the concrete base type is a union, try delegating to that.
+                    // Otherwise, this would be equivalent to what we just checked, and we
+                    // shouldn't waste time checking it twice.
+                    .or(db, || {
+                        let concrete_base = self_newtype.concrete_base_type(db);
+                        if matches!(concrete_base, Type::Union(_)) {
+                            concrete_base.has_relation_to_impl(
+                                db,
+                                target,
+                                inferable,
+                                relation,
+                                relation_visitor,
+                                disjointness_visitor,
+                            )
+                        } else {
+                            ConstraintSet::from(false)
+                        }
+                    })
+            }
+            // All other `NewType` assignments fall back to the concrete base type.
+            (Type::NewTypeInstance(self_newtype), _) => {
+                self_newtype.concrete_base_type(db).has_relation_to_impl(
+                    db,
+                    target,
+                    inferable,
+                    relation,
+                    relation_visitor,
+                    disjointness_visitor,
+                )
+            }
 
             (Type::Union(union), _) => union.elements(db).iter().when_all(db, |&elem_ty| {
                 elem_ty.has_relation_to_impl(
@@ -1352,21 +1425,6 @@ impl<'db> Type<'db> {
                 })
             }
 
-            (Type::NewTypeInstance(self_newtype), Type::NewTypeInstance(target_newtype)) => {
-                self_newtype.has_relation_to_impl(db, target_newtype)
-            }
-
-            (Type::NewTypeInstance(self_newtype), _) => {
-                self_newtype.concrete_base_type(db).has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                )
-            }
-
             (Type::PropertyInstance(_), _) => {
                 KnownClass::Property.to_instance(db).has_relation_to_impl(
                     db,
@@ -1987,14 +2045,15 @@ impl<'db> Type<'db> {
                 disjointness_visitor.visit((self, other), || {
                     protocol.interface(db).members(db).when_any(db, |member| {
                         match other.member(db, member.name()).place {
-                            Place::Defined(attribute_type, _, _, _) => member
-                                .has_disjoint_type_from(
-                                    db,
-                                    attribute_type,
-                                    inferable,
-                                    disjointness_visitor,
-                                    relation_visitor,
-                                ),
+                            Place::Defined(DefinedPlace {
+                                ty: attribute_type, ..
+                            }) => member.has_disjoint_type_from(
+                                db,
+                                attribute_type,
+                                inferable,
+                                disjointness_visitor,
+                                relation_visitor,
+                            ),
                             Place::Undefined => ConstraintSet::from(false),
                         }
                     })

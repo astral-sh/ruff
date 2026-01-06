@@ -526,7 +526,7 @@ impl VirtualFile {
     }
 
     /// Increments the revision of the underlying [`File`].
-    fn sync(&self, db: &mut dyn Db) {
+    pub fn sync(&self, db: &mut dyn Db) {
         let file = self.0;
         tracing::debug!("Updating the revision of `{}`", file.path(db));
         let current_revision = file.revision(db);
