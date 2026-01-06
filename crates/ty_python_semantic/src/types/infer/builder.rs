@@ -95,7 +95,6 @@ use crate::types::generics::{
 };
 use crate::types::infer::nearest_enclosing_function;
 use crate::types::instance::SliceLiteral;
-use crate::types::member::class_member;
 use crate::types::mro::MroErrorKind;
 use crate::types::newtype::NewType;
 use crate::types::subclass_of::SubclassOfInner;
@@ -2948,12 +2947,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
             .node_scope(NodeWithScopeRef::Class(class_node))
             .to_scope_id(self.db(), self.file());
 
-        // Check if the class defines any ordering method in its body.
-        // This is used by @total_ordering to determine if synthesis is valid.
-        let has_own_ordering_method = ["__lt__", "__le__", "__gt__", "__ge__"]
-            .iter()
-            .any(|method| !class_member(self.db(), body_scope, method).is_undefined());
-
         let maybe_known_class = KnownClass::try_from_file_and_name(self.db(), self.file(), name);
 
         let in_typing_module = || {
@@ -2978,7 +2971,6 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 dataclass_params,
                 dataclass_transformer_params,
                 total_ordering,
-                has_own_ordering_method,
             )),
         };
 

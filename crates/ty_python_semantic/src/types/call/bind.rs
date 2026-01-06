@@ -1123,7 +1123,6 @@ impl<'db> Bindings<'db> {
                                     Some(params),
                                     class_literal.dataclass_transformer_params(db),
                                     class_literal.total_ordering(db),
-                                    class_literal.has_own_ordering_method(db),
                                 )));
                             }
                         }

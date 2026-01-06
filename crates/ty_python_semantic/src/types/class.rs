@@ -1519,11 +1519,6 @@ pub struct ClassLiteral<'db> {
 
     /// Whether this class is decorated with `@functools.total_ordering`
     pub(crate) total_ordering: bool,
-
-    /// Whether this class defines any ordering method (`__lt__`, `__le__`, `__gt__`, `__ge__`)
-    /// in its own body (not inherited). Used by `@total_ordering` to determine if synthesis
-    /// is valid.
-    pub(crate) has_own_ordering_method: bool,
 }
 
 // The Salsa heap is tracked separately.
@@ -1546,6 +1541,17 @@ impl<'db> ClassLiteral<'db> {
 
     pub(crate) fn is_tuple(self, db: &'db dyn Db) -> bool {
         self.is_known(db, KnownClass::Tuple)
+    }
+
+    /// Returns `true` if this class defines any ordering method (`__lt__`, `__le__`, `__gt__`,
+    /// `__ge__`) in its own body (not inherited). Used by `@total_ordering` to determine if
+    /// synthesis is valid.
+    #[salsa::tracked]
+    pub(crate) fn has_own_ordering_method(self, db: &'db dyn Db) -> bool {
+        let body_scope = self.body_scope(db);
+        ["__lt__", "__le__", "__gt__", "__ge__"]
+            .iter()
+            .any(|method| !class_member(db, body_scope, method).is_undefined())
     }
 
     pub(crate) fn generic_context(self, db: &'db dyn Db) -> Option<GenericContext<'db>> {

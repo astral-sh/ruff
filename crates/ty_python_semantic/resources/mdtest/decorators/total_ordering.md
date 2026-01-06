@@ -1,8 +1,8 @@
 # `functools.total_ordering`
 
-The `@functools.total_ordering` decorator allows a class to define just `__eq__` and one comparison
-method (like `__lt__`), and the decorator automatically generates the remaining comparison methods
-(`__le__`, `__gt__`, `__ge__`).
+The `@functools.total_ordering` decorator allows a class to define a single comparison method (like
+`__lt__`), and the decorator automatically generates the remaining comparison methods (`__le__`,
+`__gt__`, `__ge__`). Defining `__eq__` is optional, as it can be inherited from `object`.
 
 ## Basic usage
 
@@ -72,6 +72,34 @@ reveal_type(p1 <= p2)  # revealed: bool
 reveal_type(p1 >= p2)  # revealed: bool
 ```
 
+## Inherited `__eq__`
+
+A class only needs to define a single comparison method. The `__eq__` method can be inherited from
+`object`:
+
+```py
+from functools import total_ordering
+
+@total_ordering
+class Score:
+    def __init__(self, value: int):
+        self.value = value
+
+    def __lt__(self, other: "Score") -> bool:
+        return self.value < other.value
+
+s1 = Score(85)
+s2 = Score(90)
+
+# `__eq__` is inherited from object.
+reveal_type(s1 == s2)  # revealed: bool
+
+# Synthesized comparison methods are available.
+reveal_type(s1 <= s2)  # revealed: bool
+reveal_type(s1 > s2)  # revealed: bool
+reveal_type(s1 >= s2)  # revealed: bool
+```
+
 ## Inherited ordering methods
 
 The decorator also works when the ordering method is inherited from a superclass:
@@ -97,6 +125,70 @@ c2 = Child()
 reveal_type(c1 <= c2)  # revealed: bool
 reveal_type(c1 > c2)  # revealed: bool
 reveal_type(c1 >= c2)  # revealed: bool
+```
+
+## Explicitly-defined methods are not overridden
+
+When a class explicitly defines multiple comparison methods, the decorator does not override them.
+We use a narrower return type (`Literal[True]`) to verify that the explicit methods are preserved:
+
+```py
+from functools import total_ordering
+from typing import Literal
+
+@total_ordering
+class Temperature:
+    def __init__(self, celsius: float):
+        self.celsius = celsius
+
+    def __lt__(self, other: "Temperature") -> Literal[True]:
+        return True
+
+    def __gt__(self, other: "Temperature") -> Literal[True]:
+        return True
+
+t1 = Temperature(20.0)
+t2 = Temperature(25.0)
+
+# User-defined methods preserve their return type.
+reveal_type(t1 < t2)  # revealed: Literal[True]
+reveal_type(t1 > t2)  # revealed: Literal[True]
+
+# Synthesized methods have `bool` return type.
+reveal_type(t1 <= t2)  # revealed: bool
+reveal_type(t1 >= t2)  # revealed: bool
+```
+
+## Combined with `@dataclass`
+
+The decorator works with `@dataclass`:
+
+```py
+from dataclasses import dataclass
+from functools import total_ordering
+
+@total_ordering
+@dataclass
+class Point:
+    x: int
+    y: int
+
+    def __lt__(self, other: "Point") -> bool:
+        return (self.x, self.y) < (other.x, other.y)
+
+p1 = Point(1, 2)
+p2 = Point(3, 4)
+
+# Dataclass-synthesized `__eq__` is available.
+reveal_type(p1 == p2)  # revealed: bool
+
+# User-defined comparison method works.
+reveal_type(p1 < p2)  # revealed: bool
+
+# Synthesized comparison methods are available.
+reveal_type(p1 <= p2)  # revealed: bool
+reveal_type(p1 > p2)  # revealed: bool
+reveal_type(p1 >= p2)  # revealed: bool
 ```
 
 ## Missing ordering method

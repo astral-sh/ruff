@@ -1414,7 +1414,6 @@ pub enum KnownFunction {
     Field,
 
     /// `functools.total_ordering`
-    #[strum(serialize = "total_ordering")]
     TotalOrdering,
 
     /// `inspect.getattr_static`
