@@ -1747,9 +1747,8 @@ impl<'db> CallableBinding<'db> {
             let mut is_argument_assignable_to_any_overload = false;
             'overload: for overload in &self.overloads {
                 for parameter_index in &overload.argument_matches[argument_index].parameters {
-                    let parameter_type = overload.signature.parameters()[*parameter_index]
-                        .annotated_type()
-                        .unwrap_or(Type::unknown());
+                    let parameter_type =
+                        overload.signature.parameters()[*parameter_index].annotated_type();
                     if argument_type
                         .when_assignable_to(db, parameter_type, overload.inferable_typevars)
                         .is_always_satisfied(db)
@@ -1996,9 +1995,8 @@ impl<'db> CallableBinding<'db> {
                 for &parameter_index in &overload.argument_matches[argument_index].parameters {
                     // TODO: For an unannotated `self` / `cls` parameter, the type should be
                     // `typing.Self` / `type[typing.Self]`
-                    let current_parameter_type = overload.signature.parameters()[parameter_index]
-                        .annotated_type()
-                        .unwrap_or(Type::unknown());
+                    let current_parameter_type =
+                        overload.signature.parameters()[parameter_index].annotated_type();
                     let first_parameter_type = &mut first_parameter_types[parameter_index];
                     if let Some(first_parameter_type) = first_parameter_type {
                         if !first_parameter_type
@@ -2109,9 +2107,8 @@ impl<'db> CallableBinding<'db> {
                         }
                         // TODO: For an unannotated `self` / `cls` parameter, the type should be
                         // `typing.Self` / `type[typing.Self]`
-                        let mut parameter_type = overload.signature.parameters()[*parameter_index]
-                            .annotated_type()
-                            .unwrap_or(Type::unknown());
+                        let mut parameter_type =
+                            overload.signature.parameters()[*parameter_index].annotated_type();
                         if let Some(specialization) = overload.specialization {
                             parameter_type =
                                 parameter_type.apply_specialization(db, specialization);
@@ -3052,9 +3049,7 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
                 self.argument_matches[argument_index].iter()
             {
                 let parameter = &parameters[parameter_index];
-                let Some(expected_type) = parameter.annotated_type() else {
-                    continue;
-                };
+                let expected_type = parameter.annotated_type();
 
                 let specialization_result = builder.infer_map(
                     expected_type,
@@ -3187,30 +3182,29 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
     ) {
         let parameters = self.signature.parameters();
         let parameter = &parameters[parameter_index];
-        if let Some(mut expected_ty) = parameter.annotated_type() {
-            if let Some(specialization) = self.specialization {
-                argument_type = argument_type.apply_specialization(self.db, specialization);
-                expected_ty = expected_ty.apply_specialization(self.db, specialization);
-            }
-            // This is one of the few places where we want to check if there's _any_ specialization
-            // where assignability holds; normally we want to check that assignability holds for
-            // _all_ specializations.
-            // TODO: Soon we will go further, and build the actual specializations from the
-            // constraint set that we get from this assignability check, instead of inferring and
-            // building them in an earlier separate step.
-            if argument_type
-                .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
-                .is_never_satisfied(self.db)
-            {
-                let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
-                    && !parameter.is_variadic();
-                self.errors.push(BindingError::InvalidArgumentType {
-                    parameter: ParameterContext::new(parameter, parameter_index, positional),
-                    argument_index: adjusted_argument_index,
-                    expected_ty,
-                    provided_ty: argument_type,
-                });
-            }
+        let mut expected_ty = parameter.annotated_type();
+        if let Some(specialization) = self.specialization {
+            argument_type = argument_type.apply_specialization(self.db, specialization);
+            expected_ty = expected_ty.apply_specialization(self.db, specialization);
+        }
+        // This is one of the few places where we want to check if there's _any_ specialization
+        // where assignability holds; normally we want to check that assignability holds for
+        // _all_ specializations.
+        // TODO: Soon we will go further, and build the actual specializations from the
+        // constraint set that we get from this assignability check, instead of inferring and
+        // building them in an earlier separate step.
+        if argument_type
+            .when_assignable_to(self.db, expected_ty, self.inferable_typevars)
+            .is_never_satisfied(self.db)
+        {
+            let positional = matches!(argument, Argument::Positional | Argument::Synthetic)
+                && !parameter.is_variadic();
+            self.errors.push(BindingError::InvalidArgumentType {
+                parameter: ParameterContext::new(parameter, parameter_index, positional),
+                argument_index: adjusted_argument_index,
+                expected_ty,
+                provided_ty: argument_type,
+            });
         }
         // We still update the actual type of the parameter in this binding to match the
         // argument, even if the argument type is not assignable to the expected parameter
@@ -3327,10 +3321,10 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             return false;
         };
 
-        if !self.signature.parameters()[*parameter_index]
-            .annotated_type()
-            .is_some_and(|ty| matches!(ty, Type::TypeVar(typevar) if typevar.is_paramspec(self.db)))
-        {
+        if !matches!(
+            self.signature.parameters()[*parameter_index].annotated_type(),
+            Type::TypeVar(typevar) if typevar.is_paramspec(self.db)
+        ) {
             return false;
         }
 

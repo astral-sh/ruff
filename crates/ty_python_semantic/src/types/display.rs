@@ -1896,17 +1896,16 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
     fn fmt_detailed(&self, f: &mut TypeWriter<'_, '_, 'db>) -> fmt::Result {
         if let Some(name) = self.param.display_name() {
             f.write_str(&name)?;
-            if let Some(annotated_type) = self.param.annotated_type() {
-                if self.param.should_annotation_be_displayed() {
-                    f.write_str(": ")?;
-                    annotated_type
-                        .display_with(self.db, self.settings.clone())
-                        .fmt_detailed(f)?;
-                }
+            let annotated_type = self.param.annotated_type();
+            if self.param.should_annotation_be_displayed() {
+                f.write_str(": ")?;
+                annotated_type
+                    .display_with(self.db, self.settings.clone())
+                    .fmt_detailed(f)?;
             }
             // Default value can only be specified if `name` is given.
             if let Some(default_type) = self.param.default_type() {
-                if self.param.annotated_type().is_some() {
+                if self.param.should_annotation_be_displayed() {
                     f.write_str(" = ")?;
                 } else {
                     f.write_str("=")?;
@@ -1939,10 +1938,13 @@ impl<'db> FmtDetailed<'db> for DisplayParameter<'_, 'db> {
                     _ => f.write_str("...")?,
                 }
             }
-        } else if let Some(ty) = self.param.annotated_type() {
+        } else {
             // This case is specifically for the `Callable` signature where name and default value
-            // cannot be provided.
-            ty.display_with(self.db, self.settings.clone())
+            // cannot be provided. For unnamed parameters we always display the type, to ensure we
+            // have something visible in the parameter slot.
+            self.param
+                .annotated_type()
+                .display_with(self.db, self.settings.clone())
                 .fmt_detailed(f)?;
         }
         Ok(())

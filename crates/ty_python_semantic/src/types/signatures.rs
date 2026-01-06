@@ -612,9 +612,7 @@ pub(super) fn walk_signature<'db, V: super::visitor::TypeVisitor<'db> + ?Sized>(
     // By default we usually don't visit the type of the default value,
     // as it isn't relevant to most things
     for parameter in &signature.parameters {
-        if let Some(ty) = parameter.annotated_type() {
-            visitor.visit_type(db, ty);
-        }
+        visitor.visit_type(db, parameter.annotated_type());
     }
     visitor.visit_type(db, signature.return_ty);
 }
@@ -811,9 +809,12 @@ impl<'db> Signature<'db> {
         visitor: &FindLegacyTypeVarsVisitor<'db>,
     ) {
         for param in &self.parameters {
-            if let Some(ty) = param.annotated_type() {
-                ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
-            }
+            param.annotated_type().find_legacy_typevars_impl(
+                db,
+                binding_context,
+                typevars,
+                visitor,
+            );
             if let Some(ty) = param.default_type() {
                 ty.find_legacy_typevars_impl(db, binding_context, typevars, visitor);
             }
@@ -839,11 +840,11 @@ impl<'db> Signature<'db> {
     ) {
         if let Some(first_parameter) = self.parameters.value.first_mut()
             && first_parameter.is_positional()
-            && first_parameter.annotated_type.is_none()
+            && first_parameter.annotated_type.is_unknown()
+            && first_parameter.inferred_annotation
             && let Some(self_type) = self_type()
         {
-            first_parameter.annotated_type = Some(self_type);
-            first_parameter.inferred_annotation = true;
+            first_parameter.annotated_type = self_type;
 
             // If we've added an implicit `self` annotation, we might need to update the
             // signature's generic context, too. (The generic context should include any synthetic
@@ -1001,29 +1002,18 @@ impl<'db> Signature<'db> {
             return ConstraintSet::from(false);
         }
 
-        // Check return type first, before creating check_optional_types closure
-        if result
-            .intersect(
-                db,
-                self.return_ty
-                    .is_equivalent_to_impl(db, other.return_ty, inferable, visitor),
-            )
-            .is_never_satisfied(db)
-        {
+        let mut check_types = |self_type: Type<'db>, other_type: Type<'db>| {
+            !result
+                .intersect(
+                    db,
+                    self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
+                )
+                .is_never_satisfied(db)
+        };
+
+        if !check_types(self.return_ty, other.return_ty) {
             return result;
         }
-
-        let mut check_optional_types =
-            |self_type: Option<Type<'db>>, other_type: Option<Type<'db>>| {
-                let self_type = self_type.unwrap_or(Type::unknown());
-                let other_type = other_type.unwrap_or(Type::unknown());
-                !result
-                    .intersect(
-                        db,
-                        self_type.is_equivalent_to_impl(db, other_type, inferable, visitor),
-                    )
-                    .is_never_satisfied(db)
-            };
 
         for (self_parameter, other_parameter) in self.parameters.iter().zip(&other.parameters) {
             match (self_parameter.kind(), other_parameter.kind()) {
@@ -1069,7 +1059,7 @@ impl<'db> Signature<'db> {
                 _ => return ConstraintSet::from(false),
             }
 
-            if !check_optional_types(
+            if !check_types(
                 self_parameter.annotated_type(),
                 other_parameter.annotated_type(),
             ) {
@@ -1250,27 +1240,7 @@ impl<'db> Signature<'db> {
 
         let mut result = ConstraintSet::from(true);
 
-        // Return types are covariant. Check first, before creating check_optional_types closure.
-        if result
-            .intersect(
-                db,
-                self.return_ty.has_relation_to_impl(
-                    db,
-                    other.return_ty,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                ),
-            )
-            .is_never_satisfied(db)
-        {
-            return result;
-        }
-
-        let mut check_optional_types = |type1: Option<Type<'db>>, type2: Option<Type<'db>>| {
-            let type1 = type1.unwrap_or(Type::unknown());
-            let type2 = type2.unwrap_or(Type::unknown());
+        let mut check_types = |type1: Type<'db>, type2: Type<'db>| {
             match (type1, type2) {
                 // This is a special case where the _same_ components of two different `ParamSpec`
                 // type variables are assignable to each other when they're both in an inferable
@@ -1308,17 +1278,22 @@ impl<'db> Signature<'db> {
                 .is_never_satisfied(db)
         };
 
+        // Return types are covariant.
+        if !check_types(self.return_ty, other.return_ty) {
+            return result;
+        }
+
         // A gradual parameter list is a supertype of the "bottom" parameter list (*args: object,
         // **kwargs: object).
         if other.parameters.is_gradual()
             && self
                 .parameters
                 .variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object()))
+                .is_some_and(|(_, param)| param.annotated_type().is_object())
             && self
                 .parameters
                 .keyword_variadic()
-                .is_some_and(|(_, param)| param.annotated_type().is_some_and(|ty| ty.is_object()))
+                .is_some_and(|(_, param)| param.annotated_type().is_object())
         {
             return ConstraintSet::from(true);
         }
@@ -1472,7 +1447,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return ConstraintSet::from(false);
                             }
-                            if !check_optional_types(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1497,7 +1472,7 @@ impl<'db> Signature<'db> {
                             if self_default.is_none() && other_default.is_some() {
                                 return ConstraintSet::from(false);
                             }
-                            if !check_optional_types(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1510,7 +1485,7 @@ impl<'db> Signature<'db> {
                             ParameterKind::PositionalOnly { .. }
                             | ParameterKind::PositionalOrKeyword { .. },
                         ) => {
-                            if !check_optional_types(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1550,7 +1525,7 @@ impl<'db> Signature<'db> {
                                         break;
                                     }
                                 }
-                                if !check_optional_types(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -1561,7 +1536,7 @@ impl<'db> Signature<'db> {
                         }
 
                         (ParameterKind::Variadic { .. }, ParameterKind::Variadic { .. }) => {
-                            if !check_optional_types(
+                            if !check_types(
                                 other_parameter.annotated_type(),
                                 self_parameter.annotated_type(),
                             ) {
@@ -1595,10 +1570,9 @@ impl<'db> Signature<'db> {
 
         // Type of the variadic keyword parameter in `self`.
         //
-        // This is a nested option where the outer option represents the presence of a keyword
-        // variadic parameter in `self` and the inner option represents the annotated type of the
-        // keyword variadic parameter.
-        let mut self_keyword_variadic: Option<Option<Type<'db>>> = None;
+        // This is an option representing the presence (and annotated type) of a keyword variadic
+        // parameter in `self`.
+        let mut self_keyword_variadic: Option<Type<'db>> = None;
 
         for self_parameter in self_parameters {
             match self_parameter.kind() {
@@ -1643,7 +1617,7 @@ impl<'db> Signature<'db> {
                                 if self_default.is_none() && other_default.is_some() {
                                     return ConstraintSet::from(false);
                                 }
-                                if !check_optional_types(
+                                if !check_types(
                                     other_parameter.annotated_type(),
                                     self_parameter.annotated_type(),
                                 ) {
@@ -1655,7 +1629,7 @@ impl<'db> Signature<'db> {
                             ),
                         }
                     } else if let Some(self_keyword_variadic_type) = self_keyword_variadic {
-                        if !check_optional_types(
+                        if !check_types(
                             other_parameter.annotated_type(),
                             self_keyword_variadic_type,
                         ) {
@@ -1671,10 +1645,7 @@ impl<'db> Signature<'db> {
                         // parameter, `self` must also have a keyword variadic parameter.
                         return ConstraintSet::from(false);
                     };
-                    if !check_optional_types(
-                        other_parameter.annotated_type(),
-                        self_keyword_variadic_type,
-                    ) {
+                    if !check_types(other_parameter.annotated_type(), self_keyword_variadic_type) {
                         return result;
                     }
                 }
@@ -1713,10 +1684,13 @@ impl<'db> VarianceInferable<'db> for &Signature<'db> {
                 .iter()
                 .filter_map(|parameter| match parameter.form {
                     ParameterForm::Type => None,
-                    ParameterForm::Value => parameter.annotated_type().map(|ty| {
-                        ty.with_polarity(TypeVarVariance::Contravariant)
-                            .variance_of(db, typevar)
-                    }),
+                    ParameterForm::Value => {
+                        let ty = parameter.annotated_type();
+                        Some(
+                            ty.with_polarity(TypeVarVariance::Contravariant)
+                                .variance_of(db, typevar),
+                        )
+                    }
                 }),
             Some(self.return_ty.variance_of(db, typevar)),
         )
@@ -1786,10 +1760,10 @@ impl<'db> Parameters<'db> {
                 && p2.is_keyword_variadic()
             {
                 match (p1.annotated_type(), p2.annotated_type()) {
-                    (None | Some(Type::Dynamic(_)), None | Some(Type::Dynamic(_))) => {
+                    (Type::Dynamic(_), Type::Dynamic(_)) => {
                         kind = ParametersKind::Gradual;
                     }
-                    (Some(Type::TypeVar(args_typevar)), Some(Type::TypeVar(kwargs_typevar))) => {
+                    (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) => {
                         if let (Some(ParamSpecAttrKind::Args), Some(ParamSpecAttrKind::Kwargs)) = (
                             args_typevar.paramspec_attr(db),
                             kwargs_typevar.paramspec_attr(db),
@@ -1951,7 +1925,7 @@ impl<'db> Parameters<'db> {
         }
 
         let (Type::TypeVar(args_typevar), Type::TypeVar(kwargs_typevar)) =
-            (maybe_args.annotated_type()?, maybe_kwargs.annotated_type()?)
+            (maybe_args.annotated_type(), maybe_kwargs.annotated_type())
         else {
             return None;
         };
@@ -2208,11 +2182,14 @@ impl<'db> std::ops::Index<usize> for Parameters<'db> {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, salsa::Update, get_size2::GetSize)]
 pub(crate) struct Parameter<'db> {
-    /// Annotated type of the parameter.
-    annotated_type: Option<Type<'db>>,
+    /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    annotated_type: Type<'db>,
 
     /// Does the type of this parameter come from an explicit annotation, or was it inferred from
-    /// the context, like `Self` for the `self` parameter of instance methods.
+    /// the context, like `Unknown` for any normal un-annotated parameter, `Self` for the `self`
+    /// parameter of instance method, or `type[Self]` for `cls` parameter of classmethods. This
+    /// field is only used to decide whether to display the annotated type; it has no effect on the
+    /// type semantics of the parameter.
     pub(crate) inferred_annotation: bool,
 
     kind: ParameterKind<'db>,
@@ -2222,8 +2199,8 @@ pub(crate) struct Parameter<'db> {
 impl<'db> Parameter<'db> {
     pub(crate) fn positional_only(name: Option<Name>) -> Self {
         Self {
-            annotated_type: None,
-            inferred_annotation: false,
+            annotated_type: Type::unknown(),
+            inferred_annotation: true,
             kind: ParameterKind::PositionalOnly {
                 name,
                 default_type: None,
@@ -2234,8 +2211,8 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn positional_or_keyword(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            inferred_annotation: false,
+            annotated_type: Type::unknown(),
+            inferred_annotation: true,
             kind: ParameterKind::PositionalOrKeyword {
                 name,
                 default_type: None,
@@ -2246,8 +2223,8 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn variadic(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            inferred_annotation: false,
+            annotated_type: Type::unknown(),
+            inferred_annotation: true,
             kind: ParameterKind::Variadic { name },
             form: ParameterForm::Value,
         }
@@ -2255,8 +2232,8 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn keyword_only(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            inferred_annotation: false,
+            annotated_type: Type::unknown(),
+            inferred_annotation: true,
             kind: ParameterKind::KeywordOnly {
                 name,
                 default_type: None,
@@ -2267,15 +2244,18 @@ impl<'db> Parameter<'db> {
 
     pub(crate) fn keyword_variadic(name: Name) -> Self {
         Self {
-            annotated_type: None,
-            inferred_annotation: false,
+            annotated_type: Type::unknown(),
+            inferred_annotation: true,
             kind: ParameterKind::KeywordVariadic { name },
             form: ParameterForm::Value,
         }
     }
 
+    /// Set the annotated type for this parameter. This also marks the annotation as explicit
+    /// (not inferred), so it will be displayed.
     pub(crate) fn with_annotated_type(mut self, annotated_type: Type<'db>) -> Self {
-        self.annotated_type = Some(annotated_type);
+        self.annotated_type = annotated_type;
+        self.inferred_annotation = false;
         self
     }
 
@@ -2304,9 +2284,12 @@ impl<'db> Parameter<'db> {
         visitor: &ApplyTypeMappingVisitor<'db>,
     ) -> Self {
         Self {
-            annotated_type: self
-                .annotated_type
-                .map(|ty| ty.apply_type_mapping_impl(db, type_mapping, tcx, visitor)),
+            annotated_type: self.annotated_type.apply_type_mapping_impl(
+                db,
+                type_mapping,
+                tcx,
+                visitor,
+            ),
             kind: self
                 .kind
                 .apply_type_mapping_impl(db, type_mapping, tcx, visitor),
@@ -2316,7 +2299,7 @@ impl<'db> Parameter<'db> {
     }
 
     /// Strip information from the parameter so that two equivalent parameters compare equal.
-    /// Normalize nested unions and intersections in the annotated type, if any.
+    /// Normalize nested unions and intersections in the annotated type.
     ///
     /// See [`Type::normalized`] for more details.
     pub(crate) fn normalized_impl(
@@ -2326,18 +2309,14 @@ impl<'db> Parameter<'db> {
     ) -> Self {
         let Parameter {
             annotated_type,
-            inferred_annotation,
             kind,
             form,
+            ..
         } = self;
 
-        // Ensure unions and intersections are ordered in the annotated type (if there is one).
-        // Ensure that a parameter without an annotation is treated equivalently to a parameter
-        // with a dynamic type as its annotation. (We must use `Any` here as all dynamic types
-        // normalize to `Any`.)
-        let annotated_type = annotated_type
-            .map(|ty| ty.normalized_impl(db, visitor))
-            .unwrap_or_else(Type::any);
+        // Ensure unions and intersections are ordered in the annotated type.
+        // Unknown normalizes to Any.
+        let annotated_type = annotated_type.normalized_impl(db, visitor);
 
         // Ensure that parameter names are stripped from positional-only, variadic and keyword-variadic parameters.
         // Ensure that we only record whether a parameter *has* a default
@@ -2369,8 +2348,10 @@ impl<'db> Parameter<'db> {
         };
 
         Self {
-            annotated_type: Some(annotated_type),
-            inferred_annotation: *inferred_annotation,
+            annotated_type,
+            // Normalize `inferred_annotation` to `false` since it's a display-only field
+            // that doesn't affect type semantics.
+            inferred_annotation: false,
             kind,
             form: *form,
         }
@@ -2389,13 +2370,12 @@ impl<'db> Parameter<'db> {
             form,
         } = self;
 
-        let annotated_type = match annotated_type {
-            Some(ty) if nested => Some(ty.recursive_type_normalized_impl(db, div, true)?),
-            Some(ty) => Some(
-                ty.recursive_type_normalized_impl(db, div, true)
-                    .unwrap_or(div),
-            ),
-            None => None,
+        let annotated_type = if nested {
+            annotated_type.recursive_type_normalized_impl(db, div, true)?
+        } else {
+            annotated_type
+                .recursive_type_normalized_impl(db, div, true)
+                .unwrap_or(div)
         };
 
         let kind = match kind {
@@ -2456,13 +2436,20 @@ impl<'db> Parameter<'db> {
         parameter: &ast::Parameter,
         kind: ParameterKind<'db>,
     ) -> Self {
+        let (annotated_type, inferred_annotation) = if let Some(annotation) = parameter.annotation()
+        {
+            (
+                function_signature_expression_type(db, definition, annotation),
+                false,
+            )
+        } else {
+            (Type::unknown(), true)
+        };
         Self {
-            annotated_type: parameter
-                .annotation()
-                .map(|annotation| function_signature_expression_type(db, definition, annotation)),
+            annotated_type,
             kind,
             form: ParameterForm::Value,
-            inferred_annotation: false,
+            inferred_annotation,
         }
     }
 
@@ -2507,8 +2494,8 @@ impl<'db> Parameter<'db> {
         }
     }
 
-    /// Annotated type of the parameter, if annotated.
-    pub(crate) fn annotated_type(&self) -> Option<Type<'db>> {
+    /// Annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    pub(crate) fn annotated_type(&self) -> Type<'db> {
         self.annotated_type
     }
 
@@ -2756,7 +2743,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution not deferred; we should see A not B
-        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A");
+        assert_eq!(annotated_type.display(&db).to_string(), "A");
     }
 
     #[test]
@@ -2794,7 +2781,7 @@ mod tests {
         };
         assert_eq!(name, "a");
         // Parameter resolution deferred:
-        assert_eq!(annotated_type.unwrap().display(&db).to_string(), "A | B");
+        assert_eq!(annotated_type.display(&db).to_string(), "A | B");
     }
 
     #[test]
@@ -2837,8 +2824,8 @@ mod tests {
         };
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
-        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A");
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
+        assert_eq!(a_annotated_ty.display(&db).to_string(), "A");
+        assert_eq!(b_annotated_ty.display(&db).to_string(), "T@f");
     }
 
     #[test]
@@ -2882,8 +2869,8 @@ mod tests {
         assert_eq!(a_name, "a");
         assert_eq!(b_name, "b");
         // Parameter resolution deferred:
-        assert_eq!(a_annotated_ty.unwrap().display(&db).to_string(), "A | B");
-        assert_eq!(b_annotated_ty.unwrap().display(&db).to_string(), "T@f");
+        assert_eq!(a_annotated_ty.display(&db).to_string(), "A | B");
+        assert_eq!(b_annotated_ty.display(&db).to_string(), "T@f");
     }
 
     #[test]

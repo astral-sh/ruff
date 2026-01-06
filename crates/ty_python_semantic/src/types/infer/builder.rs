@@ -7485,7 +7485,7 @@ impl<'db, 'ast> TypeInferenceBuilder<'db, 'ast> {
                 };
 
                 let mut parameter_type =
-                    overload.signature.parameters()[*parameter_index].annotated_type()?;
+                    overload.signature.parameters()[*parameter_index].annotated_type();
 
                 // If this is a generic call, attempt to specialize the parameter type using the
                 // declared type context, if provided.

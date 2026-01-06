@@ -34,8 +34,8 @@ pub struct ParameterDetails<'db> {
     pub name: String,
     /// The parameter label in the signature (e.g., "param1: str")
     pub label: String,
-    /// The annotated type of the parameter, if any
-    pub ty: Option<Type<'db>>,
+    /// The annotated type of the parameter. If no annotation was provided, this is `Unknown`.
+    pub ty: Type<'db>,
     /// Documentation specific to the parameter, typically extracted from the
     /// function's docstring
     pub documentation: Option<String>,
@@ -237,7 +237,7 @@ fn create_parameters_from_offsets<'db>(
     docstring: Option<&Docstring>,
     parameter_names: &[String],
     parameter_kinds: &[ParameterKind],
-    parameter_types: &[Option<Type<'db>>],
+    parameter_types: &[Type<'db>],
 ) -> Vec<ParameterDetails<'db>> {
     // Extract parameter documentation from the function's docstring if available.
     let param_docs = if let Some(docstring) = docstring {
@@ -264,7 +264,7 @@ fn create_parameters_from_offsets<'db>(
                 parameter_kinds.get(i),
                 Some(ParameterKind::PositionalOnly { .. })
             );
-            let ty = parameter_types.get(i).copied().flatten();
+            let ty = parameter_types.get(i).copied().unwrap_or(Type::unknown());
 
             ParameterDetails {
                 name: param_name.to_string(),

@@ -1268,7 +1268,8 @@ impl<'db> ClassType<'db> {
                         .parameters()
                         .get_positional(0)
                         .filter(|parameter| !parameter.inferred_annotation)
-                        .and_then(Parameter::annotated_type)
+                        .map(Parameter::annotated_type)
+                        .filter(|ty| !ty.is_unknown())
                         .filter(|ty| {
                             ty.as_typevar()
                                 .is_none_or(|bound_typevar| !bound_typevar.typevar(db).is_self(db))
@@ -2542,9 +2543,7 @@ impl<'db> ClassLiteral<'db> {
                                 if let Some(value_param) =
                                     overload.signature.parameters().get_positional(2)
                                 {
-                                    value_types = value_types.add(
-                                        value_param.annotated_type().unwrap_or_else(Type::unknown),
-                                    );
+                                    value_types = value_types.add(value_param.annotated_type());
                                 } else if overload.signature.parameters().is_gradual() {
                                     value_types = value_types.add(Type::unknown());
                                 }

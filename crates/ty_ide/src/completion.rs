@@ -1186,7 +1186,7 @@ fn add_function_arg_completions<'db>(
             }
             completions.add(Completion::argument(
                 &p.name,
-                p.ty,
+                Some(p.ty),
                 p.documentation.as_deref(),
             ));
         }
