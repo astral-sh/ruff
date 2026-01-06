@@ -3733,6 +3733,11 @@ impl<'db> BoundTypeVarInstance<'db> {
     /// when this typevar is in inferable position, where we only need _some_ specialization to
     /// satisfy the constraint set.
     fn valid_specializations(self, db: &'db dyn Db) -> Node<'db> {
+        if self.paramspec_attr(db).is_some() {
+            // P.args and P.kwargs are variadic, and do not have an upper bound or constraints.
+            return Node::AlwaysTrue;
+        }
+
         // For gradual upper bounds and constraints, we are free to choose any materialization that
         // makes the check succeed. In inferable positions, it is most helpful to choose a
         // materialization that is as permissive as possible, since that maximizes the number of
