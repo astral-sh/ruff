@@ -2274,6 +2274,7 @@ static_assert(is_subtype_of(Literal["ab"], Sequence[Literal["a", "b", "c"]]))  #
 # String literals are NOT subtypes when they contain chars outside the allowed set
 static_assert(not is_subtype_of(Literal["abc"], Sequence[Literal["a", "b"]]))  # 'c' not allowed
 static_assert(not is_subtype_of(Literal["x"], Sequence[Literal["a", "b"]]))  # 'x' not allowed
+static_assert(not is_subtype_of(Literal["aa"], Sequence[Literal[""]]))
 ```
 
 [gradual form]: https://typing.python.org/en/latest/spec/glossary.html#term-gradual-form

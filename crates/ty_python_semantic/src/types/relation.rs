@@ -973,22 +973,27 @@ impl<'db> Type<'db> {
             (Type::StringLiteral(value), _) => {
                 let chars: FxHashSet<char> = value.value(db).chars().collect();
 
-                let spec = if chars.len() == 1 {
-                    Type::StringLiteral(StringLiteralType::new(
+                let spec = match chars.len() {
+                    0 => Type::Never,
+                    1 => Type::StringLiteral(StringLiteralType::new(
                         db,
                         chars.iter().next().unwrap().to_compact_string(),
-                    ))
-                } else {
-                    // Optimisation: since we know this union will only include string-literal types,
-                    // avoid eagerly creating string-literal types when unnecessary, and avoid going
-                    // via the union-builder.
-                    let union_elements: Box<[Type<'db>]> = chars
-                        .iter()
-                        .map(|c| {
-                            Type::StringLiteral(StringLiteralType::new(db, c.to_compact_string()))
-                        })
-                        .collect();
-                    Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    )),
+                    _ => {
+                        // Optimisation: since we know this union will only include string-literal types,
+                        // avoid eagerly creating string-literal types when unnecessary, and avoid going
+                        // via the union-builder.
+                        let union_elements: Box<[Type<'db>]> = chars
+                            .iter()
+                            .map(|c| {
+                                Type::StringLiteral(StringLiteralType::new(
+                                    db,
+                                    c.to_compact_string(),
+                                ))
+                            })
+                            .collect();
+                        Type::Union(UnionType::new(db, union_elements, RecursivelyDefined::No))
+                    }
                 };
 
                 KnownClass::Sequence
