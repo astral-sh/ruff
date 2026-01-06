@@ -965,14 +965,16 @@ impl<'db> Type<'db> {
             // A string literal `Literal["abc"]` is a subtype of `str` *and* of
             // `Sequence[Literal["a", "b", "c"]]` because strings are sequences of their characters.
             (Type::StringLiteral(value), _) => {
-                let str_result = KnownClass::Str.to_instance(db).has_relation_to_impl(
-                    db,
-                    target,
-                    inferable,
-                    relation,
-                    relation_visitor,
-                    disjointness_visitor,
-                );
+                let str_result = KnownClass::Str
+                    .to_instance(db)
+                    .has_relation_to_impl(
+                        db,
+                        target,
+                        inferable,
+                        relation,
+                        relation_visitor,
+                        disjointness_visitor,
+                    );
 
                 // Optimization: only try the Sequence fallback if target could possibly
                 // be satisfied by Sequence[Literal[chars]]. This avoids expensive union
