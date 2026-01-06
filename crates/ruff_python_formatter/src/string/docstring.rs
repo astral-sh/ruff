@@ -165,7 +165,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     offset += first.text_len();
 
     // Check if we have a single line (or empty) docstring
-    if docstring[first.len()..].trim().is_empty() {
+    if docstring[first.len()..].chars().all(char::is_whitespace) {
         // For `"""\n"""` or other whitespace between the quotes, black keeps a single whitespace,
         // but `""""""` doesn't get one inserted.
         if needs_chaperone_space(normalized.flags(), trim_end, f.context())
@@ -188,7 +188,7 @@ pub(crate) fn format(normalized: &NormalizedString, f: &mut PyFormatter) -> Form
     let stripped_indentation = lines
         .clone()
         // We don't want to count whitespace-only lines as miss-indented
-        .filter(|line| !line.trim().is_empty())
+        .filter(|line| !line.chars().all(char::is_whitespace))
         .map(Indentation::from_str)
         .min_by_key(|indentation| indentation.columns())
         .unwrap_or_default();
@@ -1101,7 +1101,7 @@ impl<'src> CodeExampleRst<'src> {
             return &[];
         };
         for line in &mut self.lines {
-            line.code = if line.original.line.trim().is_empty() {
+            line.code = if line.original.line.chars().all(char::is_whitespace) {
                 ""
             } else {
                 min_indent.trim_start_str(line.original.line)
@@ -1396,7 +1396,7 @@ impl<'src> CodeExampleMarkdown<'src> {
         // docstring itself, then this causes the entire docstring to have
         // its indent normalized. And, at the time of writing, a subsequent
         // formatting run undoes this indentation, thus violating idempotency.
-        if !original.line.trim_whitespace().is_empty()
+        if !original.line.chars().all(is_python_whitespace)
             && Indentation::from_str(original.line) < self.opening_fence_indent
         {
             queue.push_back(self.into_reset_action());

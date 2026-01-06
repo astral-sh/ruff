@@ -2,7 +2,7 @@
 
 /// Extract the leading words from a line of text within a Python docstring.
 pub fn leading_words(line: &str) -> &str {
-    let line = line.trim();
+    let line = line.trim_start();
     line.find(|char: char| !char.is_alphanumeric() && !char.is_whitespace())
         .map_or(line, |index| &line[..index])
 }
