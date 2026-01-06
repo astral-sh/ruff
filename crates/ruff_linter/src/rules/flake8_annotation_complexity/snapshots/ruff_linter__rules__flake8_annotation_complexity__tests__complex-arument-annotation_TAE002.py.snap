@@ -1,0 +1,12 @@
+---
+source: crates/ruff_linter/src/rules/flake8_annotation_complexity/mod.rs
+---
+TAE002 Type annotation for argument `d` is too complex (4 > 3)
+  --> TAE002.py:14:39
+   |
+12 | # Error
+13 | def complex_argument(
+14 |     a: list[dict[str, list[int]]], d: Annotated[dict[str, list[list[int]]], "yes"]
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+15 | ) -> list[int]: ...
+   |
