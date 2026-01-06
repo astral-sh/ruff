@@ -685,7 +685,7 @@ mod tests {
     use insta::assert_debug_snapshot;
     use itertools::Itertools;
     use ruff_python_parser::{Mode, ParseOptions, parse};
-    use ruff_text_size::{TextRange, TextSize};
+    use ruff_text_size::{TextLen, TextRange, TextSize};
     use similar::DiffableStr;
 
     use crate::{
@@ -1544,10 +1544,8 @@ def bar():
     #[test]
     fn comment_attributes() {
         let source = "# ruff: disable[foo, bar] hello world";
-        let mut parser = SuppressionParser::new(
-            source,
-            TextRange::new(0.into(), TextSize::try_from(source.len()).unwrap()),
-        );
+        let mut parser =
+            SuppressionParser::new(source, TextRange::new(0.into(), source.text_len()));
         let comment = parser.parse_comment().unwrap();
         assert_eq!(comment.action, SuppressionAction::Disable);
         assert_eq!(
@@ -1566,10 +1564,7 @@ def bar():
         source: &'_ str,
     ) -> Result<DebugSuppressionComment<'_>, ParseError> {
         let offset = TextSize::new(source.find('#').unwrap_or(0).try_into().unwrap());
-        let mut parser = SuppressionParser::new(
-            source,
-            TextRange::new(offset, TextSize::try_from(source.len()).unwrap()),
-        );
+        let mut parser = SuppressionParser::new(source, TextRange::new(offset, source.text_len()));
         match parser.parse_comment() {
             Ok(comment) => Ok(DebugSuppressionComment {
                 source,
