@@ -11,6 +11,7 @@
 //! `ty_python_semantic::types::call::bind`.
 
 use std::borrow::Cow;
+use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::fmt;
 
@@ -41,6 +42,8 @@ use crate::types::generics::{
 };
 use crate::types::signatures::{Parameter, ParameterForm, ParameterKind, Parameters};
 use crate::types::tuple::{TupleLength, TupleSpec, TupleType};
+use crate::types::type_ordering::type_ordering;
+use crate::types::visitor::any_over_type;
 use crate::types::{
     BoundMethodType, BoundTypeVarIdentity, BoundTypeVarInstance, CallableSignature, CallableType,
     CallableTypeKind, ClassLiteral, DATACLASS_FLAGS, DataclassFlags, DataclassParams,
@@ -2945,6 +2948,9 @@ struct ArgumentTypeChecker<'a, 'db> {
 }
 
 impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
+    // Keep the union-arm retry bounded; call inference is hot and each arm re-runs inference.
+    const MAX_UNION_CONTEXT_ARMS: usize = 16;
+
     #[expect(clippy::too_many_arguments)]
     fn new(
         db: &'db dyn Db,
@@ -3138,36 +3144,144 @@ impl<'a, 'db> ArgumentTypeChecker<'a, 'db> {
             .return_ty
             .apply_specialization(self.db, isolated_specialization);
 
-        let mut try_infer_tcx = || {
-            let (return_ty, call_expression_tcx) = return_with_tcx?;
+        let inferred_from_context = if let Some((declared_return_ty, call_expression_tcx)) =
+            return_with_tcx
+        {
+            let context_return_ty =
+                declared_return_ty.apply_specialization(self.db, isolated_specialization);
+            let normalized_expected_ty = if call_expression_tcx.is_union() {
+                Some(call_expression_tcx.normalized(self.db))
+            } else {
+                None
+            };
+            let has_inferable_typevar = |ty: Type<'db>| {
+                any_over_type(
+                    self.db,
+                    ty,
+                    &|ty| match ty {
+                        Type::TypeVar(bound_typevar) => {
+                            bound_typevar.is_inferable(self.db, self.inferable_typevars)
+                        }
+                        _ => false,
+                    },
+                    false,
+                )
+            };
 
-            // A type variable is not a useful type-context for expression inference, and applying it
-            // to the return type can lead to confusing unions in nested generic calls.
-            if call_expression_tcx.is_type_var() {
-                return None;
+            let infer_from_context =
+                |expected_ty: Type<'db>,
+                 guard_return_ty: Type<'db>,
+                 builder: &mut SpecializationBuilder<'db>| {
+                    // A type variable is not a useful type-context for expression inference, and applying it
+                    // to the return type can lead to confusing unions in nested generic calls.
+                    if expected_ty.is_type_var() {
+                        return None;
+                    }
+
+                    // If the return type is already assignable to the annotated type, we ignore the rest of
+                    // the type context and prefer the narrower inferred type.
+                    if guard_return_ty.is_assignable_to(self.db, expected_ty) {
+                        return None;
+                    }
+
+                    // TODO: Ideally we would infer the annotated type _before_ the arguments if this call is part of an
+                    // annotated assignment, to closer match the order of any unions written in the type annotation.
+                    builder.infer(declared_return_ty, expected_ty).ok()?;
+
+                    // Otherwise, build the specialization again after inferring the complete type context.
+                    let specialization = builder
+                        .mapped(generic_context, maybe_promote)
+                        .build(generic_context);
+                    let inferred_return_ty =
+                        declared_return_ty.apply_specialization(self.db, specialization);
+
+                    Some((specialization, inferred_return_ty))
+                };
+
+            // If the expected type is a small union, try each arm as a separate context.
+            if let Some(Type::Union(union)) = normalized_expected_ty
+                && union.elements(self.db).len() <= Self::MAX_UNION_CONTEXT_ARMS
+                && has_inferable_typevar(declared_return_ty)
+                && !context_return_ty.is_assignable_to(self.db, call_expression_tcx)
+            {
+                struct UnionCandidate<'db> {
+                    specialization: Specialization<'db>,
+                    return_ty: Type<'db>,
+                }
+
+                let has_dynamic = |ty: Type<'db>| {
+                    any_over_type(self.db, ty, &|ty| matches!(ty, Type::Dynamic(_)), false)
+                };
+
+                let compare_candidates =
+                    |left: &UnionCandidate<'db>, right: &UnionCandidate<'db>| {
+                        let left_has_inferable = has_inferable_typevar(left.return_ty);
+                        let right_has_inferable = has_inferable_typevar(right.return_ty);
+                        if left_has_inferable != right_has_inferable {
+                            return left_has_inferable.cmp(&right_has_inferable);
+                        }
+
+                        let left_has_dynamic = has_dynamic(left.return_ty);
+                        let right_has_dynamic = has_dynamic(right.return_ty);
+                        if left_has_dynamic != right_has_dynamic {
+                            return left_has_dynamic.cmp(&right_has_dynamic);
+                        }
+
+                        let left_sub_right = left.return_ty.is_subtype_of(self.db, right.return_ty);
+                        let right_sub_left = right.return_ty.is_subtype_of(self.db, left.return_ty);
+                        if left_sub_right != right_sub_left {
+                            return if left_sub_right {
+                                Ordering::Less
+                            } else {
+                                Ordering::Greater
+                            };
+                        }
+
+                        type_ordering(self.db, left.return_ty, right.return_ty)
+                    };
+
+                let mut candidates = Vec::new();
+                for &arm in union.elements(self.db) {
+                    let mut arm_builder = builder.clone();
+                    let Some((specialization, inferred_return_ty)) =
+                        infer_from_context(arm, context_return_ty, &mut arm_builder)
+                    else {
+                        continue;
+                    };
+
+                    if inferred_return_ty.is_assignable_to(self.db, arm) {
+                        candidates.push(UnionCandidate {
+                            specialization,
+                            return_ty: inferred_return_ty,
+                        });
+                    }
+                }
+
+                if !candidates.is_empty() {
+                    candidates.sort_by(compare_candidates);
+                    let best = candidates.remove(0);
+                    self.specialization = Some(best.specialization);
+                    self.return_ty = best.return_ty;
+                    return;
+                }
             }
 
-            // If the return type is already assignable to the annotated type, we ignore the rest of
-            // the type context and prefer the narrower inferred type.
-            if isolated_return_ty.is_assignable_to(self.db, call_expression_tcx) {
-                return None;
-            }
+            // Constructor calls can override the declared return type, so guard with the
+            // constructor-specialized return; otherwise keep the narrower inferred return.
+            let guard_return_ty = if self.constructor_instance_type.is_some() {
+                context_return_ty
+            } else {
+                isolated_return_ty
+            };
 
-            // TODO: Ideally we would infer the annotated type _before_ the arguments if this call is part of an
-            // annotated assignment, to closer match the order of any unions written in the type annotation.
-            builder.infer(return_ty, call_expression_tcx).ok()?;
-
-            // Otherwise, build the specialization again after inferring the complete type context.
-            let specialization = builder
-                .mapped(generic_context, maybe_promote)
-                .build(generic_context);
-            let return_ty = return_ty.apply_specialization(self.db, specialization);
-
-            Some((Some(specialization), return_ty))
+            infer_from_context(call_expression_tcx, guard_return_ty, &mut builder)
+                .map(|(specialization, return_ty)| (Some(specialization), return_ty))
+        } else {
+            None
         };
 
         (self.specialization, self.return_ty) =
-            try_infer_tcx().unwrap_or((Some(isolated_specialization), isolated_return_ty));
+            inferred_from_context.unwrap_or((Some(isolated_specialization), isolated_return_ty));
     }
 
     fn check_argument_type(

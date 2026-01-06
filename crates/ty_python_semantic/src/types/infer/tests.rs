@@ -6,7 +6,7 @@ use crate::semantic_index::definition::Definition;
 use crate::semantic_index::scope::FileScopeId;
 use crate::semantic_index::{global_scope, place_table, semantic_index, use_def_map};
 use crate::types::{KnownClass, KnownInstanceType, check_types};
-use ruff_db::diagnostic::Diagnostic;
+use ruff_db::diagnostic::{Diagnostic, DiagnosticId};
 use ruff_db::files::{File, system_path_to_file};
 use ruff_db::system::DbWithWritableSystem as _;
 use ruff_db::testing::{assert_function_query_was_not_run, assert_function_query_was_run};
@@ -740,6 +740,60 @@ fn call_type_doesnt_rerun_when_only_callee_changed() -> anyhow::Result<()> {
         InferExpression::Bare(foo_call),
         &events,
     );
+
+    Ok(())
+}
+
+#[test]
+fn generic_call_union_context_inference() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        def upcast(arg: int) -> int:
+            return arg
+
+        def test[X: int](items: list[X]) -> list[X]:
+            _a: list[int] = list(items)
+            _b: list[int] = [*items]
+            _c: list[int] = [x for x in items]
+
+            _1: list[str] | list[int] = list(items)
+            _2: list[int] | list[str] = list(items)
+            _3: list[str] | list[int] = [*items]
+            _4: list[int] | list[str] = [*items]
+            _5: list[str] | list[int] = [x for x in items]
+            _6: list[int] | list[str] = [x for x in items]
+            _7: list[str] | list[int] = [upcast(x) for x in items]
+            _8: list[int] | list[str] = [upcast(x) for x in items]
+            return items
+        "#,
+    )?;
+
+    assert_file_diagnostics(&db, "src/a.py", &[]);
+
+    Ok(())
+}
+
+#[test]
+fn generic_call_union_context_inference_negative() -> anyhow::Result<()> {
+    let mut db = setup_db();
+    db.write_dedented(
+        "src/a.py",
+        r#"
+        def test[X: int](items: list[X]) -> list[X]:
+            _bad: list[str] | list[bytes] = list(items)
+            return items
+        "#,
+    )?;
+
+    let file = system_path_to_file(&db, "src/a.py").unwrap();
+    let diagnostics = check_types(&db, file);
+    assert_eq!(diagnostics.len(), 1);
+    assert!(matches!(
+        diagnostics[0].id(),
+        DiagnosticId::Lint(name) if name == "invalid-assignment"
+    ));
 
     Ok(())
 }

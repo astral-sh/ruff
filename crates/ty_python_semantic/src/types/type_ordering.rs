@@ -261,6 +261,41 @@ pub(super) fn union_or_intersection_elements_ordering<'db>(
     }
 }
 
+/// Return a total ordering for arbitrary types.
+///
+/// This is a wrapper around `union_or_intersection_elements_ordering` that also compares
+/// top-level unions by their (normalized) element lists; the element-ordering helper itself
+/// still expects non-union inputs.
+pub(super) fn type_ordering<'db>(db: &'db dyn Db, left: Type<'db>, right: Type<'db>) -> Ordering {
+    let left = left.normalized(db);
+    let right = right.normalized(db);
+
+    if left == right {
+        return Ordering::Equal;
+    }
+
+    match (left, right) {
+        (Type::Union(left_union), Type::Union(right_union)) => {
+            let left_elements = left_union.elements(db);
+            let right_elements = right_union.elements(db);
+            if left_elements.len() != right_elements.len() {
+                return left_elements.len().cmp(&right_elements.len());
+            }
+            for (left, right) in left_elements.iter().zip(right_elements) {
+                let ordering = union_or_intersection_elements_ordering(db, left, right);
+                if ordering != Ordering::Equal {
+                    return ordering;
+                }
+            }
+
+            unreachable!("Two equal, normalized unions should share the same Salsa ID")
+        }
+        (Type::Union(_), _) => Ordering::Greater,
+        (_, Type::Union(_)) => Ordering::Less,
+        _ => union_or_intersection_elements_ordering(db, &left, &right),
+    }
+}
+
 /// Determine a canonical order for two instances of [`DynamicType`].
 fn dynamic_elements_ordering(left: DynamicType, right: DynamicType) -> Ordering {
     match (left, right) {
