@@ -1106,8 +1106,8 @@ impl<'db> Type<'db> {
             // most `Literal` types delegate to their instance fallbacks
             // unless `self` is exactly equivalent to `target` (handled above)
             (
-                Type::LiteralString
-                | Type::StringLiteral(_)
+                Type::StringLiteral(_)
+                | Type::LiteralString
                 | Type::BooleanLiteral(_)
                 | Type::IntLiteral(_)
                 | Type::BytesLiteral(_)
