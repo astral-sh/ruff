@@ -1455,7 +1455,58 @@ impl<'db> Type<'db> {
 
     #[must_use]
     pub(crate) fn negate(&self, db: &'db dyn Db) -> Type<'db> {
-        IntersectionBuilder::new(db).add_negative(*self).build()
+        // Avoid invoking the `IntersectionBuilder` for negations that are trivial.
+        //
+        // We verify that this always produces the same result as
+        // `IntersectionBuilder::new(db).add_negative(*self).build()` via the
+        // property test `all_negated_types_identical_to_intersection_with_single_negated_element`
+        match self {
+            Type::Never => Type::object(),
+
+            Type::Dynamic(_) => *self,
+
+            Type::NominalInstance(instance) if instance.is_object() => Type::Never,
+
+            Type::AlwaysTruthy
+            | Type::AlwaysFalsy
+            | Type::BooleanLiteral(_)
+            | Type::KnownBoundMethod(_)
+            | Type::KnownInstance(_)
+            | Type::SpecialForm(_)
+            | Type::BoundSuper(_)
+            | Type::FunctionLiteral(_)
+            | Type::TypeIs(_)
+            | Type::TypeGuard(_)
+            | Type::TypeVar(_)
+            | Type::TypedDict(_)
+            | Type::NewTypeInstance(_)
+            | Type::NominalInstance(_)
+            | Type::ProtocolInstance(_)
+            | Type::ModuleLiteral(_)
+            | Type::ClassLiteral(_)
+            | Type::GenericAlias(_)
+            | Type::SubclassOf(_)
+            | Type::PropertyInstance(_)
+            | Type::IntLiteral(_)
+            | Type::StringLiteral(_)
+            | Type::BytesLiteral(_)
+            | Type::LiteralString
+            | Type::DataclassDecorator(_)
+            | Type::DataclassTransformer(_)
+            | Type::Callable(_)
+            | Type::WrapperDescriptor(_)
+            | Type::EnumLiteral(_)
+            | Type::TypeAlias(_)
+            | Type::BoundMethod(_) => Type::Intersection(IntersectionType::new(
+                db,
+                FxOrderSet::default(),
+                NegativeIntersectionElements::Single(*self),
+            )),
+
+            Type::Union(_) | Type::Intersection(_) => {
+                IntersectionBuilder::new(db).add_negative(*self).build()
+            }
+        }
     }
 
     #[must_use]
